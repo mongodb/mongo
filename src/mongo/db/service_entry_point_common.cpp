@@ -73,6 +73,7 @@
 #include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_donor_util.h"
+#include "mongo/db/request_execution_context.h"
 #include "mongo/db/run_op_kill_cursors.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -128,58 +129,73 @@ namespace {
 
 using namespace fmt::literals;
 
-/** Allows for the very complex handleRequest function to be decomposed into parts. */
+/*
+ * Allows for the very complex handleRequest function to be decomposed into parts.
+ * It also provides the infrastructure to futurize the process of executing commands.
+ */
 struct HandleRequest {
+    // Maintains the context (e.g., opCtx and replyBuilder) required for command execution.
+    class ExecutionContext final : public RequestExecutionContext {
+    public:
+        ExecutionContext(OperationContext* opCtx,
+                         Message msg,
+                         std::unique_ptr<const ServiceEntryPointCommon::Hooks> hooks)
+            : RequestExecutionContext(opCtx), behaviors(std::move(hooks)) {
+            // It also initializes dbMessage, which is accessible via getDbMessage()
+            setMessage(std::move(msg));
+        }
+        ~ExecutionContext() = default;
+
+        Client& client() const {
+            return *getOpCtx()->getClient();
+        }
+
+        NetworkOp op() const {
+            return getMessage().operation();
+        }
+
+        CurOp& currentOp() {
+            return *CurOp::get(getOpCtx());
+        }
+
+        NamespaceString nsString() const {
+            auto& dbmsg = getDbMessage();
+            if (!dbmsg.messageShouldHaveNs())
+                return {};
+            return NamespaceString(dbmsg.getns());
+        }
+
+        void assertValidNsString() {
+            if (!nsString().isValid()) {
+                uassert(
+                    16257, str::stream() << "Invalid ns [" << nsString().toString() << "]", false);
+            }
+        }
+
+        std::unique_ptr<const ServiceEntryPointCommon::Hooks> behaviors;
+        boost::optional<long long> slowMsOverride;
+        bool forceLog = false;
+    };
+
     struct OpRunner {
-        explicit OpRunner(HandleRequest* hr) : hr{hr} {}
+        explicit OpRunner(HandleRequest* hr) : executionContext{hr->executionContext} {}
         virtual ~OpRunner() = default;
-        virtual DbResponse run() = 0;
-        HandleRequest* hr;
+        virtual Future<DbResponse> run() = 0;
+        std::shared_ptr<ExecutionContext> executionContext;
     };
 
     HandleRequest(OperationContext* opCtx,
-                  const Message& m,
-                  const ServiceEntryPointCommon::Hooks& behaviors)
-        : opCtx{opCtx}, m{m}, behaviors{behaviors}, dbmsg{m} {}
-
-    DbResponse run();
-
-    NetworkOp op() const {
-        return m.operation();
-    }
-
-    CurOp& currentOp() {
-        return *CurOp::get(opCtx);
-    }
-
-    NamespaceString nsString() const {
-        if (!dbmsg.messageShouldHaveNs())
-            return {};
-        return NamespaceString(dbmsg.getns());
-    }
-
-    void assertValidNsString() {
-        if (!nsString().isValid()) {
-            uassert(16257, str::stream() << "Invalid ns [" << nsString().toString() << "]", false);
-        }
-    }
+                  const Message& msg,
+                  std::unique_ptr<const ServiceEntryPointCommon::Hooks> behaviors)
+        : executionContext(std::make_shared<ExecutionContext>(
+              opCtx, const_cast<Message&>(msg), std::move(behaviors))) {}
 
     std::unique_ptr<OpRunner> makeOpRunner();
-    void startOperation();
-    void completeOperation(const DbResponse& dbresponse);
 
-    Client& client() const {
-        return *opCtx->getClient();
-    }
+    Future<void> startOperation();
+    Future<void> completeOperation();
 
-    OperationContext* opCtx;
-    const Message& m;
-    const ServiceEntryPointCommon::Hooks& behaviors;
-
-    DbMessage dbmsg;
-
-    boost::optional<long long> slowMsOverride;
-    bool forceLog = false;
+    std::shared_ptr<ExecutionContext> executionContext;
 };
 
 void generateLegacyQueryErrorResponse(const AssertionException& exception,
@@ -1721,31 +1737,51 @@ DbResponse receivedGetMore(OperationContext* opCtx,
 
 struct CommandOpRunner : HandleRequest::OpRunner {
     using HandleRequest::OpRunner::OpRunner;
-    DbResponse run() override {
-        DbResponse r = receivedCommands(hr->opCtx, hr->m, hr->behaviors);
+    Future<DbResponse> run() override try {
+        DbResponse r = receivedCommands(executionContext->getOpCtx(),
+                                        executionContext->getMessage(),
+                                        *executionContext->behaviors);
         // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
-        if (auto command = hr->currentOp().getCommand();
+        if (auto command = executionContext->currentOp().getCommand();
             command && (command->getName() == "hello")) {
-            hr->slowMsOverride =
+            executionContext->slowMsOverride =
                 2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
         }
         return r;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 };
 
-struct QueryOpRunner : HandleRequest::OpRunner {
+// Allows wrapping synchronous code in futures without repeating the try-catch block.
+struct SynchronousOpRunner : HandleRequest::OpRunner {
     using HandleRequest::OpRunner::OpRunner;
-    DbResponse run() override {
-        hr->opCtx->markKillOnClientDisconnect();
-        return receivedQuery(
-            hr->opCtx, hr->nsString(), *hr->opCtx->getClient(), hr->m, hr->behaviors);
+    virtual DbResponse runSync() = 0;
+    Future<DbResponse> run() final try { return runSync(); } catch (const DBException& ex) {
+        return ex.toStatus();
     }
 };
 
-struct GetMoreOpRunner : HandleRequest::OpRunner {
-    using HandleRequest::OpRunner::OpRunner;
-    DbResponse run() override {
-        return receivedGetMore(hr->opCtx, hr->m, hr->currentOp(), &hr->forceLog);
+struct QueryOpRunner : SynchronousOpRunner {
+    using SynchronousOpRunner::SynchronousOpRunner;
+    DbResponse runSync() override {
+        auto opCtx = executionContext->getOpCtx();
+        opCtx->markKillOnClientDisconnect();
+        return receivedQuery(opCtx,
+                             executionContext->nsString(),
+                             executionContext->client(),
+                             executionContext->getMessage(),
+                             *executionContext->behaviors);
+    }
+};
+
+struct GetMoreOpRunner : SynchronousOpRunner {
+    using SynchronousOpRunner::SynchronousOpRunner;
+    DbResponse runSync() override {
+        return receivedGetMore(executionContext->getOpCtx(),
+                               executionContext->getMessage(),
+                               executionContext->currentOp(),
+                               &executionContext->forceLog);
     }
 };
 
@@ -1755,49 +1791,70 @@ struct GetMoreOpRunner : HandleRequest::OpRunner {
  * class provides a `run` that calls it and handles error reporting
  * via the `LastError` slot.
  */
-struct FireAndForgetOpRunner : HandleRequest::OpRunner {
-    using HandleRequest::OpRunner::OpRunner;
+struct FireAndForgetOpRunner : SynchronousOpRunner {
+    using SynchronousOpRunner::SynchronousOpRunner;
     virtual void runAndForget() = 0;
-    DbResponse run() final;
+    DbResponse runSync() final;
 };
 
 struct KillCursorsOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        hr->currentOp().ensureStarted();
-        hr->slowMsOverride = 10;
-        receivedKillCursors(hr->opCtx, hr->m);
+        executionContext->currentOp().ensureStarted();
+        executionContext->slowMsOverride = 10;
+        receivedKillCursors(executionContext->getOpCtx(), executionContext->getMessage());
     }
 };
 
 struct InsertOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        hr->assertValidNsString();
-        receivedInsert(hr->opCtx, hr->nsString(), hr->m);
+        executionContext->assertValidNsString();
+        receivedInsert(executionContext->getOpCtx(),
+                       executionContext->nsString(),
+                       executionContext->getMessage());
     }
 };
 
 struct UpdateOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        hr->assertValidNsString();
-        receivedUpdate(hr->opCtx, hr->nsString(), hr->m);
+        executionContext->assertValidNsString();
+        receivedUpdate(executionContext->getOpCtx(),
+                       executionContext->nsString(),
+                       executionContext->getMessage());
     }
 };
 
 struct DeleteOpRunner : FireAndForgetOpRunner {
     using FireAndForgetOpRunner::FireAndForgetOpRunner;
     void runAndForget() override {
-        hr->assertValidNsString();
-        receivedDelete(hr->opCtx, hr->nsString(), hr->m);
+        executionContext->assertValidNsString();
+        receivedDelete(executionContext->getOpCtx(),
+                       executionContext->nsString(),
+                       executionContext->getMessage());
+    }
+};
+
+struct UnsupportedOpRunner : SynchronousOpRunner {
+    using SynchronousOpRunner::SynchronousOpRunner;
+    DbResponse runSync() override {
+        // For compatibility reasons, we only log incidents of receiving operations that are not
+        // supported and return an empty response to the caller.
+        LOGV2(21968,
+              "Operation isn't supported: {operation}",
+              "Operation is not supported",
+              "operation"_attr = static_cast<int>(executionContext->op()));
+        executionContext->currentOp().done();
+        executionContext->forceLog = true;
+        return {};
     }
 };
 
 std::unique_ptr<HandleRequest::OpRunner> HandleRequest::makeOpRunner() {
-    switch (op()) {
+    switch (executionContext->op()) {
         case dbQuery:
-            if (!nsString().isCommand())
+            if (!executionContext->nsString().isCommand())
                 return std::make_unique<QueryOpRunner>(this);
             // FALLTHROUGH: it's a query containing a command
         case dbMsg:
@@ -1813,96 +1870,93 @@ std::unique_ptr<HandleRequest::OpRunner> HandleRequest::makeOpRunner() {
         case dbDelete:
             return std::make_unique<DeleteOpRunner>(this);
         default:
-            LOGV2(21968,
-                  "Operation isn't supported: {operation}",
-                  "Operation is not supported",
-                  "operation"_attr = static_cast<int>(op()));
-            return nullptr;
+            return std::make_unique<UnsupportedOpRunner>(this);
     }
 }
 
-DbResponse FireAndForgetOpRunner::run() {
+DbResponse FireAndForgetOpRunner::runSync() {
     try {
         runAndForget();
     } catch (const AssertionException& ue) {
-        LastError::get(hr->client()).setLastError(ue.code(), ue.reason());
+        LastError::get(executionContext->client()).setLastError(ue.code(), ue.reason());
         LOGV2_DEBUG(21969,
                     3,
                     "Caught Assertion in {networkOp}, continuing: {error}",
                     "Assertion in fire-and-forget operation",
-                    "networkOp"_attr = networkOpToString(hr->op()),
+                    "networkOp"_attr = networkOpToString(executionContext->op()),
                     "error"_attr = redact(ue));
-        hr->currentOp().debug().errInfo = ue.toStatus();
+        executionContext->currentOp().debug().errInfo = ue.toStatus();
     }
     // A NotWritablePrimary error can be set either within
     // receivedInsert/receivedUpdate/receivedDelete or within the AssertionException handler above.
     // Either way, we want to throw an exception here, which will cause the client to be
     // disconnected.
-    if (LastError::get(hr->client()).hadNotPrimaryError()) {
+    if (LastError::get(executionContext->client()).hadNotPrimaryError()) {
         notPrimaryLegacyUnackWrites.increment();
         uasserted(ErrorCodes::NotWritablePrimary,
                   str::stream() << "Not-master error while processing '"
-                                << networkOpToString(hr->op()) << "' operation  on '"
-                                << hr->nsString() << "' namespace via legacy "
+                                << networkOpToString(executionContext->op()) << "' operation  on '"
+                                << executionContext->nsString() << "' namespace via legacy "
                                 << "fire-and-forget command execution.");
     }
     return {};
 }
 
-void HandleRequest::startOperation() {
-    if (client().isInDirectClient()) {
+Future<void> HandleRequest::startOperation() try {
+    auto opCtx = executionContext->getOpCtx();
+    auto& client = executionContext->client();
+    auto& currentOp = executionContext->currentOp();
+
+    if (client.isInDirectClient()) {
         if (!opCtx->getLogicalSessionId() || !opCtx->getTxnNumber()) {
             invariant(!opCtx->inMultiDocumentTransaction() &&
                       !opCtx->lockState()->inAWriteUnitOfWork());
         }
     } else {
-        LastError::get(client()).startRequest();
-        AuthorizationSession::get(client())->startRequest(opCtx);
+        LastError::get(client).startRequest();
+        AuthorizationSession::get(client)->startRequest(opCtx);
 
         // We should not be holding any locks at this point
         invariant(!opCtx->lockState()->isLocked());
     }
     {
-        stdx::lock_guard<Client> lk(client());
+        stdx::lock_guard<Client> lk(client);
         // Commands handling code will reset this if the operation is a command
         // which is logically a basic CRUD operation like query, insert, etc.
-        currentOp().setNetworkOp_inlock(op());
-        currentOp().setLogicalOp_inlock(networkOpToLogicalOp(op()));
+        currentOp.setNetworkOp_inlock(executionContext->op());
+        currentOp.setLogicalOp_inlock(networkOpToLogicalOp(executionContext->op()));
     }
+    return {};
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
-DbResponse HandleRequest::run() {
-    startOperation();
-    DbResponse dbresponse;
-    if (auto opRunner = makeOpRunner()) {
-        dbresponse = opRunner->run();
-    } else {
-        currentOp().done();
-        forceLog = true;
-    }
-    completeOperation(dbresponse);
-    return dbresponse;
-}
+Future<void> HandleRequest::completeOperation() try {
+    auto opCtx = executionContext->getOpCtx();
+    auto& currentOp = executionContext->currentOp();
 
-void HandleRequest::completeOperation(const DbResponse& dbresponse) {
     // Mark the op as complete, and log it if appropriate. Returns a boolean indicating whether
     // this op should be written to the profiler.
-    const bool shouldProfile = currentOp().completeAndLogOperation(
-        opCtx, MONGO_LOGV2_DEFAULT_COMPONENT, dbresponse.response.size(), slowMsOverride, forceLog);
+    const bool shouldProfile =
+        currentOp.completeAndLogOperation(opCtx,
+                                          MONGO_LOGV2_DEFAULT_COMPONENT,
+                                          executionContext->getResponse().response.size(),
+                                          executionContext->slowMsOverride,
+                                          executionContext->forceLog);
 
     Top::get(opCtx->getServiceContext())
         .incrementGlobalLatencyStats(
             opCtx,
-            durationCount<Microseconds>(currentOp().elapsedTimeExcludingPauses()),
-            currentOp().getReadWriteType());
+            durationCount<Microseconds>(currentOp.elapsedTimeExcludingPauses()),
+            currentOp.getReadWriteType());
 
     if (shouldProfile) {
         // Performance profiling is on
         if (opCtx->lockState()->isReadLocked()) {
             LOGV2_DEBUG(21970, 1, "Note: not profiling because of recursive read lock");
-        } else if (client().isInDirectClient()) {
+        } else if (executionContext->client().isInDirectClient()) {
             LOGV2_DEBUG(21971, 1, "Note: not profiling because we are in DBDirectClient");
-        } else if (behaviors.lockedForWriting()) {
+        } else if (executionContext->behaviors->lockedForWriting()) {
             // TODO SERVER-26825: Fix race condition where fsyncLock is acquired post
             // lockedForWriting() call but prior to profile collection lock acquisition.
             LOGV2_DEBUG(21972, 1, "Note: not profiling because doing fsync+lock");
@@ -1910,11 +1964,14 @@ void HandleRequest::completeOperation(const DbResponse& dbresponse) {
             LOGV2_DEBUG(21973, 1, "Note: not profiling because server is read-only");
         } else {
             invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-            profile(opCtx, op());
+            profile(opCtx, executionContext->op());
         }
     }
 
     recordCurOpMetrics(opCtx);
+    return {};
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 }  // namespace
@@ -1928,15 +1985,27 @@ BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* comman
     return bob.obj();
 }
 
-Future<DbResponse> ServiceEntryPointCommon::handleRequest(OperationContext* opCtx,
-                                                          const Message& m,
-                                                          const Hooks& behaviors) noexcept {
-    try {
-        return Future<DbResponse>::makeReady(HandleRequest{opCtx, m, behaviors}.run());
-    } catch (DBException& e) {
-        LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(e));
-        return e.toStatus();
-    }
+Future<DbResponse> ServiceEntryPointCommon::handleRequest(
+    OperationContext* opCtx, const Message& m, std::unique_ptr<const Hooks> behaviors) noexcept {
+    auto hr = std::make_shared<HandleRequest>(opCtx, m, std::move(behaviors));
+    return hr->startOperation()
+        .then([hr]() -> Future<void> {
+            auto opRunner = hr->makeOpRunner();
+            invariant(opRunner);
+            return opRunner->run().then(
+                [execContext = hr->executionContext](DbResponse response) -> void {
+                    // Set the response upon successful execution
+                    execContext->setResponse(std::move(response));
+                });
+        })
+        .then([hr] { return hr->completeOperation(); })
+        .onCompletion([hr](Status status) -> Future<DbResponse> {
+            if (!status.isOK()) {
+                LOGV2_ERROR(4879802, "Failed to handle request", "error"_attr = redact(status));
+                return status;
+            }
+            return hr->executionContext->getResponse();
+        });
 }
 
 ServiceEntryPointCommon::Hooks::~Hooks() = default;

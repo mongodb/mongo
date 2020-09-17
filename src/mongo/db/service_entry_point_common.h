@@ -101,7 +101,7 @@ struct ServiceEntryPointCommon {
 
     static Future<DbResponse> handleRequest(OperationContext* opCtx,
                                             const Message& m,
-                                            const Hooks& hooks) noexcept;
+                                            std::unique_ptr<const Hooks> hooks) noexcept;
 
     /**
      * Produce a new object based on cmdObj, but with redactions applied as specified by

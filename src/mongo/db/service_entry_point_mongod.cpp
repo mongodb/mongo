@@ -271,7 +271,7 @@ public:
 
 Future<DbResponse> ServiceEntryPointMongod::handleRequest(OperationContext* opCtx,
                                                           const Message& m) noexcept {
-    return ServiceEntryPointCommon::handleRequest(opCtx, m, Hooks{});
+    return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
 }
 
 }  // namespace mongo

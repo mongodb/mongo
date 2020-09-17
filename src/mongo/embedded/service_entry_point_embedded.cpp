@@ -117,7 +117,7 @@ Future<DbResponse> ServiceEntryPointEmbedded::handleRequest(OperationContext* op
     // guarantees of the state (that they have run).
     checked_cast<PeriodicRunnerEmbedded*>(opCtx->getServiceContext()->getPeriodicRunner())
         ->tryPump();
-    return ServiceEntryPointCommon::handleRequest(opCtx, m, Hooks{});
+    return ServiceEntryPointCommon::handleRequest(opCtx, m, std::make_unique<Hooks>());
 }
 
 void ServiceEntryPointEmbedded::startSession(transport::SessionHandle session) {
