@@ -4,7 +4,7 @@ GitPython ~= 2.1.11
 mypy ~= 0.800; python_version > "3.5"
 pydocstyle == 2.1.1
 pylint == 2.3.1
-structlog ~= 19.1.0
+structlog ~= 19.2.0
 typing
 yamllint == 1.15.0
 yapf == 0.26.0

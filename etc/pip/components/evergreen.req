@@ -3,4 +3,4 @@ dataclasses; python_version < "3.7"
 GitPython ~= 2.1.11
 psutil
 pydantic ~= 1.7.3
-structlog ~= 19.1.0
+structlog ~= 19.2.0
