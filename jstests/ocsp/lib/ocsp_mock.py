@@ -18,6 +18,8 @@ def main():
 
     parser.add_argument('-p', '--port', type=int, default=8080, help="Port to listen on")
 
+    parser.add_argument('-b', '--bind_ip', type=str, default=None, help="IP to listen on")
+
     parser.add_argument('--ca_file', type=str, required=True, help="CA file for OCSP responder")
 
     parser.add_argument('-v', '--verbose', action='count', help="Enable verbose tracing")
@@ -37,10 +39,7 @@ def main():
     print('Initializing OCSP Responder')
     mock_ocsp_responder.init_responder(issuer_cert=args.ca_file, responder_cert=args.ocsp_responder_cert, responder_key=args.ocsp_responder_key, fault=args.fault, next_update_seconds=args.next_update_seconds)
 
-    if args.verbose:
-        mock_ocsp_responder.init(args.port, debug=True)
-    else:
-        mock_ocsp_responder.init(args.port)
+    mock_ocsp_responder.init(port=args.port, debug=args.verbose, host=args.bind_ip)
 
     print('Mock OCSP Responder is running on port %s' % (str(args.port)))
 
