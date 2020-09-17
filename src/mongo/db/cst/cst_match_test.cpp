@@ -238,6 +238,58 @@ TEST(CstMatchTest, ParsesCommentWithCompoundValueChild) {
               "hi>\", \"<UserInt 5>\" ] }");
 }
 
+TEST(CstMatchTest, ParsesExpr) {
+    CNode output;
+    auto input = fromjson("{filter: {$expr: 123}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(), "{ <KeyFieldname expr>: \"<UserInt 123>\" }");
+}
+
+TEST(CstMatchTest, ParsesText) {
+    CNode output;
+    auto input = fromjson("{filter: {$text: {$search: \"abc\"}}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <KeyFieldname text>: { "
+              "<KeyFieldname caseSensitive>: \"<KeyValue absentKey>\", "
+              "<KeyFieldname diacriticSensitive>: \"<KeyValue absentKey>\", "
+              "<KeyFieldname language>: \"<KeyValue absentKey>\", "
+              "<KeyFieldname search>: \"<UserString abc>\" } }");
+}
+
+TEST(CstMatchTest, ParsesTextOptions) {
+    CNode output;
+    auto input = fromjson(
+        "{filter: {$text: {"
+        "$search: \"abc\", "
+        "$caseSensitive: true, "
+        "$diacriticSensitive: true, "
+        "$language: \"asdfzxcv\" } } }");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <KeyFieldname text>: { "
+              "<KeyFieldname caseSensitive>: \"<UserBoolean true>\", "
+              "<KeyFieldname diacriticSensitive>: \"<UserBoolean true>\", "
+              "<KeyFieldname language>: \"<UserString asdfzxcv>\", "
+              "<KeyFieldname search>: \"<UserString abc>\" } }");
+}
+
+TEST(CstMatchTest, ParsesWhere) {
+    CNode output;
+    auto input = fromjson("{filter: {$where: \"return true;\"}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <KeyFieldname where>: \"<UserString return true;>\" }");
+}
+
 TEST(CstMatchTest, FailsToParseNotWithNonObject) {
     CNode output;
     auto input = fromjson("{filter: {a: {$not: 1}}}");
@@ -359,5 +411,27 @@ TEST(CstMatchTest, FailsToParseTypeWithBadSpecifier) {
             ParserGen(lexer, nullptr).parse(), AssertionException, ErrorCodes::FailedToParse);
     }
 }
+
+TEST(CstMatchTest, ParsesMod) {
+    CNode output;
+    auto input = fromjson("{filter: {a: {$mod: [3, 2.0]}}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(),
+              "{ <UserFieldname a>: { <KeyFieldname matchMod>: ["
+              " \"<UserInt 3>\", \"<UserDouble 2.000000>\" ] } }");
+}
+
+TEST(CstMatchTest, FailsToParseModWithEmptyArray) {
+    auto input = fromjson("{filter: {a: {$mod: []}}}");
+    BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
+    ASSERT_THROWS_CODE_AND_WHAT(ParserGen(lexer, nullptr).parse(),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "syntax error, unexpected end of array at "
+                                "element 'end array' within '$mod' of input filter");
+}
+
 }  // namespace
 }  // namespace mongo

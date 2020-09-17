@@ -51,6 +51,10 @@ public:
      */
     void add(MatchExpression* e);
 
+    void add(std::unique_ptr<MatchExpression> e) {
+        add(e.release());
+    }
+
     /**
      * clears all the thingsd we own, and does NOT delete
      * someone else has taken ownership

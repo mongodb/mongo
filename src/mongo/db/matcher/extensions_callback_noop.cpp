@@ -36,25 +36,15 @@
 
 namespace mongo {
 
-StatusWithMatchExpression ExtensionsCallbackNoop::parseText(BSONElement text) const {
-    auto textParams = extractTextMatchExpressionParams(text);
-    if (!textParams.isOK()) {
-        return textParams.getStatus();
-    }
-
-    auto expr = std::make_unique<TextNoOpMatchExpression>(std::move(textParams.getValue()));
-
-    return {std::move(expr)};
+std::unique_ptr<MatchExpression> ExtensionsCallbackNoop::createText(
+    TextMatchExpressionBase::TextParams text) const {
+    return std::make_unique<TextNoOpMatchExpression>(std::move(text));
 }
 
-StatusWithMatchExpression ExtensionsCallbackNoop::parseWhere(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONElement where) const {
-    auto whereParams = extractWhereMatchExpressionParams(where);
-    if (!whereParams.isOK()) {
-        return whereParams.getStatus();
-    }
-
-    return {std::make_unique<WhereNoOpMatchExpression>(std::move(whereParams.getValue()))};
+std::unique_ptr<MatchExpression> ExtensionsCallbackNoop::createWhere(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    WhereMatchExpressionBase::WhereParams where) const {
+    return std::make_unique<WhereNoOpMatchExpression>(std::move(where));
 }
 
 }  // namespace mongo

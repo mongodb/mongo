@@ -39,6 +39,7 @@
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/util/visit_helper.h"
@@ -49,35 +50,40 @@ namespace {
 std::unique_ptr<MatchExpression> translateMatchPredicate(
     const CNode::Fieldname& fieldName,
     const CNode& cst,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback& extensionsCallback);
+
+std::unique_ptr<MatchExpression> translatePathExpression(const UserFieldname& fieldName,
+                                                         const CNode::ObjectChildren& object);
 
 /**
  * Walk an array of nodes and produce a vector of MatchExpressions.
  */
 template <class Type>
 std::unique_ptr<Type> translateTreeExpr(const CNode::ArrayChildren& array,
-                                        const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+                                        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                        const ExtensionsCallback& extensionsCallback) {
     auto expr = std::make_unique<Type>();
     for (auto&& node : array) {
         // Tree expressions require each element to be it's own match expression object.
-        expr->add(translateMatchExpression(node, expCtx).release());
+        expr->add(translateMatchExpression(node, expCtx, extensionsCallback));
     }
     return expr;
 }
 
-std::unique_ptr<MatchExpression> translateNot(
-    const CNode::Fieldname& fieldName,
-    const CNode& argument,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+// Handles predicates of the form  <fieldname>: { $not: <argument> }
+std::unique_ptr<MatchExpression> translateNot(const UserFieldname& fieldName,
+                                              const CNode& argument) {
     // $not can accept a regex or an object expression.
     if (auto regex = stdx::get_if<UserRegex>(&argument.payload)) {
-        auto regexExpr = std::make_unique<RegexMatchExpression>(
-            stdx::get<UserFieldname>(fieldName), regex->pattern, regex->flags);
+        auto regexExpr =
+            std::make_unique<RegexMatchExpression>(fieldName, regex->pattern, regex->flags);
         return std::make_unique<NotMatchExpression>(std::move(regexExpr));
     }
 
     auto root = std::make_unique<AndMatchExpression>();
-    root->add(translateMatchPredicate(fieldName, argument, expCtx).release());
+    root->add(
+        translatePathExpression(fieldName, stdx::get<CNode::ObjectChildren>(argument.payload)));
     return std::make_unique<NotMatchExpression>(std::move(root));
 }
 
@@ -144,19 +150,36 @@ MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
     return ts;
 }
 
-std::unique_ptr<MatchExpression> translatePathExpression(
-    const CNode::Fieldname& fieldName,
-    const CNode::ObjectChildren& object,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+// Handles predicates of the form  <fieldname>: { ... }
+// For example:
+//   { abc: {$not: 5} }
+//   { abc: {$eq: 0} }
+//   { abc: {$gt: 0, $lt: 2} }
+// Examples of predicates not handled here:
+//   { abc: 5 }
+//   { $expr: ... }
+//   { $where: "return 1" }
+// Note, this function does not require an ExpressionContext.
+// The only MatchExpression that requires an ExpressionContext is $expr
+// (if you include $where, which can desugar to $expr + $function).
+std::unique_ptr<MatchExpression> translatePathExpression(const UserFieldname& fieldName,
+                                                         const CNode::ObjectChildren& object) {
     for (auto&& [op, argument] : object) {
         switch (stdx::get<KeyFieldname>(op)) {
             case KeyFieldname::notExpr:
-                return translateNot(fieldName, argument, expCtx);
+                return translateNot(fieldName, argument);
             case KeyFieldname::existsExpr:
                 return translateExists(fieldName, argument);
             case KeyFieldname::type:
-                return std::make_unique<TypeMatchExpression>(stdx::get<UserFieldname>(fieldName),
+                return std::make_unique<TypeMatchExpression>(fieldName,
                                                              getMatcherTypeSet(argument));
+            case KeyFieldname::matchMod: {
+                const auto divisor =
+                    stdx::get<CNode::ArrayChildren>(argument.payload)[0].numberInt();
+                const auto remainder =
+                    stdx::get<CNode::ArrayChildren>(argument.payload)[1].numberInt();
+                return std::make_unique<ModMatchExpression>(fieldName, divisor, remainder);
+            }
             default:
                 MONGO_UNREACHABLE;
         }
@@ -164,22 +187,86 @@ std::unique_ptr<MatchExpression> translatePathExpression(
     MONGO_UNREACHABLE;
 }
 
+// Take a variant and either get (by copying) the T it holds, or construct a default value using
+// the callable. For example:
+//   getOr<int>(123, []() { return 0; }) == 123
+//   getOr<int>("x", []() { return 0; }) == 0
+template <class T, class V, class F>
+T getOr(const V& myVariant, F makeDefaultValue) {
+    if (auto* value = stdx::get_if<T>(&myVariant)) {
+        return *value;
+    } else {
+        return makeDefaultValue();
+    }
+}
+
+// Handles predicates of the form  <fieldname>: <anything>
+// For example:
+//   { abc: 5 }
+//   { abc: {$lt: 5} }
+// Examples of predicates not handled here:
+//   { $where: "return 1" }
+//   { $and: ... }
 std::unique_ptr<MatchExpression> translateMatchPredicate(
     const CNode::Fieldname& fieldName,
     const CNode& cst,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback& extensionsCallback) {
     if (auto keyField = stdx::get_if<KeyFieldname>(&fieldName)) {
         // Top level match expression.
         switch (*keyField) {
             case KeyFieldname::andExpr:
-                return translateTreeExpr<AndMatchExpression>(cst.arrayChildren(), expCtx);
+                return translateTreeExpr<AndMatchExpression>(
+                    cst.arrayChildren(), expCtx, extensionsCallback);
             case KeyFieldname::orExpr:
-                return translateTreeExpr<OrMatchExpression>(cst.arrayChildren(), expCtx);
+                return translateTreeExpr<OrMatchExpression>(
+                    cst.arrayChildren(), expCtx, extensionsCallback);
             case KeyFieldname::norExpr:
-                return translateTreeExpr<NorMatchExpression>(cst.arrayChildren(), expCtx);
+                return translateTreeExpr<NorMatchExpression>(
+                    cst.arrayChildren(), expCtx, extensionsCallback);
             case KeyFieldname::commentExpr:
                 // comment expr is not added to the tree.
                 return nullptr;
+            case KeyFieldname::expr: {
+                // The ExprMatchExpression maintains (shared) ownership of expCtx,
+                // which the Expression from translateExpression depends on.
+                return std::make_unique<ExprMatchExpression>(
+                    cst_pipeline_translation::translateExpression(cst, expCtx.get()), expCtx);
+            }
+            case KeyFieldname::text: {
+                const auto& args = cst.objectChildren();
+                dassert(verifyFieldnames(
+                    {
+                        KeyFieldname::caseSensitive,
+                        KeyFieldname::diacriticSensitive,
+                        KeyFieldname::language,
+                        KeyFieldname::search,
+                    },
+                    args));
+
+                TextMatchExpressionBase::TextParams params;
+                params.caseSensitive = getOr<bool>(args[0].second.payload, []() {
+                    return TextMatchExpressionBase::kCaseSensitiveDefault;
+                });
+                params.diacriticSensitive = getOr<bool>(args[1].second.payload, []() {
+                    return TextMatchExpressionBase::kDiacriticSensitiveDefault;
+                });
+                params.language = getOr<std::string>(args[2].second.payload, []() { return ""s; });
+                params.query = stdx::get<std::string>(args[3].second.payload);
+
+                return extensionsCallback.createText(std::move(params));
+            }
+            case KeyFieldname::where: {
+                std::string code;
+                if (auto str = stdx::get_if<UserString>(&cst.payload)) {
+                    code = *str;
+                } else if (auto js = stdx::get_if<UserJavascript>(&cst.payload)) {
+                    code = std::string{js->code};
+                } else {
+                    MONGO_UNREACHABLE;
+                }
+                return extensionsCallback.createWhere(expCtx, {std::move(code)});
+            }
             default:
                 MONGO_UNREACHABLE;
         }
@@ -188,7 +275,7 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
         return stdx::visit(
             visit_helper::Overloaded{
                 [&](const CNode::ObjectChildren& userObject) -> std::unique_ptr<MatchExpression> {
-                    return translatePathExpression(fieldName, userObject, expCtx);
+                    return translatePathExpression(stdx::get<UserFieldname>(fieldName), userObject);
                 },
                 [&](const CNode::ArrayChildren& userObject) -> std::unique_ptr<MatchExpression> {
                     MONGO_UNREACHABLE;
@@ -209,17 +296,32 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
 }  // namespace
 
 std::unique_ptr<MatchExpression> translateMatchExpression(
-    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    const CNode& cst,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback& extensionsCallback) {
+
     auto root = std::make_unique<AndMatchExpression>();
     for (const auto& [fieldName, expr] : cst.objectChildren()) {
         // A nullptr for 'translatedExpression' indicates that the particular operator should not
         // be added to 'root'. The $comment operator currently follows this convention.
-        if (auto translatedExpression = translateMatchPredicate(fieldName, expr, expCtx);
+        if (auto translatedExpression =
+                translateMatchPredicate(fieldName, expr, expCtx, extensionsCallback);
             translatedExpression) {
-            root->add(translatedExpression.release());
+            root->add(std::move(translatedExpression));
         }
     }
     return root;
+}
+
+bool verifyFieldnames(const std::vector<CNode::Fieldname>& expected,
+                      const std::vector<std::pair<CNode::Fieldname, CNode>>& actual) {
+    if (expected.size() != actual.size())
+        return false;
+    for (size_t i = 0; i < expected.size(); ++i) {
+        if (expected[i] != actual[i].first)
+            return false;
+    }
+    return true;
 }
 
 }  // namespace mongo::cst_match_translation

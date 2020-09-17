@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo::cst_match_translation {
@@ -40,6 +41,14 @@ namespace mongo::cst_match_translation {
  * Walk an expression CNode and produce a MatchExpression.
  */
 std::unique_ptr<MatchExpression> translateMatchExpression(
-    const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    const CNode& cst,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback& extensionsCallback);
+
+/**
+ * Check that the order of arguments is what we expect in an input expression.
+ */
+bool verifyFieldnames(const std::vector<CNode::Fieldname>& expected,
+                      const std::vector<std::pair<CNode::Fieldname, CNode>>& actual);
 
 }  // namespace mongo::cst_match_translation

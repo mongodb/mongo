@@ -83,13 +83,15 @@ void BM_Bison_match_simple(benchmark::State& state) {
     auto nss = NamespaceString("test.bm");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx =
         new ExpressionContextForTest(opCtx.get(), nss);
+    ExtensionsCallbackNoop extensions;
 
     // This is where recording starts.
     for (auto keepRunning : state) {
         CNode cst;
         BSONLexer lexer{filter, ParserGen::token::START_MATCH};
         ParserGen(lexer, &cst).parse();
-        benchmark::DoNotOptimize(cst_match_translation::translateMatchExpression(cst, expCtx));
+        benchmark::DoNotOptimize(
+            cst_match_translation::translateMatchExpression(cst, expCtx, extensions));
         benchmark::ClobberMemory();
     }
 }

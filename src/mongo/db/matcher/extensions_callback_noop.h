@@ -40,16 +40,12 @@ namespace mongo {
  */
 class ExtensionsCallbackNoop : public ExtensionsCallback {
 public:
-    /**
-     * Returns a TextNoOpMatchExpression, or an error Status if parsing fails.
-     */
-    StatusWithMatchExpression parseText(BSONElement text) const final;
+    std::unique_ptr<MatchExpression> createText(
+        TextMatchExpressionBase::TextParams text) const final;
 
-    /**
-     * Returns a WhereNoOpMatchExpression, or an error Status if parsing fails.
-     */
-    StatusWithMatchExpression parseWhere(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                         BSONElement where) const final;
+    std::unique_ptr<MatchExpression> createWhere(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        WhereMatchExpressionBase::WhereParams where) const final;
 
     bool hasNoopExtensions() const final {
         return true;

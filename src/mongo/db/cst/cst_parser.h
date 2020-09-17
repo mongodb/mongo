@@ -36,6 +36,7 @@
 #include "mongo/db/cst/cst_match_translation.h"
 #include "mongo/db/cst/cst_sort_translation.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/sort_pattern.h"
 
@@ -45,11 +46,13 @@ namespace mongo::cst {
  * Parses the given 'filter' to a MatchExpression. Throws an exception if the filter fails to parse.
  */
 std::unique_ptr<MatchExpression> parseToMatchExpression(
-    BSONObj filter, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    BSONObj filter,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ExtensionsCallback& extensionsCallback) {
     BSONLexer lexer{filter, ParserGen::token::START_MATCH};
     CNode cst;
     ParserGen(lexer, &cst).parse();
-    return cst_match_translation::translateMatchExpression(cst, expCtx);
+    return cst_match_translation::translateMatchExpression(cst, expCtx, extensionsCallback);
 }
 
 /**

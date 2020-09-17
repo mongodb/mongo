@@ -192,6 +192,25 @@ struct CNode {
             return boost::optional<ProjectionType>{};
     }
 
+    /**
+     * Returns true if the value is of numeric type.
+     */
+    bool isNumber() const;
+
+    /**
+     * Coerces the value to an int.
+     *
+     * Invalid to call if isNumber() is false.
+     */
+    int numberInt() const;
+
+    /**
+     * Coerces the value to an int.
+     *
+     * Invalid to call if isNumber() is false.
+     */
+    long long numberLong() const;
+
 private:
     std::string toStringHelper(int numTabs) const;
 

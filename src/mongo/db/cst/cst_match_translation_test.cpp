@@ -40,6 +40,7 @@
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
@@ -52,6 +53,11 @@ auto getExpCtx() {
     return boost::intrusive_ptr<ExpressionContextForTest>{new ExpressionContextForTest(nss)};
 }
 
+auto translate(const CNode& cst) {
+    return cst_match_translation::translateMatchExpression(
+        cst, getExpCtx(), ExtensionsCallbackNoop{});
+}
+
 auto parseMatchToCst(BSONObj input) {
     CNode output;
     BSONLexer lexer(input["filter"].embeddedObject(), ParserGen::token::START_MATCH);
@@ -62,7 +68,7 @@ auto parseMatchToCst(BSONObj input) {
 
 TEST(CstMatchTranslationTest, TranslatesEmpty) {
     const auto cst = CNode{CNode::ObjectChildren{}};
-    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto match = translate(cst);
     auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
     ASSERT(andExpr);
     ASSERT_EQ(0, andExpr->numChildren());
@@ -70,7 +76,7 @@ TEST(CstMatchTranslationTest, TranslatesEmpty) {
 
 TEST(CstMatchTranslationTest, TranslatesSinglePredicate) {
     const auto cst = CNode{CNode::ObjectChildren{{UserFieldname{"a"}, CNode{UserInt{1}}}}};
-    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto match = translate(cst);
     ASSERT_BSONOBJ_EQ(match->serialize(), fromjson("{$and: [{a: {$eq: 1}}]}"));
 }
 
@@ -79,7 +85,7 @@ TEST(CstMatchTranslationTest, TranslatesMultipleEqualityPredicates) {
         {UserFieldname{"a"}, CNode{UserInt{1}}},
         {UserFieldname{"b"}, CNode{UserNull{}}},
     }};
-    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto match = translate(cst);
     ASSERT_BSONOBJ_EQ(match->serialize(), fromjson("{$and: [{a: {$eq: 1}}, {b: {$eq: null}}]}"));
 }
 
@@ -87,7 +93,7 @@ TEST(CstMatchTranslationTest, TranslatesEqualityPredicatesWithId) {
     const auto cst = CNode{CNode::ObjectChildren{
         {UserFieldname{"_id"}, CNode{UserNull{}}},
     }};
-    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto match = translate(cst);
     auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
     ASSERT(andExpr);
     ASSERT_EQ(1, andExpr->numChildren());
@@ -96,7 +102,7 @@ TEST(CstMatchTranslationTest, TranslatesEqualityPredicatesWithId) {
 
 TEST(CstMatchTranslationTest, TranslatesEmptyObject) {
     const auto cst = CNode{CNode::ObjectChildren{}};
-    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto match = translate(cst);
     auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
     ASSERT(andExpr);
     ASSERT_EQ(0, andExpr->numChildren());
@@ -105,7 +111,7 @@ TEST(CstMatchTranslationTest, TranslatesEmptyObject) {
 TEST(CstMatchTranslationTest, TranslatesNotWithRegex) {
     auto input = fromjson("{filter: {a: {$not: /b/}}}");
     auto cst = parseMatchToCst(input);
-    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto match = translate(cst);
     auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
     ASSERT(andExpr);
     ASSERT_EQ(1, andExpr->numChildren());
@@ -120,7 +126,7 @@ TEST(CstMatchTranslationTest, TranslatesNotWithRegex) {
 TEST(CstMatchTranslationTest, TranslatesNotWithExpression) {
     auto input = fromjson("{filter: {a: {$not: {$not: /b/}}}}");
     auto cst = parseMatchToCst(input);
-    auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+    auto match = translate(cst);
     ASSERT_EQ(match->serialize().toString(),
               "{ $and: [ { $nor: [ { a: { $not: { $regex: \"b\" } } } ] } ] }");
 }
@@ -129,14 +135,14 @@ TEST(CstMatchTranslationTest, TranslatesLogicalTreeExpressions) {
     {
         auto input = fromjson("{filter: {$and: [{b: {$not: /a/}}]}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { $and: [ { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
     }
     {
         auto input = fromjson("{filter: {$or: [{b: 1}, {a: 2}]}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { $or: [ { $and: [ { b: { $eq: 1 } } ] }, { $and: [ { a: { $eq: 2 } } "
                   "] } ] } ] }");
@@ -144,7 +150,7 @@ TEST(CstMatchTranslationTest, TranslatesLogicalTreeExpressions) {
     {
         auto input = fromjson("{filter: {$nor: [{b: {$not: /a/}}]}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { $nor: [ { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] }");
     }
@@ -154,7 +160,7 @@ TEST(CstMatchTranslationTest, TranslatesNestedLogicalTreeExpressions) {
     {
         auto input = fromjson("{filter: {$and: [{$or: [{b: {$not: /a/}}]}]}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { $and: [ { $and: [ { $or: [ { $and: [ { b: { $not: { $regex: \"a\" } "
                   "} } ] } ] } ] } ] } ] }");
@@ -162,7 +168,7 @@ TEST(CstMatchTranslationTest, TranslatesNestedLogicalTreeExpressions) {
     {
         auto input = fromjson("{filter: {$or: [{$and: [{b: {$not: /a/}}, {a: {$not: /b/}}]}]}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { $or: [ { $and: [ { $and: [ { $and: [ { b: { $not: { $regex: \"a\" } "
                   "} } ] }, { $and: [ { a: { $not: { $regex: \"b\" } } } ] } ] } ] } ] } ] }");
@@ -170,7 +176,7 @@ TEST(CstMatchTranslationTest, TranslatesNestedLogicalTreeExpressions) {
     {
         auto input = fromjson("{filter: {$and: [{$nor: [{b: {$not: /a/}}]}]}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { $and: [ { $and: [ { $nor: [ { $and: [ { b: { $not: { $regex: \"a\" "
                   "} } } ] } ] } ] } ] } ] }");
@@ -181,13 +187,13 @@ TEST(CstMatchTranslationTest, TranslatesExistsBool) {
     {
         auto input = fromjson("{filter: {a: {$exists: true}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $exists: true } } ] }");
     }
     {
         auto input = fromjson("{filter: {a: {$exists: false}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { a: { $not: { $exists: true } } } ] }");
     }
@@ -197,13 +203,13 @@ TEST(CstMatchTranslationTest, TranslatesExistsNumeric) {
     {
         auto input = fromjson("{filter: {a: {$exists: 15.0}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $exists: true } } ] }");
     }
     {
         auto input = fromjson("{filter: {a: {$exists: 0}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { a: { $not: { $exists: true } } } ] }");
     }
@@ -213,20 +219,20 @@ TEST(CstMatchTranslationTest, TranslatesExistsNullAndCompound) {
     {
         auto input = fromjson("{filter: {a: {$exists: null}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { a: { $not: { $exists: true } } } ] }");
     }
     {
         auto input = fromjson("{filter: {a: {$exists: [\"arbitrary stuff\", null]}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $exists: true } } ] }");
     }
     {
         auto input = fromjson("{filter: {a: {$exists: {doesnt: \"matter\"}}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $exists: true } } ] }");
     }
 }
@@ -235,13 +241,13 @@ TEST(CstMatchTranslationTest, TranslatesType) {
     {
         auto input = fromjson("{filter: {a: {$type: 1}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $type: [ 1 ] } } ] }");
     }
     {
         auto input = fromjson("{filter: {a: {$type: \"number\"}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $type: [ \"number\" ] } } ] }");
         // The compound "number" alias is not translated; instead the allNumbers flag of the typeset
         // used by the MatchExpression is set.
@@ -255,7 +261,7 @@ TEST(CstMatchTranslationTest, TranslatesType) {
     {
         auto input = fromjson("{filter: {a: {$type: [ \"number\", \"string\", 11]}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(),
                   "{ $and: [ { a: { $type: [ \"number\", 2, 11 ] } } ] }");
         // Direct type aliases (like "string" --> BSONType 2) are translated into their numeric
@@ -272,13 +278,13 @@ TEST(CstMatchTranslationTest, TranslatesComment) {
     {
         auto input = fromjson("{filter: {a: 1, $comment: \"hello, world\"}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $eq: 1 } } ] }");
     }
     {
         auto input = fromjson("{filter: {$comment: \"hello, world\"}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         auto andExpr = dynamic_cast<AndMatchExpression*>(match.get());
         ASSERT(andExpr);
         ASSERT_EQ(0, andExpr->numChildren());
@@ -286,9 +292,42 @@ TEST(CstMatchTranslationTest, TranslatesComment) {
     {
         auto input = fromjson("{filter: {a: {$exists: true}, $comment: \"hello, world\"}}}");
         auto cst = parseMatchToCst(input);
-        auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
+        auto match = translate(cst);
         ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $exists: true } } ] }");
     }
+}
+
+TEST(CstMatchTranslationTest, TranslatesExpr) {
+    auto input = fromjson("{filter: {$expr: 123}}");
+    auto cst = parseMatchToCst(input);
+    auto match = translate(cst);
+    ASSERT_EQ(match->serialize().toString(), "{ $and: [ { $expr: { $const: 123 } } ] }");
+}
+
+TEST(CstMatchTranslationTest, TranslatesText) {
+    auto input = fromjson("{filter: {$text: {$search: \"hi\"}}}");
+    auto cst = parseMatchToCst(input);
+    auto match = translate(cst);
+    ASSERT_EQ(match->serialize().toString(),
+              "{ $and: [ "
+              "{ $text: { $search: \"hi\", $language: \"\", "
+              "$caseSensitive: false, $diacriticSensitive: false } } ] }");
+}
+
+TEST(CstMatchTranslationTest, TranslatesWhere) {
+    auto input = fromjson("{filter: {$where: \"return this.q\"}}");
+    auto cst = parseMatchToCst(input);
+    auto match = translate(cst);
+    ASSERT_EQ(match->serialize().toString(),
+              "{ $and: [ "
+              "{ $where: return this.q } ] }");
+}
+
+TEST(CstMatchTranslationTest, TranslatesMod) {
+    auto input = fromjson("{filter: {a: {$mod: [3, 2.0]}}}");
+    auto cst = parseMatchToCst(input);
+    auto match = translate(cst);
+    ASSERT_EQ(match->serialize().toString(), "{ $and: [ { a: { $mod: [ 3, 2 ] } } ] }");
 }
 
 }  // namespace

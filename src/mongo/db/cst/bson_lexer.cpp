@@ -50,12 +50,17 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"$_internalInhibitOptimization", ParserGen::token::STAGE_INHIBIT_OPTIMIZATION},
     {"$limit", ParserGen::token::STAGE_LIMIT},
     {"$project", ParserGen::token::STAGE_PROJECT},
+    {"$match", ParserGen::token::STAGE_MATCH},
     {"$sample", ParserGen::token::STAGE_SAMPLE},
     {"size", ParserGen::token::ARG_SIZE},
     {"$skip", ParserGen::token::STAGE_SKIP},
     {"$unionWith", ParserGen::token::STAGE_UNION_WITH},
     {"coll", ParserGen::token::ARG_COLL},
     {"pipeline", ParserGen::token::ARG_PIPELINE},
+    // Pathless match operators
+    {"$expr", ParserGen::token::EXPR},
+    {"$text", ParserGen::token::TEXT},
+    {"$where", ParserGen::token::WHERE},
     // Expressions
     {"$abs", ParserGen::token::ABS},
     {"$acos", ParserGen::token::ACOS},
@@ -196,7 +201,13 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"$month", ParserGen::token::MONTH},
     {"$second", ParserGen::token::SECOND},
     {"$week", ParserGen::token::WEEK},
-    {"$year", ParserGen::token::YEAR}};
+    {"$year", ParserGen::token::YEAR},
+    {"$search", ParserGen::token::ARG_SEARCH},
+    {"$language", ParserGen::token::ARG_LANGUAGE},
+    {"$caseSensitive", ParserGen::token::ARG_CASE_SENSITIVE},
+    {"$diacriticSensitive", ParserGen::token::ARG_DIACRITIC_SENSITIVE},
+    {"$mod", ParserGen::token::MOD},
+};
 
 // Mapping of reserved key values to BSON token. Any key which is not included in this map is
 // assumed to be a user value.

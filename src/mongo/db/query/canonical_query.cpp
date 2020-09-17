@@ -122,7 +122,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     StatusWithMatchExpression statusWithMatcher = [&]() -> StatusWithMatchExpression {
         if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
             try {
-                return cst::parseToMatchExpression(qr->getFilter(), newExpCtx);
+                return cst::parseToMatchExpression(qr->getFilter(), newExpCtx, extensionsCallback);
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }

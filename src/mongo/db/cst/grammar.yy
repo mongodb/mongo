@@ -126,11 +126,13 @@
     ALL_ELEMENTS_TRUE "allElementsTrue"
     AND
     ANY_ELEMENT_TRUE "anyElementTrue"
+    ARG_CASE_SENSITIVE "$caseSensitive argument"
     ARG_CHARS "chars argument"
     ARG_COLL "coll argument"
     ARG_DATE "date argument"
     ARG_DATE_STRING "dateString argument"
     ARG_DAY "day argument"
+    ARG_DIACRITIC_SENSITIVE "$diacriticSensitive argument"
     ARG_FILTER "filter"
     ARG_FIND "find argument"
     ARG_FORMAT "format argument"
@@ -140,6 +142,7 @@
     ARG_ISO_DAY_OF_WEEK "ISO day of week argument"
     ARG_ISO_WEEK "ISO week argument"
     ARG_ISO_WEEK_YEAR "ISO week year argument"
+    ARG_LANGUAGE "$language argument"
     ARG_MILLISECOND "millisecond argument"
     ARG_MINUTE "minute argument"
     ARG_MONTH "month argument"
@@ -149,21 +152,22 @@
     ARG_PIPELINE "pipeline argument"
     ARG_REGEX "regex argument"
     ARG_REPLACEMENT "replacement argument"
+    ARG_SEARCH "$search argument"
     ARG_SECOND "second argument"
     ARG_SIZE "size argument"
     ARG_TIMEZONE "timezone argument"
     ARG_TO "to argument"
+    ARG_YEAR "year argument"
     ASIN
     ASINH
     ATAN
-    ARG_YEAR "year argument"
     ATAN2
     ATANH
     BOOL_FALSE "false"
     BOOL_TRUE "true"
     CEIL
-    COMMENT
     CMP
+    COMMENT
     CONCAT
     CONST_EXPR
     CONVERT
@@ -184,12 +188,13 @@
     DOUBLE_NEGATIVE_ONE "-1 (double)"
     DOUBLE_ONE "1 (double)"
     DOUBLE_ZERO "zero (double)"
+    ELEM_MATCH "elemMatch operator"
     END_ARRAY "end of array"
     END_OBJECT "end of object"
-    ELEM_MATCH "elemMatch operator"
     EQ
     EXISTS
     EXPONENT
+    EXPR
     FLOOR
     GEO_NEAR_DISTANCE "geoNearDistance"
     GEO_NEAR_POINT "geoNearPoint"
@@ -197,9 +202,9 @@
     GTE
     HOUR
     ID
+    INDEX_KEY "indexKey"
     INDEX_OF_BYTES
     INDEX_OF_CP
-    INDEX_KEY "indexKey"
     INT_NEGATIVE_ONE "-1 (int)"
     INT_ONE "1 (int)"
     INT_ZERO "zero (int)"
@@ -245,14 +250,15 @@
     SET_INTERSECTION "setIntersection"
     SET_IS_SUBSET "setIsSubset"
     SET_UNION "setUnion"
-    SLICE "slice"
-    SORT_KEY "sortKey"
     SIN
     SINH
+    SLICE "slice"
+    SORT_KEY "sortKey"
     SPLIT
     SQRT
     STAGE_INHIBIT_OPTIMIZATION
     STAGE_LIMIT
+    STAGE_MATCH
     STAGE_PROJECT
     STAGE_SAMPLE
     STAGE_SKIP
@@ -268,6 +274,7 @@
     SUBTRACT
     TAN
     TANH
+    TEXT
     TEXT_SCORE "textScore"
     TO_BOOL
     TO_DATE
@@ -283,6 +290,7 @@
     TRUNC
     TYPE
     WEEK
+    WHERE
     YEAR
 
     END_OF_FILE 0 "EOF"
@@ -334,7 +342,7 @@
 %nterm <CNode> typeArray typeValue
 
 // Pipeline stages and related non-terminals.
-%nterm <CNode> pipeline stageList stage inhibitOptimization unionWith skip limit project sample
+%nterm <CNode> pipeline stageList stage inhibitOptimization unionWith skip limit matchStage project sample
 %nterm <CNode> aggregationProjectFields aggregationProjectionObjectFields
 %nterm <CNode> topLevelAggregationProjection aggregationProjection projectionCommon
 %nterm <CNode> aggregationProjectionObject num
@@ -365,11 +373,15 @@
 %nterm <CNode> aggregationOperatorWithoutSlice expressionSingletonArray singleArgExpression
 %nterm <CNode> nonArrayNonObjExpression
 // Match expressions.
-%nterm <CNode> match predicates compoundMatchExprs predValue additionalExprs
-%nterm <std::pair<CNode::Fieldname, CNode>> predicate logicalExpr operatorExpression notExpr
+%nterm <CNode> matchExpression predicates compoundMatchExprs predValue additionalExprs
+%nterm <std::pair<CNode::Fieldname, CNode>> predicate fieldPredicate logicalExpr operatorExpression notExpr matchMod
 %nterm <std::pair<CNode::Fieldname, CNode>> existsExpr typeExpr commentExpr
 %nterm <CNode::Fieldname> logicalExprField
 %nterm <std::vector<CNode>> typeValues
+%nterm <std::pair<CNode::Fieldname, CNode>> matchExpr matchText matchWhere
+
+// $text arguments
+%nterm <CNode> textArgCaseSensitive textArgDiacriticSensitive textArgLanguage textArgSearch
 
 // Find Projection specific rules.
 %nterm <CNode> findProject findProjectFields topLevelFindProjection findProjection
@@ -393,8 +405,8 @@ start:
     START_PIPELINE pipeline {
         *cst = $pipeline;
     }
-    | START_MATCH match {
-        *cst = $match;
+    | START_MATCH matchExpression {
+        *cst = $matchExpression;
     }
     | START_PROJECT findProject {
         *cst = $findProject;
@@ -424,7 +436,7 @@ stageList:
 START_ORDERED_OBJECT: START_OBJECT { lexer.sortObjTokens(); };
 
 stage:
-    inhibitOptimization | unionWith | skip | limit | project | sample
+    inhibitOptimization | unionWith | skip | limit | matchStage | project | sample
 ;
 
 sample: STAGE_SAMPLE START_OBJECT ARG_SIZE num END_OBJECT {
@@ -465,6 +477,12 @@ limit:
     STAGE_LIMIT num {
         $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::limit, $num}}};
 };
+
+matchStage:
+    STAGE_MATCH matchExpression {
+        $$ = CNode{CNode::ObjectChildren{std::pair{KeyFieldname::match, $matchExpression}}};
+    }
+;
 
 project:
     STAGE_PROJECT START_OBJECT aggregationProjectFields END_OBJECT {
@@ -661,7 +679,7 @@ aggregationProjectionObjectField:
     }
 ;
 
-match:
+matchExpression:
     START_OBJECT predicates END_OBJECT {
         $$ = $predicates;
     }
@@ -677,11 +695,20 @@ predicates:
     }
 ;
 
-predicate: predFieldname predValue {
+predicate:
+    fieldPredicate
+    | commentExpr
+
+    // pathless match operators
+    | logicalExpr
+    | matchExpr
+    | matchText
+    | matchWhere
+;
+
+fieldPredicate: predFieldname predValue {
         $$ = {$predFieldname, $predValue};
     }
-    | logicalExpr
-    | commentExpr
 ;
 
 // TODO SERVER-48847: This rule assumes that object predicates always contain sub-expressions.
@@ -706,7 +733,7 @@ compoundMatchExprs:
 
 // Rules for the operators which act on a path.
 operatorExpression:
-    notExpr | existsExpr | typeExpr
+    notExpr | existsExpr | typeExpr | matchMod
 ;
 
 existsExpr:
@@ -772,11 +799,20 @@ notExpr:
     }
 ;
 
+matchMod:
+    MOD START_ARRAY num[divisor] num[remainder] END_ARRAY {
+        $$ = {KeyFieldname::matchMod, CNode{CNode::ArrayChildren{
+            $divisor,
+            $remainder,
+        }}};
+    }
+;
+
 // Logical expressions accept an array of objects, with at least one element. 'additionalExprs'
 // comes before 'match' to allow us to naturally emplace_back() into the CST.
-logicalExpr: logicalExprField START_ARRAY additionalExprs match END_ARRAY {
+logicalExpr: logicalExprField START_ARRAY additionalExprs matchExpression END_ARRAY {
         auto&& children = $additionalExprs;
-        children.arrayChildren().emplace_back($match);
+        children.arrayChildren().emplace_back($matchExpression);
         $$ = {$logicalExprField, std::move(children)};
     }
 ;
@@ -790,9 +826,9 @@ additionalExprs:
     %empty {
         $$ = CNode{CNode::ArrayChildren{}};
     }
-    | additionalExprs[exprs] match {
+    | additionalExprs[exprs] matchExpression {
         $$ = $exprs;
-        $$.arrayChildren().emplace_back($match);
+        $$.arrayChildren().emplace_back($matchExpression);
     }
 ;
 
@@ -803,6 +839,66 @@ invariableUserFieldname:
     FIELDNAME {
         $$ = UserFieldname{$1};
     }
+;
+
+matchExpr:
+    EXPR expression {
+        $$ = {KeyFieldname::expr, $expression};
+    }
+;
+
+matchText:
+    TEXT START_ORDERED_OBJECT
+    textArgCaseSensitive
+    textArgDiacriticSensitive
+    textArgLanguage
+    textArgSearch
+    END_OBJECT
+    {
+        $$ = {
+            KeyFieldname::text,
+            CNode{CNode::ObjectChildren{
+                {KeyFieldname::caseSensitive, $textArgCaseSensitive},
+                {KeyFieldname::diacriticSensitive, $textArgDiacriticSensitive},
+                {KeyFieldname::language, $textArgLanguage},
+                {KeyFieldname::search, $textArgSearch},
+            }
+        }};
+    }
+;
+textArgCaseSensitive:
+    %empty {
+        $$ = CNode{KeyValue::absentKey};
+    }
+    | ARG_CASE_SENSITIVE bool[val] {
+        $$ = $val;
+    }
+;
+textArgDiacriticSensitive:
+    %empty {
+        $$ = CNode{KeyValue::absentKey};
+    }
+    | ARG_DIACRITIC_SENSITIVE bool[val] {
+        $$ = $val;
+    }
+;
+textArgLanguage:
+    %empty {
+        $$ = CNode{KeyValue::absentKey};
+    }
+    | ARG_LANGUAGE string[val] {
+        $$ = $val;
+    }
+;
+textArgSearch:
+    ARG_SEARCH string[val] {
+        $$ = $val;
+    }
+;
+
+matchWhere:
+    WHERE string { $$ = {KeyFieldname::where, $string}; }
+    | WHERE javascript { $$ = {KeyFieldname::where, $javascript}; }
 ;
 
 stageAsUserFieldname:
@@ -819,6 +915,9 @@ stageAsUserFieldname:
     }
     | STAGE_LIMIT {
         $$ = UserFieldname{"$limit"};
+    }
+    | STAGE_MATCH {
+        $$ = UserFieldname{"$match"};
     }
     | STAGE_PROJECT {
         $$ = UserFieldname{"$project"};
@@ -931,6 +1030,18 @@ arg:
     }
     | ARG_MONTH {
         $$ = UserFieldname{"month"};
+    }
+    | ARG_SEARCH {
+        $$ = UserFieldname{"$search"};
+    }
+    | ARG_LANGUAGE {
+        $$ = UserFieldname{"$language"};
+    }
+    | ARG_CASE_SENSITIVE {
+        $$ = UserFieldname{"$caseSensitive"};
+    }
+    | ARG_DIACRITIC_SENSITIVE {
+        $$ = UserFieldname{"$diacriticSensitive"};
     }
 ;
 
@@ -2497,8 +2608,8 @@ findProjection:
 ;
 
 elemMatch:
-    START_OBJECT ELEM_MATCH match END_OBJECT {
-        $$ = {CNode::ObjectChildren{{KeyFieldname::elemMatch, $match}}};
+    START_OBJECT ELEM_MATCH matchExpression END_OBJECT {
+        $$ = {CNode::ObjectChildren{{KeyFieldname::elemMatch, $matchExpression}}};
     }
 ;
 

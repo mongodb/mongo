@@ -46,29 +46,18 @@ namespace mongo {
 ExtensionsCallbackReal::ExtensionsCallbackReal(OperationContext* opCtx, const NamespaceString* nss)
     : _opCtx(opCtx), _nss(nss) {}
 
-StatusWithMatchExpression ExtensionsCallbackReal::parseText(BSONElement text) const {
-    auto textParams = extractTextMatchExpressionParams(text);
-    if (!textParams.isOK()) {
-        return textParams.getStatus();
-    }
-
-    auto exp =
-        std::make_unique<TextMatchExpression>(_opCtx, *_nss, std::move(textParams.getValue()));
-
-    return {std::move(exp)};
+std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createText(
+    TextMatchExpressionBase::TextParams text) const {
+    return std::make_unique<TextMatchExpression>(_opCtx, *_nss, std::move(text));
 }
 
-StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, BSONElement where) const {
-    auto whereParams = extractWhereMatchExpressionParams(where);
-    if (!whereParams.isOK()) {
-        return whereParams.getStatus();
-    }
-
+std::unique_ptr<MatchExpression> ExtensionsCallbackReal::createWhere(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    WhereMatchExpressionBase::WhereParams where) const {
     if (getTestCommandsEnabled() && internalQueryDesugarWhereToFunction.load()) {
         uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", expCtx->ns.db().size() != 0);
 
-        auto code = whereParams.getValue().code;
+        auto code = where.code;
 
         // Desugar $where to $expr. The $where function is invoked through a $function expression by
         // passing the document as $$CURRENT.
@@ -81,12 +70,10 @@ StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(
             code,
             ExpressionFunction::kJavaScript);
 
-        return {std::make_unique<ExprMatchExpression>(fnExpression, expCtx)};
+        return std::make_unique<ExprMatchExpression>(fnExpression, expCtx);
     } else {
         expCtx->hasWhereClause = true;
-        auto exp = std::make_unique<WhereMatchExpression>(
-            _opCtx, std::move(whereParams.getValue()), expCtx->ns.db());
-        return {std::move(exp)};
+        return std::make_unique<WhereMatchExpression>(_opCtx, std::move(where), expCtx->ns.db());
     }
 }
 

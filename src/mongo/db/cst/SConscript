@@ -38,6 +38,9 @@ env.CppUnitTest(
         'cst_test.cpp',
     ],
     LIBDEPS=[
+        # $text depends on FTSAccessMethod.
+        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/matcher/expressions_mongod_only',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'cst',
     ]

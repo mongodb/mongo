@@ -46,11 +46,12 @@
     ENUMIFY(atan)                \
     ENUMIFY(atan2)               \
     ENUMIFY(atanh)               \
+    ENUMIFY(caseSensitive)       \
     ENUMIFY(ceil)                \
     ENUMIFY(charsArg)            \
-    ENUMIFY(commentExpr)         \
     ENUMIFY(cmp)                 \
     ENUMIFY(collArg)             \
+    ENUMIFY(commentExpr)         \
     ENUMIFY(concat)              \
     ENUMIFY(constExpr)           \
     ENUMIFY(convert)             \
@@ -62,16 +63,18 @@
     ENUMIFY(dateStringArg)       \
     ENUMIFY(dateToParts)         \
     ENUMIFY(dateToString)        \
-    ENUMIFY(degreesToRadians)    \
     ENUMIFY(dayArg)              \
     ENUMIFY(dayOfMonth)          \
     ENUMIFY(dayOfWeek)           \
     ENUMIFY(dayOfYear)           \
+    ENUMIFY(degreesToRadians)    \
+    ENUMIFY(diacriticSensitive)  \
     ENUMIFY(divide)              \
     ENUMIFY(elemMatch)           \
     ENUMIFY(eq)                  \
     ENUMIFY(existsExpr)          \
     ENUMIFY(exponent)            \
+    ENUMIFY(expr)                \
     ENUMIFY(findArg)             \
     ENUMIFY(floor)               \
     ENUMIFY(formatArg)           \
@@ -91,6 +94,7 @@
     ENUMIFY(isoWeekArg)          \
     ENUMIFY(isoWeekYear)         \
     ENUMIFY(isoWeekYearArg)      \
+    ENUMIFY(language)            \
     ENUMIFY(limit)               \
     ENUMIFY(literal)             \
     ENUMIFY(ln)                  \
@@ -100,6 +104,7 @@
     ENUMIFY(lte)                 \
     ENUMIFY(ltrim)               \
     ENUMIFY(match)               \
+    ENUMIFY(matchMod)            \
     ENUMIFY(meta)                \
     ENUMIFY(millisecond)         \
     ENUMIFY(millisecondArg)      \
@@ -126,11 +131,14 @@
     ENUMIFY(regexFindAll)        \
     ENUMIFY(regexMatch)          \
     ENUMIFY(replaceAll)          \
-    ENUMIFY(replaceOne)          \
     ENUMIFY(replacementArg)      \
+    ENUMIFY(replaceOne)          \
     ENUMIFY(round)               \
     ENUMIFY(rtrim)               \
     ENUMIFY(sample)              \
+    ENUMIFY(search)              \
+    ENUMIFY(second)              \
+    ENUMIFY(secondArg)           \
     ENUMIFY(setDifference)       \
     ENUMIFY(setEquals)           \
     ENUMIFY(setIntersection)     \
@@ -138,22 +146,21 @@
     ENUMIFY(setUnion)            \
     ENUMIFY(sin)                 \
     ENUMIFY(sinh)                \
-    ENUMIFY(second)              \
-    ENUMIFY(secondArg)           \
     ENUMIFY(sizeArg)             \
     ENUMIFY(skip)                \
     ENUMIFY(slice)               \
     ENUMIFY(split)               \
     ENUMIFY(sqrt)                \
+    ENUMIFY(strcasecmp)          \
     ENUMIFY(strLenBytes)         \
     ENUMIFY(strLenCP)            \
-    ENUMIFY(strcasecmp)          \
     ENUMIFY(substr)              \
     ENUMIFY(substrBytes)         \
     ENUMIFY(substrCP)            \
     ENUMIFY(subtract)            \
     ENUMIFY(tan)                 \
     ENUMIFY(tanh)                \
+    ENUMIFY(text)                \
     ENUMIFY(timezoneArg)         \
     ENUMIFY(toArg)               \
     ENUMIFY(toBool)              \
@@ -171,6 +178,7 @@
     ENUMIFY(type)                \
     ENUMIFY(unionWith)           \
     ENUMIFY(week)                \
+    ENUMIFY(where)               \
     ENUMIFY(year)                \
     ENUMIFY(yearArg)
 
