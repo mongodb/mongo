@@ -71,7 +71,7 @@ const RollbackResumableIndexBuildTest = class {
         // Move the index build forward to a point at which its locks are yielded. This allows the
         // primary to step down during the call to transitionToSyncSourceOperationsBeforeRollback()
         // below.
-        const locksYieldedFp = configureFailPoint(
+        let locksYieldedFp = configureFailPoint(
             originalPrimary, locksYieldedFailPointName, {namespace: coll.getFullName()});
         rollbackEndFp.off();
         locksYieldedFp.wait();
@@ -82,23 +82,37 @@ const RollbackResumableIndexBuildTest = class {
         // but it is still building in the background.
         awaitCreateIndex();
 
-        // Wait until the index build reaches the desired starting point so that we can start the
-        // rollback.
+        // Wait until the index build reaches the desired starting point for the rollback.
         locksYieldedFp.off();
         rollbackStartFp.wait();
 
-        // We ignore the return value here because the node will go into rollback immediately upon
-        // the failpoint being disabled, causing the configureFailPoint command to appear as if it
-        // failed to run due to a network error despite successfully disabling the failpoint.
-        startParallelShell(
-            funWithArgs(function(rollbackStartFailPointName) {
-                // Wait until we reach rollback state and then disable the failpoint
-                // so that the index build can be interrupted for rollback.
-                checkLog.containsJson(db.getMongo(), 21593);
-                db.adminCommand({configureFailPoint: rollbackStartFailPointName, mode: "off"});
-            }, rollbackStartFailPointName), originalPrimary.port);
+        // Let the index build yield its locks so that it can be aborted for rollback.
+        locksYieldedFp = configureFailPoint(
+            originalPrimary, locksYieldedFailPointName, {namespace: coll.getFullName()});
+        rollbackStartFp.off();
+        locksYieldedFp.wait();
+
+        const awaitDisableFailPoint = startParallelShell(
+            // Wait for the index build to be aborted for rollback.
+            funWithArgs(
+                function(buildUUID, locksYieldedFailPointName) {
+                    checkLog.containsJson(db.getMongo(), 465611, {
+                        buildUUID: function(uuid) {
+                            return uuid["uuid"]["$uuid"] === buildUUID;
+                        }
+                    });
+
+                    // Disable the failpoint so that the builder thread can exit and rollback can
+                    // continue.
+                    assert.commandWorked(db.adminCommand(
+                        {configureFailPoint: locksYieldedFailPointName, mode: "off"}));
+                },
+                buildUUID,
+                locksYieldedFailPointName),
+            originalPrimary.port);
 
         rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+        awaitDisableFailPoint();
 
         // Ensure that the index build was interrupted for rollback.
         checkLog.containsJson(originalPrimary, 20347, {
