@@ -530,12 +530,13 @@ public:
             LOGV2_DEBUG(23905, 3, "Using exhaust for isMaster or hello protocol");
 
             uassert(51756,
-                    "An isMaster request with exhaust must specify 'maxAwaitTimeMS'",
+                    "An isMaster or hello request with exhaust must specify 'maxAwaitTimeMS'",
                     maxAwaitTimeMSField);
             invariant(clientTopologyVersion);
 
             InExhaustIsMaster::get(opCtx->getClient()->session().get())
-                ->setInExhaustIsMaster(true /* inExhaustIsMaster */);
+                ->setInExhaustIsMaster(true /* inExhaust */,
+                                       cmdObj.firstElementFieldNameStringData());
 
             if (clientTopologyVersion->getProcessId() == currentTopologyVersion.getProcessId() &&
                 clientTopologyVersion->getCounter() == currentTopologyVersion.getCounter()) {

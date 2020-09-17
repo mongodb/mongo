@@ -375,7 +375,7 @@ void runCommand(OperationContext* opCtx,
     if (session) {
         if (!opCtx->isExhaust() ||
             (command->getName() != "hello"_sd && command->getName() != "isMaster"_sd)) {
-            InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
+            InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false, commandName);
         }
     }
 

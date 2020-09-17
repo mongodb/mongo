@@ -54,6 +54,18 @@ void IsMasterMetrics::decrementNumExhaustIsMaster() {
     _exhaustIsMasterConnections.fetchAndSubtract(1);
 }
 
+size_t IsMasterMetrics::getNumExhaustHello() const {
+    return _exhaustHelloConnections.load();
+}
+
+void IsMasterMetrics::incrementNumExhaustHello() {
+    _exhaustHelloConnections.fetchAndAdd(1);
+}
+
+void IsMasterMetrics::decrementNumExhaustHello() {
+    _exhaustHelloConnections.fetchAndSubtract(1);
+}
+
 size_t IsMasterMetrics::getNumAwaitingTopologyChanges() const {
     return _connectionsAwaitingTopologyChanges.load();
 }
@@ -78,19 +90,45 @@ InExhaustIsMaster::~InExhaustIsMaster() {
     if (_inExhaustIsMaster) {
         IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
     }
+    if (_inExhaustHello) {
+        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
+    }
 }
 
 bool InExhaustIsMaster::getInExhaustIsMaster() const {
     return _inExhaustIsMaster;
 }
 
-void InExhaustIsMaster::setInExhaustIsMaster(bool inExhaustIsMaster) {
-    if (!_inExhaustIsMaster && inExhaustIsMaster) {
-        IsMasterMetrics::get(getGlobalServiceContext())->incrementNumExhaustIsMaster();
-    } else if (_inExhaustIsMaster && !inExhaustIsMaster) {
-        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
+bool InExhaustIsMaster::getInExhaustHello() const {
+    return _inExhaustHello;
+}
+
+void InExhaustIsMaster::setInExhaustIsMaster(bool inExhaust, StringData commandName) {
+    bool isHello = (commandName == "hello"_sd);
+
+    // Transition out of exhaust hello if setting inExhaust to false or if
+    // the isMaster command is used.
+    if (_inExhaustHello && (!inExhaust || !isHello)) {
+        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
+        _inExhaustHello = false;
     }
-    _inExhaustIsMaster = inExhaustIsMaster;
+
+    // Transition out of exhaust isMaster if setting inExhaust to false or if
+    // the hello command is used.
+    if (_inExhaustIsMaster && (!inExhaust || isHello)) {
+        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
+        _inExhaustIsMaster = false;
+    }
+
+    if (inExhaust) {
+        if (isHello && !_inExhaustHello) {
+            IsMasterMetrics::get(getGlobalServiceContext())->incrementNumExhaustHello();
+            _inExhaustHello = inExhaust;
+        } else if (!isHello && !_inExhaustIsMaster) {
+            IsMasterMetrics::get(getGlobalServiceContext())->incrementNumExhaustIsMaster();
+            _inExhaustIsMaster = inExhaust;
+        }
+    }
 }
 
 }  // namespace mongo

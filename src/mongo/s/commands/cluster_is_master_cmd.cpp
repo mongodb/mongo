@@ -220,15 +220,16 @@ public:
         topologyVersionBuilder.done();
 
         if (opCtx->isExhaust()) {
-            LOGV2_DEBUG(23872, 3, "Using exhaust for isMaster protocol");
+            LOGV2_DEBUG(23872, 3, "Using exhaust for isMaster or hello protocol");
 
             uassert(51763,
-                    "An isMaster request with exhaust must specify 'maxAwaitTimeMS'",
+                    "An isMaster or hello request with exhaust must specify 'maxAwaitTimeMS'",
                     maxAwaitTimeMSField);
             invariant(clientTopologyVersion);
 
             InExhaustIsMaster::get(opCtx->getClient()->session().get())
-                ->setInExhaustIsMaster(true /* inExhaustIsMaster */);
+                ->setInExhaustIsMaster(true /* inExhaust */,
+                                       cmdObj.firstElementFieldNameStringData());
 
             if (clientTopologyVersion->getProcessId() == mongosTopologyVersion.getProcessId() &&
                 clientTopologyVersion->getCounter() == mongosTopologyVersion.getCounter()) {

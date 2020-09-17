@@ -1381,7 +1381,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
             if (session) {
                 if (!opCtx->isExhaust() ||
                     (c->getName() != "hello"_sd && c->getName() != "isMaster"_sd)) {
-                    InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
+                    InExhaustIsMaster::get(session.get())
+                        ->setInExhaustIsMaster(false, request.getCommandName());
                 }
             }
 
