@@ -55,6 +55,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 using namespace fmt::literals;
@@ -560,7 +561,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
         {
             BSONArrayBuilder skVarBuilder(letBuilder.subarrayStart("sk"));
             for (auto&& field : newShardKeyPattern.toBSON()) {
-                skVarBuilder.append("$original." + field.fieldNameStringData());
+                if (ShardKeyPattern::isHashedPatternEl(field)) {
+                    skVarBuilder.append(BSON("$toHashedIndexKey"
+                                             << "$original." + field.fieldNameStringData()));
+                } else {
+                    skVarBuilder.append("$original." + field.fieldNameStringData());
+                }
             }
         }
     }
