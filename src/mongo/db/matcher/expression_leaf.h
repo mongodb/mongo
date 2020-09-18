@@ -670,7 +670,7 @@ public:
         return _bitPositions;
     }
 
-    const uint64_t getBitMask() const {
+    uint64_t getBitMask() const {
         return _bitMask;
     }
 
