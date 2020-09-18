@@ -48,6 +48,14 @@ RecipientStateMachine::RecipientStateMachine(const BSONObj& recipientDoc)
           IDLParserErrorContext("ReshardingRecipientDocument"), recipientDoc)),
       _id(_recipientDoc.getCommonReshardingMetadata().get_id()) {}
 
+RecipientStateMachine::~RecipientStateMachine() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    invariant(_allDonorsPreparedToDonate.getFuture().isReady());
+    invariant(_allDonorsMirroring.getFuture().isReady());
+    invariant(_coordinatorHasCommitted.getFuture().isReady());
+    invariant(_completionPromise.getFuture().isReady());
+}
+
 void RecipientStateMachine::run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToInitialized(); })
@@ -74,7 +82,40 @@ void RecipientStateMachine::run(std::shared_ptr<executor::ScopedTaskExecutor> ex
             this->_transitionStateToError(status);
             return status;
         })
-        .getAsync([](Status) {});
+        .getAsync([this](Status status) {
+            stdx::lock_guard<Latch> lg(_mutex);
+            if (_completionPromise.getFuture().isReady()) {
+                // interrupt() was called before we got her.e
+                return;
+            }
+
+            if (status.isOK()) {
+                _completionPromise.emplaceValue();
+            } else {
+                // Set error on all promises
+                _completionPromise.setError(status);
+            }
+        });
+}
+
+void RecipientStateMachine::interrupt(Status status) {
+    // Resolve any unresolved promises to avoid hanging.
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_allDonorsPreparedToDonate.getFuture().isReady()) {
+        _allDonorsPreparedToDonate.setError(status);
+    }
+
+    if (!_allDonorsMirroring.getFuture().isReady()) {
+        _allDonorsMirroring.setError(status);
+    }
+
+    if (!_coordinatorHasCommitted.getFuture().isReady()) {
+        _coordinatorHasCommitted.setError(status);
+    }
+
+    if (!_completionPromise.getFuture().isReady()) {
+        _completionPromise.setError(status);
+    }
 }
 
 void onReshardingFieldsChanges(boost::optional<TypeCollectionReshardingFields> reshardingFields) {}

@@ -142,7 +142,15 @@ bool stateTransitionIncomplete(WithLock lk,
 
 ReshardingCoordinatorObserver::ReshardingCoordinatorObserver() = default;
 
-ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() = default;
+ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    invariant(_allRecipientsCreatedCollection.getFuture().isReady());
+    invariant(_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
+    invariant(_allRecipientsFinishedCloning.getFuture().isReady());
+    invariant(_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
+    invariant(_allRecipientsRenamedCollection.getFuture().isReady());
+    invariant(_allDonorsDroppedOriginalCollection.getFuture().isReady());
+}
 
 void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
     const ReshardingCoordinatorDocument& updatedStateDoc) {
@@ -218,6 +226,33 @@ ReshardingCoordinatorObserver::awaitAllDonorsDroppedOriginalCollection() {
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsRenamedCollection() {
     return _allRecipientsRenamedCollection.getFuture();
+}
+
+void ReshardingCoordinatorObserver::interrupt(Status status) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_allRecipientsCreatedCollection.getFuture().isReady()) {
+        _allRecipientsCreatedCollection.setError(status);
+    }
+
+    if (!_allDonorsReportedMinFetchTimestamp.getFuture().isReady()) {
+        _allDonorsReportedMinFetchTimestamp.setError(status);
+    }
+
+    if (!_allRecipientsFinishedCloning.getFuture().isReady()) {
+        _allRecipientsFinishedCloning.setError(status);
+    }
+
+    if (!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady()) {
+        _allRecipientsReportedStrictConsistencyTimestamp.setError(status);
+    }
+
+    if (!_allRecipientsRenamedCollection.getFuture().isReady()) {
+        _allRecipientsRenamedCollection.setError(status);
+    }
+
+    if (!_allDonorsDroppedOriginalCollection.getFuture().isReady()) {
+        _allDonorsDroppedOriginalCollection.setError(status);
+    }
 }
 
 }  // namespace mongo

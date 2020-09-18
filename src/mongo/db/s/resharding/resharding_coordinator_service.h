@@ -72,10 +72,19 @@ public:
         : public PrimaryOnlyService::TypedInstance<ReshardingCoordinator> {
     public:
         explicit ReshardingCoordinator(const BSONObj& state);
+        ~ReshardingCoordinator();
 
         void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
-        void interrupt(Status status) override{};
+        void interrupt(Status status) override;
+
+        /**
+         * Returns a Future that will be resolved when all work associated with this Instance has
+         * completed running.
+         */
+        SharedSemiFuture<void> getCompletionFuture() const {
+            return _completionPromise.getFuture();
+        }
 
         /**
          * TODO(SERVER-50976) Report ReshardingCoordinators in currentOp().
@@ -196,11 +205,6 @@ public:
         // collection. The object looks like: {_id: 'reshardingUUID'}
         const InstanceID _id;
 
-        // Promise containing the initial chunks and new zones based on the new shard key. These are
-        // not a part of the state document, so must be set by configsvrReshardCollection after
-        // construction.
-        SharedPromise<ChunksAndZones> _initialChunksAndZonesPromise;
-
         // Observes writes that indicate state changes for this resharding operation and notifies
         // 'this' when all donors/recipients have entered some state so that 'this' can transition
         // states.
@@ -208,6 +212,17 @@ public:
 
         // The updated coordinator state document.
         ReshardingCoordinatorDocument _stateDoc;
+
+        // Protects promises below.
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorService::_mutex");
+
+        // Promise containing the initial chunks and new zones based on the new shard key. These are
+        // not a part of the state document, so must be set by configsvrReshardCollection after
+        // construction.
+        SharedPromise<ChunksAndZones> _initialChunksAndZonesPromise;
+
+        // Promise that is resolved when the chain of work kicked off by run() has completed.
+        SharedPromise<void> _completionPromise;
     };
 };
 

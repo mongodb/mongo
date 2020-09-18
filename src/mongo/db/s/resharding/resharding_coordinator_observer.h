@@ -102,6 +102,11 @@ public:
      */
     SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsRenamedCollection();
 
+    /**
+     * Sets errors on any promises that have not yet been fulfilled.
+     */
+    void interrupt(Status status);
+
 private:
     // Protects the state below
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorObserver::_mutex");

@@ -68,9 +68,19 @@ class RecipientStateMachine final
 public:
     explicit RecipientStateMachine(const BSONObj& recipientDoc);
 
+    ~RecipientStateMachine();
+
     void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
-    void interrupt(Status status) override{};
+    void interrupt(Status status) override;
+
+    /**
+     * Returns a Future that will be resolved when all work associated with this Instance has
+     * completed running.
+     */
+    SharedSemiFuture<void> getCompletionFuture() const {
+        return _completionPromise.getFuture();
+    }
 
     /**
      * TODO(SERVER-51021) Report ReshardingRecipientService Instances in currentOp().
@@ -119,6 +129,12 @@ private:
     // config.localReshardingOperations.recipient.
     ReshardingRecipientDocument _recipientDoc;
 
+    // The id both for the resharding operation and for the primary-only-service instance.
+    const UUID _id;
+
+    // Protects the promises below
+    Mutex _mutex = MONGO_MAKE_LATCH("ReshardingRecipient::_mutex");
+
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
     SharedPromise<Timestamp> _allDonorsPreparedToDonate;
@@ -127,8 +143,7 @@ private:
 
     SharedPromise<void> _coordinatorHasCommitted;
 
-    // The id both for the resharding operation and for the primary-only-service instance.
-    const UUID _id;
+    SharedPromise<void> _completionPromise;
 };
 
 }  // namespace mongo

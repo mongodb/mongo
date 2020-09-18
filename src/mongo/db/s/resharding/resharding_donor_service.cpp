@@ -92,6 +92,13 @@ DonorStateMachine::DonorStateMachine(const BSONObj& donorDoc)
                                                donorDoc)),
       _id(_donorDoc.getCommonReshardingMetadata().get_id()) {}
 
+DonorStateMachine::~DonorStateMachine() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    invariant(_allRecipientsDoneApplying.getFuture().isReady());
+    invariant(_coordinatorHasCommitted.getFuture().isReady());
+    invariant(_completionPromise.getFuture().isReady());
+}
+
 void DonorStateMachine::run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
         .then([this] { _transitionState(DonorStateEnum::kPreparingToDonate); })
@@ -114,7 +121,35 @@ void DonorStateMachine::run(std::shared_ptr<executor::ScopedTaskExecutor> execut
             this->_transitionStateToError(status);
             return status;
         })
-        .getAsync([](Status) {});
+        .getAsync([this](Status status) {
+            stdx::lock_guard<Latch> lg(_mutex);
+            if (_completionPromise.getFuture().isReady()) {
+                // interrupt() was called before we got here.
+                return;
+            }
+
+            if (status.isOK()) {
+                _completionPromise.emplaceValue();
+            } else {
+                _completionPromise.setError(status);
+            }
+        });
+}
+
+void DonorStateMachine::interrupt(Status status) {
+    // Resolve any unresolved promises to avoid hanging.
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_allRecipientsDoneApplying.getFuture().isReady()) {
+        _allRecipientsDoneApplying.setError(status);
+    }
+
+    if (!_coordinatorHasCommitted.getFuture().isReady()) {
+        _coordinatorHasCommitted.setError(status);
+    }
+
+    if (!_completionPromise.getFuture().isReady()) {
+        _completionPromise.setError(status);
+    }
 }
 
 void DonorStateMachine::onReshardingFieldsChanges(

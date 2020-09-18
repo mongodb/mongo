@@ -113,6 +113,8 @@ TEST_F(ReshardingCoordinatorObserverTest, onReshardingParticipantTransitionSucce
     auto coordinatorDoc1 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards1, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc1);
     ASSERT_TRUE(fut.isReady());
+
+    reshardingObserver->interrupt(Status{ErrorCodes::Interrupted, "interrupted"});
 }
 
 TEST_F(ReshardingCoordinatorObserverTest, onReshardingParticipantTransitionTwoOutOfOrder) {
@@ -146,6 +148,8 @@ TEST_F(ReshardingCoordinatorObserverTest, onReshardingParticipantTransitionTwoOu
     auto coordinatorDoc2 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards2, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc2);
     ASSERT_TRUE(fut.isReady());
+
+    reshardingObserver->interrupt(Status{ErrorCodes::Interrupted, "interrupted"});
 }
 
 TEST_F(ReshardingCoordinatorObserverTest, participantReportsError) {
@@ -167,6 +171,8 @@ TEST_F(ReshardingCoordinatorObserverTest, participantReportsError) {
     // If any participant is in state kError, regardless of other participants' states, an error
     // should be set.
     ASSERT_EQ(resp.getStatus(), ErrorCodes::InternalError);
+
+    reshardingObserver->interrupt(Status{ErrorCodes::Interrupted, "interrupted"});
 }
 
 TEST_F(ReshardingCoordinatorObserverTest, onDonorsReportedMinFetchTimestamp) {
@@ -191,6 +197,8 @@ TEST_F(ReshardingCoordinatorObserverTest, onDonorsReportedMinFetchTimestamp) {
     auto coordinatorDoc1 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards, donorShards1);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc1);
     ASSERT_TRUE(fut.isReady());
+
+    reshardingObserver->interrupt(Status{ErrorCodes::Interrupted, "interrupted"});
 }
 }  // namespace
 }  // namespace mongo
