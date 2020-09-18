@@ -30,6 +30,12 @@ TestData.numDocs = 4;
 // (i.e. after they have established a snapshot but before they have returned any documents).
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 2}));
 
+// Set 'internalQueryExecYieldPeriodMS' to 24 hours to significantly reduce a probability of a
+// situation occuring where the execution threads do not receive enough CPU time and commands yield
+// on timeout (i.e. yield period expiration) instead of on the second try as expected by setting
+// parameter 'internalQueryExecYieldIterations' to 2.
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldPeriodMS: 86400000}));
+
 function assertKillPending(opId) {
     const res =
         adminDB.aggregate([{$currentOp: {}}, {$match: {ns: coll.getFullName(), opid: opId}}])
