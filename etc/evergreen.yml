@@ -7816,38 +7816,6 @@ buildvariants:
     distros:
     - ubuntu1804-test
 
-- name: ubuntu1804-s390x
-  display_name: SSL Ubuntu 18.04 s390x
-  run_on:
-  - ubuntu1804-zseries-test
-  batchtime: 10080 # 7 days
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: s390x-ubuntu1804
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu1804 --release --jlink=3 -j$(grep -c ^processor /proc/cpuinfo) CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1804
-    multiversion_edition: targeted
-    multiversion_architecture: s390x
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: s390x
-    packager_distro: ubuntu1804
-    repo_edition: org
-    tooltags: "ssl"
-    build_mongoreplay: true
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - ubuntu1804-zseries-build
-  - name: jsCore
-  - name: replica_sets_jscore_passthrough
-  - name: ssl_gen
-  - name: .publish
-    distros:
-    - ubuntu1804-test
-
 - name: enterprise-ubuntu1804-s390x
   display_name: Enterprise Ubuntu 18.04 s390x
   modules:
@@ -9710,64 +9678,6 @@ buildvariants:
     distros:
     - rhel62-small
 
-- name: rhel-72-s390x
-  display_name: SSL RHEL 7.2 s390x
-  run_on:
-  - rhel72-zseries-test
-  batchtime: 1440 # 1 day
-  expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel72 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: s390x
-    packager_distro: rhel72
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: s390x-rhel72
-    repo_edition: org
-    build_mongoreplay: true
-    tooltags: "ssl"
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel72-zseries-build
-  - name: jsCore
-  - name: replica_sets_jscore_passthrough
-  - name: ssl_gen
-  - name: .publish
-    distros:
-    - rhel70-small
-
-- name: rhel-67-s390x
-  display_name: SSL RHEL 6.7 s390x
-  run_on:
-  - rhel67-zseries-test
-  batchtime: 1440 # 1 day
-  expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel67 --release -j3 CCFLAGS="-march=z9-109 -mtune=z10" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --use-hardware-crc32=off
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: s390x
-    packager_distro: rhel67
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: s390x-rhel67
-    repo_edition: org
-    build_mongoreplay: true
-    tooltags: "ssl"
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - rhel67-zseries-build
-  - name: jsCore
-  - name: replica_sets_jscore_passthrough
-  - name: ssl_gen
-  - name: .publish
-    distros:
-    - rhel62-small
-
 ###########################################
 #          Ubuntu buildvariants           #
 ###########################################
@@ -9968,40 +9878,6 @@ buildvariants:
   - name: .publish
     distros:
     - suse12-test
-
-- name: suse12-s390x
-  display_name: SSL SLES 12 s390x
-  run_on:
-  - suse12-zseries-test
-  batchtime: 10080 # 7 days
-  stepback: false
-  expansions:
-    push_path: linux
-    push_bucket: downloads.mongodb.org
-    push_name: linux
-    push_arch: s390x-suse12
-    compile_flags: --ssl MONGO_DISTMOD=suse12 --release -j3 CCFLAGS="-march=z196 -mtune=zEC12" --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: s390x
-    packager_distro: suse12
-    repo_edition: org
-    tooltags: "ssl sasl gssapi"
-    build_mongoreplay: true
-    multiversion_platform: suse12
-    multiversion_architecture: s390x
-    multiversion_edition: targeted
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - suse12-zseries-build
-  - name: jsCore
-  - name: replica_sets_jscore_passthrough
-  - name: ssl_gen
-  - name: .publish
-    distros:
-    - suse12-test
-
 
 - name: suse12
   display_name: SSL SUSE 12
