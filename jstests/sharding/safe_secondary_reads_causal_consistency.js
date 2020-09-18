@@ -124,6 +124,11 @@ hangBeforeRefreshFP.wait();
 // will be blocked behind the critical section. This insert will be used to test causal consistency
 // in the later read.
 jsTest.log("Sending insert through mongos0.");
+
+// Wait for effects of _configsvrCommitChunkMigration to be majority-committed snapshot on all
+// config server members since the mongos may refresh from a node other than the primary.
+st.configRS.awaitLastOpCommitted();
+
 assert.commandWorked(mongos0AlphaDB.adminCommand({flushRouterConfig: 1}));
 assert.commandWorked(mongos0AlphaDB.runCommand(
     {insert: collName1, documents: [{_id: 2}], writeConcern: {w: 'majority'}}));
