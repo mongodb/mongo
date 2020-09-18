@@ -223,7 +223,7 @@ private:
     void _maybePopCodeWithScope(Cursor cursor) {
         if constexpr (precise) {
             // When ending the scope of a CodeWScope, pop the extra dummy frame and check its size.
-            if (_currFrame != _frames.begin() && _currFrame[-1].elem.type() == CodeWScope) {
+            if (_currFrame != _frames.begin() && (_currFrame - 1)->elem.type() == CodeWScope) {
                 invariant(_popFrame());
                 uassert(InvalidBSON, "incorrect BSON length", cursor.ptr == _currFrame->end);
             }
