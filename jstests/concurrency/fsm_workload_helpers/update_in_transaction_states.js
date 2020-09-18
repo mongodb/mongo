@@ -51,7 +51,8 @@ function verifyDocuments(db, collName, tid) {
     docs.forEach(doc => {
         const expectedCounter = expectedCounters[collName][doc._id];
         assertWhenOwnColl.eq(expectedCounter, doc.counter, () => {
-            return 'unexpected counter value for collection ' + collName + ', doc: ' + tojson(doc);
+            return 'unexpected counter value for collection ' + db[collName] +
+                ', doc: ' + tojson(doc);
         });
     });
 }

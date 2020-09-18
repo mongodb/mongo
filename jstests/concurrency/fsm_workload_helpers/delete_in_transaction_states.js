@@ -43,7 +43,7 @@ function getIdForDelete(collName) {
 function exactIdDelete(db, collName, session) {
     // If no documents remain in our partition, there is nothing to do.
     if (!expectedDocuments[collName].length) {
-        print('This thread owns no more documents for collection ' + collName +
+        print('This thread owns no more documents for collection ' + db[collName] +
               ', skipping exactIdDelete stage');
         return;
     }
@@ -68,7 +68,7 @@ function exactIdDelete(db, collName, session) {
 function multiDelete(db, collName, session, tid) {
     // If no documents remain in our partition, there is nothing to do.
     if (!expectedDocuments[collName].length) {
-        print('This thread owns no more documents for collection ' + collName +
+        print('This thread owns no more documents for collection ' + db[collName] +
               ', skipping multiDelete stage');
         return;
     }
@@ -94,15 +94,15 @@ function multiDelete(db, collName, session, tid) {
 function verifyDocuments(db, collName, tid) {
     const docs = db[collName].find({tid: tid}).toArray();
     assertWhenOwnColl.eq(expectedDocuments[collName].length, docs.length, () => {
-        return 'unexpected number of documents for collection ' + collName +
-            ', docs: ' + tojson(docs) + ', expected docs: ' + tojson(expectedDocuments[collName]);
+        return 'unexpected number of documents for ' + db[collName] + ', docs: ' + tojson(docs) +
+            ', expected docs: ' + tojson(expectedDocuments[collName]);
     });
 
     // Verify only the documents we haven't tried to delete were found.
     const expectedDocIds = new Set(expectedDocuments[collName].map(doc => doc._id));
     docs.forEach(doc => {
         assertWhenOwnColl(expectedDocIds.has(doc._id), () => {
-            return 'expected document for collection ' + collName +
+            return 'expected document for collection ' + db[collName] +
                 ' to be deleted, doc: ' + tojson(doc);
         });
         expectedDocIds.delete(doc._id);
@@ -110,7 +110,7 @@ function verifyDocuments(db, collName, tid) {
 
     // All expected document ids should have been found in the collection.
     assertWhenOwnColl.eq(0, expectedDocIds.size, () => {
-        return 'did not find all expected documents for collection ' + collName +
+        return 'did not find all expected documents for collection ' + db[collName] +
             ', _ids not found: ' + tojson(expectedDocIds);
     });
 }
