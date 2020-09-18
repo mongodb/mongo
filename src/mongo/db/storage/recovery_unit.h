@@ -635,6 +635,13 @@ public:
         return _noEvictionAfterRollback;
     }
 
+    /**
+     * Returns true if this is an instance of RecoveryUnitNoop.
+     */
+    virtual bool isNoop() const {
+        return false;
+    }
+
 protected:
     RecoveryUnit();
 

@@ -488,7 +488,7 @@ public:
     mutable std::unique_ptr<Timestamp> stableTimestamp = std::make_unique<Timestamp>();
 };
 
-class TimestampKVEngineTest : public ServiceContextMongoDTest {
+class TimestampKVEngineTest : public ServiceContextTest {
 public:
     using TimestampType = StorageEngineImpl::TimestampMonitor::TimestampType;
     using TimestampListener = StorageEngineImpl::TimestampMonitor::TimestampListener;
@@ -496,19 +496,28 @@ public:
     /**
      * Create an instance of the KV Storage Engine so that we have a timestamp monitor operating.
      */
-    TimestampKVEngineTest() {
+    void setUp() {
+        ServiceContextTest::setUp();
+
+        auto opCtx = makeOperationContext();
+
+        auto runner = makePeriodicRunner(getServiceContext());
+        getServiceContext()->setPeriodicRunner(std::move(runner));
+
         StorageEngineOptions options{/*directoryPerDB=*/false,
                                      /*directoryForIndexes=*/false,
                                      /*forRepair=*/false,
                                      /*lockFileCreatedByUncleanShutdown=*/false};
-        _storageEngine =
-            std::make_unique<StorageEngineImpl>(std::make_unique<TimestampMockKVEngine>(), options);
+        _storageEngine = std::make_unique<StorageEngineImpl>(
+            opCtx.get(), std::make_unique<TimestampMockKVEngine>(), options);
         _storageEngine->finishInit();
     }
 
-    ~TimestampKVEngineTest() {
+    void tearDown() {
         _storageEngine->cleanShutdown();
         _storageEngine.reset();
+
+        ServiceContextTest::tearDown();
     }
 
     std::unique_ptr<StorageEngineImpl> _storageEngine;

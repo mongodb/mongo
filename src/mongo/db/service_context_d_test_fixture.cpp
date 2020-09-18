@@ -91,7 +91,8 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(std::string engine, RepairAct
 
     // Since unit tests start in their own directories, skip lock file and metadata file for faster
     // startup.
-    initializeStorageEngine(serviceContext,
+    auto opCtx = serviceContext->makeOperationContext(getClient());
+    initializeStorageEngine(opCtx.get(),
                             StorageEngineInitFlags::kAllowNoLockFile |
                                 StorageEngineInitFlags::kSkipMetadataFile);
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);

@@ -56,6 +56,10 @@ public:
         return false;
     }
 
+    bool isNoop() const override {
+        return true;
+    }
+
 private:
     void doCommitUnitOfWork() final {
         for (auto& change : _changes) {

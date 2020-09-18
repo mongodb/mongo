@@ -178,6 +178,13 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, SetReadSource) {
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
     OperationContext* opCtx1 = clientAndCtx1.second.get();
+    OperationContext* opCtx2 = clientAndCtx2.second.get();
+
+    // Hold the global locks throughout the test to avoid having the global lock destructor
+    // prematurely abandon snapshots.
+    Lock::GlobalLock globalLock1(opCtx1, MODE_IX);
+    Lock::GlobalLock globalLock2(opCtx2, MODE_IX);
+
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx1, "a.b"));
 
     const std::string str = str::stream() << "test";
@@ -211,7 +218,6 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {
         // Start, but do not commit a transaction with opCtx2. This sets a timestamp at ts2, which
         // creates a hole. kNoOverlap, which is a function of all_durable, will only be able to read
         // at the time immediately before.
-        OperationContext* opCtx2 = clientAndCtx2.second.get();
         WriteUnitOfWork wuow(opCtx2);
         StatusWith<RecordId> res =
             rs->insertRecord(opCtx2, str.c_str(), str.size() + 1, Timestamp());
@@ -610,17 +616,21 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbor
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, ReadOnceCursorsAreNotCached) {
     auto opCtx = clientAndCtx1.second.get();
+
+    // Hold the global lock throughout the test to avoid having the global lock destructor
+    // prematurely abandon snapshots.
+    Lock::GlobalLock globalLock(opCtx, MODE_IX);
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
 
     std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx, "test.read_once"));
     auto uri = dynamic_cast<WiredTigerRecordStore*>(rs.get())->getURI();
 
     // Insert a record.
-    ru->beginUnitOfWork(opCtx);
+    WriteUnitOfWork wuow(opCtx);
     StatusWith<RecordId> s = rs->insertRecord(opCtx, "data", 4, Timestamp());
     ASSERT_TRUE(s.isOK());
     ASSERT_EQUALS(1, rs->numRecords(opCtx));
-    ru->commitUnitOfWork();
+    wuow.commit();
 
     // Test 1: A normal read should create a new cursor and release it into the session cache.
 

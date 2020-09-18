@@ -232,8 +232,13 @@ ServiceContext* initialize(const char* yaml_config) {
     serviceContext->setPeriodicRunner(std::move(periodicRunner));
 
     setUpCatalog(serviceContext);
+
+    // Creating the operation context before initializing the storage engine allows the storage
+    // engine initialization to make use of the lock manager.
+    auto startupOpCtx = serviceContext->makeOperationContext(&cc());
+
     auto lastStorageEngineShutdownState =
-        initializeStorageEngine(serviceContext, StorageEngineInitFlags::kAllowNoLockFile);
+        initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags::kAllowNoLockFile);
     invariant(LastStorageEngineShutdownState::kClean == lastStorageEngineShutdownState);
     StorageControl::startStorageControls(serviceContext);
 
@@ -275,8 +280,6 @@ ServiceContext* initialize(const char* yaml_config) {
     }
 
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupEmbedded);
-
-    auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
     bool canCallFCVSetIfCleanStartup =
         !storageGlobalParams.readOnly && !(storageGlobalParams.engine == "devnull");

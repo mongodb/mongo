@@ -83,23 +83,33 @@ protected:
                            const CollectionOptions& options,
                            KVPrefix prefix,
                            DurableCatalogImpl* catalog) {
+        Lock::DBLock dbLk(opCtx, ns.db(), MODE_IX);
         auto swEntry = catalog->_addEntry(opCtx, ns, options, prefix);
         ASSERT_OK(swEntry.getStatus());
         return swEntry.getValue().catalogId;
     }
 
-    Status renameCollection(OperationContext* opCtx,
-                            RecordId catalogId,
-                            StringData toNS,
-                            bool stayTemp,
-                            DurableCatalogImpl* catalog) {
-        return catalog->_replaceEntry(opCtx, catalogId, NamespaceString(toNS), stayTemp);
-    }
-
     Status dropCollection(OperationContext* opCtx,
                           RecordId catalogId,
                           DurableCatalogImpl* catalog) {
+        Lock::GlobalLock globalLk(opCtx, MODE_IX);
         return catalog->_removeEntry(opCtx, catalogId);
+    }
+
+    void putMetaData(OperationContext* opCtx,
+                     DurableCatalogImpl* catalog,
+                     RecordId catalogId,
+                     BSONCollectionCatalogEntry::MetaData& md) {
+        Lock::GlobalLock globalLk(opCtx, MODE_IX);
+        catalog->putMetaData(opCtx, catalogId, md);
+    }
+
+    std::string getIndexIdent(OperationContext* opCtx,
+                              DurableCatalogImpl* catalog,
+                              RecordId catalogId,
+                              StringData idxName) {
+        Lock::GlobalLock globalLk(opCtx, MODE_IS);
+        return catalog->getIndexIdent(opCtx, catalogId, idxName);
     }
 
     std::unique_ptr<KVHarnessHelper> helper;
@@ -1155,6 +1165,8 @@ TEST_F(DurableCatalogImplTest, Coll1) {
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
+        Lock::GlobalLock globalLk(opCtx, MODE_IX);
+
         WriteUnitOfWork uow(opCtx);
         catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
         catalog->init(opCtx);
@@ -1224,7 +1236,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(opCtx, catalogId, md);
+        putMetaData(opCtx, catalog.get(), catalogId, md);
         uow.commit();
     }
 
@@ -1232,14 +1244,15 @@ TEST_F(DurableCatalogImplTest, Idx1) {
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        idxIndent = catalog->getIndexIdent(opCtx, catalogId, "foo");
+        idxIndent = getIndexIdent(opCtx, catalog.get(), catalogId, "foo");
     }
 
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        ASSERT_EQUALS(idxIndent, catalog->getIndexIdent(opCtx, catalogId, "foo"));
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(opCtx, catalogId, "foo")));
+        ASSERT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
+        ASSERT_TRUE(
+            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
     }
 
     {
@@ -1249,7 +1262,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
 
         BSONCollectionCatalogEntry::MetaData md;
         md.ns = "a.b";
-        catalog->putMetaData(opCtx, catalogId, md);  // remove index
+        putMetaData(opCtx, catalog.get(), catalogId, md);  // remove index
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1259,14 +1272,14 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(opCtx, catalogId, md);
+        putMetaData(opCtx, catalog.get(), catalogId, md);
         uow.commit();
     }
 
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();
-        ASSERT_NOT_EQUALS(idxIndent, catalog->getIndexIdent(opCtx, catalogId, "foo"));
+        ASSERT_NOT_EQUALS(idxIndent, getIndexIdent(opCtx, catalog.get(), catalogId, "foo"));
     }
 }
 
@@ -1316,9 +1329,10 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(opCtx, catalogId, md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(opCtx, catalogId, "foo"), "a/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(opCtx, catalogId, "foo")));
+        putMetaData(opCtx, catalog.get(), catalogId, md);
+        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/");
+        ASSERT_TRUE(
+            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
@@ -1369,9 +1383,10 @@ TEST_F(DurableCatalogImplTest, Split1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(opCtx, catalogId, md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(opCtx, catalogId, "foo"), "index/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(opCtx, catalogId, "foo")));
+        putMetaData(opCtx, catalog.get(), catalogId, md);
+        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "index/");
+        ASSERT_TRUE(
+            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }
@@ -1422,9 +1437,10 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         imd.prefix = KVPrefix::kNotPrefixed;
         imd.isBackgroundSecondaryBuild = false;
         md.indexes.push_back(imd);
-        catalog->putMetaData(opCtx, catalogId, md);
-        ASSERT_STRING_CONTAINS(catalog->getIndexIdent(opCtx, catalogId, "foo"), "a/index/");
-        ASSERT_TRUE(catalog->isUserDataIdent(catalog->getIndexIdent(opCtx, catalogId, "foo")));
+        putMetaData(opCtx, catalog.get(), catalogId, md);
+        ASSERT_STRING_CONTAINS(getIndexIdent(opCtx, catalog.get(), catalogId, "foo"), "a/index/");
+        ASSERT_TRUE(
+            catalog->isUserDataIdent(getIndexIdent(opCtx, catalog.get(), catalogId, "foo")));
         uow.commit();
     }
 }

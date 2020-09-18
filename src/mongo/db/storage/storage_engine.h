@@ -94,7 +94,9 @@ public:
          * params.readOnly is set. Caller owns the returned pointer.
          */
         virtual std::unique_ptr<StorageEngine> create(
-            const StorageGlobalParams& params, const StorageEngineLockFile* lockFile) const = 0;
+            OperationContext* opCtx,
+            const StorageGlobalParams& params,
+            const StorageEngineLockFile* lockFile) const = 0;
 
         /**
          * Returns the name of the storage engine.

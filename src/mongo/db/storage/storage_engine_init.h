@@ -56,7 +56,7 @@ enum class LastStorageEngineShutdownState { kClean, kUnclean };
 /**
  * Initializes the storage engine on "service".
  */
-LastStorageEngineShutdownState initializeStorageEngine(ServiceContext* service,
+LastStorageEngineShutdownState initializeStorageEngine(OperationContext* opCtx,
                                                        StorageEngineInitFlags initFlags);
 
 /**

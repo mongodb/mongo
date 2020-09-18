@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -102,6 +103,7 @@ public:
     }
 
     RecordId insertRecord(OperationContext* opCtx, std::string contents = "abcd") {
+        Lock::GlobalLock globalLock(opCtx, MODE_IX);
         auto id = rs->insertRecord(opCtx, contents.c_str(), contents.length() + 1, _counter);
         ASSERT_OK(id);
         return id.getValue();
@@ -109,6 +111,7 @@ public:
 
     RecordId insertRecordAndCommit(std::string contents = "abcd") {
         auto op = makeOperation();
+        Lock::GlobalLock globalLock(op, MODE_IX);
         WriteUnitOfWork wuow(op);
         auto id = insertRecord(op, contents);
         wuow.commit();
@@ -117,6 +120,7 @@ public:
 
     void updateRecordAndCommit(RecordId id, std::string contents) {
         auto op = makeOperation();
+        Lock::GlobalLock globalLock(op, MODE_IX);
         WriteUnitOfWork wuow(op);
         ASSERT_OK(op->recoveryUnit()->setTimestamp(_counter));
         ASSERT_OK(rs->updateRecord(op, id, contents.c_str(), contents.length() + 1));
@@ -125,6 +129,7 @@ public:
 
     void deleteRecordAndCommit(RecordId id) {
         auto op = makeOperation();
+        Lock::GlobalLock globalLock(op, MODE_IX);
         WriteUnitOfWork wuow(op);
         ASSERT_OK(op->recoveryUnit()->setTimestamp(_counter));
         rs->deleteRecord(op, id);
@@ -135,6 +140,7 @@ public:
      * Returns the number of records seen iterating rs using the passed-in OperationContext.
      */
     int itCountOn(OperationContext* opCtx) {
+        Lock::GlobalLock globalLock(opCtx, MODE_IS);
         auto cursor = rs->getCursor(opCtx);
         int count = 0;
         while (auto record = cursor->next()) {
@@ -157,6 +163,7 @@ public:
     }
 
     boost::optional<Record> readRecordOn(OperationContext* op, RecordId id) {
+        Lock::GlobalLock globalLock(op, MODE_IS);
         auto cursor = rs->getCursor(op);
         auto record = cursor->seekExact(id);
         if (record)
@@ -165,6 +172,7 @@ public:
     }
     boost::optional<Record> readRecordCommitted(RecordId id) {
         auto op = makeOperation();
+        Lock::GlobalLock globalLock(op, MODE_IS);
         op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
         ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
         return readRecordOn(op, id);
@@ -258,6 +266,10 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     auto op = makeOperation();
     op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
 
+    // Hold the outer most global lock throughout the test to avoid getting snapshots abandoned when
+    // inner global locks are destructed.
+    Lock::GlobalLock globalLock(op, MODE_IS);
+
     // Start an operation using a committed snapshot.
     auto snap = fetchAndIncrementTimestamp();
     snapshotManager->setCommittedSnapshot(snap);
@@ -310,8 +322,11 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
     snapshotManager->setCommittedSnapshot(snap3);
     ASSERT_EQ(itCountCommitted(), 3);
 
-    // This op should keep its original snapshot until abandoned.
+    // Hold the outer most global lock throughout the remainder of the test to avoid getting
+    // snapshots abandoned when inner global locks are destructed. This op should keep its original
+    // snapshot until abandoned.
     auto longOp = makeOperation();
+    Lock::GlobalLock globalLock(longOp, MODE_IS);
     longOp->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
     ASSERT_OK(longOp->recoveryUnit()->obtainMajorityCommittedSnapshot());
     ASSERT_EQ(itCountOn(longOp), 3);

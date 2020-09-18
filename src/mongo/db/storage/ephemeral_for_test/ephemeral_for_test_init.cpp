@@ -49,7 +49,8 @@ namespace ephemeral_for_test {
 namespace {
 class EphemeralForTestStorageEngineFactory : public StorageEngine::Factory {
 public:
-    virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
+    virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                                  const StorageGlobalParams& params,
                                                   const StorageEngineLockFile* lockFile) const {
         auto kv = std::make_unique<KVEngine>();
         // We must only add the server parameters to the global registry once during unit testing.
@@ -70,7 +71,7 @@ public:
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
         options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
-        return std::make_unique<StorageEngineImpl>(std::move(kv), options);
+        return std::make_unique<StorageEngineImpl>(opCtx, std::move(kv), options);
     }
 
     virtual StringData getCanonicalName() const {

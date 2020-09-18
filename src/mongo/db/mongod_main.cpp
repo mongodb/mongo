@@ -380,8 +380,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                      std::make_unique<FlowControl>(
                          serviceContext, repl::ReplicationCoordinator::get(serviceContext)));
 
+    // Creating the operation context before initializing the storage engine allows the storage
+    // engine initialization to make use of the lock manager. As the storage engine is not yet
+    // initialized, a noop recovery unit is used until the initialization is complete.
+    auto startupOpCtx = serviceContext->makeOperationContext(&cc());
+
     auto lastStorageEngineShutdownState =
-        initializeStorageEngine(serviceContext, StorageEngineInitFlags::kNone);
+        initializeStorageEngine(startupOpCtx.get(), StorageEngineInitFlags::kNone);
     StorageControl::startStorageControls(serviceContext);
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
@@ -455,8 +460,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (mongodGlobalParams.scriptingEnabled) {
         ScriptEngine::setup();
     }
-
-    auto startupOpCtx = serviceContext->makeOperationContext(&cc());
 
     try {
         startup_recovery::repairAndRecoverDatabases(startupOpCtx.get(),

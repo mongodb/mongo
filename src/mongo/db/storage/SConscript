@@ -277,6 +277,7 @@ env.Library(
         'recovery_unit_test_harness.cpp'
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
@@ -457,6 +458,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
@@ -464,6 +466,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/topology_coordinator',
+        '$BUILD_DIR/mongo/db/service_context_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',

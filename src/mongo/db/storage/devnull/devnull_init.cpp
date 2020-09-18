@@ -42,13 +42,15 @@ namespace mongo {
 namespace {
 class DevNullStorageEngineFactory : public StorageEngine::Factory {
 public:
-    virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
+    virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                                  const StorageGlobalParams& params,
                                                   const StorageEngineLockFile* lockFile) const {
         StorageEngineOptions options;
         options.directoryPerDB = params.directoryperdb;
         options.forRepair = params.repair;
         options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
-        return std::make_unique<StorageEngineImpl>(std::make_unique<DevNullKVEngine>(), options);
+        return std::make_unique<StorageEngineImpl>(
+            opCtx, std::make_unique<DevNullKVEngine>(), options);
     }
 
     virtual StringData getCanonicalName() const {

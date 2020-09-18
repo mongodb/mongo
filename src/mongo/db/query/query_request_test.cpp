@@ -1647,8 +1647,12 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
     CollectionCatalog& catalog = CollectionCatalog::get(opCtx.get());
     catalog.registerCollection(uuid, std::move(collection));
-    QueryRequest qr(NamespaceStringOrUUID("test", uuid));
+
+    NamespaceStringOrUUID nssOrUUID("test", uuid);
+    QueryRequest qr(nssOrUUID);
+
     // Ensure a call to refreshNSS succeeds.
+    Lock::DBLock dbLk(opCtx.get(), nssOrUUID.db(), MODE_IS);
     qr.refreshNSS(opCtx.get());
     ASSERT_EQ(nss, qr.nss());
 }

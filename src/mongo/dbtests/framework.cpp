@@ -105,7 +105,11 @@ int runDbTests(int argc, char** argv) {
     auto runner = makePeriodicRunner(globalServiceContext);
     globalServiceContext->setPeriodicRunner(std::move(runner));
 
-    initializeStorageEngine(globalServiceContext, StorageEngineInitFlags::kNone);
+    {
+        auto opCtx = globalServiceContext->makeOperationContext(&cc());
+        initializeStorageEngine(opCtx.get(), StorageEngineInitFlags::kNone);
+    }
+
     StorageControl::startStorageControls(globalServiceContext, true /*forTestOnly*/);
     DatabaseHolder::set(globalServiceContext, std::make_unique<DatabaseHolderImpl>());
     IndexAccessMethodFactory::set(globalServiceContext,

@@ -64,7 +64,8 @@ namespace {
 class WiredTigerFactory : public StorageEngine::Factory {
 public:
     virtual ~WiredTigerFactory() {}
-    virtual std::unique_ptr<StorageEngine> create(const StorageGlobalParams& params,
+    virtual std::unique_ptr<StorageEngine> create(OperationContext* opCtx,
+                                                  const StorageGlobalParams& params,
                                                   const StorageEngineLockFile* lockFile) const {
         if (lockFile && lockFile->createdByUncleanShutdown()) {
             LOGV2_WARNING(22302, "Recovering data from the last clean checkpoint.");
@@ -134,7 +135,7 @@ public:
         options.directoryForIndexes = wiredTigerGlobalOptions.directoryForIndexes;
         options.forRepair = params.repair;
         options.lockFileCreatedByUncleanShutdown = lockFile && lockFile->createdByUncleanShutdown();
-        return std::make_unique<StorageEngineImpl>(std::move(kv), options);
+        return std::make_unique<StorageEngineImpl>(opCtx, std::move(kv), options);
     }
 
     virtual StringData getCanonicalName() const {

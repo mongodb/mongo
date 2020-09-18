@@ -42,20 +42,6 @@ namespace mongo {
 namespace {
 
 /**
- * Since dropIdents() acquires the global intent lock, which is not supported by the default locker,
- * we swap in a different locker implementation to make the tests pass.
- */
-class ReaperTestClientObserver final : public ServiceContext::ClientObserver {
-public:
-    void onCreateClient(Client* client) override{};
-    void onDestroyClient(Client* client) override{};
-    void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>());
-    }
-    void onDestroyOperationContext(OperationContext* opCtx) override {}
-};
-
-/**
  * Test-only implementation of KVEngine that tracks idents that have been dropped.
  */
 class KVEngineMock : public KVEngine {
@@ -173,8 +159,6 @@ Timestamp makeTimestampWithNextInc(const Timestamp& ts) {
 
 void KVDropPendingIdentReaperTest::setUp() {
     ServiceContextTest::setUp();
-    auto service = getServiceContext();
-    service->registerClientObserver(std::make_unique<ReaperTestClientObserver>());
     _engineMock = std::make_unique<KVEngineMock>();
 }
 void KVDropPendingIdentReaperTest::tearDown() {

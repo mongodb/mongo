@@ -39,7 +39,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/durable_catalog_feature_tracker.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -69,7 +69,9 @@ const std::string catalogInfo = "_mdb_catalog";
 const auto kCatalogLogLevel = logv2::LogSeverity::Debug(2);
 }  // namespace
 
-StorageEngineImpl::StorageEngineImpl(std::unique_ptr<KVEngine> engine, StorageEngineOptions options)
+StorageEngineImpl::StorageEngineImpl(OperationContext* opCtx,
+                                     std::unique_ptr<KVEngine> engine,
+                                     StorageEngineOptions options)
     : _engine(std::move(engine)),
       _options(std::move(options)),
       _dropPendingIdentReaper(_engine.get()),
@@ -81,11 +83,20 @@ StorageEngineImpl::StorageEngineImpl(std::unique_ptr<KVEngine> engine, StorageEn
             "Storage engine does not support --directoryperdb",
             !(_options.directoryPerDB && !_engine->supportsDirectoryPerDB()));
 
-    OperationContextNoop opCtx(_engine->newRecoveryUnit());
+    // Replace the noop recovery unit for the startup operation context now that the storage engine
+    // has been initialized. This is needed because at the time of startup, when the operation
+    // context gets created, the storage engine initialization has not yet begun and so it gets
+    // assigned a noop recovery unit. See the StorageClientObserver class.
+    invariant(opCtx->recoveryUnit()->isNoop());
+    opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_engine->newRecoveryUnit()),
+                           WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
     // If we are loading the catalog after an unclean shutdown, it's possible that there are
     // collections in the catalog that are unknown to the storage engine. We should attempt to
     // recover these orphaned idents.
-    loadCatalog(&opCtx, _options.lockFileCreatedByUncleanShutdown);
+    invariant(!opCtx->lockState()->isLocked());
+    Lock::GlobalWrite globalLk(opCtx);
+    loadCatalog(opCtx, _options.lockFileCreatedByUncleanShutdown);
 }
 
 void StorageEngineImpl::loadCatalog(OperationContext* opCtx, bool loadingFromUncleanShutdown) {
@@ -666,9 +677,6 @@ void StorageEngineImpl::cleanShutdown() {
 StorageEngineImpl::~StorageEngineImpl() {}
 
 void StorageEngineImpl::finishInit() {
-    // A storage engine may need to start threads that require OperationsContexts with real Lockers,
-    // as opposed to LockerNoops. Placing the start logic here, after the StorageEngine has been
-    // instantiated, causes makeOperationContext() to create LockerImpls instead of LockerNoops.
     if (_engine->supportsRecoveryTimestamp()) {
         _timestampMonitor = std::make_unique<TimestampMonitor>(
             _engine.get(), getGlobalServiceContext()->getPeriodicRunner());

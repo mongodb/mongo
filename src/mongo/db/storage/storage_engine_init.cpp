@@ -59,8 +59,10 @@ namespace {
 void createLockFile(ServiceContext* service);
 }  // namespace
 
-LastStorageEngineShutdownState initializeStorageEngine(ServiceContext* service,
+LastStorageEngineShutdownState initializeStorageEngine(OperationContext* opCtx,
                                                        const StorageEngineInitFlags initFlags) {
+    ServiceContext* service = opCtx->getServiceContext();
+
     // This should be set once.
     invariant(!service->getStorageEngine());
 
@@ -153,7 +155,7 @@ LastStorageEngineShutdownState initializeStorageEngine(ServiceContext* service,
 
     auto& lockFile = StorageEngineLockFile::get(service);
     service->setStorageEngine(std::unique_ptr<StorageEngine>(
-        factory->create(storageGlobalParams, lockFile ? &*lockFile : nullptr)));
+        factory->create(opCtx, storageGlobalParams, lockFile ? &*lockFile : nullptr)));
     service->getStorageEngine()->finishInit();
 
     if (lockFile) {
@@ -318,19 +320,22 @@ public:
     void onCreateClient(Client* client) override{};
     void onDestroyClient(Client* client) override{};
     void onCreateOperationContext(OperationContext* opCtx) {
+        // Use a fully fledged lock manager even when the storage engine is not set.
+        opCtx->setLockState(std::make_unique<LockerImpl>());
+
+        // There are a few cases where we don't have a storage engine available yet when creating an
+        // operation context.
+        // 1. During startup, we create an operation context to allow the storage engine
+        //    initialization code to make use of the lock manager.
+        // 2. There are unit tests that create an operation context before initializing the storage
+        //    engine.
+        // 3. Unit tests that use an operation context but don't require a storage engine for their
+        //    testing purpose.
         auto service = opCtx->getServiceContext();
         auto storageEngine = service->getStorageEngine();
-        // NOTE(schwerin): The following uassert would be more desirable than the early return when
-        // no storage engine is set, but to achieve that we would have to ensure that this file was
-        // never linked into a test binary that didn't actually need/use the storage engine.
-        //
-        // uassert(<some code>,
-        //         "Must instantiate storage engine before creating OperationContext",
-        //         storageEngine);
         if (!storageEngine) {
             return;
         }
-        opCtx->setLockState(std::make_unique<LockerImpl>());
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }

@@ -63,7 +63,8 @@ struct StorageEngineOptions {
 
 class StorageEngineImpl final : public StorageEngineInterface, public StorageEngine {
 public:
-    StorageEngineImpl(std::unique_ptr<KVEngine> engine,
+    StorageEngineImpl(OperationContext* opCtx,
+                      std::unique_ptr<KVEngine> engine,
                       StorageEngineOptions options = StorageEngineOptions());
 
     virtual ~StorageEngineImpl();

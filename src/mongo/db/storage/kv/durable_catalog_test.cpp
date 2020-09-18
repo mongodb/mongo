@@ -33,12 +33,12 @@
 #include <iostream>
 #include <string>
 
+#include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
@@ -57,45 +57,29 @@ static std::string kConstraintViolationsTableIdent("constraintViolations");
 // Update version as breaking changes are introduced into the index build procedure.
 static const long kExpectedVersion = 1;
 
-class DurableCatalogTest : public ServiceContextTest {
+class DurableCatalogTest : public CatalogTestFixture {
 public:
-    DurableCatalogTest()
-        : _nss("unittests.durable_catalog"),
-          _storageEngine(std::make_unique<DevNullKVEngine>(), StorageEngineOptions()) {
-        _storageEngine.finishInit();
-        repl::ReplicationCoordinator::set(
-            getGlobalServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
-                getGlobalServiceContext(), repl::ReplSettings())));
-    }
-
-    ~DurableCatalogTest() {
-        _storageEngine.cleanShutdown();
-    }
-
-    std::unique_ptr<OperationContext> newOperationContext() {
-        auto opCtx = std::make_unique<OperationContextNoop>(&cc(), 0);
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(_storageEngine.newRecoveryUnit()),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        return opCtx;
-    }
-
     void setUp() final {
-        auto opCtx = newOperationContext();
+        CatalogTestFixture::setUp();
+
+        _nss = NamespaceString("unittests.durable_catalog");
 
         {
-            WriteUnitOfWork wuow(opCtx.get());
+            Lock::DBLock dbLk(operationContext(), _nss.db(), MODE_IX);
+            Lock::CollectionLock collLk(operationContext(), _nss, MODE_IX);
+
+            WriteUnitOfWork wuow(operationContext());
             const bool allocateDefaultSpace = true;
             CollectionOptions options;
             options.uuid = UUID::gen();
-            auto swColl = _storageEngine.getCatalog()->createCollection(
-                opCtx.get(), _nss, options, allocateDefaultSpace);
+            auto swColl = getCatalog()->createCollection(
+                operationContext(), _nss, options, allocateDefaultSpace);
             ASSERT_OK(swColl.getStatus());
             std::pair<RecordId, std::unique_ptr<RecordStore>> coll = std::move(swColl.getValue());
             _catalogId = coll.first;
             std::shared_ptr<Collection> collection =
                 std::make_shared<CollectionMock>(_nss, _catalogId);
-            CollectionCatalog::get(opCtx.get())
+            CollectionCatalog::get(operationContext())
                 .registerCollection(options.uuid.get(), std::move(collection));
             wuow.commit();
         }
@@ -106,7 +90,7 @@ public:
     }
 
     DurableCatalog* getCatalog() {
-        return _storageEngine.getCatalog();
+        return operationContext()->getServiceContext()->getStorageEngine()->getCatalog();
     }
 
     RecordId getCatalogId() {
@@ -116,7 +100,6 @@ public:
     std::string createIndex(BSONObj keyPattern,
                             std::string indexType = IndexNames::BTREE,
                             bool twoPhase = false) {
-        auto opCtx = newOperationContext();
         std::string indexName = "idx" + std::to_string(numIndexesCreated);
 
         auto collection = std::make_unique<CollectionMock>(_nss);
@@ -125,11 +108,11 @@ public:
                              BSON("v" << 1 << "key" << keyPattern << "name" << indexName));
 
         {
-            WriteUnitOfWork wuow(opCtx.get());
+            WriteUnitOfWork wuow(operationContext());
             const bool isSecondaryBackgroundIndexBuild = false;
             boost::optional<UUID> buildUUID(twoPhase, UUID::gen());
-            ASSERT_OK(_storageEngine.getCatalog()->prepareForIndexBuild(
-                opCtx.get(), _catalogId, &desc, buildUUID, isSecondaryBackgroundIndexBuild));
+            ASSERT_OK(getCatalog()->prepareForIndexBuild(
+                operationContext(), _catalogId, &desc, buildUUID, isSecondaryBackgroundIndexBuild));
             wuow.commit();
         }
 
@@ -163,112 +146,151 @@ private:
         return ss.str();
     }
 
-    const NamespaceString _nss;
-    StorageEngineImpl _storageEngine;
+    NamespaceString _nss;
     size_t numIndexesCreated = 0;
     RecordId _catalogId;
 };
 
 TEST_F(DurableCatalogTest, MultikeyPathsForBtreeIndexInitializedToVectorOfEmptySets) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(!catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(!catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {MultikeyComponents{}, MultikeyComponents{}});
     }
 }
 
 TEST_F(DurableCatalogTest, CanSetIndividualPathComponentOfBtreeIndexAsMultikey) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    ASSERT(catalog->setIndexIsMultikey(
-        opCtx.get(), getCatalogId(), indexName, {MultikeyComponents{}, {0U}}));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(
+            operationContext(), getCatalogId(), indexName, {MultikeyComponents{}, {0U}}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {MultikeyComponents{}, {0U}});
     }
 }
 
 TEST_F(DurableCatalogTest, MultikeyPathsAccumulateOnDifferentFields) {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    ASSERT(catalog->setIndexIsMultikey(
-        opCtx.get(), getCatalogId(), indexName, {MultikeyComponents{}, {0U}}));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(
+            operationContext(), getCatalogId(), indexName, {MultikeyComponents{}, {0U}}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {MultikeyComponents{}, {0U}});
     }
 
-    ASSERT(catalog->setIndexIsMultikey(
-        opCtx.get(), getCatalogId(), indexName, {{0U}, MultikeyComponents{}}));
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(
+            operationContext(), getCatalogId(), indexName, {{0U}, MultikeyComponents{}}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}, {0U}});
     }
 }
 
 TEST_F(DurableCatalogTest, MultikeyPathsAccumulateOnDifferentComponentsOfTheSameField) {
     std::string indexName = createIndex(BSON("a.b" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, {{0U}}));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(operationContext(), getCatalogId(), indexName, {{0U}}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}});
     }
 
-    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, {{1U}}));
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(operationContext(), getCatalogId(), indexName, {{1U}}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U, 1U}});
     }
 }
 
 TEST_F(DurableCatalogTest, NoOpWhenSpecifiedPathComponentsAlreadySetAsMultikey) {
     std::string indexName = createIndex(BSON("a" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, {{0U}}));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(operationContext(), getCatalogId(), indexName, {{0U}}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}});
     }
 
-    ASSERT(!catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, {{0U}}));
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(!catalog->setIndexIsMultikey(operationContext(), getCatalogId(), indexName, {{0U}}));
+        // Rollback WUOW.
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U}});
     }
 }
 
 TEST_F(DurableCatalogTest, CanSetMultipleFieldsAndComponentsAsMultikey) {
     std::string indexName = createIndex(BSON("a.b.c" << 1 << "a.b.d" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    ASSERT(
-        catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, {{0U, 1U}, {0U, 1U}}));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(
+            operationContext(), getCatalogId(), indexName, {{0U, 1U}, {0U, 1U}}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {{0U, 1U}, {0U, 1U}});
     }
 }
@@ -277,29 +299,33 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
                    CannotOmitPathLevelMultikeyInfoWithBtreeIndex,
                    R"#(Invariant failure.*!multikeyPaths.empty\(\))#") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, MultikeyPaths{});
+
+    WriteUnitOfWork wuow(operationContext());
+    catalog->setIndexIsMultikey(operationContext(), getCatalogId(), indexName, MultikeyPaths{});
 }
 
 DEATH_TEST_REGEX_F(DurableCatalogTest,
                    AtLeastOnePathComponentMustCauseIndexToBeMultikey,
                    R"#(Invariant failure.*somePathIsMultikey)#") {
     std::string indexName = createIndex(BSON("a" << 1 << "b" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    catalog->setIndexIsMultikey(
-        opCtx.get(), getCatalogId(), indexName, {MultikeyComponents{}, MultikeyComponents{}});
+
+    WriteUnitOfWork wuow(operationContext());
+    catalog->setIndexIsMultikey(operationContext(),
+                                getCatalogId(),
+                                indexName,
+                                {MultikeyComponents{}, MultikeyComponents{}});
 }
 
 TEST_F(DurableCatalogTest, PathLevelMultikeyTrackingIsSupportedBy2dsphereIndexes) {
     std::string indexType = IndexNames::GEO_2DSPHERE;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(!catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(!catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         assertMultikeyPathsAreEqual(multikeyPaths, {MultikeyComponents{}, MultikeyComponents{}});
     }
 }
@@ -310,12 +336,11 @@ TEST_F(DurableCatalogTest, PathLevelMultikeyTrackingIsNotSupportedByAllIndexType
 
     for (auto&& indexType : indexTypes) {
         std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-        auto opCtx = newOperationContext();
         DurableCatalog* catalog = getCatalog();
         {
             MultikeyPaths multikeyPaths;
-            ASSERT(
-                !catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+            ASSERT(!catalog->isIndexMultikey(
+                operationContext(), getCatalogId(), indexName, &multikeyPaths));
             ASSERT(multikeyPaths.empty());
         }
     }
@@ -324,13 +349,19 @@ TEST_F(DurableCatalogTest, PathLevelMultikeyTrackingIsNotSupportedByAllIndexType
 TEST_F(DurableCatalogTest, CanSetEntireTextIndexAsMultikey) {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, MultikeyPaths{}));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(
+            operationContext(), getCatalogId(), indexName, MultikeyPaths{}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         ASSERT(multikeyPaths.empty());
     }
 }
@@ -338,51 +369,70 @@ TEST_F(DurableCatalogTest, CanSetEntireTextIndexAsMultikey) {
 TEST_F(DurableCatalogTest, NoOpWhenEntireIndexAlreadySetAsMultikey) {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    ASSERT(catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, MultikeyPaths{}));
+
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(catalog->setIndexIsMultikey(
+            operationContext(), getCatalogId(), indexName, MultikeyPaths{}));
+        wuow.commit();
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         ASSERT(multikeyPaths.empty());
     }
 
-    ASSERT(!catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, MultikeyPaths{}));
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT(!catalog->setIndexIsMultikey(
+            operationContext(), getCatalogId(), indexName, MultikeyPaths{}));
+        // Rollback WUOW.
+    }
 
     {
         MultikeyPaths multikeyPaths;
-        ASSERT(catalog->isIndexMultikey(opCtx.get(), getCatalogId(), indexName, &multikeyPaths));
+        ASSERT(catalog->isIndexMultikey(
+            operationContext(), getCatalogId(), indexName, &multikeyPaths));
         ASSERT(multikeyPaths.empty());
     }
 }
 
 TEST_F(DurableCatalogTest, SinglePhaseIndexBuild) {
     std::string indexName = createIndex(BSON("a" << 1));
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
 
-    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
+    ASSERT_FALSE(catalog->isIndexReady(operationContext(), getCatalogId(), indexName));
+    ASSERT_FALSE(catalog->getIndexBuildUUID(operationContext(), getCatalogId(), indexName));
 
-    catalog->indexBuildSuccess(opCtx.get(), getCatalogId(), indexName);
+    {
+        WriteUnitOfWork wuow(operationContext());
+        catalog->indexBuildSuccess(operationContext(), getCatalogId(), indexName);
+        wuow.commit();
+    }
 
-    ASSERT_TRUE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
+    ASSERT_TRUE(catalog->isIndexReady(operationContext(), getCatalogId(), indexName));
+    ASSERT_FALSE(catalog->getIndexBuildUUID(operationContext(), getCatalogId(), indexName));
 }
 
 TEST_F(DurableCatalogTest, TwoPhaseIndexBuild) {
     bool twoPhase = true;
     std::string indexName = createIndex(BSON("a" << 1), IndexNames::BTREE, twoPhase);
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
 
-    ASSERT_FALSE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_TRUE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
-    catalog->indexBuildSuccess(opCtx.get(), getCatalogId(), indexName);
+    ASSERT_FALSE(catalog->isIndexReady(operationContext(), getCatalogId(), indexName));
+    ASSERT_TRUE(catalog->getIndexBuildUUID(operationContext(), getCatalogId(), indexName));
 
-    ASSERT_TRUE(catalog->isIndexReady(opCtx.get(), getCatalogId(), indexName));
-    ASSERT_FALSE(catalog->getIndexBuildUUID(opCtx.get(), getCatalogId(), indexName));
+    {
+        WriteUnitOfWork wuow(operationContext());
+        catalog->indexBuildSuccess(operationContext(), getCatalogId(), indexName);
+        wuow.commit();
+    }
+
+    ASSERT_TRUE(catalog->isIndexReady(operationContext(), getCatalogId(), indexName));
+    ASSERT_FALSE(catalog->getIndexBuildUUID(operationContext(), getCatalogId(), indexName));
 }
 
 DEATH_TEST_REGEX_F(DurableCatalogTest,
@@ -390,9 +440,10 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
                    R"#(Invariant failure.*multikeyPaths.empty\(\))#") {
     std::string indexType = IndexNames::TEXT;
     std::string indexName = createIndex(BSON("a" << indexType << "b" << 1), indexType);
-    auto opCtx = newOperationContext();
     DurableCatalog* catalog = getCatalog();
-    catalog->setIndexIsMultikey(opCtx.get(), getCatalogId(), indexName, {{0U}, {0U}});
+
+    WriteUnitOfWork wuow(operationContext());
+    catalog->setIndexIsMultikey(operationContext(), getCatalogId(), indexName, {{0U}, {0U}});
 }
 
 }  // namespace
