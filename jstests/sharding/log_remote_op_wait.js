@@ -144,6 +144,10 @@ st.shard0.getDB('admin').setProfilingLevel(0, -1);
 st.shard1.getDB('admin').setProfilingLevel(0, -1);
 clearRawMongoProgramOutput();
 coll.aggregate(pipeline2, {allowDiskUse: true, comment: pipelineComment2}).next();
+
+// We terminate the processes to ensure that the next call to rawMongoProgramOutput()
+// will return all of their output.
+st.stop();
 {
     const line = rawMongoProgramOutput().split('\n').find(line => line.match(/mergeCursors/) &&
                                                               line.match(/fromMongos: true/));
@@ -152,6 +156,4 @@ coll.aggregate(pipeline2, {allowDiskUse: true, comment: pipelineComment2}).next(
     const duration = getDuration(line);
     assert.lte(remoteOpWait, duration);
 }
-
-st.stop();
 })();
