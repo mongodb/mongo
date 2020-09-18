@@ -288,7 +288,7 @@ bool WiredTigerRecoveryUnit::waitUntilDurable() {
 bool WiredTigerRecoveryUnit::waitUntilUnjournaledWritesDurable() {
     invariant(!_inUnitOfWork);
     const bool forceCheckpoint = true;
-    const bool stableCheckpoint = true;
+    const bool stableCheckpoint = serverGlobalParams.enableMajorityReadConcern;
     // Calling `waitUntilDurable` with `forceCheckpoint` set to false only performs a log
     // (journal) flush, and thus has no effect on unjournaled writes. Setting `forceCheckpoint` to
     // true will lock in stable writes to unjournaled tables.

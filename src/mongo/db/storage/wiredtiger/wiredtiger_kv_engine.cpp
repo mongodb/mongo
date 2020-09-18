@@ -939,8 +939,8 @@ int WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool sync) {
     }
     syncSizeInfo(false);
     const bool forceCheckpoint = true;
-    // If there's no journal, we must take a full checkpoint.
-    const bool stableCheckpoint = _durable;
+    // If there's no journal or if majority read concern is off, we must take a full checkpoint.
+    const bool stableCheckpoint = _durable && serverGlobalParams.enableMajorityReadConcern;
     _sessionCache->waitUntilDurable(forceCheckpoint, stableCheckpoint);
 
     return 1;
