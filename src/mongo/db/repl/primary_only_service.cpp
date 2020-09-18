@@ -59,6 +59,7 @@
 namespace mongo {
 namespace repl {
 
+MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceSkipRebuildingInstances);
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceHangBeforeRebuildingInstances);
 MONGO_FAIL_POINT_DEFINE(PrimaryOnlyServiceFailRebuildingInstances);
 
@@ -453,6 +454,10 @@ void PrimaryOnlyService::releaseAllInstances() {
 }
 
 void PrimaryOnlyService::_rebuildInstances() noexcept {
+    if (MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
+        return;
+    }
+
     std::vector<BSONObj> stateDocuments;
     {
         // The PrimaryOnlyServiceClientObserver will make any OpCtx created as part of a
