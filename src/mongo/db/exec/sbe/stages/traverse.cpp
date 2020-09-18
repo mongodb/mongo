@@ -142,7 +142,7 @@ PlanState TraverseStage::getNext() {
         return trackPlanState(state);
     }
 
-    traverse(_inFieldAccessor, &_outFieldOutputAccessor, 0);
+    [[maybe_unused]] auto earlyExit = traverse(_inFieldAccessor, &_outFieldOutputAccessor, 0);
 
     return trackPlanState(PlanState::ADVANCED);
 }
