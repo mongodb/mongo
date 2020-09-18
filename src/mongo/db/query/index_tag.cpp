@@ -297,7 +297,7 @@ void resolveOrPushdowns(MatchExpression* tree) {
                 std::vector<MatchExpression*> orPushdownDescendants;
                 getElemMatchOrPushdownDescendants(child, &orPushdownDescendants);
                 for (auto descendant : orPushdownDescendants) {
-                    processOrPushdownNode(descendant, indexedOr);
+                    static_cast<void>(processOrPushdownNode(descendant, indexedOr));
                 }
             } else if (processOrPushdownNode(child, indexedOr)) {
                 // The indexed $or can completely satisfy the child predicate, so we trim it.
