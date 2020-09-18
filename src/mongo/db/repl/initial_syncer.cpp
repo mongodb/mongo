@@ -60,6 +60,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/executor/task_executor.h"
@@ -536,6 +537,8 @@ void InitialSyncer::_tearDown_inlock(OperationContext* opCtx,
     const bool orderedCommit = true;
     _storage->oplogDiskLocRegister(opCtx, initialDataTimestamp, orderedCommit);
 
+    TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext()).shutDown();
+    tenant_migration_donor::recoverTenantMigrationAccessBlockers(opCtx);
     reconstructPreparedTransactions(opCtx, repl::OplogApplication::Mode::kInitialSync);
 
     _replicationProcess->getConsistencyMarkers()->setInitialSyncIdIfNotSet(opCtx);

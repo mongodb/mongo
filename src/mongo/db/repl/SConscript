@@ -1179,6 +1179,7 @@ env.Library(
         'repl_sync_shared_data',
         'rollback_checker',
         'storage_interface',
+        'tenant_migration_donor'
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',

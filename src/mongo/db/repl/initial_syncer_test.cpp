@@ -1957,6 +1957,8 @@ TEST_F(InitialSyncerTest,
     auto net = getNet();
     int baseRollbackId = 1;
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
 
@@ -2059,6 +2061,9 @@ TEST_F(InitialSyncerTest,
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -2125,6 +2130,9 @@ TEST_F(
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -2431,6 +2439,9 @@ TEST_F(InitialSyncerTest, InitialSyncerRetriesLastOplogEntryFetcherNetworkError)
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -3070,6 +3081,9 @@ TEST_F(InitialSyncerTest, InitialSyncerHandlesNetworkErrorsFromRollbackCheckerAf
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
@@ -3379,6 +3393,9 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -4034,6 +4051,9 @@ TEST_F(InitialSyncerTest,
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     doSuccessfulInitialSyncWithOneBatch();
 }
@@ -4044,6 +4064,9 @@ TEST_F(InitialSyncerTest,
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
@@ -4222,6 +4245,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
     // initial sync is complete.
@@ -4535,6 +4561,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgressForNetwork
     // InitialSyncerTest does not construct ServiceEntryPoint and this causes a segmentation fault
     // when reconstructPreparedTransactions uses DBDirectClient to call into ServiceEntryPoint.
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
+    // Skip recovering tenant migration access blockers for the same reason as the above.
+    FailPointEnableBlock skipRecoverTenantMigrationAccessBlockers(
+        "skipRecoverTenantMigrationAccessBlockers");
 
     // Skip clearing initial sync progress so that we can check initialSyncStatus fields after
     // initial sync is complete.

@@ -142,6 +142,14 @@ var TenantMigrationUtil = (function() {
         });
     }
 
+    /**
+     * Returns the TenantMigrationAccessBlocker associated with given the database prefix on the
+     * node.
+     */
+    function getTenantMigrationAccessBlocker(node, dbPrefix) {
+        return node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker[dbPrefix];
+    }
+
     return {
         accessState,
         startMigration,
@@ -150,6 +158,7 @@ var TenantMigrationUtil = (function() {
         forgetMigrationRetryOnNotPrimaryErrors,
         assertMigrationCommitted,
         waitForMigrationToCommit,
-        waitForMigrationGarbageCollection
+        waitForMigrationGarbageCollection,
+        getTenantMigrationAccessBlocker
     };
 })();
