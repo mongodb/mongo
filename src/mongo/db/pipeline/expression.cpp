@@ -6238,8 +6238,8 @@ boost::intrusive_ptr<Expression> ExpressionRegex::optimize() {
         _initialExecStateForConstantRegex.emplace();
         _extractRegexAndOptions(
             _initialExecStateForConstantRegex.get_ptr(),
-            dynamic_cast<ExpressionConstant*>(_regex.get())->getValue(),
-            _options ? dynamic_cast<ExpressionConstant*>(_options.get())->getValue() : Value());
+            static_cast<ExpressionConstant*>(_regex.get())->getValue(),
+            _options ? static_cast<ExpressionConstant*>(_options.get())->getValue() : Value());
         _compile(_initialExecStateForConstantRegex.get_ptr());
     }
     return this;
