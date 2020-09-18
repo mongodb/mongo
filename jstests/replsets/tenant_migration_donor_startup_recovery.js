@@ -20,8 +20,16 @@ const accessState = {
     kReject: 3
 };
 
-const donorRst = new ReplSetTest(
-    {nodes: 1, name: 'donor', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+const donorRst = new ReplSetTest({
+    nodes: 1,
+    name: 'donor',
+    nodeOptions: {
+        setParameter: {
+            enableTenantMigrations: true,
+            "failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})
+        }
+    }
+});
 const recipientRst = new ReplSetTest(
     {nodes: 1, name: 'recipient', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
 
@@ -65,8 +73,10 @@ sleep(Math.random() * kMaxSleepTimeMS);
 donorRst.stopSet(null /* signal */, true /*forRestart */);
 donorRst.startSet({
     restart: true,
-    setParameter:
-        {enableTenantMigrations: true, "failpoint.disallowTenantMigrations": "{'mode':'alwaysOn'}"}
+    setParameter: {
+        enableTenantMigrations: true,
+        "failpoint.PrimaryOnlyServiceSkipRebuildingInstances": "{'mode':'alwaysOn'}"
+    }
 });
 donorPrimary = donorRst.getPrimary();
 

@@ -1,7 +1,8 @@
 /**
  * Tests that the migration is interrupted successfully on stepdown and shutdown.
  *
- * @tags: [requires_fcv_47, incompatible_with_eft]
+ * @tags: [requires_fcv_47, requires_majority_read_concern, requires_persistence,
+ * incompatible_with_eft]
  */
 
 (function() {
@@ -131,6 +132,37 @@ function testDonorForgetMigrationInterrupt(
     recipientRst.stopSet();
 }
 
+/**
+ * If the donor state doc for the migration 'migrationId' exists on the donor (i.e. the donor's
+ * primary stepped down or shut down after inserting the doc), asserts that the migration
+ * eventually commits.
+ */
+function testMigrationCommitsIfDurableStateExists(donorRst, migrationId) {
+    const donorPrimary = donorRst.getPrimary();
+    const configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
+    if (configDonorsColl.count({_id: migrationId}) > 0) {
+        assert.soon(() => {
+            return "committed" === configDonorsColl.findOne({_id: migrationId}).state;
+        });
+    }
+}
+
+/**
+ * Asserts that durable and in-memory state for the migration 'migrationId' is eventually deleted
+ * from the donor.
+ */
+function testMigrationStateIsGarbageCollected(donorRst, migrationId) {
+    const donorPrimary = donorRst.getPrimary();
+    assert.soon(() => 0 === donorPrimary.getCollection(kConfigDonorsNS).count({_id: migrationId}));
+    assert.soon(() => 0 ===
+                    donorPrimary.adminCommand({serverStatus: 1})
+                        .repl.primaryOnlyServices.TenantMigrationDonorService);
+    donorRst.nodes.forEach((node) => {
+        assert.soon(() =>
+                        null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
+    });
+}
+
 (() => {
     jsTest.log("Test that the donorStartMigration command is interrupted successfully on stepdown");
     testDonorStartMigrationInterrupt((donorRst) => {
@@ -168,24 +200,23 @@ function testDonorForgetMigrationInterrupt(
 })();
 
 (() => {
-    jsTest.log("Test that the donorStartMigration command resumes on stepup");
+    jsTest.log("Test that the migration resumes on stepup");
     testDonorStartMigrationInterrupt((donorRst, migrationId) => {
-        let donorPrimary = donorRst.getPrimary();
-
         // Use a short replSetStepDown seconds to make it more likely for the old primary to step
         // back up.
-        assert.commandWorked(donorPrimary.adminCommand({replSetStepDown: 1, force: true}));
+        assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
 
-        donorPrimary = donorRst.getPrimary();
+        testMigrationCommitsIfDurableStateExists(donorRst, migrationId);
+    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
+})();
 
-        const configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
-        if (configDonorsColl.count({_id: migrationId}) > 0) {
-            // If the donor's primary steps down before inserting the donor state doc, then there
-            // is no migration to resume.
-            assert.soon(() => {
-                return "committed" === configDonorsColl.findOne({_id: migrationId}).state;
-            });
-        }
+(() => {
+    jsTest.log("Test that the migration resumes after restart");
+    testDonorStartMigrationInterrupt((donorRst, migrationId) => {
+        donorRst.stopSet(null /* signal */, true /*forRestart */);
+        donorRst.startSet({restart: true, setParameter: {enableTenantMigrations: true}});
+
+        testMigrationCommitsIfDurableStateExists(donorRst, migrationId);
     }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
 })();
 
@@ -199,15 +230,24 @@ function testDonorForgetMigrationInterrupt(
         assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
 
         donorPrimary = donorRst.getPrimary();
-
         assert.commandWorked(TenantMigrationUtil.forgetMigration(
             donorPrimary.host, extractUUIDFromObject(migrationId)));
 
-        assert.soon(() => 0 ===
-                        donorPrimary.getCollection(kConfigDonorsNS).count({_id: migrationId}));
-        assert.soon(() => 0 ===
-                        donorPrimary.adminCommand({serverStatus: 1})
-                            .repl.primaryOnlyServices.TenantMigrationDonorService);
+        testMigrationStateIsGarbageCollected(donorRst, migrationId);
+    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
+})();
+
+(() => {
+    jsTest.log("Test that the donorForgetMigration command can be retried after restart");
+    testDonorForgetMigrationInterrupt((donorRst, migrationId) => {
+        donorRst.stopSet(null /* signal */, true /*forRestart */);
+        donorRst.startSet({restart: true, setParameter: {enableTenantMigrations: true}});
+
+        let donorPrimary = donorRst.getPrimary();
+        assert.commandWorked(TenantMigrationUtil.forgetMigration(
+            donorPrimary.host, extractUUIDFromObject(migrationId)));
+
+        testMigrationStateIsGarbageCollected(donorRst, migrationId);
     }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
 })();
 })();

@@ -238,12 +238,13 @@ void onWriteToDatabase(OperationContext* opCtx, StringData dbName) {
 
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
     if (MONGO_unlikely(skipRecoverTenantMigrationAccessBlockers.shouldFail())) {
-        LOGV2(48941, "Hit skipRecoverTenantMigrationAccessBlockers failpoint");
         return;
     }
+
     PersistentTaskStore<TenantMigrationDonorDocument> store(
         NamespaceString::kTenantMigrationDonorsNamespace);
     Query query;
+
     store.forEach(opCtx, query, [&](const TenantMigrationDonorDocument& doc) {
         auto mtab =
             std::make_shared<TenantMigrationAccessBlocker>(opCtx->getServiceContext(),
