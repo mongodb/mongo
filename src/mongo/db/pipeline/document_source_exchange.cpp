@@ -394,7 +394,7 @@ size_t Exchange::loadNextBatch() {
 
     // We have reached the end so send EOS to all consumers.
     for (auto& c : _consumers) {
-        c->appendDocument(input, _maxBufferSize);
+        [[maybe_unused]] auto full = c->appendDocument(input, _maxBufferSize);
     }
 
     return kInvalidThreadId;
