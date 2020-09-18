@@ -59,6 +59,8 @@ const char kThreadNamePrefix[] = "TenantMigrationWorker-";
 const char kPoolName[] = "TenantMigrationWorkerThreadPool";
 const char kNetName[] = "TenantMigrationWorkerNetwork";
 
+const auto donorStateDocToDeleteDecoration = OperationContext::declareDecoration<BSONObj>();
+
 /**
  * Updates the TenantMigrationAccessBlocker when the tenant migration transitions to the data sync
  * state.
@@ -150,7 +152,7 @@ std::shared_ptr<executor::TaskExecutor> getTenantMigrationDonorExecutor() {
     return executor;
 }
 
-void onWriteToDonorStateDoc(OperationContext* opCtx, const BSONObj& donorStateDocBson) {
+void onInsertOrUpdate(OperationContext* opCtx, const BSONObj& donorStateDocBson) {
     // Disable the OpObserver during startup recovery, initial sync and rollback since the in-memory
     // state will be recovered by recoverTenantMigrationAccessBlockers.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -163,26 +165,29 @@ void onWriteToDonorStateDoc(OperationContext* opCtx, const BSONObj& donorStateDo
     auto donorStateDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorStateDoc"),
                                                              donorStateDocBson);
     if (donorStateDoc.getExpireAt()) {
-        TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-            .remove(donorStateDoc.getDatabasePrefix());
-    } else {
-        switch (donorStateDoc.getState()) {
-            case TenantMigrationDonorStateEnum::kDataSync:
-                onTransitionToDataSync(opCtx, donorStateDoc);
-                break;
-            case TenantMigrationDonorStateEnum::kBlocking:
-                onTransitionToBlocking(opCtx, donorStateDoc);
-                break;
-            case TenantMigrationDonorStateEnum::kCommitted:
-                onTransitionToCommitted(opCtx, donorStateDoc);
-                break;
-            case TenantMigrationDonorStateEnum::kAborted:
-                onTransitionToAborted(opCtx, donorStateDoc);
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
+        return;
     }
+
+    switch (donorStateDoc.getState()) {
+        case TenantMigrationDonorStateEnum::kDataSync:
+            onTransitionToDataSync(opCtx, donorStateDoc);
+            break;
+        case TenantMigrationDonorStateEnum::kBlocking:
+            onTransitionToBlocking(opCtx, donorStateDoc);
+            break;
+        case TenantMigrationDonorStateEnum::kCommitted:
+            onTransitionToCommitted(opCtx, donorStateDoc);
+            break;
+        case TenantMigrationDonorStateEnum::kAborted:
+            onTransitionToAborted(opCtx, donorStateDoc);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void onDelete(OperationContext* opCtx, const std::string dbPrefix) {
+    TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext()).remove(dbPrefix);
 }
 
 void checkIfCanReadOrBlock(OperationContext* opCtx, StringData dbName) {
