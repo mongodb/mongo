@@ -676,6 +676,13 @@ ResourceId LockerImpl::getWaitingResource() const {
     return _waitingResource;
 }
 
+// Ignore data races in this function when running with TSAN. For performance reasons, diagnostic
+// commands are expected to race with concurrent lock acquisitions while gathering statistics.
+#if defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+__attribute__((no_sanitize("thread")))
+#endif
+#endif
 void LockerImpl::getLockerInfo(LockerInfo* lockerInfo,
                                const boost::optional<SingleThreadedLockStats> lockStatsBase) const {
     invariant(lockerInfo);
