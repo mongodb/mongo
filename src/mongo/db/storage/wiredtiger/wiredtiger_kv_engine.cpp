@@ -870,7 +870,10 @@ void WiredTigerKVEngine::flushAllFiles(OperationContext* opCtx, bool callerHolds
     if (_ephemeral) {
         return;
     }
-    syncSizeInfo(false);
+
+    // Immediately flush the size storer information to disk. When the node is fsync locked for
+    // operations such as backup, it's imperative that we copy the most up-to-date data files.
+    syncSizeInfo(true);
 
     // If there's no journal, we must checkpoint all of the data.
     WiredTigerSessionCache::Fsync fsyncType = _durable
