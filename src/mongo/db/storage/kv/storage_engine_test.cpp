@@ -169,7 +169,6 @@ TEST_F(StorageEngineTest, ReconcileKeepsTemporary) {
     ASSERT_EQUALS(0UL, reconcileResult.indexesToRebuild.size());
     ASSERT_EQUALS(0UL, reconcileResult.indexBuildsToRestart.size());
 
-    // TODO SERVER-49847: Clean up when the feature is turned on by default.
     if (_storageEngine->supportsResumableIndexBuilds()) {
         // The storage engine does not drop its temporary idents outside of starting up after an
         // unclean shutdown.
