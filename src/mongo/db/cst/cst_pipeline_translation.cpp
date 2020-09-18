@@ -542,7 +542,7 @@ auto translateProjectInclusion(const CNode& cst,
         sawId = sawId || CNode::fieldnameIsId(name);
         // If we see a key fieldname, make sure it's _id.
         const auto path = CNode::fieldnameIsId(name)
-            ? make_vector<StringData>("_id"_sd)
+            ? makeVector<StringData>("_id"_sd)
             : std::vector<StringData>{
                   stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.begin(),
                   stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.end()};
@@ -596,7 +596,7 @@ auto translateProjectExclusion(const CNode& cst,
     for (auto&& [name, child] : cst.objectChildren()) {
         // If we see a key fieldname, make sure it's _id.
         const auto path = CNode::fieldnameIsId(name)
-            ? make_vector<StringData>("_id"_sd)
+            ? makeVector<StringData>("_id"_sd)
             : std::vector<StringData>{
                   stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.begin(),
                   stdx::get<ProjectionPath>(stdx::get<FieldnamePath>(name)).components.end()};

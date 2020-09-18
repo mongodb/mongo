@@ -1593,14 +1593,14 @@ public:
         // are necessary after the initial conversion computation because we need have the outer let
         // binding evaluate to null if any field is null.
         auto nullExprs =
-            make_vector<std::unique_ptr<sbe::EExpression>>(generateNullOrMissing(frameId, 7),
-                                                           generateNullOrMissing(frameId, 6),
-                                                           generateNullOrMissing(frameId, 5),
-                                                           generateNullOrMissing(frameId, 4),
-                                                           generateNullOrMissing(frameId, 3),
-                                                           generateNullOrMissing(frameId, 2),
-                                                           generateNullOrMissing(frameId, 1),
-                                                           generateNullOrMissing(frameId, 0));
+            makeVector<std::unique_ptr<sbe::EExpression>>(generateNullOrMissing(frameId, 7),
+                                                          generateNullOrMissing(frameId, 6),
+                                                          generateNullOrMissing(frameId, 5),
+                                                          generateNullOrMissing(frameId, 4),
+                                                          generateNullOrMissing(frameId, 3),
+                                                          generateNullOrMissing(frameId, 2),
+                                                          generateNullOrMissing(frameId, 1),
+                                                          generateNullOrMissing(frameId, 0));
 
         using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
         auto checkPartsForNull =

@@ -592,8 +592,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollS
     invariant(anchorBranchSlots.size() == resumeBranchSlots.size());
 
     // A vector of the output slots for each union branch.
-    auto branchSlots = make_vector<sbe::value::SlotVector>(std::move(anchorBranchSlots),
-                                                           std::move(resumeBranchSlots));
+    auto branchSlots = makeVector<sbe::value::SlotVector>(std::move(anchorBranchSlots),
+                                                          std::move(resumeBranchSlots));
 
     _data.resultSlot = _slotIdGenerator.generate();
     _data.recordIdSlot = _slotIdGenerator.generate();
@@ -605,7 +605,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollS
 
     // Branch output slots become the input slots to the union.
     auto unionStage =
-        sbe::makeS<sbe::UnionStage>(make_vector<std::unique_ptr<sbe::PlanStage>>(
+        sbe::makeS<sbe::UnionStage>(makeVector<std::unique_ptr<sbe::PlanStage>>(
                                         std::move(anchorBranch), std::move(resumeBranch)),
                                     branchSlots,
                                     unionOutputSlots,

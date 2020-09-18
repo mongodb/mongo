@@ -555,7 +555,7 @@ aggregationProjectionFieldname:
 // Dollar-prefixed fieldnames are illegal.
 projectionFieldname:
     FIELDNAME {
-        auto components = make_vector<std::string>($1);
+        auto components = makeVector<std::string>($1);
         if (auto positional =
             c_node_validation::validateProjectionPathAsNormalOrPositional(components);
             positional.isOK()) {
@@ -737,7 +737,7 @@ argAsUserFieldname:
 
 argAsProjectionPath:
     arg {
-        auto components = make_vector<std::string>($1);
+        auto components = makeVector<std::string>($1);
         if (auto positional =
             c_node_validation::validateProjectionPathAsNormalOrPositional(components);
             positional.isOK()) {
@@ -1412,7 +1412,7 @@ idAsUserFieldname:
 
 idAsProjectionPath:
     ID {
-        $$ = ProjectionPath{make_vector<std::string>("_id")};
+        $$ = ProjectionPath{makeVector<std::string>("_id")};
     }
 ;
 
@@ -1947,7 +1947,7 @@ oneOrNegOne:
 
 sortFieldname:
     valueFieldname {
-        $sortFieldname = SortPath{make_vector<std::string>(stdx::get<UserFieldname>($valueFieldname))};
+        $sortFieldname = SortPath{makeVector<std::string>(stdx::get<UserFieldname>($valueFieldname))};
     } | DOTTED_FIELDNAME {
         auto components = $DOTTED_FIELDNAME;
         if (auto status = c_node_validation::validateSortPath(components);

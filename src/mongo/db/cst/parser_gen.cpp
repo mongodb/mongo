@@ -1,4 +1,4 @@
-// A Bison parser, made by GNU Bison 3.7.1.
+// A Bison parser, made by GNU Bison 3.7.
 
 // Skeleton implementation for Bison LALR(1) parsers in C++
 
@@ -39,7 +39,7 @@
 
 
 // Unqualified %code blocks.
-#line 82 "src/mongo/db/cst/grammar.yy"
+#line 82 "grammar.yy"
 
 #include <boost/algorithm/string.hpp>
 #include <iterator>
@@ -65,7 +65,7 @@ void ParserGen::error(const ParserGen::location_type& loc, const std::string& ms
 // mongo.
 #define YYLLOC_DEFAULT(newPos, rhsPositions, nRhs)
 
-#line 73 "src/mongo/db/cst/parser_gen.cpp"
+#line 73 "parser_gen.cpp"
 
 
 #ifndef YY_
@@ -156,9 +156,9 @@ void ParserGen::error(const ParserGen::location_type& loc, const std::string& ms
 #define YYERROR goto yyerrorlab
 #define YYRECOVERING() (!!yyerrstatus_)
 
-#line 57 "src/mongo/db/cst/grammar.yy"
+#line 57 "grammar.yy"
 namespace mongo {
-#line 166 "src/mongo/db/cst/parser_gen.cpp"
+#line 166 "parser_gen.cpp"
 
 /// Build a parser object.
 ParserGen::ParserGen(BSONLexer& lexer_yyarg, CNode* cst_yyarg)
@@ -1906,111 +1906,111 @@ int ParserGen::parse() {
             {
                 switch (yyn) {
                     case 2:  // start: START_PIPELINE pipeline
-#line 349 "src/mongo/db/cst/grammar.yy"
+#line 349 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1978 "src/mongo/db/cst/parser_gen.cpp"
+#line 1978 "parser_gen.cpp"
                     break;
 
                     case 3:  // start: START_MATCH match
-#line 352 "src/mongo/db/cst/grammar.yy"
+#line 352 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1986 "src/mongo/db/cst/parser_gen.cpp"
+#line 1986 "parser_gen.cpp"
                     break;
 
                     case 4:  // start: START_SORT sortSpecs
-#line 355 "src/mongo/db/cst/grammar.yy"
+#line 355 "grammar.yy"
                     {
                         *cst = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 1994 "src/mongo/db/cst/parser_gen.cpp"
+#line 1994 "parser_gen.cpp"
                     break;
 
                     case 5:  // pipeline: "array" stageList "end of array"
-#line 362 "src/mongo/db/cst/grammar.yy"
+#line 362 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 2002 "src/mongo/db/cst/parser_gen.cpp"
+#line 2002 "parser_gen.cpp"
                     break;
 
                     case 6:  // stageList: %empty
-#line 368 "src/mongo/db/cst/grammar.yy"
+#line 368 "grammar.yy"
                     {
                     }
-#line 2008 "src/mongo/db/cst/parser_gen.cpp"
+#line 2008 "parser_gen.cpp"
                     break;
 
                     case 7:  // stageList: "object" stage "end of object" stageList
-#line 369 "src/mongo/db/cst/grammar.yy"
+#line 369 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}};
                     }
-#line 2016 "src/mongo/db/cst/parser_gen.cpp"
+#line 2016 "parser_gen.cpp"
                     break;
 
                     case 8:  // $@1: %empty
-#line 377 "src/mongo/db/cst/grammar.yy"
+#line 377 "grammar.yy"
                     {
                         lexer.sortObjTokens();
                     }
-#line 2022 "src/mongo/db/cst/parser_gen.cpp"
+#line 2022 "parser_gen.cpp"
                     break;
 
                     case 10:  // stage: inhibitOptimization
-#line 380 "src/mongo/db/cst/grammar.yy"
+#line 380 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2028 "src/mongo/db/cst/parser_gen.cpp"
+#line 2028 "parser_gen.cpp"
                     break;
 
                     case 11:  // stage: unionWith
-#line 380 "src/mongo/db/cst/grammar.yy"
+#line 380 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2034 "src/mongo/db/cst/parser_gen.cpp"
+#line 2034 "parser_gen.cpp"
                     break;
 
                     case 12:  // stage: skip
-#line 380 "src/mongo/db/cst/grammar.yy"
+#line 380 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2040 "src/mongo/db/cst/parser_gen.cpp"
+#line 2040 "parser_gen.cpp"
                     break;
 
                     case 13:  // stage: limit
-#line 380 "src/mongo/db/cst/grammar.yy"
+#line 380 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2046 "src/mongo/db/cst/parser_gen.cpp"
+#line 2046 "parser_gen.cpp"
                     break;
 
                     case 14:  // stage: project
-#line 380 "src/mongo/db/cst/grammar.yy"
+#line 380 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2052 "src/mongo/db/cst/parser_gen.cpp"
+#line 2052 "parser_gen.cpp"
                     break;
 
                     case 15:  // stage: sample
-#line 380 "src/mongo/db/cst/grammar.yy"
+#line 380 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2058 "src/mongo/db/cst/parser_gen.cpp"
+#line 2058 "parser_gen.cpp"
                     break;
 
                     case 16:  // sample: STAGE_SAMPLE "object" "size argument" num "end of object"
-#line 383 "src/mongo/db/cst/grammar.yy"
+#line 383 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
                             KeyFieldname::sample,
@@ -2018,22 +2018,22 @@ int ParserGen::parse() {
                                 {KeyFieldname::sizeArg, YY_MOVE(yystack_[1].value.as<CNode>())},
                             }}}}};
                     }
-#line 2070 "src/mongo/db/cst/parser_gen.cpp"
+#line 2070 "parser_gen.cpp"
                     break;
 
                     case 17:  // inhibitOptimization: STAGE_INHIBIT_OPTIMIZATION "object" "end of
                               // object"
-#line 393 "src/mongo/db/cst/grammar.yy"
+#line 393 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             std::pair{KeyFieldname::inhibitOptimization, CNode::noopLeaf()}}};
                     }
-#line 2078 "src/mongo/db/cst/parser_gen.cpp"
+#line 2078 "parser_gen.cpp"
                     break;
 
                     case 18:  // unionWith: STAGE_UNION_WITH START_ORDERED_OBJECT "coll argument"
                               // string "pipeline argument" double "end of object"
-#line 399 "src/mongo/db/cst/grammar.yy"
+#line 399 "grammar.yy"
                     {
                         auto pipeline = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
@@ -2042,61 +2042,61 @@ int ParserGen::parse() {
                                 {KeyFieldname::collArg, YY_MOVE(yystack_[3].value.as<CNode>())},
                                 {KeyFieldname::pipelineArg, std::move(pipeline)}}}}}};
                     }
-#line 2091 "src/mongo/db/cst/parser_gen.cpp"
+#line 2091 "parser_gen.cpp"
                     break;
 
                     case 19:  // num: int
-#line 409 "src/mongo/db/cst/grammar.yy"
+#line 409 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2097 "src/mongo/db/cst/parser_gen.cpp"
+#line 2097 "parser_gen.cpp"
                     break;
 
                     case 20:  // num: long
-#line 409 "src/mongo/db/cst/grammar.yy"
+#line 409 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2103 "src/mongo/db/cst/parser_gen.cpp"
+#line 2103 "parser_gen.cpp"
                     break;
 
                     case 21:  // num: double
-#line 409 "src/mongo/db/cst/grammar.yy"
+#line 409 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2109 "src/mongo/db/cst/parser_gen.cpp"
+#line 2109 "parser_gen.cpp"
                     break;
 
                     case 22:  // num: decimal
-#line 409 "src/mongo/db/cst/grammar.yy"
+#line 409 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2115 "src/mongo/db/cst/parser_gen.cpp"
+#line 2115 "parser_gen.cpp"
                     break;
 
                     case 23:  // skip: STAGE_SKIP num
-#line 413 "src/mongo/db/cst/grammar.yy"
+#line 413 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             std::pair{KeyFieldname::skip, YY_MOVE(yystack_[0].value.as<CNode>())}}};
                     }
-#line 2123 "src/mongo/db/cst/parser_gen.cpp"
+#line 2123 "parser_gen.cpp"
                     break;
 
                     case 24:  // limit: STAGE_LIMIT num
-#line 418 "src/mongo/db/cst/grammar.yy"
+#line 418 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{std::pair{
                             KeyFieldname::limit, YY_MOVE(yystack_[0].value.as<CNode>())}}};
                     }
-#line 2131 "src/mongo/db/cst/parser_gen.cpp"
+#line 2131 "parser_gen.cpp"
                     break;
 
                     case 25:  // project: STAGE_PROJECT "object" projectFields "end of object"
-#line 423 "src/mongo/db/cst/grammar.yy"
+#line 423 "grammar.yy"
                     {
                         auto&& fields = YY_MOVE(yystack_[1].value.as<CNode>());
                         if (auto status =
@@ -2117,48 +2117,48 @@ int ParserGen::parse() {
                             // function.
                             error(yystack_[3].location, inclusion.getStatus().reason());
                     }
-#line 2152 "src/mongo/db/cst/parser_gen.cpp"
+#line 2152 "parser_gen.cpp"
                     break;
 
                     case 26:  // projectFields: %empty
-#line 442 "src/mongo/db/cst/grammar.yy"
+#line 442 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 2160 "src/mongo/db/cst/parser_gen.cpp"
+#line 2160 "parser_gen.cpp"
                     break;
 
                     case 27:  // projectFields: projectFields projectField
-#line 445 "src/mongo/db/cst/grammar.yy"
+#line 445 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2169 "src/mongo/db/cst/parser_gen.cpp"
+#line 2169 "parser_gen.cpp"
                     break;
 
                     case 28:  // projectField: ID topLevelProjection
-#line 452 "src/mongo/db/cst/grammar.yy"
+#line 452 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             KeyFieldname::id, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2177 "src/mongo/db/cst/parser_gen.cpp"
+#line 2177 "parser_gen.cpp"
                     break;
 
                     case 29:  // projectField: aggregationProjectionFieldname topLevelProjection
-#line 455 "src/mongo/db/cst/grammar.yy"
+#line 455 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2185 "src/mongo/db/cst/parser_gen.cpp"
+#line 2185 "parser_gen.cpp"
                     break;
 
                     case 30:  // topLevelProjection: projection
-#line 461 "src/mongo/db/cst/grammar.yy"
+#line 461 "grammar.yy"
                     {
                         auto projection = YY_MOVE(yystack_[0].value.as<CNode>());
                         yylhs.value.as<CNode>() =
@@ -2175,287 +2175,287 @@ int ParserGen::parse() {
                                       "object project field cannot contain both "
                                       "inclusion and exclusion indicators");
                     }
-#line 2201 "src/mongo/db/cst/parser_gen.cpp"
+#line 2201 "parser_gen.cpp"
                     break;
 
                     case 31:  // projection: string
-#line 475 "src/mongo/db/cst/grammar.yy"
+#line 475 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2207 "src/mongo/db/cst/parser_gen.cpp"
+#line 2207 "parser_gen.cpp"
                     break;
 
                     case 32:  // projection: binary
-#line 476 "src/mongo/db/cst/grammar.yy"
+#line 476 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2213 "src/mongo/db/cst/parser_gen.cpp"
+#line 2213 "parser_gen.cpp"
                     break;
 
                     case 33:  // projection: undefined
-#line 477 "src/mongo/db/cst/grammar.yy"
+#line 477 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2219 "src/mongo/db/cst/parser_gen.cpp"
+#line 2219 "parser_gen.cpp"
                     break;
 
                     case 34:  // projection: objectId
-#line 478 "src/mongo/db/cst/grammar.yy"
+#line 478 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2225 "src/mongo/db/cst/parser_gen.cpp"
+#line 2225 "parser_gen.cpp"
                     break;
 
                     case 35:  // projection: date
-#line 479 "src/mongo/db/cst/grammar.yy"
+#line 479 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2231 "src/mongo/db/cst/parser_gen.cpp"
+#line 2231 "parser_gen.cpp"
                     break;
 
                     case 36:  // projection: null
-#line 480 "src/mongo/db/cst/grammar.yy"
+#line 480 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2237 "src/mongo/db/cst/parser_gen.cpp"
+#line 2237 "parser_gen.cpp"
                     break;
 
                     case 37:  // projection: regex
-#line 481 "src/mongo/db/cst/grammar.yy"
+#line 481 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2243 "src/mongo/db/cst/parser_gen.cpp"
+#line 2243 "parser_gen.cpp"
                     break;
 
                     case 38:  // projection: dbPointer
-#line 482 "src/mongo/db/cst/grammar.yy"
+#line 482 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2249 "src/mongo/db/cst/parser_gen.cpp"
+#line 2249 "parser_gen.cpp"
                     break;
 
                     case 39:  // projection: javascript
-#line 483 "src/mongo/db/cst/grammar.yy"
+#line 483 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2255 "src/mongo/db/cst/parser_gen.cpp"
+#line 2255 "parser_gen.cpp"
                     break;
 
                     case 40:  // projection: symbol
-#line 484 "src/mongo/db/cst/grammar.yy"
+#line 484 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2261 "src/mongo/db/cst/parser_gen.cpp"
+#line 2261 "parser_gen.cpp"
                     break;
 
                     case 41:  // projection: javascriptWScope
-#line 485 "src/mongo/db/cst/grammar.yy"
+#line 485 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2267 "src/mongo/db/cst/parser_gen.cpp"
+#line 2267 "parser_gen.cpp"
                     break;
 
                     case 42:  // projection: "1 (int)"
-#line 486 "src/mongo/db/cst/grammar.yy"
+#line 486 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{1}};
                     }
-#line 2275 "src/mongo/db/cst/parser_gen.cpp"
+#line 2275 "parser_gen.cpp"
                     break;
 
                     case 43:  // projection: "-1 (int)"
-#line 489 "src/mongo/db/cst/grammar.yy"
+#line 489 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{-1}};
                     }
-#line 2283 "src/mongo/db/cst/parser_gen.cpp"
+#line 2283 "parser_gen.cpp"
                     break;
 
                     case 44:  // projection: "arbitrary integer"
-#line 492 "src/mongo/db/cst/grammar.yy"
+#line 492 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<int>())}};
                     }
-#line 2291 "src/mongo/db/cst/parser_gen.cpp"
+#line 2291 "parser_gen.cpp"
                     break;
 
                     case 45:  // projection: "zero (int)"
-#line 495 "src/mongo/db/cst/grammar.yy"
+#line 495 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::intZeroKey};
                     }
-#line 2299 "src/mongo/db/cst/parser_gen.cpp"
+#line 2299 "parser_gen.cpp"
                     break;
 
                     case 46:  // projection: "1 (long)"
-#line 498 "src/mongo/db/cst/grammar.yy"
+#line 498 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{1ll}};
                     }
-#line 2307 "src/mongo/db/cst/parser_gen.cpp"
+#line 2307 "parser_gen.cpp"
                     break;
 
                     case 47:  // projection: "-1 (long)"
-#line 501 "src/mongo/db/cst/grammar.yy"
+#line 501 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{-1ll}};
                     }
-#line 2315 "src/mongo/db/cst/parser_gen.cpp"
+#line 2315 "parser_gen.cpp"
                     break;
 
                     case 48:  // projection: "arbitrary long"
-#line 504 "src/mongo/db/cst/grammar.yy"
+#line 504 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<long long>())}};
                     }
-#line 2323 "src/mongo/db/cst/parser_gen.cpp"
+#line 2323 "parser_gen.cpp"
                     break;
 
                     case 49:  // projection: "zero (long)"
-#line 507 "src/mongo/db/cst/grammar.yy"
+#line 507 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::longZeroKey};
                     }
-#line 2331 "src/mongo/db/cst/parser_gen.cpp"
+#line 2331 "parser_gen.cpp"
                     break;
 
                     case 50:  // projection: "1 (double)"
-#line 510 "src/mongo/db/cst/grammar.yy"
+#line 510 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{1.0}};
                     }
-#line 2339 "src/mongo/db/cst/parser_gen.cpp"
+#line 2339 "parser_gen.cpp"
                     break;
 
                     case 51:  // projection: "-1 (double)"
-#line 513 "src/mongo/db/cst/grammar.yy"
+#line 513 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{-1.0}};
                     }
-#line 2347 "src/mongo/db/cst/parser_gen.cpp"
+#line 2347 "parser_gen.cpp"
                     break;
 
                     case 52:  // projection: "arbitrary double"
-#line 516 "src/mongo/db/cst/grammar.yy"
+#line 516 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<double>())}};
                     }
-#line 2355 "src/mongo/db/cst/parser_gen.cpp"
+#line 2355 "parser_gen.cpp"
                     break;
 
                     case 53:  // projection: "zero (double)"
-#line 519 "src/mongo/db/cst/grammar.yy"
+#line 519 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::doubleZeroKey};
                     }
-#line 2363 "src/mongo/db/cst/parser_gen.cpp"
+#line 2363 "parser_gen.cpp"
                     break;
 
                     case 54:  // projection: "1 (decimal)"
-#line 522 "src/mongo/db/cst/grammar.yy"
+#line 522 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{Decimal128{1.0}}};
                     }
-#line 2371 "src/mongo/db/cst/parser_gen.cpp"
+#line 2371 "parser_gen.cpp"
                     break;
 
                     case 55:  // projection: "-1 (decimal)"
-#line 525 "src/mongo/db/cst/grammar.yy"
+#line 525 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{NonZeroKey{Decimal128{-1.0}}};
                     }
-#line 2379 "src/mongo/db/cst/parser_gen.cpp"
+#line 2379 "parser_gen.cpp"
                     break;
 
                     case 56:  // projection: "arbitrary decimal"
-#line 528 "src/mongo/db/cst/grammar.yy"
+#line 528 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{NonZeroKey{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
                     }
-#line 2387 "src/mongo/db/cst/parser_gen.cpp"
+#line 2387 "parser_gen.cpp"
                     break;
 
                     case 57:  // projection: "zero (decimal)"
-#line 531 "src/mongo/db/cst/grammar.yy"
+#line 531 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::decimalZeroKey};
                     }
-#line 2395 "src/mongo/db/cst/parser_gen.cpp"
+#line 2395 "parser_gen.cpp"
                     break;
 
                     case 58:  // projection: "true"
-#line 534 "src/mongo/db/cst/grammar.yy"
+#line 534 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::trueKey};
                     }
-#line 2403 "src/mongo/db/cst/parser_gen.cpp"
+#line 2403 "parser_gen.cpp"
                     break;
 
                     case 59:  // projection: "false"
-#line 537 "src/mongo/db/cst/grammar.yy"
+#line 537 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::falseKey};
                     }
-#line 2411 "src/mongo/db/cst/parser_gen.cpp"
+#line 2411 "parser_gen.cpp"
                     break;
 
                     case 60:  // projection: timestamp
-#line 540 "src/mongo/db/cst/grammar.yy"
+#line 540 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2417 "src/mongo/db/cst/parser_gen.cpp"
+#line 2417 "parser_gen.cpp"
                     break;
 
                     case 61:  // projection: minKey
-#line 541 "src/mongo/db/cst/grammar.yy"
+#line 541 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2423 "src/mongo/db/cst/parser_gen.cpp"
+#line 2423 "parser_gen.cpp"
                     break;
 
                     case 62:  // projection: maxKey
-#line 542 "src/mongo/db/cst/grammar.yy"
+#line 542 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2429 "src/mongo/db/cst/parser_gen.cpp"
+#line 2429 "parser_gen.cpp"
                     break;
 
                     case 63:  // projection: projectionObject
-#line 543 "src/mongo/db/cst/grammar.yy"
+#line 543 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2435 "src/mongo/db/cst/parser_gen.cpp"
+#line 2435 "parser_gen.cpp"
                     break;
 
                     case 64:  // projection: compoundNonObjectExpression
-#line 544 "src/mongo/db/cst/grammar.yy"
+#line 544 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2441 "src/mongo/db/cst/parser_gen.cpp"
+#line 2441 "parser_gen.cpp"
                     break;
 
                     case 65:  // aggregationProjectionFieldname: projectionFieldname
-#line 549 "src/mongo/db/cst/grammar.yy"
+#line 549 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
@@ -2465,14 +2465,14 @@ int ParserGen::parse() {
                                   "positional projection forbidden in $project aggregation "
                                   "pipeline stage");
                     }
-#line 2451 "src/mongo/db/cst/parser_gen.cpp"
+#line 2451 "parser_gen.cpp"
                     break;
 
                     case 66:  // projectionFieldname: "fieldname"
-#line 557 "src/mongo/db/cst/grammar.yy"
+#line 557 "grammar.yy"
                     {
                         auto components =
-                            make_vector<std::string>(YY_MOVE(yystack_[0].value.as<std::string>()));
+                            makeVector<std::string>(YY_MOVE(yystack_[0].value.as<std::string>()));
                         if (auto positional =
                                 c_node_validation::validateProjectionPathAsNormalOrPositional(
                                     components);
@@ -2487,20 +2487,20 @@ int ParserGen::parse() {
                             error(yystack_[0].location, positional.getStatus().reason());
                         }
                     }
-#line 2469 "src/mongo/db/cst/parser_gen.cpp"
+#line 2469 "parser_gen.cpp"
                     break;
 
                     case 67:  // projectionFieldname: argAsProjectionPath
-#line 570 "src/mongo/db/cst/grammar.yy"
+#line 570 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2475 "src/mongo/db/cst/parser_gen.cpp"
+#line 2475 "parser_gen.cpp"
                     break;
 
                     case 68:  // projectionFieldname: "fieldname containing dotted path"
-#line 571 "src/mongo/db/cst/grammar.yy"
+#line 571 "grammar.yy"
                     {
                         auto components = YY_MOVE(yystack_[0].value.as<std::vector<std::string>>());
                         if (auto positional =
@@ -2517,158 +2517,158 @@ int ParserGen::parse() {
                             error(yystack_[0].location, positional.getStatus().reason());
                         }
                     }
-#line 2493 "src/mongo/db/cst/parser_gen.cpp"
+#line 2493 "parser_gen.cpp"
                     break;
 
                     case 69:  // projectionObject: "object" projectionObjectFields "end of object"
-#line 588 "src/mongo/db/cst/grammar.yy"
+#line 588 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 2501 "src/mongo/db/cst/parser_gen.cpp"
+#line 2501 "parser_gen.cpp"
                     break;
 
                     case 70:  // projectionObjectFields: projectionObjectField
-#line 595 "src/mongo/db/cst/grammar.yy"
+#line 595 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2510 "src/mongo/db/cst/parser_gen.cpp"
+#line 2510 "parser_gen.cpp"
                     break;
 
                     case 71:  // projectionObjectFields: projectionObjectFields
                               // projectionObjectField
-#line 599 "src/mongo/db/cst/grammar.yy"
+#line 599 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2519 "src/mongo/db/cst/parser_gen.cpp"
+#line 2519 "parser_gen.cpp"
                     break;
 
                     case 72:  // projectionObjectField: idAsProjectionPath projection
-#line 607 "src/mongo/db/cst/grammar.yy"
+#line 607 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2527 "src/mongo/db/cst/parser_gen.cpp"
+#line 2527 "parser_gen.cpp"
                     break;
 
                     case 73:  // projectionObjectField: aggregationProjectionFieldname projection
-#line 610 "src/mongo/db/cst/grammar.yy"
+#line 610 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2535 "src/mongo/db/cst/parser_gen.cpp"
+#line 2535 "parser_gen.cpp"
                     break;
 
                     case 74:  // match: "object" predicates "end of object"
-#line 616 "src/mongo/db/cst/grammar.yy"
+#line 616 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 2543 "src/mongo/db/cst/parser_gen.cpp"
+#line 2543 "parser_gen.cpp"
                     break;
 
                     case 75:  // predicates: %empty
-#line 622 "src/mongo/db/cst/grammar.yy"
+#line 622 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 2551 "src/mongo/db/cst/parser_gen.cpp"
+#line 2551 "parser_gen.cpp"
                     break;
 
                     case 76:  // predicates: predicates predicate
-#line 625 "src/mongo/db/cst/grammar.yy"
+#line 625 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2560 "src/mongo/db/cst/parser_gen.cpp"
+#line 2560 "parser_gen.cpp"
                     break;
 
                     case 77:  // predicate: predFieldname predValue
-#line 631 "src/mongo/db/cst/grammar.yy"
+#line 631 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2568 "src/mongo/db/cst/parser_gen.cpp"
+#line 2568 "parser_gen.cpp"
                     break;
 
                     case 78:  // predicate: logicalExpr
-#line 634 "src/mongo/db/cst/grammar.yy"
+#line 634 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>());
                     }
-#line 2576 "src/mongo/db/cst/parser_gen.cpp"
+#line 2576 "parser_gen.cpp"
                     break;
 
                     case 79:  // predValue: simpleValue
-#line 643 "src/mongo/db/cst/grammar.yy"
+#line 643 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 2582 "src/mongo/db/cst/parser_gen.cpp"
+#line 2582 "parser_gen.cpp"
                     break;
 
                     case 80:  // predValue: "object" compoundMatchExprs "end of object"
-#line 644 "src/mongo/db/cst/grammar.yy"
+#line 644 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 2590 "src/mongo/db/cst/parser_gen.cpp"
+#line 2590 "parser_gen.cpp"
                     break;
 
                     case 81:  // compoundMatchExprs: %empty
-#line 650 "src/mongo/db/cst/grammar.yy"
+#line 650 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 2598 "src/mongo/db/cst/parser_gen.cpp"
+#line 2598 "parser_gen.cpp"
                     break;
 
                     case 82:  // compoundMatchExprs: compoundMatchExprs operatorExpression
-#line 653 "src/mongo/db/cst/grammar.yy"
+#line 653 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 2607 "src/mongo/db/cst/parser_gen.cpp"
+#line 2607 "parser_gen.cpp"
                     break;
 
                     case 83:  // operatorExpression: notExpr
-#line 660 "src/mongo/db/cst/grammar.yy"
+#line 660 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>());
                     }
-#line 2613 "src/mongo/db/cst/parser_gen.cpp"
+#line 2613 "parser_gen.cpp"
                     break;
 
                     case 84:  // notExpr: NOT regex
-#line 663 "src/mongo/db/cst/grammar.yy"
+#line 663 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::notExpr, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 2621 "src/mongo/db/cst/parser_gen.cpp"
+#line 2621 "parser_gen.cpp"
                     break;
 
                     case 85:  // notExpr: NOT "object" compoundMatchExprs operatorExpression "end of
                               // object"
-#line 668 "src/mongo/db/cst/grammar.yy"
+#line 668 "grammar.yy"
                     {
                         auto&& exprs = YY_MOVE(yystack_[2].value.as<CNode>());
                         exprs.objectChildren().emplace_back(
@@ -2677,12 +2677,12 @@ int ParserGen::parse() {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::notExpr, std::move(exprs)};
                     }
-#line 2632 "src/mongo/db/cst/parser_gen.cpp"
+#line 2632 "parser_gen.cpp"
                     break;
 
                     case 86:  // logicalExpr: logicalExprField "array" additionalExprs match "end of
                               // array"
-#line 678 "src/mongo/db/cst/grammar.yy"
+#line 678 "grammar.yy"
                     {
                         auto&& children = YY_MOVE(yystack_[2].value.as<CNode>());
                         children.arrayChildren().emplace_back(
@@ -2690,150 +2690,150 @@ int ParserGen::parse() {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[4].value.as<CNode::Fieldname>()), std::move(children)};
                     }
-#line 2642 "src/mongo/db/cst/parser_gen.cpp"
+#line 2642 "parser_gen.cpp"
                     break;
 
                     case 87:  // logicalExprField: AND
-#line 686 "src/mongo/db/cst/grammar.yy"
+#line 686 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = KeyFieldname::andExpr;
                     }
-#line 2648 "src/mongo/db/cst/parser_gen.cpp"
+#line 2648 "parser_gen.cpp"
                     break;
 
                     case 88:  // logicalExprField: OR
-#line 687 "src/mongo/db/cst/grammar.yy"
+#line 687 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = KeyFieldname::orExpr;
                     }
-#line 2654 "src/mongo/db/cst/parser_gen.cpp"
+#line 2654 "parser_gen.cpp"
                     break;
 
                     case 89:  // logicalExprField: NOR
-#line 688 "src/mongo/db/cst/grammar.yy"
+#line 688 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = KeyFieldname::norExpr;
                     }
-#line 2660 "src/mongo/db/cst/parser_gen.cpp"
+#line 2660 "parser_gen.cpp"
                     break;
 
                     case 90:  // additionalExprs: %empty
-#line 691 "src/mongo/db/cst/grammar.yy"
+#line 691 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ArrayChildren{}};
                     }
-#line 2668 "src/mongo/db/cst/parser_gen.cpp"
+#line 2668 "parser_gen.cpp"
                     break;
 
                     case 91:  // additionalExprs: additionalExprs match
-#line 694 "src/mongo/db/cst/grammar.yy"
+#line 694 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().arrayChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<CNode>()));
                     }
-#line 2677 "src/mongo/db/cst/parser_gen.cpp"
+#line 2677 "parser_gen.cpp"
                     break;
 
                     case 92:  // predFieldname: idAsUserFieldname
-#line 701 "src/mongo/db/cst/grammar.yy"
+#line 701 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2683 "src/mongo/db/cst/parser_gen.cpp"
+#line 2683 "parser_gen.cpp"
                     break;
 
                     case 93:  // predFieldname: argAsUserFieldname
-#line 701 "src/mongo/db/cst/grammar.yy"
+#line 701 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2689 "src/mongo/db/cst/parser_gen.cpp"
+#line 2689 "parser_gen.cpp"
                     break;
 
                     case 94:  // predFieldname: invariableUserFieldname
-#line 701 "src/mongo/db/cst/grammar.yy"
+#line 701 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 2695 "src/mongo/db/cst/parser_gen.cpp"
+#line 2695 "parser_gen.cpp"
                     break;
 
                     case 95:  // invariableUserFieldname: "fieldname"
-#line 704 "src/mongo/db/cst/grammar.yy"
+#line 704 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             UserFieldname{YY_MOVE(yystack_[0].value.as<std::string>())};
                     }
-#line 2703 "src/mongo/db/cst/parser_gen.cpp"
+#line 2703 "parser_gen.cpp"
                     break;
 
                     case 96:  // stageAsUserFieldname: STAGE_INHIBIT_OPTIMIZATION
-#line 712 "src/mongo/db/cst/grammar.yy"
+#line 712 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             UserFieldname{"$_internalInhibitOptimization"};
                     }
-#line 2711 "src/mongo/db/cst/parser_gen.cpp"
+#line 2711 "parser_gen.cpp"
                     break;
 
                     case 97:  // stageAsUserFieldname: STAGE_UNION_WITH
-#line 715 "src/mongo/db/cst/grammar.yy"
+#line 715 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$unionWith"};
                     }
-#line 2719 "src/mongo/db/cst/parser_gen.cpp"
+#line 2719 "parser_gen.cpp"
                     break;
 
                     case 98:  // stageAsUserFieldname: STAGE_SKIP
-#line 718 "src/mongo/db/cst/grammar.yy"
+#line 718 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$skip"};
                     }
-#line 2727 "src/mongo/db/cst/parser_gen.cpp"
+#line 2727 "parser_gen.cpp"
                     break;
 
                     case 99:  // stageAsUserFieldname: STAGE_LIMIT
-#line 721 "src/mongo/db/cst/grammar.yy"
+#line 721 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$limit"};
                     }
-#line 2735 "src/mongo/db/cst/parser_gen.cpp"
+#line 2735 "parser_gen.cpp"
                     break;
 
                     case 100:  // stageAsUserFieldname: STAGE_PROJECT
-#line 724 "src/mongo/db/cst/grammar.yy"
+#line 724 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$project"};
                     }
-#line 2743 "src/mongo/db/cst/parser_gen.cpp"
+#line 2743 "parser_gen.cpp"
                     break;
 
                     case 101:  // stageAsUserFieldname: STAGE_SAMPLE
-#line 727 "src/mongo/db/cst/grammar.yy"
+#line 727 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sample"};
                     }
-#line 2751 "src/mongo/db/cst/parser_gen.cpp"
+#line 2751 "parser_gen.cpp"
                     break;
 
                     case 102:  // argAsUserFieldname: arg
-#line 733 "src/mongo/db/cst/grammar.yy"
+#line 733 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             UserFieldname{YY_MOVE(yystack_[0].value.as<std::string>())};
                     }
-#line 2759 "src/mongo/db/cst/parser_gen.cpp"
+#line 2759 "parser_gen.cpp"
                     break;
 
                     case 103:  // argAsProjectionPath: arg
-#line 739 "src/mongo/db/cst/grammar.yy"
+#line 739 "grammar.yy"
                     {
                         auto components =
-                            make_vector<std::string>(YY_MOVE(yystack_[0].value.as<std::string>()));
+                            makeVector<std::string>(YY_MOVE(yystack_[0].value.as<std::string>()));
                         if (auto positional =
                                 c_node_validation::validateProjectionPathAsNormalOrPositional(
                                     components);
@@ -2848,892 +2848,892 @@ int ParserGen::parse() {
                             error(yystack_[0].location, positional.getStatus().reason());
                         }
                     }
-#line 2777 "src/mongo/db/cst/parser_gen.cpp"
+#line 2777 "parser_gen.cpp"
                     break;
 
                     case 104:  // arg: "coll argument"
-#line 758 "src/mongo/db/cst/grammar.yy"
+#line 758 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "coll";
                     }
-#line 2785 "src/mongo/db/cst/parser_gen.cpp"
+#line 2785 "parser_gen.cpp"
                     break;
 
                     case 105:  // arg: "pipeline argument"
-#line 761 "src/mongo/db/cst/grammar.yy"
+#line 761 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "pipeline";
                     }
-#line 2793 "src/mongo/db/cst/parser_gen.cpp"
+#line 2793 "parser_gen.cpp"
                     break;
 
                     case 106:  // arg: "size argument"
-#line 764 "src/mongo/db/cst/grammar.yy"
+#line 764 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "size";
                     }
-#line 2801 "src/mongo/db/cst/parser_gen.cpp"
+#line 2801 "parser_gen.cpp"
                     break;
 
                     case 107:  // arg: "input argument"
-#line 767 "src/mongo/db/cst/grammar.yy"
+#line 767 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "input";
                     }
-#line 2809 "src/mongo/db/cst/parser_gen.cpp"
+#line 2809 "parser_gen.cpp"
                     break;
 
                     case 108:  // arg: "to argument"
-#line 770 "src/mongo/db/cst/grammar.yy"
+#line 770 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "to";
                     }
-#line 2817 "src/mongo/db/cst/parser_gen.cpp"
+#line 2817 "parser_gen.cpp"
                     break;
 
                     case 109:  // arg: "onError argument"
-#line 773 "src/mongo/db/cst/grammar.yy"
+#line 773 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "onError";
                     }
-#line 2825 "src/mongo/db/cst/parser_gen.cpp"
+#line 2825 "parser_gen.cpp"
                     break;
 
                     case 110:  // arg: "onNull argument"
-#line 776 "src/mongo/db/cst/grammar.yy"
+#line 776 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "onNull";
                     }
-#line 2833 "src/mongo/db/cst/parser_gen.cpp"
+#line 2833 "parser_gen.cpp"
                     break;
 
                     case 111:  // arg: "dateString argument"
-#line 779 "src/mongo/db/cst/grammar.yy"
+#line 779 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "dateString";
                     }
-#line 2841 "src/mongo/db/cst/parser_gen.cpp"
+#line 2841 "parser_gen.cpp"
                     break;
 
                     case 112:  // arg: "format argument"
-#line 782 "src/mongo/db/cst/grammar.yy"
+#line 782 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "format";
                     }
-#line 2849 "src/mongo/db/cst/parser_gen.cpp"
+#line 2849 "parser_gen.cpp"
                     break;
 
                     case 113:  // arg: "timezone argument"
-#line 785 "src/mongo/db/cst/grammar.yy"
+#line 785 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "timezone";
                     }
-#line 2857 "src/mongo/db/cst/parser_gen.cpp"
+#line 2857 "parser_gen.cpp"
                     break;
 
                     case 114:  // arg: "date argument"
-#line 788 "src/mongo/db/cst/grammar.yy"
+#line 788 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "date";
                     }
-#line 2865 "src/mongo/db/cst/parser_gen.cpp"
+#line 2865 "parser_gen.cpp"
                     break;
 
                     case 115:  // arg: "chars argument"
-#line 791 "src/mongo/db/cst/grammar.yy"
+#line 791 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "chars";
                     }
-#line 2873 "src/mongo/db/cst/parser_gen.cpp"
+#line 2873 "parser_gen.cpp"
                     break;
 
                     case 116:  // arg: "regex argument"
-#line 794 "src/mongo/db/cst/grammar.yy"
+#line 794 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "regex";
                     }
-#line 2881 "src/mongo/db/cst/parser_gen.cpp"
+#line 2881 "parser_gen.cpp"
                     break;
 
                     case 117:  // arg: "options argument"
-#line 797 "src/mongo/db/cst/grammar.yy"
+#line 797 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "options";
                     }
-#line 2889 "src/mongo/db/cst/parser_gen.cpp"
+#line 2889 "parser_gen.cpp"
                     break;
 
                     case 118:  // arg: "find argument"
-#line 800 "src/mongo/db/cst/grammar.yy"
+#line 800 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "find";
                     }
-#line 2897 "src/mongo/db/cst/parser_gen.cpp"
+#line 2897 "parser_gen.cpp"
                     break;
 
                     case 119:  // arg: "replacement argument"
-#line 803 "src/mongo/db/cst/grammar.yy"
+#line 803 "grammar.yy"
                     {
                         yylhs.value.as<std::string>() = "replacement";
                     }
-#line 2905 "src/mongo/db/cst/parser_gen.cpp"
+#line 2905 "parser_gen.cpp"
                     break;
 
                     case 120:  // aggExprAsUserFieldname: ADD
-#line 811 "src/mongo/db/cst/grammar.yy"
+#line 811 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$add"};
                     }
-#line 2913 "src/mongo/db/cst/parser_gen.cpp"
+#line 2913 "parser_gen.cpp"
                     break;
 
                     case 121:  // aggExprAsUserFieldname: ATAN2
-#line 814 "src/mongo/db/cst/grammar.yy"
+#line 814 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$atan2"};
                     }
-#line 2921 "src/mongo/db/cst/parser_gen.cpp"
+#line 2921 "parser_gen.cpp"
                     break;
 
                     case 122:  // aggExprAsUserFieldname: AND
-#line 817 "src/mongo/db/cst/grammar.yy"
+#line 817 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$and"};
                     }
-#line 2929 "src/mongo/db/cst/parser_gen.cpp"
+#line 2929 "parser_gen.cpp"
                     break;
 
                     case 123:  // aggExprAsUserFieldname: CONST_EXPR
-#line 820 "src/mongo/db/cst/grammar.yy"
+#line 820 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$const"};
                     }
-#line 2937 "src/mongo/db/cst/parser_gen.cpp"
+#line 2937 "parser_gen.cpp"
                     break;
 
                     case 124:  // aggExprAsUserFieldname: LITERAL
-#line 823 "src/mongo/db/cst/grammar.yy"
+#line 823 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$literal"};
                     }
-#line 2945 "src/mongo/db/cst/parser_gen.cpp"
+#line 2945 "parser_gen.cpp"
                     break;
 
                     case 125:  // aggExprAsUserFieldname: OR
-#line 826 "src/mongo/db/cst/grammar.yy"
+#line 826 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$or"};
                     }
-#line 2953 "src/mongo/db/cst/parser_gen.cpp"
+#line 2953 "parser_gen.cpp"
                     break;
 
                     case 126:  // aggExprAsUserFieldname: NOT
-#line 829 "src/mongo/db/cst/grammar.yy"
+#line 829 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$not"};
                     }
-#line 2961 "src/mongo/db/cst/parser_gen.cpp"
+#line 2961 "parser_gen.cpp"
                     break;
 
                     case 127:  // aggExprAsUserFieldname: CMP
-#line 832 "src/mongo/db/cst/grammar.yy"
+#line 832 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$cmp"};
                     }
-#line 2969 "src/mongo/db/cst/parser_gen.cpp"
+#line 2969 "parser_gen.cpp"
                     break;
 
                     case 128:  // aggExprAsUserFieldname: EQ
-#line 835 "src/mongo/db/cst/grammar.yy"
+#line 835 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$eq"};
                     }
-#line 2977 "src/mongo/db/cst/parser_gen.cpp"
+#line 2977 "parser_gen.cpp"
                     break;
 
                     case 129:  // aggExprAsUserFieldname: GT
-#line 838 "src/mongo/db/cst/grammar.yy"
+#line 838 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$gt"};
                     }
-#line 2985 "src/mongo/db/cst/parser_gen.cpp"
+#line 2985 "parser_gen.cpp"
                     break;
 
                     case 130:  // aggExprAsUserFieldname: GTE
-#line 841 "src/mongo/db/cst/grammar.yy"
+#line 841 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$gte"};
                     }
-#line 2993 "src/mongo/db/cst/parser_gen.cpp"
+#line 2993 "parser_gen.cpp"
                     break;
 
                     case 131:  // aggExprAsUserFieldname: LT
-#line 844 "src/mongo/db/cst/grammar.yy"
+#line 844 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$lt"};
                     }
-#line 3001 "src/mongo/db/cst/parser_gen.cpp"
+#line 3001 "parser_gen.cpp"
                     break;
 
                     case 132:  // aggExprAsUserFieldname: LTE
-#line 847 "src/mongo/db/cst/grammar.yy"
+#line 847 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$lte"};
                     }
-#line 3009 "src/mongo/db/cst/parser_gen.cpp"
+#line 3009 "parser_gen.cpp"
                     break;
 
                     case 133:  // aggExprAsUserFieldname: NE
-#line 850 "src/mongo/db/cst/grammar.yy"
+#line 850 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ne"};
                     }
-#line 3017 "src/mongo/db/cst/parser_gen.cpp"
+#line 3017 "parser_gen.cpp"
                     break;
 
                     case 134:  // aggExprAsUserFieldname: CONVERT
-#line 853 "src/mongo/db/cst/grammar.yy"
+#line 853 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$convert"};
                     }
-#line 3025 "src/mongo/db/cst/parser_gen.cpp"
+#line 3025 "parser_gen.cpp"
                     break;
 
                     case 135:  // aggExprAsUserFieldname: TO_BOOL
-#line 856 "src/mongo/db/cst/grammar.yy"
+#line 856 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toBool"};
                     }
-#line 3033 "src/mongo/db/cst/parser_gen.cpp"
+#line 3033 "parser_gen.cpp"
                     break;
 
                     case 136:  // aggExprAsUserFieldname: TO_DATE
-#line 859 "src/mongo/db/cst/grammar.yy"
+#line 859 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDate"};
                     }
-#line 3041 "src/mongo/db/cst/parser_gen.cpp"
+#line 3041 "parser_gen.cpp"
                     break;
 
                     case 137:  // aggExprAsUserFieldname: TO_DECIMAL
-#line 862 "src/mongo/db/cst/grammar.yy"
+#line 862 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDecimal"};
                     }
-#line 3049 "src/mongo/db/cst/parser_gen.cpp"
+#line 3049 "parser_gen.cpp"
                     break;
 
                     case 138:  // aggExprAsUserFieldname: TO_DOUBLE
-#line 865 "src/mongo/db/cst/grammar.yy"
+#line 865 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toDouble"};
                     }
-#line 3057 "src/mongo/db/cst/parser_gen.cpp"
+#line 3057 "parser_gen.cpp"
                     break;
 
                     case 139:  // aggExprAsUserFieldname: TO_INT
-#line 868 "src/mongo/db/cst/grammar.yy"
+#line 868 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toInt"};
                     }
-#line 3065 "src/mongo/db/cst/parser_gen.cpp"
+#line 3065 "parser_gen.cpp"
                     break;
 
                     case 140:  // aggExprAsUserFieldname: TO_LONG
-#line 871 "src/mongo/db/cst/grammar.yy"
+#line 871 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toLong"};
                     }
-#line 3073 "src/mongo/db/cst/parser_gen.cpp"
+#line 3073 "parser_gen.cpp"
                     break;
 
                     case 141:  // aggExprAsUserFieldname: TO_OBJECT_ID
-#line 874 "src/mongo/db/cst/grammar.yy"
+#line 874 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toObjectId"};
                     }
-#line 3081 "src/mongo/db/cst/parser_gen.cpp"
+#line 3081 "parser_gen.cpp"
                     break;
 
                     case 142:  // aggExprAsUserFieldname: TO_STRING
-#line 877 "src/mongo/db/cst/grammar.yy"
+#line 877 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toString"};
                     }
-#line 3089 "src/mongo/db/cst/parser_gen.cpp"
+#line 3089 "parser_gen.cpp"
                     break;
 
                     case 143:  // aggExprAsUserFieldname: TYPE
-#line 880 "src/mongo/db/cst/grammar.yy"
+#line 880 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$type"};
                     }
-#line 3097 "src/mongo/db/cst/parser_gen.cpp"
+#line 3097 "parser_gen.cpp"
                     break;
 
                     case 144:  // aggExprAsUserFieldname: ABS
-#line 883 "src/mongo/db/cst/grammar.yy"
+#line 883 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$abs"};
                     }
-#line 3105 "src/mongo/db/cst/parser_gen.cpp"
+#line 3105 "parser_gen.cpp"
                     break;
 
                     case 145:  // aggExprAsUserFieldname: CEIL
-#line 886 "src/mongo/db/cst/grammar.yy"
+#line 886 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ceil"};
                     }
-#line 3113 "src/mongo/db/cst/parser_gen.cpp"
+#line 3113 "parser_gen.cpp"
                     break;
 
                     case 146:  // aggExprAsUserFieldname: DIVIDE
-#line 889 "src/mongo/db/cst/grammar.yy"
+#line 889 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$divide"};
                     }
-#line 3121 "src/mongo/db/cst/parser_gen.cpp"
+#line 3121 "parser_gen.cpp"
                     break;
 
                     case 147:  // aggExprAsUserFieldname: EXPONENT
-#line 892 "src/mongo/db/cst/grammar.yy"
+#line 892 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$exp"};
                     }
-#line 3129 "src/mongo/db/cst/parser_gen.cpp"
+#line 3129 "parser_gen.cpp"
                     break;
 
                     case 148:  // aggExprAsUserFieldname: FLOOR
-#line 895 "src/mongo/db/cst/grammar.yy"
+#line 895 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$floor"};
                     }
-#line 3137 "src/mongo/db/cst/parser_gen.cpp"
+#line 3137 "parser_gen.cpp"
                     break;
 
                     case 149:  // aggExprAsUserFieldname: LN
-#line 898 "src/mongo/db/cst/grammar.yy"
+#line 898 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ln"};
                     }
-#line 3145 "src/mongo/db/cst/parser_gen.cpp"
+#line 3145 "parser_gen.cpp"
                     break;
 
                     case 150:  // aggExprAsUserFieldname: LOG
-#line 901 "src/mongo/db/cst/grammar.yy"
+#line 901 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$log"};
                     }
-#line 3153 "src/mongo/db/cst/parser_gen.cpp"
+#line 3153 "parser_gen.cpp"
                     break;
 
                     case 151:  // aggExprAsUserFieldname: LOGTEN
-#line 904 "src/mongo/db/cst/grammar.yy"
+#line 904 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$log10"};
                     }
-#line 3161 "src/mongo/db/cst/parser_gen.cpp"
+#line 3161 "parser_gen.cpp"
                     break;
 
                     case 152:  // aggExprAsUserFieldname: MOD
-#line 907 "src/mongo/db/cst/grammar.yy"
+#line 907 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$mod"};
                     }
-#line 3169 "src/mongo/db/cst/parser_gen.cpp"
+#line 3169 "parser_gen.cpp"
                     break;
 
                     case 153:  // aggExprAsUserFieldname: MULTIPLY
-#line 910 "src/mongo/db/cst/grammar.yy"
+#line 910 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$multiply"};
                     }
-#line 3177 "src/mongo/db/cst/parser_gen.cpp"
+#line 3177 "parser_gen.cpp"
                     break;
 
                     case 154:  // aggExprAsUserFieldname: POW
-#line 913 "src/mongo/db/cst/grammar.yy"
+#line 913 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$pow"};
                     }
-#line 3185 "src/mongo/db/cst/parser_gen.cpp"
+#line 3185 "parser_gen.cpp"
                     break;
 
                     case 155:  // aggExprAsUserFieldname: ROUND
-#line 916 "src/mongo/db/cst/grammar.yy"
+#line 916 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$round"};
                     }
-#line 3193 "src/mongo/db/cst/parser_gen.cpp"
+#line 3193 "parser_gen.cpp"
                     break;
 
                     case 156:  // aggExprAsUserFieldname: "slice"
-#line 919 "src/mongo/db/cst/grammar.yy"
+#line 919 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$slice"};
                     }
-#line 3201 "src/mongo/db/cst/parser_gen.cpp"
+#line 3201 "parser_gen.cpp"
                     break;
 
                     case 157:  // aggExprAsUserFieldname: SQRT
-#line 922 "src/mongo/db/cst/grammar.yy"
+#line 922 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sqrt"};
                     }
-#line 3209 "src/mongo/db/cst/parser_gen.cpp"
+#line 3209 "parser_gen.cpp"
                     break;
 
                     case 158:  // aggExprAsUserFieldname: SUBTRACT
-#line 925 "src/mongo/db/cst/grammar.yy"
+#line 925 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$subtract"};
                     }
-#line 3217 "src/mongo/db/cst/parser_gen.cpp"
+#line 3217 "parser_gen.cpp"
                     break;
 
                     case 159:  // aggExprAsUserFieldname: TRUNC
-#line 928 "src/mongo/db/cst/grammar.yy"
+#line 928 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$trunc"};
                     }
-#line 3225 "src/mongo/db/cst/parser_gen.cpp"
+#line 3225 "parser_gen.cpp"
                     break;
 
                     case 160:  // aggExprAsUserFieldname: CONCAT
-#line 931 "src/mongo/db/cst/grammar.yy"
+#line 931 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$concat"};
                     }
-#line 3233 "src/mongo/db/cst/parser_gen.cpp"
+#line 3233 "parser_gen.cpp"
                     break;
 
                     case 161:  // aggExprAsUserFieldname: DATE_FROM_STRING
-#line 934 "src/mongo/db/cst/grammar.yy"
+#line 934 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$dateFromString"};
                     }
-#line 3241 "src/mongo/db/cst/parser_gen.cpp"
+#line 3241 "parser_gen.cpp"
                     break;
 
                     case 162:  // aggExprAsUserFieldname: DATE_TO_STRING
-#line 937 "src/mongo/db/cst/grammar.yy"
+#line 937 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$dateToString"};
                     }
-#line 3249 "src/mongo/db/cst/parser_gen.cpp"
+#line 3249 "parser_gen.cpp"
                     break;
 
                     case 163:  // aggExprAsUserFieldname: INDEX_OF_BYTES
-#line 940 "src/mongo/db/cst/grammar.yy"
+#line 940 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$indexOfBytes"};
                     }
-#line 3257 "src/mongo/db/cst/parser_gen.cpp"
+#line 3257 "parser_gen.cpp"
                     break;
 
                     case 164:  // aggExprAsUserFieldname: INDEX_OF_CP
-#line 943 "src/mongo/db/cst/grammar.yy"
+#line 943 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$indexOfCP"};
                     }
-#line 3265 "src/mongo/db/cst/parser_gen.cpp"
+#line 3265 "parser_gen.cpp"
                     break;
 
                     case 165:  // aggExprAsUserFieldname: LTRIM
-#line 946 "src/mongo/db/cst/grammar.yy"
+#line 946 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$ltrim"};
                     }
-#line 3273 "src/mongo/db/cst/parser_gen.cpp"
+#line 3273 "parser_gen.cpp"
                     break;
 
                     case 166:  // aggExprAsUserFieldname: META
-#line 949 "src/mongo/db/cst/grammar.yy"
+#line 949 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$meta"};
                     }
-#line 3281 "src/mongo/db/cst/parser_gen.cpp"
+#line 3281 "parser_gen.cpp"
                     break;
 
                     case 167:  // aggExprAsUserFieldname: REGEX_FIND
-#line 952 "src/mongo/db/cst/grammar.yy"
+#line 952 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexFind"};
                     }
-#line 3289 "src/mongo/db/cst/parser_gen.cpp"
+#line 3289 "parser_gen.cpp"
                     break;
 
                     case 168:  // aggExprAsUserFieldname: REGEX_FIND_ALL
-#line 955 "src/mongo/db/cst/grammar.yy"
+#line 955 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexFindAll"};
                     }
-#line 3297 "src/mongo/db/cst/parser_gen.cpp"
+#line 3297 "parser_gen.cpp"
                     break;
 
                     case 169:  // aggExprAsUserFieldname: REGEX_MATCH
-#line 958 "src/mongo/db/cst/grammar.yy"
+#line 958 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$regexMatch"};
                     }
-#line 3305 "src/mongo/db/cst/parser_gen.cpp"
+#line 3305 "parser_gen.cpp"
                     break;
 
                     case 170:  // aggExprAsUserFieldname: REPLACE_ONE
-#line 961 "src/mongo/db/cst/grammar.yy"
+#line 961 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceOne"};
                     }
-#line 3313 "src/mongo/db/cst/parser_gen.cpp"
+#line 3313 "parser_gen.cpp"
                     break;
 
                     case 171:  // aggExprAsUserFieldname: REPLACE_ALL
-#line 964 "src/mongo/db/cst/grammar.yy"
+#line 964 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$replaceAll"};
                     }
-#line 3321 "src/mongo/db/cst/parser_gen.cpp"
+#line 3321 "parser_gen.cpp"
                     break;
 
                     case 172:  // aggExprAsUserFieldname: RTRIM
-#line 967 "src/mongo/db/cst/grammar.yy"
+#line 967 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$rtrim"};
                     }
-#line 3329 "src/mongo/db/cst/parser_gen.cpp"
+#line 3329 "parser_gen.cpp"
                     break;
 
                     case 173:  // aggExprAsUserFieldname: SPLIT
-#line 970 "src/mongo/db/cst/grammar.yy"
+#line 970 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$split"};
                     }
-#line 3337 "src/mongo/db/cst/parser_gen.cpp"
+#line 3337 "parser_gen.cpp"
                     break;
 
                     case 174:  // aggExprAsUserFieldname: STR_LEN_BYTES
-#line 973 "src/mongo/db/cst/grammar.yy"
+#line 973 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenBytes"};
                     }
-#line 3345 "src/mongo/db/cst/parser_gen.cpp"
+#line 3345 "parser_gen.cpp"
                     break;
 
                     case 175:  // aggExprAsUserFieldname: STR_LEN_CP
-#line 976 "src/mongo/db/cst/grammar.yy"
+#line 976 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strLenCP"};
                     }
-#line 3353 "src/mongo/db/cst/parser_gen.cpp"
+#line 3353 "parser_gen.cpp"
                     break;
 
                     case 176:  // aggExprAsUserFieldname: STR_CASE_CMP
-#line 979 "src/mongo/db/cst/grammar.yy"
+#line 979 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$strcasecmp"};
                     }
-#line 3361 "src/mongo/db/cst/parser_gen.cpp"
+#line 3361 "parser_gen.cpp"
                     break;
 
                     case 177:  // aggExprAsUserFieldname: SUBSTR
-#line 982 "src/mongo/db/cst/grammar.yy"
+#line 982 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substr"};
                     }
-#line 3369 "src/mongo/db/cst/parser_gen.cpp"
+#line 3369 "parser_gen.cpp"
                     break;
 
                     case 178:  // aggExprAsUserFieldname: SUBSTR_BYTES
-#line 985 "src/mongo/db/cst/grammar.yy"
+#line 985 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrBytes"};
                     }
-#line 3377 "src/mongo/db/cst/parser_gen.cpp"
+#line 3377 "parser_gen.cpp"
                     break;
 
                     case 179:  // aggExprAsUserFieldname: SUBSTR_CP
-#line 988 "src/mongo/db/cst/grammar.yy"
+#line 988 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$substrCP"};
                     }
-#line 3385 "src/mongo/db/cst/parser_gen.cpp"
+#line 3385 "parser_gen.cpp"
                     break;
 
                     case 180:  // aggExprAsUserFieldname: TO_LOWER
-#line 991 "src/mongo/db/cst/grammar.yy"
+#line 991 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toLower"};
                     }
-#line 3393 "src/mongo/db/cst/parser_gen.cpp"
+#line 3393 "parser_gen.cpp"
                     break;
 
                     case 181:  // aggExprAsUserFieldname: TRIM
-#line 994 "src/mongo/db/cst/grammar.yy"
+#line 994 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$trim"};
                     }
-#line 3401 "src/mongo/db/cst/parser_gen.cpp"
+#line 3401 "parser_gen.cpp"
                     break;
 
                     case 182:  // aggExprAsUserFieldname: TO_UPPER
-#line 997 "src/mongo/db/cst/grammar.yy"
+#line 997 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$toUpper"};
                     }
-#line 3409 "src/mongo/db/cst/parser_gen.cpp"
+#line 3409 "parser_gen.cpp"
                     break;
 
                     case 183:  // aggExprAsUserFieldname: "allElementsTrue"
-#line 1000 "src/mongo/db/cst/grammar.yy"
+#line 1000 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$allElementsTrue"};
                     }
-#line 3417 "src/mongo/db/cst/parser_gen.cpp"
+#line 3417 "parser_gen.cpp"
                     break;
 
                     case 184:  // aggExprAsUserFieldname: "anyElementTrue"
-#line 1003 "src/mongo/db/cst/grammar.yy"
+#line 1003 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$anyElementTrue"};
                     }
-#line 3425 "src/mongo/db/cst/parser_gen.cpp"
+#line 3425 "parser_gen.cpp"
                     break;
 
                     case 185:  // aggExprAsUserFieldname: "setDifference"
-#line 1006 "src/mongo/db/cst/grammar.yy"
+#line 1006 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setDifference"};
                     }
-#line 3433 "src/mongo/db/cst/parser_gen.cpp"
+#line 3433 "parser_gen.cpp"
                     break;
 
                     case 186:  // aggExprAsUserFieldname: "setEquals"
-#line 1009 "src/mongo/db/cst/grammar.yy"
+#line 1009 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setEquals"};
                     }
-#line 3441 "src/mongo/db/cst/parser_gen.cpp"
+#line 3441 "parser_gen.cpp"
                     break;
 
                     case 187:  // aggExprAsUserFieldname: "setIntersection"
-#line 1012 "src/mongo/db/cst/grammar.yy"
+#line 1012 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setIntersection"};
                     }
-#line 3449 "src/mongo/db/cst/parser_gen.cpp"
+#line 3449 "parser_gen.cpp"
                     break;
 
                     case 188:  // aggExprAsUserFieldname: "setIsSubset"
-#line 1015 "src/mongo/db/cst/grammar.yy"
+#line 1015 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setIsSubset"};
                     }
-#line 3457 "src/mongo/db/cst/parser_gen.cpp"
+#line 3457 "parser_gen.cpp"
                     break;
 
                     case 189:  // aggExprAsUserFieldname: "setUnion"
-#line 1018 "src/mongo/db/cst/grammar.yy"
+#line 1018 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$setUnion"};
                     }
-#line 3465 "src/mongo/db/cst/parser_gen.cpp"
+#line 3465 "parser_gen.cpp"
                     break;
 
                     case 190:  // aggExprAsUserFieldname: SIN
-#line 1021 "src/mongo/db/cst/grammar.yy"
+#line 1021 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sin"};
                     }
-#line 3473 "src/mongo/db/cst/parser_gen.cpp"
+#line 3473 "parser_gen.cpp"
                     break;
 
                     case 191:  // aggExprAsUserFieldname: COS
-#line 1024 "src/mongo/db/cst/grammar.yy"
+#line 1024 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$cos"};
                     }
-#line 3481 "src/mongo/db/cst/parser_gen.cpp"
+#line 3481 "parser_gen.cpp"
                     break;
 
                     case 192:  // aggExprAsUserFieldname: TAN
-#line 1027 "src/mongo/db/cst/grammar.yy"
+#line 1027 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$tan"};
                     }
-#line 3489 "src/mongo/db/cst/parser_gen.cpp"
+#line 3489 "parser_gen.cpp"
                     break;
 
                     case 193:  // aggExprAsUserFieldname: SINH
-#line 1030 "src/mongo/db/cst/grammar.yy"
+#line 1030 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$sinh"};
                     }
-#line 3497 "src/mongo/db/cst/parser_gen.cpp"
+#line 3497 "parser_gen.cpp"
                     break;
 
                     case 194:  // aggExprAsUserFieldname: COSH
-#line 1033 "src/mongo/db/cst/grammar.yy"
+#line 1033 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$cosh"};
                     }
-#line 3505 "src/mongo/db/cst/parser_gen.cpp"
+#line 3505 "parser_gen.cpp"
                     break;
 
                     case 195:  // aggExprAsUserFieldname: TANH
-#line 1036 "src/mongo/db/cst/grammar.yy"
+#line 1036 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$tanh"};
                     }
-#line 3513 "src/mongo/db/cst/parser_gen.cpp"
+#line 3513 "parser_gen.cpp"
                     break;
 
                     case 196:  // aggExprAsUserFieldname: ASIN
-#line 1039 "src/mongo/db/cst/grammar.yy"
+#line 1039 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$asin"};
                     }
-#line 3521 "src/mongo/db/cst/parser_gen.cpp"
+#line 3521 "parser_gen.cpp"
                     break;
 
                     case 197:  // aggExprAsUserFieldname: ACOS
-#line 1042 "src/mongo/db/cst/grammar.yy"
+#line 1042 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$acos"};
                     }
-#line 3529 "src/mongo/db/cst/parser_gen.cpp"
+#line 3529 "parser_gen.cpp"
                     break;
 
                     case 198:  // aggExprAsUserFieldname: ATAN
-#line 1045 "src/mongo/db/cst/grammar.yy"
+#line 1045 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$atan"};
                     }
-#line 3537 "src/mongo/db/cst/parser_gen.cpp"
+#line 3537 "parser_gen.cpp"
                     break;
 
                     case 199:  // aggExprAsUserFieldname: ASINH
-#line 1048 "src/mongo/db/cst/grammar.yy"
+#line 1048 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$asinh"};
                     }
-#line 3545 "src/mongo/db/cst/parser_gen.cpp"
+#line 3545 "parser_gen.cpp"
                     break;
 
                     case 200:  // aggExprAsUserFieldname: ACOSH
-#line 1051 "src/mongo/db/cst/grammar.yy"
+#line 1051 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$acosh"};
                     }
-#line 3553 "src/mongo/db/cst/parser_gen.cpp"
+#line 3553 "parser_gen.cpp"
                     break;
 
                     case 201:  // aggExprAsUserFieldname: ATANH
-#line 1054 "src/mongo/db/cst/grammar.yy"
+#line 1054 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$atanh"};
                     }
-#line 3561 "src/mongo/db/cst/parser_gen.cpp"
+#line 3561 "parser_gen.cpp"
                     break;
 
                     case 202:  // aggExprAsUserFieldname: DEGREES_TO_RADIANS
-#line 1057 "src/mongo/db/cst/grammar.yy"
+#line 1057 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$degreesToRadians"};
                     }
-#line 3569 "src/mongo/db/cst/parser_gen.cpp"
+#line 3569 "parser_gen.cpp"
                     break;
 
                     case 203:  // aggExprAsUserFieldname: RADIANS_TO_DEGREES
-#line 1060 "src/mongo/db/cst/grammar.yy"
+#line 1060 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$radiansToDegrees"};
                     }
-#line 3577 "src/mongo/db/cst/parser_gen.cpp"
+#line 3577 "parser_gen.cpp"
                     break;
 
                     case 204:  // string: "string"
-#line 1067 "src/mongo/db/cst/grammar.yy"
+#line 1067 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserString{YY_MOVE(yystack_[0].value.as<std::string>())}};
                     }
-#line 3585 "src/mongo/db/cst/parser_gen.cpp"
+#line 3585 "parser_gen.cpp"
                     break;
 
                     case 205:  // string: "geoNearDistance"
-#line 1072 "src/mongo/db/cst/grammar.yy"
+#line 1072 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"geoNearDistance"}};
                     }
-#line 3593 "src/mongo/db/cst/parser_gen.cpp"
+#line 3593 "parser_gen.cpp"
                     break;
 
                     case 206:  // string: "geoNearPoint"
-#line 1075 "src/mongo/db/cst/grammar.yy"
+#line 1075 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"geoNearPoint"}};
                     }
-#line 3601 "src/mongo/db/cst/parser_gen.cpp"
+#line 3601 "parser_gen.cpp"
                     break;
 
                     case 207:  // string: "indexKey"
-#line 1078 "src/mongo/db/cst/grammar.yy"
+#line 1078 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"indexKey"}};
                     }
-#line 3609 "src/mongo/db/cst/parser_gen.cpp"
+#line 3609 "parser_gen.cpp"
                     break;
 
                     case 208:  // string: "randVal"
-#line 1081 "src/mongo/db/cst/grammar.yy"
+#line 1081 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"randVal"}};
                     }
-#line 3617 "src/mongo/db/cst/parser_gen.cpp"
+#line 3617 "parser_gen.cpp"
                     break;
 
                     case 209:  // string: "recordId"
-#line 1084 "src/mongo/db/cst/grammar.yy"
+#line 1084 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"recordId"}};
                     }
-#line 3625 "src/mongo/db/cst/parser_gen.cpp"
+#line 3625 "parser_gen.cpp"
                     break;
 
                     case 210:  // string: "searchHighlights"
-#line 1087 "src/mongo/db/cst/grammar.yy"
+#line 1087 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"searchHighlights"}};
                     }
-#line 3633 "src/mongo/db/cst/parser_gen.cpp"
+#line 3633 "parser_gen.cpp"
                     break;
 
                     case 211:  // string: "searchScore"
-#line 1090 "src/mongo/db/cst/grammar.yy"
+#line 1090 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"searchScore"}};
                     }
-#line 3641 "src/mongo/db/cst/parser_gen.cpp"
+#line 3641 "parser_gen.cpp"
                     break;
 
                     case 212:  // string: "sortKey"
-#line 1093 "src/mongo/db/cst/grammar.yy"
+#line 1093 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"sortKey"}};
                     }
-#line 3649 "src/mongo/db/cst/parser_gen.cpp"
+#line 3649 "parser_gen.cpp"
                     break;
 
                     case 213:  // string: "textScore"
-#line 1096 "src/mongo/db/cst/grammar.yy"
+#line 1096 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserString{"textScore"}};
                     }
-#line 3657 "src/mongo/db/cst/parser_gen.cpp"
+#line 3657 "parser_gen.cpp"
                     break;
 
                     case 214:  // aggregationFieldPath: "$-prefixed string"
-#line 1102 "src/mongo/db/cst/grammar.yy"
+#line 1102 "grammar.yy"
                     {
                         auto str = YY_MOVE(yystack_[0].value.as<std::string>());
                         auto components = std::vector<std::string>{};
@@ -3744,11 +3744,11 @@ int ParserGen::parse() {
                             error(yystack_[0].location, status.reason());
                         yylhs.value.as<CNode>() = CNode{AggregationPath{std::move(components)}};
                     }
-#line 3673 "src/mongo/db/cst/parser_gen.cpp"
+#line 3673 "parser_gen.cpp"
                     break;
 
                     case 215:  // variable: "$$-prefixed string"
-#line 1116 "src/mongo/db/cst/grammar.yy"
+#line 1116 "grammar.yy"
                     {
                         auto str = YY_MOVE(yystack_[0].value.as<std::string>());
                         auto components = std::vector<std::string>{};
@@ -3762,1228 +3762,1228 @@ int ParserGen::parse() {
                         yylhs.value.as<CNode>() =
                             CNode{AggregationVariablePath{std::move(components)}};
                     }
-#line 3689 "src/mongo/db/cst/parser_gen.cpp"
+#line 3689 "parser_gen.cpp"
                     break;
 
                     case 216:  // binary: "BinData"
-#line 1130 "src/mongo/db/cst/grammar.yy"
+#line 1130 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserBinary{YY_MOVE(yystack_[0].value.as<BSONBinData>())}};
                     }
-#line 3697 "src/mongo/db/cst/parser_gen.cpp"
+#line 3697 "parser_gen.cpp"
                     break;
 
                     case 217:  // undefined: "undefined"
-#line 1136 "src/mongo/db/cst/grammar.yy"
+#line 1136 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserUndefined{}};
                     }
-#line 3705 "src/mongo/db/cst/parser_gen.cpp"
+#line 3705 "parser_gen.cpp"
                     break;
 
                     case 218:  // objectId: "ObjectID"
-#line 1142 "src/mongo/db/cst/grammar.yy"
+#line 1142 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserObjectId{}};
                     }
-#line 3713 "src/mongo/db/cst/parser_gen.cpp"
+#line 3713 "parser_gen.cpp"
                     break;
 
                     case 219:  // date: "Date"
-#line 1148 "src/mongo/db/cst/grammar.yy"
+#line 1148 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDate{YY_MOVE(yystack_[0].value.as<Date_t>())}};
                     }
-#line 3721 "src/mongo/db/cst/parser_gen.cpp"
+#line 3721 "parser_gen.cpp"
                     break;
 
                     case 220:  // null: "null"
-#line 1154 "src/mongo/db/cst/grammar.yy"
+#line 1154 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserNull{}};
                     }
-#line 3729 "src/mongo/db/cst/parser_gen.cpp"
+#line 3729 "parser_gen.cpp"
                     break;
 
                     case 221:  // regex: "regex"
-#line 1160 "src/mongo/db/cst/grammar.yy"
+#line 1160 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserRegex{YY_MOVE(yystack_[0].value.as<BSONRegEx>())}};
                     }
-#line 3737 "src/mongo/db/cst/parser_gen.cpp"
+#line 3737 "parser_gen.cpp"
                     break;
 
                     case 222:  // dbPointer: "dbPointer"
-#line 1166 "src/mongo/db/cst/grammar.yy"
+#line 1166 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDBPointer{YY_MOVE(yystack_[0].value.as<BSONDBRef>())}};
                     }
-#line 3745 "src/mongo/db/cst/parser_gen.cpp"
+#line 3745 "parser_gen.cpp"
                     break;
 
                     case 223:  // javascript: "Code"
-#line 1172 "src/mongo/db/cst/grammar.yy"
+#line 1172 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserJavascript{YY_MOVE(yystack_[0].value.as<BSONCode>())}};
                     }
-#line 3753 "src/mongo/db/cst/parser_gen.cpp"
+#line 3753 "parser_gen.cpp"
                     break;
 
                     case 224:  // symbol: "Symbol"
-#line 1178 "src/mongo/db/cst/grammar.yy"
+#line 1178 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserSymbol{YY_MOVE(yystack_[0].value.as<BSONSymbol>())}};
                     }
-#line 3761 "src/mongo/db/cst/parser_gen.cpp"
+#line 3761 "parser_gen.cpp"
                     break;
 
                     case 225:  // javascriptWScope: "CodeWScope"
-#line 1184 "src/mongo/db/cst/grammar.yy"
+#line 1184 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserJavascriptWithScope{
                             YY_MOVE(yystack_[0].value.as<BSONCodeWScope>())}};
                     }
-#line 3769 "src/mongo/db/cst/parser_gen.cpp"
+#line 3769 "parser_gen.cpp"
                     break;
 
                     case 226:  // timestamp: "Timestamp"
-#line 1190 "src/mongo/db/cst/grammar.yy"
+#line 1190 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserTimestamp{YY_MOVE(yystack_[0].value.as<Timestamp>())}};
                     }
-#line 3777 "src/mongo/db/cst/parser_gen.cpp"
+#line 3777 "parser_gen.cpp"
                     break;
 
                     case 227:  // minKey: "minKey"
-#line 1196 "src/mongo/db/cst/grammar.yy"
+#line 1196 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserMinKey{YY_MOVE(yystack_[0].value.as<UserMinKey>())}};
                     }
-#line 3785 "src/mongo/db/cst/parser_gen.cpp"
+#line 3785 "parser_gen.cpp"
                     break;
 
                     case 228:  // maxKey: "maxKey"
-#line 1202 "src/mongo/db/cst/grammar.yy"
+#line 1202 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserMaxKey{YY_MOVE(yystack_[0].value.as<UserMaxKey>())}};
                     }
-#line 3793 "src/mongo/db/cst/parser_gen.cpp"
+#line 3793 "parser_gen.cpp"
                     break;
 
                     case 229:  // int: "arbitrary integer"
-#line 1208 "src/mongo/db/cst/grammar.yy"
+#line 1208 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserInt{YY_MOVE(yystack_[0].value.as<int>())}};
                     }
-#line 3801 "src/mongo/db/cst/parser_gen.cpp"
+#line 3801 "parser_gen.cpp"
                     break;
 
                     case 230:  // int: "zero (int)"
-#line 1211 "src/mongo/db/cst/grammar.yy"
+#line 1211 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserInt{0}};
                     }
-#line 3809 "src/mongo/db/cst/parser_gen.cpp"
+#line 3809 "parser_gen.cpp"
                     break;
 
                     case 231:  // int: "1 (int)"
-#line 1214 "src/mongo/db/cst/grammar.yy"
+#line 1214 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserInt{1}};
                     }
-#line 3817 "src/mongo/db/cst/parser_gen.cpp"
+#line 3817 "parser_gen.cpp"
                     break;
 
                     case 232:  // int: "-1 (int)"
-#line 1217 "src/mongo/db/cst/grammar.yy"
+#line 1217 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserInt{-1}};
                     }
-#line 3825 "src/mongo/db/cst/parser_gen.cpp"
+#line 3825 "parser_gen.cpp"
                     break;
 
                     case 233:  // long: "arbitrary long"
-#line 1223 "src/mongo/db/cst/grammar.yy"
+#line 1223 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserLong{YY_MOVE(yystack_[0].value.as<long long>())}};
                     }
-#line 3833 "src/mongo/db/cst/parser_gen.cpp"
+#line 3833 "parser_gen.cpp"
                     break;
 
                     case 234:  // long: "zero (long)"
-#line 1226 "src/mongo/db/cst/grammar.yy"
+#line 1226 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserLong{0ll}};
                     }
-#line 3841 "src/mongo/db/cst/parser_gen.cpp"
+#line 3841 "parser_gen.cpp"
                     break;
 
                     case 235:  // long: "1 (long)"
-#line 1229 "src/mongo/db/cst/grammar.yy"
+#line 1229 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserLong{1ll}};
                     }
-#line 3849 "src/mongo/db/cst/parser_gen.cpp"
+#line 3849 "parser_gen.cpp"
                     break;
 
                     case 236:  // long: "-1 (long)"
-#line 1232 "src/mongo/db/cst/grammar.yy"
+#line 1232 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserLong{-1ll}};
                     }
-#line 3857 "src/mongo/db/cst/parser_gen.cpp"
+#line 3857 "parser_gen.cpp"
                     break;
 
                     case 237:  // double: "arbitrary double"
-#line 1238 "src/mongo/db/cst/grammar.yy"
+#line 1238 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDouble{YY_MOVE(yystack_[0].value.as<double>())}};
                     }
-#line 3865 "src/mongo/db/cst/parser_gen.cpp"
+#line 3865 "parser_gen.cpp"
                     break;
 
                     case 238:  // double: "zero (double)"
-#line 1241 "src/mongo/db/cst/grammar.yy"
+#line 1241 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDouble{0.0}};
                     }
-#line 3873 "src/mongo/db/cst/parser_gen.cpp"
+#line 3873 "parser_gen.cpp"
                     break;
 
                     case 239:  // double: "1 (double)"
-#line 1244 "src/mongo/db/cst/grammar.yy"
+#line 1244 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDouble{1.0}};
                     }
-#line 3881 "src/mongo/db/cst/parser_gen.cpp"
+#line 3881 "parser_gen.cpp"
                     break;
 
                     case 240:  // double: "-1 (double)"
-#line 1247 "src/mongo/db/cst/grammar.yy"
+#line 1247 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDouble{-1.0}};
                     }
-#line 3889 "src/mongo/db/cst/parser_gen.cpp"
+#line 3889 "parser_gen.cpp"
                     break;
 
                     case 241:  // decimal: "arbitrary decimal"
-#line 1253 "src/mongo/db/cst/grammar.yy"
+#line 1253 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{UserDecimal{YY_MOVE(yystack_[0].value.as<Decimal128>())}};
                     }
-#line 3897 "src/mongo/db/cst/parser_gen.cpp"
+#line 3897 "parser_gen.cpp"
                     break;
 
                     case 242:  // decimal: "zero (decimal)"
-#line 1256 "src/mongo/db/cst/grammar.yy"
+#line 1256 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDecimal{0.0}};
                     }
-#line 3905 "src/mongo/db/cst/parser_gen.cpp"
+#line 3905 "parser_gen.cpp"
                     break;
 
                     case 243:  // decimal: "1 (decimal)"
-#line 1259 "src/mongo/db/cst/grammar.yy"
+#line 1259 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDecimal{1.0}};
                     }
-#line 3913 "src/mongo/db/cst/parser_gen.cpp"
+#line 3913 "parser_gen.cpp"
                     break;
 
                     case 244:  // decimal: "-1 (decimal)"
-#line 1262 "src/mongo/db/cst/grammar.yy"
+#line 1262 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserDecimal{-1.0}};
                     }
-#line 3921 "src/mongo/db/cst/parser_gen.cpp"
+#line 3921 "parser_gen.cpp"
                     break;
 
                     case 245:  // bool: "true"
-#line 1268 "src/mongo/db/cst/grammar.yy"
+#line 1268 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserBoolean{true}};
                     }
-#line 3929 "src/mongo/db/cst/parser_gen.cpp"
+#line 3929 "parser_gen.cpp"
                     break;
 
                     case 246:  // bool: "false"
-#line 1271 "src/mongo/db/cst/grammar.yy"
+#line 1271 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{UserBoolean{false}};
                     }
-#line 3937 "src/mongo/db/cst/parser_gen.cpp"
+#line 3937 "parser_gen.cpp"
                     break;
 
                     case 247:  // simpleValue: string
-#line 1277 "src/mongo/db/cst/grammar.yy"
+#line 1277 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3943 "src/mongo/db/cst/parser_gen.cpp"
+#line 3943 "parser_gen.cpp"
                     break;
 
                     case 248:  // simpleValue: aggregationFieldPath
-#line 1278 "src/mongo/db/cst/grammar.yy"
+#line 1278 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3949 "src/mongo/db/cst/parser_gen.cpp"
+#line 3949 "parser_gen.cpp"
                     break;
 
                     case 249:  // simpleValue: variable
-#line 1279 "src/mongo/db/cst/grammar.yy"
+#line 1279 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3955 "src/mongo/db/cst/parser_gen.cpp"
+#line 3955 "parser_gen.cpp"
                     break;
 
                     case 250:  // simpleValue: binary
-#line 1280 "src/mongo/db/cst/grammar.yy"
+#line 1280 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3961 "src/mongo/db/cst/parser_gen.cpp"
+#line 3961 "parser_gen.cpp"
                     break;
 
                     case 251:  // simpleValue: undefined
-#line 1281 "src/mongo/db/cst/grammar.yy"
+#line 1281 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3967 "src/mongo/db/cst/parser_gen.cpp"
+#line 3967 "parser_gen.cpp"
                     break;
 
                     case 252:  // simpleValue: objectId
-#line 1282 "src/mongo/db/cst/grammar.yy"
+#line 1282 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3973 "src/mongo/db/cst/parser_gen.cpp"
+#line 3973 "parser_gen.cpp"
                     break;
 
                     case 253:  // simpleValue: date
-#line 1283 "src/mongo/db/cst/grammar.yy"
+#line 1283 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3979 "src/mongo/db/cst/parser_gen.cpp"
+#line 3979 "parser_gen.cpp"
                     break;
 
                     case 254:  // simpleValue: null
-#line 1284 "src/mongo/db/cst/grammar.yy"
+#line 1284 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3985 "src/mongo/db/cst/parser_gen.cpp"
+#line 3985 "parser_gen.cpp"
                     break;
 
                     case 255:  // simpleValue: regex
-#line 1285 "src/mongo/db/cst/grammar.yy"
+#line 1285 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3991 "src/mongo/db/cst/parser_gen.cpp"
+#line 3991 "parser_gen.cpp"
                     break;
 
                     case 256:  // simpleValue: dbPointer
-#line 1286 "src/mongo/db/cst/grammar.yy"
+#line 1286 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 3997 "src/mongo/db/cst/parser_gen.cpp"
+#line 3997 "parser_gen.cpp"
                     break;
 
                     case 257:  // simpleValue: javascript
-#line 1287 "src/mongo/db/cst/grammar.yy"
+#line 1287 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4003 "src/mongo/db/cst/parser_gen.cpp"
+#line 4003 "parser_gen.cpp"
                     break;
 
                     case 258:  // simpleValue: symbol
-#line 1288 "src/mongo/db/cst/grammar.yy"
+#line 1288 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4009 "src/mongo/db/cst/parser_gen.cpp"
+#line 4009 "parser_gen.cpp"
                     break;
 
                     case 259:  // simpleValue: javascriptWScope
-#line 1289 "src/mongo/db/cst/grammar.yy"
+#line 1289 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4015 "src/mongo/db/cst/parser_gen.cpp"
+#line 4015 "parser_gen.cpp"
                     break;
 
                     case 260:  // simpleValue: int
-#line 1290 "src/mongo/db/cst/grammar.yy"
+#line 1290 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4021 "src/mongo/db/cst/parser_gen.cpp"
+#line 4021 "parser_gen.cpp"
                     break;
 
                     case 261:  // simpleValue: long
-#line 1291 "src/mongo/db/cst/grammar.yy"
+#line 1291 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4027 "src/mongo/db/cst/parser_gen.cpp"
+#line 4027 "parser_gen.cpp"
                     break;
 
                     case 262:  // simpleValue: double
-#line 1292 "src/mongo/db/cst/grammar.yy"
+#line 1292 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4033 "src/mongo/db/cst/parser_gen.cpp"
+#line 4033 "parser_gen.cpp"
                     break;
 
                     case 263:  // simpleValue: decimal
-#line 1293 "src/mongo/db/cst/grammar.yy"
+#line 1293 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4039 "src/mongo/db/cst/parser_gen.cpp"
+#line 4039 "parser_gen.cpp"
                     break;
 
                     case 264:  // simpleValue: bool
-#line 1294 "src/mongo/db/cst/grammar.yy"
+#line 1294 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4045 "src/mongo/db/cst/parser_gen.cpp"
+#line 4045 "parser_gen.cpp"
                     break;
 
                     case 265:  // simpleValue: timestamp
-#line 1295 "src/mongo/db/cst/grammar.yy"
+#line 1295 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4051 "src/mongo/db/cst/parser_gen.cpp"
+#line 4051 "parser_gen.cpp"
                     break;
 
                     case 266:  // simpleValue: minKey
-#line 1296 "src/mongo/db/cst/grammar.yy"
+#line 1296 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4057 "src/mongo/db/cst/parser_gen.cpp"
+#line 4057 "parser_gen.cpp"
                     break;
 
                     case 267:  // simpleValue: maxKey
-#line 1297 "src/mongo/db/cst/grammar.yy"
+#line 1297 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4063 "src/mongo/db/cst/parser_gen.cpp"
+#line 4063 "parser_gen.cpp"
                     break;
 
                     case 268:  // expressions: %empty
-#line 1304 "src/mongo/db/cst/grammar.yy"
+#line 1304 "grammar.yy"
                     {
                     }
-#line 4069 "src/mongo/db/cst/parser_gen.cpp"
+#line 4069 "parser_gen.cpp"
                     break;
 
                     case 269:  // expressions: expressions expression
-#line 1305 "src/mongo/db/cst/grammar.yy"
+#line 1305 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             YY_MOVE(yystack_[1].value.as<std::vector<CNode>>());
                         yylhs.value.as<std::vector<CNode>>().emplace_back(
                             YY_MOVE(yystack_[0].value.as<CNode>()));
                     }
-#line 4078 "src/mongo/db/cst/parser_gen.cpp"
+#line 4078 "parser_gen.cpp"
                     break;
 
                     case 270:  // expression: simpleValue
-#line 1312 "src/mongo/db/cst/grammar.yy"
+#line 1312 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4084 "src/mongo/db/cst/parser_gen.cpp"
+#line 4084 "parser_gen.cpp"
                     break;
 
                     case 271:  // expression: expressionObject
-#line 1312 "src/mongo/db/cst/grammar.yy"
+#line 1312 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4090 "src/mongo/db/cst/parser_gen.cpp"
+#line 4090 "parser_gen.cpp"
                     break;
 
                     case 272:  // expression: expressionArray
-#line 1312 "src/mongo/db/cst/grammar.yy"
+#line 1312 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4096 "src/mongo/db/cst/parser_gen.cpp"
+#line 4096 "parser_gen.cpp"
                     break;
 
                     case 273:  // expression: nonArrayNonObjCompoundExpression
-#line 1312 "src/mongo/db/cst/grammar.yy"
+#line 1312 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4102 "src/mongo/db/cst/parser_gen.cpp"
+#line 4102 "parser_gen.cpp"
                     break;
 
                     case 274:  // nonArrayExpression: simpleValue
-#line 1316 "src/mongo/db/cst/grammar.yy"
+#line 1316 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4108 "src/mongo/db/cst/parser_gen.cpp"
+#line 4108 "parser_gen.cpp"
                     break;
 
                     case 275:  // nonArrayExpression: nonArrayCompoundExpression
-#line 1316 "src/mongo/db/cst/grammar.yy"
+#line 1316 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4114 "src/mongo/db/cst/parser_gen.cpp"
+#line 4114 "parser_gen.cpp"
                     break;
 
                     case 276:  // nonArrayCompoundExpression: expressionObject
-#line 1320 "src/mongo/db/cst/grammar.yy"
+#line 1320 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4120 "src/mongo/db/cst/parser_gen.cpp"
+#line 4120 "parser_gen.cpp"
                     break;
 
                     case 277:  // nonArrayCompoundExpression: nonArrayNonObjCompoundExpression
-#line 1320 "src/mongo/db/cst/grammar.yy"
+#line 1320 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4126 "src/mongo/db/cst/parser_gen.cpp"
+#line 4126 "parser_gen.cpp"
                     break;
 
                     case 278:  // nonArrayNonObjCompoundExpression: arrayManipulation
-#line 1324 "src/mongo/db/cst/grammar.yy"
+#line 1324 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4132 "src/mongo/db/cst/parser_gen.cpp"
+#line 4132 "parser_gen.cpp"
                     break;
 
                     case 279:  // nonArrayNonObjCompoundExpression: maths
-#line 1324 "src/mongo/db/cst/grammar.yy"
+#line 1324 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4138 "src/mongo/db/cst/parser_gen.cpp"
+#line 4138 "parser_gen.cpp"
                     break;
 
                     case 280:  // nonArrayNonObjCompoundExpression: meta
-#line 1324 "src/mongo/db/cst/grammar.yy"
+#line 1324 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4144 "src/mongo/db/cst/parser_gen.cpp"
+#line 4144 "parser_gen.cpp"
                     break;
 
                     case 281:  // nonArrayNonObjCompoundExpression: boolExprs
-#line 1324 "src/mongo/db/cst/grammar.yy"
+#line 1324 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4150 "src/mongo/db/cst/parser_gen.cpp"
+#line 4150 "parser_gen.cpp"
                     break;
 
                     case 282:  // nonArrayNonObjCompoundExpression: literalEscapes
-#line 1324 "src/mongo/db/cst/grammar.yy"
+#line 1324 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4156 "src/mongo/db/cst/parser_gen.cpp"
+#line 4156 "parser_gen.cpp"
                     break;
 
                     case 283:  // nonArrayNonObjCompoundExpression: compExprs
-#line 1324 "src/mongo/db/cst/grammar.yy"
+#line 1324 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4162 "src/mongo/db/cst/parser_gen.cpp"
+#line 4162 "parser_gen.cpp"
                     break;
 
                     case 284:  // nonArrayNonObjCompoundExpression: typeExpression
-#line 1324 "src/mongo/db/cst/grammar.yy"
+#line 1324 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4168 "src/mongo/db/cst/parser_gen.cpp"
+#line 4168 "parser_gen.cpp"
                     break;
 
                     case 285:  // nonArrayNonObjCompoundExpression: stringExps
-#line 1325 "src/mongo/db/cst/grammar.yy"
+#line 1325 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4174 "src/mongo/db/cst/parser_gen.cpp"
+#line 4174 "parser_gen.cpp"
                     break;
 
                     case 286:  // nonArrayNonObjCompoundExpression: setExpression
-#line 1325 "src/mongo/db/cst/grammar.yy"
+#line 1325 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4180 "src/mongo/db/cst/parser_gen.cpp"
+#line 4180 "parser_gen.cpp"
                     break;
 
                     case 287:  // nonArrayNonObjCompoundExpression: trig
-#line 1325 "src/mongo/db/cst/grammar.yy"
+#line 1325 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4186 "src/mongo/db/cst/parser_gen.cpp"
+#line 4186 "parser_gen.cpp"
                     break;
 
                     case 288:  // exprFixedTwoArg: "array" expression expression "end of array"
-#line 1330 "src/mongo/db/cst/grammar.yy"
+#line 1330 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>()),
                                                        YY_MOVE(yystack_[1].value.as<CNode>())}};
                     }
-#line 4194 "src/mongo/db/cst/parser_gen.cpp"
+#line 4194 "parser_gen.cpp"
                     break;
 
                     case 289:  // exprFixedThreeArg: "array" expression expression expression "end
                                // of array"
-#line 1337 "src/mongo/db/cst/grammar.yy"
+#line 1337 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                        YY_MOVE(yystack_[2].value.as<CNode>()),
                                                        YY_MOVE(yystack_[1].value.as<CNode>())}};
                     }
-#line 4202 "src/mongo/db/cst/parser_gen.cpp"
+#line 4202 "parser_gen.cpp"
                     break;
 
                     case 290:  // compoundNonObjectExpression: expressionArray
-#line 1343 "src/mongo/db/cst/grammar.yy"
+#line 1343 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4208 "src/mongo/db/cst/parser_gen.cpp"
+#line 4208 "parser_gen.cpp"
                     break;
 
                     case 291:  // compoundNonObjectExpression: nonArrayNonObjCompoundExpression
-#line 1343 "src/mongo/db/cst/grammar.yy"
+#line 1343 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4214 "src/mongo/db/cst/parser_gen.cpp"
+#line 4214 "parser_gen.cpp"
                     break;
 
                     case 292:  // arrayManipulation: slice
-#line 1347 "src/mongo/db/cst/grammar.yy"
+#line 1347 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4220 "src/mongo/db/cst/parser_gen.cpp"
+#line 4220 "parser_gen.cpp"
                     break;
 
                     case 293:  // slice: "object" "slice" exprFixedTwoArg "end of object"
-#line 1351 "src/mongo/db/cst/grammar.yy"
+#line 1351 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::slice, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4229 "src/mongo/db/cst/parser_gen.cpp"
+#line 4229 "parser_gen.cpp"
                     break;
 
                     case 294:  // slice: "object" "slice" exprFixedThreeArg "end of object"
-#line 1355 "src/mongo/db/cst/grammar.yy"
+#line 1355 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::slice, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4238 "src/mongo/db/cst/parser_gen.cpp"
+#line 4238 "parser_gen.cpp"
                     break;
 
                     case 295:  // expressionArray: "array" expressions "end of array"
-#line 1364 "src/mongo/db/cst/grammar.yy"
+#line 1364 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{YY_MOVE(yystack_[1].value.as<std::vector<CNode>>())};
                     }
-#line 4246 "src/mongo/db/cst/parser_gen.cpp"
+#line 4246 "parser_gen.cpp"
                     break;
 
                     case 296:  // expressionSingletonArray: "array" expression "end of array"
-#line 1371 "src/mongo/db/cst/grammar.yy"
+#line 1371 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ArrayChildren{YY_MOVE(yystack_[1].value.as<CNode>())}};
                     }
-#line 4254 "src/mongo/db/cst/parser_gen.cpp"
+#line 4254 "parser_gen.cpp"
                     break;
 
                     case 297:  // singleArgExpression: nonArrayExpression
-#line 1376 "src/mongo/db/cst/grammar.yy"
+#line 1376 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4260 "src/mongo/db/cst/parser_gen.cpp"
+#line 4260 "parser_gen.cpp"
                     break;
 
                     case 298:  // singleArgExpression: expressionSingletonArray
-#line 1376 "src/mongo/db/cst/grammar.yy"
+#line 1376 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4266 "src/mongo/db/cst/parser_gen.cpp"
+#line 4266 "parser_gen.cpp"
                     break;
 
                     case 299:  // expressionObject: "object" expressionFields "end of object"
-#line 1381 "src/mongo/db/cst/grammar.yy"
+#line 1381 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 4274 "src/mongo/db/cst/parser_gen.cpp"
+#line 4274 "parser_gen.cpp"
                     break;
 
                     case 300:  // expressionFields: %empty
-#line 1387 "src/mongo/db/cst/grammar.yy"
+#line 1387 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 4282 "src/mongo/db/cst/parser_gen.cpp"
+#line 4282 "parser_gen.cpp"
                     break;
 
                     case 301:  // expressionFields: expressionFields expressionField
-#line 1390 "src/mongo/db/cst/grammar.yy"
+#line 1390 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 4291 "src/mongo/db/cst/parser_gen.cpp"
+#line 4291 "parser_gen.cpp"
                     break;
 
                     case 302:  // expressionField: expressionFieldname expression
-#line 1397 "src/mongo/db/cst/grammar.yy"
+#line 1397 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 4299 "src/mongo/db/cst/parser_gen.cpp"
+#line 4299 "parser_gen.cpp"
                     break;
 
                     case 303:  // expressionFieldname: invariableUserFieldname
-#line 1404 "src/mongo/db/cst/grammar.yy"
+#line 1404 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4305 "src/mongo/db/cst/parser_gen.cpp"
+#line 4305 "parser_gen.cpp"
                     break;
 
                     case 304:  // expressionFieldname: stageAsUserFieldname
-#line 1404 "src/mongo/db/cst/grammar.yy"
+#line 1404 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4311 "src/mongo/db/cst/parser_gen.cpp"
+#line 4311 "parser_gen.cpp"
                     break;
 
                     case 305:  // expressionFieldname: argAsUserFieldname
-#line 1404 "src/mongo/db/cst/grammar.yy"
+#line 1404 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4317 "src/mongo/db/cst/parser_gen.cpp"
+#line 4317 "parser_gen.cpp"
                     break;
 
                     case 306:  // expressionFieldname: idAsUserFieldname
-#line 1404 "src/mongo/db/cst/grammar.yy"
+#line 1404 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 4323 "src/mongo/db/cst/parser_gen.cpp"
+#line 4323 "parser_gen.cpp"
                     break;
 
                     case 307:  // idAsUserFieldname: ID
-#line 1408 "src/mongo/db/cst/grammar.yy"
+#line 1408 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"_id"};
                     }
-#line 4331 "src/mongo/db/cst/parser_gen.cpp"
+#line 4331 "parser_gen.cpp"
                     break;
 
                     case 308:  // idAsProjectionPath: ID
-#line 1414 "src/mongo/db/cst/grammar.yy"
+#line 1414 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
-                            ProjectionPath{make_vector<std::string>("_id")};
+                            ProjectionPath{makeVector<std::string>("_id")};
                     }
-#line 4339 "src/mongo/db/cst/parser_gen.cpp"
+#line 4339 "parser_gen.cpp"
                     break;
 
                     case 309:  // maths: add
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4345 "src/mongo/db/cst/parser_gen.cpp"
+#line 4345 "parser_gen.cpp"
                     break;
 
                     case 310:  // maths: abs
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4351 "src/mongo/db/cst/parser_gen.cpp"
+#line 4351 "parser_gen.cpp"
                     break;
 
                     case 311:  // maths: ceil
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4357 "src/mongo/db/cst/parser_gen.cpp"
+#line 4357 "parser_gen.cpp"
                     break;
 
                     case 312:  // maths: divide
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4363 "src/mongo/db/cst/parser_gen.cpp"
+#line 4363 "parser_gen.cpp"
                     break;
 
                     case 313:  // maths: exponent
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4369 "src/mongo/db/cst/parser_gen.cpp"
+#line 4369 "parser_gen.cpp"
                     break;
 
                     case 314:  // maths: floor
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4375 "src/mongo/db/cst/parser_gen.cpp"
+#line 4375 "parser_gen.cpp"
                     break;
 
                     case 315:  // maths: ln
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4381 "src/mongo/db/cst/parser_gen.cpp"
+#line 4381 "parser_gen.cpp"
                     break;
 
                     case 316:  // maths: log
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4387 "src/mongo/db/cst/parser_gen.cpp"
+#line 4387 "parser_gen.cpp"
                     break;
 
                     case 317:  // maths: logten
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4393 "src/mongo/db/cst/parser_gen.cpp"
+#line 4393 "parser_gen.cpp"
                     break;
 
                     case 318:  // maths: mod
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4399 "src/mongo/db/cst/parser_gen.cpp"
+#line 4399 "parser_gen.cpp"
                     break;
 
                     case 319:  // maths: multiply
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4405 "src/mongo/db/cst/parser_gen.cpp"
+#line 4405 "parser_gen.cpp"
                     break;
 
                     case 320:  // maths: pow
-#line 1420 "src/mongo/db/cst/grammar.yy"
+#line 1420 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4411 "src/mongo/db/cst/parser_gen.cpp"
+#line 4411 "parser_gen.cpp"
                     break;
 
                     case 321:  // maths: round
-#line 1421 "src/mongo/db/cst/grammar.yy"
+#line 1421 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4417 "src/mongo/db/cst/parser_gen.cpp"
+#line 4417 "parser_gen.cpp"
                     break;
 
                     case 322:  // maths: sqrt
-#line 1421 "src/mongo/db/cst/grammar.yy"
+#line 1421 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4423 "src/mongo/db/cst/parser_gen.cpp"
+#line 4423 "parser_gen.cpp"
                     break;
 
                     case 323:  // maths: subtract
-#line 1421 "src/mongo/db/cst/grammar.yy"
+#line 1421 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4429 "src/mongo/db/cst/parser_gen.cpp"
+#line 4429 "parser_gen.cpp"
                     break;
 
                     case 324:  // maths: trunc
-#line 1421 "src/mongo/db/cst/grammar.yy"
+#line 1421 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4435 "src/mongo/db/cst/parser_gen.cpp"
+#line 4435 "parser_gen.cpp"
                     break;
 
                     case 325:  // meta: "object" META "geoNearDistance" "end of object"
-#line 1425 "src/mongo/db/cst/grammar.yy"
+#line 1425 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::meta, CNode{KeyValue::geoNearDistance}}}};
                     }
-#line 4443 "src/mongo/db/cst/parser_gen.cpp"
+#line 4443 "parser_gen.cpp"
                     break;
 
                     case 326:  // meta: "object" META "geoNearPoint" "end of object"
-#line 1428 "src/mongo/db/cst/grammar.yy"
+#line 1428 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::meta, CNode{KeyValue::geoNearPoint}}}};
                     }
-#line 4451 "src/mongo/db/cst/parser_gen.cpp"
+#line 4451 "parser_gen.cpp"
                     break;
 
                     case 327:  // meta: "object" META "indexKey" "end of object"
-#line 1431 "src/mongo/db/cst/grammar.yy"
+#line 1431 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::indexKey}}}};
                     }
-#line 4459 "src/mongo/db/cst/parser_gen.cpp"
+#line 4459 "parser_gen.cpp"
                     break;
 
                     case 328:  // meta: "object" META "randVal" "end of object"
-#line 1434 "src/mongo/db/cst/grammar.yy"
+#line 1434 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::randVal}}}};
                     }
-#line 4467 "src/mongo/db/cst/parser_gen.cpp"
+#line 4467 "parser_gen.cpp"
                     break;
 
                     case 329:  // meta: "object" META "recordId" "end of object"
-#line 1437 "src/mongo/db/cst/grammar.yy"
+#line 1437 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::recordId}}}};
                     }
-#line 4475 "src/mongo/db/cst/parser_gen.cpp"
+#line 4475 "parser_gen.cpp"
                     break;
 
                     case 330:  // meta: "object" META "searchHighlights" "end of object"
-#line 1440 "src/mongo/db/cst/grammar.yy"
+#line 1440 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::meta, CNode{KeyValue::searchHighlights}}}};
                     }
-#line 4483 "src/mongo/db/cst/parser_gen.cpp"
+#line 4483 "parser_gen.cpp"
                     break;
 
                     case 331:  // meta: "object" META "searchScore" "end of object"
-#line 1443 "src/mongo/db/cst/grammar.yy"
+#line 1443 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::meta, CNode{KeyValue::searchScore}}}};
                     }
-#line 4491 "src/mongo/db/cst/parser_gen.cpp"
+#line 4491 "parser_gen.cpp"
                     break;
 
                     case 332:  // meta: "object" META "sortKey" "end of object"
-#line 1446 "src/mongo/db/cst/grammar.yy"
+#line 1446 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::sortKey}}}};
                     }
-#line 4499 "src/mongo/db/cst/parser_gen.cpp"
+#line 4499 "parser_gen.cpp"
                     break;
 
                     case 333:  // meta: "object" META "textScore" "end of object"
-#line 1449 "src/mongo/db/cst/grammar.yy"
+#line 1449 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::meta, CNode{KeyValue::textScore}}}};
                     }
-#line 4507 "src/mongo/db/cst/parser_gen.cpp"
+#line 4507 "parser_gen.cpp"
                     break;
 
                     case 334:  // trig: sin
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4513 "src/mongo/db/cst/parser_gen.cpp"
+#line 4513 "parser_gen.cpp"
                     break;
 
                     case 335:  // trig: cos
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4519 "src/mongo/db/cst/parser_gen.cpp"
+#line 4519 "parser_gen.cpp"
                     break;
 
                     case 336:  // trig: tan
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4525 "src/mongo/db/cst/parser_gen.cpp"
+#line 4525 "parser_gen.cpp"
                     break;
 
                     case 337:  // trig: sinh
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4531 "src/mongo/db/cst/parser_gen.cpp"
+#line 4531 "parser_gen.cpp"
                     break;
 
                     case 338:  // trig: cosh
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4537 "src/mongo/db/cst/parser_gen.cpp"
+#line 4537 "parser_gen.cpp"
                     break;
 
                     case 339:  // trig: tanh
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4543 "src/mongo/db/cst/parser_gen.cpp"
+#line 4543 "parser_gen.cpp"
                     break;
 
                     case 340:  // trig: asin
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4549 "src/mongo/db/cst/parser_gen.cpp"
+#line 4549 "parser_gen.cpp"
                     break;
 
                     case 341:  // trig: acos
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4555 "src/mongo/db/cst/parser_gen.cpp"
+#line 4555 "parser_gen.cpp"
                     break;
 
                     case 342:  // trig: atan
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4561 "src/mongo/db/cst/parser_gen.cpp"
+#line 4561 "parser_gen.cpp"
                     break;
 
                     case 343:  // trig: atan2
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4567 "src/mongo/db/cst/parser_gen.cpp"
+#line 4567 "parser_gen.cpp"
                     break;
 
                     case 344:  // trig: asinh
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4573 "src/mongo/db/cst/parser_gen.cpp"
+#line 4573 "parser_gen.cpp"
                     break;
 
                     case 345:  // trig: acosh
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4579 "src/mongo/db/cst/parser_gen.cpp"
+#line 4579 "parser_gen.cpp"
                     break;
 
                     case 346:  // trig: atanh
-#line 1454 "src/mongo/db/cst/grammar.yy"
+#line 1454 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4585 "src/mongo/db/cst/parser_gen.cpp"
+#line 4585 "parser_gen.cpp"
                     break;
 
                     case 347:  // trig: degreesToRadians
-#line 1455 "src/mongo/db/cst/grammar.yy"
+#line 1455 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4591 "src/mongo/db/cst/parser_gen.cpp"
+#line 4591 "parser_gen.cpp"
                     break;
 
                     case 348:  // trig: radiansToDegrees
-#line 1455 "src/mongo/db/cst/grammar.yy"
+#line 1455 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4597 "src/mongo/db/cst/parser_gen.cpp"
+#line 4597 "parser_gen.cpp"
                     break;
 
                     case 349:  // add: "object" ADD expressionArray "end of object"
-#line 1459 "src/mongo/db/cst/grammar.yy"
+#line 1459 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::add, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4606 "src/mongo/db/cst/parser_gen.cpp"
+#line 4606 "parser_gen.cpp"
                     break;
 
                     case 350:  // atan2: "object" ATAN2 exprFixedTwoArg "end of object"
-#line 1466 "src/mongo/db/cst/grammar.yy"
+#line 1466 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::atan2, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4615 "src/mongo/db/cst/parser_gen.cpp"
+#line 4615 "parser_gen.cpp"
                     break;
 
                     case 351:  // abs: "object" ABS expression "end of object"
-#line 1472 "src/mongo/db/cst/grammar.yy"
+#line 1472 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::abs, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4623 "src/mongo/db/cst/parser_gen.cpp"
+#line 4623 "parser_gen.cpp"
                     break;
 
                     case 352:  // ceil: "object" CEIL expression "end of object"
-#line 1477 "src/mongo/db/cst/grammar.yy"
+#line 1477 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ceil, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4631 "src/mongo/db/cst/parser_gen.cpp"
+#line 4631 "parser_gen.cpp"
                     break;
 
                     case 353:  // divide: "object" DIVIDE "array" expression expression "end of
                                // array" "end of object"
-#line 1482 "src/mongo/db/cst/grammar.yy"
+#line 1482 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::divide,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4640 "src/mongo/db/cst/parser_gen.cpp"
+#line 4640 "parser_gen.cpp"
                     break;
 
                     case 354:  // exponent: "object" EXPONENT expression "end of object"
-#line 1488 "src/mongo/db/cst/grammar.yy"
+#line 1488 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::exponent, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4648 "src/mongo/db/cst/parser_gen.cpp"
+#line 4648 "parser_gen.cpp"
                     break;
 
                     case 355:  // floor: "object" FLOOR expression "end of object"
-#line 1493 "src/mongo/db/cst/grammar.yy"
+#line 1493 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::floor, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4656 "src/mongo/db/cst/parser_gen.cpp"
+#line 4656 "parser_gen.cpp"
                     break;
 
                     case 356:  // ln: "object" LN expression "end of object"
-#line 1498 "src/mongo/db/cst/grammar.yy"
+#line 1498 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ln, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4664 "src/mongo/db/cst/parser_gen.cpp"
+#line 4664 "parser_gen.cpp"
                     break;
 
                     case 357:  // log: "object" LOG "array" expression expression "end of array"
                                // "end of object"
-#line 1503 "src/mongo/db/cst/grammar.yy"
+#line 1503 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::log,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4673 "src/mongo/db/cst/parser_gen.cpp"
+#line 4673 "parser_gen.cpp"
                     break;
 
                     case 358:  // logten: "object" LOGTEN expression "end of object"
-#line 1509 "src/mongo/db/cst/grammar.yy"
+#line 1509 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::logten, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4681 "src/mongo/db/cst/parser_gen.cpp"
+#line 4681 "parser_gen.cpp"
                     break;
 
                     case 359:  // mod: "object" MOD "array" expression expression "end of array"
                                // "end of object"
-#line 1514 "src/mongo/db/cst/grammar.yy"
+#line 1514 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::mod,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4690 "src/mongo/db/cst/parser_gen.cpp"
+#line 4690 "parser_gen.cpp"
                     break;
 
                     case 360:  // multiply: "object" MULTIPLY "array" expression expression
                                // expressions "end of array" "end of object"
-#line 1520 "src/mongo/db/cst/grammar.yy"
+#line 1520 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::multiply,
@@ -4994,428 +4994,428 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 4702 "src/mongo/db/cst/parser_gen.cpp"
+#line 4702 "parser_gen.cpp"
                     break;
 
                     case 361:  // pow: "object" POW "array" expression expression "end of array"
                                // "end of object"
-#line 1529 "src/mongo/db/cst/grammar.yy"
+#line 1529 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::pow,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4711 "src/mongo/db/cst/parser_gen.cpp"
+#line 4711 "parser_gen.cpp"
                     break;
 
                     case 362:  // round: "object" ROUND "array" expression expression "end of array"
                                // "end of object"
-#line 1535 "src/mongo/db/cst/grammar.yy"
+#line 1535 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::round,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4720 "src/mongo/db/cst/parser_gen.cpp"
+#line 4720 "parser_gen.cpp"
                     break;
 
                     case 363:  // sqrt: "object" SQRT expression "end of object"
-#line 1541 "src/mongo/db/cst/grammar.yy"
+#line 1541 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::sqrt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4728 "src/mongo/db/cst/parser_gen.cpp"
+#line 4728 "parser_gen.cpp"
                     break;
 
                     case 364:  // subtract: "object" SUBTRACT "array" expression expression "end of
                                // array" "end of object"
-#line 1546 "src/mongo/db/cst/grammar.yy"
+#line 1546 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::subtract,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4737 "src/mongo/db/cst/parser_gen.cpp"
+#line 4737 "parser_gen.cpp"
                     break;
 
                     case 365:  // trunc: "object" TRUNC "array" expression expression "end of array"
                                // "end of object"
-#line 1552 "src/mongo/db/cst/grammar.yy"
+#line 1552 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::trunc,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4746 "src/mongo/db/cst/parser_gen.cpp"
+#line 4746 "parser_gen.cpp"
                     break;
 
                     case 366:  // sin: "object" SIN singleArgExpression "end of object"
-#line 1558 "src/mongo/db/cst/grammar.yy"
+#line 1558 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::sin, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4754 "src/mongo/db/cst/parser_gen.cpp"
+#line 4754 "parser_gen.cpp"
                     break;
 
                     case 367:  // cos: "object" COS singleArgExpression "end of object"
-#line 1563 "src/mongo/db/cst/grammar.yy"
+#line 1563 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::cos, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4762 "src/mongo/db/cst/parser_gen.cpp"
+#line 4762 "parser_gen.cpp"
                     break;
 
                     case 368:  // tan: "object" TAN singleArgExpression "end of object"
-#line 1568 "src/mongo/db/cst/grammar.yy"
+#line 1568 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::tan, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4770 "src/mongo/db/cst/parser_gen.cpp"
+#line 4770 "parser_gen.cpp"
                     break;
 
                     case 369:  // sinh: "object" SINH singleArgExpression "end of object"
-#line 1573 "src/mongo/db/cst/grammar.yy"
+#line 1573 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::sinh, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4778 "src/mongo/db/cst/parser_gen.cpp"
+#line 4778 "parser_gen.cpp"
                     break;
 
                     case 370:  // cosh: "object" COSH singleArgExpression "end of object"
-#line 1578 "src/mongo/db/cst/grammar.yy"
+#line 1578 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::cosh, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4786 "src/mongo/db/cst/parser_gen.cpp"
+#line 4786 "parser_gen.cpp"
                     break;
 
                     case 371:  // tanh: "object" TANH singleArgExpression "end of object"
-#line 1583 "src/mongo/db/cst/grammar.yy"
+#line 1583 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::tanh, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4794 "src/mongo/db/cst/parser_gen.cpp"
+#line 4794 "parser_gen.cpp"
                     break;
 
                     case 372:  // asin: "object" ASIN singleArgExpression "end of object"
-#line 1588 "src/mongo/db/cst/grammar.yy"
+#line 1588 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::asin, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4802 "src/mongo/db/cst/parser_gen.cpp"
+#line 4802 "parser_gen.cpp"
                     break;
 
                     case 373:  // acos: "object" ACOS singleArgExpression "end of object"
-#line 1593 "src/mongo/db/cst/grammar.yy"
+#line 1593 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::acos, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4810 "src/mongo/db/cst/parser_gen.cpp"
+#line 4810 "parser_gen.cpp"
                     break;
 
                     case 374:  // atan: "object" ATAN singleArgExpression "end of object"
-#line 1598 "src/mongo/db/cst/grammar.yy"
+#line 1598 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::atan, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4818 "src/mongo/db/cst/parser_gen.cpp"
+#line 4818 "parser_gen.cpp"
                     break;
 
                     case 375:  // asinh: "object" ASINH singleArgExpression "end of object"
-#line 1603 "src/mongo/db/cst/grammar.yy"
+#line 1603 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::asinh, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4826 "src/mongo/db/cst/parser_gen.cpp"
+#line 4826 "parser_gen.cpp"
                     break;
 
                     case 376:  // acosh: "object" ACOSH singleArgExpression "end of object"
-#line 1608 "src/mongo/db/cst/grammar.yy"
+#line 1608 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::acosh, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4834 "src/mongo/db/cst/parser_gen.cpp"
+#line 4834 "parser_gen.cpp"
                     break;
 
                     case 377:  // atanh: "object" ATANH singleArgExpression "end of object"
-#line 1613 "src/mongo/db/cst/grammar.yy"
+#line 1613 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::atanh, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4842 "src/mongo/db/cst/parser_gen.cpp"
+#line 4842 "parser_gen.cpp"
                     break;
 
                     case 378:  // degreesToRadians: "object" DEGREES_TO_RADIANS singleArgExpression
                                // "end of object"
-#line 1618 "src/mongo/db/cst/grammar.yy"
+#line 1618 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ObjectChildren{{KeyFieldname::degreesToRadians,
                                                          YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4850 "src/mongo/db/cst/parser_gen.cpp"
+#line 4850 "parser_gen.cpp"
                     break;
 
                     case 379:  // radiansToDegrees: "object" RADIANS_TO_DEGREES singleArgExpression
                                // "end of object"
-#line 1623 "src/mongo/db/cst/grammar.yy"
+#line 1623 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{CNode::ObjectChildren{{KeyFieldname::radiansToDegrees,
                                                          YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4858 "src/mongo/db/cst/parser_gen.cpp"
+#line 4858 "parser_gen.cpp"
                     break;
 
                     case 380:  // boolExprs: and
-#line 1629 "src/mongo/db/cst/grammar.yy"
+#line 1629 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4864 "src/mongo/db/cst/parser_gen.cpp"
+#line 4864 "parser_gen.cpp"
                     break;
 
                     case 381:  // boolExprs: or
-#line 1629 "src/mongo/db/cst/grammar.yy"
+#line 1629 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4870 "src/mongo/db/cst/parser_gen.cpp"
+#line 4870 "parser_gen.cpp"
                     break;
 
                     case 382:  // boolExprs: not
-#line 1629 "src/mongo/db/cst/grammar.yy"
+#line 1629 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4876 "src/mongo/db/cst/parser_gen.cpp"
+#line 4876 "parser_gen.cpp"
                     break;
 
                     case 383:  // and: "object" AND expressionArray "end of object"
-#line 1633 "src/mongo/db/cst/grammar.yy"
+#line 1633 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::andExpr, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4885 "src/mongo/db/cst/parser_gen.cpp"
+#line 4885 "parser_gen.cpp"
                     break;
 
                     case 384:  // or: "object" OR expressionArray "end of object"
-#line 1640 "src/mongo/db/cst/grammar.yy"
+#line 1640 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::orExpr, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 4894 "src/mongo/db/cst/parser_gen.cpp"
+#line 4894 "parser_gen.cpp"
                     break;
 
                     case 385:  // not: "object" NOT "array" expression "end of array" "end of
                                // object"
-#line 1647 "src/mongo/db/cst/grammar.yy"
+#line 1647 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::notExpr,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 4903 "src/mongo/db/cst/parser_gen.cpp"
+#line 4903 "parser_gen.cpp"
                     break;
 
                     case 386:  // stringExps: concat
-#line 1654 "src/mongo/db/cst/grammar.yy"
+#line 1654 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4909 "src/mongo/db/cst/parser_gen.cpp"
+#line 4909 "parser_gen.cpp"
                     break;
 
                     case 387:  // stringExps: dateFromString
-#line 1654 "src/mongo/db/cst/grammar.yy"
+#line 1654 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4915 "src/mongo/db/cst/parser_gen.cpp"
+#line 4915 "parser_gen.cpp"
                     break;
 
                     case 388:  // stringExps: dateToString
-#line 1654 "src/mongo/db/cst/grammar.yy"
+#line 1654 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4921 "src/mongo/db/cst/parser_gen.cpp"
+#line 4921 "parser_gen.cpp"
                     break;
 
                     case 389:  // stringExps: indexOfBytes
-#line 1654 "src/mongo/db/cst/grammar.yy"
+#line 1654 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4927 "src/mongo/db/cst/parser_gen.cpp"
+#line 4927 "parser_gen.cpp"
                     break;
 
                     case 390:  // stringExps: indexOfCP
-#line 1654 "src/mongo/db/cst/grammar.yy"
+#line 1654 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4933 "src/mongo/db/cst/parser_gen.cpp"
+#line 4933 "parser_gen.cpp"
                     break;
 
                     case 391:  // stringExps: ltrim
-#line 1654 "src/mongo/db/cst/grammar.yy"
+#line 1654 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4939 "src/mongo/db/cst/parser_gen.cpp"
+#line 4939 "parser_gen.cpp"
                     break;
 
                     case 392:  // stringExps: regexFind
-#line 1654 "src/mongo/db/cst/grammar.yy"
+#line 1654 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4945 "src/mongo/db/cst/parser_gen.cpp"
+#line 4945 "parser_gen.cpp"
                     break;
 
                     case 393:  // stringExps: regexFindAll
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4951 "src/mongo/db/cst/parser_gen.cpp"
+#line 4951 "parser_gen.cpp"
                     break;
 
                     case 394:  // stringExps: regexMatch
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4957 "src/mongo/db/cst/parser_gen.cpp"
+#line 4957 "parser_gen.cpp"
                     break;
 
                     case 395:  // stringExps: replaceOne
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4963 "src/mongo/db/cst/parser_gen.cpp"
+#line 4963 "parser_gen.cpp"
                     break;
 
                     case 396:  // stringExps: replaceAll
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4969 "src/mongo/db/cst/parser_gen.cpp"
+#line 4969 "parser_gen.cpp"
                     break;
 
                     case 397:  // stringExps: rtrim
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4975 "src/mongo/db/cst/parser_gen.cpp"
+#line 4975 "parser_gen.cpp"
                     break;
 
                     case 398:  // stringExps: split
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4981 "src/mongo/db/cst/parser_gen.cpp"
+#line 4981 "parser_gen.cpp"
                     break;
 
                     case 399:  // stringExps: strLenBytes
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4987 "src/mongo/db/cst/parser_gen.cpp"
+#line 4987 "parser_gen.cpp"
                     break;
 
                     case 400:  // stringExps: strLenCP
-#line 1655 "src/mongo/db/cst/grammar.yy"
+#line 1655 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4993 "src/mongo/db/cst/parser_gen.cpp"
+#line 4993 "parser_gen.cpp"
                     break;
 
                     case 401:  // stringExps: strcasecmp
-#line 1656 "src/mongo/db/cst/grammar.yy"
+#line 1656 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 4999 "src/mongo/db/cst/parser_gen.cpp"
+#line 4999 "parser_gen.cpp"
                     break;
 
                     case 402:  // stringExps: substr
-#line 1656 "src/mongo/db/cst/grammar.yy"
+#line 1656 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5005 "src/mongo/db/cst/parser_gen.cpp"
+#line 5005 "parser_gen.cpp"
                     break;
 
                     case 403:  // stringExps: substrBytes
-#line 1656 "src/mongo/db/cst/grammar.yy"
+#line 1656 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5011 "src/mongo/db/cst/parser_gen.cpp"
+#line 5011 "parser_gen.cpp"
                     break;
 
                     case 404:  // stringExps: substrCP
-#line 1656 "src/mongo/db/cst/grammar.yy"
+#line 1656 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5017 "src/mongo/db/cst/parser_gen.cpp"
+#line 5017 "parser_gen.cpp"
                     break;
 
                     case 405:  // stringExps: toLower
-#line 1656 "src/mongo/db/cst/grammar.yy"
+#line 1656 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5023 "src/mongo/db/cst/parser_gen.cpp"
+#line 5023 "parser_gen.cpp"
                     break;
 
                     case 406:  // stringExps: trim
-#line 1656 "src/mongo/db/cst/grammar.yy"
+#line 1656 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5029 "src/mongo/db/cst/parser_gen.cpp"
+#line 5029 "parser_gen.cpp"
                     break;
 
                     case 407:  // stringExps: toUpper
-#line 1656 "src/mongo/db/cst/grammar.yy"
+#line 1656 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5035 "src/mongo/db/cst/parser_gen.cpp"
+#line 5035 "parser_gen.cpp"
                     break;
 
                     case 408:  // concat: "object" CONCAT "array" expressions "end of array" "end of
                                // object"
-#line 1660 "src/mongo/db/cst/grammar.yy"
+#line 1660 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::concat, CNode{CNode::ArrayChildren{}}}}};
@@ -5424,49 +5424,49 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 5047 "src/mongo/db/cst/parser_gen.cpp"
+#line 5047 "parser_gen.cpp"
                     break;
 
                     case 409:  // formatArg: %empty
-#line 1670 "src/mongo/db/cst/grammar.yy"
+#line 1670 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::formatArg, CNode{KeyValue::absentKey}};
                     }
-#line 5055 "src/mongo/db/cst/parser_gen.cpp"
+#line 5055 "parser_gen.cpp"
                     break;
 
                     case 410:  // formatArg: "format argument" expression
-#line 1673 "src/mongo/db/cst/grammar.yy"
+#line 1673 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::formatArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5063 "src/mongo/db/cst/parser_gen.cpp"
+#line 5063 "parser_gen.cpp"
                     break;
 
                     case 411:  // timezoneArg: %empty
-#line 1679 "src/mongo/db/cst/grammar.yy"
+#line 1679 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::timezoneArg, CNode{KeyValue::absentKey}};
                     }
-#line 5071 "src/mongo/db/cst/parser_gen.cpp"
+#line 5071 "parser_gen.cpp"
                     break;
 
                     case 412:  // timezoneArg: "timezone argument" expression
-#line 1682 "src/mongo/db/cst/grammar.yy"
+#line 1682 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::timezoneArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5079 "src/mongo/db/cst/parser_gen.cpp"
+#line 5079 "parser_gen.cpp"
                     break;
 
                     case 413:  // dateFromString: "object" DATE_FROM_STRING START_ORDERED_OBJECT
                                // "dateString argument" expression formatArg timezoneArg onErrorArg
                                // onNullArg "end of object" "end of object"
-#line 1689 "src/mongo/db/cst/grammar.yy"
+#line 1689 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::dateFromString,
@@ -5482,13 +5482,13 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[2]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 5089 "src/mongo/db/cst/parser_gen.cpp"
+#line 5089 "parser_gen.cpp"
                     break;
 
                     case 414:  // dateToString: "object" DATE_TO_STRING START_ORDERED_OBJECT "date
                                // argument" expression formatArg timezoneArg onNullArg "end of
                                // object" "end of object"
-#line 1698 "src/mongo/db/cst/grammar.yy"
+#line 1698 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::dateToString,
@@ -5501,39 +5501,39 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[2]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 5099 "src/mongo/db/cst/parser_gen.cpp"
+#line 5099 "parser_gen.cpp"
                     break;
 
                     case 415:  // exprZeroToTwo: %empty
-#line 1706 "src/mongo/db/cst/grammar.yy"
+#line 1706 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() = CNode::ArrayChildren{};
                     }
-#line 5107 "src/mongo/db/cst/parser_gen.cpp"
+#line 5107 "parser_gen.cpp"
                     break;
 
                     case 416:  // exprZeroToTwo: expression
-#line 1709 "src/mongo/db/cst/grammar.yy"
+#line 1709 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             CNode::ArrayChildren{YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5115 "src/mongo/db/cst/parser_gen.cpp"
+#line 5115 "parser_gen.cpp"
                     break;
 
                     case 417:  // exprZeroToTwo: expression expression
-#line 1712 "src/mongo/db/cst/grammar.yy"
+#line 1712 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             CNode::ArrayChildren{YY_MOVE(yystack_[1].value.as<CNode>()),
                                                  YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5123 "src/mongo/db/cst/parser_gen.cpp"
+#line 5123 "parser_gen.cpp"
                     break;
 
                     case 418:  // indexOfBytes: "object" INDEX_OF_BYTES "array" expression
                                // expression exprZeroToTwo "end of array" "end of object"
-#line 1719 "src/mongo/db/cst/grammar.yy"
+#line 1719 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::indexOfBytes,
@@ -5544,12 +5544,12 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 5135 "src/mongo/db/cst/parser_gen.cpp"
+#line 5135 "parser_gen.cpp"
                     break;
 
                     case 419:  // indexOfCP: "object" INDEX_OF_CP "array" expression expression
                                // exprZeroToTwo "end of array" "end of object"
-#line 1730 "src/mongo/db/cst/grammar.yy"
+#line 1730 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::indexOfCP,
@@ -5560,30 +5560,30 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 5147 "src/mongo/db/cst/parser_gen.cpp"
+#line 5147 "parser_gen.cpp"
                     break;
 
                     case 420:  // charsArg: %empty
-#line 1740 "src/mongo/db/cst/grammar.yy"
+#line 1740 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::charsArg, CNode{KeyValue::absentKey}};
                     }
-#line 5155 "src/mongo/db/cst/parser_gen.cpp"
+#line 5155 "parser_gen.cpp"
                     break;
 
                     case 421:  // charsArg: "chars argument" expression
-#line 1743 "src/mongo/db/cst/grammar.yy"
+#line 1743 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::charsArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5163 "src/mongo/db/cst/parser_gen.cpp"
+#line 5163 "parser_gen.cpp"
                     break;
 
                     case 422:  // ltrim: "object" LTRIM START_ORDERED_OBJECT charsArg "input
                                // argument" expression "end of object" "end of object"
-#line 1749 "src/mongo/db/cst/grammar.yy"
+#line 1749 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ltrim,
@@ -5592,12 +5592,12 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 5173 "src/mongo/db/cst/parser_gen.cpp"
+#line 5173 "parser_gen.cpp"
                     break;
 
                     case 423:  // rtrim: "object" RTRIM START_ORDERED_OBJECT charsArg "input
                                // argument" expression "end of object" "end of object"
-#line 1757 "src/mongo/db/cst/grammar.yy"
+#line 1757 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::rtrim,
@@ -5606,12 +5606,12 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 5183 "src/mongo/db/cst/parser_gen.cpp"
+#line 5183 "parser_gen.cpp"
                     break;
 
                     case 424:  // trim: "object" TRIM START_ORDERED_OBJECT charsArg "input argument"
                                // expression "end of object" "end of object"
-#line 1765 "src/mongo/db/cst/grammar.yy"
+#line 1765 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::trim,
@@ -5620,30 +5620,30 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 5193 "src/mongo/db/cst/parser_gen.cpp"
+#line 5193 "parser_gen.cpp"
                     break;
 
                     case 425:  // optionsArg: %empty
-#line 1773 "src/mongo/db/cst/grammar.yy"
+#line 1773 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::optionsArg, CNode{KeyValue::absentKey}};
                     }
-#line 5201 "src/mongo/db/cst/parser_gen.cpp"
+#line 5201 "parser_gen.cpp"
                     break;
 
                     case 426:  // optionsArg: "options argument" expression
-#line 1776 "src/mongo/db/cst/grammar.yy"
+#line 1776 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::optionsArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5209 "src/mongo/db/cst/parser_gen.cpp"
+#line 5209 "parser_gen.cpp"
                     break;
 
                     case 427:  // regexArgs: START_ORDERED_OBJECT "input argument" expression
                                // optionsArg "regex argument" expression "end of object"
-#line 1781 "src/mongo/db/cst/grammar.yy"
+#line 1781 "grammar.yy"
                     {
                         // Note that the order of these arguments must match the constructor for the
                         // regex expression.
@@ -5652,40 +5652,40 @@ int ParserGen::parse() {
                             {KeyFieldname::regexArg, YY_MOVE(yystack_[1].value.as<CNode>())},
                             YY_MOVE(yystack_[3].value.as<std::pair<CNode::Fieldname, CNode>>())}};
                     }
-#line 5221 "src/mongo/db/cst/parser_gen.cpp"
+#line 5221 "parser_gen.cpp"
                     break;
 
                     case 428:  // regexFind: "object" REGEX_FIND regexArgs "end of object"
-#line 1790 "src/mongo/db/cst/grammar.yy"
+#line 1790 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexFind, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5229 "src/mongo/db/cst/parser_gen.cpp"
+#line 5229 "parser_gen.cpp"
                     break;
 
                     case 429:  // regexFindAll: "object" REGEX_FIND_ALL regexArgs "end of object"
-#line 1796 "src/mongo/db/cst/grammar.yy"
+#line 1796 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexFindAll, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5237 "src/mongo/db/cst/parser_gen.cpp"
+#line 5237 "parser_gen.cpp"
                     break;
 
                     case 430:  // regexMatch: "object" REGEX_MATCH regexArgs "end of object"
-#line 1802 "src/mongo/db/cst/grammar.yy"
+#line 1802 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::regexMatch, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5245 "src/mongo/db/cst/parser_gen.cpp"
+#line 5245 "parser_gen.cpp"
                     break;
 
                     case 431:  // replaceOne: "object" REPLACE_ONE START_ORDERED_OBJECT "find
                                // argument" expression "input argument" expression "replacement
                                // argument" expression "end of object" "end of object"
-#line 1809 "src/mongo/db/cst/grammar.yy"
+#line 1809 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::replaceOne,
@@ -5695,13 +5695,13 @@ int ParserGen::parse() {
                                  {KeyFieldname::replacementArg,
                                   YY_MOVE(yystack_[2].value.as<CNode>())}}}}}};
                     }
-#line 5256 "src/mongo/db/cst/parser_gen.cpp"
+#line 5256 "parser_gen.cpp"
                     break;
 
                     case 432:  // replaceAll: "object" REPLACE_ALL START_ORDERED_OBJECT "find
                                // argument" expression "input argument" expression "replacement
                                // argument" expression "end of object" "end of object"
-#line 1819 "src/mongo/db/cst/grammar.yy"
+#line 1819 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::replaceAll,
@@ -5711,54 +5711,54 @@ int ParserGen::parse() {
                                  {KeyFieldname::replacementArg,
                                   YY_MOVE(yystack_[2].value.as<CNode>())}}}}}};
                     }
-#line 5267 "src/mongo/db/cst/parser_gen.cpp"
+#line 5267 "parser_gen.cpp"
                     break;
 
                     case 433:  // split: "object" SPLIT "array" expression expression "end of array"
                                // "end of object"
-#line 1828 "src/mongo/db/cst/grammar.yy"
+#line 1828 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::split,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 5276 "src/mongo/db/cst/parser_gen.cpp"
+#line 5276 "parser_gen.cpp"
                     break;
 
                     case 434:  // strLenBytes: "object" STR_LEN_BYTES expression "end of object"
-#line 1835 "src/mongo/db/cst/grammar.yy"
+#line 1835 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strLenBytes, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5285 "src/mongo/db/cst/parser_gen.cpp"
+#line 5285 "parser_gen.cpp"
                     break;
 
                     case 435:  // strLenCP: "object" STR_LEN_CP expression "end of object"
-#line 1842 "src/mongo/db/cst/grammar.yy"
+#line 1842 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strLenCP, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5294 "src/mongo/db/cst/parser_gen.cpp"
+#line 5294 "parser_gen.cpp"
                     break;
 
                     case 436:  // strcasecmp: "object" STR_CASE_CMP "array" expression expression
                                // "end of array" "end of object"
-#line 1850 "src/mongo/db/cst/grammar.yy"
+#line 1850 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::strcasecmp,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 5303 "src/mongo/db/cst/parser_gen.cpp"
+#line 5303 "parser_gen.cpp"
                     break;
 
                     case 437:  // substr: "object" SUBSTR "array" expression expression expression
                                // "end of array" "end of object"
-#line 1858 "src/mongo/db/cst/grammar.yy"
+#line 1858 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substr,
@@ -5766,12 +5766,12 @@ int ParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 5312 "src/mongo/db/cst/parser_gen.cpp"
+#line 5312 "parser_gen.cpp"
                     break;
 
                     case 438:  // substrBytes: "object" SUBSTR_BYTES "array" expression expression
                                // expression "end of array" "end of object"
-#line 1866 "src/mongo/db/cst/grammar.yy"
+#line 1866 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substrBytes,
@@ -5779,12 +5779,12 @@ int ParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 5321 "src/mongo/db/cst/parser_gen.cpp"
+#line 5321 "parser_gen.cpp"
                     break;
 
                     case 439:  // substrCP: "object" SUBSTR_CP "array" expression expression
                                // expression "end of array" "end of object"
-#line 1874 "src/mongo/db/cst/grammar.yy"
+#line 1874 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::substrCP,
@@ -5792,154 +5792,154 @@ int ParserGen::parse() {
                                                         YY_MOVE(yystack_[3].value.as<CNode>()),
                                                         YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 5330 "src/mongo/db/cst/parser_gen.cpp"
+#line 5330 "parser_gen.cpp"
                     break;
 
                     case 440:  // toLower: "object" TO_LOWER expression "end of object"
-#line 1881 "src/mongo/db/cst/grammar.yy"
+#line 1881 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toLower, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5338 "src/mongo/db/cst/parser_gen.cpp"
+#line 5338 "parser_gen.cpp"
                     break;
 
                     case 441:  // toUpper: "object" TO_UPPER expression "end of object"
-#line 1887 "src/mongo/db/cst/grammar.yy"
+#line 1887 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toUpper, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5346 "src/mongo/db/cst/parser_gen.cpp"
+#line 5346 "parser_gen.cpp"
                     break;
 
                     case 442:  // metaSortKeyword: "randVal"
-#line 1893 "src/mongo/db/cst/grammar.yy"
+#line 1893 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::randVal};
                     }
-#line 5354 "src/mongo/db/cst/parser_gen.cpp"
+#line 5354 "parser_gen.cpp"
                     break;
 
                     case 443:  // metaSortKeyword: "textScore"
-#line 1896 "src/mongo/db/cst/grammar.yy"
+#line 1896 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::textScore};
                     }
-#line 5362 "src/mongo/db/cst/parser_gen.cpp"
+#line 5362 "parser_gen.cpp"
                     break;
 
                     case 444:  // metaSort: "object" META metaSortKeyword "end of object"
-#line 1902 "src/mongo/db/cst/grammar.yy"
+#line 1902 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::meta, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5370 "src/mongo/db/cst/parser_gen.cpp"
+#line 5370 "parser_gen.cpp"
                     break;
 
                     case 445:  // sortSpecs: "object" specList "end of object"
-#line 1908 "src/mongo/db/cst/grammar.yy"
+#line 1908 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 5378 "src/mongo/db/cst/parser_gen.cpp"
+#line 5378 "parser_gen.cpp"
                     break;
 
                     case 446:  // specList: %empty
-#line 1913 "src/mongo/db/cst/grammar.yy"
+#line 1913 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 5386 "src/mongo/db/cst/parser_gen.cpp"
+#line 5386 "parser_gen.cpp"
                     break;
 
                     case 447:  // specList: specList sortSpec
-#line 1916 "src/mongo/db/cst/grammar.yy"
+#line 1916 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 5395 "src/mongo/db/cst/parser_gen.cpp"
+#line 5395 "parser_gen.cpp"
                     break;
 
                     case 448:  // oneOrNegOne: "1 (int)"
-#line 1923 "src/mongo/db/cst/grammar.yy"
+#line 1923 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::intOneKey};
                     }
-#line 5403 "src/mongo/db/cst/parser_gen.cpp"
+#line 5403 "parser_gen.cpp"
                     break;
 
                     case 449:  // oneOrNegOne: "-1 (int)"
-#line 1926 "src/mongo/db/cst/grammar.yy"
+#line 1926 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::intNegOneKey};
                     }
-#line 5411 "src/mongo/db/cst/parser_gen.cpp"
+#line 5411 "parser_gen.cpp"
                     break;
 
                     case 450:  // oneOrNegOne: "1 (long)"
-#line 1929 "src/mongo/db/cst/grammar.yy"
+#line 1929 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::longOneKey};
                     }
-#line 5419 "src/mongo/db/cst/parser_gen.cpp"
+#line 5419 "parser_gen.cpp"
                     break;
 
                     case 451:  // oneOrNegOne: "-1 (long)"
-#line 1932 "src/mongo/db/cst/grammar.yy"
+#line 1932 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::longNegOneKey};
                     }
-#line 5427 "src/mongo/db/cst/parser_gen.cpp"
+#line 5427 "parser_gen.cpp"
                     break;
 
                     case 452:  // oneOrNegOne: "1 (double)"
-#line 1935 "src/mongo/db/cst/grammar.yy"
+#line 1935 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::doubleOneKey};
                     }
-#line 5435 "src/mongo/db/cst/parser_gen.cpp"
+#line 5435 "parser_gen.cpp"
                     break;
 
                     case 453:  // oneOrNegOne: "-1 (double)"
-#line 1938 "src/mongo/db/cst/grammar.yy"
+#line 1938 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::doubleNegOneKey};
                     }
-#line 5443 "src/mongo/db/cst/parser_gen.cpp"
+#line 5443 "parser_gen.cpp"
                     break;
 
                     case 454:  // oneOrNegOne: "1 (decimal)"
-#line 1941 "src/mongo/db/cst/grammar.yy"
+#line 1941 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::decimalOneKey};
                     }
-#line 5451 "src/mongo/db/cst/parser_gen.cpp"
+#line 5451 "parser_gen.cpp"
                     break;
 
                     case 455:  // oneOrNegOne: "-1 (decimal)"
-#line 1944 "src/mongo/db/cst/grammar.yy"
+#line 1944 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{KeyValue::decimalNegOneKey};
                     }
-#line 5459 "src/mongo/db/cst/parser_gen.cpp"
+#line 5459 "parser_gen.cpp"
                     break;
 
                     case 456:  // sortFieldname: valueFieldname
-#line 1949 "src/mongo/db/cst/grammar.yy"
+#line 1949 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
-                            SortPath{make_vector<std::string>(stdx::get<UserFieldname>(
+                            SortPath{makeVector<std::string>(stdx::get<UserFieldname>(
                                 YY_MOVE(yystack_[0].value.as<CNode::Fieldname>())))};
                     }
-#line 5467 "src/mongo/db/cst/parser_gen.cpp"
+#line 5467 "parser_gen.cpp"
                     break;
 
                     case 457:  // sortFieldname: "fieldname containing dotted path"
-#line 1951 "src/mongo/db/cst/grammar.yy"
+#line 1951 "grammar.yy"
                     {
                         auto components = YY_MOVE(yystack_[0].value.as<std::vector<std::string>>());
                         if (auto status = c_node_validation::validateSortPath(components);
@@ -5947,120 +5947,120 @@ int ParserGen::parse() {
                             error(yystack_[0].location, status.reason());
                         yylhs.value.as<CNode::Fieldname>() = SortPath{std::move(components)};
                     }
-#line 5479 "src/mongo/db/cst/parser_gen.cpp"
+#line 5479 "parser_gen.cpp"
                     break;
 
                     case 458:  // sortSpec: sortFieldname metaSort
-#line 1961 "src/mongo/db/cst/grammar.yy"
+#line 1961 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5487 "src/mongo/db/cst/parser_gen.cpp"
+#line 5487 "parser_gen.cpp"
                     break;
 
                     case 459:  // sortSpec: sortFieldname oneOrNegOne
-#line 1963 "src/mongo/db/cst/grammar.yy"
+#line 1963 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5495 "src/mongo/db/cst/parser_gen.cpp"
+#line 5495 "parser_gen.cpp"
                     break;
 
                     case 460:  // setExpression: allElementsTrue
-#line 1969 "src/mongo/db/cst/grammar.yy"
+#line 1969 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5501 "src/mongo/db/cst/parser_gen.cpp"
+#line 5501 "parser_gen.cpp"
                     break;
 
                     case 461:  // setExpression: anyElementTrue
-#line 1969 "src/mongo/db/cst/grammar.yy"
+#line 1969 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5507 "src/mongo/db/cst/parser_gen.cpp"
+#line 5507 "parser_gen.cpp"
                     break;
 
                     case 462:  // setExpression: setDifference
-#line 1969 "src/mongo/db/cst/grammar.yy"
+#line 1969 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5513 "src/mongo/db/cst/parser_gen.cpp"
+#line 5513 "parser_gen.cpp"
                     break;
 
                     case 463:  // setExpression: setEquals
-#line 1969 "src/mongo/db/cst/grammar.yy"
+#line 1969 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5519 "src/mongo/db/cst/parser_gen.cpp"
+#line 5519 "parser_gen.cpp"
                     break;
 
                     case 464:  // setExpression: setIntersection
-#line 1969 "src/mongo/db/cst/grammar.yy"
+#line 1969 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5525 "src/mongo/db/cst/parser_gen.cpp"
+#line 5525 "parser_gen.cpp"
                     break;
 
                     case 465:  // setExpression: setIsSubset
-#line 1969 "src/mongo/db/cst/grammar.yy"
+#line 1969 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5531 "src/mongo/db/cst/parser_gen.cpp"
+#line 5531 "parser_gen.cpp"
                     break;
 
                     case 466:  // setExpression: setUnion
-#line 1970 "src/mongo/db/cst/grammar.yy"
+#line 1970 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5537 "src/mongo/db/cst/parser_gen.cpp"
+#line 5537 "parser_gen.cpp"
                     break;
 
                     case 467:  // allElementsTrue: "object" "allElementsTrue" "array" expression
                                // "end of array" "end of object"
-#line 1974 "src/mongo/db/cst/grammar.yy"
+#line 1974 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::allElementsTrue,
                                                    CNode{YY_MOVE(yystack_[2].value.as<CNode>())}}}};
                     }
-#line 5545 "src/mongo/db/cst/parser_gen.cpp"
+#line 5545 "parser_gen.cpp"
                     break;
 
                     case 468:  // anyElementTrue: "object" "anyElementTrue" "array" expression "end
                                // of array" "end of object"
-#line 1980 "src/mongo/db/cst/grammar.yy"
+#line 1980 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{
                             CNode::ObjectChildren{{KeyFieldname::anyElementTrue,
                                                    CNode{YY_MOVE(yystack_[2].value.as<CNode>())}}}};
                     }
-#line 5553 "src/mongo/db/cst/parser_gen.cpp"
+#line 5553 "parser_gen.cpp"
                     break;
 
                     case 469:  // setDifference: "object" "setDifference" exprFixedTwoArg "end of
                                // object"
-#line 1986 "src/mongo/db/cst/grammar.yy"
+#line 1986 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setDifference, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5562 "src/mongo/db/cst/parser_gen.cpp"
+#line 5562 "parser_gen.cpp"
                     break;
 
                     case 470:  // setEquals: "object" "setEquals" "array" expression expression
                                // expressions "end of array" "end of object"
-#line 1994 "src/mongo/db/cst/grammar.yy"
+#line 1994 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setEquals,
@@ -6071,12 +6071,12 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 5574 "src/mongo/db/cst/parser_gen.cpp"
+#line 5574 "parser_gen.cpp"
                     break;
 
                     case 471:  // setIntersection: "object" "setIntersection" "array" expression
                                // expression expressions "end of array" "end of object"
-#line 2005 "src/mongo/db/cst/grammar.yy"
+#line 2005 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setIntersection,
@@ -6087,22 +6087,22 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 5586 "src/mongo/db/cst/parser_gen.cpp"
+#line 5586 "parser_gen.cpp"
                     break;
 
                     case 472:  // setIsSubset: "object" "setIsSubset" exprFixedTwoArg "end of
                                // object"
-#line 2015 "src/mongo/db/cst/grammar.yy"
+#line 2015 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setIsSubset, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5595 "src/mongo/db/cst/parser_gen.cpp"
+#line 5595 "parser_gen.cpp"
                     break;
 
                     case 473:  // setUnion: "object" "setUnion" "array" expression expression
                                // expressions "end of array" "end of object"
-#line 2023 "src/mongo/db/cst/grammar.yy"
+#line 2023 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::setUnion,
@@ -6113,426 +6113,426 @@ int ParserGen::parse() {
                             yylhs.value.as<CNode>().objectChildren()[0].second.arrayChildren();
                         array.insert(array.end(), others.begin(), others.end());
                     }
-#line 5607 "src/mongo/db/cst/parser_gen.cpp"
+#line 5607 "parser_gen.cpp"
                     break;
 
                     case 474:  // literalEscapes: const
-#line 2033 "src/mongo/db/cst/grammar.yy"
+#line 2033 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5613 "src/mongo/db/cst/parser_gen.cpp"
+#line 5613 "parser_gen.cpp"
                     break;
 
                     case 475:  // literalEscapes: literal
-#line 2033 "src/mongo/db/cst/grammar.yy"
+#line 2033 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5619 "src/mongo/db/cst/parser_gen.cpp"
+#line 5619 "parser_gen.cpp"
                     break;
 
                     case 476:  // const: "object" CONST_EXPR "array" value "end of array" "end of
                                // object"
-#line 2037 "src/mongo/db/cst/grammar.yy"
+#line 2037 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::constExpr,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 5628 "src/mongo/db/cst/parser_gen.cpp"
+#line 5628 "parser_gen.cpp"
                     break;
 
                     case 477:  // literal: "object" LITERAL "array" value "end of array" "end of
                                // object"
-#line 2044 "src/mongo/db/cst/grammar.yy"
+#line 2044 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::literal,
                              CNode{CNode::ArrayChildren{YY_MOVE(yystack_[2].value.as<CNode>())}}}}};
                     }
-#line 5637 "src/mongo/db/cst/parser_gen.cpp"
+#line 5637 "parser_gen.cpp"
                     break;
 
                     case 478:  // value: simpleValue
-#line 2051 "src/mongo/db/cst/grammar.yy"
+#line 2051 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5643 "src/mongo/db/cst/parser_gen.cpp"
+#line 5643 "parser_gen.cpp"
                     break;
 
                     case 479:  // value: compoundValue
-#line 2051 "src/mongo/db/cst/grammar.yy"
+#line 2051 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5649 "src/mongo/db/cst/parser_gen.cpp"
+#line 5649 "parser_gen.cpp"
                     break;
 
                     case 480:  // compoundValue: valueArray
-#line 2055 "src/mongo/db/cst/grammar.yy"
+#line 2055 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5655 "src/mongo/db/cst/parser_gen.cpp"
+#line 5655 "parser_gen.cpp"
                     break;
 
                     case 481:  // compoundValue: valueObject
-#line 2055 "src/mongo/db/cst/grammar.yy"
+#line 2055 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5661 "src/mongo/db/cst/parser_gen.cpp"
+#line 5661 "parser_gen.cpp"
                     break;
 
                     case 482:  // valueArray: "array" values "end of array"
-#line 2059 "src/mongo/db/cst/grammar.yy"
+#line 2059 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() =
                             CNode{YY_MOVE(yystack_[1].value.as<std::vector<CNode>>())};
                     }
-#line 5669 "src/mongo/db/cst/parser_gen.cpp"
+#line 5669 "parser_gen.cpp"
                     break;
 
                     case 483:  // values: %empty
-#line 2065 "src/mongo/db/cst/grammar.yy"
+#line 2065 "grammar.yy"
                     {
                     }
-#line 5675 "src/mongo/db/cst/parser_gen.cpp"
+#line 5675 "parser_gen.cpp"
                     break;
 
                     case 484:  // values: values value
-#line 2066 "src/mongo/db/cst/grammar.yy"
+#line 2066 "grammar.yy"
                     {
                         yylhs.value.as<std::vector<CNode>>() =
                             YY_MOVE(yystack_[1].value.as<std::vector<CNode>>());
                         yylhs.value.as<std::vector<CNode>>().emplace_back(
                             YY_MOVE(yystack_[0].value.as<CNode>()));
                     }
-#line 5684 "src/mongo/db/cst/parser_gen.cpp"
+#line 5684 "parser_gen.cpp"
                     break;
 
                     case 485:  // valueObject: "object" valueFields "end of object"
-#line 2073 "src/mongo/db/cst/grammar.yy"
+#line 2073 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                     }
-#line 5692 "src/mongo/db/cst/parser_gen.cpp"
+#line 5692 "parser_gen.cpp"
                     break;
 
                     case 486:  // valueFields: %empty
-#line 2079 "src/mongo/db/cst/grammar.yy"
+#line 2079 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode::noopLeaf();
                     }
-#line 5700 "src/mongo/db/cst/parser_gen.cpp"
+#line 5700 "parser_gen.cpp"
                     break;
 
                     case 487:  // valueFields: valueFields valueField
-#line 2082 "src/mongo/db/cst/grammar.yy"
+#line 2082 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[1].value.as<CNode>());
                         yylhs.value.as<CNode>().objectChildren().emplace_back(
                             YY_MOVE(yystack_[0].value.as<std::pair<CNode::Fieldname, CNode>>()));
                     }
-#line 5709 "src/mongo/db/cst/parser_gen.cpp"
+#line 5709 "parser_gen.cpp"
                     break;
 
                     case 488:  // valueField: valueFieldname value
-#line 2089 "src/mongo/db/cst/grammar.yy"
+#line 2089 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = {
                             YY_MOVE(yystack_[1].value.as<CNode::Fieldname>()),
                             YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5717 "src/mongo/db/cst/parser_gen.cpp"
+#line 5717 "parser_gen.cpp"
                     break;
 
                     case 489:  // valueFieldname: invariableUserFieldname
-#line 2096 "src/mongo/db/cst/grammar.yy"
+#line 2096 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 5723 "src/mongo/db/cst/parser_gen.cpp"
+#line 5723 "parser_gen.cpp"
                     break;
 
                     case 490:  // valueFieldname: stageAsUserFieldname
-#line 2097 "src/mongo/db/cst/grammar.yy"
+#line 2097 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 5729 "src/mongo/db/cst/parser_gen.cpp"
+#line 5729 "parser_gen.cpp"
                     break;
 
                     case 491:  // valueFieldname: argAsUserFieldname
-#line 2098 "src/mongo/db/cst/grammar.yy"
+#line 2098 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 5735 "src/mongo/db/cst/parser_gen.cpp"
+#line 5735 "parser_gen.cpp"
                     break;
 
                     case 492:  // valueFieldname: aggExprAsUserFieldname
-#line 2099 "src/mongo/db/cst/grammar.yy"
+#line 2099 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 5741 "src/mongo/db/cst/parser_gen.cpp"
+#line 5741 "parser_gen.cpp"
                     break;
 
                     case 493:  // valueFieldname: idAsUserFieldname
-#line 2100 "src/mongo/db/cst/grammar.yy"
+#line 2100 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() =
                             YY_MOVE(yystack_[0].value.as<CNode::Fieldname>());
                     }
-#line 5747 "src/mongo/db/cst/parser_gen.cpp"
+#line 5747 "parser_gen.cpp"
                     break;
 
                     case 494:  // compExprs: cmp
-#line 2103 "src/mongo/db/cst/grammar.yy"
+#line 2103 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5753 "src/mongo/db/cst/parser_gen.cpp"
+#line 5753 "parser_gen.cpp"
                     break;
 
                     case 495:  // compExprs: eq
-#line 2103 "src/mongo/db/cst/grammar.yy"
+#line 2103 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5759 "src/mongo/db/cst/parser_gen.cpp"
+#line 5759 "parser_gen.cpp"
                     break;
 
                     case 496:  // compExprs: gt
-#line 2103 "src/mongo/db/cst/grammar.yy"
+#line 2103 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5765 "src/mongo/db/cst/parser_gen.cpp"
+#line 5765 "parser_gen.cpp"
                     break;
 
                     case 497:  // compExprs: gte
-#line 2103 "src/mongo/db/cst/grammar.yy"
+#line 2103 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5771 "src/mongo/db/cst/parser_gen.cpp"
+#line 5771 "parser_gen.cpp"
                     break;
 
                     case 498:  // compExprs: lt
-#line 2103 "src/mongo/db/cst/grammar.yy"
+#line 2103 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5777 "src/mongo/db/cst/parser_gen.cpp"
+#line 5777 "parser_gen.cpp"
                     break;
 
                     case 499:  // compExprs: lte
-#line 2103 "src/mongo/db/cst/grammar.yy"
+#line 2103 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5783 "src/mongo/db/cst/parser_gen.cpp"
+#line 5783 "parser_gen.cpp"
                     break;
 
                     case 500:  // compExprs: ne
-#line 2103 "src/mongo/db/cst/grammar.yy"
+#line 2103 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5789 "src/mongo/db/cst/parser_gen.cpp"
+#line 5789 "parser_gen.cpp"
                     break;
 
                     case 501:  // cmp: "object" CMP exprFixedTwoArg "end of object"
-#line 2105 "src/mongo/db/cst/grammar.yy"
+#line 2105 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::cmp, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5798 "src/mongo/db/cst/parser_gen.cpp"
+#line 5798 "parser_gen.cpp"
                     break;
 
                     case 502:  // eq: "object" EQ exprFixedTwoArg "end of object"
-#line 2110 "src/mongo/db/cst/grammar.yy"
+#line 2110 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::eq, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5807 "src/mongo/db/cst/parser_gen.cpp"
+#line 5807 "parser_gen.cpp"
                     break;
 
                     case 503:  // gt: "object" GT exprFixedTwoArg "end of object"
-#line 2115 "src/mongo/db/cst/grammar.yy"
+#line 2115 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::gt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5816 "src/mongo/db/cst/parser_gen.cpp"
+#line 5816 "parser_gen.cpp"
                     break;
 
                     case 504:  // gte: "object" GTE exprFixedTwoArg "end of object"
-#line 2120 "src/mongo/db/cst/grammar.yy"
+#line 2120 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::gte, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5825 "src/mongo/db/cst/parser_gen.cpp"
+#line 5825 "parser_gen.cpp"
                     break;
 
                     case 505:  // lt: "object" LT exprFixedTwoArg "end of object"
-#line 2125 "src/mongo/db/cst/grammar.yy"
+#line 2125 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::lt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5834 "src/mongo/db/cst/parser_gen.cpp"
+#line 5834 "parser_gen.cpp"
                     break;
 
                     case 506:  // lte: "object" LTE exprFixedTwoArg "end of object"
-#line 2130 "src/mongo/db/cst/grammar.yy"
+#line 2130 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::lte, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5843 "src/mongo/db/cst/parser_gen.cpp"
+#line 5843 "parser_gen.cpp"
                     break;
 
                     case 507:  // ne: "object" NE exprFixedTwoArg "end of object"
-#line 2135 "src/mongo/db/cst/grammar.yy"
+#line 2135 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::ne, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5852 "src/mongo/db/cst/parser_gen.cpp"
+#line 5852 "parser_gen.cpp"
                     break;
 
                     case 508:  // typeExpression: convert
-#line 2141 "src/mongo/db/cst/grammar.yy"
+#line 2141 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5858 "src/mongo/db/cst/parser_gen.cpp"
+#line 5858 "parser_gen.cpp"
                     break;
 
                     case 509:  // typeExpression: toBool
-#line 2142 "src/mongo/db/cst/grammar.yy"
+#line 2142 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5864 "src/mongo/db/cst/parser_gen.cpp"
+#line 5864 "parser_gen.cpp"
                     break;
 
                     case 510:  // typeExpression: toDate
-#line 2143 "src/mongo/db/cst/grammar.yy"
+#line 2143 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5870 "src/mongo/db/cst/parser_gen.cpp"
+#line 5870 "parser_gen.cpp"
                     break;
 
                     case 511:  // typeExpression: toDecimal
-#line 2144 "src/mongo/db/cst/grammar.yy"
+#line 2144 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5876 "src/mongo/db/cst/parser_gen.cpp"
+#line 5876 "parser_gen.cpp"
                     break;
 
                     case 512:  // typeExpression: toDouble
-#line 2145 "src/mongo/db/cst/grammar.yy"
+#line 2145 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5882 "src/mongo/db/cst/parser_gen.cpp"
+#line 5882 "parser_gen.cpp"
                     break;
 
                     case 513:  // typeExpression: toInt
-#line 2146 "src/mongo/db/cst/grammar.yy"
+#line 2146 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5888 "src/mongo/db/cst/parser_gen.cpp"
+#line 5888 "parser_gen.cpp"
                     break;
 
                     case 514:  // typeExpression: toLong
-#line 2147 "src/mongo/db/cst/grammar.yy"
+#line 2147 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5894 "src/mongo/db/cst/parser_gen.cpp"
+#line 5894 "parser_gen.cpp"
                     break;
 
                     case 515:  // typeExpression: toObjectId
-#line 2148 "src/mongo/db/cst/grammar.yy"
+#line 2148 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5900 "src/mongo/db/cst/parser_gen.cpp"
+#line 5900 "parser_gen.cpp"
                     break;
 
                     case 516:  // typeExpression: toString
-#line 2149 "src/mongo/db/cst/grammar.yy"
+#line 2149 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5906 "src/mongo/db/cst/parser_gen.cpp"
+#line 5906 "parser_gen.cpp"
                     break;
 
                     case 517:  // typeExpression: type
-#line 2150 "src/mongo/db/cst/grammar.yy"
+#line 2150 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = YY_MOVE(yystack_[0].value.as<CNode>());
                     }
-#line 5912 "src/mongo/db/cst/parser_gen.cpp"
+#line 5912 "parser_gen.cpp"
                     break;
 
                     case 518:  // onErrorArg: %empty
-#line 2155 "src/mongo/db/cst/grammar.yy"
+#line 2155 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::onErrorArg, CNode{KeyValue::absentKey}};
                     }
-#line 5920 "src/mongo/db/cst/parser_gen.cpp"
+#line 5920 "parser_gen.cpp"
                     break;
 
                     case 519:  // onErrorArg: "onError argument" expression
-#line 2158 "src/mongo/db/cst/grammar.yy"
+#line 2158 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::onErrorArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5928 "src/mongo/db/cst/parser_gen.cpp"
+#line 5928 "parser_gen.cpp"
                     break;
 
                     case 520:  // onNullArg: %empty
-#line 2165 "src/mongo/db/cst/grammar.yy"
+#line 2165 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() =
                             std::pair{KeyFieldname::onNullArg, CNode{KeyValue::absentKey}};
                     }
-#line 5936 "src/mongo/db/cst/parser_gen.cpp"
+#line 5936 "parser_gen.cpp"
                     break;
 
                     case 521:  // onNullArg: "onNull argument" expression
-#line 2168 "src/mongo/db/cst/grammar.yy"
+#line 2168 "grammar.yy"
                     {
                         yylhs.value.as<std::pair<CNode::Fieldname, CNode>>() = std::pair{
                             KeyFieldname::onNullArg, YY_MOVE(yystack_[0].value.as<CNode>())};
                     }
-#line 5944 "src/mongo/db/cst/parser_gen.cpp"
+#line 5944 "parser_gen.cpp"
                     break;
 
                     case 522:  // convert: "object" CONVERT START_ORDERED_OBJECT "input argument"
                                // expression onErrorArg onNullArg "to argument" expression "end of
                                // object" "end of object"
-#line 2175 "src/mongo/db/cst/grammar.yy"
+#line 2175 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::convert,
@@ -6544,92 +6544,92 @@ int ParserGen::parse() {
                                  YY_MOVE(yystack_[4]
                                              .value.as<std::pair<CNode::Fieldname, CNode>>())}}}}};
                     }
-#line 5955 "src/mongo/db/cst/parser_gen.cpp"
+#line 5955 "parser_gen.cpp"
                     break;
 
                     case 523:  // toBool: "object" TO_BOOL expression "end of object"
-#line 2184 "src/mongo/db/cst/grammar.yy"
+#line 2184 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toBool, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5963 "src/mongo/db/cst/parser_gen.cpp"
+#line 5963 "parser_gen.cpp"
                     break;
 
                     case 524:  // toDate: "object" TO_DATE expression "end of object"
-#line 2189 "src/mongo/db/cst/grammar.yy"
+#line 2189 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDate, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5971 "src/mongo/db/cst/parser_gen.cpp"
+#line 5971 "parser_gen.cpp"
                     break;
 
                     case 525:  // toDecimal: "object" TO_DECIMAL expression "end of object"
-#line 2194 "src/mongo/db/cst/grammar.yy"
+#line 2194 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDecimal, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5979 "src/mongo/db/cst/parser_gen.cpp"
+#line 5979 "parser_gen.cpp"
                     break;
 
                     case 526:  // toDouble: "object" TO_DOUBLE expression "end of object"
-#line 2199 "src/mongo/db/cst/grammar.yy"
+#line 2199 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toDouble, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5987 "src/mongo/db/cst/parser_gen.cpp"
+#line 5987 "parser_gen.cpp"
                     break;
 
                     case 527:  // toInt: "object" TO_INT expression "end of object"
-#line 2204 "src/mongo/db/cst/grammar.yy"
+#line 2204 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toInt, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 5995 "src/mongo/db/cst/parser_gen.cpp"
+#line 5995 "parser_gen.cpp"
                     break;
 
                     case 528:  // toLong: "object" TO_LONG expression "end of object"
-#line 2209 "src/mongo/db/cst/grammar.yy"
+#line 2209 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toLong, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 6003 "src/mongo/db/cst/parser_gen.cpp"
+#line 6003 "parser_gen.cpp"
                     break;
 
                     case 529:  // toObjectId: "object" TO_OBJECT_ID expression "end of object"
-#line 2214 "src/mongo/db/cst/grammar.yy"
+#line 2214 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toObjectId, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 6011 "src/mongo/db/cst/parser_gen.cpp"
+#line 6011 "parser_gen.cpp"
                     break;
 
                     case 530:  // toString: "object" TO_STRING expression "end of object"
-#line 2219 "src/mongo/db/cst/grammar.yy"
+#line 2219 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::toString, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 6019 "src/mongo/db/cst/parser_gen.cpp"
+#line 6019 "parser_gen.cpp"
                     break;
 
                     case 531:  // type: "object" TYPE expression "end of object"
-#line 2224 "src/mongo/db/cst/grammar.yy"
+#line 2224 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
                             {KeyFieldname::type, YY_MOVE(yystack_[1].value.as<CNode>())}}};
                     }
-#line 6027 "src/mongo/db/cst/parser_gen.cpp"
+#line 6027 "parser_gen.cpp"
                     break;
 
 
-#line 6031 "src/mongo/db/cst/parser_gen.cpp"
+#line 6031 "parser_gen.cpp"
 
                     default:
                         break;
@@ -7929,8 +7929,8 @@ void ParserGen::yy_reduce_print_(int yyrule) const {
 #endif  // YYDEBUG
 
 
-#line 57 "src/mongo/db/cst/grammar.yy"
+#line 57 "grammar.yy"
 }  // namespace mongo
-#line 7628 "src/mongo/db/cst/parser_gen.cpp"
+#line 7628 "parser_gen.cpp"
 
-#line 2228 "src/mongo/db/cst/grammar.yy"
+#line 2228 "grammar.yy"

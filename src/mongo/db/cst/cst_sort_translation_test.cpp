@@ -78,7 +78,7 @@ void assertSortPatternsEQ(SortPattern correct, SortPattern fromTest) {
 
 TEST(CstSortTranslationTest, BasicSortGeneratesCorrectSortPattern) {
     const auto cst = CNode{CNode::ObjectChildren{
-        {SortPath{make_vector<std::string>("val")}, CNode{KeyValue::intOneKey}}}};
+        {SortPath{makeVector<std::string>("val")}, CNode{KeyValue::intOneKey}}}};
     auto expCtx = getExpCtx();
     auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
     auto correctPattern = SortPattern(fromjson("{val: 1}"), expCtx);
@@ -88,8 +88,8 @@ TEST(CstSortTranslationTest, BasicSortGeneratesCorrectSortPattern) {
 TEST(CstSortTranslationTest, MultiplePartSortGeneratesCorrectSortPattern) {
     {
         const auto cst = CNode{CNode::ObjectChildren{
-            {SortPath{make_vector<std::string>("val")}, CNode{KeyValue::intOneKey}},
-            {SortPath{make_vector<std::string>("test")}, CNode{KeyValue::intNegOneKey}}}};
+            {SortPath{makeVector<std::string>("val")}, CNode{KeyValue::intOneKey}},
+            {SortPath{makeVector<std::string>("test")}, CNode{KeyValue::intNegOneKey}}}};
         auto expCtx = getExpCtx();
         auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
         auto correctPattern = SortPattern(fromjson("{val: 1, test: -1}"), expCtx);
@@ -97,9 +97,9 @@ TEST(CstSortTranslationTest, MultiplePartSortGeneratesCorrectSortPattern) {
     }
     {
         const auto cst = CNode{CNode::ObjectChildren{
-            {SortPath{make_vector<std::string>("val")}, CNode{KeyValue::doubleOneKey}},
-            {SortPath{make_vector<std::string>("test")}, CNode{KeyValue::intNegOneKey}},
-            {SortPath{make_vector<std::string>("third")}, CNode{KeyValue::longNegOneKey}}}};
+            {SortPath{makeVector<std::string>("val")}, CNode{KeyValue::doubleOneKey}},
+            {SortPath{makeVector<std::string>("test")}, CNode{KeyValue::intNegOneKey}},
+            {SortPath{makeVector<std::string>("third")}, CNode{KeyValue::longNegOneKey}}}};
         auto expCtx = getExpCtx();
         auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
         auto correctPattern = SortPattern(fromjson("{val: 1, test: -1, third: -1}"), expCtx);
@@ -107,8 +107,8 @@ TEST(CstSortTranslationTest, MultiplePartSortGeneratesCorrectSortPattern) {
     }
     {
         const auto cst = CNode{CNode::ObjectChildren{
-            {SortPath{make_vector<std::string>("val")}, CNode{KeyValue::intOneKey}},
-            {SortPath{make_vector<std::string>("test")},
+            {SortPath{makeVector<std::string>("val")}, CNode{KeyValue::intOneKey}},
+            {SortPath{makeVector<std::string>("test")},
              CNode{
                  CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::randVal}}},
              }}}};
@@ -122,7 +122,7 @@ TEST(CstSortTranslationTest, MultiplePartSortGeneratesCorrectSortPattern) {
 TEST(CstSortTranslationTest, SortWithMetaGeneratesCorrectSortPattern) {
     {
         const auto cst = CNode{CNode::ObjectChildren{
-            {SortPath{make_vector<std::string>("val")},
+            {SortPath{makeVector<std::string>("val")},
              CNode{
                  CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::randVal}}},
              }}}};
@@ -133,7 +133,7 @@ TEST(CstSortTranslationTest, SortWithMetaGeneratesCorrectSortPattern) {
     }
     {
         const auto cst = CNode{CNode::ObjectChildren{
-            {SortPath{make_vector<std::string>("val")},
+            {SortPath{makeVector<std::string>("val")},
              CNode{
                  CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::textScore}}},
              }}}};

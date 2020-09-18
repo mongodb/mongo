@@ -583,8 +583,8 @@ generateGenericMultiIntervalIndexScan(const Collection* collection,
         return sv;
     };
     auto unionStage = sbe::makeS<sbe::UnionStage>(
-        make_vector<std::unique_ptr<sbe::PlanStage>>(std::move(anchorBranch),
-                                                     std::move(recursiveBranch)),
+        makeVector<std::unique_ptr<sbe::PlanStage>>(std::move(anchorBranch),
+                                                    std::move(recursiveBranch)),
         std::vector<sbe::value::SlotVector>{makeSVWithVars(anchorSlot, unusedVarSlots),
                                             makeSVWithVars(recursiveSlot, savedVarSlots)},
         makeSVWithVars(resultSlot, vars),

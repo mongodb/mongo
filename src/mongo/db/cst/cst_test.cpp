@@ -57,7 +57,7 @@ TEST(CstGrammarTest, BuildsAndPrints) {
         const auto cst = CNode{CNode::ObjectChildren{
             {KeyFieldname::projectInclusion,
              CNode{CNode::ObjectChildren{
-                 {ProjectionPath{make_vector<std::string>("a")}, CNode{KeyValue::trueKey}},
+                 {ProjectionPath{makeVector<std::string>("a")}, CNode{KeyValue::trueKey}},
                  {KeyFieldname::id, CNode{KeyValue::falseKey}}}}}}};
         ASSERT_BSONOBJ_EQ(
             fromjson("{\"<KeyFieldname projectInclusion>\": {\"<ProjectionPath a>\": \"<KeyValue "

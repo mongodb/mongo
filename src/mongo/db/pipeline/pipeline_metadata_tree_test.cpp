@@ -87,7 +87,7 @@ protected:
     }
 
     template <typename T, typename... Args>
-    std::vector<T> make_vector(Args&&... args) {
+    std::vector<T> makeVector(Args&&... args) {
         std::vector<T> v;
         v.reserve(sizeof...(Args));
         (v.push_back(std::forward<Args>(args)), ...);
@@ -270,7 +270,7 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
                                                          {}),
                                          {}),
                                      {}),
-                                 make_vector<Stage<TestThing>>(Stage(TestThing{"2"}, {}, {}))),
+                                 makeVector<Stage<TestThing>>(Stage(TestThing{"2"}, {}, {}))),
                              {}),
                          {}),
                      {}),
@@ -293,7 +293,7 @@ TEST_F(PipelineMetadataTreeTest, BranchingPipelinesConstructProperTrees) {
                  makeUniqueStage(
                      TestThing{""},
                      {},
-                     make_vector<Stage<TestThing>>(
+                     makeVector<Stage<TestThing>>(
                          Stage(TestThing{"tug"},
                                makeUniqueStage(
                                    TestThing{"tu"},

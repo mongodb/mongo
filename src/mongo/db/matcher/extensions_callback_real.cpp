@@ -76,7 +76,7 @@ StatusWithMatchExpression ExtensionsCallbackReal::parseWhere(
             expCtx.get(),
             ExpressionArray::create(
                 expCtx.get(),
-                make_vector<boost::intrusive_ptr<Expression>>(ExpressionFieldPath::parse(
+                makeVector<boost::intrusive_ptr<Expression>>(ExpressionFieldPath::parse(
                     expCtx.get(), "$$CURRENT", expCtx->variablesParseState))),
             code,
             ExpressionFunction::kJavaScript);

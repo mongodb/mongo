@@ -60,7 +60,7 @@ auto makePipelineContainingProjectStageWithLiteral(CNode&& literal) {
     return CNode{CNode::ArrayChildren{CNode{CNode::ObjectChildren{
         {KeyFieldname::projectInclusion,
          CNode{CNode::ObjectChildren{
-             {ProjectionPath{make_vector<std::string>("a")},
+             {ProjectionPath{makeVector<std::string>("a")},
               CNode{CNode::ObjectChildren{{KeyFieldname::literal, std::move(literal)}}}}}}}}}}};
 }
 

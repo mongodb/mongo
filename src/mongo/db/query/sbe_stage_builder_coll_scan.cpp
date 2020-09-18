@@ -398,8 +398,8 @@ generateGenericCollScan(OperationContext* opCtx,
         // Construct a union stage from the 'seek' and 'fail' branches. Note that this stage will
         // ever produce a single call to getNext() due to a 'limit 1' sitting on top of it.
         auto unionStage = sbe::makeS<sbe::UnionStage>(
-            make_vector<std::unique_ptr<sbe::PlanStage>>(std::move(seekBranch),
-                                                         std::move(failBranch)),
+            makeVector<std::unique_ptr<sbe::PlanStage>>(std::move(seekBranch),
+                                                        std::move(failBranch)),
             std::vector<sbe::value::SlotVector>{sbe::makeSV(seekSlot), sbe::makeSV(unusedSlot)},
             sbe::makeSV(*seekRecordIdSlot),
             csn->nodeId());

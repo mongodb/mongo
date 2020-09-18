@@ -35,18 +35,6 @@
 
 namespace mongo {
 
-/**
- * Create a vector. unlike an initializer list, this function will allow passing elements by Rvalue
- * reference.
- */
-template <typename T, typename... Args>
-auto make_vector(Args&&... args) {
-    std::vector<T> v;
-    v.reserve(sizeof...(Args));
-    (v.push_back(std::forward<Args>(args)), ...);
-    return v;
-}
-
 namespace detail {
 
 /**
@@ -74,7 +62,36 @@ void pushBackUnlessNone(DS&& ds, Arg&& arg, ...) {
     ds.push_back(std::forward<Arg>(arg));
 }
 
+/**
+ * Helpers for makeVector. Pass along the given type if a type is given for the vector elements, or
+ * deduce the type and use that if void.
+ */
+template <typename T, typename...>
+struct vecTypeHelper {
+    using type = T;
+};
+
+template <typename... Args>
+struct vecTypeHelper<void, Args...> {
+    using type = typename std::common_type<Args...>::type;
+};
+
+template <typename T, typename... Args>
+using vecTypeHelperT = typename vecTypeHelper<T, Args...>::type;
+
 }  // namespace detail
+
+/**
+ * Create a vector. Unlike an initializer list, this function will allow passing elements by Rvalue
+ * reference.
+ */
+template <typename T = void, typename... Args, typename V = detail::vecTypeHelperT<T, Args...>>
+auto makeVector(Args&&... args) {
+    std::vector<V> v;
+    v.reserve(sizeof...(Args));
+    (v.push_back(std::forward<Args>(args)), ...);
+    return v;
+}
 
 /**
  * Create a list. unlike an initializer list, this function will allow passing elements by Rvalue

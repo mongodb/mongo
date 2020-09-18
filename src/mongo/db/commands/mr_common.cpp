@@ -135,7 +135,7 @@ auto translateReduce(boost::intrusive_ptr<ExpressionContext> expCtx, std::string
         ExpressionFieldPath::parse(expCtx.get(), "$emits.k", expCtx->variablesParseState);
     return DocumentSourceGroup::create(expCtx,
                                        std::move(groupKeyExpression),
-                                       make_vector<AccumulationStatement>(std::move(jsReduce)),
+                                       makeVector<AccumulationStatement>(std::move(jsReduce)),
                                        boost::none);
 }
 
@@ -146,7 +146,7 @@ auto translateFinalize(boost::intrusive_ptr<ExpressionContext> expCtx,
             expCtx.get(),
             ExpressionArray::create(
                 expCtx.get(),
-                make_vector<boost::intrusive_ptr<Expression>>(
+                makeVector<boost::intrusive_ptr<Expression>>(
                     ExpressionFieldPath::parse(expCtx.get(), "$_id", expCtx->variablesParseState),
                     ExpressionFieldPath::parse(
                         expCtx.get(), "$value", expCtx->variablesParseState))),
