@@ -140,7 +140,7 @@ private:
     // True means the elements of _pendingCalls should be interpreted as intermediate states from
     // other instances of $accumulator. False means the elements of _pendingCalls should be
     // interpreted as inputs from accumulateArgs.
-    bool _pendingCallsMerging;
+    bool _pendingCallsMerging = false;
 };
 
 }  // namespace mongo
