@@ -1,9 +1,14 @@
 /**
  * Test that an error is raised when we try to resume a query from a record which doesn't exist.
  *
+ * Suites which require retryable writes may involve a change in the primary node during the course
+ * of the test. However, $_requestResumeToken and a subsequent $_resumeAfter must be directed at the
+ * same node, since they rely on a record id which is assigned internally by a given node.
+ *
  * @tags: [
  *  assumes_against_mongod_not_mongos,
  *  requires_find_command,
+ *  requires_non_retryable_writes,
  *  multiversion_incompatible,
  * ]
  */
