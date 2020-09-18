@@ -849,21 +849,12 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(Operation
     auto action = TemporaryRecordStore::FinalizationAction::kDelete;
     boost::optional<ResumeIndexInfo> resumeInfo;
 
-    if (isResumable) {
+    if (isResumable && (shutdown || IndexBuildPhaseEnum::kCollectionScan == _phase)) {
         invariant(_buildUUID);
         invariant(_method == IndexBuildMethod::kHybrid);
 
-        if (shutdown) {
-            _writeStateToDisk(opCtx, collection);
-
-            // TODO (SERVER-48419): Keep the temporary tables unconditionally of shutdown once
-            // rollback uses the resume information.
-            action = TemporaryRecordStore::FinalizationAction::kKeep;
-        } else {
-            resumeInfo =
-                ResumeIndexInfo::parse(IDLParserErrorContext("MultiIndexBlock::getResumeInfo"),
-                                       _constructStateObject(opCtx, collection));
-        }
+        _writeStateToDisk(opCtx, collection);
+        action = TemporaryRecordStore::FinalizationAction::kKeep;
     }
 
     for (auto& index : _indexes) {

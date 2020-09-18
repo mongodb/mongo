@@ -402,7 +402,6 @@ bool isIndexBuildResumable(OperationContext* opCtx,
     // startup recovery, the last optime here derived from the local oplog may not be a valid
     // optime to wait on for the majority commit point since the rest of the replica set may
     // be on a different branch of history.
-    // TODO(SERVER-48419): Examine impact on rollback.
     if (inReplicationRecovery(opCtx->getServiceContext())) {
         LOGV2(5039100,
               "Index build: in replication recovery. Not waiting for last optime before "
@@ -1571,7 +1570,8 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
               "collectionUUID"_attr = collUUID,
               "buildUUID"_attr = buildUUID,
               "specs"_attr = indexSpecs,
-              "phase"_attr = IndexBuildPhase_serializer(resumeInfo.getPhase()));
+              "phase"_attr = IndexBuildPhase_serializer(resumeInfo.getPhase()),
+              "details"_attr = resumeInfo.toBSON());
 
         try {
             // This spawns a new thread and returns immediately. These index builds will resume and
