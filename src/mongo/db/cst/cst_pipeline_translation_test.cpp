@@ -48,7 +48,6 @@
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/unittest/unittest.h"
 
@@ -59,31 +58,6 @@ using namespace std::string_literals;
 auto getExpCtx() {
     auto nss = NamespaceString{"db", "coll"};
     return boost::intrusive_ptr<ExpressionContextForTest>{new ExpressionContextForTest(nss)};
-}
-
-void assertSortPatternsEQ(SortPattern correct, SortPattern fromTest) {
-    for (size_t i = 0; i < correct.size(); ++i) {
-        ASSERT_EQ(correct[i].isAscending, fromTest[i].isAscending);
-        if (correct[i].fieldPath) {
-            if (fromTest[i].fieldPath) {
-                ASSERT_EQ(correct[i].fieldPath->fullPath(), fromTest[i].fieldPath->fullPath());
-            } else {
-                FAIL("Pattern missing fieldpath");
-            }
-        } else if (fromTest[i].fieldPath) {
-            FAIL("Pattern incorrectly had fieldpath");
-        }
-        if (correct[i].expression) {
-            if (fromTest[i].expression)
-                ASSERT_EQ(correct[i].expression->serialize(false).toString(),
-                          fromTest[i].expression->serialize(false).toString());
-            else {
-                FAIL("Pattern missing expression");
-            }
-        } else if (fromTest[i].expression) {
-            FAIL("Pattern incorrectly had expression");
-        }
-    }
 }
 
 TEST(CstPipelineTranslationTest, TranslatesEmpty) {
@@ -1348,62 +1322,6 @@ TEST(CstPipelineTranslationTest, RecognizesDoubleDollarAsNonConst) {
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$convert: {input: \"$$NOW\", to: {$const: 'date'}}}")) ==
         expr->serialize(false)));
-}
-
-TEST(CstSortTranslationTest, BasicSortGeneratesCorrectSortPattern) {
-    const auto cst =
-        CNode{CNode::ObjectChildren{{UserFieldname{"val"}, CNode{KeyValue::intOneKey}}}};
-    auto expCtx = getExpCtx();
-    auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
-    auto correctPattern = SortPattern(fromjson("{val: 1}"), expCtx);
-    assertSortPatternsEQ(correctPattern, pattern);
-}
-
-TEST(CstSortTranslationTest, MultiplePartSortGeneratesCorrectSortPattern) {
-    {
-        const auto cst =
-            CNode{CNode::ObjectChildren{{UserFieldname{"val"}, CNode{KeyValue::intOneKey}},
-                                        {UserFieldname{"test"}, CNode{KeyValue::intNegOneKey}}}};
-        auto expCtx = getExpCtx();
-        auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
-        auto correctPattern = SortPattern(fromjson("{val: 1, test: -1}"), expCtx);
-        assertSortPatternsEQ(correctPattern, pattern);
-    }
-    {
-        const auto cst =
-            CNode{CNode::ObjectChildren{{UserFieldname{"val"}, CNode{KeyValue::doubleOneKey}},
-                                        {UserFieldname{"test"}, CNode{KeyValue::intNegOneKey}},
-                                        {UserFieldname{"third"}, CNode{KeyValue::longNegOneKey}}}};
-        auto expCtx = getExpCtx();
-        auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
-        auto correctPattern = SortPattern(fromjson("{val: 1, test: -1, third: -1}"), expCtx);
-        assertSortPatternsEQ(correctPattern, pattern);
-    }
-}
-
-TEST(CstSortTranslationTest, SortWithMetaGeneratesCorrectSortPattern) {
-    {
-        const auto cst = CNode{CNode::ObjectChildren{
-            {UserFieldname{"val"},
-             CNode{
-                 CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::randVal}}},
-             }}}};
-        auto expCtx = getExpCtx();
-        auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
-        auto correctPattern = SortPattern(fromjson("{val: {$meta: \"randVal\"}}"), expCtx);
-        assertSortPatternsEQ(correctPattern, pattern);
-    }
-    {
-        const auto cst = CNode{CNode::ObjectChildren{
-            {UserFieldname{"val"},
-             CNode{
-                 CNode::ObjectChildren{{KeyFieldname::meta, CNode{KeyValue::textScore}}},
-             }}}};
-        auto expCtx = getExpCtx();
-        auto pattern = cst_sort_translation::translateSortSpec(cst, expCtx);
-        auto correctPattern = SortPattern(fromjson("{val: {$meta: \"textScore\"}}"), expCtx);
-        assertSortPatternsEQ(correctPattern, pattern);
-    }
 }
 
 TEST(CstPipelineTranslationTest, AllElementsTrueTest) {

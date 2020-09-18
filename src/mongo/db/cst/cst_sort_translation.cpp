@@ -33,6 +33,7 @@
 
 #include "mongo/db/cst/cst_sort_translation.h"
 #include "mongo/db/cst/key_value.h"
+#include "mongo/db/cst/path.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
@@ -45,10 +46,9 @@ SortPattern translateSortSpec(const CNode& cst,
     // Assume object children, only thing possible for sort.
     const auto& children = cst.objectChildren();
     std::vector<SortPattern::SortPatternPart> sortKeys;
-    std::set<std::string> paths;
     for (const auto& keyValPair : children) {
-        const auto& path = stdx::get<UserString>(keyValPair.first);
-        paths.insert(path);
+        auto&& path = path::vectorToString(
+            std::move(stdx::get<SortPath>(stdx::get<FieldnamePath>(keyValPair.first)).components));
         stdx::visit(
             visit_helper::Overloaded{
                 [&](const CNode::ObjectChildren& object) {
@@ -83,7 +83,7 @@ SortPattern translateSortSpec(const CNode& cst,
                         case KeyValue::doubleOneKey:
                         case KeyValue::decimalOneKey:
                             sortKeys.push_back(SortPattern::SortPatternPart{
-                                true, FieldPath{path}, nullptr /* meta */});
+                                true, FieldPath{std::move(path)}, nullptr /* meta */});
 
                             break;
                         case KeyValue::intNegOneKey:
@@ -91,7 +91,7 @@ SortPattern translateSortSpec(const CNode& cst,
                         case KeyValue::doubleNegOneKey:
                         case KeyValue::decimalNegOneKey:
                             sortKeys.push_back(SortPattern::SortPatternPart{
-                                false, FieldPath{path}, nullptr /* meta */});
+                                false, FieldPath{std::move(path)}, nullptr /* meta */});
                             break;
                         default:
                             MONGO_UNREACHABLE;
@@ -101,7 +101,7 @@ SortPattern translateSortSpec(const CNode& cst,
             },
             keyValPair.second.payload);
     }
-    return SortPattern(std::move(sortKeys), std::move(paths));
+    return SortPattern(std::move(sortKeys));
 }
 
 }  // namespace mongo::cst_sort_translation

@@ -290,7 +290,7 @@
 // Possible fieldnames.
 %nterm <CNode::Fieldname> aggregationProjectionFieldname projectionFieldname expressionFieldname 
 %nterm <CNode::Fieldname> stageAsUserFieldname argAsUserFieldname argAsProjectionPath
-%nterm <CNode::Fieldname> aggExprAsUserFieldname invariableUserFieldname
+%nterm <CNode::Fieldname> aggExprAsUserFieldname invariableUserFieldname sortFieldname
 %nterm <CNode::Fieldname> idAsUserFieldname idAsProjectionPath valueFieldname predFieldname
 %nterm <std::pair<CNode::Fieldname, CNode>> projectField projectionObjectField expressionField
 %nterm <std::pair<CNode::Fieldname, CNode>> valueField
@@ -1945,10 +1945,22 @@ oneOrNegOne:
         $$ = CNode{KeyValue::decimalNegOneKey};
     }
 
+sortFieldname:
+    valueFieldname {
+        $sortFieldname = SortPath{make_vector<std::string>(stdx::get<UserFieldname>($valueFieldname))};
+    } | DOTTED_FIELDNAME {
+        auto components = $DOTTED_FIELDNAME;
+        if (auto status = c_node_validation::validateSortPath(components);
+            !status.isOK())
+            error(@DOTTED_FIELDNAME, status.reason());
+        $sortFieldname = SortPath{std::move(components)};
+    }
+;
+
 sortSpec:
-    valueFieldname metaSort {
+    sortFieldname metaSort {
         $$ = {$1, $2};
-    } | valueFieldname oneOrNegOne {
+    } | sortFieldname oneOrNegOne {
         $$ = {$1, $2};
     }
 ;

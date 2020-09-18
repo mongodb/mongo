@@ -84,4 +84,12 @@ enum class IsPositional : bool { no, yes };
 StatusWith<IsPositional> validateProjectionPathAsNormalOrPositional(
     const std::vector<std::string>& pathComponents);
 
+/**
+ * Verifies that the given path is valid in a sort spec. Performs the following checks:
+ * * Forbids empty path components.
+ * * Forbids dollar characters.
+ * * Forbids null bytes.
+ */
+Status validateSortPath(const std::vector<std::string>& pathComponents);
+
 }  // namespace mongo::c_node_validation

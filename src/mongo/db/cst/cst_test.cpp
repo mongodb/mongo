@@ -1014,8 +1014,34 @@ TEST(CstGrammarTest, ParsesBasicSort) {
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     ASSERT_EQ(output.toBson().toString(),
-              "{ <UserFieldname val>: \"<KeyValue intOneKey>\", <UserFieldname test>: \"<KeyValue "
+              "{ <SortPath val>: \"<KeyValue intOneKey>\", <SortPath test>: \"<KeyValue "
               "intNegOneKey>\" }");
+}
+
+TEST(CstGrammarTest, ParsesDottedPathSort) {
+    CNode output;
+    auto input = fromjson("{sort: {'a.b': 1}}");
+    BSONLexer lexer(input["sort"].embeddedObject(), ParserGen::token::START_SORT);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    ASSERT_EQ(output.toBson().toString(), "{ <SortPath a.b>: \"<KeyValue intOneKey>\" }");
+}
+
+TEST(CstGrammarTest, FailsToParseDollarPrefixedSortPath) {
+    {
+        CNode output;
+        auto input = fromjson("{sort: {$a: 1}}");
+        BSONLexer lexer(input["sort"].embeddedObject(), ParserGen::token::START_SORT);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
+    {
+        CNode output;
+        auto input = fromjson("{sort: {'a.$b': 1}}");
+        BSONLexer lexer(input["sort"].embeddedObject(), ParserGen::token::START_SORT);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
+    }
 }
 
 TEST(CstGrammarTest, ParsesMetaSort) {
@@ -1025,7 +1051,7 @@ TEST(CstGrammarTest, ParsesMetaSort) {
     auto parseTree = ParserGen(lexer, &output);
     ASSERT_EQ(0, parseTree.parse());
     ASSERT_EQ(output.toBson().toString(),
-              "{ <UserFieldname val>: { <KeyFieldname meta>: \"<KeyValue textScore>\" } }");
+              "{ <SortPath val>: { <KeyFieldname meta>: \"<KeyValue textScore>\" } }");
 }
 
 TEST(CstGrammarTest, ParsesValidAllElementsTrue) {

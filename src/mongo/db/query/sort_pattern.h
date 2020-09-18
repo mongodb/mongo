@@ -54,8 +54,12 @@ public:
 
     SortPattern(const BSONObj&, const boost::intrusive_ptr<ExpressionContext>&);
 
-    SortPattern(std::vector<SortPatternPart> patterns, std::set<std::string> paths)
-        : _sortPattern(std::move(patterns)), _paths(std::move(paths)) {}
+    SortPattern(std::vector<SortPatternPart> patterns) : _sortPattern(std::move(patterns)) {
+        for (auto&& patternPart : _sortPattern) {
+            if (patternPart.fieldPath)
+                _paths.insert(patternPart.fieldPath->fullPath());
+        }
+    }
 
     /**
      * Write out a Document whose contents are the sort key pattern.
@@ -80,7 +84,7 @@ public:
     /**
      * Singleton sort patterns are a special case. In memory, sort keys for singleton patterns get
      * stored as a single Value, corresponding to the single component of the sort pattern. By
-     * contrast, sort patterns for "compound" sort keys get stored as a Value that is an a array,
+     * contrast, sort patterns for "compound" sort keys get stored as a Value that is an array,
      * with one element for each component of the sort.
      */
     bool isSingleElementKey() const {

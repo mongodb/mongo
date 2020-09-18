@@ -24,10 +24,6 @@ selector:
   # TODO SERVER-50851 Implement $sampleRate in CST.
   - jstests/core/sample_rate.js
 
-  # TODO SERVER-51059: Fix dotted path sort specs.
-  - jstests/core/sort2.js
-  - jstests/core/sort5.js
-
   # TODO SERVER-48847 Enable tests with comparison operators.
   - jstests/core/background_index_multikey.js
   - jstests/core/wildcard_index_collation.js
