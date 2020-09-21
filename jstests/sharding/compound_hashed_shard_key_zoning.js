@@ -103,7 +103,7 @@ function testZoningAfterSharding(namespace, shardKey, NumberType) {
         max: fillMissingShardKeyFields(shardKey, {x: 10}, MinKey),
         zone: "zoneName"
     };
-    assert.commandWorked(configDB.tags.insert(zone));
+    assert.commandWorked(configDB.tags.update({_id: 0}, zone, {upsert: true}));
     assert.eq(zone, configDB.tags.findOne());
 
     // Remove works on entries inserted directly into the tags collection, even when those entries
