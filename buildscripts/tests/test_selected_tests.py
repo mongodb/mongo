@@ -77,9 +77,13 @@ class TestAcceptance(unittest.TestCase):
             },
         ]
         selected_tests_variant_expansions = {
-            "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master",
-            "version_id": "my_version", "task_id": "task_id"
+            "task_name": "selected_tests_gen",
+            "build_variant": "selected-tests",
+            "build_id": "my_build_id",
+            "project": "mongodb-mongo-master",
+            "version_id": "my_version",
+            "task_id": "task_id",
+            "max_sub_suites": 3,
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
 
@@ -114,9 +118,13 @@ class TestAcceptance(unittest.TestCase):
             },
         ]
         selected_tests_variant_expansions = {
-            "task_name": "selected_tests_gen", "build_variant": "selected-tests",
-            "build_id": "my_build_id", "project": "mongodb-mongo-master",
-            "version_id": "my_version", "task_id": "task id"
+            "task_name": "selected_tests_gen",
+            "build_variant": "selected-tests",
+            "build_id": "my_build_id",
+            "project": "mongodb-mongo-master",
+            "version_id": "my_version",
+            "task_id": "task id",
+            "max_sub_suites": 3,
         }
         repos = [mock_changed_git_files(["src/file1.cpp"])]
 

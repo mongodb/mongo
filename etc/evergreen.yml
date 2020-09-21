@@ -8661,7 +8661,7 @@ buildvariants:
     scons_cache_mode: all
     test_flags: --excludeWithAnyTags=requires_http_client
     target_resmoke_time: 15
-    max_sub_suites: 3
+    max_sub_suites: 5
     num_scons_link_jobs_available: 0.99
   tasks:
   - name: compile_parallel_TG
@@ -9689,7 +9689,7 @@ buildvariants:
     multiversion_edition: enterprise
     jstestfuzz_num_generated_files: 35
     target_resmoke_time: 20
-    max_sub_suites: 3
+    max_sub_suites: 5
     large_distro_name: windows-64-vs2019-large
     push_path: windows
     push_bucket: downloads.10gen.com
@@ -10213,7 +10213,7 @@ buildvariants:
     jstestfuzz_num_generated_files: 40
     jstestfuzz_concurrent_num_files: 10
     target_resmoke_time: 10
-    max_sub_suites: 3
+    max_sub_suites: 5
     large_distro_name: rhel62-large
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
