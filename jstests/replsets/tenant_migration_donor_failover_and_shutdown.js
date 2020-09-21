@@ -8,16 +8,16 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kMaxSleepTimeMS = 1000;
 const kConfigDonorsNS = "config.tenantMigrationDonors";
+const kDBPrefix = "testDbPrefix";
 
 // Set the delay before a donor state doc is garbage collected to be short to speed up the test.
-const kGarbageCollectionDelayMS = 60 * 1000;
+const kGarbageCollectionDelayMS = 30 * 1000;
 
 // Set the TTL monitor to run at a smaller interval to speed up the test.
 const kTTLMonitorSleepSecs = 1;
@@ -51,7 +51,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, isExpectedErrorFunc, nu
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: "testDbPrefix",
+        dbPrefix: kDBPrefix,
         readPreference: {mode: "primary"},
     };
 
@@ -59,7 +59,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, isExpectedErrorFunc, nu
         new Thread(TenantMigrationUtil.startMigration, donorPrimary.host, migrationOpts);
     migrationThread.start();
     sleep(Math.random() * kMaxSleepTimeMS);
-    interruptFunc(donorRst, migrationId);
+    interruptFunc(donorRst, migrationId, migrationOpts.dbPrefix);
     migrationThread.join();
 
     const res = migrationThread.returnData();
@@ -111,7 +111,7 @@ function testDonorForgetMigrationInterrupt(
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: "testDbPrefix",
+        dbPrefix: kDBPrefix,
         readPreference: {mode: "primary"},
     };
 
@@ -122,7 +122,7 @@ function testDonorForgetMigrationInterrupt(
         TenantMigrationUtil.forgetMigration, donorPrimary.host, migrationOpts.migrationIdString);
     forgetMigrationThread.start();
     sleep(Math.random() * kMaxSleepTimeMS);
-    interruptFunc(donorRst, migrationId);
+    interruptFunc(donorRst, migrationId, migrationOpts.dbPrefix);
     forgetMigrationThread.join();
 
     const res = forgetMigrationThread.returnData();
@@ -137,30 +137,12 @@ function testDonorForgetMigrationInterrupt(
  * primary stepped down or shut down after inserting the doc), asserts that the migration
  * eventually commits.
  */
-function testMigrationCommitsIfDurableStateExists(donorRst, migrationId) {
+function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix) {
     const donorPrimary = donorRst.getPrimary();
     const configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
     if (configDonorsColl.count({_id: migrationId}) > 0) {
-        assert.soon(() => {
-            return "committed" === configDonorsColl.findOne({_id: migrationId}).state;
-        });
+        TenantMigrationUtil.waitForMigrationToCommit(donorRst.nodes, migrationId, dbPrefix);
     }
-}
-
-/**
- * Asserts that durable and in-memory state for the migration 'migrationId' is eventually deleted
- * from the donor.
- */
-function testMigrationStateIsGarbageCollected(donorRst, migrationId) {
-    const donorPrimary = donorRst.getPrimary();
-    assert.soon(() => 0 === donorPrimary.getCollection(kConfigDonorsNS).count({_id: migrationId}));
-    assert.soon(() => 0 ===
-                    donorPrimary.adminCommand({serverStatus: 1})
-                        .repl.primaryOnlyServices.TenantMigrationDonorService);
-    donorRst.nodes.forEach((node) => {
-        assert.soon(() =>
-                        null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
-    });
 }
 
 (() => {
@@ -201,28 +183,28 @@ function testMigrationStateIsGarbageCollected(donorRst, migrationId) {
 
 (() => {
     jsTest.log("Test that the migration resumes on stepup");
-    testDonorStartMigrationInterrupt((donorRst, migrationId) => {
+    testDonorStartMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
         // Use a short replSetStepDown seconds to make it more likely for the old primary to step
         // back up.
         assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
 
-        testMigrationCommitsIfDurableStateExists(donorRst, migrationId);
+        testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix);
     }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
 })();
 
 (() => {
     jsTest.log("Test that the migration resumes after restart");
-    testDonorStartMigrationInterrupt((donorRst, migrationId) => {
+    testDonorStartMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
         donorRst.stopSet(null /* signal */, true /*forRestart */);
         donorRst.startSet({restart: true, setParameter: {enableTenantMigrations: true}});
 
-        testMigrationCommitsIfDurableStateExists(donorRst, migrationId);
+        testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix);
     }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
 })();
 
 (() => {
     jsTest.log("Test that the donorForgetMigration command can be retried on stepup");
-    testDonorForgetMigrationInterrupt((donorRst, migrationId) => {
+    testDonorForgetMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
         let donorPrimary = donorRst.getPrimary();
 
         // Use a short replSetStepDown seconds to make it more likely for the old primary to step
@@ -233,13 +215,14 @@ function testMigrationStateIsGarbageCollected(donorRst, migrationId) {
         assert.commandWorked(TenantMigrationUtil.forgetMigration(
             donorPrimary.host, extractUUIDFromObject(migrationId)));
 
-        testMigrationStateIsGarbageCollected(donorRst, migrationId);
+        TenantMigrationUtil.waitForMigrationGarbageCollection(
+            donorRst.nodes, migrationId, dbPrefix);
     }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
 })();
 
 (() => {
     jsTest.log("Test that the donorForgetMigration command can be retried after restart");
-    testDonorForgetMigrationInterrupt((donorRst, migrationId) => {
+    testDonorForgetMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
         donorRst.stopSet(null /* signal */, true /*forRestart */);
         donorRst.startSet({restart: true, setParameter: {enableTenantMigrations: true}});
 
@@ -247,7 +230,8 @@ function testMigrationStateIsGarbageCollected(donorRst, migrationId) {
         assert.commandWorked(TenantMigrationUtil.forgetMigration(
             donorPrimary.host, extractUUIDFromObject(migrationId)));
 
-        testMigrationStateIsGarbageCollected(donorRst, migrationId);
+        TenantMigrationUtil.waitForMigrationGarbageCollection(
+            donorRst.nodes, migrationId, dbPrefix);
     }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
 })();
 })();

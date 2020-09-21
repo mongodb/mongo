@@ -38,9 +38,66 @@ var TenantMigrationUtil = (function() {
             {donorForgetMigration: 1, migrationId: UUID(migrationIdString)});
     }
 
+    /**
+     * Returns true if the durable and in-memory state for the migration 'migrationId' and
+     * 'dbPrefix' is in state "committed", and false otherwise.
+     */
+    function isMigrationCommitted(node, migrationId, dbPrefix) {
+        const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
+        if (configDonorsColl.findOne({_id: migrationId}).state != "committed") {
+            return false;
+        }
+        const mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+        return mtabs[dbPrefix].access === TenantMigrationUtil.accessState.kReject;
+    }
+
+    /**
+     * Asserts that the migration 'migrationId' and 'dbPrefix' is in state "committed" on all the
+     * given nodes.
+     */
+    function assertMigrationCommitted(nodes, migrationId, dbPrefix) {
+        nodes.forEach(node => {
+            assert(isMigrationCommitted(node, migrationId, dbPrefix));
+        });
+    }
+
+    /**
+     * Asserts that the migration 'migrationId' and 'dbPrefix' eventually goes to state "committed"
+     * on all the given nodes.
+     */
+    function waitForMigrationToCommit(nodes, migrationId, dbPrefix) {
+        nodes.forEach(node => {
+            assert.soon(() => isMigrationCommitted(node, migrationId, dbPrefix));
+        });
+    }
+
+    /**
+     * Asserts that durable and in-memory state for the migration 'migrationId' and 'dbPrefix' is
+     * eventually deleted from the given nodes.
+     */
+    function waitForMigrationGarbageCollection(nodes, migrationId, dbPrefix) {
+        nodes.forEach(node => {
+            const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
+            assert.soon(() => 0 === configDonorsColl.count({_id: migrationId}));
+
+            assert.soon(() => 0 ===
+                            node.adminCommand({serverStatus: 1})
+                                .repl.primaryOnlyServices.TenantMigrationDonorService);
+
+            let mtabs;
+            assert.soon(() => {
+                mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+                return !mtabs || !mtabs[dbPrefix];
+            }, tojson(mtabs));
+        });
+    }
+
     return {
         accessState,
         startMigration,
         forgetMigration,
+        assertMigrationCommitted,
+        waitForMigrationToCommit,
+        waitForMigrationGarbageCollection
     };
 })();
