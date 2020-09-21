@@ -54,6 +54,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(abortTenantMigrationAfterBlockingStarts);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterBlockingStarts);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterDataSync);
 MONGO_FAIL_POINT_DEFINE(skipSendingRecipientSyncDataCommand);
 
 const Seconds kRecipientSyncDataTimeout(30);
@@ -442,6 +443,11 @@ void TenantMigrationDonorService::Instance::run(
             }
 
             return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
+                .then([this] {
+                    auto opCtxHolder = cc().makeOperationContext();
+                    auto opCtx = opCtxHolder.get();
+                    pauseTenantMigrationAfterDataSync.pauseWhileSet(opCtx);
+                })
                 .then([this, executor] {
                     // Enter "blocking" state.
                     auto mtab = getTenantMigrationAccessBlocker(_serviceContext,
