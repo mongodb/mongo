@@ -420,11 +420,15 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
 }
 
 boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::lookupInstance(
-    const InstanceID& id) {
+    OperationContext* opCtx, const InstanceID& id) {
+    // If this operation is holding any database locks, then it must have opted into getting
+    // interrupted at stepdown to prevent deadlocks.
+    invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+
     stdx::unique_lock lk(_mutex);
-    while (_state == State::kRebuilding) {
-        _rebuildCV.wait(lk);
-    }
+    opCtx->waitForConditionOrInterrupt(
+        _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
+
     if (_state == State::kShutdown || _state == State::kPaused) {
         invariant(_instances.empty());
         return boost::none;

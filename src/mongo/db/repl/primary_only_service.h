@@ -135,9 +135,10 @@ public:
          * Same functionality as PrimaryOnlyService::lookupInstance, but returns a pointer of
          * the proper derived class for the Instance.
          */
-        static boost::optional<std::shared_ptr<InstanceType>> lookup(PrimaryOnlyService* service,
+        static boost::optional<std::shared_ptr<InstanceType>> lookup(OperationContext* opCtx,
+                                                                     PrimaryOnlyService* service,
                                                                      const InstanceID& id) {
-            auto instance = service->lookupInstance(id);
+            auto instance = service->lookupInstance(opCtx, id);
             if (!instance) {
                 return boost::none;
             }
@@ -237,9 +238,11 @@ protected:
 
     /**
      * Given an InstanceId returns the corresponding running Instance object, or boost::none if
-     * there is none.
+     * there is none. If the service is in State::kRebuilding, will wait (interruptibly on the
+     * opCtx) for the rebuild to complete.
      */
-    boost::optional<std::shared_ptr<Instance>> lookupInstance(const InstanceID& id);
+    boost::optional<std::shared_ptr<Instance>> lookupInstance(OperationContext* opCtx,
+                                                              const InstanceID& id);
 
     /**
      * Extracts an InstanceID from the _id field of the given 'initialState' object. If an Instance

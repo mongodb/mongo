@@ -145,7 +145,7 @@ public:
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
             auto donor = TenantMigrationDonorService::Instance::lookup(
-                donorService, BSON("_id" << requestBody.getMigrationId()));
+                opCtx, donorService, BSON("_id" << requestBody.getMigrationId()));
             uassert(ErrorCodes::NoSuchTenantMigration,
                     str::stream() << "Could not find tenant migration with id "
                                   << requestBody.getMigrationId(),
