@@ -352,6 +352,10 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
 }
 
 TEST_F(PrimaryOnlyServiceTest, StepUpAfterShutdown) {
+    // TODO(SERVER-50612): Shutting down the WaitForMajorityService is a workaround for
+    // SERVER-50612. After that is resolved this line should be able to be removed.
+    WaitForMajorityService::get(getServiceContext()).shutDown();
+
     _registry->onShutdown();
     stepUp();
 }
