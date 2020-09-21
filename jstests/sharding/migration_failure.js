@@ -24,8 +24,7 @@ function runTest(shouldIncrementChunkMajorVersionOnChunkSplits) {
     });
 
     if (shouldIncrementChunkMajorVersionOnChunkSplits) {
-        assert.commandWorked(
-            st.configRS.getPrimary().adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
+        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastStableFCV}));
     }
 
     var mongos = st.s0;
