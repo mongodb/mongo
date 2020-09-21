@@ -81,6 +81,8 @@ public:
                                       RecordId id,
                                       StringData idxName) const = 0;
 
+    virtual BSONObj getCatalogEntry(OperationContext* opCtx, RecordId catalogId) const = 0;
+
     virtual BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx,
                                                              RecordId id) const = 0;
 

@@ -75,6 +75,10 @@ public:
                               RecordId catalogId,
                               StringData idxName) const;
 
+    BSONObj getCatalogEntry(OperationContext* opCtx, RecordId catalogId) const {
+        return _findEntry(opCtx, catalogId);
+    }
+
     BSONCollectionCatalogEntry::MetaData getMetaData(OperationContext* opCtx,
                                                      RecordId catalogId) const;
     void putMetaData(OperationContext* opCtx,
