@@ -1172,6 +1172,18 @@ methods = {
         object exists, check that its settings match the specified
         configuration''',
         type='boolean'),
+    Config('import', '', r'''
+        configure import of an existing object into the currently running database''',
+        type='category', subconfig=[
+        Config('enabled', 'false', r'''
+            whether to import the input URI from disk''',
+            type='boolean'),
+        Config('repair', 'false', r'''
+            whether to reconstruct the metadata from the raw file content''',
+            type='boolean'),
+        Config('file_metadata', '', r'''
+            the file configuration extracted from the metadata of the export database'''),
+        ]),
 ]),
 
 'WT_SESSION.drop' : Method([

@@ -1283,6 +1283,16 @@ struct __wt_session {
 	 * the configured cache limit., a boolean flag; default \c false.}
 	 * @config{immutable, configure the index to be immutable - that is an index is not changed
 	 * by any update to a record in the table., a boolean flag; default \c false.}
+	 * @config{import = (, configure import of an existing object into the currently running
+	 * database., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, whether to import the input URI from disk., a
+	 * boolean flag; default \c false.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_metadata, the file
+	 * configuration extracted from the metadata of the export database., a string; default
+	 * empty.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;repair, whether to reconstruct the metadata from
+	 * the raw file content., a boolean flag; default \c false.}
+	 * @config{ ),,}
 	 * @config{internal_key_max, the largest key stored in an internal node\, in bytes.  If
 	 * set\, keys larger than the specified size are stored as overflow items (which may require
 	 * additional I/O to access). The default and the maximum allowed value are both one-tenth

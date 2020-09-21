@@ -223,6 +223,10 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_create_encryption_subconfigs[] =
   {"keyid", "string", NULL, NULL, NULL, 0}, {"name", "string", NULL, NULL, NULL, 0},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
+static const WT_CONFIG_CHECK confchk_WT_SESSION_create_import_subconfigs[] = {
+  {"enabled", "boolean", NULL, NULL, NULL, 0}, {"file_metadata", "string", NULL, NULL, NULL, 0},
+  {"repair", "boolean", NULL, NULL, NULL, 0}, {NULL, NULL, NULL, NULL, NULL, 0}};
+
 static const WT_CONFIG_CHECK confchk_WT_SESSION_create_merge_custom_subconfigs[] = {
   {"prefix", "string", NULL, NULL, NULL, 0},
   {"start_generation", "int", NULL, "min=0,max=10", NULL, 0},
@@ -258,6 +262,7 @@ static const WT_CONFIG_CHECK confchk_WT_SESSION_create[] = {
   {"huffman_key", "string", NULL, NULL, NULL, 0}, {"huffman_value", "string", NULL, NULL, NULL, 0},
   {"ignore_in_memory_cache_size", "boolean", NULL, NULL, NULL, 0},
   {"immutable", "boolean", NULL, NULL, NULL, 0},
+  {"import", "category", NULL, NULL, confchk_WT_SESSION_create_import_subconfigs, 3},
   {"internal_item_max", "int", NULL, "min=0", NULL, 0},
   {"internal_key_max", "int", NULL, "min=0", NULL, 0},
   {"internal_key_truncate", "boolean", NULL, NULL, NULL, 0},
@@ -908,6 +913,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "columns=,dictionary=0,encryption=(keyid=,name=),exclusive=false,"
     "extractor=,format=btree,huffman_key=,huffman_value=,"
     "ignore_in_memory_cache_size=false,immutable=false,"
+    "import=(enabled=false,file_metadata=,repair=false),"
     "internal_item_max=0,internal_key_max=0,"
     "internal_key_truncate=true,internal_page_max=4KB,key_format=u,"
     "key_gap=10,leaf_item_max=0,leaf_key_max=0,leaf_page_max=32KB,"
@@ -920,7 +926,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {{"WT_CONNECTION.add_collator", 
     "prefix_compression=false,prefix_compression_min=4,source=,"
     "split_deepen_min_child=0,split_deepen_per_child=0,split_pct=90,"
     "type=file,value_format=u",
-    confchk_WT_SESSION_create, 44},
+    confchk_WT_SESSION_create, 45},
   {"WT_SESSION.drop",
     "checkpoint_wait=true,force=false,lock_wait=true,"
     "remove_files=true",
