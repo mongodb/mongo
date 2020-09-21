@@ -590,6 +590,17 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp(WT_SESS
     return readTimestamp;
 }
 
+namespace {
+/**
+ * This mutex serializes starting read transactions at lastApplied. This throttles new transactions
+ * so they do not overwhelm the WiredTiger spinlock that manages the global read timestamp queue.
+ * Because this queue can grow larger than the number of active transactions, the MongoDB ticketing
+ * system alone cannot restrict its growth and thus bound the amount of time the queue is locked.
+ * TODO: WT-6709
+ */
+Mutex _lastAppliedTxnMutex = MONGO_MAKE_LATCH("lastAppliedTxnMutex");
+}  // namespace
+
 Timestamp WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SESSION* session) {
     auto lastApplied = _sessionCache->snapshotManager().getLastApplied();
     if (!lastApplied) {
@@ -609,13 +620,16 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SES
         return Timestamp();
     }
 
-    WiredTigerBeginTxnBlock txnOpen(session,
-                                    _prepareConflictBehavior,
-                                    _roundUpPreparedTimestamps,
-                                    RoundUpReadTimestamp::kRound);
-    auto status = txnOpen.setReadSnapshot(*lastApplied);
-    fassert(4847501, status);
-    txnOpen.done();
+    {
+        stdx::lock_guard<Mutex> lock(_lastAppliedTxnMutex);
+        WiredTigerBeginTxnBlock txnOpen(session,
+                                        _prepareConflictBehavior,
+                                        _roundUpPreparedTimestamps,
+                                        RoundUpReadTimestamp::kRound);
+        auto status = txnOpen.setReadSnapshot(*lastApplied);
+        fassert(4847501, status);
+        txnOpen.done();
+    }
 
     // We might have rounded to oldest between calling getLastApplied and setReadSnapshot. We
     // need to get the actual read timestamp we used.
