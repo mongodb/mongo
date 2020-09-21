@@ -161,8 +161,7 @@ TEST(ComparisonMatchExpression, EqImplicitArrayTraversal) {
                                  << "$eq"
                                  << "specifiedAs" << query << "reason"
                                  << "comparison failed"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(3 << 4 << 5 << BSON_ARRAY(3 << 4 << 5)));
+                                 << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -196,9 +195,18 @@ TEST(ComparisonMatchExpression, EqImplicitArrayTraversalNestedArrays) {
                                  << "$eq"
                                  << "specifiedAs" << query << "reason"
                                  << "comparison failed"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(1 << 2 << BSON_ARRAY(1 << 2) << 3 << 4
-                                                 << BSON_ARRAY(3 << 4)));
+                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ComparisonMatchExpression, EqEmptyArray) {
+    BSONObj query = BSON("a" << BSON("$eq" << BSON_ARRAY(1 << 2)));
+    BSONObj document = BSON("a" << BSONArray{});
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$eq"
+                                 << "specifiedAs" << query << "reason"
+                                 << "comparison failed"
+                                 << "consideredValues" << BSONArray{});
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -232,8 +240,7 @@ TEST(ComparisonMatchExpression, NeImplicitArrayTraversal) {
                                  << "$ne"
                                  << "specifiedAs" << query << "reason"
                                  << "comparison succeeded"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(1 << 2 << 3 << BSON_ARRAY(1 << 2 << 3)));
+                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -266,8 +273,7 @@ TEST(ComparisonMatchExpression, LtImplicitArrayTraversal) {
                                  << "$lt"
                                  << "specifiedAs" << query << "reason"
                                  << "comparison failed"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(3 << 4 << 5 << BSON_ARRAY(3 << 4 << 5)));
+                                 << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -300,8 +306,7 @@ TEST(ComparisonMatchExpression, LteImplicitArrayTraversal) {
                                  << "$lte"
                                  << "specifiedAs" << query << "reason"
                                  << "comparison failed"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(3 << 4 << 5 << BSON_ARRAY(3 << 4 << 5)));
+                                 << "consideredValues" << BSON_ARRAY(3 << 4 << 5));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -334,8 +339,7 @@ TEST(ComparisonMatchExpression, GtImplicitArrayTraversal) {
                                  << "$gt"
                                  << "specifiedAs" << query << "reason"
                                  << "comparison failed"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(0 << 1 << 2 << BSON_ARRAY(0 << 1 << 2)));
+                                 << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -368,8 +372,18 @@ TEST(ComparisonMatchExpression, GteImplicitArrayTraversal) {
                                  << "$gte"
                                  << "specifiedAs" << query << "reason"
                                  << "comparison failed"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(0 << 1 << 2 << BSON_ARRAY(0 << 1 << 2)));
+                                 << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(ComparisonMatchExpression, GteImplicitArrayTraversalEmptyArray) {
+    BSONObj query = BSON("a" << BSON("$gte" << 3));
+    BSONObj document = BSON("a" << BSONArray());
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$gte"
+                                 << "specifiedAs" << query << "reason"
+                                 << "comparison failed"
+                                 << "consideredValues" << BSONArray{});
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -404,9 +418,7 @@ TEST(ComparisonMatchExpression, InNestedDocumentsAndArrays) {
                                  << "$in"
                                  << "specifiedAs" << query << "reason"
                                  << "no matching value found in array"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(1 << 2 << BSON_ARRAY(1 << 2) << 3 << 4
-                                                 << BSON_ARRAY(3 << 4)));
+                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -430,9 +442,7 @@ TEST(ComparisonMatchExpression, NinNestedDocumentsAndArrays) {
                                  << "$nin"
                                  << "specifiedAs" << query << "reason"
                                  << "matching value found in array"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(1 << 2 << BSON_ARRAY(1 << 2) << 3 << 4
-                                                 << BSON_ARRAY(3 << 4)));
+                                 << "consideredValues" << BSON_ARRAY(1 << 2 << 3 << 4));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -866,13 +876,20 @@ TEST(MiscellaneousMatchExpression, TypeImplicitArrayTraversal) {
                                  << "consideredValues"
                                  << BSON_ARRAY("x"
                                                << "y"
-                                               << "z"
-                                               << BSON_ARRAY("x"
-                                                             << "y"
-                                                             << "z"))
-                                 << "consideredTypes"
-                                 << BSON_ARRAY("array"
-                                               << "string"));
+                                               << "z")
+                                 << "consideredType"
+                                 << "string");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, TypeImplicitArrayTraversalEmptyArray) {
+    BSONObj query = BSON("a" << BSON("$type"
+                                     << "double"));
+    BSONObj document = BSON("a" << BSONArray{});
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$type"
+                                 << "specifiedAs" << query << "reason"
+                                 << "type did not match"
+                                 << "consideredValues" << BSONArray{});
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 // $expr
@@ -958,8 +975,7 @@ TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversal) {
                                  << "$mod"
                                  << "specifiedAs" << query << "reason"
                                  << "$mod did not evaluate to expected remainder"
-                                 << "consideredValues"
-                                 << BSON_ARRAY(0 << 2 << 4 << BSON_ARRAY(0 << 2 << 4)));
+                                 << "consideredValues" << BSON_ARRAY(0 << 2 << 4));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ModNonNumeric) {
@@ -990,9 +1006,8 @@ TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalNonNumeric) {
                                  << "$mod"
                                  << "specifiedAs" << query << "reason"
                                  << "type did not match"
-                                 << "consideredTypes"
-                                 << BSON_ARRAY("array"
-                                               << "string")
+                                 << "consideredType"
+                                 << "string"
                                  << "expectedTypes"
                                  << BSON_ARRAY("decimal"
                                                << "double"
@@ -1001,10 +1016,7 @@ TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalNonNumeric) {
                                  << "consideredValues"
                                  << BSON_ARRAY("zero"
                                                << "two"
-                                               << "four"
-                                               << BSON_ARRAY("zero"
-                                                             << "two"
-                                                             << "four")));
+                                               << "four"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalMixedTypes) {
@@ -1017,9 +1029,7 @@ TEST(MiscellaneousMatchExpression, ModImplicitArrayTraversalMixedTypes) {
                                  << "$mod did not evaluate to expected remainder"
                                  << "consideredValues"
                                  << BSON_ARRAY(0 << "two"
-                                                 << "four"
-                                                 << BSON_ARRAY(0 << "two"
-                                                                 << "four")));
+                                                 << "four"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 // $regex
@@ -1078,10 +1088,7 @@ TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversal) {
                                  << "consideredValues"
                                  << BSON_ARRAY("x"
                                                << "y"
-                                               << "z"
-                                               << BSON_ARRAY("x"
-                                                             << "y"
-                                                             << "z")));
+                                               << "z"));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, RegexNonString) {
@@ -1109,15 +1116,13 @@ TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalNonString) {
                                  << "$regex"
                                  << "specifiedAs" << query << "reason"
                                  << "type did not match"
-                                 << "consideredTypes"
-                                 << BSON_ARRAY("array"
-                                               << "int")
+                                 << "consideredType"
+                                 << "int"
                                  << "expectedTypes"
                                  << BSON_ARRAY("regex"
                                                << "string"
                                                << "symbol")
-                                 << "consideredValues"
-                                 << BSON_ARRAY(0 << 1 << 2 << BSON_ARRAY(0 << 1 << 2)));
+                                 << "consideredValues" << BSON_ARRAY(0 << 1 << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalMixedTypes) {
@@ -1128,8 +1133,7 @@ TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalMixedTypes) {
                                  << "$regex"
                                  << "specifiedAs" << query << "reason"
                                  << "regular expression did not match"
-                                 << "consideredValues"
-                                 << BSON_ARRAY("x" << 1 << 2 << BSON_ARRAY("x" << 1 << 2)));
+                                 << "consideredValues" << BSON_ARRAY("x" << 1 << 2));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1344,7 +1348,7 @@ TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearOnValueArray) {
                                  << "$bitsAllClear"
                                  << "specifiedAs" << query << "reason"
                                  << "bitwise operator failed to match"
-                                 << "consideredValues" << BSON_ARRAY(7 << 3 << attributeValue));
+                                 << "consideredValues" << BSON_ARRAY(7 << 3));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1432,7 +1436,7 @@ TEST(GeoMatchExpression, GeneratesValidationErrorGeoIntersectsOnValueArray) {
              << "$geoIntersects"
              << "specifiedAs" << query << "reason"
              << "none of considered geometries intersected the expression’s geometry"
-             << "consideredValues" << BSON_ARRAY(point1 << point2 << points));
+             << "consideredValues" << points);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
@@ -1784,11 +1788,7 @@ TEST(DocValidationTruncationTest, TruncatedConsideredValuesArray) {
 TEST(DocValidationTruncationTest, ConsideredValuesArrayNotTruncatedWhenConfiguredLimitMatches) {
     BSONObj query = BSON("a" << BSON("$lt" << 0));
     BSONArrayBuilder valuesArray;
-    // TODO SERVER-49454: We subtract one to account for the fact that the ElementIterator
-    // interface will report the entire array as the last element in 'consideredValues'. This
-    // subtraction should be removed if the interface is updated to allow for omitting the array
-    // at the end.
-    auto consideredValuesLimit = internalQueryMaxDocValidationErrorConsideredValues.load() - 1;
+    auto consideredValuesLimit = internalQueryMaxDocValidationErrorConsideredValues.load();
     for (int i = 0; i < consideredValuesLimit; i++) {
         valuesArray.append(i);
     }

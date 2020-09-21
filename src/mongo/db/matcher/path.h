@@ -54,6 +54,13 @@ public:
         // Does not traverse arrays at the end of the path. For the path "f" and document {f: [1,
         // 2]}, the path iterator returns only the entire array [1, 2].
         kNoTraversal,
+
+        // Matches against the elements of arrays at the end of the path. The same as kTraverse, but
+        // does not match the array as a whole.
+        //
+        // For example, for the path "f" and document {f: [1, 2]}, causes the path iterator to
+        // return 1 and 2.
+        kTraverseOmitArray,
     };
 
     /**

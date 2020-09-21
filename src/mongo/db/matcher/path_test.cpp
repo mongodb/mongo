@@ -484,6 +484,55 @@ TEST(Path, ArrayOffsetWithImplicitAndExplicitTraversal) {
     ASSERT(!cursor.more());
 }
 
+TEST(Path, LeafArrayBehaviorTraverseOmitArrayWithNonEmptyArray) {
+    ElementPath path{"a", ElementPath::LeafArrayBehavior::kTraverseOmitArray};
+    BSONObj doc = fromjson("{a: [1, 2]}");
+    BSONElementIterator cursor(&path, doc);
+
+    // Verifies that only array elements are returned by the iterator, that is the array [1, 2] is
+    // not returned.
+    ASSERT_TRUE(cursor.more());
+    ElementIterator::Context context = cursor.next();
+    ASSERT_EQUALS(1, context.element().Int());
+
+    ASSERT_TRUE(cursor.more());
+    context = cursor.next();
+    ASSERT_EQUALS(2, context.element().Int());
+
+    ASSERT_FALSE(cursor.more());
+}
+
+TEST(Path, LeafArrayBehaviorTraverseOmitArrayWithEmptyArray) {
+    ElementPath path{"a", ElementPath::LeafArrayBehavior::kTraverseOmitArray};
+    BSONObj doc = fromjson("{a: []}");
+    BSONElementIterator cursor(&path, doc);
+
+    // Verifies that no elements are returned by the iterator since the array is empty.
+    ASSERT_FALSE(cursor.more());
+}
+
+TEST(Path, LeafArrayBehaviorTraverseOmitArrayNested) {
+    ElementPath path{"a.b", ElementPath::LeafArrayBehavior::kTraverseOmitArray};
+    BSONObj doc = fromjson("{a: [{b: [1]}, {b: []}, {b: [2, 3]}]}");
+    BSONElementIterator cursor(&path, doc);
+
+    // Verifies that all elements of nested arrays are returned.
+    for (auto&& element : {1, 2, 3}) {
+        ASSERT_TRUE(cursor.more());
+        ASSERT_EQUALS(element, cursor.next().element().Int());
+    }
+    ASSERT_FALSE(cursor.more());
+}
+
+TEST(Path, LeafArrayBehaviorTraverseOmitArrayNestedEmptyArray) {
+    ElementPath path{"a.b", ElementPath::LeafArrayBehavior::kTraverseOmitArray};
+    BSONObj doc = fromjson("{a: [{b: []}, {b: []}]}");
+    BSONElementIterator cursor(&path, doc);
+
+    // Verifies that no elements are returned.
+    ASSERT_FALSE(cursor.more());
+}
+
 TEST(SimpleArrayElementIterator, SimpleNoArrayLast1) {
     BSONObj obj = BSON("a" << BSON_ARRAY(5 << BSON("x" << 6) << BSON_ARRAY(7 << 9) << 11));
     SimpleArrayElementIterator i(obj["a"], false);

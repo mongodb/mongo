@@ -819,7 +819,11 @@ public:
     }
     void visit(const TwoDPtInAnnulusExpression* expr) final {}
     void visit(const TypeMatchExpression* expr) final {
-        generateTypeError(expr, LeafArrayBehavior::kTraverse);
+        // Although $type predicate can match an array field, we are only interested in implicitly
+        // traversed array elements as considered values since, when we have predicate "{$type:
+        // 'array'}" and a field is an array, that is a match. Therefore we use
+        // LeafArrayBehavior::kTraverseOmitArray as the traversal behavior.
+        generateTypeError(expr, LeafArrayBehavior::kTraverseOmitArray);
     }
     void visit(const WhereMatchExpression* expr) final {
         MONGO_UNREACHABLE;
@@ -854,16 +858,25 @@ private:
         appendSpecifiedAs(*annotation, &bob);
     }
 
-    BSONArray createValuesArray(const ElementPath& path) {
+    /**
+     * Returns an enumeration of values of a field at path 'fieldPath' in the current document as an
+     * array if the path is present. A return value of empty array means that the path was present,
+     * but the value associated with that path was the empty array. If the path is not present, then
+     * returns 'boost::none'. 'leafArrayBehavior' determines how the values are enumerated when the
+     * leaf value of the path is an array.
+     */
+    boost::optional<BSONArray> createValuesArray(const StringData fieldPath,
+                                                 LeafArrayBehavior leafArrayBehavior) {
         // Empty path means that the match is against the root document.
-        if (path.fieldRef().empty())
+        if (fieldPath.empty())
             return BSON_ARRAY(_context->rootDoc);
         BSONMatchableDocument doc(_context->getCurrentDocument());
-        MatchableDocument::IteratorHolder cursor(&doc, &path);
+        ElementPath path{fieldPath, leafArrayBehavior};
+        MatchableDocument::IteratorHolder valueIterator(&doc, &path);
         BSONArrayBuilder bab;
         auto maxConsideredElements = _context->kMaxConsideredValuesElements;
-        while (cursor->more() && bab.arrSize() < maxConsideredElements) {
-            auto elem = cursor->next().element();
+        while (valueIterator->more() && bab.arrSize() < maxConsideredElements) {
+            auto elem = valueIterator->next().element();
             if (elem.eoo()) {
                 break;
             } else {
@@ -872,12 +885,19 @@ private:
         }
 
         // Indicate that 'consideredValues' has been truncated if there are non eoo elements left
-        // in 'cursor'.
-        if (cursor->more() && bab.arrSize() == maxConsideredElements) {
-            auto elem = cursor->next().element();
+        // in 'valueIterator'.
+        if (valueIterator->more() && bab.arrSize() == maxConsideredElements) {
+            auto elem = valueIterator->next().element();
             if (!elem.eoo()) {
                 _context->markConsideredValuesAsTruncated();
             }
+        }
+
+        // When the iterator 'valueIterator' returns no values, there are two possible cases: either
+        // the path does not exist, or the path exists and contains an empty array. In this case we
+        // perform a check for field existence to disambiguate those two cases.
+        if (bab.arrSize() == 0 && !pathExists(fieldPath)) {
+            return boost::none;
         }
         return bab.arr();
     }
@@ -900,11 +920,11 @@ private:
     }
 
     /**
-     * Appends a missing field error if 'arr' is empty.
+     * Appends a missing field error if 'arr' does not contain a value.
      */
-    void appendMissingField(const BSONArray& arr) {
+    void appendMissingField(const boost::optional<BSONArray>& arr) {
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
-        if (arr.isEmpty()) {
+        if (!arr) {
             bob.append("reason", "field was missing");
         }
     }
@@ -912,7 +932,11 @@ private:
     /**
      * Appends a type mismatch error if no elements in 'arr' have one of the expected types.
      */
-    void appendTypeMismatch(const BSONArray& arr, const std::set<BSONType>* expectedTypes) {
+    void appendTypeMismatch(const boost::optional<BSONArray>& arr,
+                            const std::set<BSONType>* expectedTypes) {
+        if (!arr) {
+            return;  // The field is not present.
+        }
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
         if (bob.hasField("reason")) {
             return;  // there's already a reason for failure
@@ -920,7 +944,7 @@ private:
         if (!expectedTypes) {
             return;  // this operator accepts all types
         }
-        for (auto&& elem : arr) {
+        for (auto&& elem : *arr) {
             if (expectedTypes->count(elem.type())) {
                 return;  // an element has one of the expected types
             }
@@ -961,30 +985,39 @@ private:
     void appendConsideredValue(const BSONArray& array) {
         _context->verifySizeAndAppend(array, "consideredValue", &_context->getCurrentObjBuilder());
     }
-    void appendConsideredValues(const BSONArray& arr) {
-        int size = arr.nFields();
-        // Return if there are no values to append or if we are generating a truncated error.
-        if (size == 0 || _context->truncate) {
+
+    /**
+     * Appends values of 'arr' array to the current object builder if 'arr' contains a value.
+     */
+    void appendConsideredValues(const boost::optional<BSONArray>& arr) {
+        // Return if there is no field or if we are generating a truncated error.
+        if (!arr || _context->truncate) {
             return;
         }
+        auto arraySize = arr->nFields();
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
-        if (size == 1) {
-            _context->verifySizeAndAppendAs(arr[0], "consideredValue", &bob);
+        if (arraySize == 1) {
+            _context->verifySizeAndAppendAs((*arr)[0], "consideredValue", &bob);
         } else {
-            _context->verifySizeAndAppend(arr, "consideredValues", &bob);
+            _context->verifySizeAndAppend(*arr, "consideredValues", &bob);
         }
 
         if (_context->isConsideredValuesTruncated()) {
             bob.append("consideredValuesTruncated", true);
         }
     }
-    void appendConsideredTypes(const BSONArray& arr) {
-        if (arr.isEmpty()) {
-            return;  // no values means no considered types
+
+    /**
+     * Appends types of values of 'arr' array to the current object builder if 'arr' contains a
+     * value.
+     */
+    void appendConsideredTypes(const boost::optional<BSONArray>& arr) {
+        if (!arr || arr->isEmpty()) {
+            return;  // The field is not present or the array is empty.
         }
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
         std::set<std::string> types;
-        for (auto&& elem : arr) {
+        for (auto&& elem : *arr) {
             types.insert(typeName(elem.type()));
         }
         if (types.size() == 1) {
@@ -992,6 +1025,18 @@ private:
         } else {
             bob.append("consideredTypes", types);
         }
+    }
+
+    /**
+     * Returns 'true' if a field exists at path 'fieldPath' in the current document.
+     */
+    bool pathExists(StringData fieldPath) {
+        ElementPath path(fieldPath,
+                         LeafArrayBehavior::kTraverse);  // Use kTraverse to return at least one
+                                                         // item if the field exists.
+        BSONMatchableDocument doc(_context->getCurrentDocument());
+        MatchableDocument::IteratorHolder valueIterator(&doc, &path);
+        return valueIterator->more() && valueIterator->next().element();
     }
 
     /**
@@ -1006,16 +1051,16 @@ private:
      * - Appends the specified 'reason' along with 'consideredValues' if the 'path' in the
      * document resolves to an array of values that is implicitly traversed by 'expr'.
      */
-    void generatePathError(const PathMatchExpression& expr,
-                           const std::string& normalReason,
-                           const std::string& invertedReason,
-                           const std::set<BSONType>* expectedTypes = nullptr,
-                           LeafArrayBehavior leafArrayBehavior = LeafArrayBehavior::kTraverse) {
+    void generatePathError(
+        const PathMatchExpression& expr,
+        const std::string& normalReason,
+        const std::string& invertedReason,
+        const std::set<BSONType>* expectedTypes = nullptr,
+        LeafArrayBehavior leafArrayBehavior = LeafArrayBehavior::kTraverseOmitArray) {
         _context->pushNewFrame(expr, _context->getCurrentDocument());
         if (_context->shouldGenerateError(expr)) {
             appendErrorDetails(expr);
-            ElementPath path(expr.path(), leafArrayBehavior);
-            auto arr = createValuesArray(path);
+            auto arr = createValuesArray(expr.path(), leafArrayBehavior);
             appendMissingField(arr);
             appendTypeMismatch(arr, expectedTypes);
             appendErrorReason(normalReason, invertedReason);
@@ -1050,8 +1095,7 @@ private:
         static constexpr auto kInvertedReason = "type did match";
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
-            ElementPath path(expr->path(), behavior);
-            BSONArray arr = createValuesArray(path);
+            auto arr = createValuesArray(expr->path(), behavior);
             appendMissingField(arr);
             appendErrorReason(kNormalReason, kInvertedReason);
             appendConsideredValues(arr);
@@ -1102,8 +1146,7 @@ private:
             invariant(expr.numChildren() > 0);
             appendErrorDetails(expr);
             auto childExpr = expr.getChild(0);
-            ElementPath path(childExpr->path(), LeafArrayBehavior::kNoTraversal);
-            auto arr = createValuesArray(path);
+            auto arr = createValuesArray(childExpr->path(), LeafArrayBehavior::kNoTraversal);
             appendMissingField(arr);
             appendErrorReason(normalReason, invertedReason);
             appendConsideredValues(arr);

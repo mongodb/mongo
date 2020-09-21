@@ -299,7 +299,7 @@ bool BSONElementIterator::more() {
                 invariant(eltInArray.type() != Object);  // Handled above.
                 if (eltInArray.type() == Array) {
                     // The current array element is itself an array.  See if the nested array
-                    // has any elements matching the remainihng.
+                    // has any elements matching the remaining.
                     _subCursorPath.reset(
                         new ElementPath(_arrayIterationState.restOfPath.substr(
                                             _arrayIterationState.nextPieceOfPath.size() + 1),
@@ -327,6 +327,14 @@ bool BSONElementIterator::more() {
             return false;
         }
 
+        // All array elements have been iterated over. If the leaf array behavior is to omit the
+        // array from the results, then we indicate that there are no more items.
+        if (_path->leafArrayBehavior() == ElementPath::LeafArrayBehavior::kTraverseOmitArray) {
+            return false;
+        }
+
+        // Leaf array behavior is kTraverse, therefore return the array we iterated over as the last
+        // item.
         _next.reset(_arrayIterationState._theArray, BSONElement());
         _state = DONE;
         return true;

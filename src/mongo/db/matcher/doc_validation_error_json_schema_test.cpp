@@ -130,6 +130,29 @@ TEST(JSONSchemaValidation, ExclusiveMaximum) {
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
+// TODO: Update the test when SERVER-50859 is implemented.
+TEST(JSONSchemaValidation, MaximumTypeNumberWithEmptyArray) {
+    BSONObj query =
+        fromjson("{'$jsonSchema': {'properties': {'a': {'maximum': 1, type: 'number'}}}}");
+    BSONObj document = fromjson("{a: []}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "      'schemaRulesNotSatisfied': ["
+        "           {'operatorName': 'properties',"
+        "            'propertiesNotSatisfied': ["
+        "                   {'propertyName': 'a', 'details': "
+        "                       [{'operatorName': 'maximum',"
+        "                       'specifiedAs': {'maximum' : 1},"
+        "                       'reason': 'comparison failed',"
+        "                       'consideredValues': []},"
+        "                        {'operatorName': 'type',"
+        "                       'specifiedAs': {'type': 'number'},"
+        "                       'reason': 'type did not match',"
+        "                       'consideredValue': [],"
+        "                       'consideredType': 'array'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
 TEST(JSONSchemaValidation, ExclusiveMaximumInverted) {
     BSONObj query = fromjson(
         "{'$jsonSchema': {'not': {'properties': {'a': {'maximum': 1, 'exclusiveMaximum': "
@@ -1401,6 +1424,19 @@ TEST(JSONSchemaLogicalKeywordValidation, TopLevelEnum) {
         "        specifiedAs: {enum: [{a: 1, b: 1 }, {a: 0, b: {c: [ 1, 2, 3 ]}}]}, "
         "        reason: 'value was not found in enum', "
         "       'consideredValue': {a: 0, b: 1, _id: 1}}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaLogicalKeywordValidation, EnumTypeArrayWithEmptyArray) {
+    BSONObj query =
+        fromjson("{'$jsonSchema': {'properties': {'a': {'type': 'array', 'enum': [[1]]}}}}");
+    BSONObj document = fromjson("{'a': []}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "    {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "        {'propertyName': 'a', 'details': ["
+        "            {'operatorName': 'enum', 'specifiedAs': { 'enum': [[1]]}, 'reason': "
+        "'value was not found in enum', consideredValue: []}]}]}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
