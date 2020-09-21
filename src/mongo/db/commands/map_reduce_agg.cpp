@@ -49,8 +49,10 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/map_reduce_output_format.h"
+#include "mongo/db/query/plan_executor_factory.h"
 
 namespace mongo::map_reduce_agg {
 
@@ -110,10 +112,12 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
-    auto exhaustPipelineIntoBSONArray = [](auto&& pipeline) {
+    auto exhaustPipelineIntoBSONArray = [](auto&& exec) {
         BSONArrayBuilder bab;
-        while (auto&& doc = pipeline->getNext())
-            bab.append(doc->toBson());
+        BSONObj obj;
+        while (exec->getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
+            bab.append(obj);
+        }
         return bab.arr();
     };
 
@@ -126,24 +130,25 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
             pipeline.release());
     }();
+    auto exec = plan_executor_factory::make(
+        expCtx, std::move(runnablePipeline), false /* isChangeStream */);
+    auto&& explainer = exec->getPlanExplainer();
 
     {
-        auto planSummaryStr = PipelineD::getPlanSummaryStr(runnablePipeline.get());
-
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(std::move(planSummaryStr));
+        CurOp::get(opCtx)->setPlanSummary_inlock(explainer.getPlanSummary());
     }
 
     try {
-        auto resultArray = exhaustPipelineIntoBSONArray(runnablePipeline);
+        auto resultArray = exhaustPipelineIntoBSONArray(exec);
 
         if (expCtx->explain) {
-            result << "stages" << Value(runnablePipeline->writeExplainOps(*(expCtx->explain)));
-            explain_common::generateServerInfo(&result);
+            Explain::explainPipeline(
+                exec.get(), false /* executePipeline  */, *expCtx->explain, &result);
         }
 
         PlanSummaryStats planSummaryStats;
-        PipelineD::getPlanSummaryStats(runnablePipeline.get(), &planSummaryStats);
+        explainer.getSummaryStats(&planSummaryStats);
         CurOp::get(opCtx)->debug().setPlanSummaryMetrics(planSummaryStats);
 
         if (!expCtx->explain) {

@@ -87,9 +87,7 @@ public:
     Timestamp getLatestOplogTimestamp() const final;
     BSONObj getPostBatchResumeToken() const final;
     LockPolicy lockPolicy() const final;
-    std::string getPlanSummary() const final;
-    void getSummaryStats(PlanSummaryStats* statsOut) const final;
-    BSONObj getStats() const final;
+    const PlanExplainer& getPlanExplainer() const final;
 
     /**
      * Same as restoreState() but without the logic to retry if a WriteConflictException is thrown.
@@ -148,6 +146,7 @@ private:
     std::unique_ptr<WorkingSet> _workingSet;
     std::unique_ptr<QuerySolution> _qs;
     std::unique_ptr<PlanStage> _root;
+    std::unique_ptr<PlanExplainer> _planExplainer;
 
     // If _killStatus has a non-OK value, then we have been killed and the value represents the
     // reason for the kill.

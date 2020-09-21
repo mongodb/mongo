@@ -670,19 +670,21 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
+        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
     auto updateResult = exec->executeUpdate();
 
     PlanSummaryStats summary;
-    exec->getSummaryStats(&summary);
+    auto&& explainer = exec->getPlanExplainer();
+    explainer.getSummaryStats(&summary);
     if (const auto& coll = collection->getCollection()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
 
     if (curOp.shouldDBProfile(opCtx)) {
-        curOp.debug().execStats = exec->getStats();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        curOp.debug().execStats = std::move(stats);
     }
 
     recordUpdateResultInOpDebug(updateResult, &curOp.debug());
@@ -907,21 +909,23 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
+        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
     auto nDeleted = exec->executeDelete();
     curOp.debug().additiveMetrics.ndeleted = nDeleted;
 
     PlanSummaryStats summary;
-    exec->getSummaryStats(&summary);
+    auto&& explainer = exec->getPlanExplainer();
+    explainer.getSummaryStats(&summary);
     if (const auto& coll = collection.getCollection()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
     curOp.debug().setPlanSummaryMetrics(summary);
 
     if (curOp.shouldDBProfile(opCtx)) {
-        curOp.debug().execStats = exec->getStats();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        curOp.debug().execStats = std::move(stats);
     }
 
     LastError::get(opCtx->getClient()).recordDelete(nDeleted);

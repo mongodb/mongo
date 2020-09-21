@@ -182,11 +182,14 @@ bool handleCursorCommand(OperationContext* opCtx,
             exec = nullptr;
             break;
         } catch (DBException& exception) {
+            auto&& explainer = exec->getPlanExplainer();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23799,
                           "Aggregate command executor error: {error}, stats: {stats}",
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
-                          "stats"_attr = redact(exec->getStats()));
+                          "stats"_attr = redact(stats));
 
             exception.addContext("PlanExecutor error during aggregation");
             throw;
@@ -701,7 +704,7 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         {
-            auto planSummary = execs[0]->getPlanSummary();
+            auto planSummary = execs[0]->getPlanExplainer().getPlanSummary();
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(std::move(planSummary));
         }
@@ -752,7 +755,8 @@ Status runAggregate(OperationContext* opCtx,
         auto explainExecutor = pins[0]->getExecutor();
         auto bodyBuilder = result->getBodyBuilder();
         if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
-            Explain::explainPipelineExecutor(pipelineExec, *(expCtx->explain), &bodyBuilder);
+            Explain::explainPipeline(
+                pipelineExec, true /* executePipeline */, *(expCtx->explain), &bodyBuilder);
         } else {
             invariant(explainExecutor->getOpCtx() == opCtx);
             // The explainStages() function for a non-pipeline executor may need to execute the plan
@@ -775,7 +779,7 @@ Status runAggregate(OperationContext* opCtx,
         }
 
         PlanSummaryStats stats;
-        pins[0].getCursor()->getExecutor()->getSummaryStats(&stats);
+        pins[0].getCursor()->getExecutor()->getPlanExplainer().getSummaryStats(&stats);
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
         // For an optimized away pipeline, signal the cache that a query operation has completed.

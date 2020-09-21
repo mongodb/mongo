@@ -427,7 +427,7 @@ public:
 
             {
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
+                CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
             }
 
             if (!collection) {
@@ -476,12 +476,15 @@ public:
             } catch (DBException& exception) {
                 firstBatch.abandon();
 
+                auto&& explainer = exec->getPlanExplainer();
+                auto&& [stats, _] =
+                    explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
                 LOGV2_WARNING(23798,
                               "Plan executor error during find command: {error}, "
                               "stats: {stats}",
                               "Plan executor error during find command",
                               "error"_attr = exception.toStatus(),
-                              "stats"_attr = redact(exec->getStats()));
+                              "stats"_attr = redact(stats));
 
                 exception.addContext("Executor error during find command");
                 throw;

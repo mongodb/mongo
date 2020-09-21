@@ -761,32 +761,4 @@ Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {
     }
     return Timestamp();
 }
-
-std::string PipelineD::getPlanSummaryStr(const Pipeline* pipeline) {
-    if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
-        return docSourceCursor->getPlanSummaryStr();
-    }
-
-    return "";
-}
-
-void PipelineD::getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* statsOut) {
-    invariant(statsOut);
-
-    if (auto docSourceCursor =
-            dynamic_cast<DocumentSourceCursor*>(pipeline->_sources.front().get())) {
-        *statsOut = docSourceCursor->getPlanSummaryStats();
-    }
-
-    for (auto&& source : pipeline->_sources) {
-        if (dynamic_cast<DocumentSourceSort*>(source.get()))
-            statsOut->hasSortStage = true;
-
-        statsOut->usedDisk = statsOut->usedDisk || source->usedDisk();
-        if (statsOut->usedDisk && statsOut->hasSortStage)
-            break;
-    }
-}
-
 }  // namespace mongo

@@ -568,7 +568,7 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     }
 
     PlanSummaryStats stats;
-    exec->getSummaryStats(&stats);
+    exec->getPlanExplainer().getSummaryStats(&stats);
 
     // If only the winning plan's stats are recorded, we should not have examined more than the
     // total number of documents/index keys.

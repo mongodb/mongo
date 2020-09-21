@@ -111,11 +111,12 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // that a different plan is less resource-intensive, so we fall back to replanning the
             // whole query. We neither evict the existing cache entry nor cache the result of
             // replanning.
+            auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
             LOGV2_DEBUG(20579,
                         1,
                         "Execution of cached plan failed, falling back to replan",
                         "query"_attr = redact(_canonicalQuery->toStringShort()),
-                        "planSummary"_attr = Explain::getPlanSummary(child().get()),
+                        "planSummary"_attr = explainer->getPlanSummary(),
                         "status"_attr = redact(ex.toStatus()));
 
             const bool shouldCache = false;
@@ -159,13 +160,14 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // If we're here, the trial period took more than 'maxWorksBeforeReplan' work cycles. This
     // plan is taking too long, so we replan from scratch.
+    auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
     LOGV2_DEBUG(20580,
                 1,
                 "Evicting cache entry and replanning query",
                 "maxWorksBeforeReplan"_attr = maxWorksBeforeReplan,
                 "decisionWorks"_attr = _decisionWorks,
                 "query"_attr = redact(_canonicalQuery->toStringShort()),
-                "planSummary"_attr = Explain::getPlanSummary(child().get()));
+                "planSummary"_attr = explainer->getPlanSummary());
 
     const bool shouldCache = true;
     return replan(
@@ -225,12 +227,13 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         _replannedQs = std::move(solutions.back());
         solutions.pop_back();
 
+        auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
         LOGV2_DEBUG(
             20581,
             1,
             "Replanning of query resulted in single query solution, which will not be cached.",
             "query"_attr = redact(_canonicalQuery->toStringShort()),
-            "planSummary"_attr = Explain::getPlanSummary(child().get()),
+            "planSummary"_attr = explainer->getPlanSummary(),
             "shouldCache"_attr = (shouldCache ? "yes" : "no"));
         return Status::OK();
     }
@@ -259,11 +262,12 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         return pickBestPlanStatus;
     }
 
+    auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
     LOGV2_DEBUG(20582,
                 1,
                 "Query plan after replanning and its cache status",
                 "query"_attr = redact(_canonicalQuery->toStringShort()),
-                "planSummary"_attr = Explain::getPlanSummary(child().get()),
+                "planSummary"_attr = explainer->getPlanSummary(),
                 "shouldCache"_attr = (shouldCache ? "yes" : "no"));
     return Status::OK();
 }

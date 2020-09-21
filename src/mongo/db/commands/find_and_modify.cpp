@@ -96,11 +96,13 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     try {
         state = exec->getNext(&value, nullptr);
     } catch (DBException& exception) {
+        auto&& explainer = exec->getPlanExplainer();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         LOGV2_WARNING(23802,
                       "Plan executor error during findAndModify: {error}, stats: {stats}",
                       "Plan executor error during findAndModify",
                       "error"_attr = exception.toStatus(),
-                      "stats"_attr = redact(exec->getStats()));
+                      "stats"_attr = redact(stats));
 
         exception.addContext("Plan executor error during findAndModify");
         throw;
@@ -478,7 +480,7 @@ public:
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
+            CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
         }
 
         auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
@@ -487,7 +489,7 @@ public:
         // multiple times.
 
         PlanSummaryStats summaryStats;
-        exec->getSummaryStats(&summaryStats);
+        exec->getPlanExplainer().getSummaryStats(&summaryStats);
         if (const auto& coll = collection.getCollection()) {
             CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summaryStats);
         }
@@ -497,7 +499,10 @@ public:
         opDebug->additiveMetrics.ndeleted = docFound ? 1 : 0;
 
         if (curOp->shouldDBProfile(opCtx)) {
-            curOp->debug().execStats = exec->getStats();
+            auto&& explainer = exec->getPlanExplainer();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+            curOp->debug().execStats = std::move(stats);
         }
         recordStatsForTopCommand(opCtx);
 
@@ -562,7 +567,7 @@ public:
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanSummary());
+            CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
         }
 
         auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
@@ -571,7 +576,8 @@ public:
         // multiple times.
 
         PlanSummaryStats summaryStats;
-        exec->getSummaryStats(&summaryStats);
+        auto&& explainer = exec->getPlanExplainer();
+        explainer.getSummaryStats(&summaryStats);
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
@@ -579,7 +585,9 @@ public:
         opDebug->setPlanSummaryMetrics(summaryStats);
 
         if (curOp->shouldDBProfile(opCtx)) {
-            curOp->debug().execStats = exec->getStats();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+            curOp->debug().execStats = std::move(stats);
         }
         recordStatsForTopCommand(opCtx);
 

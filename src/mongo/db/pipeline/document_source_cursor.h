@@ -231,10 +231,10 @@ private:
     std::string _planSummary;
     PlanSummaryStats _planSummaryStats;
 
-    // Used only for explain() queries. Stores the stats of the winning plan when _exec's root
-    // stage is a MultiPlanStage. When the query is executed (with exec->executePlan()), it will
+    // Used only for explain() queries. Stores the stats of the winning plan when a plan was
+    // selected by the multi-planner. When the query is executed (with exec->executePlan()), it will
     // wipe out its own copy of the winning plan's statistics, so they need to be saved here.
-    std::unique_ptr<PlanStageStats> _winningPlanTrialStats;
+    boost::optional<PlanExplainer::PlanStatsDetails> _winningPlanTrialStats;
 
     // True if we are tracking the latest observed oplog timestamp, false otherwise.
     bool _trackOplogTS = false;

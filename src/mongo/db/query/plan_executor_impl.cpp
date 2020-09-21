@@ -55,6 +55,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/mock_yield_policies.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -103,26 +104,6 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutorImpl* exec,
             MONGO_UNREACHABLE;
     }
 }
-
-/**
- * Retrieves the first stage of a given type from the plan tree, or NULL
- * if no such stage is found.
- */
-PlanStage* getStageByType(PlanStage* root, StageType type) {
-    if (root->stageType() == type) {
-        return root;
-    }
-
-    const auto& children = root->getChildren();
-    for (size_t i = 0; i < children.size(); i++) {
-        PlanStage* result = getStageByType(children[i].get(), type);
-        if (result) {
-            return result;
-        }
-    }
-
-    return nullptr;
-}
 }  // namespace
 
 PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
@@ -140,6 +121,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
+      _planExplainer(plan_explainer_factory::makePlanExplainer(_root.get(), nullptr)),
       _nss(std::move(nss)),
       // There's no point in yielding if the collection doesn't exist.
       _yieldPolicy(
@@ -607,95 +589,9 @@ PlanExecutor::LockPolicy PlanExecutorImpl::lockPolicy() const {
     return LockPolicy::kLockExternally;
 }
 
-std::string PlanExecutorImpl::getPlanSummary() const {
-    return Explain::getPlanSummary(_root.get());
-}
-
-void PlanExecutorImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
-    invariant(statsOut);
-
-    // We can get some of the fields we need from the common stats stored in the
-    // root stage of the plan tree.
-    const CommonStats* common = _root->getCommonStats();
-    statsOut->nReturned = common->advanced;
-
-    // The other fields are aggregations over the stages in the plan tree. We flatten
-    // the tree into a list and then compute these aggregations.
-    std::vector<const PlanStage*> stages;
-    Explain::flattenExecTree(_root.get(), &stages);
-
-    statsOut->totalKeysExamined = 0;
-    statsOut->totalDocsExamined = 0;
-
-    for (size_t i = 0; i < stages.size(); i++) {
-        statsOut->totalKeysExamined +=
-            Explain::getKeysExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
-        statsOut->totalDocsExamined +=
-            Explain::getDocsExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
-
-        if (isSortStageType(stages[i]->stageType())) {
-            statsOut->hasSortStage = true;
-
-            auto sortStage = static_cast<const SortStage*>(stages[i]);
-            auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
-            statsOut->usedDisk = sortStats->wasDiskUsed;
-        }
-
-        if (STAGE_IXSCAN == stages[i]->stageType()) {
-            const IndexScan* ixscan = static_cast<const IndexScan*>(stages[i]);
-            const IndexScanStats* ixscanStats =
-                static_cast<const IndexScanStats*>(ixscan->getSpecificStats());
-            statsOut->indexesUsed.insert(ixscanStats->indexName);
-        } else if (STAGE_COUNT_SCAN == stages[i]->stageType()) {
-            const CountScan* countScan = static_cast<const CountScan*>(stages[i]);
-            const CountScanStats* countScanStats =
-                static_cast<const CountScanStats*>(countScan->getSpecificStats());
-            statsOut->indexesUsed.insert(countScanStats->indexName);
-        } else if (STAGE_IDHACK == stages[i]->stageType()) {
-            const IDHackStage* idHackStage = static_cast<const IDHackStage*>(stages[i]);
-            const IDHackStats* idHackStats =
-                static_cast<const IDHackStats*>(idHackStage->getSpecificStats());
-            statsOut->indexesUsed.insert(idHackStats->indexName);
-        } else if (STAGE_DISTINCT_SCAN == stages[i]->stageType()) {
-            const DistinctScan* distinctScan = static_cast<const DistinctScan*>(stages[i]);
-            const DistinctScanStats* distinctScanStats =
-                static_cast<const DistinctScanStats*>(distinctScan->getSpecificStats());
-            statsOut->indexesUsed.insert(distinctScanStats->indexName);
-        } else if (STAGE_TEXT == stages[i]->stageType()) {
-            const TextStage* textStage = static_cast<const TextStage*>(stages[i]);
-            const TextStats* textStats =
-                static_cast<const TextStats*>(textStage->getSpecificStats());
-            statsOut->indexesUsed.insert(textStats->indexName);
-        } else if (STAGE_GEO_NEAR_2D == stages[i]->stageType() ||
-                   STAGE_GEO_NEAR_2DSPHERE == stages[i]->stageType()) {
-            const NearStage* nearStage = static_cast<const NearStage*>(stages[i]);
-            const NearStats* nearStats =
-                static_cast<const NearStats*>(nearStage->getSpecificStats());
-            statsOut->indexesUsed.insert(nearStats->indexName);
-        } else if (STAGE_CACHED_PLAN == stages[i]->stageType()) {
-            const CachedPlanStage* cachedPlan = static_cast<const CachedPlanStage*>(stages[i]);
-            const CachedPlanStats* cachedStats =
-                static_cast<const CachedPlanStats*>(cachedPlan->getSpecificStats());
-            statsOut->replanReason = cachedStats->replanReason;
-        } else if (STAGE_MULTI_PLAN == stages[i]->stageType()) {
-            statsOut->fromMultiPlanner = true;
-        } else if (STAGE_COLLSCAN == stages[i]->stageType()) {
-            statsOut->collectionScans++;
-            const auto collScan = static_cast<const CollectionScan*>(stages[i]);
-            const auto collScanStats =
-                static_cast<const CollectionScanStats*>(collScan->getSpecificStats());
-            if (!collScanStats->tailable)
-                statsOut->collectionScansNonTailable++;
-        }
-    }
-}
-
-BSONObj PlanExecutorImpl::getStats() const {
-    // Serialize all stats from the winning plan.
-    auto mps = getMultiPlanStage();
-    auto winningPlanStats =
-        mps ? std::move(mps->getStats()->children[mps->bestPlanIdx()]) : _root->getStats();
-    return Explain::statsToBSON(*winningPlanStats);
+const PlanExplainer& PlanExecutorImpl::getPlanExplainer() const {
+    invariant(_planExplainer);
+    return *_planExplainer;
 }
 
 MultiPlanStage* PlanExecutorImpl::getMultiPlanStage() const {

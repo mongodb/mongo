@@ -93,7 +93,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _operationUsingCursor(operationUsingCursor),
       _lastUseDate(now),
       _createdDate(now),
-      _planSummary(_exec->getPlanSummary()),
+      _planSummary(_exec->getPlanExplainer().getPlanSummary()),
       _opKey(operationUsingCursor->getOperationKey()) {
     invariant(_exec);
     invariant(_operationUsingCursor);

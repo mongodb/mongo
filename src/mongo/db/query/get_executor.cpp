@@ -415,7 +415,8 @@ public:
 
     std::string getPlanSummary() const final {
         invariant(_root);
-        return Explain::getPlanSummary(_root.get());
+        auto explainer = plan_explainer_factory::makePlanExplainer(_root.get(), nullptr);
+        return explainer->getPlanSummary();
     }
 
     std::unique_ptr<PlanStage> root() {
@@ -466,8 +467,11 @@ public:
     std::string getPlanSummary() const final {
         // We can report plan summary only if this result contains a single solution.
         invariant(_roots.size() == 1);
+        invariant(_solutions.size() == 1);
         invariant(_roots[0].first);
-        return Explain::getPlanSummary(_roots[0].first.get());
+        auto explainer =
+            plan_explainer_factory::makePlanExplainer(_roots[0].first.get(), _solutions[0].get());
+        return explainer->getPlanSummary();
     }
 
     PlanStageVector roots() {
@@ -2057,11 +2061,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
     auto&& root = stage_builder::buildClassicExecutableTree(
         opCtx, collection, *parsedDistinct->getQuery(), *soln, ws.get());
 
+    auto explainer = plan_explainer_factory::makePlanExplainer(root.get(), soln.get());
     LOGV2_DEBUG(20931,
                 2,
                 "Using fast distinct",
                 "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
-                "planSummary"_attr = Explain::getPlanSummary(root.get()));
+                "planSummary"_attr = explainer->getPlanSummary());
 
     return plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                        std::move(ws),
@@ -2101,11 +2106,13 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
             auto&& root = stage_builder::buildClassicExecutableTree(
                 opCtx, collection, *parsedDistinct->getQuery(), *currentSolution, ws.get());
 
+            auto explainer =
+                plan_explainer_factory::makePlanExplainer(root.get(), currentSolution.get());
             LOGV2_DEBUG(20932,
                         2,
                         "Using fast distinct",
                         "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
-                        "planSummary"_attr = Explain::getPlanSummary(root.get()));
+                        "planSummary"_attr = explainer->getPlanSummary());
 
             return plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                                std::move(ws),

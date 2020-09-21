@@ -34,6 +34,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 
@@ -54,7 +55,9 @@ PlanExecutorSBE::PlanExecutorSBE(
       _ctx(std::move(root.second.ctx)),
       _root(std::move(root.first)),
       _cq{std::move(cq)},
-      _yieldPolicy(std::move(yieldPolicy)) {
+      _yieldPolicy(std::move(yieldPolicy)),
+      // TODO SERVER-50743: plumb through QuerySolution to init the PlanExplainer.
+      _planExplainer{plan_explainer_factory::makePlanExplainer(_root.get(), nullptr)} {
     invariant(_root);
     invariant(!_nss.isEmpty());
 

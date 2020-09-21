@@ -110,21 +110,26 @@ void updatePlanCache(
             size_t winnerIdx = ranking->candidateOrder[0];
             size_t runnerUpIdx = ranking->candidateOrder[1];
 
+            auto winnerExplainer = plan_explainer_factory::makePlanExplainer(
+                &*candidates[winnerIdx].root, candidates[winnerIdx].solution.get());
+            auto runnerUpExplainer = plan_explainer_factory::makePlanExplainer(
+                &*candidates[runnerUpIdx].root, candidates[runnerUpIdx].solution.get());
+
             log_detail::logTieForBest(query.toStringShort(),
                                       ranking->scores[0],
                                       ranking->scores[1],
-                                      Explain::getPlanSummary(&*candidates[winnerIdx].root),
-                                      Explain::getPlanSummary(&*candidates[runnerUpIdx].root));
+                                      winnerExplainer->getPlanSummary(),
+                                      runnerUpExplainer->getPlanSummary());
         }
 
         if (candidates[winnerIdx].results.empty()) {
             // We're using the "sometimes cache" mode, and the winning plan produced no results
             // during the plan ranking trial period. We will not write a plan cache entry.
             canCache = false;
+            auto winnerExplainer = plan_explainer_factory::makePlanExplainer(
+                &*candidates[winnerIdx].root, candidates[winnerIdx].solution.get());
             log_detail::logNotCachingZeroResults(
-                query.toStringShort(),
-                ranking->scores[0],
-                Explain::getPlanSummary(&*candidates[winnerIdx].root));
+                query.toStringShort(), ranking->scores[0], winnerExplainer->getPlanSummary());
         }
     }
 

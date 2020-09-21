@@ -212,6 +212,9 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         try {
             state = exec->getNext(&deletedObj, nullptr);
         } catch (const DBException& ex) {
+            auto&& explainer = exec->getPlanExplainer();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23776,
                           "Cursor error while trying to delete {min} to {max} in {namespace}, "
                           "stats: {stats}, error: {error}",
@@ -219,7 +222,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                           "min"_attr = redact(min),
                           "max"_attr = redact(max),
                           "namespace"_attr = nss,
-                          "stats"_attr = redact(exec->getStats()),
+                          "stats"_attr = redact(stats),
                           "error"_attr = redact(ex.toStatus()));
             throw;
         }

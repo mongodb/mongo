@@ -243,7 +243,8 @@ public:
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setPlanSummary_inlock(executor.getValue()->getPlanSummary());
+            CurOp::get(opCtx)->setPlanSummary_inlock(
+                executor.getValue()->getPlanExplainer().getPlanSummary());
         }
 
         const auto key = cmdObj[ParsedDistinct::kKeyField].valuestrsafe();
@@ -284,12 +285,15 @@ public:
                 }
             }
         } catch (DBException& exception) {
+            auto&& explainer = executor.getValue()->getPlanExplainer();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23797,
                           "Plan executor error during distinct command: {error}, "
                           "stats: {stats}",
                           "Plan executor error during distinct command",
                           "error"_attr = exception.toStatus(),
-                          "stats"_attr = redact(executor.getValue()->getStats()));
+                          "stats"_attr = redact(stats));
 
             exception.addContext("Executor error during distinct command");
             throw;
@@ -299,14 +303,17 @@ public:
 
         // Get summary information about the plan.
         PlanSummaryStats stats;
-        executor.getValue()->getSummaryStats(&stats);
+        auto&& explainer = executor.getValue()->getPlanExplainer();
+        explainer.getSummaryStats(&stats);
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, stats);
         }
         curOp->debug().setPlanSummaryMetrics(stats);
 
         if (curOp->shouldDBProfile(opCtx)) {
-            curOp->debug().execStats = executor.getValue()->getStats();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+            curOp->debug().execStats = std::move(stats);
         }
 
         BSONArrayBuilder valueListBuilder(result.subarrayStart("values"));

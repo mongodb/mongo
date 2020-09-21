@@ -199,8 +199,9 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     LOGV2_DEBUG(
         20590, 5, "Winning solution", "bestSolution"_attr = redact(bestSolution->toString()));
-    LOGV2_DEBUG(
-        20591, 2, "Winning plan", "planSummary"_attr = Explain::getPlanSummary(bestCandidate.root));
+
+    auto explainer = plan_explainer_factory::makePlanExplainer(bestCandidate.root, nullptr);
+    LOGV2_DEBUG(20591, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
 
     _backupPlanIdx = kNoSuchPlan;
     if (bestSolution->hasBlockingStage && (0 == alreadyProduced.size())) {

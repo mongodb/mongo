@@ -35,6 +35,7 @@
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/util/container_size_helper.h"
 
@@ -327,10 +328,16 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
         if (!candidates[i].failed) {
             log_detail::logScoringPlan(
                 [& candidate = candidates[i]]() { return candidate.solution->toString(); },
-                [& stats = *statTrees[i]]() {
-                    return Explain::statsToBSON(stats).jsonString(ExtendedRelaxedV2_0_0, true);
+                [root = &*candidates[i].root, solution = candidates[i].solution.get()]() {
+                    auto explainer = plan_explainer_factory::makePlanExplainer(root, solution);
+                    auto&& [stats, _] =
+                        explainer->getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+                    return stats.jsonString(ExtendedRelaxedV2_0_0, true);
                 },
-                [root = &*candidates[i].root]() { return Explain::getPlanSummary(root); },
+                [root = &*candidates[i].root, solution = candidates[i].solution.get()]() {
+                    auto explainer = plan_explainer_factory::makePlanExplainer(root, solution);
+                    return explainer->getPlanSummary();
+                },
                 i,
                 statTrees[i]->common.isEOF);
             auto scorer = [solution = candidates[i].solution.get()]()
@@ -353,7 +360,10 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
         } else {
             failed.push_back(i);
             log_detail::logFailedPlan(
-                [root = &*candidates[i].root] { return Explain::getPlanSummary(root); });
+                [root = &*candidates[i].root, solution = candidates[i].solution.get()] {
+                    auto explainer = plan_explainer_factory::makePlanExplainer(root, solution);
+                    return explainer->getPlanSummary();
+                });
         }
     }
 

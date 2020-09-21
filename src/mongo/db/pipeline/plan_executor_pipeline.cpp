@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 
 #include "mongo/db/pipeline/pipeline_d.h"
+#include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
 
@@ -40,7 +41,10 @@ namespace mongo {
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
                                            bool isChangeStream)
-    : _expCtx(std::move(expCtx)), _pipeline(std::move(pipeline)), _isChangeStream(isChangeStream) {
+    : _expCtx(std::move(expCtx)),
+      _pipeline(std::move(pipeline)),
+      _planExplainer{_pipeline.get()},
+      _isChangeStream(isChangeStream) {
     // Pipeline plan executors must always have an ExpressionContext.
     invariant(_expCtx);
 
@@ -69,7 +73,7 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId*
     if (!_stash.empty()) {
         *objOut = std::move(_stash.front());
         _stash.pop();
-        ++_nReturned;
+        _planExplainer.incrementNReturned();
         return PlanExecutor::ADVANCED;
     }
 
@@ -96,7 +100,7 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNextDocument(Document* docOut,
 
     if (auto next = _getNext()) {
         *docOut = std::move(*next);
-        ++_nReturned;
+        _planExplainer.incrementNReturned();
         return PlanExecutor::ADVANCED;
     }
 
@@ -146,16 +150,6 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
             _setSpeculativeReadTimestamp();
         }
     }
-}
-
-std::string PlanExecutorPipeline::getPlanSummary() const {
-    return PipelineD::getPlanSummaryStr(_pipeline.get());
-}
-
-void PlanExecutorPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
-    invariant(statsOut);
-    PipelineD::getPlanSummaryStats(_pipeline.get(), statsOut);
-    statsOut->nReturned = _nReturned;
 }
 
 void PlanExecutorPipeline::_validateResumeToken(const Document& event) const {

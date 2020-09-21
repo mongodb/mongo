@@ -55,11 +55,13 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
     if (candidate.failed) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
         // entry, nor cache the result of replanning.
+        auto explainer = plan_explainer_factory::makePlanExplainer(candidate.root.get(),
+                                                                   candidate.solution.get());
         LOGV2_DEBUG(2057901,
                     1,
                     "Execution of cached plan failed, falling back to replan",
                     "query"_attr = redact(_cq.toStringShort()),
-                    "planSummary"_attr = Explain::getPlanSummary(candidate.root.get()));
+                    "planSummary"_attr = explainer->getPlanSummary());
         return replan(false);
     }
 
@@ -73,6 +75,8 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
 
     // If we're here, the trial period took more than 'maxReadsBeforeReplan' physical reads. This
     // plan may not be efficient any longer, so we replan from scratch.
+    auto explainer =
+        plan_explainer_factory::makePlanExplainer(candidate.root.get(), candidate.solution.get());
     LOGV2_DEBUG(
         2058001,
         1,
@@ -81,7 +85,7 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
         "maxReadsBeforeReplan"_attr = numReads,
         "decisionReads"_attr = _decisionReads,
         "query"_attr = redact(_cq.toStringShort()),
-        "planSummary"_attr = Explain::getPlanSummary(candidate.root.get()));
+        "planSummary"_attr = explainer->getPlanSummary());
     return replan(true);
 }
 
@@ -118,12 +122,14 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collection, _cq, *solutions[0], _yieldPolicy, true);
         prepareExecutionPlan(root.get(), &data);
+
+        auto explainer = plan_explainer_factory::makePlanExplainer(root.get(), solutions[0].get());
         LOGV2_DEBUG(
             2058101,
             1,
             "Replanning of query resulted in a single query solution, which will not be cached. ",
             "query"_attr = redact(_cq.toStringShort()),
-            "planSummary"_attr = Explain::getPlanSummary(root.get()),
+            "planSummary"_attr = explainer->getPlanSummary(),
             "shouldCache"_attr = (shouldCache ? "yes" : "no"));
         return {std::move(solutions[0]), std::move(root), std::move(data)};
     }
@@ -144,11 +150,13 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const
         shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
     MultiPlanner multiPlanner{_opCtx, _collection, _cq, cachingMode, _yieldPolicy};
     auto plan = multiPlanner.plan(std::move(solutions), std::move(roots));
+    auto explainer =
+        plan_explainer_factory::makePlanExplainer(plan.root.get(), plan.solution.get());
     LOGV2_DEBUG(2058201,
                 1,
                 "Query plan after replanning and its cache status",
                 "query"_attr = redact(_cq.toStringShort()),
-                "planSummary"_attr = Explain::getPlanSummary(plan.root.get()),
+                "planSummary"_attr = explainer->getPlanSummary(),
                 "shouldCache"_attr = (shouldCache ? "yes" : "no"));
     return plan;
 }

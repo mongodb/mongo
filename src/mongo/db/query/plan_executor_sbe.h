@@ -119,17 +119,9 @@ public:
         return LockPolicy::kLocksInternally;
     }
 
-    // TODO: Support 'planSummary' for SBE.
-    std::string getPlanSummary() const override {
-        return "unsupported";
-    }
-
-    // TODO: Support collection of plan summary stats for SBE.
-    void getSummaryStats(PlanSummaryStats* statsOut) const override {}
-
-    // TODO: Support debug stats for SBE.
-    BSONObj getStats() const override {
-        return BSONObj{};
+    const PlanExplainer& getPlanExplainer() const final {
+        invariant(_planExplainer);
+        return *_planExplainer;
     }
 
 private:
@@ -162,6 +154,8 @@ private:
     std::unique_ptr<CanonicalQuery> _cq;
 
     std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
+
+    std::unique_ptr<PlanExplainer> _planExplainer;
 };
 
 /**

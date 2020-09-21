@@ -134,7 +134,8 @@ void endQueryOp(OperationContext* opCtx,
 
     // Fill out CurOp based on explain summary statistics.
     PlanSummaryStats summaryStats;
-    exec.getSummaryStats(&summaryStats);
+    auto&& explainer = exec.getPlanExplainer();
+    explainer.getSummaryStats(&summaryStats);
     curOp->debug().setPlanSummaryMetrics(summaryStats);
 
     if (collection) {
@@ -142,7 +143,8 @@ void endQueryOp(OperationContext* opCtx,
     }
 
     if (curOp->shouldDBProfile(opCtx)) {
-        curOp->debug().execStats = exec.getStats();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        curOp->debug().execStats = std::move(stats);
     }
 }
 
@@ -181,7 +183,9 @@ void generateBatch(int ntoreturn,
             (*numResults)++;
         }
     } catch (DBException& exception) {
-        LOGV2_ERROR(20918, "getMore executor error", "stats"_attr = redact(exec->getStats()));
+        auto&& explainer = exec->getPlanExplainer();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        LOGV2_ERROR(20918, "getMore executor error", "stats"_attr = redact(stats));
         exception.addContext("Executor error during OP_GET_MORE");
         throw;
     }
@@ -412,7 +416,7 @@ Message getMore(OperationContext* opCtx,
     exec->reattachToOperationContext(opCtx);
     exec->restoreState(readLock ? &readLock->getCollection() : nullptr);
 
-    auto planSummary = exec->getPlanSummary();
+    auto planSummary = exec->getPlanExplainer().getPlanSummary();
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         curOp.setPlanSummary_inlock(planSummary);
@@ -448,7 +452,7 @@ Message getMore(OperationContext* opCtx,
     // these values we need to take a diff of the pre-execution and post-execution metrics, as they
     // accumulate over the course of a cursor's lifetime.
     PlanSummaryStats preExecutionStats;
-    exec->getSummaryStats(&preExecutionStats);
+    exec->getPlanExplainer().getSummaryStats(&preExecutionStats);
     if (MONGO_unlikely(waitWithPinnedCursorDuringGetMoreBatch.shouldFail())) {
         CurOpFailpointHelpers::waitWhileFailPointEnabled(&waitWithPinnedCursorDuringGetMoreBatch,
                                                          opCtx,
@@ -484,7 +488,8 @@ Message getMore(OperationContext* opCtx,
     }
 
     PlanSummaryStats postExecutionStats;
-    exec->getSummaryStats(&postExecutionStats);
+    auto&& explainer = exec->getPlanExplainer();
+    explainer.getSummaryStats(&postExecutionStats);
     postExecutionStats.totalKeysExamined -= preExecutionStats.totalKeysExamined;
     postExecutionStats.totalDocsExamined -= preExecutionStats.totalDocsExamined;
     curOp.debug().setPlanSummaryMetrics(postExecutionStats);
@@ -496,7 +501,9 @@ Message getMore(OperationContext* opCtx,
     // cost.
     if (cursorPin->getExecutor()->lockPolicy() != PlanExecutor::LockPolicy::kLocksInternally &&
         curOp.shouldDBProfile(opCtx)) {
-        curOp.debug().execStats = exec->getStats();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+
+        curOp.debug().execStats = std::move(stats);
     }
 
     // Our two possible ClientCursorPin cleanup paths are:
@@ -682,7 +689,7 @@ bool runQuery(OperationContext* opCtx,
     // Get summary info about which plan the executor is using.
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curOp.setPlanSummary_inlock(exec->getPlanSummary());
+        curOp.setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
     }
 
     try {
@@ -710,10 +717,12 @@ bool runQuery(OperationContext* opCtx,
             }
         }
     } catch (DBException& exception) {
+        auto&& explainer = exec->getPlanExplainer();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         LOGV2_ERROR(20919,
                     "Plan executor error during find",
                     "error"_attr = redact(exception.toStatus()),
-                    "stats"_attr = redact(exec->getStats()));
+                    "stats"_attr = redact(stats));
 
         exception.addContext("Executor error during find");
         throw;

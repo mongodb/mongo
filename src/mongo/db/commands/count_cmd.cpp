@@ -264,20 +264,23 @@ public:
         auto curOp = CurOp::get(opCtx);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
-            curOp->setPlanSummary_inlock(exec->getPlanSummary());
+            curOp->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
         }
 
         auto countResult = exec->executeCount();
 
         PlanSummaryStats summaryStats;
-        exec->getSummaryStats(&summaryStats);
+        exec->getPlanExplainer().getSummaryStats(&summaryStats);
         if (collection) {
             CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
         }
         curOp->debug().setPlanSummaryMetrics(summaryStats);
 
         if (curOp->shouldDBProfile(opCtx)) {
-            curOp->debug().execStats = exec->getStats();
+            auto&& explainer = exec->getPlanExplainer();
+            auto&& [stats, _] =
+                explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+            curOp->debug().execStats = std::move(stats);
         }
 
         result.appendNumber("n", countResult);

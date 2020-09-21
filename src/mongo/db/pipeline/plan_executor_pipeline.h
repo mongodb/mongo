@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/plan_explainer_pipeline.h"
 #include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
@@ -127,9 +128,9 @@ public:
         return LockPolicy::kLocksInternally;
     }
 
-    std::string getPlanSummary() const override;
-
-    void getSummaryStats(PlanSummaryStats* statsOut) const override;
+    const PlanExplainer& getPlanExplainer() const final {
+        return _planExplainer;
+    }
 
     /**
      * Writes the explain information about the underlying pipeline to a std::vector<Value>,
@@ -137,11 +138,6 @@ public:
      */
     std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const {
         return _pipeline->writeExplainOps(verbosity);
-    }
-
-    BSONObj getStats() const override {
-        // TODO SERVER-49808: Report execution stats for the pipeline.
-        return BSONObj{};
     }
 
 private:
@@ -172,6 +168,8 @@ private:
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 
+    PlanExplainerPipeline _planExplainer;
+
     const bool _isChangeStream;
 
     std::queue<BSONObj> _stash;
@@ -179,8 +177,6 @@ private:
     // If _killStatus has a non-OK value, then we have been killed and the value represents the
     // reason for the kill.
     Status _killStatus = Status::OK();
-
-    size_t _nReturned = 0;
 
     // Set to true once we have received all results from the underlying '_pipeline', and the
     // pipeline has indicated end-of-stream.

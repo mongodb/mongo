@@ -55,11 +55,17 @@ struct PlanSummaryStats {
     // more than one collection scan may happen during execution (e.g. for $lookup execution).
     long long collectionScansNonTailable = 0;
 
+    // Time elapsed while executing this plan.
+    long long executionTimeMillisEstimate = 0;
+
     // Did this plan use an in-memory sort stage?
     bool hasSortStage = false;
 
     // Did this plan use disk space?
     bool usedDisk = false;
+
+    // Did this plan failed during execution?
+    bool planFailed = false;
 
     // The names of each index used by the plan.
     std::set<std::string> indexesUsed;

@@ -118,11 +118,6 @@ public:
                                                            const AggregationRequest* aggRequest,
                                                            Pipeline* pipeline);
 
-
-    static std::string getPlanSummaryStr(const Pipeline* pipeline);
-
-    static void getPlanSummaryStats(const Pipeline* pipeline, PlanSummaryStats* statsOut);
-
     static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
 
     /**
