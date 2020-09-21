@@ -265,7 +265,10 @@ TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
       _egressReactor(std::make_shared<ASIOReactor>()),
       _acceptorReactor(std::make_shared<ASIOReactor>()),
       _sep(sep),
-      _listenerOptions(opts) {}
+      _listenerOptions(opts) {
+    invariant(!opts.isIngress() || _sep,
+              "TransportLayers with ingress must have a ServiceEntryPoint.");
+}
 
 TransportLayerASIO::~TransportLayerASIO() = default;
 
