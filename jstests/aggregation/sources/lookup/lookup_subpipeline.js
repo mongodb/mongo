@@ -1,7 +1,4 @@
 // Tests for the $lookup stage with a sub-pipeline.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

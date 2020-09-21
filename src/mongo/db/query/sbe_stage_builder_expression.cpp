@@ -1115,19 +1115,26 @@ public:
                 sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
         } else {
             std::vector<std::unique_ptr<sbe::EExpression>> binds;
-            for (size_t i = 0; i < arity; i++) {
-                binds.push_back(_context->popExpr());
-            }
-            std::reverse(std::begin(binds), std::end(binds));
-
+            std::vector<std::unique_ptr<sbe::EExpression>> argVars;
             std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
             std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNotNumberOrDate;
-            std::vector<std::unique_ptr<sbe::EExpression>> argVars;
-            for (size_t idx = 0; idx < arity; idx++) {
+            binds.reserve(arity);
+            argVars.reserve(arity);
+            checkExprsNull.reserve(arity);
+            checkExprsNotNumberOrDate.reserve(arity);
+            for (size_t idx = 0; idx < arity; ++idx) {
+                binds.push_back(_context->popExpr());
+                argVars.push_back(sbe::makeE<sbe::EVariable>(frameId, idx));
+
                 checkExprsNull.push_back(generateNullOrMissing(frameId, idx));
                 checkExprsNotNumberOrDate.push_back(generateNotNumberOrDate(idx));
-                argVars.push_back(sbe::makeE<sbe::EVariable>(frameId, idx));
             }
+
+            // At this point 'binds' vector contains arguments of $add expression in the reversed
+            // order. We need to reverse it back to perform summation in the right order below.
+            // Summation in different order can lead to different result because of accumulated
+            // precision errors from floating point types.
+            std::reverse(std::begin(binds), std::end(binds));
 
             using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
             auto checkNullAllArguments =
@@ -1881,7 +1888,72 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionMultiply* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+        auto frameId = _context->frameIdGenerator->generate();
+
+        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        std::vector<std::unique_ptr<sbe::EExpression>> variables;
+        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
+        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNumber;
+        binds.reserve(arity);
+        variables.reserve(arity);
+        checkExprsNull.reserve(arity);
+        checkExprsNumber.reserve(arity);
+        sbe::value::SlotId slot{0};
+        for (size_t idx = 0; idx < arity; ++idx, ++slot) {
+            binds.push_back(_context->popExpr());
+            sbe::EVariable currentVariable{frameId, slot};
+            variables.push_back(currentVariable.clone());
+
+            checkExprsNull.push_back(generateNullOrMissing(currentVariable));
+            checkExprsNumber.push_back(
+                sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(currentVariable.clone())));
+        }
+
+        // At this point 'binds' vector contains arguments of $multiply expression in the reversed
+        // order. We need to reverse it back to perform multiplication in the right order below.
+        // Multiplication in different order can lead to different result because of accumulated
+        // precision errors from floating point types.
+        std::reverse(std::begin(binds), std::end(binds));
+
+        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        auto checkNullAnyArgument =
+            std::accumulate(std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
+                            std::move_iterator<iter_t>(checkExprsNull.end()),
+                            std::move(checkExprsNull.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                            });
+
+        auto checkNumberAllArguments =
+            std::accumulate(std::move_iterator<iter_t>(checkExprsNumber.begin() + 1),
+                            std::move_iterator<iter_t>(checkExprsNumber.end()),
+                            std::move(checkExprsNumber.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicAnd, std::move(acc), std::move(ex));
+                            });
+
+        auto multiplication =
+            std::accumulate(std::move_iterator<iter_t>(variables.begin() + 1),
+                            std::move_iterator<iter_t>(variables.end()),
+                            std::move(variables.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::mul, std::move(acc), std::move(ex));
+                            });
+
+        auto multiplyExpr = buildMultiBranchConditional(
+            CaseValuePair{std::move(checkNullAnyArgument),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{std::move(checkNumberAllArguments), std::move(multiplication)},
+            sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073102},
+                                   "only numbers are allowed in an $multiply expression"));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(multiplyExpr)));
     }
     void visit(ExpressionNot* expr) final {
         auto frameId = _context->frameIdGenerator->generate();
