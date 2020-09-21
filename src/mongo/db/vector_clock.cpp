@@ -335,9 +335,13 @@ bool VectorClock::gossipOut(OperationContext* opCtx,
     if (!isEnabled()) {
         return false;
     }
+
     auto clientSessionTags = defaultClientSessionTags;
     if (opCtx && opCtx->getClient()) {
-        clientSessionTags = opCtx->getClient()->getSessionTags();
+        const auto session = opCtx->getClient()->session();
+        if (session && !(session->getTags() & transport::Session::kPending)) {
+            clientSessionTags = session->getTags();
+        }
     }
 
     ComponentSet toGossip = clientSessionTags & transport::Session::kInternalClient
@@ -359,9 +363,13 @@ void VectorClock::gossipIn(OperationContext* opCtx,
     if (!isEnabled()) {
         return;
     }
+
     auto clientSessionTags = defaultClientSessionTags;
     if (opCtx && opCtx->getClient()) {
-        clientSessionTags = opCtx->getClient()->getSessionTags();
+        const auto session = opCtx->getClient()->session();
+        if (session && !(session->getTags() & transport::Session::kPending)) {
+            clientSessionTags = session->getTags();
+        }
     }
 
     ComponentSet toGossip = clientSessionTags & transport::Session::kInternalClient
