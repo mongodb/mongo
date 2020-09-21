@@ -605,7 +605,7 @@ std::shared_ptr<Shard> ShardRegistry::_getShardForRSNameNoReload(const std::stri
 
 ShardRegistryData ShardRegistryData::createWithConfigShardOnly(std::shared_ptr<Shard> configShard) {
     ShardRegistryData data;
-    data._addShard(configShard, true);
+    data._addShard(configShard);
     return data;
 }
 
@@ -672,7 +672,7 @@ std::pair<ShardRegistryData, Timestamp> ShardRegistryData::createFromCatalogClie
         auto shard = shardFactory->createShard(std::move(std::get<0>(shardInfo)),
                                                std::move(std::get<1>(shardInfo)));
 
-        data._addShard(std::move(shard), false);
+        data._addShard(std::move(shard));
     }
     return {data, maxTopologyTime};
 }
@@ -718,7 +718,7 @@ ShardRegistryData ShardRegistryData::createFromExisting(const ShardRegistryData&
     }
     invariant(it->second);
     auto updatedShard = shardFactory->createShard(it->second->getId(), newConnString);
-    data._addShard(updatedShard, true);
+    data._addShard(updatedShard);
 
     return data;
 }
@@ -786,30 +786,16 @@ void ShardRegistryData::getAllShardIds(std::set<ShardId>& seen) const {
     }
 }
 
-void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard, bool useOriginalCS) {
+void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
     const ShardId shardId = shard->getId();
-
-    const ConnectionString connString =
-        useOriginalCS ? shard->originalConnString() : shard->getConnString();
+    const ConnectionString connString = shard->getConnString();
 
     auto currentShard = findShard(shardId);
     if (currentShard) {
-        auto oldConnString = currentShard->originalConnString();
-
-        if (oldConnString.toString() != connString.toString()) {
-            LOGV2(22732,
-                  "Updating shard registry connection string for shard {shardId} to "
-                  "{newShardConnectionString} from {oldShardConnectionString}",
-                  "Updating shard connection string on shard registry",
-                  "shardId"_attr = currentShard->getId(),
-                  "newShardConnectionString"_attr = connString,
-                  "oldShardConnectionString"_attr = oldConnString);
-        }
-
-        for (const auto& host : oldConnString.getServers()) {
+        for (const auto& host : connString.getServers()) {
             _hostLookup.erase(host);
         }
-        _connStringLookup.erase(oldConnString);
+        _connStringLookup.erase(connString);
     }
 
     _shardIdLookup[shard->getId()] = shard;

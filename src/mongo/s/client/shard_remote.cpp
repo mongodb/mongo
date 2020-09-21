@@ -95,9 +95,9 @@ BSONObj appendMaxTimeToCmdObj(Milliseconds maxTimeMSOverride, const BSONObj& cmd
 }  // unnamed namespace
 
 ShardRemote::ShardRemote(const ShardId& id,
-                         const ConnectionString& originalConnString,
+                         const ConnectionString& connString,
                          std::unique_ptr<RemoteCommandTargeter> targeter)
-    : Shard(id), _originalConnString(originalConnString), _targeter(targeter.release()) {}
+    : Shard(id), _connString(connString), _targeter(std::move(targeter)) {}
 
 ShardRemote::~ShardRemote() = default;
 
@@ -121,10 +121,6 @@ bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) 
     }
 
     MONGO_UNREACHABLE;
-}
-
-const ConnectionString ShardRemote::getConnString() const {
-    return _targeter->connectionString();
 }
 
 // Any error code changes should possibly also be made to Shard::shouldErrorBePropagated!
@@ -159,7 +155,7 @@ LogicalTime ShardRemote::getLastCommittedOpTime() const {
 }
 
 std::string ShardRemote::toString() const {
-    return getId().toString() + ":" + _originalConnString.toString();
+    return getId().toString() + ":" + _connString.toString();
 }
 
 BSONObj ShardRemote::_appendMetadataForCommand(OperationContext* opCtx,

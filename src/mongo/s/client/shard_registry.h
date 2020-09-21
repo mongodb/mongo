@@ -137,12 +137,8 @@ private:
 
     /**
      * Puts the given shard object into the lookup maps.
-     *
-     * If useOriginalCS = true it will use the ConnectionSring used for shard creation to update
-     * lookup maps. Otherwise the current connection string from the Shard's RemoteCommandTargeter
-     * will be used. Only called during ShardRegistryData construction.
      */
-    void _addShard(std::shared_ptr<Shard>, bool useOriginalCS);
+    void _addShard(std::shared_ptr<Shard>);
 
     // Map of shardName -> Shard
     ShardMap _shardIdLookup;

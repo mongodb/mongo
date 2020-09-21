@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-ShardLocal::ShardLocal(const ShardId& id) : Shard(id), _rsLocalClient() {
+ShardLocal::ShardLocal(const ShardId& id) : Shard(id) {
     // Currently ShardLocal only works for config servers. If we ever start using ShardLocal on
     // shards we'll need to consider how to handle shards.
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
@@ -61,13 +61,6 @@ const ConnectionString ShardLocal::getConnString() const {
 std::shared_ptr<RemoteCommandTargeter> ShardLocal::getTargeter() const {
     MONGO_UNREACHABLE;
 };
-
-const ConnectionString ShardLocal::originalConnString() const {
-    // Return the local connection string here as this method is only used for updating the
-    // ShardRegistry and we don't need a mapping from hosts in the replica set config to the shard
-    // for local shards.
-    return ConnectionString::forLocal();
-}
 
 void ShardLocal::updateReplSetMonitor(const HostAndPort& remoteHost,
                                       const Status& remoteCommandStatus) {

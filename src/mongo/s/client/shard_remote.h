@@ -51,15 +51,13 @@ public:
      * Instantiates a new shard connection management object for the specified shard.
      */
     ShardRemote(const ShardId& id,
-                const ConnectionString& originalConnString,
+                const ConnectionString& connString,
                 std::unique_ptr<RemoteCommandTargeter> targeter);
 
     ~ShardRemote();
 
-    const ConnectionString getConnString() const override;
-
-    const ConnectionString originalConnString() const override {
-        return _originalConnString;
+    const ConnectionString getConnString() const override {
+        return _connString;
     }
 
     std::shared_ptr<RemoteCommandTargeter> getTargeter() const override {
@@ -131,6 +129,16 @@ private:
         const executor::TaskExecutor::RemoteCommandCallbackFn& cb);
 
     /**
+     * Connection string for the shard at the creation time.
+     */
+    ConnectionString _connString;
+
+    /**
+     * Targeter for obtaining hosts from which to read or to which to write.
+     */
+    std::shared_ptr<RemoteCommandTargeter> _targeter;
+
+    /**
      * Protects _lastCommittedOpTime.
      */
     mutable Mutex _lastCommittedOpTimeMutex =
@@ -142,16 +150,6 @@ private:
      * earlier times.
      */
     LogicalTime _lastCommittedOpTime;
-
-    /**
-     * Connection string for the shard at the creation time.
-     */
-    const ConnectionString _originalConnString;
-
-    /**
-     * Targeter for obtaining hosts from which to read or to which to write.
-     */
-    const std::shared_ptr<RemoteCommandTargeter> _targeter;
 };
 
 }  // namespace mongo

@@ -48,7 +48,6 @@ public:
      * ShardLocal because doing so triggers invariants.
      */
     const ConnectionString getConnString() const override;
-    const ConnectionString originalConnString() const override;
     std::shared_ptr<RemoteCommandTargeter> getTargeter() const override;
     void updateReplSetMonitor(const HostAndPort& remoteHost,
                               const Status& remoteCommandStatus) override;
