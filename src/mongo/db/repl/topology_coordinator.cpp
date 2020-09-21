@@ -838,6 +838,8 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     invariant(hbStats.getLastHeartbeatStartDate() != Date_t());
     const bool isUnauthorized = (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
         (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
+
+    // Replication of auth changes can cause temporary auth failures.
     if (hbResponse.isOK() || isUnauthorized) {
         hbStats.hit(networkRoundTripTime);
     } else {
@@ -932,15 +934,14 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     if (!_rsConfig.isInitialized()) {
         return nextAction;
     }
-    // If we're not in the config, we don't need to respond to heartbeats.
+    // This server is not in the config, either because it was removed or a DNS error finding self.
     if (_selfIndex == -1) {
-        LOGV2_DEBUG(21805,
-                    1,
-                    "Could not find ourself in current config so ignoring heartbeat from {target} "
-                    "-- current config: {currentConfig}",
-                    "Could not find ourself in current config so ignoring heartbeat",
-                    "target"_attr = target,
-                    "currentConfig"_attr = _rsConfig.toBSON());
+        LOGV2(3564900,
+              "Could not find self in current config, retrying DNS resolution of members",
+              "target"_attr = target,
+              "currentConfig"_attr = _rsConfig.toBSON());
+        nextAction = HeartbeatResponseAction::makeRetryReconfigAction();
+        nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
         return nextAction;
     }
     const int memberIndex = _rsConfig.findMemberIndexByHostAndPort(target);

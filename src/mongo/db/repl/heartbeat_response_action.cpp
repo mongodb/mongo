@@ -56,6 +56,12 @@ HeartbeatResponseAction HeartbeatResponseAction::makeCatchupTakeoverAction() {
     return result;
 }
 
+HeartbeatResponseAction HeartbeatResponseAction::makeRetryReconfigAction() {
+    HeartbeatResponseAction result;
+    result._action = RetryReconfig;
+    return result;
+}
+
 HeartbeatResponseAction HeartbeatResponseAction::makeStepDownSelfAction(int primaryIndex) {
     HeartbeatResponseAction result;
     result._action = StepDownSelf;
