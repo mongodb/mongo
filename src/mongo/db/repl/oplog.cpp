@@ -1653,9 +1653,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
                 // an index may not have been built on a secondary when a command dropping it
                 // comes in.
                 //
-                // TODO(SERVER-46550): We should be able to enforce constraints on "dropDatabase"
-                // once we're no longer able to create databases on the primary without an oplog
-                // entry.
+                // We can never enforce constraints on "dropDatabase" because a database is an
+                // ephemeral entity that can be created or destroyed (if no collections exist)
+                // without an oplog entry.
                 if ((mode == OplogApplication::Mode::kSecondary &&
                      oplogApplicationEnforcesSteadyStateConstraints &&
                      status.code() != ErrorCodes::IndexNotFound && op->first != "dropDatabase") ||
