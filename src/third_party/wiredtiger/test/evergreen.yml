@@ -1362,6 +1362,21 @@ tasks:
 
             ${test_env_vars|} $(pwd)/test/csuite/test_wt4333_handle_locks 2>&1
 
+  - name: csuite-wt6616-checkpoint-oldest-ts-test
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/build_posix"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} $(pwd)/test/csuite/test_wt6616_checkpoint_oldest_ts 2>&1
+
   # End of csuite test tasks
 
   # Start of Python unit test tasks
@@ -1940,9 +1955,10 @@ tasks:
       - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 rebalance=1 salvage=1 statistics=1 statistics_server=1 verify=1
+      # FIXME-WT-6410: temporarily disable rebalance test
+      # - func: "format test"
+      #   vars:
+      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 rebalance=1 salvage=1 statistics=1 statistics_server=1 verify=1
       - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row firstfit=1 internal_key_truncation=1
@@ -1952,24 +1968,28 @@ tasks:
       - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_key=1 huffman_value=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row isolation=random transaction_timestamps=0
+      # FIXME-WT-6668: temporarily disable lower isolation level test
+      # - func: "format test"
+      #   vars:
+      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row isolation=random transaction_timestamps=0
       - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row data_source=lsm bloom=1
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
+      # FIXME-WT-6669: temporarily disable column store test
+      # - func: "format test"
+      #   vars:
+      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
       - func: "format test"
         vars:
           extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
-      - func: "format test"
-        vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=fix
+      # FIXME-WT-6669: temporarily disable column store test
+      # - func: "format test"
+      #   vars:
+      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
+      # FIXME-WT-6669: temporarily disable column store test
+      # - func: "format test"
+      #   vars:
+      #     extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=fix
       - command: shell.exec
         params:
           working_dir: "wiredtiger/build_posix"
@@ -2397,7 +2417,7 @@ buildvariants:
     - name: make-check-asan-test
     - name: configure-combinations
     - name: checkpoint-filetypes-test
-    # - name: coverage-report
+    - name: coverage-report
     - name: unit-test-long
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
@@ -2508,7 +2528,7 @@ buildvariants:
     - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
-    # - name: coverage-report
+    - name: coverage-report
 
 - name: large-scale-tests
   display_name: "~ Large scale tests"

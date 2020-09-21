@@ -595,7 +595,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
           trk->col_stop);
         break;
     case WT_PAGE_COL_VAR:
-        WT_TIME_AGGREGATE_INIT_MAX(&trk->trk_ta);
+        WT_TIME_AGGREGATE_INIT_MERGE(&trk->trk_ta);
 
         /*
          * Column-store variable-length format: the start key can be taken from the block's header,
@@ -605,7 +605,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
         WT_CELL_FOREACH_KV (session, dsk, unpack) {
             stop_recno += __wt_cell_rle(&unpack);
 
-            WT_TIME_AGGREGATE_UPDATE(&trk->trk_ta, &unpack.tw);
+            WT_TIME_AGGREGATE_UPDATE(session, &trk->trk_ta, &unpack.tw);
         }
         WT_CELL_FOREACH_END;
 
@@ -620,9 +620,9 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
         WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
         break;
     case WT_PAGE_ROW_LEAF:
-        WT_TIME_AGGREGATE_INIT_MAX(&trk->trk_ta);
+        WT_TIME_AGGREGATE_INIT_MERGE(&trk->trk_ta);
         WT_CELL_FOREACH_KV (session, dsk, unpack) {
-            WT_TIME_AGGREGATE_UPDATE(&trk->trk_ta, &unpack.tw);
+            WT_TIME_AGGREGATE_UPDATE(session, &trk->trk_ta, &unpack.tw);
         }
         WT_CELL_FOREACH_END;
 

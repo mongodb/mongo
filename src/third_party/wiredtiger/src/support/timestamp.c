@@ -127,63 +127,62 @@ __wt_verbose_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t ts, const char *
     } while (0)
 
 /*
- * __wt_time_aggregate_validate --
- *     Do a aggregated time window validation.
+ * __time_stable --
+ *     Return the stable timestamp for the system.
  */
-int
-__wt_time_aggregate_validate(
+static wt_timestamp_t
+__time_stable(WT_SESSION_IMPL *session)
+{
+    WT_TXN_GLOBAL *txn_global;
+
+    txn_global = &S2C(session)->txn_global;
+
+    return (txn_global->has_stable_timestamp ? txn_global->stable_timestamp :
+                                               txn_global->recovery_timestamp);
+}
+
+#undef WT_TIME_ERROR
+#define WT_TIME_ERROR(tag)                                             \
+    WT_TIME_VALIDATE_RET(session,                                      \
+      "aggregate time window has " tag                                 \
+      " the stable point with an empty parent aggregate time window; " \
+      "stable time %s, time window %s",                                \
+      __wt_timestamp_to_string(stable, ts_string), __wt_time_aggregate_to_string(ta, time_string))
+
+/*
+ * __time_aggregate_validate_parent_stable --
+ *     Aggregated time window validation against a stable point.
+ */
+static int
+__time_aggregate_validate_parent_stable(
+  WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, bool silent)
+{
+    wt_timestamp_t stable;
+    char time_string[WT_TIME_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
+
+    stable = __time_stable(session);
+
+    if (ta->newest_start_durable_ts > stable)
+        WT_TIME_ERROR("a newest start durable time after");
+    if (ta->newest_stop_durable_ts > stable)
+        WT_TIME_ERROR("a newest stop durable time after");
+    if (ta->oldest_start_ts > stable)
+        WT_TIME_ERROR("an oldest start time after");
+    if (ta->newest_stop_ts != WT_TS_MAX && ta->newest_stop_ts > stable)
+        WT_TIME_ERROR("a newest stop time after");
+
+    return (0);
+}
+
+/*
+ * __time_aggregate_validate_parent --
+ *     Aggregated time window validation against a parent.
+ */
+static int
+__time_aggregate_validate_parent(
   WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, WT_TIME_AGGREGATE *parent, bool silent)
 {
     char time_string[2][WT_TIME_STRING_SIZE];
-
-    if (ta->oldest_start_ts > ta->newest_stop_ts)
-        WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has an oldest start time after its newest stop time; time "
-          "aggregate %s",
-          __wt_time_aggregate_to_string(ta, time_string[0]));
-
-    if (ta->oldest_start_txn > ta->newest_stop_txn)
-        WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has an oldest start transaction after its newest stop "
-          "transaction; time aggregate %s",
-          __wt_time_aggregate_to_string(ta, time_string[0]));
-
-    if (ta->oldest_start_ts > ta->newest_start_durable_ts)
-        WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has an oldest start time after its newest start durable time; "
-          "time aggregate %s",
-          __wt_time_aggregate_to_string(ta, time_string[0]));
-
-    if (ta->newest_stop_ts != WT_TS_MAX && ta->newest_stop_ts > ta->newest_stop_durable_ts)
-        WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has a newest stop time after its newest stop durable time; time "
-          "aggregate %s",
-          __wt_time_aggregate_to_string(ta, time_string[0]));
-
-    /*
-     * In the case of out of order timestamps, we assign the start point to the stop point and
-     * newest start durable timestamp may be larger than newest stop timestamp. Check whether start
-     * and stop are equal first.
-     */
-    if (ta->newest_start_durable_ts != ta->newest_stop_durable_ts &&
-      ta->newest_start_durable_ts > ta->newest_stop_ts)
-        WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has a newest stop durable time after its newest stop time; time "
-          "aggregate %s",
-          __wt_time_aggregate_to_string(ta, time_string[0]));
-
-    if (ta->newest_stop_durable_ts != WT_TS_NONE &&
-      ta->newest_stop_durable_ts < ta->oldest_start_ts)
-        WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has a newest stop durable time before its oldest start time; time "
-          "aggregate %s",
-          __wt_time_aggregate_to_string(ta, time_string[0]));
-
-    /*
-     * Optionally validate the time window against a parent's time window.
-     */
-    if (parent == NULL)
-        return (0);
 
     if (ta->newest_start_durable_ts > parent->newest_start_durable_ts)
         WT_TIME_VALIDATE_RET(session,
@@ -237,55 +236,114 @@ __wt_time_aggregate_validate(
 }
 
 /*
- * __wt_time_value_validate --
- *     Do a value time window validation.
+ * __wt_time_aggregate_validate --
+ *     Aggregated time window validation.
  */
 int
-__wt_time_value_validate(
-  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_TIME_AGGREGATE *parent, bool silent)
+__wt_time_aggregate_validate(
+  WT_SESSION_IMPL *session, WT_TIME_AGGREGATE *ta, WT_TIME_AGGREGATE *parent, bool silent)
 {
     char time_string[2][WT_TIME_STRING_SIZE];
 
-    if (tw->start_ts > tw->stop_ts)
+    if (ta->oldest_start_ts > ta->newest_stop_ts)
         WT_TIME_VALIDATE_RET(session,
-          "value time window has a start time after its stop time; time window %s",
-          __wt_time_window_to_string(tw, time_string[0]));
+          "aggregate time window has an oldest start time after its newest stop time; time "
+          "aggregate %s",
+          __wt_time_aggregate_to_string(ta, time_string[0]));
 
-    if (tw->start_txn > tw->stop_txn)
+    if (ta->oldest_start_txn > ta->newest_stop_txn)
         WT_TIME_VALIDATE_RET(session,
-          "value time window has a start transaction after its stop transaction; time window %s",
-          __wt_time_window_to_string(tw, time_string[0]));
+          "aggregate time window has an oldest start transaction after its newest stop "
+          "transaction; time aggregate %s",
+          __wt_time_aggregate_to_string(ta, time_string[0]));
 
-    if (tw->start_ts > tw->durable_start_ts)
+    if (ta->oldest_start_ts > ta->newest_start_durable_ts)
         WT_TIME_VALIDATE_RET(session,
-          "value time window has a start time after its durable start time; time window %s",
-          __wt_time_window_to_string(tw, time_string[0]));
+          "aggregate time window has an oldest start time after its newest start durable time; "
+          "time aggregate %s",
+          __wt_time_aggregate_to_string(ta, time_string[0]));
 
-    if (tw->stop_ts != WT_TS_MAX && tw->stop_ts > tw->durable_stop_ts)
+    if (ta->newest_stop_ts != WT_TS_MAX && ta->newest_stop_ts > ta->newest_stop_durable_ts)
         WT_TIME_VALIDATE_RET(session,
-          "value time window has a stop time after its durable stop time; time window %s",
-          __wt_time_window_to_string(tw, time_string[0]));
+          "aggregate time window has a newest stop time after its newest stop durable time; time "
+          "aggregate %s",
+          __wt_time_aggregate_to_string(ta, time_string[0]));
 
     /*
-     * In the case of out of order timestamps, we assign start time point to the stop point and
-     * durable start timestamp may be larger than stop timestamp. Check whether start and stop are
-     * equal first.
+     * In the case of out of order timestamps, we assign the start point to the stop point and
+     * newest start durable timestamp may be larger than newest stop timestamp. Check whether start
+     * and stop are equal first.
      */
-    if (tw->durable_start_ts != tw->durable_stop_ts && tw->durable_start_ts > tw->stop_ts)
+    if (ta->newest_start_durable_ts != ta->newest_stop_durable_ts &&
+      ta->newest_start_durable_ts > ta->newest_stop_ts)
         WT_TIME_VALIDATE_RET(session,
-          "value time window has a durable start time after its stop time; time window %s",
-          __wt_time_window_to_string(tw, time_string[0]));
+          "aggregate time window has a newest stop durable time after its newest stop time; time "
+          "aggregate %s",
+          __wt_time_aggregate_to_string(ta, time_string[0]));
 
-    if (tw->durable_stop_ts != WT_TS_NONE && tw->durable_start_ts > tw->durable_stop_ts)
+    if (ta->newest_stop_durable_ts != WT_TS_NONE &&
+      ta->newest_stop_durable_ts < ta->oldest_start_ts)
         WT_TIME_VALIDATE_RET(session,
-          "value time window has a durable start time after its durable stop time; time window %s",
-          __wt_time_window_to_string(tw, time_string[0]));
+          "aggregate time window has a newest stop durable time before its oldest start time; time "
+          "aggregate %s",
+          __wt_time_aggregate_to_string(ta, time_string[0]));
 
     /*
      * Optionally validate the time window against a parent's time window.
+     *
+     * If no aggregated time window is set, it can be for one of two reasons: there really isn't any
+     * time window information, or there was a downgrade/upgrade to a previous release which doesn't
+     * write time window information. We can't tell the difference, but in either case, everything
+     * should be stable.
      */
-    if (parent == NULL)
+    if (parent == NULL || WT_IS_METADATA(session->dhandle))
         return (0);
+    return (WT_TIME_AGGREGATE_IS_EMPTY(parent) ?
+        __time_aggregate_validate_parent_stable(session, ta, silent) :
+        __time_aggregate_validate_parent(session, ta, parent, silent));
+}
+
+#undef WT_TIME_ERROR
+#define WT_TIME_ERROR(tag)                                             \
+    WT_TIME_VALIDATE_RET(session,                                      \
+      "time window has " tag                                           \
+      " the stable point with an empty parent aggregate time window; " \
+      "stable time %s, time window %s",                                \
+      __wt_timestamp_to_string(stable, ts_string), __wt_time_window_to_string(tw, time_string))
+
+/*
+ * __time_value_validate_parent_stable --
+ *     Value time window validation against a stable point.
+ */
+static int
+__time_value_validate_parent_stable(WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, bool silent)
+{
+    wt_timestamp_t stable;
+    char time_string[WT_TIME_STRING_SIZE], ts_string[WT_TS_INT_STRING_SIZE];
+
+    stable = __time_stable(session);
+
+    if (tw->durable_start_ts > stable)
+        WT_TIME_ERROR("a durable start time after");
+    if (tw->start_ts > stable)
+        WT_TIME_ERROR("a start time after");
+    if (tw->durable_stop_ts > stable)
+        WT_TIME_ERROR("a durable stop time after");
+    if (tw->stop_ts != WT_TS_MAX && tw->stop_ts > stable)
+        WT_TIME_ERROR("a stop time after");
+
+    return (0);
+}
+
+/*
+ * __time_value_validate_parent --
+ *     Value time window validation against a parent.
+ */
+static int
+__time_value_validate_parent(
+  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_TIME_AGGREGATE *parent, bool silent)
+{
+    char time_string[2][WT_TIME_STRING_SIZE];
 
     if (parent->newest_start_durable_ts != WT_TS_NONE &&
       tw->durable_start_ts > parent->newest_start_durable_ts)
@@ -338,4 +396,64 @@ __wt_time_value_validate(
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
     return (0);
+}
+
+/*
+ * __wt_time_value_validate --
+ *     Value time window validation.
+ */
+int
+__wt_time_value_validate(
+  WT_SESSION_IMPL *session, WT_TIME_WINDOW *tw, WT_TIME_AGGREGATE *parent, bool silent)
+{
+    char time_string[2][WT_TIME_STRING_SIZE];
+
+    if (tw->start_ts > tw->stop_ts)
+        WT_TIME_VALIDATE_RET(session,
+          "value time window has a start time after its stop time; time window %s",
+          __wt_time_window_to_string(tw, time_string[0]));
+
+    if (tw->start_txn > tw->stop_txn)
+        WT_TIME_VALIDATE_RET(session,
+          "value time window has a start transaction after its stop transaction; time window %s",
+          __wt_time_window_to_string(tw, time_string[0]));
+
+    if (tw->start_ts > tw->durable_start_ts)
+        WT_TIME_VALIDATE_RET(session,
+          "value time window has a start time after its durable start time; time window %s",
+          __wt_time_window_to_string(tw, time_string[0]));
+
+    if (tw->stop_ts != WT_TS_MAX && tw->stop_ts > tw->durable_stop_ts)
+        WT_TIME_VALIDATE_RET(session,
+          "value time window has a stop time after its durable stop time; time window %s",
+          __wt_time_window_to_string(tw, time_string[0]));
+
+    /*
+     * In the case of out of order timestamps, we assign start time point to the stop point and
+     * durable start timestamp may be larger than stop timestamp. Check whether start and stop are
+     * equal first.
+     */
+    if (tw->durable_start_ts != tw->durable_stop_ts && tw->durable_start_ts > tw->stop_ts)
+        WT_TIME_VALIDATE_RET(session,
+          "value time window has a durable start time after its stop time; time window %s",
+          __wt_time_window_to_string(tw, time_string[0]));
+
+    if (tw->durable_stop_ts != WT_TS_NONE && tw->durable_start_ts > tw->durable_stop_ts)
+        WT_TIME_VALIDATE_RET(session,
+          "value time window has a durable start time after its durable stop time; time window %s",
+          __wt_time_window_to_string(tw, time_string[0]));
+
+    /*
+     * Optionally validate the time window against a parent's time window.
+     *
+     * If no aggregated time window is set, it can be for one of two reasons: there really isn't any
+     * time window information, or there was a downgrade/upgrade to a previous release which doesn't
+     * write time window information. We can't tell the difference, but in either case, everything
+     * should be stable.
+     */
+    if (parent == NULL || WT_IS_METADATA(session->dhandle))
+        return (0);
+    return (WT_TIME_AGGREGATE_IS_EMPTY(parent) ?
+        __time_value_validate_parent_stable(session, tw, silent) :
+        __time_value_validate_parent(session, tw, parent, silent));
 }

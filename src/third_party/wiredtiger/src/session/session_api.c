@@ -267,7 +267,7 @@ __session_close(WT_SESSION *wt_session, const char *config)
     SESSION_API_CALL_PREPARE_ALLOWED(session, close, config, cfg);
     WT_UNUSED(cfg);
 
-    WT_ERR(__wt_session_close_internal(session));
+    WT_TRET(__wt_session_close_internal(session));
     session = NULL;
 
 err:

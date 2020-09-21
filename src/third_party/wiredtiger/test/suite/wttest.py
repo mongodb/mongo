@@ -227,6 +227,7 @@ class WiredTigerTestCase(unittest.TestCase):
         if hasattr(self, 'scenarios'):
             assert(len(self.scenarios) == len(dict(self.scenarios)))
         unittest.TestCase.__init__(self, *args, **kwargs)
+        self.skipped = False
         if not self._globalSetup:
             WiredTigerTestCase.globalSetup()
 
@@ -252,6 +253,10 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def buildDirectory(self):
         return self._builddir
+
+    def skipTest(self, reason):
+        self.skipped = True
+        super(WiredTigerTestCase, self).skipTest(reason)
 
     # Return the wiredtiger_open extension argument for
     # any needed shared library.
@@ -460,9 +465,10 @@ class WiredTigerTestCase(unittest.TestCase):
             for f in files:
                 os.chmod(os.path.join(root, f), 0o666)
         self.pr('passed=' + str(passed))
+        self.pr('skipped=' + str(self.skipped))
 
         # Clean up unless there's a failure
-        if passed and not WiredTigerTestCase._preserveFiles:
+        if (passed and (not WiredTigerTestCase._preserveFiles)) or self.skipped:
             shutil.rmtree(self.testdir, ignore_errors=True)
         else:
             self.pr('preserving directory ' + self.testdir)
@@ -470,7 +476,7 @@ class WiredTigerTestCase(unittest.TestCase):
         elapsed = time.time() - self.starttime
         if elapsed > 0.001 and WiredTigerTestCase._verbose >= 2:
             print("%s: %.2f seconds" % (str(self), elapsed))
-        if not passed:
+        if (not passed) and (not self.skipped):
             print("ERROR in " + str(self))
             self.pr('FAIL')
             self.pr('preserving directory ' + self.testdir)

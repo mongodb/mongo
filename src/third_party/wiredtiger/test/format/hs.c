@@ -35,6 +35,9 @@
 WT_THREAD_RET
 hs_cursor(void *arg)
 {
+#if WIREDTIGER_VERSION_MAJOR < 10
+    WT_UNUSED(arg);
+#else
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -129,6 +132,7 @@ hs_cursor(void *arg)
 
     __wt_buf_free(CUR2S(cursor), &key);
     testutil_check(session->close(session, NULL));
+#endif
 
     return (WT_THREAD_RET_VALUE);
 }

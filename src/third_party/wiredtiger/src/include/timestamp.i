@@ -18,18 +18,6 @@
         (tw)->prepare = 0;                   \
     } while (0)
 
-/* Initialize the fields in a time window to values that force an override. */
-#define WT_TIME_WINDOW_INIT_MAX(tw)         \
-    do {                                    \
-        (tw)->durable_start_ts = WT_TS_MAX; \
-        (tw)->start_ts = WT_TS_MAX;         \
-        (tw)->start_txn = WT_TXN_MAX;       \
-        (tw)->durable_stop_ts = WT_TS_MAX;  \
-        (tw)->stop_ts = WT_TS_NONE;         \
-        (tw)->stop_txn = WT_TXN_NONE;       \
-        (tw)->prepare = 0;                  \
-    } while (0)
-
 /* Copy the values from one time window structure to another.  */
 #define WT_TIME_WINDOW_COPY(dest, source) (*(dest) = *(source))
 
@@ -88,6 +76,7 @@
         (ta)->newest_stop_ts = WT_TS_MAX;           \
         (ta)->newest_stop_txn = WT_TXN_MAX;         \
         (ta)->prepare = 0;                          \
+        (ta)->init_merge = 0;                       \
     } while (0)
 
 /*
@@ -98,7 +87,7 @@
  * aggregated max values are used for rollback to stable operation to find out whether the page has
  * any timestamp updates more than stable timestamp.
  */
-#define WT_TIME_AGGREGATE_INIT_MAX(ta)              \
+#define WT_TIME_AGGREGATE_INIT_MERGE(ta)            \
     do {                                            \
         (ta)->newest_start_durable_ts = WT_TS_NONE; \
         (ta)->newest_stop_durable_ts = WT_TS_NONE;  \
@@ -107,21 +96,28 @@
         (ta)->newest_stop_ts = WT_TS_NONE;          \
         (ta)->newest_stop_txn = WT_TXN_NONE;        \
         (ta)->prepare = 0;                          \
+        (ta)->init_merge = 1;                       \
     } while (0)
 
-/* Return true if the time aggregate is equivalent to the default time aggregate. */
-#define WT_TIME_AGGREGATE_IS_EMPTY(ta)                                                            \
-    ((ta)->newest_start_durable_ts == WT_TS_NONE && (ta)->newest_stop_durable_ts == WT_TS_NONE && \
-      (ta)->oldest_start_ts == WT_TS_MAX && (ta)->oldest_start_txn == WT_TXN_MAX &&               \
-      (ta)->newest_stop_ts == WT_TS_NONE && (ta)->newest_stop_txn == WT_TXN_NONE &&               \
-      (ta)->prepare == 0)
+/* Return true if the time aggregate is equivalent to the initialized time aggregate. */
+#define WT_TIME_AGGREGATE_IS_EMPTY(ta)                                                         \
+    ((ta)->init_merge == 0 ?                                                                   \
+        ((ta)->newest_start_durable_ts == WT_TS_NONE &&                                        \
+          (ta)->newest_stop_durable_ts == WT_TS_NONE && (ta)->oldest_start_ts == WT_TS_NONE && \
+          (ta)->oldest_start_txn == WT_TXN_NONE && (ta)->newest_stop_ts == WT_TS_MAX &&        \
+          (ta)->newest_stop_txn == WT_TXN_MAX && (ta)->prepare == 0) :                         \
+        ((ta)->newest_start_durable_ts == WT_TS_NONE &&                                        \
+          (ta)->newest_stop_durable_ts == WT_TS_NONE && (ta)->oldest_start_ts == WT_TS_MAX &&  \
+          (ta)->oldest_start_txn == WT_TXN_MAX && (ta)->newest_stop_ts == WT_TS_NONE &&        \
+          (ta)->newest_stop_txn == WT_TXN_NONE && (ta)->prepare == 0))
 
 /* Copy the values from one time aggregate structure to another. */
 #define WT_TIME_AGGREGATE_COPY(dest, source) (*(dest) = *(source))
 
 /* Update the aggregated window to reflect for a new time window. */
-#define WT_TIME_AGGREGATE_UPDATE(ta, tw)                                          \
+#define WT_TIME_AGGREGATE_UPDATE(session, ta, tw)                                 \
     do {                                                                          \
+        WT_ASSERT(session, (ta)->init_merge == 1);                                \
         (ta)->newest_start_durable_ts =                                           \
           WT_MAX((tw)->durable_start_ts, (ta)->newest_start_durable_ts);          \
         (ta)->newest_stop_durable_ts =                                            \
@@ -135,8 +131,9 @@
     } while (0)
 
 /* Merge an aggregated time window into another - choosing the most conservative value from each. */
-#define WT_TIME_AGGREGATE_MERGE(dest, source)                                                    \
+#define WT_TIME_AGGREGATE_MERGE(session, dest, source)                                           \
     do {                                                                                         \
+        WT_ASSERT(session, (dest)->init_merge == 1);                                             \
         (dest)->newest_start_durable_ts =                                                        \
           WT_MAX((dest)->newest_start_durable_ts, (source)->newest_start_durable_ts);            \
         (dest)->newest_stop_durable_ts =                                                         \

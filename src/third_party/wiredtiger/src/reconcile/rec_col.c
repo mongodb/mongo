@@ -138,7 +138,7 @@ __wt_bulk_insert_var(WT_SESSION_IMPL *session, WT_CURSOR_BULK *cbulk, bool delet
     if (btree->dictionary)
         WT_RET(__wt_rec_dict_replace(session, r, &tw, cbulk->rle, val));
     __wt_rec_image_copy(session, r, val);
-    WT_TIME_AGGREGATE_UPDATE(&r->cur_ptr->ta, &tw);
+    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
 
     /* Update the starting record number in case we split. */
     r->recno += cbulk->rle;
@@ -178,7 +178,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
         /* Copy the value onto the page. */
         __wt_rec_image_copy(session, r, val);
-        WT_TIME_AGGREGATE_MERGE(&r->cur_ptr->ta, &addr->ta);
+        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &addr->ta);
     }
     return (0);
 }
@@ -293,7 +293,7 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 
         /* Copy the value onto the page. */
         __wt_rec_image_copy(session, r, val);
-        WT_TIME_AGGREGATE_MERGE(&r->cur_ptr->ta, &ta);
+        WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ta);
     }
     WT_INTL_FOREACH_END;
 
@@ -547,7 +547,7 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_SALVAGE_COOKI
     if (!deleted && !overflow_type && btree->dictionary)
         WT_RET(__wt_rec_dict_replace(session, r, tw, rle, val));
     __wt_rec_image_copy(session, r, val);
-    WT_TIME_AGGREGATE_UPDATE(&r->cur_ptr->ta, tw);
+    WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, tw);
 
     /* Update the starting record number in case we split. */
     r->recno += rle;
@@ -599,7 +599,7 @@ __wt_rec_col_var(
 
     /* Set the "last" values to cause failure if they're not set. */
     last.value = r->last;
-    WT_TIME_WINDOW_INIT_MAX(&last.tw);
+    WT_TIME_WINDOW_INIT(&last.tw);
     last.deleted = false;
 
     /*
@@ -607,7 +607,7 @@ __wt_rec_col_var(
      * [-Werror=maybe-uninitialized]
      */
     /* NOLINTNEXTLINE(clang-analyzer-deadcode.DeadStores) */
-    WT_TIME_WINDOW_INIT_MAX(&tw);
+    WT_TIME_WINDOW_INIT(&tw);
 
     WT_RET(__wt_rec_split_init(session, r, page, pageref->ref_recno, btree->maxleafpage_precomp));
 

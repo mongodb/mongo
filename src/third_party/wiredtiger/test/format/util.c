@@ -101,20 +101,13 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
                 last_cur = cur_ts;
             }
 
-            if (g.c_txn_rollback_to_stable)
-                testutil_check(__wt_snprintf(ts_msg, sizeof(ts_msg),
-                  " old%s"
-                  "stb%s%s"
-                  "ts%s%s",
-                  track_ts_dots(old_dot_cnt), track_ts_diff(old_ts, stable_ts),
-                  track_ts_dots(stable_dot_cnt), track_ts_diff(stable_ts, cur_ts),
-                  track_ts_dots(cur_dot_cnt)));
-            else
-                testutil_check(__wt_snprintf(ts_msg, sizeof(ts_msg),
-                  " old%s"
-                  "ts%s%s",
-                  track_ts_dots(old_dot_cnt), track_ts_diff(old_ts, cur_ts),
-                  track_ts_dots(cur_dot_cnt)));
+            testutil_check(__wt_snprintf(ts_msg, sizeof(ts_msg),
+              " old%s"
+              "stb%s%s"
+              "ts%s%s",
+              track_ts_dots(old_dot_cnt), track_ts_diff(old_ts, stable_ts),
+              track_ts_dots(stable_dot_cnt), track_ts_diff(stable_ts, cur_ts),
+              track_ts_dots(cur_dot_cnt)));
         }
         testutil_check(
           __wt_snprintf_len_set(msg, sizeof(msg), &len,
@@ -232,81 +225,78 @@ fclose_and_clear(FILE **fpp)
 }
 
 /*
+ * timestamp_parse --
+ *     Parse a timestamp to an integral value.
+ */
+static void
+timestamp_parse(const char *p, uint64_t *tsp)
+{
+    char *endptr;
+
+    errno = 0;
+    *tsp = __wt_strtouq(p, &endptr, 16);
+    testutil_assert(errno == 0 && endptr[0] == '\0');
+}
+
+/*
+ * timestamp_stable --
+ *     Set the stable timestamp on open.
+ */
+void
+timestamp_init(void)
+{
+    WT_CONNECTION *conn;
+    char timestamp_buf[2 * sizeof(uint64_t) + 1];
+
+    conn = g.wts_conn;
+
+    testutil_check(conn->query_timestamp(conn, timestamp_buf, "get=recovery"));
+    timestamp_parse(timestamp_buf, &g.timestamp);
+}
+
+/*
  * timestamp_once --
  *     Update the timestamp once.
  */
 void
-timestamp_once(WT_SESSION *session, bool allow_lag)
+timestamp_once(bool allow_lag, bool final)
 {
     static const char *oldest_timestamp_str = "oldest_timestamp=";
     static const char *stable_timestamp_str = "stable_timestamp=";
     WT_CONNECTION *conn;
     WT_DECL_RET;
-    size_t len;
-    uint64_t all_durable, stable;
-    char buf[WT_TS_HEX_STRING_SIZE * 2 + 64], tsbuf[WT_TS_HEX_STRING_SIZE];
+    uint64_t all_durable;
+    char buf[WT_TS_HEX_STRING_SIZE * 2 + 64];
 
     conn = g.wts_conn;
-    stable = 0ULL;
 
-    /*
-     * Lock out transaction timestamp operations. The lock acts as a barrier ensuring we've checked
-     * if the workers have finished, we don't want that line reordered. We can also be called from
-     * places, such as bulk load, where we are single-threaded and the locks haven't been
-     * initialized.
-     */
-    if (LOCK_INITIALIZED(&g.ts_lock))
-        lock_writelock(session, &g.ts_lock);
-
-    if ((ret = conn->query_timestamp(conn, tsbuf, "get=all_durable")) == 0) {
-        timestamp_parse(session, tsbuf, &all_durable);
+    if (final)
+        g.oldest_timestamp = g.stable_timestamp = ++g.timestamp;
+    else {
+        if ((ret = conn->query_timestamp(conn, buf, "get=all_durable")) == 0)
+            testutil_timestamp_parse(buf, &all_durable);
+        else {
+            testutil_assert(ret == WT_NOTFOUND);
+            return;
+        }
 
         /*
          * If a lag is permitted, move the oldest timestamp half the way to the current
-         * "all_durable" timestamp.
+         * "all_durable" timestamp.  Move the stable timestamp to "all_durable".
          */
         if (allow_lag)
             g.oldest_timestamp = (all_durable + g.oldest_timestamp) / 2;
         else
             g.oldest_timestamp = all_durable;
-        testutil_check(
-          __wt_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp));
+        g.stable_timestamp = all_durable;
+    }
 
-        /*
-         * When we're doing rollback to stable operations, we'll advance the stable timestamp to the
-         * current timestamp value.
-         */
-        if (g.c_txn_rollback_to_stable) {
-            stable = g.timestamp;
-            len = strlen(buf);
-            WT_ASSERT((WT_SESSION_IMPL *)session, len < sizeof(buf));
-            testutil_check(__wt_snprintf(
-              buf + len, sizeof(buf) - len, ",%s%" PRIx64, stable_timestamp_str, stable));
-        }
-        testutil_check(conn->set_timestamp(conn, buf));
-        trace_msg("%-10s oldest=%" PRIu64 ", stable=%" PRIu64, "setts", g.oldest_timestamp, stable);
-        if (g.c_txn_rollback_to_stable)
-            g.stable_timestamp = stable;
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,
+      g.oldest_timestamp, stable_timestamp_str, g.stable_timestamp));
 
-    } else
-        testutil_assert(ret == WT_NOTFOUND);
-
-    if (LOCK_INITIALIZED(&g.ts_lock))
-        lock_writeunlock(session, &g.ts_lock);
-}
-
-/*
- * timestamp_parse --
- *     Parse a timestamp to an integral value.
- */
-void
-timestamp_parse(WT_SESSION *session, const char *str, uint64_t *tsp)
-{
-    char *p;
-
-    *tsp = strtoull(str, &p, 16);
-    if (session != NULL)
-        WT_ASSERT((WT_SESSION_IMPL *)session, p - str <= 16);
+    testutil_check(conn->set_timestamp(conn, buf));
+    trace_msg(
+      "%-10s oldest=%" PRIu64 ", stable=%" PRIu64, "setts", g.oldest_timestamp, g.stable_timestamp);
 }
 
 /*
@@ -318,7 +308,6 @@ timestamp(void *arg)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
-    bool done;
 
     (void)(arg);
     conn = g.wts_conn;
@@ -326,36 +315,31 @@ timestamp(void *arg)
     /* Locks need session */
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    /* Update the oldest timestamp at least once every 15 seconds. */
-    done = false;
-    do {
+    /* Update the oldest and stable timestamps at least once every 15 seconds. */
+    while (!g.workers_finished) {
         random_sleep(&g.rnd, 15);
 
-        /*
-         * If running without rollback_to_stable, do a final bump of the oldest timestamp as part of
-         * shutting down the worker threads, otherwise recent operations can prevent verify from
-         * running.
-         *
-         * With rollback_to_stable configured, don't do a bump at the end of the run. We need the
-         * worker threads to have time to see any changes in the stable timestamp, so they can stash
-         * their stable state - if we bump they will have no time to do that. And when we rollback,
-         * we'd like to see a reasonable amount of data changed. So we don't bump the stable
-         * timestamp, and we can't bump the oldest timestamp as well, as it would get ahead of the
-         * stable timestamp, which is not allowed.
-         */
-        if (g.workers_finished)
-            done = true;
-
-        if (!done || !g.c_txn_rollback_to_stable) {
-            timestamp_once(session, true);
-            if (done)
-                timestamp_once(session, true);
-        }
-
-    } while (!done);
+        lock_writelock(session, &g.ts_lock); /* Lock out transaction timestamp operations. */
+        timestamp_once(true, false);
+        lock_writeunlock(session, &g.ts_lock);
+    }
 
     testutil_check(session->close(session, NULL));
     return (WT_THREAD_RET_VALUE);
+}
+
+/*
+ * timestamp_teardown --
+ *     Wrap up timestamp operations.
+ */
+void
+timestamp_teardown(void)
+{
+    /*
+     * Do a final bump of the oldest and stable timestamps, otherwise recent operations can prevent
+     * verify from running.
+     */
+    timestamp_once(false, true);
 }
 
 /*
@@ -376,7 +360,7 @@ set_oldest_timestamp(void)
     conn = g.wts_conn;
 
     if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest")) == 0) {
-        timestamp_parse(NULL, tsbuf, &oldest_ts);
+        testutil_timestamp_parse(tsbuf, &oldest_ts);
         g.timestamp = oldest_ts;
         testutil_check(
           __wt_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp));

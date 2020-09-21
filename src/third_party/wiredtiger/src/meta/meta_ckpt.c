@@ -932,14 +932,18 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
 {
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
+    WT_TXN_GLOBAL *txn_global;
+    wt_timestamp_t oldest_timestamp;
     char hex_timestamp[WT_TS_HEX_STRING_SIZE];
+
+    txn_global = &S2C(session)->txn_global;
 
     WT_ERR(__wt_scr_alloc(session, 0, &buf));
     /*
      * We need to record the timestamp of the checkpoint in the metadata. The timestamp value is set
      * at a higher level, either in checkpoint or in recovery.
      */
-    __wt_timestamp_to_hex_string(S2C(session)->txn_global.meta_ckpt_timestamp, hex_timestamp);
+    __wt_timestamp_to_hex_string(txn_global->meta_ckpt_timestamp, hex_timestamp);
 
     /*
      * Don't leave a zero entry in the metadata: remove it. This avoids downgrade issues if the
@@ -953,9 +957,18 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
         WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_URI, buf->data));
     }
 
-    /* We also need to record the oldest timestamp in the metadata so we can set it on startup. */
+    /*
+     * We also need to record the oldest timestamp in the metadata so we can set it on startup. We
+     * should set the checkpoint's oldest timestamp as the minimum of the current oldest timestamp
+     * and the checkpoint timestamp.
+     *
+     * Cache the oldest timestamp and use a read barrier to prevent us from reading two different
+     * values of the oldest timestamp.
+     */
+    oldest_timestamp = txn_global->oldest_timestamp;
+    WT_READ_BARRIER();
     __wt_timestamp_to_hex_string(
-      S2C(session)->txn_global.checkpoint_oldest_timestamp, hex_timestamp);
+      WT_MIN(oldest_timestamp, txn_global->meta_ckpt_timestamp), hex_timestamp);
     if (strcmp(hex_timestamp, "0") == 0)
         WT_ERR_NOTFOUND_OK(__wt_metadata_remove(session, WT_SYSTEM_OLDEST_URI), false);
     else {
