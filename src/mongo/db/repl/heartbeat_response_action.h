@@ -45,7 +45,14 @@ public:
     /**
      * Actions taken based on heartbeat responses
      */
-    enum Action { NoAction, Reconfig, StepDownSelf, PriorityTakeover, CatchupTakeover };
+    enum Action {
+        NoAction,
+        Reconfig,
+        StepDownSelf,
+        PriorityTakeover,
+        CatchupTakeover,
+        RetryReconfig
+    };
 
     /**
      * Makes a new action representing doing nothing.
@@ -68,6 +75,12 @@ public:
      * primary after the appropriate catchup takeover delay.
      */
     static HeartbeatResponseAction makeCatchupTakeoverAction();
+
+    /**
+     * Makes a new action telling the current node to attempt to find itself in its current replica
+     * set config again, in case the previous attempt's failure was due to a temporary DNS outage.
+     */
+    static HeartbeatResponseAction makeRetryReconfigAction();
 
     /**
      * Makes a new action telling the current node to step down as primary.

@@ -283,6 +283,9 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
             invariant(responseStatus.isOK());
             _scheduleHeartbeatReconfig_inlock(responseStatus.getValue().getConfig());
             break;
+        case HeartbeatResponseAction::RetryReconfig:
+            _scheduleHeartbeatReconfig_inlock(_rsConfig);
+            break;
         case HeartbeatResponseAction::StepDownSelf:
             invariant(action.getPrimaryConfigIndex() == _selfIndex);
             if (_topCoord->prepareForUnconditionalStepDown()) {
@@ -482,7 +485,7 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig_inlock(const ReplSet
     }
     _setConfigState_inlock(kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
-              _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+              _rsConfig.getConfigVersion() < newConfig.getConfigVersion() || _selfIndex < 0);
     if (auto electionFinishedEvent = _cancelElectionIfNeeded_inlock()) {
         LOG_FOR_HEARTBEATS(2) << "Rescheduling heartbeat reconfig to version "
                               << newConfig.getConfigVersion()
@@ -674,7 +677,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
-              _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+              _rsConfig.getConfigVersion() < newConfig.getConfigVersion() || _selfIndex < 0);
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {

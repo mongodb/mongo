@@ -113,6 +113,8 @@ suites:
     test_file: jstests/replsets/rollback_via_refetch_anomaly.js
   - ticket: SERVER-47645
     test_file: jstests/replsets/invalidate_sessions_on_stepdown.js
+  - ticket: SERVER-35649
+    test_file: jstests/replsets/disallow_adding_initialized_node1.js
 
   sharding_multiversion:
 

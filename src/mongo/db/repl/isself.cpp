@@ -77,6 +77,8 @@
 namespace mongo {
 namespace repl {
 
+MONGO_FAIL_POINT_DEFINE(failIsSelfCheck);
+
 OID instanceId;
 
 MONGO_INITIALIZER(GenerateInstanceId)(InitializerContext*) {
@@ -156,6 +158,12 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 }  // namespace
 
 bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
+    if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
+        log() << "failIsSelfCheck failpoint activated, returning false from isSelf; hostAndPort: "
+              << hostAndPort;
+        return false;
+    }
+
     // Fastpath: check if the host&port in question is bound to one
     // of the interfaces on this machine.
     // No need for ip match if the ports do not match
