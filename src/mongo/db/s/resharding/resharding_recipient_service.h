@@ -36,6 +36,19 @@
 namespace mongo {
 constexpr StringData kReshardingRecipientServiceName = "ReshardingRecipientService"_sd;
 
+namespace resharding {
+
+/**
+ * Creates the temporary resharding collection locally by loading the collection options and
+ * collection indexes from the original collection's primary and MinKey owning chunk shards,
+ * respectively.
+ */
+void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
+                                                const NamespaceString& reshardingNss,
+                                                Timestamp fetchTimestamp);
+
+}  // namespace resharding
+
 class ReshardingRecipientService final : public repl::PrimaryOnlyService {
 public:
     explicit ReshardingRecipientService(ServiceContext* serviceContext)

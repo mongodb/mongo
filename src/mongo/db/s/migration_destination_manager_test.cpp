@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/s/catalog_cache_test_fixture.h"
 
 namespace mongo {
 namespace {
@@ -154,6 +155,67 @@ TEST_F(MigrationDestinationManagerTest, CloneDocumentsCatchesInsertErrors) {
                                 "operation was interrupted");
 
     ASSERT_EQ(operationContext()->getKillStatus(), 51008);
+}
+
+using MigrationDestinationManagerNetworkTest = CatalogCacheTestFixture;
+
+// Verifies MigrationDestinationManager::getCollectionOptions() and
+// MigrationDestinationManager::getCollectionIndexes() won't use shard/db versioning without a chunk
+// manager and won't include a read concern without afterClusterTime.
+TEST_F(MigrationDestinationManagerNetworkTest,
+       MigrationDestinationManagerGetIndexesAndCollectionsNoVersionsOrReadConcern) {
+    const NamespaceString nss("db.foo");
+
+    // Shard nss by _id with chunks [minKey, 0), [0, maxKey] on shards "0" and "1" respectively.
+    // ShardId("1") is the primary shard for the database.
+    auto shards = setupNShards(2);
+    auto cm = loadRoutingTableWithTwoChunksAndTwoShardsImpl(
+        nss, BSON("_id" << 1), boost::optional<std::string>("1"));
+
+    auto future = launchAsync([&] {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listCollections"_sd);
+            ASSERT_EQUALS(request.target, HostAndPort("Host0:12345"));
+            ASSERT_FALSE(request.cmdObj.hasField("readConcern"));
+            ASSERT_FALSE(request.cmdObj.hasField("databaseVersion"));
+            ASSERT_BSONOBJ_EQ(request.cmdObj["filter"].Obj(), BSON("name" << nss.coll()));
+
+            const std::vector<BSONObj> colls = {
+                BSON("name" << nss.coll() << "options" << BSONObj() << "info"
+                            << BSON("readOnly" << false << "uuid" << UUID::gen()) << "idIndex"
+                            << BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
+                                        << "_id_"))};
+
+            std::string listCollectionsNs = str::stream() << nss.db() << "$cmd.listCollections";
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("id" << 0LL << "ns" << listCollectionsNs << "firstBatch" << colls));
+        });
+    });
+
+    MigrationDestinationManager::getCollectionOptions(
+        operationContext(), nss, ShardId("0"), boost::none, boost::none);
+
+    future.default_timed_get();
+
+    future = launchAsync([&] {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.cmdObj.firstElementFieldName(), "listIndexes"_sd);
+            ASSERT_EQUALS(request.target, HostAndPort("Host0:12345"));
+            ASSERT_FALSE(request.cmdObj.hasField("readConcern"));
+            ASSERT_FALSE(request.cmdObj.hasField("shardVersion"));
+
+            const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1)
+                                                           << "name"
+                                                           << "_id_")};
+            return BSON("ok" << 1 << "cursor"
+                             << BSON("id" << 0LL << "ns" << nss.ns() << "firstBatch" << indexes));
+        });
+    });
+
+    MigrationDestinationManager::getCollectionIndexes(
+        operationContext(), nss, ShardId("0"), boost::none, boost::none);
+    future.default_timed_get();
 }
 
 }  // namespace

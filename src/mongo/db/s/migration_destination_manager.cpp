@@ -50,6 +50,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -68,6 +69,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/chrono.h"
@@ -90,6 +92,13 @@ const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 // in the ReplSetConfig.
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 -1);
+
+BSONObj makeLocalReadConcernWithAfterClusterTime(Timestamp afterClusterTime) {
+    return BSON(repl::ReadConcernArgs::kReadConcernFieldName
+                << BSON(repl::ReadConcernArgs::kLevelFieldName
+                        << repl::readConcernLevels::kLocalName
+                        << repl::ReadConcernArgs::kAfterClusterTimeFieldName << afterClusterTime));
+}
 
 void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
     MongoDOperationContextSession::checkOut(opCtx);
@@ -578,28 +587,38 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     return Status::OK();
 }
 
-CollectionOptionsAndIndexes MigrationDestinationManager::getCollectionIndexesAndOptions(
-    OperationContext* opCtx, const NamespaceString& nss, const ShardId& fromShardId) {
+MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getCollectionIndexes(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nssOrUUID,
+    const ShardId& fromShardId,
+    const boost::optional<ChunkManager>& cm,
+    boost::optional<Timestamp> afterClusterTime) {
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
 
-    DisableDocumentValidation validationDisabler(opCtx);
-
     std::vector<BSONObj> donorIndexSpecs;
     BSONObj donorIdIndexSpec;
-    BSONObj donorOptions;
 
     // Get the collection indexes and options from the donor shard.
 
     // Do not hold any locks while issuing remote calls.
     invariant(!opCtx->lockState()->isLocked());
 
+    auto cmd = nssOrUUID.nss() ? BSON("listIndexes" << nssOrUUID.nss()->coll())
+                               : BSON("listIndexes" << *nssOrUUID.uuid());
+    if (cm) {
+        cmd = appendShardVersion(cmd, cm->getVersion(fromShardId));
+    }
+    if (afterClusterTime) {
+        cmd = cmd.addFields(makeLocalReadConcernWithAfterClusterTime(*afterClusterTime));
+    }
+
     // Get indexes by calling listIndexes against the donor.
     auto indexes = uassertStatusOK(
         fromShard->runExhaustiveCursorCommand(opCtx,
                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                              nss.db().toString(),
-                                              BSON("listIndexes" << nss.coll().toString()),
+                                              nssOrUUID.db().toString(),
+                                              cmd,
                                               Milliseconds(-1)));
 
     for (auto&& spec : indexes.docs) {
@@ -612,18 +631,42 @@ CollectionOptionsAndIndexes MigrationDestinationManager::getCollectionIndexesAnd
         }
     }
 
-    // Get collection options by calling listCollections against the donor.
-    auto infosRes = uassertStatusOK(fromShard->runExhaustiveCursorCommand(
-        opCtx,
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-        nss.db().toString(),
-        BSON("listCollections" << 1 << "filter" << BSON("name" << nss.coll())),
-        Milliseconds(-1)));
+    return {donorIndexSpecs, donorIdIndexSpec};
+}
+
+MigrationDestinationManager::CollectionOptionsAndUUID
+MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
+                                                  const NamespaceStringOrUUID& nssOrUUID,
+                                                  const ShardId& fromShardId,
+                                                  const boost::optional<ChunkManager>& cm,
+                                                  boost::optional<Timestamp> afterClusterTime) {
+    auto fromShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
+
+    BSONObj fromOptions;
+
+    auto cmd = nssOrUUID.nss()
+        ? BSON("listCollections" << 1 << "filter" << BSON("name" << nssOrUUID.nss()->coll()))
+        : BSON("listCollections" << 1 << "filter" << BSON("info.uuid" << *nssOrUUID.uuid()));
+    if (cm) {
+        cmd = appendDbVersionIfPresent(cmd, cm->dbVersion());
+    }
+    if (afterClusterTime) {
+        cmd = cmd.addFields(makeLocalReadConcernWithAfterClusterTime(*afterClusterTime));
+    }
+
+    // Get collection options by calling listCollections against the from shard.
+    auto infosRes = uassertStatusOK(
+        fromShard->runExhaustiveCursorCommand(opCtx,
+                                              ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                              nssOrUUID.db().toString(),
+                                              cmd,
+                                              Milliseconds(-1)));
 
     auto infos = infosRes.docs;
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "expected listCollections against the primary shard for "
-                          << nss.toString() << " to return 1 entry, but got " << infos.size()
+                          << nssOrUUID.toString() << " to return 1 entry, but got " << infos.size()
                           << " entries",
             infos.size() == 1);
 
@@ -632,10 +675,10 @@ CollectionOptionsAndIndexes MigrationDestinationManager::getCollectionIndexesAnd
 
     // The entire options include both the settable options under the 'options' field in the
     // listCollections response, and the UUID under the 'info' field.
-    BSONObjBuilder donorOptionsBob;
+    BSONObjBuilder fromOptionsBob;
 
     if (entry["options"].isABSONObj()) {
-        donorOptionsBob.appendElements(entry["options"].Obj());
+        fromOptionsBob.appendElements(entry["options"].Obj());
     }
 
     BSONObj info;
@@ -644,25 +687,23 @@ CollectionOptionsAndIndexes MigrationDestinationManager::getCollectionIndexesAnd
     }
 
     uassert(ErrorCodes::InvalidUUID,
-            str::stream() << "The donor shard did not return a UUID for collection " << nss.ns()
-                          << " as part of its listCollections response: " << entry
-                          << ", but this node expects to see a UUID.",
+            str::stream() << "The from shard did not return a UUID for collection "
+                          << nssOrUUID.toString() << " as part of its listCollections response: "
+                          << entry << ", but this node expects to see a UUID.",
             !info["uuid"].eoo());
 
-    auto donorUUID = info["uuid"].uuid();
+    auto fromUUID = info["uuid"].uuid();
 
-    donorOptionsBob.append(info["uuid"]);
-    donorOptions = donorOptionsBob.obj();
+    fromOptionsBob.append(info["uuid"]);
+    fromOptions = fromOptionsBob.obj();
 
-    return {donorUUID, donorIndexSpecs, donorIdIndexSpec, donorOptions};
+    return {fromOptions, fromUUID};
 }
 
-void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
+void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollectionOptionsAndIndexes& collectionOptionsAndIndexes) {
-    // 0. If this shard doesn't own any chunks for the collection to be cloned and the collection
-    // exists locally, we drop its indexes to guarantee that no stale indexes carry over.
     bool dropNonDonorIndexes = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
         auto* const css = CollectionShardingRuntime::get(opCtx, nss);
@@ -711,7 +752,12 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
             }
         }
     }
+}
 
+void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptionsAndIndexes& collectionOptionsAndIndexes) {
     {
         // 1. Create the collection (if it doesn't already exist) and create any indexes we are
         // missing (auto-heal indexes).
@@ -881,8 +927,13 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
     invariant(initialState == READY);
 
-    auto donorCollectionOptionsAndIndexes =
-        getCollectionIndexesAndOptions(outerOpCtx, _nss, _fromShard);
+    auto donorCollectionOptionsAndIndexes = [&]() -> CollectionOptionsAndIndexes {
+        auto [collOptions, uuid] =
+            getCollectionOptions(outerOpCtx, _nss, _fromShard, boost::none, boost::none);
+        auto [indexes, idIndex] =
+            getCollectionIndexes(outerOpCtx, _nss, _fromShard, boost::none, boost::none);
+        return {uuid, indexes, idIndex, collOptions};
+    }();
 
     auto fromShard =
         uassertStatusOK(Grid::get(outerOpCtx)->shardRegistry()->getShard(outerOpCtx, _fromShard));
@@ -965,6 +1016,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     auto opCtx = newOpCtxPtr.get();
 
     {
+        _dropLocalIndexesIfNecessary(opCtx, _nss, donorCollectionOptionsAndIndexes);
         cloneCollectionIndexesAndOptions(opCtx, _nss, donorCollectionOptionsAndIndexes);
 
         timing.done(2);

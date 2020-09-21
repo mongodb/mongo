@@ -41,6 +41,7 @@
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -135,11 +136,34 @@ public:
     Status startCommit(const MigrationSessionId& sessionId);
 
     /**
-     * Gets the collection uuid, options and indexes from fromShardId.
+     * Gets the collection indexes from fromShardId. If given a chunk manager, will fetch the
+     * indexes using the shard version protocol.
      */
-    static CollectionOptionsAndIndexes getCollectionIndexesAndOptions(OperationContext* opCtx,
-                                                                      const NamespaceString& nss,
-                                                                      const ShardId& fromShardId);
+    struct IndexesAndIdIndex {
+        std::vector<BSONObj> indexSpecs;
+        BSONObj idIndexSpec;
+    };
+    static IndexesAndIdIndex getCollectionIndexes(OperationContext* opCtx,
+                                                  const NamespaceStringOrUUID& nssOrUUID,
+                                                  const ShardId& fromShardId,
+                                                  const boost::optional<ChunkManager>& cm,
+                                                  boost::optional<Timestamp> afterClusterTime);
+
+    /**
+     * Gets the collection uuid and options from fromShardId. If given a chunk manager, will fetch
+     * the collection options using the database version protocol.
+     */
+    struct CollectionOptionsAndUUID {
+        BSONObj options;
+        UUID uuid;
+    };
+    static CollectionOptionsAndUUID getCollectionOptions(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nssOrUUID,
+        const ShardId& fromShardId,
+        const boost::optional<ChunkManager>& cm,
+        boost::optional<Timestamp> afterClusterTime);
+
 
     /**
      * Creates the collection on the shard and clones the indexes and options.
@@ -167,6 +191,15 @@ private:
     bool _applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer, repl::OpTime* lastOpApplied);
 
     bool _flushPendingWrites(OperationContext* opCtx, const repl::OpTime& lastOpApplied);
+
+    /**
+     * If this shard doesn't own any chunks for the collection to be cloned and the collection
+     * exists locally, drops its indexes to guarantee that no stale indexes carry over.
+     */
+    void _dropLocalIndexesIfNecessary(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const CollectionOptionsAndIndexes& collectionOptionsAndIndexes);
 
     /**
      * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated

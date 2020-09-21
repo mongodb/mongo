@@ -31,11 +31,94 @@
 
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
+
+namespace resharding {
+
+void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
+                                                const NamespaceString& reshardingNss,
+                                                Timestamp fetchTimestamp) {
+    LOGV2_DEBUG(
+        5002300, 1, "Creating temporary resharding collection", "namespace"_attr = reshardingNss);
+
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    auto reshardingCm =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, reshardingNss));
+    uassert(
+        5002301,
+        "Expected cached metadata for resharding temporary collection to have resharding fields",
+        reshardingCm.getReshardingFields() &&
+            reshardingCm.getReshardingFields()->getRecipientFields());
+    auto originalNss =
+        reshardingCm.getReshardingFields()->getRecipientFields()->getOriginalNamespace();
+
+    // Load the original collection's options from the database's primary shard.
+    auto [collOptions, uuid] = sharded_agg_helpers::shardVersionRetry(
+        opCtx,
+        catalogCache,
+        reshardingNss,
+        "loading collection options to create temporary resharding collection"_sd,
+        [&]() -> MigrationDestinationManager::CollectionOptionsAndUUID {
+            auto originalCm =
+                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, originalNss));
+            uassert(ErrorCodes::InvalidUUID,
+                    "Expected cached metadata for resharding temporary collection to have a UUID",
+                    originalCm.getUUID());
+            return MigrationDestinationManager::getCollectionOptions(
+                opCtx,
+                NamespaceStringOrUUID(originalNss.db().toString(), *originalCm.getUUID()),
+                originalCm.dbPrimary(),
+                originalCm,
+                fetchTimestamp);
+        });
+
+    // Load the original collection's indexes from the shard that owns the global minimum chunk.
+    auto [indexes, idIndex] = sharded_agg_helpers::shardVersionRetry(
+        opCtx,
+        catalogCache,
+        reshardingNss,
+        "loading indexes to create temporary resharding collection"_sd,
+        [&]() -> MigrationDestinationManager::IndexesAndIdIndex {
+            auto originalCm =
+                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, originalNss));
+            uassert(ErrorCodes::NamespaceNotSharded,
+                    str::stream() << "Expected collection " << originalNss << " to be sharded",
+                    originalCm.isSharded());
+            uassert(ErrorCodes::InvalidUUID,
+                    "Expected cached metadata for resharding temporary collection to have a UUID",
+                    originalCm.getUUID());
+            auto indexShardId = originalCm.getMinKeyShardIdWithSimpleCollation();
+            return MigrationDestinationManager::getCollectionIndexes(
+                opCtx,
+                NamespaceStringOrUUID(originalNss.db().toString(), *originalCm.getUUID()),
+                indexShardId,
+                originalCm,
+                fetchTimestamp);
+        });
+
+    // Set the temporary resharding collection's UUID to the resharding UUID. Note that
+    // BSONObj::addFields() replaces any fields that already exist.
+    auto reshardingUUID = reshardingCm.getReshardingFields()->getUuid();
+    collOptions = collOptions.addFields(BSON("uuid" << reshardingUUID));
+
+    CollectionOptionsAndIndexes optionsAndIndexes = {reshardingUUID, indexes, idIndex, collOptions};
+    MigrationDestinationManager::cloneCollectionIndexesAndOptions(
+        opCtx, reshardingNss, optionsAndIndexes);
+}
+
+}  // namespace resharding
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::constructInstance(
     BSONObj initialState) const {
@@ -128,6 +211,9 @@ void ReshardingRecipientService::RecipientStateMachine::
     if (_recipientDoc.getState() > RecipientStateEnum::kInitializing) {
         return;
     }
+
+    // TODO SERVER-51217: Call
+    // resharding_recipient_service_util::createTemporaryReshardingCollectionLocally()
 
     _transitionState(RecipientStateEnum::kInitialized);
 }

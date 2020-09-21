@@ -197,13 +197,17 @@ void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string
 
 void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
                                                   OID epoch,
-                                                  const ShardKeyPattern& shardKeyPattern) {
+                                                  const ShardKeyPattern& shardKeyPattern,
+                                                  boost::optional<UUID> uuid) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         CollectionType collType;
         collType.setNs(nss);
         collType.setEpoch(epoch);
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);
+        if (uuid) {
+            collType.setUUID(*uuid);
+        }
 
         return std::vector<BSONObj>{collType.toBSON()};
     }());
@@ -224,7 +228,10 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsH
 }
 
 ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsImpl(
-    NamespaceString nss, const BSONObj& shardKey) {
+    NamespaceString nss,
+    const BSONObj& shardKey,
+    boost::optional<std::string> primaryShardId,
+    boost::optional<UUID> uuid) {
     const OID epoch = OID::gen();
     const ShardKeyPattern shardKeyPattern(shardKey);
 
@@ -232,9 +239,13 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
 
     // Mock the expected config server queries.
     if (!nss.isAdminDB() && !nss.isConfigDB()) {
-        expectGetDatabase(nss);
+        if (primaryShardId) {
+            expectGetDatabase(nss, *primaryShardId);
+        } else {
+            expectGetDatabase(nss);
+        }
     }
-    expectGetCollection(nss, epoch, shardKeyPattern);
+    expectGetCollection(nss, epoch, shardKeyPattern, uuid);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version(1, 0, epoch);
 

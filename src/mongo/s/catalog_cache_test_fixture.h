@@ -116,8 +116,11 @@ protected:
     /**
      * The common implementation for any shard key.
      */
-    ChunkManager loadRoutingTableWithTwoChunksAndTwoShardsImpl(NamespaceString nss,
-                                                               const BSONObj& shardKey);
+    ChunkManager loadRoutingTableWithTwoChunksAndTwoShardsImpl(
+        NamespaceString nss,
+        const BSONObj& shardKey,
+        boost::optional<std::string> primaryShardId = boost::none,
+        boost::optional<UUID> uuid = boost::none);
 
     /**
      * Mocks network responses for loading a sharded database and collection from the config server.
@@ -125,7 +128,8 @@ protected:
     void expectGetDatabase(NamespaceString nss, std::string primaryShard = "0");
     void expectGetCollection(NamespaceString nss,
                              OID epoch,
-                             const ShardKeyPattern& shardKeyPattern);
+                             const ShardKeyPattern& shardKeyPattern,
+                             boost::optional<UUID> uuid = boost::none);
 
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };
