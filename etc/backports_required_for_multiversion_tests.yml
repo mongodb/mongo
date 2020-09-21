@@ -90,6 +90,8 @@ suites:
   concurrency_sharded_replication_multiversion:
 
   replica_sets_multiversion:
+  - ticket: SERVER-35649
+    test_file: jstests/replsets/disallow_adding_initialized_node1.js
 
   replica_sets_jscore_multiversion_passthrough:
 

@@ -12,7 +12,8 @@ var replSetA = new ReplSetTest({
     name: name,
     nodes: [
         {rsConfig: {_id: 10}},
-    ]
+    ],
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({replication: 2})}}
 });
 replSetA.startSet({dbpath: "$set-A-$node"});
 replSetA.initiate();
@@ -21,7 +22,8 @@ var replSetB = new ReplSetTest({
     name: name,
     nodes: [
         {rsConfig: {_id: 20}},
-    ]
+    ],
+    nodeOptions: {setParameter: {logComponentVerbosity: tojsononeline({replication: 2})}}
 });
 replSetB.startSet({dbpath: "$set-B-$node"});
 replSetB.initiate();
@@ -54,14 +56,19 @@ configA.version++;
 configA.members.push({_id: 11, host: primaryB.host, votes: 0, priority: 0});
 assert.commandWorked(primaryA.adminCommand({replSetReconfig: configA}));
 
-// Wait for primary A to report primary B down. B should reject all heartbeats from A due to a
-// replset name mismatch, leading A to consider it down.
+// Wait for primary A to report primary B UNKNOWN.
 assert.soon(function() {
     const statusA = assert.commandWorked(primaryA.adminCommand({replSetGetStatus: 1}));
     if (statusA.members.length !== 2) {
         return false;
     }
-    return statusA.members[1].state === ReplSetTest.State.DOWN;
+    return statusA.members[1].state === ReplSetTest.State.UNKNOWN;
+});
+
+checkLog.containsJson(primaryA, 4615621, {
+    error: (error) => {
+        return error.code === 93 && error.errmsg.indexOf("replica set IDs do not match") !== -1;
+    }
 });
 
 // Confirm that each set still has the correct primary.
@@ -72,7 +79,7 @@ jsTestLog('After merging with 0 votes: primary A = ' + newPrimaryA.host +
 assert.eq(primaryA, newPrimaryA);
 assert.eq(primaryB, newPrimaryB);
 
-// Replica set A's config should include primary B and consider it DOWN.
+// Replica set A's config should include primary B and consider it UNKNOWN.
 let statusA = assert.commandWorked(primaryA.adminCommand({replSetGetStatus: 1}));
 jsTestLog('After merging with 0 votes: replica set status A = ' + tojson(statusA));
 assert.eq(2, statusA.members.length);
@@ -81,7 +88,7 @@ assert.eq(primaryA.host, statusA.members[0].name);
 assert.eq(ReplSetTest.State.PRIMARY, statusA.members[0].state);
 assert.eq(11, statusA.members[1]._id);
 assert.eq(primaryB.host, statusA.members[1].name);
-assert.eq(ReplSetTest.State.DOWN, statusA.members[1].state);
+assert.eq(ReplSetTest.State.UNKNOWN, statusA.members[1].state);
 
 // Replica set B's config should remain unchanged.
 let statusB = assert.commandWorked(primaryB.adminCommand({replSetGetStatus: 1}));
@@ -115,7 +122,7 @@ var msgB = "replica set IDs do not match, ours: " + configB.settings.replicaSetI
     "; remote node's: " + configA.settings.replicaSetId;
 checkLog.contains(primaryB, msgB);
 
-// Confirm primary B is still DOWN.
+// Confirm primary B is still UNKNOWN.
 statusA = assert.commandWorked(primaryA.adminCommand({replSetGetStatus: 1}));
 jsTestLog('After merging: replica set status A = ' + tojson(statusA));
 assert.eq(2, statusA.members.length);
@@ -124,7 +131,7 @@ assert.eq(primaryA.host, statusA.members[0].name);
 assert.eq(ReplSetTest.State.PRIMARY, statusA.members[0].state);
 assert.eq(11, statusA.members[1]._id);
 assert.eq(primaryB.host, statusA.members[1].name);
-assert.eq(ReplSetTest.State.DOWN, statusA.members[1].state);
+assert.eq(ReplSetTest.State.UNKNOWN, statusA.members[1].state);
 
 // Replica set B's config should remain unchanged.
 statusB = assert.commandWorked(primaryB.adminCommand({replSetGetStatus: 1}));

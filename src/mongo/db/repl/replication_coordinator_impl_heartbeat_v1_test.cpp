@@ -1035,12 +1035,8 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
     ASSERT_TRUE(members[1].isABSONObj());
     auto member = members[1].Obj();
     ASSERT_EQ(host2, HostAndPort(member["name"].String()));
-    ASSERT_EQ(MemberState(MemberState::RS_DOWN).toString(),
+    ASSERT_EQ(MemberState(MemberState::RS_UNKNOWN).toString(),
               MemberState(member["state"].numberInt()).toString());
-    ASSERT_EQ(member["lastHeartbeatMessage"].String(),
-              std::string(str::stream()
-                          << "replica set IDs do not match, ours: " << rsConfig.getReplicaSetId()
-                          << "; remote node's: " << unexpectedId));
 }
 
 TEST_F(ReplCoordHBV1Test,

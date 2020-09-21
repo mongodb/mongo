@@ -1311,7 +1311,7 @@ TEST_F(TopoCoordTest, NodeChangesToRecoveringWhenOnlyUnauthorizedNodesAreUp) {
     ASSERT_NO_ACTION(action.getAction());
 }
 
-TEST_F(TopoCoordTest, NodeDoesNotActOnHeartbeatsWhenAbsentFromConfig) {
+TEST_F(TopoCoordTest, NodeRetriesReconfigWhenAbsentFromConfig) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 1 << "members"
@@ -1322,12 +1322,13 @@ TEST_F(TopoCoordTest, NodeDoesNotActOnHeartbeatsWhenAbsentFromConfig) {
                                     << BSON("_id" << 30 << "host"
                                                   << "h3"))),
                  -1);
-    ASSERT_NO_ACTION(heartbeatFromMember(HostAndPort("h2"),
-                                         "rs0",
-                                         MemberState::RS_SECONDARY,
-                                         OpTime(Timestamp(1, 0), 0),
-                                         Milliseconds(300))
-                         .getAction());
+    ASSERT_EQUALS(HeartbeatResponseAction::RetryReconfig,
+                  heartbeatFromMember(HostAndPort("h2"),
+                                      "rs0",
+                                      MemberState::RS_SECONDARY,
+                                      OpTime(Timestamp(1, 0), 0),
+                                      Milliseconds(300))
+                      .getAction());
 }
 
 TEST_F(TopoCoordTest, NodeReturnsNotSecondaryWhenSyncFromIsRunPriorToHavingAConfig) {
