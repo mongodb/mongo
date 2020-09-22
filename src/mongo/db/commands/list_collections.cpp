@@ -46,6 +46,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/queued_data_stage.h"
@@ -150,6 +151,9 @@ BSONObj buildViewBson(const ViewDefinition& view) {
     return b.obj();
 }
 
+/**
+ * Return an object describing the collection. Takes a collection lock.
+ */
 BSONObj buildCollectionBson(OperationContext* opCtx,
                             const Collection* collection,
                             bool includePendingDrops) {
@@ -175,6 +179,7 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
     b.append("name", collectionName);
     b.append("type", "collection");
 
+    Lock::CollectionLock clk(opCtx->lockState(), nss.ns(), MODE_IS);
     CollectionOptions options = collection->getCatalogEntry()->getCollectionOptions(opCtx);
 
     // While the UUID is stored as a collection option, from the user's perspective it is an
@@ -280,7 +285,7 @@ public:
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         BSONArrayBuilder firstBatch;
         {
-            AutoGetDb autoDb(opCtx, dbname, MODE_S);
+            AutoGetDb autoDb(opCtx, dbname, MODE_IS);
 
             Database* db = autoDb.getDb();
 
