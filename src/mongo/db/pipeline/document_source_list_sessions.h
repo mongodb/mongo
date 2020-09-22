@@ -51,7 +51,7 @@ namespace mongo {
 class DocumentSourceListSessions final : public DocumentSourceMatch {
 public:
     DocumentSourceListSessions(const DocumentSourceListSessions& other)
-        : DocumentSourceMatch(other) {}
+        : DocumentSourceMatch(other), _allUsers(other._allUsers), _users(other._users) {}
 
     virtual boost::intrusive_ptr<DocumentSourceMatch> clone() const {
         return make_intrusive<std::decay_t<decltype(*this)>>(*this);
