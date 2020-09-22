@@ -1117,7 +1117,9 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionCoerceToBool* expr) final {
-        unsupportedExpression("$coerceToBool");
+        // Since $coerceToBool is internal-only and there are not yet any input expressions that
+        // generate an ExpressionCoerceToBool expression, we will leave it as unreachable for now.
+        MONGO_UNREACHABLE;
     }
     void visit(ExpressionCompare* expr) final {
         _context->ensureArity(2);
