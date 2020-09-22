@@ -51,8 +51,8 @@
 
 namespace mongo {
 
-// Hangs in the beginning of each isMaster command when set.
-MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
+// Hangs in the beginning of each hello command when set.
+MONGO_FAIL_POINT_DEFINE(waitInHello);
 
 namespace {
 
@@ -97,7 +97,7 @@ public:
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        waitInIsMaster.pauseWhileSet(opCtx);
+        waitInHello.pauseWhileSet(opCtx);
 
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();

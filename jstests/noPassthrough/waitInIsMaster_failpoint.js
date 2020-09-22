@@ -1,4 +1,4 @@
-// Tests the waitInIsMaster failpoint.
+// Tests the waitInHello failpoint.
 // @tags: [requires_replication]
 (function() {
 "use strict";
@@ -17,11 +17,11 @@ function runTest(conn) {
     assert.eq(0, conn.getDB("test").c.find().itcount());
 
     // Use a skip of 1, since the parallel shell runs hello when it starts.
-    const isMasterFailpoint = configureFailPoint(conn, "waitInIsMaster", {}, {skip: 1});
+    const helloFailpoint = configureFailPoint(conn, "waitInHello", {}, {skip: 1});
     const awaitHello = startParallelShell(runHelloCommand, conn.port);
-    isMasterFailpoint.wait();
+    helloFailpoint.wait();
     sleep(100);
-    isMasterFailpoint.off();
+    helloFailpoint.off();
     awaitHello();
 }
 

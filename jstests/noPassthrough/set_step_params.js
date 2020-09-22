@@ -184,7 +184,7 @@ runSubTest("MaxConnecting", function() {
         ShardingTaskExecutorPoolMaxConnecting: maxPending1,
     });
 
-    configureReplSetFailpoint("waitInIsMaster", "alwaysOn");
+    configureReplSetFailpoint("waitInHello", "alwaysOn");
     configureReplSetFailpoint("waitInFindBeforeMakingBatch", "alwaysOn");
     dropConnections();
 
@@ -205,7 +205,7 @@ runSubTest("MaxConnecting", function() {
     hasConnPoolStats({pending: maxPending2});
 
     // Release our pending and walk away
-    configureReplSetFailpoint("waitInIsMaster", "off");
+    configureReplSetFailpoint("waitInHello", "off");
     hasConnPoolStats({
         // Expects the number of pending connections to be zero.
         checkStatsFunc: function(stats) {
@@ -242,7 +242,7 @@ runSubTest("Timeouts", function() {
     hasConnPoolStats({ready: conns});
 
     // Block refreshes and wait for the toRefresh timeout
-    configureReplSetFailpoint("waitInIsMaster", "alwaysOn");
+    configureReplSetFailpoint("waitInHello", "alwaysOn");
     sleep(toRefreshTimeoutMS);
 
     // Confirm that we're in pending for all of our conns
@@ -257,7 +257,7 @@ runSubTest("Timeouts", function() {
     sleep(pendingTimeoutMS);
     hasConnPoolStats({});
 
-    configureReplSetFailpoint("waitInIsMaster", "off");
+    configureReplSetFailpoint("waitInHello", "off");
 
     // Reset the min conns to make sure normal refresh doesn't extend the timeout
     updateSetParameters({
