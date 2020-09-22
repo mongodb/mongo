@@ -84,11 +84,8 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     auto storageSize =
         static_cast<long long>(recordStore->storageSize(opCtx, result, verbose ? 1 : 0));
     result->appendNumber("storageSize", storageSize / scale);
-
-    auto freeStorageSize = static_cast<long long>(recordStore->freeStorageSize(opCtx));
-    if (freeStorageSize != 0) {
-        result->appendNumber("freeStorageSize", freeStorageSize / scale);
-    }
+    result->appendNumber("freeStorageSize",
+                         static_cast<long long>(recordStore->freeStorageSize(opCtx)) / scale);
 
     recordStore->appendCustomStats(opCtx, result, scale);
 
