@@ -298,10 +298,6 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
         sbe::makeE<sbe::ELocalBind>(frameId, std::move(str), std::move(totalCaseConversionExpr)));
 }
 
-std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
-    return sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot, std::move(e));
-}
-
 void buildArrayAccessByConstantIndex(ExpressionVisitorContext* context,
                                      const std::string& exprName,
                                      int32_t index) {
@@ -328,6 +324,21 @@ void buildArrayAccessByConstantIndex(ExpressionVisitorContext* context,
 
     context->pushExpr(
         sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
+}
+
+/**
+ * Generate an EExpression representing a Regex function result upon null argument(s) depending on
+ * the type of the function: $regexMatch - false, $regexFind - null, $RegexFindAll - [].
+ */
+std::unique_ptr<sbe::EExpression> generateRegexNullResponse(StringData exprName) {
+    if (exprName.toString().compare(std::string("regexMatch")) == 0) {
+        return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                          sbe::value::bitcastFrom<bool>(false));
+    } else if (exprName.toString().compare("regexFindAll") == 0) {
+        auto [arrTag, arrVal] = sbe::value::makeNewArray();
+        return sbe::makeE<sbe::EConstant>(arrTag, arrVal);
+    }
+    return sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0);
 }
 
 class ExpressionPreVisitor final : public ExpressionVisitor {
@@ -1136,7 +1147,7 @@ public:
         //
         // 2) Check if the value in a given slot is an integral int64. This test is done by
         // computing a lossless conversion of the value in s1 to an int64. The exposed
-        // conversion function by the vm returns a value if there is no loss of precsision,
+        // conversion function by the vm returns a value if there is no loss of precision,
         // otherwise it returns Nothing. In both the valid or Nothing case, we can store the result
         // of the conversion in l2.0 of the inner let binding and test for existence. If the
         // existence check fails we know the conversion is lossy and we can fail the query.
@@ -2116,13 +2127,13 @@ public:
         unsupportedExpression("$convert");
     }
     void visit(ExpressionRegexFind* expr) final {
-        unsupportedExpression("$regexFind");
+        generateRegexExpression(expr, "regexFind");
     }
     void visit(ExpressionRegexFindAll* expr) final {
-        unsupportedExpression("$regexFind");
+        generateRegexExpression(expr, "regexFindAll");
     }
     void visit(ExpressionRegexMatch* expr) final {
-        unsupportedExpression("$regexFind");
+        generateRegexExpression(expr, "regexMatch");
     }
     void visit(ExpressionCosine* expr) final {
         generateTrigonometricExpressionWithBounds(
@@ -2699,6 +2710,86 @@ private:
             sbe::makeE<sbe::EFunction>(setFunction, std::move(argVars)));
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(setExpr)));
+    }
+
+    /**
+     * Shared expression building logic for regex expressions.
+     */
+    void generateRegexExpression(ExpressionRegex* expr, StringData exprName) {
+        size_t arity = (expr->hasOptions()) ? 3 : 2;
+        _context->ensureArity(arity);
+
+        std::unique_ptr<sbe::EExpression> options =
+            (arity == 3) ? _context->popExpr() : sbe::makeE<sbe::EConstant>("");
+        auto pattern = _context->popExpr();
+        auto input = _context->popExpr();
+
+        auto pcreRegexExpr = [&]() {
+            auto [patternStr, optStr] = expr->getConstantPatternAndOptions();
+            if (patternStr) {
+                // Create the compiled Regex from constant pattern and options.
+                auto [regexTag, regexVal] = sbe::value::makeNewPcreRegex(patternStr.get(), optStr);
+                return sbe::makeE<sbe::EConstant>(regexTag, regexVal);
+            } else {
+                // Build a call to regexCompile function.
+                auto frameId = _context->frameIdGenerator->generate();
+                auto binds = sbe::makeEs(std::move(pattern));
+                sbe::EVariable patternRef(frameId, 0);
+
+                return sbe::makeE<sbe::ELocalBind>(
+                    frameId,
+                    std::move(binds),
+                    buildMultiBranchConditional(
+                        CaseValuePair{generateNullOrMissing(patternRef),
+                                      sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+                        CaseValuePair{generateNonStringCheck(patternRef),
+                                      sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073400},
+                                                             str::stream()
+                                                                 << "$" << exprName.toString()
+                                                                 << " expects string pattern")},
+                        sbe::makeE<sbe::EFunction>(
+                            "regexCompile", sbe::makeEs(patternRef.clone(), std::move(options)))));
+            }
+        }();
+
+        auto outerFrameId = _context->frameIdGenerator->generate();
+        auto outerBinds = sbe::makeEs(std::move(pcreRegexExpr), std::move(input));
+        sbe::EVariable regexRef(outerFrameId, 0);
+        sbe::EVariable inputRef(outerFrameId, 1);
+        auto innerFrameId = _context->frameIdGenerator->generate();
+        sbe::EVariable resRef(innerFrameId, 0);
+
+        auto regexWithErrorCheck = buildMultiBranchConditional(
+            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(
+                              sbe::EPrimBinary::logicOr,
+                              generateNullOrMissing(inputRef),
+                              sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(regexRef.clone()))),
+                          generateRegexNullResponse(exprName)},
+            CaseValuePair{generateNonStringCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073401},
+                                                 str::stream() << "$" << exprName.toString()
+                                                               << " expects input of type string")},
+
+            CaseValuePair{
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(regexRef.clone()))),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073402}, "Invalid regular expression")},
+            sbe::makeE<sbe::ELocalBind>(
+                innerFrameId,
+                sbe::makeEs(sbe::makeE<sbe::EFunction>(
+                    exprName.toString(), sbe::makeEs(regexRef.clone(), inputRef.clone()))),
+                sbe::makeE<sbe::EIf>(
+                    sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(resRef.clone())),
+                    resRef.clone(),
+                    sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073403},
+                                           str::stream()
+                                               << "Unexpected error occurred while executing "
+                                               << exprName.toString()
+                                               << ". For more details see the error logs."))));
+
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            outerFrameId, std::move(outerBinds), std::move(regexWithErrorCheck)));
     }
 
     void unsupportedExpression(const char* op) const {

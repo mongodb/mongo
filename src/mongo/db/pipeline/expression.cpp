@@ -3132,6 +3132,7 @@ Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) 
         if (stringHasTokenAtIndex(byteIx, input, token)) {
             return Value(static_cast<int>(currentCodePointIndex));
         }
+
         byteIx += str::getCodePointLength(input[byteIx]);
     }
 
@@ -6333,6 +6334,61 @@ void ExpressionRegex::_doAddDependencies(DepsTracker* deps) const {
     if (_options) {
         _options->addDependencies(deps);
     }
+}
+
+std::pair<boost::optional<std::string>, std::string> ExpressionRegex::getConstantPatternAndOptions()
+    const {
+    if (!ExpressionConstant::isNullOrConstant(_regex) ||
+        !ExpressionConstant::isNullOrConstant(_options)) {
+        return {boost::none, ""};
+    }
+    auto patternValue = static_cast<ExpressionConstant*>(_regex.get())->getValue();
+    uassert(5073405,
+            str::stream() << _opName << " needs 'regex' to be of type string or regex",
+            patternValue.nullish() || patternValue.getType() == BSONType::RegEx ||
+                patternValue.getType() == BSONType::String);
+    auto patternStr = [&]() -> boost::optional<std::string> {
+        if (patternValue.getType() == BSONType::RegEx) {
+            StringData flags = patternValue.getRegexFlags();
+            uassert(5073406,
+                    str::stream()
+                        << _opName
+                        << ": found regex options specified in both 'regex' and 'options' fields",
+                    _options.get() == nullptr || flags.empty());
+            return std::string(patternValue.getRegex());
+        } else if (patternValue.getType() == BSONType::String) {
+            return patternValue.getString();
+        } else {
+            return boost::none;
+        }
+    }();
+
+    auto optionsStr = [&]() -> std::string {
+        if (_options.get() != nullptr) {
+            auto optValue = static_cast<ExpressionConstant*>(_options.get())->getValue();
+            if (optValue.getType() == BSONType::String) {
+                return optValue.getString();
+            }
+        }
+        if (patternValue.getType() == BSONType::RegEx) {
+            StringData flags = patternValue.getRegexFlags();
+            if (!flags.empty()) {
+                return flags.toString();
+            }
+        }
+        return {};
+    }();
+
+    uassert(5073407,
+            str::stream() << _opName << ": regular expression cannot contain an embedded null byte",
+            patternStr->find('\0', 0) == std::string::npos);
+
+    uassert(5073408,
+            str::stream() << _opName
+                          << ": regular expression options cannot contain an embedded null byte",
+            optionsStr.find('\0', 0) == std::string::npos);
+
+    return {patternStr, optionsStr};
 }
 
 /* -------------------------- ExpressionRegexFind ------------------------------ */

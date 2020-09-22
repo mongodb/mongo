@@ -31,13 +31,12 @@
 
 #include "mongo/db/exec/sbe/values/value.h"
 
-#include <pcrecpp.h>
-
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/regex_util.h"
 
 namespace mongo {
 namespace sbe {
@@ -48,9 +47,49 @@ std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
     return {TypeTags::ksValue, bitcastFrom<KeyString::Value*>(k)};
 }
 
-std::pair<TypeTags, Value> makeCopyPcreRegex(const pcrecpp::RE& regex) {
-    auto ownedRegexVal = sbe::value::bitcastFrom<pcrecpp::RE*>(new pcrecpp::RE(regex));
-    return {TypeTags::pcreRegex, ownedRegexVal};
+std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::string_view options) {
+    auto regex = std::make_unique<PcreRegex>(pattern, options);
+    if (regex->isValid()) {
+        return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regex.release())};
+    }
+    return {TypeTags::Nothing, 0};
+}
+
+std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex) {
+    if (regex.isValid()) {
+        auto regexCopy = std::make_unique<PcreRegex>(regex);
+        invariant(regexCopy->isValid());
+        return {TypeTags::pcreRegex, bitcastFrom<PcreRegex*>(regexCopy.release())};
+    }
+    return {TypeTags::Nothing, 0};
+}
+
+void PcreRegex::_compile() {
+    const auto pcreOptions = regex_util::flagsToPcreOptions(_options.c_str(), false).all_options();
+    const char* compile_error;
+    int eoffset;
+    _pcrePtr = pcre_compile(_pattern.c_str(), pcreOptions, &compile_error, &eoffset, nullptr);
+    _isValid = (_pcrePtr != nullptr);
+}
+
+int PcreRegex::execute(std::string_view stringView, int startPos, std::vector<int>& buf) {
+    invariant(_isValid);
+    return pcre_exec(_pcrePtr,
+                     nullptr,
+                     stringView.data(),
+                     stringView.length(),
+                     startPos,
+                     0,
+                     &(buf.front()),
+                     buf.size());
+}
+
+size_t PcreRegex::getNumberCaptures() const {
+    int numCaptures;
+    invariant(_isValid);
+    pcre_fullinfo(_pcrePtr, nullptr, PCRE_INFO_CAPTURECOUNT, &numCaptures);
+    invariant(numCaptures >= 0);
+    return static_cast<size_t>(numCaptures);
 }
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {
@@ -374,8 +413,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         }
         case value::TypeTags::pcreRegex: {
             auto regex = getPcreRegexView(val);
-            // TODO: Also include the regex flags.
-            stream << "/" << regex->pattern() << "/";
+            stream << "/" << regex->pattern() << "/" << regex->options();
             break;
         }
         case value::TypeTags::timeZoneDB: {

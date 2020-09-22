@@ -231,6 +231,9 @@ enum class Builtin : uint8_t {
     setIntersection,
     setDifference,
     runJsPredicate,
+    regexCompile,  // compile <pattern, options> into value::pcreRegex
+    regexFind,
+    regexFindAll,
 };
 
 using SmallArityType = uint8_t;
@@ -582,6 +585,9 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetDifference(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinRegexFindAll(ArityType arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

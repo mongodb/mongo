@@ -416,6 +416,9 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::setDifference, false}},
     {"runJsPredicate",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::runJsPredicate, false}},
+    {"regexCompile", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexCompile, false}},
+    {"regexFind", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexFind, false}},
+    {"regexFindAll", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexFindAll, false}},
 };
 
 /**

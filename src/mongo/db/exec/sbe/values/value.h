@@ -35,6 +35,7 @@
 #include <bitset>
 #include <cstdint>
 #include <ostream>
+#include <pcre.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -46,10 +47,6 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/represent_as.h"
-
-namespace pcrecpp {
-class RE;
-}  // namespace pcrecpp
 
 namespace mongo {
 /**
@@ -153,6 +150,10 @@ inline constexpr bool isBinData(TypeTags tag) noexcept {
 
 inline constexpr bool isRecordId(TypeTags tag) noexcept {
     return tag == TypeTags::RecordId;
+}
+
+inline constexpr bool isPcreRegex(TypeTags tag) noexcept {
+    return tag == TypeTags::pcreRegex;
 }
 
 BSONType tagToType(TypeTags tag) noexcept;
@@ -529,6 +530,81 @@ private:
     ValueSetType _values;
 };
 
+/**
+ * Implements a wrapper of PCRE regular expression.
+ * Storing the pattern and the options allows for copying of the sbe::value::PcreRegex expression,
+ * which includes recompilation.
+ * The compiled expression pcre* allows for direct usage of the pcre C library functionality.
+ */
+class PcreRegex {
+public:
+    PcreRegex() = default;
+
+    PcreRegex(std::string_view pattern, std::string_view options)
+        : _pattern(pattern), _options(options), _pcrePtr(nullptr) {
+        _compile();
+    }
+
+    PcreRegex(std::string_view pattern) : PcreRegex(pattern, "") {}
+
+    PcreRegex(const PcreRegex& other) : PcreRegex(other._pattern, other._options) {}
+
+    PcreRegex& operator=(const PcreRegex& other) {
+        if (this != &other) {
+            if (_pcrePtr != nullptr) {
+                (*pcre_free)(_pcrePtr);
+            }
+            _pattern = other._pattern;
+            _options = other._options;
+            _isValid = false;
+            _compile();
+        }
+        return *this;
+    }
+
+    ~PcreRegex() {
+        if (_pcrePtr != nullptr) {
+            (*pcre_free)(_pcrePtr);
+        }
+    }
+
+    bool isValid() const {
+        return _isValid;
+    }
+
+    const std::string& pattern() const {
+        return _pattern;
+    }
+
+    const std::string& options() const {
+        return _options;
+    }
+
+    /**
+     * Wrapper function for pcre_exec().
+     * - input: The input string.
+     * - startPos: The position from where the search should start.
+     * - buf: Array populated with the found matched string and capture groups.
+     * Returns the number of matches or an error code:
+     *         < -1 error
+     *         = -1 no match
+     *         = 0  there was a match, but not enough space in the buffer
+     *         > 0  the number of matches
+     */
+    int execute(std::string_view input, int startPos, std::vector<int>& buf);
+
+    size_t getNumberCaptures() const;
+
+private:
+    void _compile();
+
+    std::string _pattern;
+    std::string _options;
+
+    pcre* _pcrePtr;
+    bool _isValid = false;
+};
+
 constexpr size_t kSmallStringThreshold = 8;
 using ObjectIdType = std::array<uint8_t, 12>;
 static_assert(sizeof(ObjectIdType) == 12);
@@ -694,8 +770,12 @@ inline KeyString::Value* getKeyStringView(Value val) noexcept {
     return reinterpret_cast<KeyString::Value*>(val);
 }
 
-inline pcrecpp::RE* getPcreRegexView(Value val) noexcept {
-    return reinterpret_cast<pcrecpp::RE*>(val);
+std::pair<TypeTags, Value> makeNewPcreRegex(std::string_view pattern, std::string_view options);
+
+std::pair<TypeTags, Value> makeCopyPcreRegex(const PcreRegex& regex);
+
+inline PcreRegex* getPcreRegexView(Value val) noexcept {
+    return reinterpret_cast<PcreRegex*>(val);
 }
 
 inline JsFunction* getJsFunctionView(Value val) noexcept {
@@ -707,8 +787,6 @@ inline TimeZoneDatabase* getTimeZoneDBView(Value val) noexcept {
 }
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
-
-std::pair<TypeTags, Value> makeCopyPcreRegex(const pcrecpp::RE&);
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction&);
 

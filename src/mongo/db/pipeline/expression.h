@@ -2898,6 +2898,16 @@ public:
         return _initialExecStateForConstantRegex.has_value();
     }
 
+    bool hasOptions() const {
+        return (_options.get() != nullptr);
+    }
+
+    /**
+     * Return regex pattern and options in case they are constants. Return pattern boost::none in
+     * case the pattern or options are not constants, or if the pattern is null.
+     */
+    std::pair<boost::optional<std::string>, std::string> getConstantPatternAndOptions() const;
+
     Value serialize(bool explain) const;
 
     const std::string& getOpName() const {

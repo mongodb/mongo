@@ -1042,9 +1042,9 @@ public:
             arr->reserve(regexes.size());
 
             for (auto&& r : regexes) {
-                auto regex = RegexMatchExpression::makeRegex(r->getString(), r->getFlags());
-                arr->push_back(sbe::value::TypeTags::pcreRegex,
-                               sbe::value::bitcastFrom<pcrecpp::RE*>(regex.release()));
+                auto [regexTag, regexVal] =
+                    sbe::value::makeNewPcreRegex(r->getString(), r->getFlags());
+                arr->push_back(regexTag, regexVal);
             }
 
             auto makePredicate =
@@ -1214,16 +1214,14 @@ public:
     void visit(const RegexMatchExpression* expr) final {
         auto makePredicate = [expr](sbe::value::SlotId inputSlot,
                                     EvalStage inputStage) -> EvalExprStagePair {
-            auto regex = RegexMatchExpression::makeRegex(expr->getString(), expr->getFlags());
-            auto ownedRegexVal = sbe::value::bitcastFrom<pcrecpp::RE*>(regex.release());
-
+            auto [regexTag, regexVal] =
+                sbe::value::makeNewPcreRegex(expr->getString(), expr->getFlags());
             // TODO: In the future, this needs to account for the fact that the regex match
             // expression matches strings, but also matches stored regexes. For example,
             // {$match: {a: /foo/}} matches the document {a: /foo/} in addition to {a: "foobar"}.
             return {makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
                         "regexMatch",
-                        sbe::makeEs(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::pcreRegex,
-                                                               ownedRegexVal),
+                        sbe::makeEs(sbe::makeE<sbe::EConstant>(regexTag, regexVal),
                                     sbe::makeE<sbe::EVariable>(inputSlot)))),
                     std::move(inputStage)};
         };

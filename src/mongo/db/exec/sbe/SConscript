@@ -22,7 +22,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/third_party/shim_pcrecpp',
+        '$BUILD_DIR/mongo/util/regex_util',
     ]
 )
 
@@ -124,6 +124,7 @@ env.CppUnitTest(
         'expressions/sbe_is_member_builtin_test.cpp',
         'expressions/sbe_iso_date_to_parts_test.cpp',
         'expressions/sbe_mod_expression_test.cpp',
+        'expressions/sbe_regex_test.cpp',
         'expressions/sbe_set_expressions_test.cpp',
         'expressions/sbe_to_upper_to_lower_test.cpp',
         'expressions/sbe_trigonometric_expressions_test.cpp',

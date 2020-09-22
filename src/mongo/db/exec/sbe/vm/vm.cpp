@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 
 #include <boost/algorithm/string.hpp>
-#include <pcrecpp.h>
+#include <pcre.h>
 
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
@@ -43,7 +45,9 @@
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 #include "mongo/util/summation.h"
 
 MONGO_FAIL_POINT_DEFINE(failOnPoisonedFieldLookup);
@@ -972,25 +976,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToSet(ArityT
 
     guard.reset();
     return {ownAgg, tagAgg, valAgg};
-}
-
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(ArityType arity) {
-    invariant(arity == 2);
-
-    auto [ownedPcreRegex, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
-    auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(1);
-
-    if (!value::isString(typeTagInputStr) || typeTagPcreRegex != value::TypeTags::pcreRegex) {
-        return {false, value::TypeTags::Nothing, 0};
-    }
-
-    auto stringView = value::getStringView(typeTagInputStr, valueInputStr);
-    pcrecpp::StringPiece pcreStringView{stringView.data(), static_cast<int>(stringView.size())};
-
-    auto pcreRegex = value::getPcreRegexView(valuePcreRegex);
-    auto regexMatchResult = pcreRegex->PartialMatch(pcreStringView);
-
-    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(regexMatchResult)};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRunJsPredicate(ArityType arity) {
@@ -1932,6 +1917,291 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(A
     return {true, resTag, resVal};
 }
 
+namespace {
+/**
+ * A helper function to create the result object {"match" : .., "idx" : ..., "captures" :
+ * ...} from the result of pcre_exec().
+ */
+std::tuple<bool, value::TypeTags, value::Value> buildRegexMatchResultObject(
+    std::string_view inputString,
+    const std::vector<int>& capturesBuffer,
+    size_t numCaptures,
+    uint32_t& startBytePos,
+    uint32_t& codePointPos) {
+
+    auto verifyBounds = [&inputString](auto startPos, auto limitPos, auto isCapture) {
+        // If a capture group was not matched, then the 'startPos' and 'limitPos' will both be -1.
+        // These bounds cannot occur for a match on the full string.
+        if (startPos == -1 && limitPos == -1 && isCapture) {
+            return true;
+        }
+        if (startPos == -1 || limitPos == -1) {
+            LOGV2_ERROR(5073412,
+                        "Unexpected error occurred while executing regexFind.",
+                        "startPos"_attr = startPos,
+                        "limitPos"_attr = limitPos);
+            return false;
+        }
+        if (startPos < 0 || static_cast<size_t>(startPos) > inputString.size() || limitPos < 0 ||
+            static_cast<size_t>(limitPos) > inputString.size() || startPos > limitPos) {
+            LOGV2_ERROR(5073413,
+                        "Unexpected error occurred while executing regexFind.",
+                        "startPos"_attr = startPos,
+                        "limitPos"_attr = limitPos);
+            return false;
+        }
+        return true;
+    };
+
+    // Extract the matched string: its start and (end+1) indices are in the first two elements of
+    // capturesBuffer.
+    if (!verifyBounds(capturesBuffer[0], capturesBuffer[1], false)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto matchStartIdx = capturesBuffer[0];
+    auto matchedString = inputString.substr(matchStartIdx, capturesBuffer[1] - matchStartIdx);
+    auto [matchedTag, matchedVal] = value::makeNewString(matchedString);
+    value::ValueGuard matchedGuard{matchedTag, matchedVal};
+
+    // We iterate through the input string's contents preceding the match index, in order to convert
+    // the byte offset to a code point offset.
+    for (auto byteIdx = startBytePos; byteIdx < static_cast<uint32_t>(matchStartIdx);
+         ++codePointPos) {
+        byteIdx += str::getCodePointLength(inputString[byteIdx]);
+    }
+    startBytePos = matchStartIdx;
+
+    auto [arrTag, arrVal] = value::makeNewArray();
+    value::ValueGuard arrGuard{arrTag, arrVal};
+    auto arrayView = value::getArrayView(arrVal);
+    // The next '2 * numCaptures' entries (after the first two entries) of 'capturesBuffer'
+    // hold the (start, limit) pairs of indexes, for each of the capture groups. We skip the first
+    // two elements and start iteration from 3rd element so that we only construct the strings for
+    // capture groups.
+    for (size_t i = 0; i < numCaptures; ++i) {
+        const auto start = capturesBuffer[2 * (i + 1)];
+        const auto limit = capturesBuffer[2 * (i + 1) + 1];
+        if (!verifyBounds(start, limit, true)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        if (start == -1 && limit == -1) {
+            arrayView->push_back(value::TypeTags::Null, 0);
+        } else {
+            auto captureString = inputString.substr(start, limit - start);
+            auto [tag, val] = value::makeNewString(captureString);
+            arrayView->push_back(tag, val);
+        }
+    }
+
+    auto [resTag, resVal] = value::makeNewObject();
+    value::ValueGuard resGuard{resTag, resVal};
+    auto resObjectView = value::getObjectView(resVal);
+    resObjectView->reserve(3);
+    matchedGuard.reset();
+    resObjectView->push_back("match", matchedTag, matchedVal);
+    resObjectView->push_back(
+        "idx", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(codePointPos));
+    arrGuard.reset();
+    resObjectView->push_back("captures", arrTag, arrVal);
+    resGuard.reset();
+    return {true, resTag, resVal};
+}
+
+/**
+ * A helper function to extract the next match in the subject string using the compiled regex
+ * pattern.
+ * - pcre: The wrapper object containing the compiled pcre expression
+ * - inputString: The subject string.
+ * - capturesBuffer: Array to be populated with the found matched string and capture groups.
+ * - startBytePos: The position from where the search should start given in bytes.
+ * - codePointPos: The same position in terms of code points.
+ * - isMatch: Boolean flag to mark if the caller function is $regexMatch, in which case the result
+ * returned is true/false.
+ */
+std::tuple<bool, value::TypeTags, value::Value> pcreNextMatch(value::PcreRegex* pcre,
+                                                              std::string_view inputString,
+                                                              std::vector<int>& capturesBuffer,
+                                                              uint32_t& startBytePos,
+                                                              uint32_t& codePointPos,
+                                                              bool isMatch = false) {
+    auto execResult = pcre->execute(inputString, startBytePos, capturesBuffer);
+
+    auto numCaptures = pcre->getNumberCaptures();
+    if (execResult < -1 || execResult > static_cast<int>(numCaptures) + 1) {
+        LOGV2_ERROR(5073414,
+                    "Error occurred while executing regular expression.",
+                    "execResult"_attr = execResult);
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    if (isMatch) {
+        // $regexMatch returns true or false.
+        bool match = (execResult != PCRE_ERROR_NOMATCH);
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(match)};
+    } else {
+        // $regexFind and $regexFindAll build result object or return null.
+        if (execResult == PCRE_ERROR_NOMATCH) {
+            return {false, value::TypeTags::Null, 0};
+        }
+        return buildRegexMatchResultObject(
+            inputString, capturesBuffer, numCaptures, startBytePos, codePointPos);
+    }
+}
+
+/**
+ * A helper function to extract the first match in the subject string using the compiled regex
+ * pattern. See 'pcreNextMatch' function for parameters description.
+ */
+std::tuple<bool, value::TypeTags, value::Value> pcreFirstMatch(
+    value::PcreRegex* pcre,
+    std::string_view inputString,
+    bool isMatch = false,
+    std::vector<int>* capturesBuffer = nullptr,
+    uint32_t* startBytePos = nullptr,
+    uint32_t* codePointPos = nullptr) {
+    std::vector<int> tmpCapturesBuffer;
+    uint32_t tmpStartBytePos = 0;
+    uint32_t tmpCodePointPos = 0;
+
+    capturesBuffer = capturesBuffer ? capturesBuffer : &tmpCapturesBuffer;
+    startBytePos = startBytePos ? startBytePos : &tmpStartBytePos;
+    codePointPos = codePointPos ? codePointPos : &tmpCodePointPos;
+
+    // The first two-thirds of the capturesBuffer is used to pass back captured substrings' start
+    // and (end+1) indexes. The remaining third of the vector is used as workspace by pcre_exec()
+    // while matching capturing subpatterns, and is not available for passing back information.
+    auto numCaptures = pcre->getNumberCaptures();
+    capturesBuffer->resize((1 + numCaptures) * 3);
+
+    return pcreNextMatch(pcre, inputString, *capturesBuffer, *startBytePos, *codePointPos, isMatch);
+}
+
+/**
+ * A helper function with common logic for $regexMatch and $regexFind functions. Both extract only
+ * the first match to a regular expression, but return different result objects.
+ */
+std::tuple<bool, value::TypeTags, value::Value> genericPcreRegexSingleMatch(
+    value::TypeTags typeTagPcreRegex,
+    value::Value valuePcreRegex,
+    value::TypeTags typeTagInputStr,
+    value::Value valueInputStr,
+    bool isMatch) {
+    if (!value::isString(typeTagInputStr) || !value::isPcreRegex(typeTagPcreRegex)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto inputString = value::getStringView(typeTagInputStr, valueInputStr);
+    auto pcreRegex = value::getPcreRegexView(valuePcreRegex);
+
+    return pcreFirstMatch(pcreRegex, inputString, isMatch);
+}
+}  // namespace
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(ArityType arity) {
+    invariant(arity == 2);
+
+    auto [patternOwned, patternTypeTag, patternValue] = getFromStack(0);
+    auto [optionsOwned, optionsTypeTag, optionsValue] = getFromStack(1);
+
+    if (patternTypeTag == value::TypeTags::Null) {
+        return {false, value::TypeTags::Null, 0};
+    }
+    if (!value::isString(patternTypeTag) || !value::isString(optionsTypeTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    // At the moment we support only string patterns.
+    // TODO SERVER-51266 : complete the following items once BSONType::RegEx is supported in SBE
+    // - Handle the case when patternTypeTag == TypeTags::bsonRegex.
+    // - Ensure that regex options are specified either in the options argument or in bsonRegex
+    // value.
+    auto pattern = value::getStringView(patternTypeTag, patternValue);
+    auto options = value::getStringView(optionsTypeTag, optionsValue);
+
+    if (pattern.find('\0', 0) != std::string::npos || options.find('\0', 0) != std::string::npos) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [pcreTag, pcreValue] = value::makeNewPcreRegex(pattern, options);
+    return {true, pcreTag, pcreValue};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(ArityType arity) {
+    invariant(arity == 2);
+    auto [ownedPcreRegex, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
+    auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(1);
+
+    return genericPcreRegexSingleMatch(
+        typeTagPcreRegex, valuePcreRegex, typeTagInputStr, valueInputStr, true);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFind(ArityType arity) {
+    invariant(arity == 2);
+    auto [ownedPcreRegex, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
+    auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(1);
+
+    return genericPcreRegexSingleMatch(
+        typeTagPcreRegex, valuePcreRegex, typeTagInputStr, valueInputStr, false);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(ArityType arity) {
+    invariant(arity == 2);
+    auto [ownedPcre, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
+    auto [ownedStr, typeTagInputStr, valueInputStr] = getFromStack(1);
+
+    if (!value::isString(typeTagInputStr) || typeTagPcreRegex != value::TypeTags::pcreRegex) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto inputString = value::getStringView(typeTagInputStr, valueInputStr);
+    auto pcre = value::getPcreRegexView(valuePcreRegex);
+
+    std::vector<int> capturesBuffer;
+    uint32_t startBytePos = 0;
+    uint32_t codePointPos = 0;
+    bool isFirstMatch = true;
+
+    // Prepare the result array of matching objects.
+    auto [arrTag, arrVal] = value::makeNewArray();
+    value::ValueGuard arrGuard{arrTag, arrVal};
+    auto arrayView = value::getArrayView(arrVal);
+
+    do {
+        auto [owned, matchTag, matchVal] = [&]() {
+            if (isFirstMatch) {
+                isFirstMatch = false;
+                return pcreFirstMatch(
+                    pcre, inputString, false, &capturesBuffer, &startBytePos, &codePointPos);
+            }
+            return pcreNextMatch(pcre, inputString, capturesBuffer, startBytePos, codePointPos);
+        }();
+
+        if (matchTag == value::TypeTags::Null) {
+            break;
+        }
+        if (matchTag != value::TypeTags::Object) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        arrayView->push_back(matchTag, matchVal);
+
+        // Move indexes after the current matched string to prepare for the next search.
+        auto [mstrTag, mstrVal] = value::getObjectView(matchVal)->getField("match");
+        auto matchString = value::getStringView(mstrTag, mstrVal);
+        if (matchString.empty()) {
+            startBytePos += str::getCodePointLength(inputString[startBytePos]);
+            ++codePointPos;
+        } else {
+            startBytePos += matchString.length();
+            for (size_t byteIdx = 0; byteIdx < matchString.length(); ++codePointPos) {
+                byteIdx += str::getCodePointLength(matchString[byteIdx]);
+            }
+        }
+    } while (startBytePos < inputString.size());
+
+    arrGuard.reset();
+    return {true, arrTag, arrVal};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           ArityType arity) {
     switch (f) {
@@ -2045,6 +2315,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinSetDifference(arity);
         case Builtin::runJsPredicate:
             return builtinRunJsPredicate(arity);
+        case Builtin::regexCompile:
+            return builtinRegexCompile(arity);
+        case Builtin::regexFind:
+            return builtinRegexFind(arity);
+        case Builtin::regexFindAll:
+            return builtinRegexFindAll(arity);
     }
 
     MONGO_UNREACHABLE;
