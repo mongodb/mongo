@@ -54,12 +54,12 @@ TEST(CstExpressionTest, ParsesProjectWithAnd) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
-              "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname andExpr>: [ { "
-              "<KeyFieldname andExpr>: [ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] "
-              "}, <ProjectionPath b>: { <KeyFieldname andExpr>: "
-              "[ \"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type double "
+        "9.100000>\", <ProjectionPath a>: { <KeyFieldname andExpr>: [ \"<UserInt 4>\", { "
+        "<KeyFieldname andExpr>: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, <ProjectionPath b>: { "
+        "<KeyFieldname andExpr>: [ \"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesProjectWithOr) {
@@ -72,12 +72,12 @@ TEST(CstExpressionTest, ParsesProjectWithOr) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
-              "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname orExpr>: [ "
-              "{ <KeyFieldname orExpr>: [ \"<UserInt 8>\", \"<UserInt 7>\" ] }, \"<UserInt 4>\" ] "
-              "}, <ProjectionPath b>: { "
-              "<KeyFieldname orExpr>: [ \"<UserInt -3>\", \"<UserInt 2>\" ] } } }");
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type double "
+        "9.100000>\", <ProjectionPath a>: { <KeyFieldname orExpr>: [ \"<UserInt 4>\", { "
+        "<KeyFieldname orExpr>: [ \"<UserInt 7>\", \"<UserInt 8>\" ] } ] }, <ProjectionPath b>: { "
+        "<KeyFieldname orExpr>: [ \"<UserInt 2>\", \"<UserInt -3>\" ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesProjectWithNot) {
@@ -91,13 +91,11 @@ TEST(CstExpressionTest, ParsesProjectWithNot) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(
-        stages[0].toBson().toString(),
-        "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
-        "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname notExpr>: [ "
-        "\"<UserInt 4>\" ] }, <ProjectionPath b>: { <KeyFieldname andExpr>: [ { <KeyFieldname "
-        "notExpr>: [ \"<UserBoolean 1>\" ] }, "
-        "\"<UserDouble 1.000000>\" ] } } }");
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
+              "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname notExpr>: [ \"<UserInt 4>\" "
+              "] }, <ProjectionPath b>: { <KeyFieldname andExpr>: [ \"<UserDouble 1.000000>\", { "
+              "<KeyFieldname notExpr>: [ \"<UserBoolean true>\" ] } ] } } }");
 }
 
 TEST(CstExpressionTest, ParsesComparisonExpressions) {
@@ -188,7 +186,7 @@ TEST(CstExpressionTest, ParsesConvertExpressions) {
               "<ProjectionPath f>: { <KeyFieldname toLong>: \"<UserDouble "
               "1.999999>\" }, <ProjectionPath g>: { <KeyFieldname toObjectId>: \"<AggregationPath "
               "_id>\" }, <ProjectionPath h>: { <KeyFieldname toString>: "
-              "\"<UserBoolean 0>\" } } }");
+              "\"<UserBoolean false>\" } } }");
 }
 
 TEST(CstExpressionTest, ParsesConvertExpressionsNoOptArgs) {
@@ -234,7 +232,7 @@ TEST(CstExpressionTest, ParsesConvertExpressionsWithOptArgs) {
         "string>\", <KeyFieldname onErrorArg>: \"<UserString Could not convert>\", "
         "<KeyFieldname onNullArg>: \"<KeyValue "
         "absentKey>\" } }, <ProjectionPath b>: { <KeyFieldname convert>: { <KeyFieldname "
-        "inputArg>: \"<UserBoolean 1>\", <KeyFieldname toArg>: "
+        "inputArg>: \"<UserBoolean true>\", <KeyFieldname toArg>: "
         "\"<UserString double>\", <KeyFieldname onErrorArg>: \"<KeyValue absentKey>\", "
         "<KeyFieldname onNullArg>: "
         "\"<UserInt 0>\" } } } }");
@@ -482,11 +480,10 @@ TEST(CstExpressionTest, ParsesConcat) {
     auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
     ASSERT_EQ(1, stages.size());
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
-    ASSERT_EQ(stages[0].toBson().toString(),
-              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname concat>: [ "
-              "\"<AggregationPath description>\", "
-              "\"<UserString  - >\", "
-              "\"<UserString item>\" ] } } }");
+    ASSERT_EQ(
+        stages[0].toBson().toString(),
+        "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname concat>: [ "
+        "\"<UserString item>\", \"<UserString  - >\", \"<AggregationPath description>\" ] } } }");
 }
 
 TEST(CstExpressionTest, FailsToParseTripleDollar) {

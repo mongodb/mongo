@@ -274,12 +274,11 @@ TEST(CstGrammarTest, ParsesProject) {
         ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
         ASSERT_EQ(
             stages[0].toBson().toString(),
-            "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type "
-            "double 9.100000>\", <ProjectionPath a>: { <KeyFieldname add>: [ "
-            "{ <KeyFieldname add>: [ \"<UserInt 8>\", \"<UserInt 7>\", \"<UserInt 6>\" ] }, "
-            "\"<UserInt 5>\", "
-            "\"<UserInt 4>\" ] }, <ProjectionPath b>: { <KeyFieldname atan2>: [ \"<UserDouble "
-            "1.000000>\", { <KeyFieldname add>: [ \"<UserInt -3>\", \"<UserInt 2>\" ] } ] } } }");
+            "{ <KeyFieldname projectInclusion>: { <KeyFieldname id>: \"<NonZeroKey of type double "
+            "9.100000>\", <ProjectionPath a>: { <KeyFieldname add>: [ \"<UserInt 4>\", \"<UserInt "
+            "5>\", { <KeyFieldname add>: [ \"<UserInt 6>\", \"<UserInt 7>\", \"<UserInt 8>\" ] } ] "
+            "}, <ProjectionPath b>: { <KeyFieldname atan2>: [ \"<UserDouble 1.000000>\", { "
+            "<KeyFieldname add>: [ \"<UserInt 2>\", \"<UserInt -3>\" ] } ] } } }");
     }
     {
         CNode output;
@@ -479,7 +478,7 @@ TEST(CstGrammarTest, BuildsAndPrintsAnd) {
             {KeyFieldname::andExpr,
              CNode{CNode::ArrayChildren{CNode{UserInt{0}}, CNode{UserBoolean{true}}}}}}};
         ASSERT_BSONOBJ_EQ(
-            fromjson("{\"<KeyFieldname andExpr>\": [\"<UserInt 0>\", \"<UserBoolean 1>\"]}"),
+            fromjson("{\"<KeyFieldname andExpr>\": [\"<UserInt 0>\", \"<UserBoolean true>\"]}"),
             cst.toBson());
     }
 }
@@ -522,7 +521,7 @@ TEST(CstGrammarTest, BuildsAndPrintsOr) {
             {KeyFieldname::orExpr,
              CNode{CNode::ArrayChildren{CNode{UserInt{0}}, CNode{UserBoolean{true}}}}}}};
         ASSERT_BSONOBJ_EQ(
-            fromjson("{\"<KeyFieldname orExpr>\": [\"<UserInt 0>\", \"<UserBoolean 1>\"]}"),
+            fromjson("{\"<KeyFieldname orExpr>\": [\"<UserInt 0>\", \"<UserBoolean true>\"]}"),
             cst.toBson());
     }
 }
@@ -537,13 +536,13 @@ TEST(CstGrammarTest, BuildsAndPrintsNot) {
     {
         const auto cst = CNode{CNode::ObjectChildren{
             {KeyFieldname::notExpr, CNode{CNode::ArrayChildren{CNode{UserBoolean{true}}}}}}};
-        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname notExpr>\": [\"<UserBoolean 1>\"]}"),
+        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname notExpr>\": [\"<UserBoolean true>\"]}"),
                           cst.toBson());
     }
     {
         const auto cst = CNode{CNode::ObjectChildren{
             {KeyFieldname::notExpr, CNode{CNode::ArrayChildren{CNode{UserBoolean{false}}}}}}};
-        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname notExpr>\": [\"<UserBoolean 0>\"]}"),
+        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname notExpr>\": [\"<UserBoolean false>\"]}"),
                           cst.toBson());
     }
 }
@@ -701,7 +700,7 @@ TEST(CstGrammarTest, BuildsAndPrintsToDecimal) {
     {
         const auto cst =
             CNode{CNode::ObjectChildren{{KeyFieldname::toDecimal, CNode{UserBoolean{false}}}}};
-        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname toDecimal>\": \"<UserBoolean 0>\"}"),
+        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname toDecimal>\": \"<UserBoolean false>\"}"),
                           cst.toBson());
     }
     {
@@ -716,7 +715,7 @@ TEST(CstGrammarTest, BuildsAndPrintsToDouble) {
     {
         const auto cst =
             CNode{CNode::ObjectChildren{{KeyFieldname::toDouble, CNode{UserBoolean{true}}}}};
-        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname toDouble>\": \"<UserBoolean 1>\"}"),
+        ASSERT_BSONOBJ_EQ(fromjson("{\"<KeyFieldname toDouble>\": \"<UserBoolean true>\"}"),
                           cst.toBson());
     }
     {
@@ -877,7 +876,7 @@ TEST(CstGrammarTest, ParsesValidLn) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname ln>: [ "
-              "\"<UserInt 10>\", \"<UserInt 37>\" ] } } }");
+              "\"<UserInt 37>\", \"<UserInt 10>\" ] } } }");
 }
 
 TEST(CstGrammarTest, ParsesValidLog) {
@@ -1040,7 +1039,7 @@ TEST(CstGrammarTest, ParsesValidAllElementsTrue) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname "
-              "allElementsTrue>: [ \"<UserInt 1>\", \"<UserBoolean 1>\" "
+              "allElementsTrue>: [ \"<UserBoolean true>\", \"<UserInt 1>\" "
               "] } } }");
 }
 
@@ -1055,7 +1054,7 @@ TEST(CstGrammarTest, ParsesValidSlice) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname slice>: "
-              "[ [ \"<UserInt 3>\", \"<UserInt 2>\", \"<UserInt 1>\" ], \"<UserInt -15>\", "
+              "[ [ \"<UserInt 1>\", \"<UserInt 2>\", \"<UserInt 3>\" ], \"<UserInt -15>\", "
               "\"<UserInt 2>\" ] } } }");
 }
 
@@ -1084,7 +1083,7 @@ TEST(CstGrammarTest, ParsesValidAnyElementTrue) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname "
-              "anyElementTrue>: [ \"<UserInt 0>\", \"<UserBoolean 0>\" "
+              "anyElementTrue>: [ \"<UserBoolean false>\", \"<UserInt 0>\" "
               "] } } }");
 }
 
@@ -1100,8 +1099,8 @@ TEST(CstGrammarTest, ParsesValidSetDifference) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname "
-              "setDifference>: [ [ \"<UserString c>\", \"<UserString a>\" ], "
-              "[ \"<UserString a>\", \"<UserString b>\" ] ] } } }");
+              "setDifference>: [ [ \"<UserString a>\", \"<UserString c>\" ], [ \"<UserString b>\", "
+              "\"<UserString a>\" ] ] } } }");
 }
 
 TEST(CstGrammarTest, ParsesValidSetEquals) {
@@ -1116,8 +1115,8 @@ TEST(CstGrammarTest, ParsesValidSetEquals) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname "
-              "setEquals>: [ [ \"<UserString a>\", \"<UserString b>\", "
-              "\"<UserString a>\" ], [ \"<UserString a>\", \"<UserString b>\" ] ] } } }");
+              "setEquals>: [ [ \"<UserString a>\", \"<UserString b>\", \"<UserString a>\" ], [ "
+              "\"<UserString b>\", \"<UserString a>\" ] ] } } }");
 }
 
 TEST(CstGrammarTest, ParsesValidSetIntersection) {
@@ -1133,9 +1132,8 @@ TEST(CstGrammarTest, ParsesValidSetIntersection) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname "
-              "setIntersection>: [ [ \"<UserString b>\", \"<UserString "
-              "a>\" ], "
-              "[ [ \"<UserString b>\", \"<UserString a>\" ] ] ] } } }");
+              "setIntersection>: [ [ \"<UserString a>\", \"<UserString b>\" ], [ [ \"<UserString "
+              "a>\", \"<UserString b>\" ] ] ] } } }");
 }
 
 TEST(CstGrammarTest, ParsesValidSetIsSubset) {
@@ -1165,7 +1163,7 @@ TEST(CstGrammarTest, ParsesValidSetUnion) {
     ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
     ASSERT_EQ(stages[0].toBson().toString(),
               "{ <KeyFieldname projectInclusion>: { <ProjectionPath val>: { <KeyFieldname "
-              "setUnion>: [ [ \"<UserInt 2>\", \"<UserInt 1>\" ], [ "
+              "setUnion>: [ [ \"<UserInt 1>\", \"<UserInt 2>\" ], [ "
               "\"<UserInt "
               "3>\" ] ] } } }");
 }

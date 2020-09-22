@@ -663,8 +663,9 @@ notExpr:
     NOT regex {
         $$ = std::pair{KeyFieldname::notExpr, $regex};
     }
-    // $not requires an object with atleast one expression.
-    | NOT START_OBJECT operatorExpression compoundMatchExprs END_OBJECT {
+    // $not requires an object with at least one expression. 'compoundMatchExprs' comes before
+    // 'operatorExpression' to allow us to naturally emplace_back() into the CST.
+    | NOT START_OBJECT compoundMatchExprs operatorExpression END_OBJECT {
         auto&& exprs = $compoundMatchExprs;
         exprs.objectChildren().emplace_back($operatorExpression);
 
@@ -672,8 +673,9 @@ notExpr:
     }
 ;
 
-// Logical expressions accept an array of objects, with at least one element.
-logicalExpr: logicalExprField START_ARRAY match additionalExprs END_ARRAY {
+// Logical expressions accept an array of objects, with at least one element. 'additionalExprs'
+// comes before 'match' to allow us to naturally emplace_back() into the CST.
+logicalExpr: logicalExprField START_ARRAY additionalExprs match END_ARRAY {
         auto&& children = $additionalExprs;
         children.arrayChildren().emplace_back($match);
         $$ = {$logicalExprField, std::move(children)};
@@ -1300,7 +1302,7 @@ simpleValue:
 // expressions are allowed.
 expressions:
     %empty { }
-    | expression expressions[expressionArg] {
+    | expressions[expressionArg] expression {
         $$ = $expressionArg;
         $$.emplace_back($expression);
     }
@@ -2049,7 +2051,7 @@ valueArray:
 
 values:
     %empty { }
-    | value values[valuesArg] {
+    | values[valuesArg] value {
         $$ = $valuesArg;
         $$.emplace_back($value);
     }

@@ -32,7 +32,7 @@
 
 
 /**
- ** \file src/mongo/db/cst/parser_gen.hpp
+ ** \file parser_gen.hpp
  ** Define the mongo::parser class.
  */
 
@@ -42,10 +42,10 @@
 // especially those whose name start with YY_ or yy_.  They are
 // private implementation details that can be changed or removed.
 
-#ifndef YY_YY_SRC_MONGO_DB_CST_PARSER_GEN_HPP_INCLUDED
-#define YY_YY_SRC_MONGO_DB_CST_PARSER_GEN_HPP_INCLUDED
+#ifndef YY_YY_PARSER_GEN_HPP_INCLUDED
+#define YY_YY_PARSER_GEN_HPP_INCLUDED
 // "%code requires" blocks.
-#line 66 "src/mongo/db/cst/grammar.yy"
+#line 66 "grammar.yy"
 
 #include "mongo/db/cst/bson_location.h"
 #include "mongo/db/cst/c_node.h"
@@ -60,7 +60,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 64 "src/mongo/db/cst/parser_gen.hpp"
+#line 64 "parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -189,9 +189,9 @@ class BSONLexer;
 #define YYDEBUG 0
 #endif
 
-#line 57 "src/mongo/db/cst/grammar.yy"
+#line 57 "grammar.yy"
 namespace mongo {
-#line 199 "src/mongo/db/cst/parser_gen.hpp"
+#line 199 "parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -4247,7 +4247,7 @@ private:
 
     /// Constants.
     enum {
-        yylast_ = 2016,  ///< Last index in yytable_.
+        yylast_ = 3007,  ///< Last index in yytable_.
         yynnts_ = 194,   ///< Number of nonterminal symbols.
         yyfinal_ = 11    ///< Termination state number.
     };
@@ -4888,9 +4888,9 @@ inline ParserGen::symbol_kind_type ParserGen::by_kind::type_get() const YY_NOEXC
     return this->kind();
 }
 
-#line 57 "src/mongo/db/cst/grammar.yy"
+#line 57 "grammar.yy"
 }  // namespace mongo
-#line 6071 "src/mongo/db/cst/parser_gen.hpp"
+#line 6071 "parser_gen.hpp"
 
 
-#endif  // !YY_YY_SRC_MONGO_DB_CST_PARSER_GEN_HPP_INCLUDED
+#endif  // !YY_YY_PARSER_GEN_HPP_INCLUDED

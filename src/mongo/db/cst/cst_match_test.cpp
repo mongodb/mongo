@@ -101,8 +101,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithMultipleChildren) {
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         ASSERT_EQ(output.toBson().toString(),
-                  "{ <KeyFieldname andExpr>: [ { <UserFieldname b>: \"<UserString bee>\" }, { "
-                  "<UserFieldname a>: \"<UserInt 1>\" } ] }");
+                  "{ <KeyFieldname andExpr>: [ { <UserFieldname a>: \"<UserInt 1>\" }, { "
+                  "<UserFieldname b>: \"<UserString bee>\" } ] }");
     }
     {
         CNode output;
@@ -111,8 +111,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithMultipleChildren) {
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         ASSERT_EQ(output.toBson().toString(),
-                  "{ <KeyFieldname orExpr>: [ { <UserFieldname b>: \"<UserString bee>\" }, { "
-                  "<UserFieldname a>: \"<UserInt 1>\" } ] }");
+                  "{ <KeyFieldname orExpr>: [ { <UserFieldname a>: \"<UserInt 1>\" }, { "
+                  "<UserFieldname b>: \"<UserString bee>\" } ] }");
     }
     {
         CNode output;
@@ -121,8 +121,8 @@ TEST(CstMatchTest, ParsesLogicalOperatorsWithMultipleChildren) {
         auto parseTree = ParserGen(lexer, &output);
         ASSERT_EQ(0, parseTree.parse());
         ASSERT_EQ(output.toBson().toString(),
-                  "{ <KeyFieldname norExpr>: [ { <UserFieldname b>: \"<UserString bee>\" }, { "
-                  "<UserFieldname a>: \"<UserInt 1>\" } ] }");
+                  "{ <KeyFieldname norExpr>: [ { <UserFieldname a>: \"<UserInt 1>\" }, { "
+                  "<UserFieldname b>: \"<UserString bee>\" } ] }");
     }
 }
 

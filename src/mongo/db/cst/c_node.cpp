@@ -123,7 +123,7 @@ auto printValue(const T& payload) {
                 return "<UserObjectId "s + userObjectId.toString() + ">";
             },
             [](const UserBoolean& userBoolean) {
-                return "<UserBoolean "s + std::to_string(userBoolean) + ">";
+                return "<UserBoolean "s + (userBoolean ? "true" : "false") + ">";
             },
             [](const UserDate& userDate) {
                 return "<UserDate "s +
