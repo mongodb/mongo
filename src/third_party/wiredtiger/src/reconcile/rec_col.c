@@ -882,7 +882,7 @@ compare:
             if (rle != 0) {
                 if ((deleted && last.deleted) ||
                   (!deleted && !last.deleted && last.value->size == size &&
-                      memcmp(last.value->data, data, size) == 0)) {
+                    memcmp(last.value->data, data, size) == 0)) {
                     rle += repeat_count;
                     continue;
                 }
@@ -1050,7 +1050,7 @@ compare:
             if (rle != 0) {
                 if ((deleted && last.deleted) ||
                   (!deleted && !last.deleted && last.value->size == size &&
-                      memcmp(last.value->data, data, size) == 0)) {
+                    memcmp(last.value->data, data, size) == 0)) {
                     ++rle;
                     goto next;
                 }
@@ -1082,10 +1082,10 @@ compare:
             last.deleted = deleted;
             rle = 1;
 
-        /*
-         * Move to the next record. It's not a simple increment because if it's the maximum record,
-         * incrementing it wraps to 0 and this turns into an infinite loop.
-         */
+            /*
+             * Move to the next record. It's not a simple increment because if it's the maximum
+             * record, incrementing it wraps to 0 and this turns into an infinite loop.
+             */
 next:
             if (src_recno == UINT64_MAX)
                 break;

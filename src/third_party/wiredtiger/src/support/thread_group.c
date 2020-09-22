@@ -47,7 +47,8 @@ err:
      * 2.  When the connection is closing.
      * 3.  When a shutdown has been requested via clearing the run flag.
      */
-    WT_ASSERT(session, !F_ISSET(thread, WT_THREAD_RUN) ||
+    WT_ASSERT(session,
+      !F_ISSET(thread, WT_THREAD_RUN) ||
         F_ISSET(S2C(session), WT_CONN_CLOSING | WT_CONN_RECOVERING));
 
     return (WT_THREAD_RET_VALUE);
@@ -139,8 +140,9 @@ __thread_group_resize(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, uint32_t
     conn = S2C(session);
     thread = NULL;
 
-    __wt_verbose(session, WT_VERB_THREAD_GROUP, "Resize thread group: %s, from min: %" PRIu32
-                                                " -> %" PRIu32 " from max: %" PRIu32 " -> %" PRIu32,
+    __wt_verbose(session, WT_VERB_THREAD_GROUP,
+      "Resize thread group: %s, from min: %" PRIu32 " -> %" PRIu32 " from max: %" PRIu32
+      " -> %" PRIu32,
       group->name, group->min, new_min, group->max, new_max);
 
     WT_ASSERT(session,
@@ -150,8 +152,9 @@ __thread_group_resize(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, uint32_t
         return (0);
 
     if (new_min > new_max)
-        WT_RET_MSG(session, EINVAL, "Illegal thread group resize: %s, from min: %" PRIu32
-                                    " -> %" PRIu32 " from max: %" PRIu32 " -> %" PRIu32,
+        WT_RET_MSG(session, EINVAL,
+          "Illegal thread group resize: %s, from min: %" PRIu32 " -> %" PRIu32 " from max: %" PRIu32
+          " -> %" PRIu32,
           group->name, group->min, new_min, group->max, new_max);
 
     /*

@@ -73,8 +73,8 @@ text(WT_SESSION *session, const char *uri)
     if (!WT_STREQ(cursor->value_format, "S") ||
       (!WT_STREQ(cursor->key_format, "S") && !WT_STREQ(cursor->key_format, "r")))
         return (util_err(session, EINVAL,
-          "the loadtext command can only load objects configured "
-          "for record number or string keys, and string values"));
+          "the loadtext command can only load objects configured for record number or string keys, "
+          "and string values"));
     readkey = !WT_STREQ(cursor->key_format, "r");
 
     /* Insert the records */
@@ -155,9 +155,6 @@ insert(WT_CURSOR *cursor, const char *name, bool readkey)
 static int
 usage(void)
 {
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "loadtext [-f input-file] uri\n",
-      progname, usage_prefix);
+    (void)fprintf(stderr, "usage: %s %s loadtext [-f input-file] uri\n", progname, usage_prefix);
     return (1);
 }

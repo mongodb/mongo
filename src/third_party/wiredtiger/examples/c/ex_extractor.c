@@ -185,8 +185,7 @@ setup_table(WT_SESSION *session)
 
     /* Create the primary table. It has a key of the unique ID. */
     error_check(session->create(session, "table:presidents",
-      "key_format=I,value_format=SSHH,"
-      "columns=(ID,last_name,first_name,term_begin,term_end)"));
+      "key_format=I,value_format=SSHH,columns=(ID,last_name,first_name,term_begin,term_end)"));
 
     /*
      * Create the index that is generated with an extractor. The index will generate an entry in the

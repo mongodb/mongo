@@ -589,22 +589,19 @@ session_ops_create(WT_SESSION *session)
      * (string, signed 32-bit integer, unsigned 16-bit integer).
      */
     error_check(session->create(session, "table:mytable",
-      "key_format=r,value_format=SiH,"
-      "columns=(id,department,salary,year-started)"));
+      "key_format=r,value_format=SiH,columns=(id,department,salary,year-started)"));
     /*! [Create a table with columns] */
     error_check(session->drop(session, "table:mytable", NULL));
 
     /*! [Create a table and configure the page size] */
     error_check(session->create(session, "table:mytable",
-      "key_format=S,value_format=S,"
-      "internal_page_max=16KB,leaf_page_max=1MB,leaf_value_max=64KB"));
+      "key_format=S,value_format=S,internal_page_max=16KB,leaf_page_max=1MB,leaf_value_max=64KB"));
     /*! [Create a table and configure the page size] */
     error_check(session->drop(session, "table:mytable", NULL));
 
     /*! [Create a table and configure a large leaf value max] */
     error_check(session->create(session, "table:mytable",
-      "key_format=S,value_format=S,"
-      "leaf_page_max=16KB,leaf_value_max=256KB"));
+      "key_format=S,value_format=S,leaf_page_max=16KB,leaf_value_max=256KB"));
     /*! [Create a table and configure a large leaf value max] */
     error_check(session->drop(session, "table:mytable", NULL));
 
@@ -705,7 +702,7 @@ session_ops(WT_SESSION *session)
 
         /*! [Compact a table] */
         error_check(session->compact(session, "table:mytable", NULL));
-/*! [Compact a table] */
+        /*! [Compact a table] */
 
 #ifdef MIGHT_NOT_RUN
         /*! [Import a file] */
@@ -1164,9 +1161,9 @@ main(int argc, char *argv[])
     /*! [Open a connection] */
 
     connection_ops(conn);
-/*
- * The connection has been closed.
- */
+    /*
+     * The connection has been closed.
+     */
 
 #ifdef MIGHT_NOT_RUN
     /*
@@ -1174,51 +1171,39 @@ main(int argc, char *argv[])
      * open to fail. The documentation requires the code snippets, use #ifdef's to avoid running it.
      */
     /*! [Configure lz4 extension] */
-    error_check(wiredtiger_open(home, NULL,
-      "create,"
-      "extensions=[/usr/local/lib/libwiredtiger_lz4.so]",
-      &conn));
+    error_check(wiredtiger_open(
+      home, NULL, "create,extensions=[/usr/local/lib/libwiredtiger_lz4.so]", &conn));
     /*! [Configure lz4 extension] */
     error_check(conn->close(conn, NULL));
 
     /*! [Configure snappy extension] */
-    error_check(wiredtiger_open(home, NULL,
-      "create,"
-      "extensions=[/usr/local/lib/libwiredtiger_snappy.so]",
-      &conn));
+    error_check(wiredtiger_open(
+      home, NULL, "create,extensions=[/usr/local/lib/libwiredtiger_snappy.so]", &conn));
     /*! [Configure snappy extension] */
     error_check(conn->close(conn, NULL));
 
     /*! [Configure zlib extension] */
-    error_check(wiredtiger_open(home, NULL,
-      "create,"
-      "extensions=[/usr/local/lib/libwiredtiger_zlib.so]",
-      &conn));
+    error_check(wiredtiger_open(
+      home, NULL, "create,extensions=[/usr/local/lib/libwiredtiger_zlib.so]", &conn));
     /*! [Configure zlib extension] */
     error_check(conn->close(conn, NULL));
 
     /*! [Configure zlib extension with compression level] */
     error_check(wiredtiger_open(home, NULL,
-      "create,"
-      "extensions=[/usr/local/lib/"
-      "libwiredtiger_zlib.so=[config=[compression_level=3]]]",
+      "create,extensions=[/usr/local/lib/libwiredtiger_zlib.so=[config=[compression_level=3]]]",
       &conn));
     /*! [Configure zlib extension with compression level] */
     error_check(conn->close(conn, NULL));
 
     /*! [Configure zstd extension] */
-    error_check(wiredtiger_open(home, NULL,
-      "create,"
-      "extensions=[/usr/local/lib/libwiredtiger_zstd.so]",
-      &conn));
+    error_check(wiredtiger_open(
+      home, NULL, "create,extensions=[/usr/local/lib/libwiredtiger_zstd.so]", &conn));
     /*! [Configure zstd extension] */
     error_check(conn->close(conn, NULL));
 
     /*! [Configure zstd extension with compression level] */
     error_check(wiredtiger_open(home, NULL,
-      "create,"
-      "extensions=[/usr/local/lib/"
-      "libwiredtiger_zstd.so=[config=[compression_level=9]]]",
+      "create,extensions=[/usr/local/lib/libwiredtiger_zstd.so=[config=[compression_level=9]]]",
       &conn));
     /*! [Configure zstd extension with compression level] */
     error_check(conn->close(conn, NULL));
@@ -1276,9 +1261,7 @@ main(int argc, char *argv[])
      */
     /*! [Statistics logging with a table] */
     error_check(wiredtiger_open(home, NULL,
-      "create, statistics_log=("
-      "sources=(\"table:table1\",\"table:table2\"), wait=5)",
-      &conn));
+      "create, statistics_log=(sources=(\"table:table1\",\"table:table2\"), wait=5)", &conn));
     /*! [Statistics logging with a table] */
     error_check(conn->close(conn, NULL));
 

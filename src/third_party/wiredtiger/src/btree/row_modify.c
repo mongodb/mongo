@@ -32,7 +32,7 @@ __wt_page_modify_alloc(WT_SESSION_IMPL *session, WT_PAGE *page)
         __wt_cache_page_inmem_incr(session, page, sizeof(*modify));
     else
 err:
-    __wt_free(session, modify);
+        __wt_free(session, modify);
     return (ret);
 }
 

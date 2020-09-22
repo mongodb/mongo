@@ -131,7 +131,7 @@ str2recno(WT_SESSION_IMPL *session, const char *p, uint64_t *recnop)
         WT_RET_MSG(session, ERANGE, "%s: invalid record number", p);
     if (endptr[0] != '\0')
 format:
-    WT_RET_MSG(session, EINVAL, "%s: invalid record number", p);
+        WT_RET_MSG(session, EINVAL, "%s: invalid record number", p);
 
     *recnop = recno;
     return (0);

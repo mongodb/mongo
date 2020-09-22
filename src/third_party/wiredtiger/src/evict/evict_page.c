@@ -300,11 +300,11 @@ __evict_page_clean_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
      * Before discarding a page, assert that all updates are globally visible unless the tree is
      * closing, dead, or we're evicting with history in lookaside.
      */
-    WT_ASSERT(session, closing || ref->page->modify == NULL ||
-        F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
+    WT_ASSERT(session,
+      closing || ref->page->modify == NULL || F_ISSET(session->dhandle, WT_DHANDLE_DEAD) ||
         (ref->page_las != NULL && ref->page_las->eviction_to_lookaside) ||
-        __wt_txn_visible_all(session, ref->page->modify->rec_max_txn,
-                         ref->page->modify->rec_max_timestamp));
+        __wt_txn_visible_all(
+          session, ref->page->modify->rec_max_txn, ref->page->modify->rec_max_timestamp));
 
     /*
      * Discard the page and update the reference structure. If evicting a WT_REF_LIMBO page with
@@ -671,7 +671,8 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 
     /* Reconcile the page. */
     ret = __wt_reconcile(session, ref, NULL, flags, lookaside_retryp);
-    WT_ASSERT(session, __wt_page_is_modified(page) ||
+    WT_ASSERT(session,
+      __wt_page_is_modified(page) ||
         __wt_txn_visible_all(session, page->modify->rec_max_txn, page->modify->rec_max_timestamp));
 
     /*

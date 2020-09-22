@@ -48,6 +48,8 @@
 #define URI_FORMAT "table:t%d-%d"
 #define KEY_FORMAT "key-%d-%d"
 
+#define CONN_CONFIG_COMMON "timing_stress_for_test=[backup_rename]"
+
 static int verbose_level = 0;
 static uint64_t seed = 0;
 
@@ -59,7 +61,7 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static bool slow_incremental = false;
 
 static bool do_drop = true;
-static bool do_rename = false;
+static bool do_rename = true;
 
 #define VERBOSE(level, fmt, ...)      \
     do {                              \
@@ -711,7 +713,7 @@ check_backup(const char *backup_home, const char *backup_check, TABLE_INFO *tinf
       buf, sizeof(buf), "rm -rf %s && cp -r %s %s", backup_check, backup_home, backup_check));
     testutil_check(system(buf));
 
-    testutil_check(wiredtiger_open(backup_check, NULL, NULL, &conn));
+    testutil_check(wiredtiger_open(backup_check, NULL, CONN_CONFIG_COMMON, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     for (slot = 0; slot < tinfo->table_count; slot++) {
@@ -799,8 +801,9 @@ main(int argc, char *argv[])
         file_max = 200 + __wt_random(&rnd) % 1000; /* 200K to ~1M */
     else
         file_max = 1000 + __wt_random(&rnd) % 20000; /* 1M to ~20M */
-    testutil_check(__wt_snprintf(conf, sizeof(conf),
-      "create,%s,log=(enabled=true,file_max=%" PRIu32 "K)", backup_verbose, file_max));
+    testutil_check(
+      __wt_snprintf(conf, sizeof(conf), "%s,create,%s,log=(enabled=true,file_max=%" PRIu32 "K)",
+        CONN_CONFIG_COMMON, backup_verbose, file_max));
     VERBOSE(2, "wiredtiger config: %s\n", conf);
     testutil_check(wiredtiger_open(home, NULL, conf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));

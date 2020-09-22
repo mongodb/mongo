@@ -267,9 +267,7 @@ verify_consistency(WT_SESSION *session, bool use_checkpoint)
                 continue;
             else if (ret == WT_NOTFOUND || t_ret == WT_NOTFOUND) {
                 (void)log_print_err(
-                  "verify_consistency tables with different"
-                  " amount of data",
-                  EFAULT, 1);
+                  "verify_consistency tables with different amount of data", EFAULT, 1);
                 goto err;
             }
 

@@ -510,26 +510,20 @@ build(int ikey, int ivalue, int cnt)
     switch (page_type) {
     case WT_PAGE_COL_FIX:
         testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=r,value_format=7t,"
-          "allocation_size=%d,"
-          "internal_page_max=%d,internal_item_max=%d,"
-          "leaf_page_max=%d,leaf_item_max=%d",
+          "key_format=r,value_format=7t,allocation_size=%d,internal_page_max=%d,internal_item_max=%"
+          "d,leaf_page_max=%d,leaf_item_max=%d",
           PSIZE, PSIZE, OSIZE, PSIZE, OSIZE));
         break;
     case WT_PAGE_COL_VAR:
         testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=r,"
-          "allocation_size=%d,"
-          "internal_page_max=%d,internal_item_max=%d,"
-          "leaf_page_max=%d,leaf_item_max=%d",
+          "key_format=r,allocation_size=%d,internal_page_max=%d,internal_item_max=%d,leaf_page_max="
+          "%d,leaf_item_max=%d",
           PSIZE, PSIZE, OSIZE, PSIZE, OSIZE));
         break;
     case WT_PAGE_ROW_LEAF:
         testutil_check(__wt_snprintf(config, sizeof(config),
-          "key_format=u,"
-          "allocation_size=%d,"
-          "internal_page_max=%d,internal_item_max=%d,"
-          "leaf_page_max=%d,leaf_item_max=%d",
+          "key_format=u,allocation_size=%d,internal_page_max=%d,internal_item_max=%d,leaf_page_max="
+          "%d,leaf_item_max=%d",
           PSIZE, PSIZE, OSIZE, PSIZE, OSIZE));
         break;
     default:

@@ -64,10 +64,8 @@ compare_tables(WT_SESSION *session, WT_SESSION *sess_copy)
         error_check(curs_copy->get_key(curs_copy, &key_copy));
         error_check(curs_copy->get_value(curs_copy, &value_copy));
         if (strcmp(key, key_copy) != 0 || strcmp(value, value_copy) != 0) {
-            fprintf(stderr,
-              "Mismatched: key %s, key_copy %s "
-              "value %s value_copy %s\n",
-              key, key_copy, value, value_copy);
+            fprintf(stderr, "Mismatched: key %s, key_copy %s value %s value_copy %s\n", key,
+              key_copy, value, value_copy);
             exit(1);
         }
     }

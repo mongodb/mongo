@@ -44,7 +44,7 @@ class test_checkpoint05(wttest.WiredTigerTestCase):
         while metadata_cursor.next() == 0:
             key = metadata_cursor.get_key()
             value = metadata_cursor[key]
-            nckpt = nckpt + value.count("WiredTigerCheckpoint")
+            nckpt += value.count("WiredTigerCheckpoint")
         metadata_cursor.close()
         return nckpt
 

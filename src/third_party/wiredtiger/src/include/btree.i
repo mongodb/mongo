@@ -98,8 +98,9 @@ __wt_btree_bytes_evictable(WT_SESSION_IMPL *session)
     bytes_inmem = btree->bytes_inmem;
     bytes_root = root_page == NULL ? 0 : root_page->memory_footprint;
 
-    return (bytes_inmem <= bytes_root ? 0 : __wt_cache_bytes_plus_overhead(
-                                              cache, bytes_inmem - bytes_root));
+    return (bytes_inmem <= bytes_root ?
+        0 :
+        __wt_cache_bytes_plus_overhead(cache, bytes_inmem - bytes_root));
 }
 
 /*
@@ -1609,7 +1610,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
   ,
   const char *func, int line
 #endif
-  )
+)
 {
     WT_DECL_RET;
     bool acquired;
@@ -1633,7 +1634,7 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
       ,
       func, line
 #endif
-      );
+    );
 
     /*
      * Expected failures: page not found or restart. Our callers list the errors they're expecting

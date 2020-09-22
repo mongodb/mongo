@@ -41,9 +41,9 @@ check_timing(WTPERF *wtperf, const char *name, struct timespec start, struct tim
     last_interval = (uint64_t)(WT_TIMEDIFF_SEC(*stop, start));
 
     if (last_interval > opts->idle_table_cycle) {
-        lprintf(wtperf, ETIMEDOUT, 0, "Cycling idle table failed because %s took %" PRIu64
-                                      " seconds which is longer than configured acceptable"
-                                      " maximum of %" PRIu32 ".",
+        lprintf(wtperf, ETIMEDOUT, 0,
+          "Cycling idle table failed because %s took %" PRIu64
+          " seconds which is longer than configured acceptable maximum of %" PRIu32 ".",
           name, last_interval, opts->idle_table_cycle);
         wtperf->error = true;
         return (ETIMEDOUT);

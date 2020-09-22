@@ -214,8 +214,7 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
     /* Logging configuration. */
     if (g.c_logging)
         CONFIG_APPEND(p,
-          ",log=(enabled=true,archive=%d,"
-          "prealloc=%d,file_max=%" PRIu32 ",compressor=\"%s\")",
+          ",log=(enabled=true,archive=%d,prealloc=%d,file_max=%" PRIu32 ",compressor=\"%s\")",
           g.c_logging_archive ? 1 : 0, g.c_logging_prealloc ? 1 : 0, KILOBYTE(g.c_logging_file_max),
           compressor(g.c_logging_compression_flag));
 
@@ -245,13 +244,10 @@ wts_open(const char *home, bool set_api, WT_CONNECTION **connp)
      */
     if (g.c_statistics_server) {
         if (mmrand(NULL, 0, 5) == 1 && memcmp(g.uri, "file:", strlen("file:")) == 0)
-            CONFIG_APPEND(p,
-              ",statistics=(fast),statistics_log="
-              "(json,on_close,wait=5,sources=(\"file:\"))");
+            CONFIG_APPEND(
+              p, ",statistics=(fast),statistics_log=(json,on_close,wait=5,sources=(\"file:\"))");
         else
-            CONFIG_APPEND(p,
-              ",statistics=(fast),statistics_log="
-              "(json,on_close,wait=5)");
+            CONFIG_APPEND(p, ",statistics=(fast),statistics_log=(json,on_close,wait=5)");
     } else
         CONFIG_APPEND(p, ",statistics=(%s)", g.c_statistics ? "fast" : "none");
 

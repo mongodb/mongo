@@ -624,9 +624,7 @@ print_config(WT_SESSION *session, const char *key, const char *cfg, bool json, b
 static int
 usage(void)
 {
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "dump [-jrx] [-c checkpoint] [-f output-file] uri\n",
+    (void)fprintf(stderr, "usage: %s %s dump [-jrx] [-c checkpoint] [-f output-file] uri\n",
       progname, usage_prefix);
     return (1);
 }

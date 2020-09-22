@@ -83,11 +83,12 @@ typedef enum {
         (s)->txn.isolation = saved_txn_iso;                               \
         WT_ASSERT((s), (s)->txn.forced_iso > 0);                          \
         (s)->txn.forced_iso--;                                            \
-        WT_ASSERT((s), txn_state->id == saved_state.id &&                 \
+        WT_ASSERT((s),                                                    \
+          txn_state->id == saved_state.id &&                              \
             (txn_state->metadata_pinned == saved_state.metadata_pinned || \
-                         saved_state.metadata_pinned == WT_TXN_NONE) &&   \
+              saved_state.metadata_pinned == WT_TXN_NONE) &&              \
             (txn_state->pinned_id == saved_state.pinned_id ||             \
-                         saved_state.pinned_id == WT_TXN_NONE));          \
+              saved_state.pinned_id == WT_TXN_NONE));                     \
         txn_state->metadata_pinned = saved_state.metadata_pinned;         \
         txn_state->pinned_id = saved_state.pinned_id;                     \
     } while (0)

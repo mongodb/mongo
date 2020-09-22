@@ -196,6 +196,21 @@ struct __wt_btree {
      */
     uint64_t file_max;
 
+/*
+ * We maintain a timer for a clean file to avoid excessive checking of checkpoint information that
+ * incurs a large processing penalty. We avoid that but will periodically incur the cost to clean up
+ * checkpoints that can be deleted.
+ */
+#define WT_BTREE_CLEAN_CKPT(session, btree, val)                          \
+    do {                                                                  \
+        (btree)->clean_ckpt_timer = (val);                                \
+        WT_STAT_DATA_SET((session), btree_clean_checkpoint_timer, (val)); \
+    } while (0)
+/* Statistics don't like UINT64_MAX, use INT64_MAX. It's still forever. */
+#define WT_BTREE_CLEAN_CKPT_FOREVER INT64_MAX
+#define WT_BTREE_CLEAN_MINUTES 10
+    uint64_t clean_ckpt_timer;
+
     /*
      * We flush pages from the tree (in order to make checkpoint faster), without a high-level lock.
      * To avoid multiple threads flushing at the same time, lock the tree.

@@ -52,9 +52,7 @@ __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t
     if (F_ISSET(dsk, WT_PAGE_ENCRYPTED)) {
         if (btree->kencryptor == NULL || (encryptor = btree->kencryptor->encryptor) == NULL ||
           encryptor->decrypt == NULL) {
-            fail_msg =
-              "encrypted block in file for which no encryption "
-              "configured";
+            fail_msg = "encrypted block in file for which no encryption configured";
             goto corrupt;
         }
 
@@ -73,9 +71,7 @@ __wt_bt_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, size_t
 
     if (F_ISSET(dsk, WT_PAGE_COMPRESSED)) {
         if (btree->compressor == NULL || btree->compressor->decompress == NULL) {
-            fail_msg =
-              "compressed block in file for which no compression "
-              "configured";
+            fail_msg = "compressed block in file for which no compression configured";
             goto corrupt;
         }
 
@@ -181,7 +177,8 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *add
     time_start = time_stop = 0;
 
     /* Checkpoint calls are different than standard calls. */
-    WT_ASSERT(session, (!checkpoint && addr != NULL && addr_sizep != NULL) ||
+    WT_ASSERT(session,
+      (!checkpoint && addr != NULL && addr_sizep != NULL) ||
         (checkpoint && addr == NULL && addr_sizep == NULL));
 
     /* In-memory databases shouldn't write pages. */

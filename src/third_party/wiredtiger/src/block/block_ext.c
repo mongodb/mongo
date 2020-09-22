@@ -298,10 +298,8 @@ __wt_block_misplaced(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *list
         name = "discard";
     __wt_spin_unlock(session, &block->live_lock);
     if (name != NULL) {
-        __wt_errx(session, "%s failed: %" PRIuMAX "/%" PRIu32
-                           " is on the %s list "
-                           "(%s, %d)",
-          list, (uintmax_t)offset, size, name, func, line);
+        __wt_errx(session, "%s failed: %" PRIuMAX "/%" PRIu32 " is on the %s list (%s, %d)", list,
+          (uintmax_t)offset, size, name, func, line);
         return (__wt_panic(session));
     }
     return (0);
@@ -496,9 +494,9 @@ __wt_block_alloc(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_o
 
     WT_STAT_DATA_INCR(session, block_alloc);
     if (size % block->allocsize != 0)
-        WT_RET_MSG(session, EINVAL, "cannot allocate a block size %" PRIdMAX
-                                    " that is not "
-                                    "a multiple of the allocation size %" PRIu32,
+        WT_RET_MSG(session, EINVAL,
+          "cannot allocate a block size %" PRIdMAX
+          " that is not a multiple of the allocation size %" PRIu32,
           (intmax_t)size, block->allocsize);
 
     /*

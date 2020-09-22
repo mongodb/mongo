@@ -1022,7 +1022,7 @@ restart:
          */
         F_SET(unpack, WT_CELL_UNPACK_OVERFLOW);
         unpack->ovfl = 1;
-    /* FALLTHROUGH */
+        /* FALLTHROUGH */
 
     case WT_CELL_ADDR_DEL:
     case WT_CELL_ADDR_INT:
@@ -1042,7 +1042,7 @@ restart:
          */
         if (unpack->raw == WT_CELL_KEY || unpack->raw == WT_CELL_KEY_PFX ||
           (unpack->raw == WT_CELL_VALUE && unpack->v == 0 &&
-              (cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0))
+            (cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0))
             v += WT_CELL_SIZE_ADJUST;
 
         unpack->data = p;
@@ -1223,8 +1223,9 @@ __cell_data_ref(
         return (__wt_illegal_value(session, unpack->type));
     }
 
-    return (huffman == NULL || store->size == 0 ? 0 : __wt_huffman_decode(session, huffman,
-                                                        store->data, store->size, store));
+    return (huffman == NULL || store->size == 0 ?
+        0 :
+        __wt_huffman_decode(session, huffman, store->data, store->size, store));
 }
 
 /*

@@ -62,15 +62,10 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, NULL,
-      "create,"
-      "cache_size=2G,"
-      "eviction=(threads_max=5),"
-      "statistics=(fast)",
-      &opts->conn));
+      "create,cache_size=2G,eviction=(threads_max=5),statistics=(fast)", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
-    testutil_check(session->create(session, opts->uri,
-      "key_format=Q,value_format=Q,"
-      "leaf_page_max=32k,"));
+    testutil_check(
+      session->create(session, opts->uri, "key_format=Q,value_format=Q,leaf_page_max=32k,"));
 
     /* Create the single record. */
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &c));

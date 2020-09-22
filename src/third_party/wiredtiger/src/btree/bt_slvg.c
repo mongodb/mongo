@@ -505,8 +505,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
                 ss->page_type = dsk->type;
             if (ss->page_type != dsk->type)
                 WT_ERR_MSG(session, WT_ERROR,
-                  "file contains multiple file formats (both "
-                  "%s and %s), and cannot be salvaged",
+                  "file contains multiple file formats (both %s and %s), and cannot be salvaged",
                   __wt_page_type_string(ss->page_type), __wt_page_type_string(dsk->type));
 
             WT_ERR(__slvg_trk_leaf(session, dsk, addr, addr_size, ss));
@@ -1237,9 +1236,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
     cookie->skip = skip = trk->col_start - recno;
     cookie->take = take = (trk->col_stop - trk->col_start) + 1;
 
-    __wt_verbose(session, WT_VERB_SALVAGE, "%s merge discarding first %" PRIu64
-                                           " records, "
-                                           "then taking %" PRIu64 " records",
+    __wt_verbose(session, WT_VERB_SALVAGE,
+      "%s merge discarding first %" PRIu64 " records, then taking %" PRIu64 " records",
       __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, trk->ss->tmp1), skip, take);
 
     /* Set the referenced flag on overflow pages we're using. */
@@ -2265,8 +2263,7 @@ __slvg_ovfl_ref(WT_SESSION_IMPL *session, WT_TRACK *trk, bool multi_panic)
         if (!multi_panic)
             return (__wt_set_return(session, EBUSY));
         WT_PANIC_RET(session, EINVAL,
-          "overflow record unexpectedly referenced multiple times "
-          "during leaf page merge");
+          "overflow record unexpectedly referenced multiple times during leaf page merge");
     }
 
     F_SET(trk, WT_TRACK_OVFL_REFD);

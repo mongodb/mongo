@@ -32,10 +32,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
                 dump_layout = true;
             else if (WT_PREFIX_MATCH(__wt_optarg, "dump_offsets=")) {
                 if (dump_offsets != NULL) {
-                    fprintf(stderr,
-                      "%s: only a single 'dump_offsets' "
-                      "argument supported\n",
-                      progname);
+                    fprintf(
+                      stderr, "%s: only a single 'dump_offsets' argument supported\n", progname);
                     return (usage());
                 }
                 dump_offsets = __wt_optarg + strlen("dump_offsets=");
@@ -94,11 +92,7 @@ err:
 static int
 usage(void)
 {
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "verify %s\n",
-      progname, usage_prefix,
-      "[-d dump_address | dump_blocks | dump_layout | "
-      "dump_offsets=#,# | dump_pages] uri");
+    (void)fprintf(stderr, "usage: %s %s verify %s\n", progname, usage_prefix,
+      "[-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# | dump_pages] uri");
     return (1);
 }

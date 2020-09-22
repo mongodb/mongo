@@ -257,10 +257,8 @@ zlib_init_config(WT_CONNECTION *connection, WT_CONFIG_ARG *config, int *zlib_lev
          */
         zlib_level = (int)v.val;
         if (zlib_level < 0 || zlib_level > 9) {
-            (void)wt_api->err_printf(wt_api, NULL,
-              "zlib_init_config: "
-              "unsupported compression level %d",
-              zlib_level);
+            (void)wt_api->err_printf(
+              wt_api, NULL, "zlib_init_config: unsupported compression level %d", zlib_level);
             return (EINVAL);
         }
         *zlib_levelp = zlib_level;

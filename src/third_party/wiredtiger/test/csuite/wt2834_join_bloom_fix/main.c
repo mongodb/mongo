@@ -74,9 +74,8 @@ main(int argc, char *argv[])
      * Note: repeated primary key 'id' as 'id2'. This makes it easier to dump an index and know
      * which record we're looking at.
      */
-    testutil_check(session->create(session, opts->uri,
-      "key_format=i,value_format=iiii,"
-      "columns=(id,post,balance,flag,id2)"));
+    testutil_check(session->create(
+      session, opts->uri, "key_format=i,value_format=iiii,columns=(id,post,balance,flag,id2)"));
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);
@@ -136,10 +135,8 @@ main(int argc, char *argv[])
          */
         testutil_check(joincur->get_key(joincur, &key));
         testutil_check(joincur->get_value(joincur, &post, &balance, &flag, &key2));
-        fprintf(stderr,
-          "FAIL: "
-          "key=%d/%d, postal_code=%d, balance=%d, flag=%d\n",
-          key, key2, post, balance, flag);
+        fprintf(stderr, "FAIL: key=%d/%d, postal_code=%d, balance=%d, flag=%d\n", key, key2, post,
+          balance, flag);
         count++;
     }
     testutil_assert(ret == WT_NOTFOUND);

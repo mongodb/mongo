@@ -39,13 +39,13 @@
 #endif
 
 #define CRC32CX(crc, value) \
-    __asm__("crc32cx %w[c], %w[c], %x[v]" : [c] "+r"(*&crc) : [v] "r"(+value))
+    __asm__("crc32cx %w[c], %w[c], %x[v]" : [ c ] "+r"(*&crc) : [ v ] "r"(+value))
 #define CRC32CW(crc, value) \
-    __asm__("crc32cw %w[c], %w[c], %w[v]" : [c] "+r"(*&crc) : [v] "r"(+value))
+    __asm__("crc32cw %w[c], %w[c], %w[v]" : [ c ] "+r"(*&crc) : [ v ] "r"(+value))
 #define CRC32CH(crc, value) \
-    __asm__("crc32ch %w[c], %w[c], %w[v]" : [c] "+r"(*&crc) : [v] "r"(+value))
+    __asm__("crc32ch %w[c], %w[c], %w[v]" : [ c ] "+r"(*&crc) : [ v ] "r"(+value))
 #define CRC32CB(crc, value) \
-    __asm__("crc32cb %w[c], %w[c], %w[v]" : [c] "+r"(*&crc) : [v] "r"(+value))
+    __asm__("crc32cb %w[c], %w[c], %w[v]" : [ c ] "+r"(*&crc) : [ v ] "r"(+value))
 
 /*
  * __wt_checksum_hw --

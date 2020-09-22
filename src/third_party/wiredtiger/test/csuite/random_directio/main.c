@@ -1131,9 +1131,7 @@ main(int argc, char *argv[])
     }
     if (!LF_ISSET(SCHEMA_INTEGRATED) &&
       LF_ISSET(SCHEMA_CREATE_CHECK | SCHEMA_DATA_CHECK | SCHEMA_DROP_CHECK)) {
-        fprintf(stderr,
-          "Schema '*check' options cannot be used "
-          "without 'integrated'\n");
+        fprintf(stderr, "Schema '*check' options cannot be used without 'integrated'\n");
         usage();
     }
     printf("CONFIG:%s\n", args);

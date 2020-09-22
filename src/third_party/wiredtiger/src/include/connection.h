@@ -85,8 +85,7 @@ struct __wt_named_encryptor {
     const char *name;        /* Name of encryptor */
     WT_ENCRYPTOR *encryptor; /* User supplied callbacks */
     /* Locked: list of encryptors by key */
-    TAILQ_HEAD(__wt_keyedhash, __wt_keyed_encryptor)
-    keyedhashqh[WT_HASH_ARRAY_SIZE];
+    TAILQ_HEAD(__wt_keyedhash, __wt_keyed_encryptor) * keyedhashqh;
     TAILQ_HEAD(__wt_keyed_qh, __wt_keyed_encryptor) keyedqh;
     /* Linked list of encryptors */
     TAILQ_ENTRY(__wt_named_encryptor) q;
@@ -187,6 +186,8 @@ struct __wt_connection_impl {
 
     const char *home;         /* Database home */
     const char *error_prefix; /* Database error prefix */
+    uint64_t dh_hash_size;    /* Data handle hash bucket array size */
+    uint64_t hash_size;       /* General hash bucket array size */
     int is_new;               /* Connection created database */
 
     uint16_t compat_major; /* Compatibility major version */
@@ -224,24 +225,24 @@ struct __wt_connection_impl {
      * of the table URI.
      */
     /* Locked: data handle hash array */
-    TAILQ_HEAD(__wt_dhhash, __wt_data_handle) dhhash[WT_HASH_ARRAY_SIZE];
+    TAILQ_HEAD(__wt_dhhash, __wt_data_handle) * dhhash;
     /* Locked: data handle list */
     TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
     /* Locked: LSM handle list. */
     TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
     /* Locked: file list */
-    TAILQ_HEAD(__wt_fhhash, __wt_fh) fhhash[WT_HASH_ARRAY_SIZE];
+    TAILQ_HEAD(__wt_fhhash, __wt_fh) * fhhash;
     TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
     /* Locked: library list */
     TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
     WT_SPINLOCK block_lock; /* Locked: block manager list */
-    TAILQ_HEAD(__wt_blockhash, __wt_block) blockhash[WT_HASH_ARRAY_SIZE];
+    TAILQ_HEAD(__wt_blockhash, __wt_block) * blockhash;
     TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
     /* Locked: handles in each bucket */
-    u_int dh_bucket_count[WT_HASH_ARRAY_SIZE];
-    u_int dhandle_count;        /* Locked: handles in the queue */
+    uint64_t *dh_bucket_count;
+    uint64_t dhandle_count;     /* Locked: handles in the queue */
     u_int open_btree_count;     /* Locked: open writable btree count */
     uint32_t next_file_id;      /* Locked: file ID counter */
     uint32_t open_file_count;   /* Atomic: open file handle count */
@@ -282,8 +283,12 @@ struct __wt_connection_impl {
     wt_off_t ckpt_logsize; /* Checkpoint log size period */
     bool ckpt_signalled;   /* Checkpoint signalled */
 
-    uint64_t ckpt_usecs;    /* Checkpoint timer */
-    uint64_t ckpt_time_max; /* Checkpoint time min/max */
+    uint64_t ckpt_apply;      /* Checkpoint handles applied */
+    uint64_t ckpt_apply_time; /* Checkpoint applied handles gather time */
+    uint64_t ckpt_skip;       /* Checkpoint handles skipped */
+    uint64_t ckpt_skip_time;  /* Checkpoint skipped handles gather time */
+    uint64_t ckpt_usecs;      /* Checkpoint timer */
+    uint64_t ckpt_time_max;   /* Checkpoint time min/max */
     uint64_t ckpt_time_min;
     uint64_t ckpt_time_recent; /* Checkpoint time recent/total */
     uint64_t ckpt_time_total;
@@ -487,16 +492,17 @@ struct __wt_connection_impl {
  */
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_TIMING_STRESS_AGGRESSIVE_SWEEP 0x001u
-#define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x002u
-#define WT_TIMING_STRESS_LOOKASIDE_SWEEP 0x004u
-#define WT_TIMING_STRESS_SPLIT_1 0x008u
-#define WT_TIMING_STRESS_SPLIT_2 0x010u
-#define WT_TIMING_STRESS_SPLIT_3 0x020u
-#define WT_TIMING_STRESS_SPLIT_4 0x040u
-#define WT_TIMING_STRESS_SPLIT_5 0x080u
-#define WT_TIMING_STRESS_SPLIT_6 0x100u
-#define WT_TIMING_STRESS_SPLIT_7 0x200u
-#define WT_TIMING_STRESS_SPLIT_8 0x400u
+#define WT_TIMING_STRESS_BACKUP_RENAME 0x002u
+#define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x004u
+#define WT_TIMING_STRESS_LOOKASIDE_SWEEP 0x008u
+#define WT_TIMING_STRESS_SPLIT_1 0x010u
+#define WT_TIMING_STRESS_SPLIT_2 0x020u
+#define WT_TIMING_STRESS_SPLIT_3 0x040u
+#define WT_TIMING_STRESS_SPLIT_4 0x080u
+#define WT_TIMING_STRESS_SPLIT_5 0x100u
+#define WT_TIMING_STRESS_SPLIT_6 0x200u
+#define WT_TIMING_STRESS_SPLIT_7 0x400u
+#define WT_TIMING_STRESS_SPLIT_8 0x800u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint64_t timing_stress_flags;
 

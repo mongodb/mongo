@@ -579,9 +579,8 @@ err:
         break;
     case WT_ERR_IGNORE:
         if (ret != 0 && ret != WT_PANIC) {
-            __wt_err(session, ret,
-              "ignoring not-fatal error during root page split "
-              "to deepen the tree");
+            __wt_err(
+              session, ret, "ignoring not-fatal error during root page split to deepen the tree");
             ret = 0;
         }
         break;
@@ -646,8 +645,8 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
         WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
         if ((discard && next_ref == ref) ||
           ((!WT_BTREE_SYNCING(btree) || WT_SESSION_BTREE_SYNC(session)) &&
-              next_ref->state == WT_REF_DELETED && __wt_delete_page_skip(session, next_ref, true) &&
-              WT_REF_CAS_STATE(session, next_ref, WT_REF_DELETED, WT_REF_SPLIT))) {
+            next_ref->state == WT_REF_DELETED && __wt_delete_page_skip(session, next_ref, true) &&
+            WT_REF_CAS_STATE(session, next_ref, WT_REF_DELETED, WT_REF_SPLIT))) {
             WT_ERR(__wt_buf_grow(session, scr, (deleted_entries + 1) * sizeof(uint32_t)));
             deleted_refs = scr->mem;
             deleted_refs[deleted_entries++] = i;
@@ -866,9 +865,7 @@ err:
         break;
     case WT_ERR_IGNORE:
         if (ret != 0 && ret != WT_PANIC) {
-            __wt_err(session, ret,
-              "ignoring not-fatal error during parent page "
-              "split");
+            __wt_err(session, ret, "ignoring not-fatal error during parent page split");
             ret = 0;
         }
         break;
@@ -1141,9 +1138,7 @@ err:
         break;
     case WT_ERR_IGNORE:
         if (ret != 0 && ret != WT_PANIC) {
-            __wt_err(session, ret,
-              "ignoring not-fatal error during internal page "
-              "split");
+            __wt_err(session, ret, "ignoring not-fatal error during internal page split");
             ret = 0;
         }
         break;
@@ -1617,7 +1612,8 @@ __wt_multi_to_ref(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi, WT_R
     WT_ASSERT(session, multi->supd == NULL || multi->disk_image != NULL);
 
     /* Verify any disk image we have. */
-    WT_ASSERT(session, multi->disk_image == NULL ||
+    WT_ASSERT(session,
+      multi->disk_image == NULL ||
         __wt_verify_dsk_image(
           session, "[page instantiate]", multi->disk_image, 0, &multi->addr, true) == 0);
 

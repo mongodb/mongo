@@ -45,7 +45,8 @@ __nsnap_drop_one(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name)
         txn_global->nsnap_oldest_id =
           (TAILQ_NEXT(found, q) != NULL) ? TAILQ_NEXT(found, q)->pinned_id : WT_TXN_NONE;
         WT_DIAGNOSTIC_YIELD;
-        WT_ASSERT(session, txn_global->nsnap_oldest_id == WT_TXN_NONE ||
+        WT_ASSERT(session,
+          txn_global->nsnap_oldest_id == WT_TXN_NONE ||
             !__wt_txn_visible_all(session, txn_global->nsnap_oldest_id, WT_TS_NONE));
     }
     TAILQ_REMOVE(&txn_global->nsnaph, found, q);
@@ -116,12 +117,14 @@ __nsnap_drop_to(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *name, bool inclusive)
     } while (nsnap != last && !TAILQ_EMPTY(&txn_global->nsnaph));
 
     /* Now that the queue of named snapshots is updated, update the ID */
-    WT_ASSERT(session, !__wt_txn_visible_all(session, txn_global->nsnap_oldest_id, WT_TS_NONE) &&
+    WT_ASSERT(session,
+      !__wt_txn_visible_all(session, txn_global->nsnap_oldest_id, WT_TS_NONE) &&
         (new_nsnap_oldest == WT_TXN_NONE ||
-                WT_TXNID_LE(txn_global->nsnap_oldest_id, new_nsnap_oldest)));
+          WT_TXNID_LE(txn_global->nsnap_oldest_id, new_nsnap_oldest)));
     txn_global->nsnap_oldest_id = new_nsnap_oldest;
     WT_DIAGNOSTIC_YIELD;
-    WT_ASSERT(session, new_nsnap_oldest == WT_TXN_NONE ||
+    WT_ASSERT(session,
+      new_nsnap_oldest == WT_TXN_NONE ||
         !__wt_txn_visible_all(session, new_nsnap_oldest, WT_TS_NONE));
 
     return (0);
@@ -157,8 +160,7 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
     if (!F_ISSET(txn, WT_TXN_RUNNING)) {
         if (include_updates)
             WT_RET_MSG(session, EINVAL,
-              "A transaction must be "
-              "running to include updates in a named snapshot");
+              "A transaction must be running to include updates in a named snapshot");
 
         WT_RET(__wt_txn_begin(session, txn_cfg));
         started_txn = true;
@@ -198,7 +200,8 @@ __wt_txn_named_snapshot_begin(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ERR_NOTFOUND_OK(__nsnap_drop_one(session, &cval));
 
     if (TAILQ_EMPTY(&txn_global->nsnaph)) {
-        WT_ASSERT(session, txn_global->nsnap_oldest_id == WT_TXN_NONE &&
+        WT_ASSERT(session,
+          txn_global->nsnap_oldest_id == WT_TXN_NONE &&
             !__wt_txn_visible_all(session, nsnap_new->pinned_id, WT_TS_NONE));
         __wt_readlock(session, &txn_global->rwlock);
         txn_global->nsnap_oldest_id = nsnap_new->pinned_id;
@@ -295,7 +298,8 @@ __wt_txn_named_snapshot_get(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *nameval)
             txn_state->pinned_id = nsnap->pinned_id;
             __wt_readunlock(session, &txn_global->rwlock);
 
-            WT_ASSERT(session, !__wt_txn_visible_all(session, txn_state->pinned_id, WT_TS_NONE) &&
+            WT_ASSERT(session,
+              !__wt_txn_visible_all(session, txn_state->pinned_id, WT_TS_NONE) &&
                 txn_global->nsnap_oldest_id != WT_TXN_NONE &&
                 WT_TXNID_LE(txn_global->nsnap_oldest_id, txn_state->pinned_id));
             txn->snap_min = nsnap->snap_min;
@@ -348,12 +352,11 @@ __wt_txn_named_snapshot_config(
 
         if (F_ISSET(txn, WT_TXN_RUNNING) && txn->isolation != WT_ISO_SNAPSHOT)
             WT_RET_MSG(session, EINVAL,
-              "Can't create a named snapshot from a running "
-              "transaction that isn't snapshot isolation");
+              "Can't create a named snapshot from a running transaction that isn't snapshot "
+              "isolation");
         else if (F_ISSET(txn, WT_TXN_RUNNING) && txn->mod_count != 0)
             WT_RET_MSG(session, EINVAL,
-              "Can't create a named snapshot from a running "
-              "transaction that has made updates");
+              "Can't create a named snapshot from a running transaction that has made updates");
         *has_create = true;
     }
 
@@ -368,20 +371,18 @@ __wt_txn_named_snapshot_config(
       to_config.len != 0) {
         if (before_config.len != 0 && to_config.len != 0)
             WT_RET_MSG(session, EINVAL,
-              "Illegal configuration; named snapshot drop can't "
-              "specify both before and to options");
+              "Illegal configuration; named snapshot drop can't specify both before and to "
+              "options");
         if (all_config.val != 0 &&
           (names_config.len != 0 || to_config.len != 0 || before_config.len != 0))
             WT_RET_MSG(session, EINVAL,
-              "Illegal configuration; named snapshot drop can't "
-              "specify all and any other options");
+              "Illegal configuration; named snapshot drop can't specify all and any other options");
         *has_drops = true;
     }
 
     if (!*has_create && !*has_drops)
-        WT_RET_MSG(session, EINVAL,
-          "WT_SESSION::snapshot API called without any drop or "
-          "name option");
+        WT_RET_MSG(
+          session, EINVAL, "WT_SESSION::snapshot API called without any drop or name option");
 
     return (0);
 }

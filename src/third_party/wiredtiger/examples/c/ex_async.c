@@ -110,10 +110,8 @@ main(int argc, char *argv[])
     home = example_setup(argc, argv);
 
     /*! [async example connection] */
-    error_check(wiredtiger_open(home, NULL,
-      "create,cache_size=100MB,"
-      "async=(enabled=true,ops_max=20,threads=2)",
-      &conn));
+    error_check(wiredtiger_open(
+      home, NULL, "create,cache_size=100MB,async=(enabled=true,ops_max=20,threads=2)", &conn));
     /*! [async example connection] */
 
     /*! [async example table create] */

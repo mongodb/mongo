@@ -63,10 +63,12 @@ test_value(int64_t val)
     }
     /* Ensure that decoding used the correct amount of buffer */
     if (cp != p) {
-        fprintf(stderr, "Unpack consumed wrong size for %" PRId64 ", expected %" WT_SIZET_FMT
-                        ", got %" WT_SIZET_FMT "\n",
-          sinput, used_len, cp > p ? used_len + (size_t)(cp - p) : /* More than buf used */
-            used_len - (size_t)(p - cp));                          /* Less than buf used */
+        fprintf(stderr,
+          "Unpack consumed wrong size for %" PRId64 ", expected %" WT_SIZET_FMT
+          ", got %" WT_SIZET_FMT "\n",
+          sinput, used_len,
+          cp > p ? used_len + (size_t)(cp - p) : /* More than buf used */
+            used_len - (size_t)(p - cp));        /* Less than buf used */
         abort();
     }
 
@@ -86,8 +88,9 @@ test_value(int64_t val)
     }
     /* Ensure that decoding used the correct amount of buffer */
     if (cp != p) {
-        fprintf(stderr, "Unpack consumed wrong size for %" PRId64 ", expected %" WT_SIZET_FMT
-                        ", got %" WT_SIZET_FMT "\n",
+        fprintf(stderr,
+          "Unpack consumed wrong size for %" PRId64 ", expected %" WT_SIZET_FMT
+          ", got %" WT_SIZET_FMT "\n",
           sinput, used_len, cp > p ? used_len + (size_t)(cp - p) : used_len - (size_t)(p - cp));
         abort();
     }

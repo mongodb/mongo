@@ -45,19 +45,21 @@ track(const char *tag, uint64_t cnt, TINFO *tinfo)
         testutil_check(__wt_snprintf_len_set(
           msg, sizeof(msg), &len, "%4" PRIu32 ": %s: %" PRIu64, g.run_cnt, tag, cnt));
     else
-        testutil_check(__wt_snprintf_len_set(msg, sizeof(msg), &len, "%4" PRIu32 ": %s: "
-                                                                     "search %" PRIu64 "%s, "
-                                                                     "insert %" PRIu64 "%s, "
-                                                                     "update %" PRIu64 "%s, "
-                                                                     "remove %" PRIu64 "%s",
-          g.run_cnt, tag, tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search,
-          tinfo->search > M(9) ? "M" : "",
-          tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert,
-          tinfo->insert > M(9) ? "M" : "",
-          tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update,
-          tinfo->update > M(9) ? "M" : "",
-          tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove,
-          tinfo->remove > M(9) ? "M" : ""));
+        testutil_check(
+          __wt_snprintf_len_set(msg, sizeof(msg), &len,
+            "%4" PRIu32 ": %s: "
+            "search %" PRIu64 "%s, "
+            "insert %" PRIu64 "%s, "
+            "update %" PRIu64 "%s, "
+            "remove %" PRIu64 "%s",
+            g.run_cnt, tag, tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search,
+            tinfo->search > M(9) ? "M" : "",
+            tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert,
+            tinfo->insert > M(9) ? "M" : "",
+            tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update,
+            tinfo->update > M(9) ? "M" : "",
+            tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove,
+            tinfo->remove > M(9) ? "M" : ""));
 
     if (lastlen > len) {
         memset(msg + len, ' ', (size_t)(lastlen - len));

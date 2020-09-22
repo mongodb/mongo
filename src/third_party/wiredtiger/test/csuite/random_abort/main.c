@@ -455,9 +455,7 @@ recover_and_verify(uint32_t nthreads)
                     fatal = true;
                 } else {
                     if (!inmem)
-                        printf(
-                          "%s: deleted record"
-                          " found with key %" PRIu64 "\n",
+                        printf("%s: deleted record found with key %" PRIu64 "\n",
                           fname[DELETE_RECORD_FILE_ID], key);
                     absent++;
                     middle = key;
@@ -477,9 +475,7 @@ recover_and_verify(uint32_t nthreads)
                     if (ret != WT_NOTFOUND)
                         testutil_die(ret, "search");
                     if (!inmem)
-                        printf(
-                          "%s: no insert record"
-                          " with key %" PRIu64 "\n",
+                        printf("%s: no insert record with key %" PRIu64 "\n",
                           fname[INSERT_RECORD_FILE_ID], key);
                     absent++;
                     middle = key;
@@ -722,9 +718,7 @@ main(int argc, char *argv[])
         testutil_die(errno, "parent chdir: %s", home);
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ../%s.SAVE; mkdir ../%s.SAVE; "
-      "cp -p WiredTigerLog.* ../%s.SAVE;",
-      home, home, home));
+      "rm -rf ../%s.SAVE; mkdir ../%s.SAVE; cp -p WiredTigerLog.* ../%s.SAVE;", home, home, home));
     if ((status = system(buf)) < 0)
         testutil_die(status, "system: %s", buf);
 

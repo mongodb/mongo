@@ -439,12 +439,12 @@ restart:
             return (WT_NOTFOUND);
         }
 
-    /*
-     * Swap the current page for the child page. If the page splits while we're retrieving it,
-     * restart the search at the root.
-     *
-     * On other error, simply return, the swap call ensures we're holding nothing on failure.
-     */
+        /*
+         * Swap the current page for the child page. If the page splits while we're retrieving it,
+         * restart the search at the root.
+         *
+         * On other error, simply return, the swap call ensures we're holding nothing on failure.
+         */
 descend:
         if ((ret = __wt_page_swap(session, current, descent, flags)) == 0) {
             current = descent;

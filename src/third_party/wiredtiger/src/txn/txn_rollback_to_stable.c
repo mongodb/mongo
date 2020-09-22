@@ -111,7 +111,8 @@ __txn_abort_newer_update(
              * is not configured for key consistency check, the timestamps could be out of order
              * here.
              */
-            WT_ASSERT(session, !FLD_ISSET(S2BT(session)->assert_flags, WT_ASSERT_COMMIT_TS_KEYS) ||
+            WT_ASSERT(session,
+              !FLD_ISSET(S2BT(session)->assert_flags, WT_ASSERT_COMMIT_TS_KEYS) ||
                 upd == first_upd);
             first_upd = upd->next;
 

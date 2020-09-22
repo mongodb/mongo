@@ -233,17 +233,13 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
          * incremental backup file and a destination database that incorrectly ran recovery.
          */
         if (exist_incr && !exist_isrc)
-            WT_RET_MSG(session, EINVAL,
-              "Incremental backup after running recovery "
-              "is not allowed");
+            WT_RET_MSG(session, EINVAL, "Incremental backup after running recovery is not allowed");
         /*
          * If we have a backup file and metadata and turtle files, we want to recreate the metadata
          * from the backup.
          */
         if (exist_backup) {
-            WT_RET(__wt_msg(session,
-              "Both %s and %s exist; recreating metadata from "
-              "backup",
+            WT_RET(__wt_msg(session, "Both %s and %s exist; recreating metadata from backup",
               WT_METADATA_TURTLE, WT_METADATA_BACKUP));
             WT_RET(__wt_remove_if_exists(session, WT_METAFILE, false));
             WT_RET(__wt_remove_if_exists(session, WT_METADATA_TURTLE, false));

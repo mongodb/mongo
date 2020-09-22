@@ -111,9 +111,8 @@ main(int argc, char *argv[])
      * Note: id is repeated as id2. This makes it easier to identify the primary key in dumps of the
      * index files.
      */
-    testutil_check(session->create(session, opts->uri,
-      "key_format=i,value_format=iiSii,"
-      "columns=(id,post,bal,extra,flag,id2)"));
+    testutil_check(session->create(
+      session, opts->uri, "key_format=i,value_format=iiSii,columns=(id,post,bal,extra,flag,id2)"));
 
     tablename = strchr(opts->uri, ':');
     testutil_assert(tablename != NULL);

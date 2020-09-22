@@ -312,9 +312,7 @@ copy_database(const char *sfx)
     char buf[1024];
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "rm -rf ./%s.%s; mkdir ./%s.%s; "
-      "cp -p %s/* ./%s.%s",
-      home, sfx, home, sfx, home, home, sfx));
+      "rm -rf ./%s.%s; mkdir ./%s.%s; cp -p %s/* ./%s.%s", home, sfx, home, sfx, home, home, sfx));
     printf("copy: %s\n", buf);
     if ((ret = system(buf)) < 0)
         testutil_die(ret, "system: %s", buf);

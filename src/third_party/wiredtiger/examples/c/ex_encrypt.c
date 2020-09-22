@@ -431,25 +431,21 @@ main(int argc, char *argv[])
      * Create and open some encrypted and not encrypted tables. Also use column store and
      * compression for some tables.
      */
-    error_check(
-      session->create(session, "table:crypto1", "encryption=(name=rotn,keyid=" USER1_KEYID "),"
-                                                "columns=(key0,value0),"
-                                                "key_format=S,value_format=S"));
-    error_check(session->create(session,
-      "index:crypto1:byvalue", "encryption=(name=rotn,keyid=" USER1_KEYID "),"
-                               "columns=(value0,key0)"));
-    error_check(
-      session->create(session, "table:crypto2", "encryption=(name=rotn,keyid=" USER2_KEYID "),"
-                                                "key_format=S,value_format=S"));
+    error_check(session->create(session, "table:crypto1",
+      "encryption=(name=rotn,keyid=" USER1_KEYID
+      "),columns=(key0,value0),key_format=S,value_format=S"));
+    error_check(session->create(session, "index:crypto1:byvalue",
+      "encryption=(name=rotn,keyid=" USER1_KEYID "),columns=(value0,key0)"));
+    error_check(session->create(session, "table:crypto2",
+      "encryption=(name=rotn,keyid=" USER2_KEYID "),key_format=S,value_format=S"));
     error_check(session->create(session, "table:nocrypto", "key_format=S,value_format=S"));
 
     /*
      * Send in an unknown keyid. WiredTiger will try to add in the new keyid, but the customize
      * function above will return an error since it is unrecognized.
      */
-    ret = session->create(session, "table:cryptobad", "encryption=(name=rotn,keyid=" USERBAD_KEYID
-                                                      "),"
-                                                      "key_format=S,value_format=S");
+    ret = session->create(session, "table:cryptobad",
+      "encryption=(name=rotn,keyid=" USERBAD_KEYID "),key_format=S,value_format=S");
     if (ret == 0) {
         fprintf(stderr, "Did not detect bad/unknown keyid error\n");
         exit(EXIT_FAILURE);

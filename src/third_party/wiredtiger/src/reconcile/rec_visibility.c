@@ -271,8 +271,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      * The checkpoint transaction is special. Make sure we never write metadata updates from a
      * checkpoint in a concurrent session.
      */
-    WT_ASSERT(session, !WT_IS_METADATA(session->dhandle) || upd == NULL ||
-        upd->txnid == WT_TXN_NONE || upd->txnid != S2C(session)->txn_global.checkpoint_state.id ||
+    WT_ASSERT(session,
+      !WT_IS_METADATA(session->dhandle) || upd == NULL || upd->txnid == WT_TXN_NONE ||
+        upd->txnid != S2C(session)->txn_global.checkpoint_state.id ||
         WT_SESSION_IS_CHECKPOINT(session));
 
     /* If all of the updates were aborted, quit. */
@@ -317,7 +318,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
          */
         if ((upd_select->stop_ts == WT_TS_MAX && upd_select->stop_txn == WT_TXN_MAX) &&
           ((upd_select->start_ts == WT_TS_NONE && upd_select->start_txn == WT_TXN_NONE) ||
-              __wt_txn_visible_all(session, upd_select->start_txn, upd_select->start_ts))) {
+            __wt_txn_visible_all(session, upd_select->start_txn, upd_select->start_ts))) {
             upd_select->start_ts = WT_TS_NONE;
             upd_select->start_txn = WT_TXN_NONE;
             upd_select->stop_ts = WT_TS_MAX;
@@ -341,8 +342,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
      * If the update we chose was a birthmark, or we are doing update-restore and we skipped a
      * birthmark, the original on-page value must be retained.
      */
-    if (upd != NULL && (upd->type == WT_UPDATE_BIRTHMARK ||
-                         (F_ISSET(r, WT_REC_UPDATE_RESTORE) && skipped_birthmark))) {
+    if (upd != NULL &&
+      (upd->type == WT_UPDATE_BIRTHMARK ||
+        (F_ISSET(r, WT_REC_UPDATE_RESTORE) && skipped_birthmark))) {
         /*
          * Resolve the birthmark now regardless of whether the update being written to the data file
          * is the same as it was the previous reconciliation. Otherwise lookaside can end up with
@@ -417,7 +419,7 @@ check_original_value:
      */
     if (upd_select->upd != NULL &&
       (upd_select->upd_saved ||
-          (vpack != NULL && vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
+        (vpack != NULL && vpack->ovfl && vpack->raw != WT_CELL_VALUE_OVFL_RM)))
         WT_RET(__rec_append_orig_value(session, page, first_upd, vpack));
 
     return (0);

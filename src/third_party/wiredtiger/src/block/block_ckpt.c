@@ -197,8 +197,8 @@ __wt_block_checkpoint_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
     case WT_CKPT_PANIC_ON_FAILURE:
     case WT_CKPT_SALVAGE:
         __wt_err(session, EINVAL,
-          "%s: an unexpected checkpoint start: the checkpoint "
-          "has already started or was configured for salvage",
+          "%s: an unexpected checkpoint start: the checkpoint has already started or was "
+          "configured for salvage",
           block->name);
         ret = __wt_block_panic(session);
         break;
@@ -506,8 +506,8 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
     case WT_CKPT_NONE:
     case WT_CKPT_PANIC_ON_FAILURE:
         __wt_err(session, EINVAL,
-          "%s: an unexpected checkpoint attempt: the checkpoint "
-          "was never started or has already completed",
+          "%s: an unexpected checkpoint attempt: the checkpoint was never started or has already "
+          "completed",
           block->name);
         ret = __wt_block_panic(session);
         break;
@@ -751,9 +751,8 @@ live_update:
     if ((a = ckpt->bpriv) == NULL)
         a = &block->live;
     if (a->discard.entries != 0)
-        WT_ERR_MSG(session, WT_ERROR,
-          "first checkpoint incorrectly has blocks on the discard "
-          "list");
+        WT_ERR_MSG(
+          session, WT_ERROR, "first checkpoint incorrectly has blocks on the discard list");
 #endif
 
 err:
@@ -913,8 +912,8 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block, bool fa
     case WT_CKPT_NONE:
     case WT_CKPT_SALVAGE:
         __wt_err(session, EINVAL,
-          "%s: an unexpected checkpoint resolution: the checkpoint "
-          "was never started or completed, or configured for salvage",
+          "%s: an unexpected checkpoint resolution: the checkpoint was never started or completed, "
+          "or configured for salvage",
           block->name);
         ret = __wt_block_panic(session);
         break;

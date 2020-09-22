@@ -284,9 +284,6 @@ list_print_checkpoint(WT_SESSION *session, const char *key)
 static int
 usage(void)
 {
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "list [-cv] [uri]\n",
-      progname, usage_prefix);
+    (void)fprintf(stderr, "usage: %s %s list [-cv] [uri]\n", progname, usage_prefix);
     return (1);
 }

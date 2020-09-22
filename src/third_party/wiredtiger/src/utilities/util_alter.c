@@ -42,9 +42,6 @@ util_alter(WT_SESSION *session, int argc, char *argv[])
 static int
 usage(void)
 {
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "alter uri configuration ...\n",
-      progname, usage_prefix);
+    (void)fprintf(stderr, "usage: %s %s alter uri configuration ...\n", progname, usage_prefix);
     return (1);
 }

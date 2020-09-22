@@ -48,9 +48,6 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 static int
 usage(void)
 {
-    (void)fprintf(stderr,
-      "usage: %s %s "
-      "create [-c configuration] uri\n",
-      progname, usage_prefix);
+    (void)fprintf(stderr, "usage: %s %s create [-c configuration] uri\n", progname, usage_prefix);
     return (1);
 }

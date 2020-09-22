@@ -573,21 +573,15 @@ __las_insert_block_verbose(WT_SESSION_IMPL *session, WT_BTREE *btree, WT_MULTI *
      */
     if (WT_VERBOSE_ISSET(session, WT_VERB_LOOKASIDE) ||
       (ckpt_gen_current > ckpt_gen_last &&
-          __wt_atomic_casv64(&cache->las_verb_gen_write, ckpt_gen_last, ckpt_gen_current))) {
+        __wt_atomic_casv64(&cache->las_verb_gen_write, ckpt_gen_last, ckpt_gen_current))) {
         WT_IGNORE_RET_BOOL(__wt_eviction_clean_needed(session, &pct_full));
         WT_IGNORE_RET_BOOL(__wt_eviction_dirty_needed(session, &pct_dirty));
 
         __wt_verbose(session, WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,
-          "Page reconciliation triggered lookaside write "
-          "file ID %" PRIu32 ", page ID %" PRIu64
-          ". "
-          "Max txn ID %" PRIu64
-          ", max ondisk timestamp %s, "
-          "first skipped ts %s. "
-          "Entries now in lookaside file: %" PRId64
-          ", "
-          "cache dirty: %2.3f%% , "
-          "cache use: %2.3f%%",
+          "Page reconciliation triggered lookaside write file ID %" PRIu32 ", page ID %" PRIu64
+          ". Max txn ID %" PRIu64
+          ", max ondisk timestamp %s, first skipped ts %s. Entries now in lookaside file: %" PRId64
+          ", cache dirty: %2.3f%% , cache use: %2.3f%%",
           btree_id, multi->page_las.las_pageid, multi->page_las.max_txn,
           __wt_timestamp_to_string(multi->page_las.max_ondisk_ts, ts_string[0]),
           __wt_timestamp_to_string(multi->page_las.min_skipped_ts, ts_string[1]),
@@ -766,9 +760,8 @@ __wt_las_insert_block(
     WT_STAT_CONN_SET(session, cache_lookaside_ondisk, las_size);
     max_las_size = ((WT_CURSOR_BTREE *)cursor)->btree->file_max;
     if (max_las_size != 0 && (uint64_t)las_size > max_las_size)
-        WT_PANIC_MSG(session, WT_PANIC, "WiredTigerLAS: file size of %" PRIu64
-                                        " exceeds maximum "
-                                        "size %" PRIu64,
+        WT_PANIC_MSG(session, WT_PANIC,
+          "WiredTigerLAS: file size of %" PRIu64 " exceeds maximum size %" PRIu64,
           (uint64_t)las_size, max_las_size);
 
 err:
@@ -1087,8 +1080,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
         WT_ERR(cursor->get_key(cursor, &las_pageid, &las_id, &las_counter, &las_key));
 
         __wt_verbose(session, WT_VERB_LOOKASIDE_ACTIVITY,
-          "Sweep reviewing lookaside entry with lookaside "
-          "page ID %" PRIu64 " btree ID %" PRIu32 " saved key size: %" WT_SIZET_FMT,
+          "Sweep reviewing lookaside entry with lookaside page ID %" PRIu64 " btree ID %" PRIu32
+          " saved key size: %" WT_SIZET_FMT,
           las_pageid, las_id, saved_key->size);
 
         /*
@@ -1169,8 +1162,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
              *	4. no restriction on durable timestamp value
              *	for other updates.
              */
-            WT_ASSERT(session, prepare_state != WT_PREPARE_LOCKED &&
-                durable_timestamp != WT_TS_MAX &&
+            WT_ASSERT(session,
+              prepare_state != WT_PREPARE_LOCKED && durable_timestamp != WT_TS_MAX &&
                 (prepare_state != WT_PREPARE_INPROGRESS || durable_timestamp == 0));
 
             WT_ASSERT(session,
@@ -1196,9 +1189,8 @@ __wt_las_sweep(WT_SESSION_IMPL *session)
             continue;
 
         __wt_verbose(session, WT_VERB_LOOKASIDE_ACTIVITY,
-          "Sweep removing lookaside entry with "
-          "page ID: %" PRIu64 " btree ID: %" PRIu32 " saved key size: %" WT_SIZET_FMT
-          ", record type: %" PRIu8 " transaction ID: %" PRIu64,
+          "Sweep removing lookaside entry with page ID: %" PRIu64 " btree ID: %" PRIu32
+          " saved key size: %" WT_SIZET_FMT ", record type: %" PRIu8 " transaction ID: %" PRIu64,
           las_pageid, las_id, saved_key->size, upd_type, las_txnid);
         WT_ERR(cursor->remove(cursor));
         ++remove_cnt;

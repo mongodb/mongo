@@ -61,7 +61,8 @@ __wt_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, WT_SALVAGE_COOKIE *salvage
      */
     WT_ASSERT(session, !LF_ISSET(WT_REC_LOOKASIDE) || !LF_ISSET(WT_REC_UPDATE_RESTORE));
     WT_ASSERT(session, !LF_ISSET(WT_REC_UPDATE_RESTORE) || LF_ISSET(WT_REC_VISIBLE_ALL));
-    WT_ASSERT(session, !LF_ISSET(WT_REC_EVICT) || LF_ISSET(WT_REC_VISIBLE_ALL) ||
+    WT_ASSERT(session,
+      !LF_ISSET(WT_REC_EVICT) || LF_ISSET(WT_REC_VISIBLE_ALL) ||
         F_ISSET(&session->txn, WT_TXN_HAS_SNAPSHOT));
 
     /* It's an error to be called with a clean page. */
@@ -609,8 +610,8 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
       txn_global->has_stable_timestamp &&
       ((btree->checkpoint_gen != __wt_gen(session, WT_GEN_CHECKPOINT) &&
          txn_global->stable_is_pinned) ||
-          FLD_ISSET(page->modify->restore_state, WT_PAGE_RS_LOOKASIDE) ||
-          page->modify->last_stable_timestamp == txn_global->stable_timestamp))
+        FLD_ISSET(page->modify->restore_state, WT_PAGE_RS_LOOKASIDE) ||
+        page->modify->last_stable_timestamp == txn_global->stable_timestamp))
         r->las_skew_newest = false;
 
     /*
@@ -1976,7 +1977,8 @@ copy_image:
      * The I/O routines verify all disk images we write, but there are paths in reconciliation that
      * don't do I/O. Verify those images, too.
      */
-    WT_ASSERT(session, verify_image == false ||
+    WT_ASSERT(session,
+      verify_image == false ||
         __wt_verify_dsk_image(
           session, "[reconcile-image]", chunk->image.data, 0, &multi->addr, true) == 0);
 #endif
@@ -2153,7 +2155,7 @@ __rec_split_dump_keys(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
             __wt_verbose(session, WT_VERB_SPLIT, "starting key %s",
               __wt_buf_set_printable(
-                           session, WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size, tkey));
+                session, WT_IKEY_DATA(multi->key.ikey), multi->key.ikey->size, tkey));
         __wt_scr_free(session, &tkey);
     } else
         for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
@@ -2272,16 +2274,16 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         mod->rec_result = WT_PM_REC_EMPTY;
         break;
     case 1: /* 1-for-1 page swap */
-            /*
-             * Because WiredTiger's pages grow without splitting, we're replacing a single page with
-             * another single page most of the time.
-             *
-             * If in-memory, or saving/restoring changes for this page and there's only one block,
-             * there's nothing to write. Set up a single block as if to split, then use that disk
-             * image to rewrite the page in memory. This is separate from simple replacements where
-             * eviction has decided to retain the page in memory because the latter can't handle
-             * update lists and splits can.
-             */
+        /*
+         * Because WiredTiger's pages grow without splitting, we're replacing a single page with
+         * another single page most of the time.
+         *
+         * If in-memory, or saving/restoring changes for this page and there's only one block,
+         * there's nothing to write. Set up a single block as if to split, then use that disk image
+         * to rewrite the page in memory. This is separate from simple replacements where eviction
+         * has decided to retain the page in memory because the latter can't handle update lists and
+         * splits can.
+         */
         if (F_ISSET(r, WT_REC_IN_MEMORY) ||
           (F_ISSET(r, WT_REC_UPDATE_RESTORE) && r->multi->supd_entries != 0))
             goto split;
@@ -2316,10 +2318,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
         if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT))
             WT_RET(__rec_split_dump_keys(session, r));
 
-    /*
-     * The reuse flag was set in some cases, but we have to clear it, otherwise on subsequent
-     * reconciliation we would fail to remove blocks that are being discarded.
-     */
+        /*
+         * The reuse flag was set in some cases, but we have to clear it, otherwise on subsequent
+         * reconciliation we would fail to remove blocks that are being discarded.
+         */
 split:
         for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
             multi->addr.reuse = 0;

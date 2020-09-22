@@ -920,9 +920,8 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
      */
     if (desc->version > WT_LOG_VERSION)
         WT_ERR_MSG(session, WT_ERROR,
-          "unsupported WiredTiger file version: this build"
-          " only supports versions up to %d,"
-          " and the file is version %" PRIu16,
+          "unsupported WiredTiger file version: this build only supports versions up to %d, and "
+          "the file is version %" PRIu16,
           WT_LOG_VERSION, desc->version);
 
     /*
@@ -930,19 +929,17 @@ __log_open_verify(WT_SESSION_IMPL *session, uint32_t id, WT_FH **fhp, WT_LSN *ls
      * maximum.
      */
     if (conn->req_max_major != WT_CONN_COMPAT_NONE && desc->version > conn->log_req_max)
-        WT_ERR_MSG(session, WT_ERROR, WT_COMPAT_MSG_PREFIX
-          "unsupported WiredTiger file version: this build"
-          " requires a maximum version of %" PRIu16
-          ","
-          " and the file is version %" PRIu16,
+        WT_ERR_MSG(session, WT_ERROR,
+          WT_COMPAT_MSG_PREFIX
+          "unsupported WiredTiger file version: this build requires a maximum version of %" PRIu16
+          ", and the file is version %" PRIu16,
           conn->log_req_max, desc->version);
 
     if (conn->req_min_major != WT_CONN_COMPAT_NONE && desc->version < conn->log_req_min)
-        WT_ERR_MSG(session, WT_ERROR, WT_COMPAT_MSG_PREFIX
-          "unsupported WiredTiger file version: this build"
-          " requires a minimum version of %" PRIu16
-          ","
-          " and the file is version %" PRIu16,
+        WT_ERR_MSG(session, WT_ERROR,
+          WT_COMPAT_MSG_PREFIX
+          "unsupported WiredTiger file version: this build requires a minimum version of %" PRIu16
+          ", and the file is version %" PRIu16,
           conn->log_req_min, desc->version);
 
     /*
@@ -1030,8 +1027,9 @@ __log_record_verify(
     }
     for (i = 0; i < sizeof(logrec.unused); i++)
         if (logrec.unused[i] != 0) {
-            WT_RET(__wt_msg(session, "%s: log record at position %" PRIu32
-                                     " has unused[%" WT_SIZET_FMT "] corruption 0x%" PRIx8,
+            WT_RET(__wt_msg(session,
+              "%s: log record at position %" PRIu32 " has unused[%" WT_SIZET_FMT
+              "] corruption 0x%" PRIx8,
               log_fh->name, offset, i, logrec.unused[i]));
             *corrupt = true;
         }
@@ -2022,7 +2020,7 @@ __log_salvage_message(
 int
 __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
   int (*func)(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, WT_LSN *next_lsnp,
-                void *cookie, int firstrecord),
+    void *cookie, int firstrecord),
   void *cookie)
 {
     WT_CONNECTION_IMPL *conn;
@@ -2211,9 +2209,7 @@ advance:
             if (LF_ISSET(WT_LOGSCAN_RECOVER) && version == WT_LOG_VERSION_SYSTEM &&
               WT_IS_ZERO_LSN(&prev_lsn)) {
                 __wt_verbose(session, WT_VERB_LOG,
-                  "log_scan: Stopping, no system "
-                  "record detected in %s.",
-                  log_fh->name);
+                  "log_scan: Stopping, no system record detected in %s.", log_fh->name);
                 break;
             }
             WT_ERR(__wt_filesize(session, log_fh, &log_size));
@@ -2399,13 +2395,11 @@ err:
     if (ret != 0 && firstrecord && LF_ISSET(WT_LOGSCAN_RECOVER | WT_LOGSCAN_RECOVER_METADATA)) {
         __wt_err(session, ret, "WiredTiger is unable to read the recovery log");
         __wt_err(session, ret,
-          "This may be due to the log"
-          " files being encrypted, being from an older"
-          " version or due to corruption on disk");
+          "This may be due to the log files being encrypted, being from an older version or due to "
+          "corruption on disk");
         __wt_err(session, ret,
-          "You should confirm that you have"
-          " opened the database with the correct options including"
-          " all encryption and compression options");
+          "You should confirm that you have opened the database with the correct options including "
+          "all encryption and compression options");
     }
 
     WT_TRET(__wt_fs_directory_list_free(session, &logfiles, logcount));
@@ -2576,9 +2570,8 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     conn = S2C(session);
     log = conn->log;
     if (record->size > UINT32_MAX)
-        WT_RET_MSG(session, EFBIG, "Log record size of %" WT_SIZET_FMT
-                                   " exceeds the maximum "
-                                   "supported size of %" PRIu32,
+        WT_RET_MSG(session, EFBIG,
+          "Log record size of %" WT_SIZET_FMT " exceeds the maximum supported size of %" PRIu32,
           record->size, UINT32_MAX);
     WT_INIT_LSN(&lsn);
     myslot.slot = NULL;

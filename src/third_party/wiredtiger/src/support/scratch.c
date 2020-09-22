@@ -333,9 +333,7 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
             continue;
         if (F_ISSET(*bufp, WT_ITEM_INUSE))
 #ifdef HAVE_DIAGNOSTIC
-            __wt_errx(session,
-              "scratch buffer allocated and never discarded"
-              ": %s: %d",
+            __wt_errx(session, "scratch buffer allocated and never discarded: %s: %d",
               session->scratch_track[bufp - session->scratch].func,
               session->scratch_track[bufp - session->scratch].line);
 #else

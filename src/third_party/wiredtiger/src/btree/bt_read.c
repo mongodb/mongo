@@ -95,8 +95,7 @@ __las_page_instantiate_verbose(WT_SESSION_IMPL *session, uint64_t las_pageid)
          */
         if (__wt_atomic_casv64(&cache->las_verb_gen_read, ckpt_gen_last, ckpt_gen_current)) {
             __wt_verbose(session, WT_VERB_LOOKASIDE | WT_VERB_LOOKASIDE_ACTIVITY,
-              "Read from lookaside file triggered for "
-              "file ID %" PRIu32 ", page ID %" PRIu64,
+              "Read from lookaside file triggered for file ID %" PRIu32 ", page ID %" PRIu64,
               S2BT(session)->id, las_pageid);
         }
     }
@@ -504,7 +503,8 @@ __page_read(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     /*
      * The WT_REF lookaside state should match the page-header state of any page we read.
      */
-    WT_ASSERT(session, (previous_state != WT_REF_LIMBO && previous_state != WT_REF_LOOKASIDE) ||
+    WT_ASSERT(session,
+      (previous_state != WT_REF_LIMBO && previous_state != WT_REF_LOOKASIDE) ||
         ref->page->dsk == NULL || F_ISSET(ref->page->dsk, WT_PAGE_LAS_UPDATE));
 
 skip_read:
@@ -573,7 +573,7 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
   ,
   const char *func, int line
 #endif
-  )
+)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -589,7 +589,8 @@ __wt_page_in_func(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags
         LF_SET(WT_READ_IGNORE_CACHE_SIZE);
 
     /* Sanity check flag combinations. */
-    WT_ASSERT(session, !LF_ISSET(WT_READ_DELETED_SKIP | WT_READ_NO_WAIT | WT_READ_LOOKASIDE) ||
+    WT_ASSERT(session,
+      !LF_ISSET(WT_READ_DELETED_SKIP | WT_READ_NO_WAIT | WT_READ_LOOKASIDE) ||
         LF_ISSET(WT_READ_CACHE));
     WT_ASSERT(session, !LF_ISSET(WT_READ_DELETED_CHECK) || !LF_ISSET(WT_READ_DELETED_SKIP));
 
@@ -702,7 +703,7 @@ read:
              */
             if (current_state == WT_REF_LIMBO &&
               ((!LF_ISSET(WT_READ_CACHE) || LF_ISSET(WT_READ_LOOKASIDE)) &&
-                  !__wt_las_page_skip_locked(session, ref))) {
+                !__wt_las_page_skip_locked(session, ref))) {
                 WT_RET(__wt_hazard_clear(session, ref));
                 goto read;
             }

@@ -93,8 +93,8 @@ __curfile_next(WT_CURSOR *cursor)
     WT_ERR(__wt_btcur_next(cbt, false));
 
     /* Next maintains a position, key and value. */
-    WT_ASSERT(session, F_ISSET(cbt, WT_CBT_ACTIVE) &&
-        F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+    WT_ASSERT(session,
+      F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
@@ -120,8 +120,8 @@ __wt_curfile_next_random(WT_CURSOR *cursor)
     WT_ERR(__wt_btcur_next_random(cbt));
 
     /* Next-random maintains a position, key and value. */
-    WT_ASSERT(session, F_ISSET(cbt, WT_CBT_ACTIVE) &&
-        F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+    WT_ASSERT(session,
+      F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
@@ -146,8 +146,8 @@ __curfile_prev(WT_CURSOR *cursor)
     WT_ERR(__wt_btcur_prev(cbt, false));
 
     /* Prev maintains a position, key and value. */
-    WT_ASSERT(session, F_ISSET(cbt, WT_CBT_ACTIVE) &&
-        F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+    WT_ASSERT(session,
+      F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
@@ -172,7 +172,8 @@ __curfile_reset(WT_CURSOR *cursor)
     ret = __wt_btcur_reset(cbt);
 
     /* Reset maintains no position, key or value. */
-    WT_ASSERT(session, !F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == 0 &&
+    WT_ASSERT(session,
+      !F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == 0 &&
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
 
 err:
@@ -202,8 +203,8 @@ __curfile_search(WT_CURSOR *cursor)
     __wt_stat_usecs_hist_incr_opread(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
     /* Search maintains a position, key and value. */
-    WT_ASSERT(session, F_ISSET(cbt, WT_CBT_ACTIVE) &&
-        F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+    WT_ASSERT(session,
+      F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
@@ -233,8 +234,8 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
     __wt_stat_usecs_hist_incr_opread(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
     /* Search-near maintains a position, key and value. */
-    WT_ASSERT(session, F_ISSET(cbt, WT_CBT_ACTIVE) &&
-        F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+    WT_ASSERT(session,
+      F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
@@ -270,10 +271,11 @@ __curfile_insert(WT_CURSOR *cursor)
      * Insert maintains no position, key or value (except for column-store appends, where we are
      * returning a key).
      */
-    WT_ASSERT(session, !F_ISSET(cbt, WT_CBT_ACTIVE) &&
+    WT_ASSERT(session,
+      !F_ISSET(cbt, WT_CBT_ACTIVE) &&
         ((F_ISSET(cursor, WT_CURSTD_APPEND) &&
            F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_EXT) ||
-                (!F_ISSET(cursor, WT_CURSTD_APPEND) && F_MASK(cursor, WT_CURSTD_KEY_SET) == 0)));
+          (!F_ISSET(cursor, WT_CURSTD_APPEND) && F_MASK(cursor, WT_CURSTD_KEY_SET) == 0)));
     WT_ASSERT(session, F_MASK(cursor, WT_CURSTD_VALUE_SET) == 0);
 
 err:
@@ -368,8 +370,8 @@ __curfile_update(WT_CURSOR *cursor)
     __wt_stat_usecs_hist_incr_opwrite(session, WT_CLOCKDIFF_US(time_stop, time_start));
 
     /* Update maintains a position, key and value. */
-    WT_ASSERT(session, F_ISSET(cbt, WT_CBT_ACTIVE) &&
-        F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
+    WT_ASSERT(session,
+      F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == WT_CURSTD_KEY_INT &&
         F_MASK(cursor, WT_CURSTD_VALUE_SET) == WT_CURSTD_VALUE_INT);
 
 err:
@@ -689,9 +691,8 @@ __curfile_create(WT_SESSION_IMPL *session, WT_CURSOR *owner, const char *cfg[], 
     WT_ERR(__wt_config_gets_def(session, cfg, "next_random", 0, &cval));
     if (cval.val != 0) {
         if (WT_CURSOR_RECNO(cursor))
-            WT_ERR_MSG(session, ENOTSUP,
-              "next_random configuration not supported for "
-              "column-store objects");
+            WT_ERR_MSG(
+              session, ENOTSUP, "next_random configuration not supported for column-store objects");
 
         __wt_cursor_set_notsup(cursor);
         cursor->next = __wt_curfile_next_random;

@@ -361,9 +361,8 @@ __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *typ
 
     /* Check each chunk against the total file size. */
     if (offset + size > block->size)
-        WT_RET_MSG(session, WT_ERROR, "fragment %" PRIuMAX "-%" PRIuMAX
-                                      " references "
-                                      "non-existent file blocks",
+        WT_RET_MSG(session, WT_ERROR,
+          "fragment %" PRIuMAX "-%" PRIuMAX " references non-existent file blocks",
           (uintmax_t)offset, (uintmax_t)(offset + size));
 
     frag = (uint64_t)WT_wt_off_TO_FRAG(block, offset);
@@ -373,10 +372,8 @@ __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block, const char *typ
     if (nodup)
         for (f = frag, i = 0; i < frags; ++f, ++i)
             if (__bit_test(block->fragfile, f))
-                WT_RET_MSG(session, WT_ERROR, "file fragment at %" PRIuMAX
-                                              " referenced "
-                                              "multiple times",
-                  (uintmax_t)offset);
+                WT_RET_MSG(session, WT_ERROR,
+                  "file fragment at %" PRIuMAX " referenced multiple times", (uintmax_t)offset);
 
     /* Add fragments to the file's fragment list. */
     __bit_nset(block->fragfile, frag, frag + (frags - 1));
@@ -458,9 +455,8 @@ __verify_ckptfrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset
      * outside of the checkpoint's stored size.
      */
     if (offset + size > block->verify_size)
-        WT_RET_MSG(session, WT_ERROR, "fragment %" PRIuMAX "-%" PRIuMAX
-                                      " references "
-                                      "file blocks outside the checkpoint",
+        WT_RET_MSG(session, WT_ERROR,
+          "fragment %" PRIuMAX "-%" PRIuMAX " references file blocks outside the checkpoint",
           (uintmax_t)offset, (uintmax_t)(offset + size));
 
     frag = (uint64_t)WT_wt_off_TO_FRAG(block, offset);
@@ -469,11 +465,10 @@ __verify_ckptfrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset
     /* It is illegal to reference a particular chunk more than once. */
     for (f = frag, i = 0; i < frags; ++f, ++i)
         if (!__bit_test(block->fragckpt, f))
-            WT_RET_MSG(session, WT_ERROR, "fragment at %" PRIuMAX
-                                          " referenced multiple "
-                                          "times in a single checkpoint or found in the "
-                                          "checkpoint but not listed in the checkpoint's "
-                                          "allocation list",
+            WT_RET_MSG(session, WT_ERROR,
+              "fragment at %" PRIuMAX
+              " referenced multiple times in a single checkpoint or found in the checkpoint but "
+              "not listed in the checkpoint's allocation list",
               (uintmax_t)offset);
 
     /* Remove fragments from the checkpoint's allocation list. */

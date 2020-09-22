@@ -67,16 +67,13 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
              * pool.
              */
             if (__wt_config_gets(session, &cfg[1], "shared_cache.size", &cval) != WT_NOTFOUND)
-                WT_RET_MSG(session, EINVAL,
-                  "Shared cache configuration requires a "
-                  "pool name");
+                WT_RET_MSG(session, EINVAL, "Shared cache configuration requires a pool name");
             return (0);
         }
 
         if (__wt_config_gets(session, &cfg[1], "cache_size", &cval_cache_size) != WT_NOTFOUND)
             WT_RET_MSG(session, EINVAL,
-              "Only one of cache_size and shared_cache can be "
-              "in the configuration");
+              "Only one of cache_size and shared_cache can be in the configuration");
 
         /*
          * NOTE: The allocations made when configuring and opening a cache pool don't really belong
@@ -185,8 +182,8 @@ __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
         used_cache -= conn->cache->cp_reserved;
     if (used_cache + reserve > size)
         WT_ERR_MSG(session, EINVAL,
-          "Shared cache unable to accommodate this configuration. "
-          "Shared cache size: %" PRIu64 ", requested min: %" PRIu64,
+          "Shared cache unable to accommodate this configuration. Shared cache size: %" PRIu64
+          ", requested min: %" PRIu64,
           size, used_cache + reserve);
 
     /* The configuration is verified - it's safe to update the pool. */

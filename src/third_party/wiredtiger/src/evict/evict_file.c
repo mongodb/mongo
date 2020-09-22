@@ -89,8 +89,9 @@ __wt_evict_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
             /*
              * Discard the page regardless of whether it is dirty.
              */
-            WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_DEAD) ||
-                F_ISSET(S2C(session), WT_CONN_CLOSING) || __wt_page_can_evict(session, ref, NULL));
+            WT_ASSERT(session,
+              F_ISSET(dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING) ||
+                __wt_page_can_evict(session, ref, NULL));
             __wt_ref_out(session, ref);
             break;
         case WT_SYNC_CHECKPOINT:

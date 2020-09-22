@@ -117,10 +117,8 @@ __compact_progress(WT_SESSION_IMPL *session)
     time_diff = WT_TIMEDIFF_SEC(cur_time, session->compact->begin);
     if (time_diff / WT_PROGRESS_MSG_PERIOD > session->compact->prog_msg_count) {
         __wt_verbose(session, WT_VERB_COMPACT_PROGRESS,
-          "Compact running"
-          " for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, skipped %" PRIu64
-          " pages,"
-          " wrote %" PRIu64 " pages",
+          "Compact running for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, skipped %" PRIu64
+          " pages, wrote %" PRIu64 " pages",
           time_diff, bm->block->compact_pages_reviewed, bm->block->compact_pages_skipped,
           bm->block->compact_pages_written);
         session->compact->prog_msg_count++;

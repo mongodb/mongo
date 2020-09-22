@@ -107,7 +107,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
         WT_ASSERT(session, F_ISSET(&session->txn, WT_TXN_HAS_ID));
         have_primary = (primary != NULL && primary_chunk != NULL &&
           (primary_chunk->switch_txn == WT_TXN_NONE ||
-                          WT_TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
+            WT_TXNID_LT(session->txn.id, primary_chunk->switch_txn)));
     }
 
     /*
@@ -229,7 +229,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
         if ((!update || txn->isolation != WT_ISO_SNAPSHOT ||
               F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
           ((update && clsm->primary_chunk != NULL) ||
-              (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
+            (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
             break;
 
 open:
@@ -682,14 +682,14 @@ err:
             if (lsm_tree->custom_generation == 0 ||
               chunk->generation < lsm_tree->custom_generation) {
                 checkpoint = ((WT_CURSOR_BTREE *)cursor)->btree->dhandle->checkpoint;
-                WT_ASSERT(session, (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ?
-                    checkpoint != NULL :
-                    checkpoint == NULL);
+                WT_ASSERT(session,
+                  (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ? checkpoint != NULL :
+                                                                           checkpoint == NULL);
             }
 
             /* Make sure the Bloom config matches. */
-            WT_ASSERT(
-              session, (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) && !F_ISSET(clsm, WT_CLSM_MERGE)) ?
+            WT_ASSERT(session,
+              (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) && !F_ISSET(clsm, WT_CLSM_MERGE)) ?
                 clsm->chunks[i]->bloom != NULL :
                 clsm->chunks[i]->bloom == NULL);
         }
@@ -1388,9 +1388,10 @@ __clsm_put(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, const WT_ITEM *key, co
 
     lsm_tree = clsm->lsm_tree;
 
-    WT_ASSERT(session, F_ISSET(&session->txn, WT_TXN_HAS_ID) && clsm->primary_chunk != NULL &&
+    WT_ASSERT(session,
+      F_ISSET(&session->txn, WT_TXN_HAS_ID) && clsm->primary_chunk != NULL &&
         (clsm->primary_chunk->switch_txn == WT_TXN_NONE ||
-                         WT_TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));
+          WT_TXNID_LE(session->txn.id, clsm->primary_chunk->switch_txn)));
 
     /*
      * Clear the existing cursor position. Don't clear the primary cursor: we're about to use it

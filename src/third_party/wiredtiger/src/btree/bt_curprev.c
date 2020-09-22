@@ -253,7 +253,7 @@ new_page:
     upd = NULL;
     if (cbt->ins != NULL)
 restart_read:
-    WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
+        WT_RET(__wt_txn_read(session, cbt->ins->upd, &upd));
     if (upd == NULL) {
         cbt->v = __bit_getv_recno(cbt->ref, cbt->recno, btree->bitcnt);
         cbt->iface.value.data = &cbt->v;
@@ -633,8 +633,9 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
          * repeatedly deleting from the beginning of a tree can have quadratic performance. Take
          * care not to force eviction of pages that are genuinely empty, in new trees.
          */
-        if (page != NULL && (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
-                              (newpage && cbt->page_deleted_count > 0))) {
+        if (page != NULL &&
+          (cbt->page_deleted_count > WT_BTREE_DELETE_THRESHOLD ||
+            (newpage && cbt->page_deleted_count > 0))) {
             __wt_page_evict_soon(session, cbt->ref);
             WT_STAT_CONN_INCR(session, cache_eviction_force_delete);
         }

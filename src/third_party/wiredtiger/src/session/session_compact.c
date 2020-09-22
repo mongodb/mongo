@@ -295,9 +295,7 @@ __compact_worker(WT_SESSION_IMPL *session)
              */
             if (ret == EBUSY) {
                 if (__wt_cache_stuck(session)) {
-                    WT_ERR_MSG(session, EBUSY,
-                      "compaction halted by eviction "
-                      "pressure");
+                    WT_ERR_MSG(session, EBUSY, "compaction halted by eviction pressure");
                 }
                 ret = 0;
                 another_pass = true;
@@ -389,8 +387,9 @@ __wt_session_compact(WT_SESSION *wt_session, const char *uri, const char *config
      * table, so acquire the table lock in write mode.
      */
     WT_WITH_SCHEMA_LOCK(session,
-      WT_WITH_TABLE_WRITE_LOCK(session, ret = __wt_schema_worker(session, uri,
-                                          __compact_handle_append, __compact_uri_analyze, cfg, 0)));
+      WT_WITH_TABLE_WRITE_LOCK(session,
+        ret = __wt_schema_worker(
+          session, uri, __compact_handle_append, __compact_uri_analyze, cfg, 0)));
     WT_ERR(ret);
 
     if (session->compact->lsm_count != 0)

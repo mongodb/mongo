@@ -282,8 +282,9 @@ done:
     return (0);
 
 err:
-    __wt_err(session, ret, "operation apply failed during recovery: operation type %" PRIu32
-                           " at LSN %" PRIu32 "/%" PRIu32,
+    __wt_err(session, ret,
+      "operation apply failed during recovery: operation type %" PRIu32 " at LSN %" PRIu32
+      "/%" PRIu32,
       optype, lsnp->l.file, lsnp->l.offset);
     return (ret);
 }
@@ -425,9 +426,8 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 
     if (r->files[fileid].uri != NULL)
         WT_PANIC_RET(r->session, WT_PANIC,
-          "metadata corruption: files %s and %s have the same "
-          "file ID %u",
-          uri, r->files[fileid].uri, fileid);
+          "metadata corruption: files %s and %s have the same file ID %u", uri,
+          r->files[fileid].uri, fileid);
     WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
     WT_RET(__wt_config_getones(r->session, config, "checkpoint_lsn", &cval));
     /* If there is checkpoint logged for the file, apply everything. */

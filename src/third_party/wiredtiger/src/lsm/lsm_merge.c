@@ -113,10 +113,8 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
     if (new_aggressive > lsm_tree->merge_aggressiveness) {
         __wt_verbose(session, WT_VERB_LSM,
-          "LSM merge %s got aggressive "
-          "(old %" PRIu32 " new %" PRIu32
-          "), "
-          "merge_min %u, %" PRIu64 " / %" PRIu64,
+          "LSM merge %s got aggressive (old %" PRIu32 " new %" PRIu32 "), merge_min %u, %" PRIu64
+          " / %" PRIu64,
           lsm_tree->name, lsm_tree->merge_aggressiveness, new_aggressive, lsm_tree->merge_min,
           msec_since_last_merge, lsm_tree->chunk_fill_ms);
         lsm_tree->merge_aggressiveness = new_aggressive;
@@ -243,8 +241,9 @@ retry_find:
          * small chunks in the middle.
          */
         if ((chunk_size += chunk->size) > lsm_tree->chunk_max)
-            if (nchunks < merge_min || (chunk->generation > youngest->generation &&
-                                         chunk_size - youngest->size > lsm_tree->chunk_max))
+            if (nchunks < merge_min ||
+              (chunk->generation > youngest->generation &&
+                chunk_size - youngest->size > lsm_tree->chunk_max))
                 break;
 
         /* Track chunk generations seen while looking for a merge */
@@ -267,7 +266,7 @@ retry_find:
          */
         if (chunk_size > lsm_tree->chunk_max ||
           (nchunks == merge_max && start_chunk > 0 &&
-              chunk->generation == lsm_tree->chunk[start_chunk - 1]->generation)) {
+            chunk->generation == lsm_tree->chunk[start_chunk - 1]->generation)) {
             /*
              * Try again with smaller range. Unfortunately all the intermediate state will be reset.
              * Since there's no easy way to restore youngest_gen and oldest_gen.
@@ -374,13 +373,13 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
      * in the conditional. Avoid the loop in the normal path.
      */
     if (WT_VERBOSE_ISSET(session, WT_VERB_LSM)) {
-        __wt_verbose(session, WT_VERB_LSM, "Merging %s chunks %u-%u into %u (%" PRIu64
-                                           " records)"
-                                           ", generation %" PRIu32,
+        __wt_verbose(session, WT_VERB_LSM,
+          "Merging %s chunks %u-%u into %u (%" PRIu64 " records), generation %" PRIu32,
           lsm_tree->name, start_chunk, end_chunk, dest_id, record_count, generation);
         for (verb = start_chunk; verb < end_chunk + 1; verb++)
-            __wt_verbose(session, WT_VERB_LSM, "Merging %s: Chunk[%u] id %" PRIu32 ", gen: %" PRIu32
-                                               ", size: %" PRIu64 ", records: %" PRIu64,
+            __wt_verbose(session, WT_VERB_LSM,
+              "Merging %s: Chunk[%u] id %" PRIu32 ", gen: %" PRIu32 ", size: %" PRIu64
+              ", records: %" PRIu64,
               lsm_tree->name, verb, lsm_tree->chunk[verb]->id, lsm_tree->chunk[verb]->generation,
               lsm_tree->chunk[verb]->size, lsm_tree->chunk[verb]->count);
     }
