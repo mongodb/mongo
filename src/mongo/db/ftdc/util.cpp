@@ -222,7 +222,25 @@ StatusWith<bool> extractMetricsFromDocument(const BSONObj& referenceDoc,
             // all numeric types are extracted as long (int64)
             // this supports the loose schema matching mentioned above,
             // but does create a range issue for doubles, and requires doubles to be integer
-            case NumberDouble:
+            // Doubles and Decimal that fall out of the range of int64 are converted to:
+            // NaN -> 0
+            // Inf -> MAX
+            // -Inf -> MIN
+            case NumberDouble: {
+                double value = currentElement.numberDouble();
+                long long newValue = 0;
+                if (std::isnan(value)) {
+                    newValue = 0;
+                } else if (!(value < BSONElement::kLongLongMaxPlusOneAsDouble)) {
+                    newValue = std::numeric_limits<long long>::max();
+                } else if (value < std::numeric_limits<long long>::min()) {
+                    newValue = std::numeric_limits<long long>::min();
+                } else {
+                    newValue = static_cast<long long>(value);
+                }
+                metrics->emplace_back(newValue);
+                break;
+            }
             case NumberInt:
             case NumberLong:
             case NumberDecimal:

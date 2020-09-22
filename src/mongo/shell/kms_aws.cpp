@@ -251,6 +251,7 @@ BSONObj AWSKMSService::encryptDataKey(ConstDataRange cdr, StringData keyId) {
     keyAndMaterial.setKeyMaterial(dataKey);
     keyAndMaterial.setMasterKey(masterKey);
 
+
     return keyAndMaterial.toBSON();
 }
 

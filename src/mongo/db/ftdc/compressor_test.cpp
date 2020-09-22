@@ -170,6 +170,11 @@ public:
         ValidateDocumentList(list, _docs, _mode);
     }
 
+    void setExpectedDocuments(const std::vector<BSONObj>& docs) {
+        _docs.clear();
+        std::copy(docs.begin(), docs.end(), std::back_inserter(_docs));
+    }
+
 private:
     std::vector<BSONObj> _docs;
     FTDCConfig _config;
@@ -535,6 +540,42 @@ TEST_F(FTDCCompressorTest, TestManyMetrics) {
         st = c.addSample(generateSample(rd, genValues, metrics));
         ASSERT_HAS_SPACE(st);
     }
+}
+
+// Test various non-finite double values
+TEST_F(FTDCCompressorTest, TestDoubleValues) {
+    TestTie c;
+
+    auto st = c.addSample(BSON("d" << 0.0));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << -42.0));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << 42.0));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << std::numeric_limits<double>::max()));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << std::numeric_limits<double>::min()));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << std::numeric_limits<double>::lowest()));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << std::numeric_limits<double>::infinity()));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << -std::numeric_limits<double>::infinity()));
+    ASSERT_HAS_SPACE(st);
+    st = c.addSample(BSON("d" << std::numeric_limits<double>::quiet_NaN()));
+    ASSERT_HAS_SPACE(st);
+
+    c.setExpectedDocuments({
+        BSON("d" << 0.0),
+        BSON("d" << -42.0),
+        BSON("d" << 42.0),
+        BSON("d" << std::numeric_limits<long long>::max()),
+        BSON("d" << 0),
+        BSON("d" << std::numeric_limits<long long>::min()),
+        BSON("d" << std::numeric_limits<long long>::max()),
+        BSON("d" << std::numeric_limits<long long>::min()),
+        BSON("d" << 0),
+    });
 }
 
 }  // namespace mongo
