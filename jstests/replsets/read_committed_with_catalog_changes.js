@@ -21,7 +21,10 @@
  *  - reindex collection
  *  - compact collection
  *
- * @tags: [requires_majority_read_concern]
+ * @tags: [
+ *   requires_fcv_47,
+ *   requires_majority_read_concern,
+ * ]
  */
 
 load("jstests/libs/parallelTester.js");  // For Thread.
@@ -140,8 +143,22 @@ const testCases = {
             // So, disabling index build commit quorum.
             assert.commandWorked(db.coll.createIndex({x: 1}, {}, 0));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other'],
+        blockedCollections: [],
+        unblockedCollections: ['coll', 'other'],
+    },
+    collMod: {
+        prepare: function(db) {
+            // This test create indexes with majority of nodes not available for replication.
+            // So, disabling index build commit quorum.
+            assert.commandWorked(db.coll.createIndex({x: 1}, {expireAfterSeconds: 60 * 60}, 0));
+            assert.commandWorked(db.coll.insert({_id: 1, x: 1}));
+        },
+        performOp: function(db) {
+            assert.commandWorked(db.coll.runCommand(
+                'collMod', {index: {keyPattern: {x: 1}, expireAfterSeconds: 60 * 61}}));
+        },
+        blockedCollections: [],
+        unblockedCollections: ['coll'],
     },
     dropIndex: {
         prepare: function(db) {
@@ -155,8 +172,8 @@ const testCases = {
         performOp: function(db) {
             assert.commandWorked(db.coll.dropIndex({x: 1}));
         },
-        blockedCollections: ['coll'],
-        unblockedCollections: ['other'],
+        blockedCollections: [],
+        unblockedCollections: ['coll', 'other'],
     },
 
     // Remaining case is a local-only operation.

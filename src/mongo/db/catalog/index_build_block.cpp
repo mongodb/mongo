@@ -159,7 +159,6 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
                 // This will prevent the unfinished index from being visible on index iterators.
                 if (commitTime) {
                     entry->setMinimumVisibleSnapshot(commitTime.get());
-                    coll->setMinimumVisibleSnapshot(commitTime.get());
                 }
             });
     }
@@ -223,15 +222,6 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
             // Note: this runs after the WUOW commits but before we release our X lock on the
             // collection. This means that any snapshot created after this must include the full
             // index, and no one can try to read this index before we set the visibility.
-            if (!commitTime) {
-                // The end of background index builds on secondaries does not get a commit
-                // timestamp. We use the cluster time since it's guaranteed to be greater than the
-                // time of the index build. It is possible the cluster time could be in the future,
-                // and we will need to do another write to reach the minimum visible snapshot.
-                const auto currentTime = VectorClock::get(svcCtx)->getTime();
-                commitTime = currentTime.clusterTime().asTimestamp();
-            }
-
             LOGV2(20345,
                   "Index build: done building index {indexName} on ns {nss}",
                   "Index build: done building",
@@ -240,11 +230,9 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "index"_attr = indexName,
                   "commitTimestamp"_attr = commitTime);
 
-            entry->setMinimumVisibleSnapshot(commitTime.get());
-            // We must also set the minimum visible snapshot on the collection like during init().
-            // This prevents reads in the past from reading inconsistent metadata. We should be
-            // able to remove this when the catalog is versioned.
-            coll->setMinimumVisibleSnapshot(commitTime.get());
+            if (commitTime) {
+                entry->setMinimumVisibleSnapshot(commitTime.get());
+            }
 
             // Add the index to the TTLCollectionCache upon successfully committing the index build.
             if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {

@@ -612,7 +612,6 @@ env.Library(
     target='db_raii',
     source=[
         'db_raii.cpp',
-        env.Idlc('db_raii.idl')[0]
     ],
     LIBDEPS=[
         'catalog_raii',

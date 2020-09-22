@@ -53,6 +53,13 @@ function testReadConcernLevel(level) {
         assert.eq(res.code, ErrorCodes.MaxTimeMSExpired);
     }
 
+    function assertNoSnapshotAvailableForReadConcernLevelByUUID(uuid) {
+        var res =
+            db.runCommand({find: uuid, batchSize: 2, readConcern: {level: level}, maxTimeMS: 1000});
+        assert.commandFailed(res);
+        assert.eq(res.code, ErrorCodes.MaxTimeMSExpired);
+    }
+
     function getCursorForReadConcernLevel() {
         var res = t.runCommand('find', {batchSize: 2, readConcern: {level: level}});
         assert.commandWorked(res);
@@ -145,30 +152,77 @@ function testReadConcernLevel(level) {
     assert.eq(cursor.next().version, 4);
     assert.eq(cursor.next().version, 4);
 
-    // Adding an index bumps the min snapshot for a collection as of SERVER-20260. This may
-    // change to just filter that index out from query planning as part of SERVER-20439.
+    // Adding an index does not bump the min snapshot for a collection. Collection scans are
+    // possible, however the index is not guaranteed to be usable until the majority-committed
+    // snapshot advances.
     t.createIndex({version: 1}, {}, 0);
-    assertNoSnapshotAvailableForReadConcernLevel();
+    assert.eq(getCursorForReadConcernLevel().itcount(), 10);
+    assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
 
     // To use the index, a snapshot created after the index was completed must be marked
     // committed.
     var newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
-    assertNoSnapshotAvailableForReadConcernLevel();
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
     assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
     assert(isIxscan(db, getExplainPlan({version: 1})));
 
-    // Dropping an index does bump the min snapshot.
+    // Dropping an index does not bump the min snapshot, so the query should succeed.
     t.dropIndex({version: 1});
-    assertNoSnapshotAvailableForReadConcernLevel();
+    assert.eq(getCursorForReadConcernLevel().itcount(), 10);
+    assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
+    assert(isCollscan(db, getExplainPlan({version: 1})));
 
-    // To use the collection again, a snapshot created after the dropIndex must be marked
-    // committed.
     newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
-    assertNoSnapshotAvailableForReadConcernLevel();
     assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
     assert.eq(getCursorForReadConcernLevel().itcount(), 10);
+    assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
+    assert(isCollscan(db, getExplainPlan({version: 1})));
+
+    // Get the UUID before renaming.
+    const collUuid = (() => {
+        const collectionInfos =
+            assert.commandWorked(db.runCommand({listCollections: 1})).cursor.firstBatch;
+        assert.eq(1, collectionInfos.length);
+        const info = collectionInfos[0];
+        assert.eq(t.getName(), info.name);
+        return info.info.uuid;
+    })();
+    assert(collUuid);
+
+    // Get a cursor before renaming.
+    cursor = getCursorForReadConcernLevel();  // Note: uses batchsize=2.
+    assert.eq(cursor.next().version, 4);
+    assert.eq(cursor.next().version, 4);
+    assert(!cursor.objsLeftInBatch());
+
+    // Even though renaming advances the minimum visible snapshot, we're querying by a namespace
+    // that no longer exists. Because of this, the query surprisingly returns no results instead of
+    // timing out. This violates read-committed semantics but is allowed by the current
+    // specification.
+    const tempNs = db.getName() + '.temp';
+    assert.commandWorked(db.adminCommand({renameCollection: t.getFullName(), to: tempNs}));
+    assert.eq(getCursorForReadConcernLevel().itcount(), 0);
+
+    // Trigger a getMore that should fail due to the rename.
+    let error = assert.throws(() => {
+        cursor.next();
+    });
+    assert.eq(error.code, ErrorCodes.QueryPlanKilled);
+
+    // Starting a new query by UUID will block because the minimum visible timestamp is ahead of the
+    // majority-committed snapshot.
+    assertNoSnapshotAvailableForReadConcernLevelByUUID(collUuid);
+
+    // Renaming back will cause queries to block again because the original namespace exists, and
+    // its minimum visible timestamp is ahead of the current majority-committed snapshot.
+    assert.commandWorked(db.adminCommand({renameCollection: tempNs, to: t.getFullName()}));
+    assertNoSnapshotAvailableForReadConcernLevel();
+
+    newSnapshot = assert.commandWorked(db.adminCommand("makeSnapshot")).name;
+    assert.commandWorked(db.adminCommand({"setCommittedSnapshot": newSnapshot}));
+    assert.eq(getCursorForReadConcernLevel().itcount(), 10);
+    assert.eq(getAggCursorForReadConcernLevel().itcount(), 10);
 
     // Dropping the collection is visible in the committed snapshot, even though it hasn't been
     // marked committed yet. This is allowed by the current specification even though it

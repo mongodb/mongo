@@ -75,7 +75,7 @@ TEST_F(CatalogControlTest, CloseAndOpenCatalog) {
     OperationContextNoop opCtx(&cc(), 0);
     auto map = catalog::closeCatalog(&opCtx);
     ASSERT_EQUALS(0U, map.size());
-    catalog::openCatalog(&opCtx, {});
+    catalog::openCatalog(&opCtx, {}, Timestamp());
 }
 
 }  // namespace

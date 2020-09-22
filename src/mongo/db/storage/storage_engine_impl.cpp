@@ -956,7 +956,7 @@ StatusWith<Timestamp> StorageEngineImpl::recoverToStableTimestamp(OperationConte
         return swTimestamp;
     }
 
-    catalog::openCatalog(opCtx, state);
+    catalog::openCatalog(opCtx, state, swTimestamp.getValue());
 
     LOGV2(22259,
           "recoverToStableTimestamp successful",

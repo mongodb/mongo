@@ -73,23 +73,38 @@ for (let i = 0; i < 10; i++) {
     assert.commandWorked(
         coll.createIndex({x: 1}, {'name': 'x_1', 'expireAfterSeconds': 60 * 60 * 23}));
 
-    doMajorityRead(coll, 1);
+    // Majority read should eventually see new documents because it will not block on the index
+    // build.
+    assert.soonNoExcept(() => {
+        doMajorityRead(coll, 1);
+        return true;
+    });
 
     assert.commandWorked(coll.insert({x: 7, y: 2}));
     assert.commandWorked(coll.runCommand(
         'collMod', {'index': {'keyPattern': {x: 1}, 'expireAfterSeconds': 60 * 60 * 24}}));
-    doMajorityRead(coll, 2);
+    // Majority read should eventually see new documents because it will not block on the index
+    // build.
+    assert.soonNoExcept(() => {
+        doMajorityRead(coll, 2);
+        return true;
+    });
 
     assert.commandWorked(coll.insert({x: 7, y: 3}));
     assert.commandWorked(coll.dropIndexes());
 
-    doMajorityRead(coll, 3);
+    // Majority read should eventually see new documents because it will not block on the drop.
+    assert.soonNoExcept(() => {
+        doMajorityRead(coll, 3);
+        return true;
+    });
 
     assert.commandWorked(coll.insert({x: 7, y: 4}));
     const newCollNameI = collNameI + '_new';
     assert.commandWorked(coll.renameCollection(newCollNameI));
 
     coll = primary.getDB(dbName).getCollection(newCollNameI);
+    // Majority read should immediately see new documents because it blocks on the rename.
     doMajorityRead(coll, 4);
 }
 

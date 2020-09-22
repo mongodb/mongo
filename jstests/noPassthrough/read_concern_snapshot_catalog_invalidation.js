@@ -42,13 +42,19 @@ function testCommand(cmd, curOpFilter) {
 
     waitForCurOpByFailPointNoNS(testDB, "hangAfterPreallocateSnapshot", curOpFilter);
 
-    // Create an index on the collection the command was executed against. This will move the
-    // collection's minimum visible timestamp to a point later than the point-in-time referenced
-    // by the transaction snapshot.
-    assert.commandWorked(testDB.runCommand({
-        createIndexes: kCollName,
-        indexes: [{key: {x: 1}, name: "x_1"}],
-        writeConcern: {w: "majority"}
+    // Rename the collection the command was executed against and then back to its original name.
+    // This will move the collection's minimum visible timestamp to a point later than the
+    // point-in-time referenced by the transaction snapshot.
+    const tempColl = testDB.getName() + '.temp';
+    assert.commandWorked(testDB.adminCommand({
+        renameCollection: testDB.getName() + '.' + kCollName,
+        to: tempColl,
+        writeConcern: {w: "majority"},
+    }));
+    assert.commandWorked(testDB.adminCommand({
+        renameCollection: tempColl,
+        to: testDB.getName() + '.' + kCollName,
+        writeConcern: {w: "majority"},
     }));
 
     // Disable the hang and check for parallel shell success. Success indicates that the command

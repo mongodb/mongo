@@ -235,10 +235,9 @@ TEST_F(DBRAIITestFixture,
 
     // Don't call into the ReplicationCoordinator to update lastApplied because it is only a mock
     // class and does not update the correct state in the SnapshotManager.
-    repl::OpTime opTime(Timestamp(200, 1), 1);
     auto snapshotManager =
         client1.second.get()->getServiceContext()->getStorageEngine()->getSnapshotManager();
-    snapshotManager->setLastApplied(opTime.getTimestamp());
+    snapshotManager->setLastApplied(replCoord->getMyLastAppliedOpTime().getTimestamp());
     Lock::DBLock dbLock1(client1.second.get(), nss.db(), MODE_IX);
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
@@ -310,14 +309,24 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
 
     // Simulate using a DBDirectClient to test this behavior for user reads.
     client1.first->setInDirectClient(true);
-    AutoGetCollectionForRead coll(client1.second.get(), nss);
 
-    // We can't read from kLastApplied in this scenario because there is a catalog conflict. Resort
-    // to taking the PBWM lock and reading without a timestamp.
+    auto timeoutError = client1.second->getTimeoutError();
+    auto waitForLock = [&] {
+        auto deadline = Date_t::now() + Milliseconds(10);
+        client1.second->runWithDeadline(deadline, timeoutError, [&] {
+            AutoGetCollectionForRead coll(client1.second.get(), nss);
+        });
+    };
+
+    // Expect that the lock acquisition eventually times out because lastApplied is not advancing.
+    ASSERT_THROWS_CODE(waitForLock(), DBException, timeoutError);
+
+    // Advance lastApplied and ensure the lock acquisition succeeds.
+    snapshotManager->setLastApplied(replCoord->getMyLastAppliedOpTime().getTimestamp());
+
+    AutoGetCollectionForRead coll(client1.second.get(), nss);
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
-              RecoveryUnit::ReadSource::kNoTimestamp);
-    ASSERT_TRUE(client1.second.get()->lockState()->isLockHeldForMode(
-        resourceIdParallelBatchWriterMode, MODE_IS));
+              RecoveryUnit::ReadSource::kLastApplied);
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
