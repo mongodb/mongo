@@ -91,7 +91,7 @@ OplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
  * Returns a document representing an oplog entry with the given fields.
  */
 BSONObj makeOplogEntryDoc(OpTime opTime,
-                          const boost::optional<long long> hash,
+                          const boost::optional<int64_t> hash,
                           OpTypeEnum opType,
                           const NamespaceString& nss,
                           const boost::optional<UUID>& uuid,
@@ -299,7 +299,7 @@ OplogEntry::OplogEntry(BSONObj rawInput) : _raw(std::move(rawInput)) {
 }
 
 OplogEntry::OplogEntry(OpTime opTime,
-                       const boost::optional<long long> hash,
+                       const boost::optional<int64_t> hash,
                        OpTypeEnum opType,
                        const NamespaceString& nss,
                        const boost::optional<UUID>& uuid,

@@ -287,7 +287,7 @@ public:
     static StatusWith<OplogEntry> parse(const BSONObj& object);
 
     OplogEntry(OpTime opTime,
-               const boost::optional<long long> hash,
+               const boost::optional<int64_t> hash,
                OpTypeEnum opType,
                const NamespaceString& nss,
                const boost::optional<UUID>& uuid,

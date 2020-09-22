@@ -29,13 +29,8 @@
 
 #pragma once
 
-#include <vector>
-
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/s/resharding/donor_oplog_id_gen.h"
-#include "mongo/db/s/resharding/resharding_donor_oplog_iterator_interface.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -46,41 +41,19 @@ class OperationContext;
  * Iterator for extracting oplog entries from the resharding donor oplog buffer. This is not thread
  * safe.
  */
-class ReshardingDonorOplogIterator : public ReshardingDonorOplogIteratorInterface {
+class ReshardingDonorOplogIteratorInterface {
 public:
-    ReshardingDonorOplogIterator(NamespaceString donorOplogBufferNs,
-                                 boost::optional<ReshardingDonorOplogId> resumeToken);
+    virtual ~ReshardingDonorOplogIteratorInterface() {}
 
     /**
      * Returns the next oplog entry. Returns boost::none when there are no more entries to return.
-     * Calling getNext() when the previously returned future is not ready is undefined.
      */
-    Future<boost::optional<repl::OplogEntry>> getNext(OperationContext* opCtx) override;
+    virtual Future<boost::optional<repl::OplogEntry>> getNext(OperationContext* opCtx) = 0;
 
     /**
-     * Returns false if this iterator has seen the final oplog entry. Since this is not thread safe,
-     * should not be called while there is a pending future from getNext() that is not ready.
+     * Returns false if this iterator has seen the final oplog entry.
      */
-    bool hasMore() const override;
-
-private:
-    /**
-     * Returns a future to wait until a new oplog entry is inserted to the target oplog collection.
-     */
-    Future<void> _waitForNewOplog();
-
-    /**
-     * Creates a new expression context that can be used to make a new pipeline to query the target
-     * oplog collection.
-     */
-    boost::intrusive_ptr<ExpressionContext> _makeExpressionContext(OperationContext* opCtx);
-
-    const NamespaceString _oplogBufferNs;
-
-    boost::optional<ReshardingDonorOplogId> _resumeToken;
-
-    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
-    bool _hasSeenFinalOplogEntry{false};
+    virtual bool hasMore() const = 0;
 };
 
 }  // namespace mongo
