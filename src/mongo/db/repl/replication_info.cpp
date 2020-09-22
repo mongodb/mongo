@@ -65,7 +65,7 @@
 
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
+MONGO_FAIL_POINT_DEFINE(waitInHello);
 
 using std::list;
 using std::string;
@@ -252,7 +252,7 @@ public:
              BSONObjBuilder& result) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, waitInIsMaster);
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET_OR_INTERRUPTED(opCtx, waitInHello);
 
         /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
            authenticated.
