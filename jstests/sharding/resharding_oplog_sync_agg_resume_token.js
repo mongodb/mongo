@@ -1,6 +1,6 @@
 /**
  * Test that the postBatchResumeToken field is only included for the oplog namespace when
- * $_requestResumeToken is specified for an aggregate command.
+ * $_requestReshardingResumeToken is specified for an aggregate command.
  *
  * @tags: [requires_fcv_47]
  */
@@ -25,11 +25,11 @@ for (let i = 0; i < 10; i++) {
 
 const localDb = rst.getPrimary().getDB("local");
 
-jsTest.log("Run aggregation pipeline on oplog with $_requestResumeToken set");
+jsTest.log("Run aggregation pipeline on oplog with $_requestReshardingResumeToken set");
 const resEnabled = localDb.runCommand({
     aggregate: "oplog.rs",
     pipeline: [{$match: {ts: {$gte: Timestamp(0, 0)}}}],
-    $_requestResumeToken: true,
+    $_requestReshardingResumeToken: true,
     cursor: {batchSize: 1}
 });
 
@@ -46,11 +46,11 @@ assert.commandWorked(resGetMore);
 assert(resGetMore.cursor.hasOwnProperty("postBatchResumeToken"), resGetMore);
 assert(resGetMore.cursor.postBatchResumeToken.hasOwnProperty("ts"), resGetMore);
 
-jsTest.log("Run aggregation pipeline on oplog with $_requestResumeToken disabled");
+jsTest.log("Run aggregation pipeline on oplog with $_requestReshardingResumeToken disabled");
 const resDisabled = localDb.runCommand({
     aggregate: "oplog.rs",
     pipeline: [{$match: {ts: {$gte: Timestamp(0, 0)}}}],
-    $_requestResumeToken: false,
+    $_requestReshardingResumeToken: false,
     cursor: {}
 });
 
@@ -58,16 +58,16 @@ assert.commandWorked(resDisabled);
 assert(!resDisabled.cursor.hasOwnProperty("postBatchResumeToken"), resDisabled);
 
 jsTest.log(
-    "Run aggregation pipeline on oplog with $_requestResumeToken unspecified and defaulting to disabled");
+    "Run aggregation pipeline on oplog with $_requestReshardingResumeToken unspecified and defaulting to disabled");
 const resWithout = localDb.runCommand(
     {aggregate: "oplog.rs", pipeline: [{$match: {ts: {$gte: Timestamp(0, 0)}}}], cursor: {}});
 
 assert.commandWorked(resWithout);
 assert(!resWithout.cursor.hasOwnProperty("postBatchResumeToken"), resWithout);
 
-jsTest.log("Run aggregation pipeline on non-oplog with $_requestResumeToken set");
+jsTest.log("Run aggregation pipeline on non-oplog with $_requestReshardingResumeToken set");
 const resNotOplog = localDb.runCommand(
-    {aggregate: ns, pipeline: [{limit: 100}], $_requestResumeToken: true, cursor: {}});
+    {aggregate: ns, pipeline: [{limit: 100}], $_requestReshardingResumeToken: true, cursor: {}});
 
 assert.commandFailedWithCode(resNotOplog, ErrorCodes.FailedToParse);
 
@@ -75,13 +75,13 @@ jsTest.log("Run aggregation pipeline on oplog with empty batch");
 const resEmpty = localDb.runCommand({
     aggregate: "oplog.rs",
     pipeline: [{$match: {ts: {$gte: Timestamp(0, 0)}}}],
-    $_requestResumeToken: true,
+    $_requestReshardingResumeToken: true,
     cursor: {batchSize: 0}
 });
 
 assert.commandWorked(resEmpty);
 assert(resEmpty.cursor.hasOwnProperty("postBatchResumeToken"), resEmpty);
-assert(resEnabled.cursor.postBatchResumeToken.hasOwnProperty("ts"), resEmpty);
+assert(resEmpty.cursor.postBatchResumeToken.hasOwnProperty("ts"), resEmpty);
 assert.eq(resEmpty.cursor.postBatchResumeToken.ts, new Timestamp(0, 0));
 
 jsTest.log("End of test");

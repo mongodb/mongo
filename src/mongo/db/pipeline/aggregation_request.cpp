@@ -180,16 +180,17 @@ StatusWith<AggregationRequest> AggregationRequest::parseFromBSON(
             }
         } else if (bypassDocumentValidationCommandOption() == fieldName) {
             request.setBypassDocumentValidation(elem.trueValue());
-        } else if (kRequestResumeToken == fieldName) {
+        } else if (kRequestReshardingResumeToken == fieldName) {
             if (elem.type() != BSONType::Bool) {
                 return {ErrorCodes::TypeMismatch,
                         str::stream()
                             << fieldName << "must be a boolean, not a " << typeName(elem.type())};
             }
 
-            request.setRequestResumeToken(elem.Bool());
+            request.setRequestReshardingResumeToken(elem.Bool());
 
-            if (request.getRequestResumeToken() && !request.getNamespaceString().isOplog()) {
+            if (request.getRequestReshardingResumeToken() &&
+                !request.getNamespaceString().isOplog()) {
                 return {ErrorCodes::FailedToParse,
                         str::stream()
                             << fieldName << " must only be set for the oplog namespace, not "
@@ -330,7 +331,7 @@ Document AggregationRequest::serializeToCommandObj() const {
         {kNeedsMergeName, _needsMerge ? Value(true) : Value()},
         {bypassDocumentValidationCommandOption(),
          _bypassDocumentValidation ? Value(true) : Value()},
-        {kRequestResumeToken, _requestResumeToken ? Value(true) : Value()},
+        {kRequestReshardingResumeToken, _requestReshardingResumeToken ? Value(true) : Value()},
         // Only serialize a collation if one was specified.
         {kCollationName, _collation.isEmpty() ? Value() : Value(_collation)},
         // Only serialize batchSize if not an explain, otherwise serialize an empty cursor object.

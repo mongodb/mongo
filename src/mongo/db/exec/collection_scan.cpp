@@ -82,7 +82,10 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
     // We should never see 'assertMinTsHasNotFallenOffOplog' if 'minTS' is not present.
     if (params.assertMinTsHasNotFallenOffOplog) {
         invariant(params.shouldTrackLatestOplogTimestamp);
-        invariant(params.minTs);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "assertMinTsHasNotFallenOffOplog cannot be applied to a query "
+                                 "which does not imply a minimum 'ts' value ",
+                params.minTs);
     }
 
     if (params.resumeAfterRecordId) {

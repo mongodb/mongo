@@ -656,9 +656,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                         QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
 
-    // The aggregate command's $_requestResumeToken parameter can only be used for the oplog.
-    if (aggRequest && aggRequest->getRequestResumeToken()) {
-        plannerOpts |= QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
+    // The $_requestReshardingResumeToken parameter is only valid for an oplog scan.
+    if (aggRequest && aggRequest->getRequestReshardingResumeToken()) {
+        plannerOpts |= (QueryPlannerParams::TRACK_LATEST_OPLOG_TS |
+                        QueryPlannerParams::ASSERT_MIN_TS_HAS_NOT_FALLEN_OFF_OPLOG);
     }
 
     // If there is a sort stage eligible for pushdown, serialize its SortPattern to a BSONObj. The
