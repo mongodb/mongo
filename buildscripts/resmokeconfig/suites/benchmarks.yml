@@ -9,6 +9,8 @@ selector:
   # The trailing asterisk is for handling the .exe extension on Windows.
   # These benchmarks are being run as part of the benchmarks_sharding.yml test suite.
   - build/install/bin/chunk_manager_refresh_bm*
+  # These benchmarks are being run as part of the benchmarks_cst.yml test suite.
+  - build/install/bin/cst_bm*
   # Hash table benchmark is really slow, don't run on evergreen
   - build/install/bin/hash_table_bm*
 
