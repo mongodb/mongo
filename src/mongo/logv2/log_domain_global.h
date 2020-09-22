@@ -60,7 +60,7 @@ public:
     LogSource& source() override;
 
     Status configure(ConfigurationOptions const& options);
-    Status rotate(bool rename, StringData renameSuffix);
+    Status rotate(bool rename, StringData renameSuffix, std::function<void(Status)> onMinorError);
 
     const ConfigurationOptions& config() const;
 

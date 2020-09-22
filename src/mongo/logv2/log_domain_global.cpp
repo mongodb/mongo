@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include "log_domain_global.h"
 
 #include "mongo/config.h"
@@ -35,6 +37,7 @@
 #include "mongo/logv2/console.h"
 #include "mongo/logv2/file_rotate_sink.h"
 #include "mongo/logv2/json_formatter.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/log_source.h"
 #include "mongo/logv2/ramlog_sink.h"
 #include "mongo/logv2/shared_access_fstream.h"
@@ -71,7 +74,7 @@ struct LogDomainGlobal::Impl {
 
     Impl(LogDomainGlobal& parent);
     Status configure(LogDomainGlobal::ConfigurationOptions const& options);
-    Status rotate(bool rename, StringData renameSuffix);
+    Status rotate(bool rename, StringData renameSuffix, std::function<void(Status)> onMinorError);
 
     const ConfigurationOptions& config() const;
 
@@ -222,12 +225,21 @@ const LogDomainGlobal::ConfigurationOptions& LogDomainGlobal::Impl::config() con
     return _config;
 }
 
-Status LogDomainGlobal::Impl::rotate(bool rename, StringData renameSuffix) {
-    if (_rotatableFileSink) {
-        auto backend = _rotatableFileSink->locked_backend()->lockedBackend<0>();
-        return backend->rotate(rename, renameSuffix);
-    }
-    return Status::OK();
+Status LogDomainGlobal::Impl::rotate(bool rename,
+                                     StringData renameSuffix,
+                                     std::function<void(Status)> onMinorError) {
+    if (!_rotatableFileSink)
+        return Status::OK();
+    std::vector<Status> errors;
+    Status result = _rotatableFileSink->locked_backend()->lockedBackend<0>()->rotate(
+        rename, renameSuffix, [&](Status s) {
+            errors.push_back(s);
+            if (onMinorError)
+                onMinorError(s);
+        });
+    if (!errors.empty())
+        LOGV2_WARNING(4719804, "Errors occurred during log rotate", "errors"_attr = errors);
+    return result;
 }
 
 LogSource& LogDomainGlobal::Impl::source() {
@@ -279,8 +291,10 @@ const LogDomainGlobal::ConfigurationOptions& LogDomainGlobal::config() const {
     return _impl->config();
 }
 
-Status LogDomainGlobal::rotate(bool rename, StringData renameSuffix) {
-    return _impl->rotate(rename, renameSuffix);
+Status LogDomainGlobal::rotate(bool rename,
+                               StringData renameSuffix,
+                               std::function<void(Status)> onMinorError) {
+    return _impl->rotate(rename, renameSuffix, onMinorError);
 }
 
 LogComponentSettings& LogDomainGlobal::settings() {

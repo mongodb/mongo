@@ -200,12 +200,13 @@ public:
             logType = val.checkAndGetStringData();
         }
 
-        if (logv2::rotateLogs(serverGlobalParams.logRenameOnRotate, logType)) {
+        int minorErrorCount = 0;
+        bool ok = logv2::rotateLogs(
+            serverGlobalParams.logRenameOnRotate, logType, [&](Status) { ++minorErrorCount; });
+        if (ok) {
             logProcessDetailsForLogRotate(opCtx->getServiceContext());
-            return true;
         }
-
-        return false;
+        return ok && minorErrorCount == 0;
     }
 
 } logRotateCmd;

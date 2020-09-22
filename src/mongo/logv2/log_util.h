@@ -40,7 +40,7 @@ namespace mongo::logv2 {
 constexpr auto kServerLogTag = "server"_sd;
 constexpr auto kAuditLogTag = "audit"_sd;
 
-using LogRotateCallback = std::function<Status(bool, StringData)>;
+using LogRotateCallback = std::function<Status(bool, StringData, std::function<void(Status)>)>;
 
 /**
  * logType param needs to have static lifetime. If a new logType needs to be defined, add it above
@@ -59,7 +59,9 @@ void addLogRotator(StringData logType, LogRotateCallback cb);
  * We expect logrotate to rename the existing file before we rotate, and so the next open
  * we do should result in a file create.
  */
-bool rotateLogs(bool renameFiles, boost::optional<StringData> logType = boost::none);
+bool rotateLogs(bool renameFiles,
+                boost::optional<StringData> logType,
+                std::function<void(Status)> onMinorError);
 
 /**
  * Returns true if system logs should be redacted.

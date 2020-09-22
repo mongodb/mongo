@@ -101,9 +101,12 @@ LogComponentSettings& LogManager::getGlobalSettings() {
 }
 
 MONGO_INITIALIZER(GlobalLogRotator)(InitializerContext*) {
-    addLogRotator(logv2::kServerLogTag, [](bool renameFiles, StringData suffix) {
-        return LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
-    });
+    addLogRotator(
+        logv2::kServerLogTag,
+        [](bool renameFiles, StringData suffix, std::function<void(Status)> onMinorError) {
+            return LogManager::global().getGlobalDomainInternal().rotate(
+                renameFiles, suffix, onMinorError);
+        });
 }
 
 }  // namespace mongo::logv2

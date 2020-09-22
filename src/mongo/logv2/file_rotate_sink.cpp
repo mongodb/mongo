@@ -46,6 +46,9 @@
 
 namespace mongo::logv2 {
 namespace {
+
+using namespace fmt::literals;
+
 #if _WIN32
 using stream_t = Win32SharedAccessOfstream;
 #else
@@ -96,35 +99,51 @@ void FileRotateSink::removeFile(const std::string& filename) {
     }
 }
 
-Status FileRotateSink::rotate(bool rename, StringData renameSuffix) {
+Status FileRotateSink::rotate(bool rename,
+                              StringData renameSuffix,
+                              std::function<void(Status)> onMinorError) {
     for (auto& file : _impl->files) {
         const std::string& filename = file.first;
         if (rename) {
             std::string renameTarget = filename + renameSuffix;
-            try {
-                if (boost::filesystem::exists(renameTarget)) {
-                    return Status(
-                        ErrorCodes::FileRenameFailed,
-                        fmt::format("Renaming file {} to {} failed; destination already exists",
-                                    filename,
-                                    renameTarget));
+
+            auto targetExists = [&]() -> StatusWith<bool> {
+                try {
+                    return boost::filesystem::exists(renameTarget);
+                } catch (const boost::exception&) {
+                    return exceptionToStatus();
                 }
-            } catch (const std::exception& e) {
-                return Status(ErrorCodes::FileRenameFailed,
-                              fmt::format("Renaming file {} to {} failed; Cannot verify whether "
-                                          "destination already exists: {}",
-                                          filename,
-                                          renameTarget,
-                                          e.what()));
+            }();
+
+            if (!targetExists.isOK()) {
+                return Status(ErrorCodes::FileRenameFailed, targetExists.getStatus().reason())
+                    .withContext("Cannot verify whether destination already exists: {}"_format(
+                        renameTarget));
+            }
+
+            if (targetExists.getValue()) {
+                if (onMinorError) {
+                    onMinorError({ErrorCodes::FileRenameFailed,
+                                  "Target already exists during log rotation. Skipping this file. "
+                                  "target={}, file={}"_format(renameTarget, filename)});
+                }
+                continue;
             }
 
             boost::system::error_code ec;
             boost::filesystem::rename(filename, renameTarget, ec);
             if (ec) {
-                return Status(
-                    ErrorCodes::FileRenameFailed,
-                    fmt::format(
-                        "Failed  to rename {} to {}: {}", filename, renameTarget, ec.message()));
+                if (ec == boost::system::errc::no_such_file_or_directory) {
+                    if (onMinorError)
+                        onMinorError(
+                            {ErrorCodes::FileRenameFailed,
+                             "Source file was missing during log rotation. Creating a new one. "
+                             "file={}"_format(filename)});
+                } else {
+                    return Status(ErrorCodes::FileRenameFailed,
+                                  "Failed to rename {} to {}: {}"_format(
+                                      filename, renameTarget, ec.message()));
+                }
             }
         }
 

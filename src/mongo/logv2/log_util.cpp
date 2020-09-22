@@ -49,7 +49,9 @@ void addLogRotator(StringData logType, LogRotateCallback cb) {
     logRotateCallbacks.emplace(logType, std::move(cb));
 }
 
-bool rotateLogs(bool renameFiles, boost::optional<StringData> logType) {
+bool rotateLogs(bool renameFiles,
+                boost::optional<StringData> logType,
+                std::function<void(Status)> onMinorError) {
     std::string suffix = "." + terseCurrentTimeForFilename();
 
     LOGV2(23166, "Log rotation initiated", "suffix"_attr = suffix, "logType"_attr = logType);
@@ -61,7 +63,7 @@ bool rotateLogs(bool renameFiles, boost::optional<StringData> logType) {
                 ErrorCodes::NoSuchKey, "Unknown log type for rotate", "logType"_attr = logType);
             return false;
         }
-        auto status = it->second(renameFiles, suffix);
+        auto status = it->second(renameFiles, suffix, onMinorError);
         if (!status.isOK()) {
             LOGV2_WARNING(
                 1947001, "Log rotation failed", "reason"_attr = status, "logType"_attr = logType);
@@ -71,7 +73,7 @@ bool rotateLogs(bool renameFiles, boost::optional<StringData> logType) {
     } else {
         bool ret = true;
         for (const auto& entry : logRotateCallbacks) {
-            auto status = entry.second(renameFiles, suffix);
+            auto status = entry.second(renameFiles, suffix, onMinorError);
             if (!status.isOK()) {
                 LOGV2_WARNING(23168,
                               "Log rotation failed",

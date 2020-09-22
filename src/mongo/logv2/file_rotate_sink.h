@@ -48,7 +48,7 @@ public:
     Status addFile(const std::string& filename, bool append);
     void removeFile(const std::string& filename);
 
-    Status rotate(bool rename, StringData renameSuffix);
+    Status rotate(bool rename, StringData renameSuffix, std::function<void(Status)> onMinorError);
 
     void consume(const boost::log::record_view& rec, const string_type& formatted_string);
 
