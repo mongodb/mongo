@@ -34,6 +34,9 @@
 #include <memory>
 #include <tuple>
 
+#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -174,6 +177,24 @@ rpc::UniqueReply MockRemoteDBServer::runCommand(InstanceID id, const OpMsgReques
     return rpc::UniqueReply(std::move(message), std::move(replyView));
 }
 
+std::unique_ptr<projection_executor::ProjectionExecutor>
+MockRemoteDBServer::createProjectionExecutor(const BSONObj& projectionSpec) {
+    const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ProjectionPolicies defaultPolicies;
+    auto projection = projection_ast::parse(expCtx, projectionSpec, defaultPolicies);
+    return projection_executor::buildProjectionExecutor(
+        expCtx, &projection, defaultPolicies, projection_executor::kDefaultBuilderParams);
+}
+
+BSONObj MockRemoteDBServer::project(projection_executor::ProjectionExecutor* projectionExecutor,
+                                    const BSONObj& o) {
+    if (!projectionExecutor)
+        return o.copy();
+    Document doc(o);
+    auto projectedDoc = projectionExecutor->applyTransformation(doc);
+    return projectedDoc.toBson().getOwned();
+}
+
 mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
                                            const NamespaceStringOrUUID& nsOrUuid,
                                            mongo::Query query,
@@ -191,6 +212,10 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
 
     checkIfUp(id);
 
+    std::unique_ptr<projection_executor::ProjectionExecutor> projectionExecutor;
+    if (fieldsToReturn) {
+        projectionExecutor = createProjectionExecutor(*fieldsToReturn);
+    }
     scoped_spinlock sLock(_lock);
     _queryCount++;
 
@@ -198,7 +223,7 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
     const vector<BSONObj>& coll = _dataMgr[ns];
     BSONArrayBuilder result;
     for (vector<BSONObj>::const_iterator iter = coll.begin(); iter != coll.end(); ++iter) {
-        result.append(iter->copy());
+        result.append(project(projectionExecutor.get(), *iter));
     }
 
     return BSONArray(result.obj());

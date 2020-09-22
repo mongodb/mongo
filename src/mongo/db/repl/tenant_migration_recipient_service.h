@@ -130,6 +130,11 @@ public:
          */
         SemiFuture<void> _createAndConnectClients();
 
+        /**
+         * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
+         */
+        void _getStartOpTimesFromDonor(WithLock);
+
         std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
 
         // Protects below non-const data members.

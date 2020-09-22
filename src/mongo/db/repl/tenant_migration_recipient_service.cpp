@@ -39,11 +39,14 @@
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -55,7 +58,9 @@ namespace repl {
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(stopAfterPersistingTenantMigrationRecipientInstanceStateDoc);
 MONGO_FAIL_POINT_DEFINE(stopAfterConnectingTenantMigrationRecipientInstance);
+MONGO_FAIL_POINT_DEFINE(stopAfterRetrievingStartOpTimesMigrationRecipientInstance);
 MONGO_FAIL_POINT_DEFINE(setTenantMigrationRecipientInstanceHostTimeout);
+MONGO_FAIL_POINT_DEFINE(pauseAfterRetrievingLastTxnMigrationRecipientInstance);
 
 TenantMigrationRecipientService::TenantMigrationRecipientService(ServiceContext* serviceContext)
     : PrimaryOnlyService(serviceContext) {}
@@ -213,6 +218,80 @@ SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_initializeSta
     return WaitForMajorityService::get(opCtx->getServiceContext()).waitUntilMajority(insertOpTime);
 }
 
+void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLock) {
+    // Get the last oplog entry at the read concern majority optime in the remote oplog.  It
+    // does not matter which tenant it is for.
+    auto oplogOpTimeFields =
+        BSON(OplogEntry::kTimestampFieldName << 1 << OplogEntry::kTermFieldName << 1);
+    auto lastOplogEntry1Bson =
+        _client->findOne(NamespaceString::kRsOplogNamespace.ns(),
+                         Query().sort("$natural", -1),
+                         &oplogOpTimeFields,
+                         QueryOption_SlaveOk,
+                         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    uassert(4880601, "Found no entries in the remote oplog", !lastOplogEntry1Bson.isEmpty());
+    LOGV2_DEBUG(4880600,
+                2,
+                "Found last oplog entry at read concern majority optime on remote node",
+                "migrationId"_attr = getMigrationUUID(),
+                "tenantId"_attr = _stateDoc.getDatabasePrefix(),
+                "lastOplogEntry"_attr = lastOplogEntry1Bson);
+    auto lastOplogEntry1OpTime = uassertStatusOK(OpTime::parseFromOplogEntry(lastOplogEntry1Bson));
+
+    // Get the optime of the earliest transaction that was open at the read concern majority optime
+    // As with the last oplog entry, it does not matter that this may be for a different tenant; an
+    // optime that is too early does not result in incorrect behavior.
+    const auto preparedState = DurableTxnState_serializer(DurableTxnStateEnum::kPrepared);
+    const auto inProgressState = DurableTxnState_serializer(DurableTxnStateEnum::kInProgress);
+    auto transactionTableOpTimeFields = BSON(SessionTxnRecord::kStartOpTimeFieldName << 1);
+    auto earliestOpenTransactionBson = _client->findOne(
+        NamespaceString::kSessionTransactionsTableNamespace.ns(),
+        QUERY("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState)))
+            .sort(SessionTxnRecord::kStartOpTimeFieldName.toString(), 1),
+        &transactionTableOpTimeFields,
+        QueryOption_SlaveOk,
+        ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    LOGV2_DEBUG(4880602,
+                2,
+                "Transaction table entry for earliest transaction that was open at the read "
+                "concern majority optime on remote node (may be empty)",
+                "migrationId"_attr = getMigrationUUID(),
+                "tenantId"_attr = _stateDoc.getDatabasePrefix(),
+                "earliestOpenTransaction"_attr = earliestOpenTransactionBson);
+
+    pauseAfterRetrievingLastTxnMigrationRecipientInstance.pauseWhileSet();
+
+    // We need to fetch the last oplog entry both before and after getting the transaction
+    // table entry, as otherwise there is a potential race where we may try to apply
+    // a commit for which we have not fetched a previous transaction oplog entry.
+    auto lastOplogEntry2Bson =
+        _client->findOne(NamespaceString::kRsOplogNamespace.ns(),
+                         Query().sort("$natural", -1),
+                         &oplogOpTimeFields,
+                         QueryOption_SlaveOk,
+                         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+    uassert(4880603, "Found no entries in the remote oplog", !lastOplogEntry2Bson.isEmpty());
+    LOGV2_DEBUG(4880604,
+                2,
+                "Found last oplog entry at the read concern majority optime (after reading txn "
+                "table) on remote node",
+                "migrationId"_attr = getMigrationUUID(),
+                "tenantId"_attr = _stateDoc.getDatabasePrefix(),
+                "lastOplogEntry"_attr = lastOplogEntry2Bson);
+    auto lastOplogEntry2OpTime = uassertStatusOK(OpTime::parseFromOplogEntry(lastOplogEntry2Bson));
+    _stateDoc.setStartApplyingOpTime(lastOplogEntry2OpTime);
+
+    OpTime startFetchingOpTime = lastOplogEntry1OpTime;
+    if (!earliestOpenTransactionBson.isEmpty()) {
+        auto startOpTimeField =
+            earliestOpenTransactionBson[SessionTxnRecord::kStartOpTimeFieldName];
+        if (startOpTimeField.isABSONObj()) {
+            startFetchingOpTime = OpTime::parse(startOpTimeField.Obj());
+        }
+    }
+    _stateDoc.setStartFetchingOpTime(startFetchingOpTime);
+}
+
 namespace {
 constexpr std::int32_t stopFailPointErrorCode = 4880402;
 void stopOnFailPoint(FailPoint* fp) {
@@ -250,7 +329,15 @@ void TenantMigrationRecipientService::Instance::run(
                                      "for garbage collect for migration uuid: "
                                   << getMigrationUUID(),
                     !_stateDoc.getGarbageCollect());
-
+            _getStartOpTimesFromDonor(lk);
+            auto opCtx = cc().makeOperationContext();
+            uassertStatusOK(
+                tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
+            return WaitForMajorityService::get(opCtx->getServiceContext())
+                .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
+        })
+        .then([this] {
+            stopOnFailPoint(&stopAfterRetrievingStartOpTimesMigrationRecipientInstance);
             // TODO SERVER-48808: Run cloners in MigrationServiceInstance
             // TODO SERVER-48811: Oplog fetching in MigrationServiceInstance
         })

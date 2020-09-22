@@ -50,6 +50,14 @@ namespace tenantMigrationRecipientEntryHelpers {
 Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc);
 
 /**
+ * Updates the state doc in the database.
+ *
+ * Returns 'NoSuchKey' error code if no state document already exists on the disk with the same
+ * 'migrationUUID'.
+ */
+Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc);
+
+/**
  * Returns the state doc matching the document with 'migrationUUID' from the disk if it
  * exists. Reads at "no" timestamp i.e, reading with the "latest" snapshot reflecting up to date
  * data.

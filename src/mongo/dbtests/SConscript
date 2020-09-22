@@ -57,6 +57,12 @@ env.Library(
         '$BUILD_DIR/mongo/client/dbclient_mockcursor',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages'
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/exec/projection_executor',
+        '$BUILD_DIR/mongo/db/pipeline/expression_context',
+        '$BUILD_DIR/mongo/db/query/projection_ast',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+    ],
 )
 
 if not has_option('noshell') and usemozjs:

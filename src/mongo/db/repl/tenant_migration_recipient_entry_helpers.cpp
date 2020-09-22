@@ -39,6 +39,8 @@
 #include "mongo/db/index_build_entry_helpers.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/str.h"
@@ -99,6 +101,28 @@ Status insertStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
         wuow.commit();
         return Status::OK();
     });
+}
+
+Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDocument& stateDoc) {
+    const auto nss = NamespaceString::kTenantMigrationRecipientsNamespace;
+    AutoGetCollection collection(opCtx, nss, MODE_IX);
+
+    if (!collection) {
+        return Status(ErrorCodes::NamespaceNotFound,
+                      str::stream() << nss.ns() << " does not exist");
+    }
+    auto updateReq = UpdateRequest();
+    updateReq.setNamespaceString(nss);
+    updateReq.setQuery(BSON("_id" << stateDoc.getId()));
+    updateReq.setUpdateModification(
+        write_ops::UpdateModification::parseFromClassicUpdate(stateDoc.toBSON()));
+    auto updateResult = update(opCtx, collection.getDb(), updateReq);
+    if (updateResult.numMatched == 0) {
+        return {ErrorCodes::NoSuchKey,
+                str::stream() << "Existing Tenant Migration State Document not found for id: "
+                              << stateDoc.getId()};
+    }
+    return Status::OK();
 }
 
 StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx,
