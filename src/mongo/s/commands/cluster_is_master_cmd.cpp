@@ -52,8 +52,8 @@
 
 namespace mongo {
 
-// Hangs in the beginning of each isMaster command when set.
-MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
+// Hangs in the beginning of each hello command when set.
+MONGO_FAIL_POINT_DEFINE(waitInHello);
 // Awaitable isMaster requests with the proper topologyVersions are expected to sleep for
 // maxAwaitTimeMS on mongos. This failpoint will hang right before doing this sleep when set.
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
@@ -104,7 +104,7 @@ public:
                              rpc::ReplyBuilderInterface* replyBuilder) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
-        waitInIsMaster.pauseWhileSet(opCtx);
+        waitInHello.pauseWhileSet(opCtx);
 
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();

@@ -22,12 +22,12 @@ let rsPrimary = st.rs0.getPrimary();
 // Make sure mongos knows who the primary is
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: true});
 
-// Turn on the waitInIsMaster failpoint. This will cause the primary node to cease sending isMaster
+// Turn on the waitInHello failpoint. This will cause the primary node to cease sending isMaster
 // responses and the RSM should mark the node as down
-jsTestLog("Turning on waitInIsMaster failpoint. Node should stop sending isMaster responses.");
-const isMasterFailpoint = configureFailPoint(rsPrimary, "waitInIsMaster");
+jsTestLog("Turning on waitInHello failpoint. Node should stop sending isMaster responses.");
+const helloFailpoint = configureFailPoint(rsPrimary, "waitInHello");
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: false, ismaster: false});
-isMasterFailpoint.off();
+helloFailpoint.off();
 
 // Wait for mongos to find out the node is still primary
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: true});
