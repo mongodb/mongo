@@ -27,69 +27,196 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 
+#include <fmt/format.h>
+
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
+namespace {
+
+using namespace fmt::literals;
+
+/**
+ * Retrieves the participants corresponding to the expectedState type.
+ */
+const std::vector<DonorShardEntry>& getParticipants(
+    WithLock, DonorStateEnum expectedState, const ReshardingCoordinatorDocument& updatedStateDoc) {
+    return updatedStateDoc.getDonorShards();
+}
+const std::vector<RecipientShardEntry>& getParticipants(
+    WithLock,
+    RecipientStateEnum expectedState,
+    const ReshardingCoordinatorDocument& updatedStateDoc) {
+    return updatedStateDoc.getRecipientShards();
+}
+
+/**
+ * Generates error an response indicating which participant was found to be in state kError.
+ */
+Status generateErrorStatus(WithLock, const DonorShardEntry& donor) {
+    return {ErrorCodes::InternalError,
+            "Donor shard {} is in an error state"_format(donor.getId().toString())};
+}
+Status generateErrorStatus(WithLock, const RecipientShardEntry& recipient) {
+    return {ErrorCodes::InternalError,
+            "Recipient shard {} is in an error state"_format(recipient.getId().toString())};
+}
+
+/**
+ * Returns true if the participants all have a (non-error) state greater than or equal to
+ * expectedState, false otherwise.
+ *
+ * If any participant is in state kError, returns an error status.
+ */
+template <class TState, class TParticipant>
+StatusWith<bool> allParticipantsInStateGTE(WithLock lk,
+                                           TState expectedState,
+                                           const std::vector<TParticipant>& participants) {
+
+    bool allInStateGTE = true;
+    for (const auto& shard : participants) {
+        auto state = shard.getState();
+        if (state != expectedState) {
+            if (state == TState::kError) {
+                return generateErrorStatus(lk, shard);
+            }
+
+            // If one state is greater than the expectedState, it is guaranteed that all other
+            // participant states are at least expectedState or greater.
+            //
+            // Instead of early returning, continue loop in case another participant reported an
+            // error.
+            allInStateGTE = state > expectedState;
+        }
+    }
+    return allInStateGTE;
+}
+
+/**
+ * Returns true if the state transition is incomplete and the promise cannot yet be fulfilled. This
+ * includes if one or more of the participants report state kError. In the error case, an error is
+ * set on the promise.
+ *
+ * Otherwise returns false and fulfills the promise if it is not already.
+ */
+template <class T>
+bool stateTransitionIncomplete(WithLock lk,
+                               SharedPromise<ReshardingCoordinatorDocument>& sp,
+                               T expectedState,
+                               const ReshardingCoordinatorDocument& updatedStateDoc) {
+    if (sp.getFuture().isReady()) {
+        // Ensure promise is not fulfilled twice.
+        return false;
+    }
+
+    auto participants = getParticipants(lk, expectedState, updatedStateDoc);
+    auto swAllParticipantsGTE = allParticipantsInStateGTE(lk, expectedState, participants);
+    if (!swAllParticipantsGTE.isOK()) {
+        // By returning true, onReshardingParticipantTransition will not try to fulfill any more of
+        // the promises.
+        // ReshardingCoordinator::run() waits on the promises from the ReshardingCoordinatorObserver
+        // in the same order they're fulfilled by onReshardingParticipantTransition(). If even one
+        // promise in the chain errors, ReshardingCoordinator::run() will jump to onError and not
+        // wait for the remaining promises to be fulfilled.
+        sp.setError(swAllParticipantsGTE.getStatus());
+        return true;
+    }
+
+    if (swAllParticipantsGTE.getValue()) {
+        // All participants are in a state greater than or equal to expected state.
+        sp.emplaceValue(updatedStateDoc);
+        return false;
+    }
+    return true;
+}
+
+}  // namespace
 
 ReshardingCoordinatorObserver::ReshardingCoordinatorObserver() = default;
 
 ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() = default;
 
-// TODO SERVER-49572
-void ReshardingCoordinatorObserver::onRecipientReportsCreatedCollection(const ShardId& recipient) {}
+void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
+    const ReshardingCoordinatorDocument& updatedStateDoc) {
 
-// TODO SERVER-49573
-void ReshardingCoordinatorObserver::onDonorReportsMinFetchTimestamp(const ShardId& donor,
-                                                                    Timestamp timestamp) {}
+    stdx::lock_guard<Latch> lk(_mutex);
 
-// TODO SERVER-49574
-void ReshardingCoordinatorObserver::onRecipientFinishesCloning(const ShardId& recipient) {}
+    if (stateTransitionIncomplete(lk,
+                                  _allRecipientsCreatedCollection,
+                                  RecipientStateEnum::kInitialized,
+                                  updatedStateDoc)) {
+        return;
+    }
 
-// TODO SERVER-49575
-void ReshardingCoordinatorObserver::onRecipientReportsStrictlyConsistent(const ShardId& recipient) {
+    if (stateTransitionIncomplete(
+            lk, _allDonorsReportedMinFetchTimestamp, DonorStateEnum::kDonating, updatedStateDoc)) {
+        return;
+    }
+
+    if (stateTransitionIncomplete(
+            lk, _allRecipientsFinishedCloning, RecipientStateEnum::kSteadyState, updatedStateDoc)) {
+        return;
+    }
+
+    if (stateTransitionIncomplete(lk,
+                                  _allRecipientsReportedStrictConsistencyTimestamp,
+                                  RecipientStateEnum::kStrictConsistency,
+                                  updatedStateDoc)) {
+        return;
+    }
+
+    if (stateTransitionIncomplete(
+            lk, _allRecipientsRenamedCollection, RecipientStateEnum::kDone, updatedStateDoc)) {
+        return;
+    }
+
+    if (stateTransitionIncomplete(
+            lk, _allDonorsDroppedOriginalCollection, DonorStateEnum::kDone, updatedStateDoc)) {
+        return;
+    }
 }
 
-// TODO SERVER-49576
-void ReshardingCoordinatorObserver::onRecipientRenamesCollection(const ShardId& recipient) {}
-
-// TODO SERVER-49577
-void ReshardingCoordinatorObserver::onDonorDropsOriginalCollection(const ShardId& donor) {}
-
-// TODO SERVER-49578
-void ReshardingCoordinatorObserver::onRecipientReportsUnrecoverableError(const ShardId& recipient,
-                                                                         Status error) {}
-
 // TODO	SERVER-49572
-SharedSemiFuture<void> ReshardingCoordinatorObserver::awaitAllRecipientsCreatedCollection() {
+SharedSemiFuture<ReshardingCoordinatorDocument>
+ReshardingCoordinatorObserver::awaitAllRecipientsCreatedCollection() {
     return _allRecipientsCreatedCollection.getFuture();
 }
 
 // TODO SERVER-49573
-SharedSemiFuture<Timestamp> ReshardingCoordinatorObserver::awaitAllDonorsReadyToDonate() {
+SharedSemiFuture<ReshardingCoordinatorDocument>
+ReshardingCoordinatorObserver::awaitAllDonorsReadyToDonate() {
     return _allDonorsReportedMinFetchTimestamp.getFuture();
 }
 
 // TODO SERVER-49574
-SharedSemiFuture<void> ReshardingCoordinatorObserver::awaitAllRecipientsFinishedCloning() {
+SharedSemiFuture<ReshardingCoordinatorDocument>
+ReshardingCoordinatorObserver::awaitAllRecipientsFinishedCloning() {
     return _allRecipientsFinishedCloning.getFuture();
 }
 
 // TODO SERVER-49575
-SharedSemiFuture<void> ReshardingCoordinatorObserver::awaitAllRecipientsInStrictConsistency() {
+SharedSemiFuture<ReshardingCoordinatorDocument>
+ReshardingCoordinatorObserver::awaitAllRecipientsInStrictConsistency() {
     return _allRecipientsReportedStrictConsistencyTimestamp.getFuture();
 }
 
 // TODO SERVER-49577
-SharedSemiFuture<void> ReshardingCoordinatorObserver::awaitAllDonorsDroppedOriginalCollection() {
+SharedSemiFuture<ReshardingCoordinatorDocument>
+ReshardingCoordinatorObserver::awaitAllDonorsDroppedOriginalCollection() {
     return _allDonorsDroppedOriginalCollection.getFuture();
 }
 
 // TODO SERVER-49576
-SharedSemiFuture<void> ReshardingCoordinatorObserver::awaitAllRecipientsRenamedCollection() {
+SharedSemiFuture<ReshardingCoordinatorDocument>
+ReshardingCoordinatorObserver::awaitAllRecipientsRenamedCollection() {
     return _allRecipientsRenamedCollection.getFuture();
 }
 

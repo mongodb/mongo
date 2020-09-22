@@ -89,6 +89,8 @@ public:
         void setInitialChunksAndZones(std::vector<ChunkType> initialChunks,
                                       std::vector<TagsType> newZones);
 
+        std::shared_ptr<ReshardingCoordinatorObserver> getObserver();
+
     private:
         struct ChunksAndZones {
             std::vector<ChunkType> initialChunks;
@@ -132,7 +134,7 @@ public:
          * Waits on _reshardingCoordinatorObserver to notify that all recipients have entered
          * strict-consistency.
          */
-        SharedSemiFuture<void> _awaitAllRecipientsInStrictConsistency(
+        SharedSemiFuture<ReshardingCoordinatorDocument> _awaitAllRecipientsInStrictConsistency(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
         /**
@@ -143,7 +145,7 @@ public:
          *
          * Transitions to 'kCommitted'.
          */
-        Future<void> _commit();
+        Future<void> _commit(ReshardingCoordinatorDocument updatedDoc);
 
         /**
          * Waits on _reshardingCoordinatorObserver to notify that all recipients have renamed the
@@ -164,6 +166,7 @@ public:
          * catalog entries for the original and temporary namespaces in config.collections.
          */
         void _runUpdates(CoordinatorStateEnum nextState,
+                         ReshardingCoordinatorDocument updatedStateDoc,
                          boost::optional<Timestamp> fetchTimestamp = boost::none);
 
         /**

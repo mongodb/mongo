@@ -33,6 +33,7 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
@@ -62,13 +63,15 @@ void ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
         .then([this] { _tellAllDonorsToRefresh(); })
         .then([this, executor] { return _awaitAllRecipientsInStrictConsistency(executor); })
-        .then([this] { return _commit(); })
+        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
+            return _commit(updatedStateDoc);
+        })
         .then([this] {
             if (_stateDoc.getState() > CoordinatorStateEnum::kRenaming) {
                 return;
             }
 
-            this->_runUpdates(CoordinatorStateEnum::kRenaming);
+            this->_runUpdates(CoordinatorStateEnum::kRenaming, _stateDoc);
             return;
         })
         .then([this, executor] { return _awaitAllRecipientsRenamedCollection(executor); })
@@ -77,7 +80,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this] { _tellAllRecipientsToRefresh(); })
         .then([this] { _tellAllDonorsToRefresh(); })
         .onError([this](Status status) {
-            _runUpdates(CoordinatorStateEnum::kError);
+            _runUpdates(CoordinatorStateEnum::kError, _stateDoc);
 
             LOGV2(4956902,
                   "Resharding failed",
@@ -103,6 +106,11 @@ void ReshardingCoordinatorService::ReshardingCoordinator::setInitialChunksAndZon
 
     _initialChunksAndZonesPromise.emplaceValue(
         ChunksAndZones{std::move(initialChunks), std::move(newZones)});
+}
+
+std::shared_ptr<ReshardingCoordinatorObserver>
+ReshardingCoordinatorService::ReshardingCoordinator::getObserver() {
+    return _reshardingCoordinatorObserver;
 }
 
 ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_init(
@@ -140,7 +148,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsCreatedC
 
     return _reshardingCoordinatorObserver->awaitAllRecipientsCreatedCollection()
         .thenRunOn(**executor)
-        .then([this]() { this->_runUpdates(CoordinatorStateEnum::kPreparingToDonate); });
+        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
+            this->_runUpdates(CoordinatorStateEnum::kPreparingToDonate, updatedStateDoc);
+        });
 }
 
 ExecutorFuture<void>
@@ -152,8 +162,10 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
 
     return _reshardingCoordinatorObserver->awaitAllDonorsReadyToDonate()
         .thenRunOn(**executor)
-        .then([this](Timestamp fetchTimestamp) {
-            this->_runUpdates(CoordinatorStateEnum::kCloning, fetchTimestamp);
+        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
+            // TODO SERVER-49573 Calculate the fetchTimestamp from the updatedStateDoc then pass it
+            // into _runUpdates.
+            this->_runUpdates(CoordinatorStateEnum::kCloning, updatedStateDoc);
         });
 }
 
@@ -166,27 +178,31 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
 
     return _reshardingCoordinatorObserver->awaitAllRecipientsFinishedCloning()
         .thenRunOn(**executor)
-        .then([this]() { this->_runUpdates(CoordinatorStateEnum::kMirroring); });
+        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
+            this->_runUpdates(CoordinatorStateEnum::kMirroring, updatedStateDoc);
+        });
 }
 
-SharedSemiFuture<void>
+SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsInStrictConsistency(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_stateDoc.getState() > CoordinatorStateEnum::kMirroring) {
-        return Status::OK();
+        // If in recovery, just return the existing _stateDoc.
+        return _stateDoc;
     }
 
     return _reshardingCoordinatorObserver->awaitAllRecipientsInStrictConsistency();
 }
 
-Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit() {
+Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
+    ReshardingCoordinatorDocument updatedStateDoc) {
     if (_stateDoc.getState() > CoordinatorStateEnum::kMirroring) {
         return Status::OK();
     }
 
     // TODO SERVER-50304 Run this update in a transaction with writes to config.collections,
     // config.chunks, and config.tags
-    this->_runUpdates(CoordinatorStateEnum::kCommitted);
+    this->_runUpdates(CoordinatorStateEnum::kCommitted, updatedStateDoc);
 
     return Status::OK();
 };
@@ -200,7 +216,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsRenamedC
 
     return _reshardingCoordinatorObserver->awaitAllRecipientsRenamedCollection()
         .thenRunOn(**executor)
-        .then([this]() { this->_runUpdates(CoordinatorStateEnum::kDropping); });
+        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
+            this->_runUpdates(CoordinatorStateEnum::kDropping, updatedStateDoc);
+        });
 }
 
 ExecutorFuture<void>
@@ -212,15 +230,18 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsDroppedOrigi
 
     return _reshardingCoordinatorObserver->awaitAllDonorsDroppedOriginalCollection()
         .thenRunOn(**executor)
-        .then([this]() { this->_runUpdates(CoordinatorStateEnum::kDone); });
+        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
+            this->_runUpdates(CoordinatorStateEnum::kDone, updatedStateDoc);
+        });
 }
 
 // TODO SERVER-50304 Run this write in a transaction with updates to config.collections (and
 // the initial chunks to config.chunks and config.tags if nextState is kInitialized)
 void ReshardingCoordinatorService::ReshardingCoordinator::_runUpdates(
-    CoordinatorStateEnum nextState, boost::optional<Timestamp> fetchTimestamp) {
+    CoordinatorStateEnum nextState,
+    ReshardingCoordinatorDocument updatedStateDoc,
+    boost::optional<Timestamp> fetchTimestamp) {
     // Build new state doc for update
-    ReshardingCoordinatorDocument updatedStateDoc = _stateDoc;
     updatedStateDoc.setState(nextState);
     if (fetchTimestamp) {
         auto fetchTimestampStruct = updatedStateDoc.getFetchTimestampStruct();

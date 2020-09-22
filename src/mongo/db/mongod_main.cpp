@@ -137,6 +137,7 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_op_observer.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -1006,6 +1007,7 @@ void setUpObservers(ServiceContext* serviceContext) {
     } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
     } else {
         opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
     }
