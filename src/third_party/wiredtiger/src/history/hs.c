@@ -898,14 +898,18 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
                 continue;
             }
 
-            /* Skip updates that are already in the history store or are obsolete. */
-            if (F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_OBSOLETE)) {
+            /* Skip updates that are already in the history store. */
+            if (F_ISSET(upd, WT_UPDATE_HS)) {
                 if (hs_inserted)
                     WT_ERR_PANIC(session, WT_PANIC,
-                      "Inserting updates older than obsolete updates or updates that are already "
-                      "in the history store to the history store may corrupt the data.");
+                      "Reinserting updates to the history store may corrupt the data as it may "
+                      "clear the history store data newer than it.");
                 continue;
             }
+
+            /* Skip updates that are obsolete. */
+            if (F_ISSET(upd, WT_UPDATE_OBSOLETE))
+                continue;
 
             /*
              * If the time points are out of order (which can happen if the application performs
