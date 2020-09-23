@@ -38,8 +38,9 @@ LoopJoinStage::LoopJoinStage(std::unique_ptr<PlanStage> outer,
                              std::unique_ptr<PlanStage> inner,
                              value::SlotVector outerProjects,
                              value::SlotVector outerCorrelated,
-                             std::unique_ptr<EExpression> predicate)
-    : PlanStage("nlj"_sd),
+                             std::unique_ptr<EExpression> predicate,
+                             PlanNodeId nodeId)
+    : PlanStage("nlj"_sd, nodeId),
       _outerProjects(std::move(outerProjects)),
       _outerCorrelated(std::move(outerCorrelated)),
       _predicate(std::move(predicate)) {
@@ -52,7 +53,8 @@ std::unique_ptr<PlanStage> LoopJoinStage::clone() const {
                                            _children[1]->clone(),
                                            _outerProjects,
                                            _outerCorrelated,
-                                           _predicate ? _predicate->clone() : nullptr);
+                                           _predicate ? _predicate->clone() : nullptr,
+                                           _commonStats.nodeId);
 }
 
 void LoopJoinStage::prepare(CompileCtx& ctx) {

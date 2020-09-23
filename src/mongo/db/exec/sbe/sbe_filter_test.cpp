@@ -52,8 +52,8 @@ TEST_F(FilterStageTest, ConstantFilterAlwaysTrueTest) {
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a constant FilterStage whose filter expression is always boolean true.
-        auto filter = makeS<FilterStage<true>>(std::move(scanStage),
-                                               makeE<EConstant>(value::TypeTags::Boolean, 1));
+        auto filter = makeS<FilterStage<true>>(
+            std::move(scanStage), makeE<EConstant>(value::TypeTags::Boolean, 1), kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(filter));
     };
@@ -73,8 +73,8 @@ TEST_F(FilterStageTest, ConstantFilterAlwaysFalseTest) {
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a constant FilterStage whose filter expression is always boolean false.
-        auto filter = makeS<FilterStage<true>>(std::move(scanStage),
-                                               makeE<EConstant>(value::TypeTags::Boolean, 0));
+        auto filter = makeS<FilterStage<true>>(
+            std::move(scanStage), makeE<EConstant>(value::TypeTags::Boolean, 0), kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(filter));
     };
@@ -94,8 +94,8 @@ TEST_F(FilterStageTest, FilterAlwaysTrueTest) {
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a non-constant FilterStage whose filter expression is always boolean true.
-        auto filter = makeS<FilterStage<false>>(std::move(scanStage),
-                                                makeE<EConstant>(value::TypeTags::Boolean, 1));
+        auto filter = makeS<FilterStage<false>>(
+            std::move(scanStage), makeE<EConstant>(value::TypeTags::Boolean, 1), kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(filter));
     };
@@ -115,8 +115,8 @@ TEST_F(FilterStageTest, FilterAlwaysFalseTest) {
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
         // Build a non-constant FilterStage whose filter expression is always boolean false.
-        auto filter = makeS<FilterStage<false>>(std::move(scanStage),
-                                                makeE<EConstant>(value::TypeTags::Boolean, 0));
+        auto filter = makeS<FilterStage<false>>(
+            std::move(scanStage), makeE<EConstant>(value::TypeTags::Boolean, 0), kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(filter));
     };
@@ -140,7 +140,8 @@ TEST_F(FilterStageTest, FilterIsNumberTest) {
         // Build a FilterStage whose filter expression is "isNumber(scanSlot)".
         auto filter = makeS<FilterStage<false>>(
             std::move(scanStage),
-            makeE<EFunction>("isNumber"sv, makeEs(makeE<EVariable>(scanSlot))));
+            makeE<EFunction>("isNumber"sv, makeEs(makeE<EVariable>(scanSlot))),
+            kEmptyPlanNodeId);
 
         return std::make_pair(scanSlot, std::move(filter));
     };
@@ -166,7 +167,8 @@ TEST_F(FilterStageTest, FilterLessThanTest) {
         auto filter = makeS<FilterStage<false>>(std::move(scanStage),
                                                 makeE<EPrimBinary>(EPrimBinary::less,
                                                                    makeE<EVariable>(scanSlots[0]),
-                                                                   makeE<EVariable>(scanSlots[1])));
+                                                                   makeE<EVariable>(scanSlots[1])),
+                                                kEmptyPlanNodeId);
         return std::make_pair(scanSlots, std::move(filter));
     };
 

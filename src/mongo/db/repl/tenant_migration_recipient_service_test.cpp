@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional_io.hpp>
 #include <memory>
 
 #include "mongo/client/connpool.h"
@@ -40,10 +41,12 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_interface.h"
@@ -58,6 +61,34 @@
 
 namespace mongo {
 namespace repl {
+
+namespace {
+OplogEntry makeOplogEntry(OpTime opTime,
+                          OpTypeEnum opType,
+                          NamespaceString nss,
+                          OptionalCollectionUUID uuid,
+                          BSONObj o,
+                          boost::optional<BSONObj> o2) {
+    return OplogEntry(opTime,                     // optime
+                      boost::none,                // hash
+                      opType,                     // opType
+                      nss,                        // namespace
+                      uuid,                       // uuid
+                      boost::none,                // fromMigrate
+                      OplogEntry::kOplogVersion,  // version
+                      o,                          // o
+                      o2,                         // o2
+                      {},                         // sessionInfo
+                      boost::none,                // upsert
+                      Date_t(),                   // wall clock time
+                      boost::none,                // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none,   // post-image optime
+                      boost::none);  // ShardId of resharding recipient
+}
+
+}  // namespace
 
 class TenantMigrationRecipientServiceTest : public ServiceContextMongoDTest {
 public:
@@ -137,6 +168,41 @@ protected:
     PrimaryOnlyService* _service;
     long long _term = 0;
 
+    void checkStateDocPersisted(const TenantMigrationRecipientService::Instance* instance) {
+        auto opCtx = cc().makeOperationContext();
+        auto memoryStateDoc = getStateDoc(instance);
+        auto persistedStateDocWithStatus =
+            tenantMigrationRecipientEntryHelpers::getStateDoc(opCtx.get(), memoryStateDoc.getId());
+        ASSERT_OK(persistedStateDocWithStatus.getStatus());
+        ASSERT_BSONOBJ_EQ(memoryStateDoc.toBSON(), persistedStateDocWithStatus.getValue().toBSON());
+    }
+    void insertToAllNodes(MockReplicaSet* replSet, const std::string& nss, BSONObj obj) {
+        for (const auto& host : replSet->getHosts()) {
+            replSet->getNode(host.toString())->insert(nss, obj);
+        }
+    }
+
+    void clearCollectionAllNodes(MockReplicaSet* replSet, const std::string& nss) {
+        for (const auto& host : replSet->getHosts()) {
+            replSet->getNode(host.toString())->remove(nss, Query());
+        }
+    }
+
+    void insertTopOfOplog(MockReplicaSet* replSet, const OpTime& topOfOplogOpTime) {
+        // The MockRemoteDBService does not actually implement the database, so to make our
+        // find work correctly we must make sure there's only one document to find.
+        clearCollectionAllNodes(replSet, NamespaceString::kRsOplogNamespace.ns());
+        insertToAllNodes(replSet,
+                         NamespaceString::kRsOplogNamespace.ns(),
+                         makeOplogEntry(topOfOplogOpTime,
+                                        OpTypeEnum::kNoop,
+                                        {} /* namespace */,
+                                        boost::none /* uuid */,
+                                        BSONObj() /* o */,
+                                        boost::none /* o2 */)
+                             .toBSON());
+    }
+
     // Accessors to class private members
     DBClientConnection* getClient(const TenantMigrationRecipientService::Instance* instance) const {
         return instance->_client.get();
@@ -145,6 +211,11 @@ protected:
     DBClientConnection* getOplogFetcherClient(
         const TenantMigrationRecipientService::Instance* instance) const {
         return instance->_oplogFetcherClient.get();
+    }
+
+    const TenantMigrationRecipientDocument& getStateDoc(
+        const TenantMigrationRecipientService::Instance* instance) const {
+        return instance->_stateDoc;
     }
 
 private:
@@ -396,6 +467,176 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Wait for task completion failure.
     ASSERT_EQUALS(ErrorCodes::FailedToParse, instance->getCompletionFuture().getNoThrow().code());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_NoTransaction) {
+    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    checkStateDocPersisted(instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientGetStartOpTime_Advances_NoTransaction) {
+    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+    auto pauseFailPoint =
+        globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
+    auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+    const OpTime newTopOfOplogOpTime(Timestamp(6, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    pauseFailPoint->waitForTimesEntered(timesEntered + 1);
+    insertTopOfOplog(&replSet, newTopOfOplogOpTime);
+    pauseFailPoint->setMode(FailPoint::off, 0);
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
+    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    checkStateDocPersisted(instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_Transaction) {
+    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime txnStartOpTime(Timestamp(3, 1), 1);
+    const OpTime txnLastWriteOpTime(Timestamp(4, 1), 1);
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+    SessionTxnRecord lastTxn(makeLogicalSessionIdForTest(), 100, txnLastWriteOpTime, Date_t());
+    lastTxn.setStartOpTime(txnStartOpTime);
+    lastTxn.setState(DurableTxnStateEnum::kInProgress);
+    insertToAllNodes(
+        &replSet, NamespaceString::kSessionTransactionsTableNamespace.ns(), lastTxn.toBSON());
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    checkStateDocPersisted(instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientGetStartOpTime_Advances_Transaction) {
+    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+    auto pauseFailPoint =
+        globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
+    auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime txnStartOpTime(Timestamp(3, 1), 1);
+    const OpTime txnLastWriteOpTime(Timestamp(4, 1), 1);
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+    const OpTime newTopOfOplogOpTime(Timestamp(6, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+    SessionTxnRecord lastTxn(makeLogicalSessionIdForTest(), 100, txnLastWriteOpTime, Date_t());
+    lastTxn.setStartOpTime(txnStartOpTime);
+    lastTxn.setState(DurableTxnStateEnum::kInProgress);
+    insertToAllNodes(
+        &replSet, NamespaceString::kSessionTransactionsTableNamespace.ns(), lastTxn.toBSON());
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    pauseFailPoint->waitForTimesEntered(timesEntered + 1);
+    insertTopOfOplog(&replSet, newTopOfOplogOpTime);
+    pauseFailPoint->setMode(FailPoint::off, 0);
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+    ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
+    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    checkStateDocPersisted(instance.get());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest,
+       TenantMigrationRecipientGetStartOpTimes_RemoteOplogQueryFails) {
+    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    // Create and start the instance.  Fail to populate the remote oplog mock.
+    auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
+        _service, initialStateDocument.toBSON());
+    ASSERT(instance.get());
+
+    // Wait for task completion success.
+    ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+
+    // Even though we failed, the memory state should still match the on-disk state.
+    checkStateDocPersisted(instance.get());
 }
 
 }  // namespace repl

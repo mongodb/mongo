@@ -1020,17 +1020,7 @@ public:
         : _opCtx(opCtx), _collection(collection), _entries(entries), _entry(std::move(entry)) {}
 
     void commit(boost::optional<Timestamp> commitTime) final {
-        // Ban reading from this collection on committed reads on snapshots before now.
-        if (!commitTime) {
-            // This is called when we refresh the index catalog entry, which does not always have
-            // a commit timestamp. We use the cluster time since it's guaranteed to be greater
-            // than the time of the index removal. It is possible the cluster time could be in the
-            // future, and we will need to do another write to reach the minimum visible snapshot.
-            const auto currentTime = VectorClock::get(_opCtx)->getTime();
-            commitTime = currentTime.clusterTime().asTimestamp();
-        }
         _entry->setDropped();
-        _collection->setMinimumVisibleSnapshot(commitTime.get());
     }
 
     void rollback() final {
@@ -1318,10 +1308,15 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // to the CollectionQueryInfo.
     auto newDesc =
         std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
-    const IndexCatalogEntry* newEntry =
-        createIndexEntry(opCtx, std::move(newDesc), CreateIndexEntryFlags::kIsReady);
+    auto newEntry = createIndexEntry(opCtx, std::move(newDesc), CreateIndexEntryFlags::kIsReady);
     invariant(newEntry->isReady(opCtx));
     CollectionQueryInfo::get(_collection).addedIndex(opCtx, _collection, newEntry->descriptor());
+
+    opCtx->recoveryUnit()->onCommit([newEntry](auto commitTime) {
+        if (commitTime) {
+            newEntry->setMinimumVisibleSnapshot(*commitTime);
+        }
+    });
 
     // Return the new descriptor.
     return newEntry->descriptor();

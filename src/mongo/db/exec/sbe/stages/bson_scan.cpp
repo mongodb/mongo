@@ -40,8 +40,9 @@ BSONScanStage::BSONScanStage(const char* bsonBegin,
                              const char* bsonEnd,
                              boost::optional<value::SlotId> recordSlot,
                              std::vector<std::string> fields,
-                             value::SlotVector vars)
-    : PlanStage("bsonscan"_sd),
+                             value::SlotVector vars,
+                             PlanNodeId planNodeId)
+    : PlanStage("bsonscan"_sd, planNodeId),
       _bsonBegin(bsonBegin),
       _bsonEnd(bsonEnd),
       _recordSlot(recordSlot),
@@ -50,7 +51,8 @@ BSONScanStage::BSONScanStage(const char* bsonBegin,
       _bsonCurrent(bsonBegin) {}
 
 std::unique_ptr<PlanStage> BSONScanStage::clone() const {
-    return std::make_unique<BSONScanStage>(_bsonBegin, _bsonEnd, _recordSlot, _fields, _vars);
+    return std::make_unique<BSONScanStage>(
+        _bsonBegin, _bsonEnd, _recordSlot, _fields, _vars, _commonStats.nodeId);
 }
 
 void BSONScanStage::prepare(CompileCtx& ctx) {

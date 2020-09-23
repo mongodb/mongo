@@ -28,12 +28,22 @@ rst.awaitLastOpCommitted();
 
 stopReplicationOnSecondaries(rst);
 
-// Create the index that is not majority commited
-// This test create indexes with majority of nodes not available for replication. So, disabling
-// index build commit quorum.
+// Rename the collection temporarily and then back to its original name. This advances the minimum
+// visible snapshot and forces the $out to block until its snapshot advances.
+const tempColl = db.getName() + '.temp';
+assert.commandWorked(db.adminCommand({
+    renameCollection: sourceColl.getFullName(),
+    to: tempColl,
+}));
+assert.commandWorked(db.adminCommand({
+    renameCollection: tempColl,
+    to: sourceColl.getFullName(),
+}));
+
+// Create the index that is not majority committed
 assert.commandWorked(sourceColl.createIndex({state: 1}, {name: "secondIndex"}, 0));
 
-// Run the $out in the parallel shell as it will block in the metadata until the shapshot is
+// Run the $out in the parallel shell as it will block in the metadata until the snapshot is
 // advanced.
 const awaitShell = startParallelShell(`{
         const testDB = db.getSiblingDB("${name}");
@@ -58,7 +68,7 @@ assert.soon(function() {
     return assert.commandWorked(db.currentOp(filter)).inprog.length === 1;
 });
 
-// Restart data replicaiton and wait until the new write becomes visible.
+// Restart data replication and wait until the new write becomes visible.
 restartReplicationOnSecondaries(rst);
 rst.awaitLastOpCommitted();
 

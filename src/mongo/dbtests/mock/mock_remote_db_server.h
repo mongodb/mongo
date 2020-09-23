@@ -40,6 +40,9 @@
 #include "mongo/util/concurrency/spin_lock.h"
 
 namespace mongo {
+namespace projection_executor {
+class ProjectionExecutor;
+}  // namespace projection_executor
 
 const std::string IdentityNS("local.me");
 const BSONField<std::string> HostField("host");
@@ -218,6 +221,19 @@ private:
      * @throws mongo::SocketException if this server is down
      */
     void checkIfUp(InstanceID id) const;
+
+    /**
+     * Creates a ProjectionExecutor to handle fieldsToReturn.
+     */
+    std::unique_ptr<projection_executor::ProjectionExecutor> createProjectionExecutor(
+        const BSONObj& projectionSpec);
+
+    /**
+     * Projects the object, unless the projectionExecutor is null, in which case returns a
+     * copy of the object.
+     */
+    BSONObj project(projection_executor::ProjectionExecutor* projectionExecutor, const BSONObj& o);
+
 
     typedef stdx::unordered_map<std::string, std::shared_ptr<CircularBSONIterator>> CmdToReplyObj;
     typedef stdx::unordered_map<std::string, std::vector<BSONObj>> MockDataMgr;

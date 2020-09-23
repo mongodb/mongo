@@ -34,13 +34,15 @@
 namespace mongo::sbe {
 SpoolEagerProducerStage::SpoolEagerProducerStage(std::unique_ptr<PlanStage> input,
                                                  SpoolId spoolId,
-                                                 value::SlotVector vals)
-    : PlanStage{"espool"_sd}, _spoolId{spoolId}, _vals{std::move(vals)} {
+                                                 value::SlotVector vals,
+                                                 PlanNodeId planNodeId)
+    : PlanStage{"espool"_sd, planNodeId}, _spoolId{spoolId}, _vals{std::move(vals)} {
     _children.emplace_back(std::move(input));
 }
 
 std::unique_ptr<PlanStage> SpoolEagerProducerStage::clone() const {
-    return std::make_unique<SpoolEagerProducerStage>(_children[0]->clone(), _spoolId, _vals);
+    return std::make_unique<SpoolEagerProducerStage>(
+        _children[0]->clone(), _spoolId, _vals, _commonStats.nodeId);
 }
 
 void SpoolEagerProducerStage::prepare(CompileCtx& ctx) {
@@ -147,8 +149,9 @@ std::vector<DebugPrinter::Block> SpoolEagerProducerStage::debugPrint() const {
 SpoolLazyProducerStage::SpoolLazyProducerStage(std::unique_ptr<PlanStage> input,
                                                SpoolId spoolId,
                                                value::SlotVector vals,
-                                               std::unique_ptr<EExpression> predicate)
-    : PlanStage{"lspool"_sd},
+                                               std::unique_ptr<EExpression> predicate,
+                                               PlanNodeId planNodeId)
+    : PlanStage{"lspool"_sd, planNodeId},
       _spoolId{spoolId},
       _vals{std::move(vals)},
       _predicate{std::move(predicate)} {
@@ -157,7 +160,7 @@ SpoolLazyProducerStage::SpoolLazyProducerStage(std::unique_ptr<PlanStage> input,
 
 std::unique_ptr<PlanStage> SpoolLazyProducerStage::clone() const {
     return std::make_unique<SpoolLazyProducerStage>(
-        _children[0]->clone(), _spoolId, _vals, _predicate->clone());
+        _children[0]->clone(), _spoolId, _vals, _predicate->clone(), _commonStats.nodeId);
 }
 
 void SpoolLazyProducerStage::prepare(CompileCtx& ctx) {

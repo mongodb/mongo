@@ -50,6 +50,7 @@ public:
               bool forward,
               PlanYieldPolicy* yieldPolicy,
               TrialRunProgressTracker* tracker,
+              PlanNodeId nodeId,
               ScanOpenCallback openCallback = {});
 
     std::unique_ptr<PlanStage> clone() const final;
@@ -119,7 +120,8 @@ public:
                       boost::optional<value::SlotId> recordIdSlot,
                       std::vector<std::string> fields,
                       value::SlotVector vars,
-                      PlanYieldPolicy* yieldPolicy);
+                      PlanYieldPolicy* yieldPolicy,
+                      PlanNodeId nodeId);
 
     ParallelScanStage(const std::shared_ptr<ParallelState>& state,
                       const NamespaceStringOrUUID& name,
@@ -127,7 +129,8 @@ public:
                       boost::optional<value::SlotId> recordIdSlot,
                       std::vector<std::string> fields,
                       value::SlotVector vars,
-                      PlanYieldPolicy* yieldPolicy);
+                      PlanYieldPolicy* yieldPolicy,
+                      PlanNodeId nodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

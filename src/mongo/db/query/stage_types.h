@@ -29,7 +29,17 @@
 
 #pragma once
 
+#include <cstdint>
+
 namespace mongo {
+/**
+ * This type acts as an identifier for a node in a query plan tree, such as a 'QuerySolution' tree
+ * or an 'sbe::PlanStage' tree.
+ *
+ * An id of 0 is used to represent the absence of an explicitly assigned id.
+ */
+using PlanNodeId = uint32_t;
+static constexpr PlanNodeId kEmptyPlanNodeId = 0u;
 
 /**
  * These map to implementations of the PlanStage interface, all of which live in db/exec/

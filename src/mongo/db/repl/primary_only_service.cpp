@@ -228,10 +228,19 @@ void PrimaryOnlyServiceRegistry::onStepDown() {
     }
 }
 
-void PrimaryOnlyServiceRegistry::reportServiceInfo(BSONObjBuilder* result) {
+void PrimaryOnlyServiceRegistry::reportServiceInfoForServerStatus(BSONObjBuilder* result) noexcept {
     BSONObjBuilder subBuilder(result->subobjStart("primaryOnlyServices"));
     for (auto& service : _servicesByName) {
         subBuilder.appendNumber(service.first, service.second->getNumberOfInstances());
+    }
+}
+
+void PrimaryOnlyServiceRegistry::reportServiceInfoForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+    std::vector<BSONObj>* ops) noexcept {
+    for (auto& [_, service] : _servicesByName) {
+        service->reportInstanceInfoForCurrentOp(connMode, sessionMode, ops);
     }
 }
 
@@ -241,6 +250,20 @@ PrimaryOnlyService::PrimaryOnlyService(ServiceContext* serviceContext)
 size_t PrimaryOnlyService::getNumberOfInstances() {
     stdx::lock_guard lk(_mutex);
     return _instances.size();
+}
+
+void PrimaryOnlyService::reportInstanceInfoForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+    std::vector<BSONObj>* ops) noexcept {
+
+    stdx::lock_guard lk(_mutex);
+    for (auto& [_, instance] : _instances) {
+        auto op = instance->reportForCurrentOp(connMode, sessionMode);
+        if (op.has_value()) {
+            ops->push_back(std::move(op.get()));
+        }
+    }
 }
 
 bool PrimaryOnlyService::isRunning() const {
@@ -420,11 +443,15 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
 }
 
 boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyService::lookupInstance(
-    const InstanceID& id) {
+    OperationContext* opCtx, const InstanceID& id) {
+    // If this operation is holding any database locks, then it must have opted into getting
+    // interrupted at stepdown to prevent deadlocks.
+    invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+
     stdx::unique_lock lk(_mutex);
-    while (_state == State::kRebuilding) {
-        _rebuildCV.wait(lk);
-    }
+    opCtx->waitForConditionOrInterrupt(
+        _rebuildCV, lk, [this]() { return _state != State::kRebuilding; });
+
     if (_state == State::kShutdown || _state == State::kPaused) {
         invariant(_instances.empty());
         return boost::none;
@@ -537,7 +564,6 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl, std::shared_ptr<Instance> ins
             if (ErrorCodes::isCancelationError(status) ||
                 ErrorCodes::InterruptedDueToReplStateChange ==  // from kExecutorShutdownStatus
                     status) {
-                instance->_completionPromise.setError(status);
                 return;
             }
             invariant(status);
@@ -545,16 +571,7 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl, std::shared_ptr<Instance> ins
             invariant(!instance->_running);
             instance->_running = true;
 
-            instance->run(std::move(scopedExecutor))
-                .thenRunOn(std::move(executor))  // Must use executor for this since scopedExecutor
-                                                 // could be shut down by this point
-                .getAsync([instance](Status status) {
-                    if (status.isOK()) {
-                        instance->_completionPromise.emplaceValue();
-                    } else {
-                        instance->_completionPromise.setError(status);
-                    }
-                });
+            instance->run(std::move(scopedExecutor));
         });
 }
 

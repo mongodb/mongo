@@ -36,7 +36,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/snapshot_helper.h"
@@ -49,7 +48,6 @@ const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
 // TODO: SERVER-44105 remove
 // If set to false, secondary reads should wait behind the PBW lock.
-// Does nothing if gAllowSecondaryReadsDuringBatchApplication setting is false.
 const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
     OperationContext::declareDecoration<boost::optional<bool>>();
 
@@ -94,10 +92,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     // i.e. the caller does not currently have a ShouldNotConflict... block in scope.
     bool callerWasConflicting = opCtx->lockState()->shouldConflictWithSecondaryBatchApplication();
 
-    // Don't take the ParallelBatchWriterMode lock when the server parameter is set and our
-    // storage engine supports snapshot reads.
-    if (gAllowSecondaryReadsDuringBatchApplication.load() &&
-        allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
+    if (allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
     }
@@ -123,11 +118,6 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
         // guarantee we read at a consistent state, so we must read at the lastApplied timestamp,
         // which is set after each complete batch.
-        //
-        // If an attempt to read at the lastApplied timestamp is unsuccessful because there are
-        // pending catalog changes that occur after that timestamp, we release our locks and try
-        // again with the PBWM lock (by unsetting
-        // _shouldNotConflictWithSecondaryBatchApplicationBlock).
 
         const NamespaceString nss = coll->ns();
         auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
@@ -175,7 +165,8 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
             !nss.mustBeAppliedInOwnOplogBatch() &&
             SnapshotHelper::shouldReadAtLastApplied(opCtx, nss)) {
             LOGV2_FATAL(4728700,
-                        "Reading from replicated collection without read timestamp or PBWM lock",
+                        "Reading from replicated collection on a secondary without read timestamp "
+                        "or PBWM lock",
                         "collection"_attr = nss);
         }
 
@@ -208,39 +199,28 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
         _autoColl = boost::none;
 
         // If there are pending catalog changes when using a no-overlap or lastApplied read source,
-        // we choose to take the PBWM lock to conflict with any in-progress batches. This prevents
-        // us from idly spinning in this loop trying to get a new read timestamp ahead of the
-        // minimum visible snapshot. This helps us guarantee liveness (i.e. we can eventually get a
-        // suitable read timestamp) but should not be necessary for correctness. After initial sync
-        // finishes, if we waited instead of retrying, readers would block indefinitely waiting for
-        // their read timstamp to move forward. Instead we force the reader take the PBWM lock and
-        // retry.
+        // we yield to get a new read timestamp ahead of the minimum visible snapshot.
         if (readSource == RecoveryUnit::ReadSource::kLastApplied ||
             readSource == RecoveryUnit::ReadSource::kNoOverlap) {
             invariant(readTimestamp);
             LOGV2(20576,
                   "Tried reading at a timestamp, but future catalog changes are pending. "
-                  "Trying again without reading at a timestamp",
+                  "Trying again",
                   "readTimestamp"_attr = *readTimestamp,
                   "collection"_attr = nss.ns(),
                   "collectionMinSnapshot"_attr = *minSnapshot);
-            // Destructing the block sets _shouldConflictWithSecondaryBatchApplication back to the
-            // previous value. If the previous value is false (because there is another
-            // shouldNotConflictWithSecondaryBatchApplicationBlock outside of this function), this
-            // does not take the PBWM lock.
-            _shouldNotConflictWithSecondaryBatchApplicationBlock = boost::none;
 
-            // As alluded to above, if we are AutoGetting multiple collections, it
-            // is possible that our "reaquire the PBWM" trick doesn't work, since we've already done
+            // If we are AutoGetting multiple collections, it is possible that we've already done
             // some reads and locked in our snapshot.  At this point, the only way out is to fail
             // the operation. The client application will need to retry.
             uassert(
                 ErrorCodes::SnapshotUnavailable,
                 str::stream() << "Unable to read from a snapshot due to pending collection catalog "
-                                 "changes; please retry the operation. Snapshot timestamp is "
+                                 "changes and holding multiple collection locks; please retry the "
+                                 "operation. Snapshot timestamp is "
                               << readTimestamp->toString() << ". Collection minimum is "
                               << minSnapshot->toString(),
-                opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
+                !opCtx->lockState()->isLocked());
 
             // Abandon our snapshot. We may select a new read timestamp or ReadSource in the next
             // loop iteration.

@@ -126,6 +126,7 @@ private:
     std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(
         std::unique_ptr<sbe::PlanStage> inputStage,
         sbe::value::SlotId recordIdKeySlot,
+        PlanNodeId planNodeId,
         const sbe::value::SlotVector& slotsToForward = {});
 
     std::unique_ptr<sbe::PlanStage> makeUnionForTailableCollScan(const QuerySolutionNode* root);

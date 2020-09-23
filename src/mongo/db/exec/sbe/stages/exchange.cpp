@@ -160,8 +160,9 @@ ExchangeConsumer::ExchangeConsumer(std::unique_ptr<PlanStage> input,
                                    value::SlotVector fields,
                                    ExchangePolicy policy,
                                    std::unique_ptr<EExpression> partition,
-                                   std::unique_ptr<EExpression> orderLess)
-    : PlanStage("exchange"_sd) {
+                                   std::unique_ptr<EExpression> orderLess,
+                                   PlanNodeId planNodeId)
+    : PlanStage("exchange"_sd, planNodeId) {
     _children.emplace_back(std::move(input));
     _state = std::make_shared<ExchangeState>(
         numOfProducers, std::move(fields), policy, std::move(partition), std::move(orderLess));
@@ -169,13 +170,13 @@ ExchangeConsumer::ExchangeConsumer(std::unique_ptr<PlanStage> input,
     _tid = _state->addConsumer(this);
     _orderPreserving = _state->isOrderPreserving();
 }
-ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state)
-    : PlanStage("exchange"_sd), _state(state) {
+ExchangeConsumer::ExchangeConsumer(std::shared_ptr<ExchangeState> state, PlanNodeId planNodeId)
+    : PlanStage("exchange"_sd, planNodeId), _state(state) {
     _tid = _state->addConsumer(this);
     _orderPreserving = _state->isOrderPreserving();
 }
 std::unique_ptr<PlanStage> ExchangeConsumer::clone() const {
-    return std::make_unique<ExchangeConsumer>(_state);
+    return std::make_unique<ExchangeConsumer>(_state, _commonStats.nodeId);
 }
 void ExchangeConsumer::prepare(CompileCtx& ctx) {
     for (size_t idx = 0; idx < _state->fields().size(); ++idx) {
@@ -238,13 +239,13 @@ void ExchangeConsumer::open(bool reOpen) {
 
             for (size_t idx = 0; idx < _state->numOfProducers(); ++idx) {
                 if (idx == 0) {
-                    _state->producerPlans().emplace_back(
-                        std::make_unique<ExchangeProducer>(std::move(_children[0]), _state));
+                    _state->producerPlans().emplace_back(std::make_unique<ExchangeProducer>(
+                        std::move(_children[0]), _state, _commonStats.nodeId));
                     // We have moved the child to the producer so clear the children vector.
                     _children.clear();
                 } else {
-                    _state->producerPlans().emplace_back(
-                        std::make_unique<ExchangeProducer>(masterSubTree->clone(), _state));
+                    _state->producerPlans().emplace_back(std::make_unique<ExchangeProducer>(
+                        masterSubTree->clone(), _state, _commonStats.nodeId));
                 }
             }
 
@@ -439,8 +440,9 @@ void ExchangeProducer::closePipes() {
 }
 
 ExchangeProducer::ExchangeProducer(std::unique_ptr<PlanStage> input,
-                                   std::shared_ptr<ExchangeState> state)
-    : PlanStage("exchangep"_sd), _state(state) {
+                                   std::shared_ptr<ExchangeState> state,
+                                   PlanNodeId planNodeId)
+    : PlanStage("exchangep"_sd, planNodeId), _state(state) {
     _children.emplace_back(std::move(input));
 
     _tid = _state->addProducer(this);

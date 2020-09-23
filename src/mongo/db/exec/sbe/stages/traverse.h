@@ -55,7 +55,8 @@ public:
                   value::SlotVector outerCorrelated,
                   std::unique_ptr<EExpression> foldExpr,
                   std::unique_ptr<EExpression> finalExpr,
-                  boost::optional<size_t> nestedArraysDepth = boost::none);
+                  PlanNodeId planNodeId,
+                  boost::optional<size_t> nestedArraysDepth);
 
     std::unique_ptr<PlanStage> clone() const final;
 

@@ -73,9 +73,26 @@ public:
     public:
         explicit Instance(BSONObj stateDoc);
 
-        SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
+        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
 
-        void interrupt(Status status) override{};
+        void interrupt(Status status) override;
+
+        /**
+         * Returns a Future that will be resolved when all work associated with this Instance has
+         * completed running.
+         */
+        SharedSemiFuture<void> getCompletionFuture() const {
+            return _completionPromise.getFuture();
+        }
+
+        /**
+         * TODO(SERVER-50974) Report TenantMigrationRecipientService Instances in currentOp().
+         */
+        boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept final {
+            return boost::none;
+        }
 
         /*
          *  Returns the instance id.
@@ -113,6 +130,11 @@ public:
          */
         SemiFuture<void> _createAndConnectClients();
 
+        /**
+         * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
+         */
+        void _getStartOpTimesFromDonor(WithLock);
+
         std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
 
         // Protects below non-const data members.
@@ -128,6 +150,8 @@ public:
         const ReadPreferenceSetting _readPreference;
         // TODO(SERVER-50670): Populate authParams
         const BSONObj _authParams;
+        // Promise that is resolved when the chain of work kicked off by run() has completed.
+        SharedPromise<void> _completionPromise;
 
         std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;
 

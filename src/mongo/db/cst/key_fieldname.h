@@ -35,11 +35,17 @@
 
 #define KEYFIELDNAMES(ENUMIFY)   \
     ENUMIFY(abs)                 \
+    ENUMIFY(acos)                \
+    ENUMIFY(acosh)               \
     ENUMIFY(add)                 \
     ENUMIFY(allElementsTrue)     \
     ENUMIFY(andExpr)             \
     ENUMIFY(anyElementTrue)      \
+    ENUMIFY(asin)                \
+    ENUMIFY(asinh)               \
+    ENUMIFY(atan)                \
     ENUMIFY(atan2)               \
+    ENUMIFY(atanh)               \
     ENUMIFY(ceil)                \
     ENUMIFY(charsArg)            \
     ENUMIFY(cmp)                 \
@@ -47,10 +53,13 @@
     ENUMIFY(concat)              \
     ENUMIFY(constExpr)           \
     ENUMIFY(convert)             \
+    ENUMIFY(cos)                 \
+    ENUMIFY(cosh)                \
     ENUMIFY(dateArg)             \
     ENUMIFY(dateFromString)      \
     ENUMIFY(dateStringArg)       \
     ENUMIFY(dateToString)        \
+    ENUMIFY(degreesToRadians)    \
     ENUMIFY(divide)              \
     ENUMIFY(eq)                  \
     ENUMIFY(exponent)            \
@@ -87,6 +96,7 @@
     ENUMIFY(pow)                 \
     ENUMIFY(projectExclusion)    \
     ENUMIFY(projectInclusion)    \
+    ENUMIFY(radiansToDegrees)    \
     ENUMIFY(regexArg)            \
     ENUMIFY(regexFind)           \
     ENUMIFY(regexFindAll)        \
@@ -102,6 +112,8 @@
     ENUMIFY(setIntersection)     \
     ENUMIFY(setIsSubset)         \
     ENUMIFY(setUnion)            \
+    ENUMIFY(sin)                 \
+    ENUMIFY(sinh)                \
     ENUMIFY(sizeArg)             \
     ENUMIFY(skip)                \
     ENUMIFY(slice)               \
@@ -114,6 +126,8 @@
     ENUMIFY(substrBytes)         \
     ENUMIFY(substrCP)            \
     ENUMIFY(subtract)            \
+    ENUMIFY(tan)                 \
+    ENUMIFY(tanh)                \
     ENUMIFY(timezoneArg)         \
     ENUMIFY(toArg)               \
     ENUMIFY(toBool)              \

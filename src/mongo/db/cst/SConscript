@@ -8,12 +8,12 @@ env.Library(
     target='cst',
     source=[
         'bson_lexer.cpp',
+        'c_node.cpp',
+        'c_node_disambiguation.cpp',
+        'c_node_validation.cpp',
         'compound_key.cpp',
         'cst_match_translation.cpp',
         'cst_pipeline_translation.cpp',
-        'c_node.cpp',
-        'c_node_validation.cpp',
-        'c_node_disambiguation.cpp',
         'cst_sort_translation.cpp',
         'parser_gen.cpp',
     ],
@@ -33,6 +33,7 @@ env.CppUnitTest(
         'cst_expression_test.cpp',
         'cst_match_test.cpp',
         'cst_match_translation_test.cpp',
+        'cst_sort_translation_test.cpp',
         'cst_test.cpp',
     ],
     LIBDEPS=[
@@ -52,4 +53,18 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         'cst',
     ]
+)
+
+env.Benchmark(
+    target='cst_bm',
+    source=[
+        'cst_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/processinfo',
+        'cst',
+    ],
 )

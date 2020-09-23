@@ -37,8 +37,12 @@
 namespace mongo::sbe {
 
 std::unique_ptr<PlanStage> TextMatchStage::clone() const {
-    return makeS<TextMatchStage>(
-        _children[0]->clone(), _ftsMatcher.query(), _ftsMatcher.spec(), _inputSlot, _outputSlot);
+    return makeS<TextMatchStage>(_children[0]->clone(),
+                                 _ftsMatcher.query(),
+                                 _ftsMatcher.spec(),
+                                 _inputSlot,
+                                 _outputSlot,
+                                 _commonStats.nodeId);
 }
 
 void TextMatchStage::prepare(CompileCtx& ctx) {

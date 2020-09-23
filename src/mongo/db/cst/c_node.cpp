@@ -59,14 +59,17 @@ auto printFieldname(const CNode::Fieldname& fieldname) {
             [](const UserFieldname& user) { return "<UserFieldname "s + user + ">"; },
             [](const FieldnamePath& path) {
                 return stdx::visit(
-                    visit_helper::Overloaded{[&](const ProjectionPath& projPath) {
-                                                 return "<ProjectionPath "s +
-                                                     path::vectorToString(projPath) + ">";
-                                             },
-                                             [&](const PositionalProjectionPath& posProjPath) {
-                                                 return "<PositionalionProjectionPath "s +
-                                                     path::vectorToString(posProjPath) + ">";
-                                             }},
+                    visit_helper::Overloaded{
+                        [&](const ProjectionPath& projPath) {
+                            return "<ProjectionPath "s + path::vectorToString(projPath) + ">";
+                        },
+                        [&](const PositionalProjectionPath& posProjPath) {
+                            return "<PositionalionProjectionPath "s +
+                                path::vectorToString(posProjPath) + ">";
+                        },
+                        [&](const SortPath& sortPath) {
+                            return "<SortPath "s + path::vectorToString(sortPath) + ">";
+                        }},
                     path);
             }},
         fieldname);
@@ -123,7 +126,7 @@ auto printValue(const T& payload) {
                 return "<UserObjectId "s + userObjectId.toString() + ">";
             },
             [](const UserBoolean& userBoolean) {
-                return "<UserBoolean "s + std::to_string(userBoolean) + ">";
+                return "<UserBoolean "s + (userBoolean ? "true" : "false") + ">";
             },
             [](const UserDate& userDate) {
                 return "<UserDate "s +

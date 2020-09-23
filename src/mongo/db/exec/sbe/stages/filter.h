@@ -44,15 +44,18 @@ namespace mongo::sbe {
 template <bool IsConst, bool IsEof = false>
 class FilterStage final : public PlanStage {
 public:
-    FilterStage(std::unique_ptr<PlanStage> input, std::unique_ptr<EExpression> filter)
-        : PlanStage(IsConst ? "cfilter"_sd : (IsEof ? "efilter" : "filter"_sd)),
+    FilterStage(std::unique_ptr<PlanStage> input,
+                std::unique_ptr<EExpression> filter,
+                PlanNodeId planNodeId)
+        : PlanStage(IsConst ? "cfilter"_sd : (IsEof ? "efilter" : "filter"_sd), planNodeId),
           _filter(std::move(filter)) {
         static_assert(!IsEof || !IsConst);
         _children.emplace_back(std::move(input));
     }
 
     std::unique_ptr<PlanStage> clone() const final {
-        return std::make_unique<FilterStage>(_children[0]->clone(), _filter->clone());
+        return std::make_unique<FilterStage>(
+            _children[0]->clone(), _filter->clone(), _commonStats.nodeId);
     }
 
     void prepare(CompileCtx& ctx) final {

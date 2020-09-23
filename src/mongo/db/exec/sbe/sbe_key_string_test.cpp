@@ -115,7 +115,7 @@ TEST_F(SBEKeyStringTest, Basic) {
     // Set up an SBE expression that will compare one element in the 'testValues' BSON object with
     // one of the KeyString components.
     CompileCtx ctx{std::make_unique<RuntimeEnvironment>()};
-    CoScanStage emptyStage;
+    CoScanStage emptyStage{kEmptyPlanNodeId};
     ctx.root = &emptyStage;
 
     // The expression takes three inputs:

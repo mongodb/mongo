@@ -1618,9 +1618,8 @@ public:
 
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
 
-        // It is not valid to read the multikey state earlier than the 'minimumVisibleTimestamp',
-        // so at least assert that it has been updated due to the index creation.
-        ASSERT_GT(autoColl.getCollection()->getMinimumVisibleSnapshot().get(),
+        // Ensure minimumVisible has not been updated due to the index creation.
+        ASSERT_LT(autoColl.getCollection()->getMinimumVisibleSnapshot().get(),
                   pastTime.asTimestamp());
 
         // Reading the multikey state before 'insertTime0' is not valid or reliable to test. If the

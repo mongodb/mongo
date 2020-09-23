@@ -42,7 +42,8 @@ public:
                   value::SlotVector outerCond,
                   value::SlotVector outerProjects,
                   value::SlotVector innerCond,
-                  value::SlotVector innerProjects);
+                  value::SlotVector innerProjects,
+                  PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

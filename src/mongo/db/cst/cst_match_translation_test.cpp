@@ -138,7 +138,7 @@ TEST(CstMatchTranslationTest, TranslatesLogicalTreeExpressions) {
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $or: [ { $and: [ { a: { $eq: 2 } } ] }, { $and: [ { b: { $eq: 1 } } "
+                  "{ $and: [ { $or: [ { $and: [ { b: { $eq: 1 } } ] }, { $and: [ { a: { $eq: 2 } } "
                   "] } ] } ] }");
     }
     {
@@ -164,8 +164,8 @@ TEST(CstMatchTranslationTest, TranslatesNestedLogicalTreeExpressions) {
         auto cst = parseMatchToCst(input);
         auto match = cst_match_translation::translateMatchExpression(cst, getExpCtx());
         ASSERT_EQ(match->serialize().toString(),
-                  "{ $and: [ { $or: [ { $and: [ { $and: [ { $and: [ { a: { $not: { $regex: \"b\" } "
-                  "} } ] }, { $and: [ { b: { $not: { $regex: \"a\" } } } ] } ] } ] } ] } ] }");
+                  "{ $and: [ { $or: [ { $and: [ { $and: [ { $and: [ { b: { $not: { $regex: \"a\" } "
+                  "} } ] }, { $and: [ { a: { $not: { $regex: \"b\" } } } ] } ] } ] } ] } ] }");
     }
     {
         auto input = fromjson("{filter: {$and: [{$nor: [{b: {$not: /a/}}]}]}}");

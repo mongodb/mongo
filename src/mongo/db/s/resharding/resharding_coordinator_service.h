@@ -73,10 +73,18 @@ public:
     public:
         explicit ReshardingCoordinator(const BSONObj& state);
 
-        SemiFuture<void> run(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
         void interrupt(Status status) override{};
+
+        /**
+         * TODO(SERVER-50976) Report ReshardingCoordinators in currentOp().
+         */
+        boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override {
+            return boost::none;
+        }
 
         void setInitialChunksAndZones(std::vector<ChunkType> initialChunks,
                                       std::vector<TagsType> newZones);

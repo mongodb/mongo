@@ -40,7 +40,8 @@ public:
                   const char* bsonEnd,
                   boost::optional<value::SlotId> recordSlot,
                   std::vector<std::string> fields,
-                  value::SlotVector vars);
+                  value::SlotVector vars,
+                  PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

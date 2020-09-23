@@ -2,8 +2,7 @@
 
 /**
  * Perform point-in-time snapshot reads that span a 'find' and multiple 'getmore's concurrently with
- * CRUD operations. Index operations running concurrently with the snapshot read may cause
- * the read to fail with a SnapshotUnavailable error.
+ * CRUD operations.
  *
  * @tags: [creates_background_indexes, requires_fcv_47, requires_replication,
  * does_not_support_causal_consistency, requires_majority_read_concern]
@@ -17,7 +16,6 @@ var $config = (function() {
 
         snapshotScan: function snapshotScan(db, collName) {
             const readErrorCodes = [
-                ErrorCodes.SnapshotUnavailable,
                 ErrorCodes.ShutdownInProgress,
                 ErrorCodes.CursorNotFound,
                 ErrorCodes.QueryPlanKilled,

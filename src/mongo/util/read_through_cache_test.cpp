@@ -571,6 +571,40 @@ TEST_F(ReadThroughCacheAsyncTest, AcquireWithAShutdownThreadPool) {
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::ShutdownInProgress);
 }
 
+TEST_F(ReadThroughCacheAsyncTest, ShutdownWithConcurrentInvalidate) {
+    ThreadPool threadPool{ThreadPool::Options()};
+    Barrier lookupStartedBarrier(2);
+    Barrier completeLookupBarrier(2);
+
+    threadPool.startup();
+
+    Cache cache(getServiceContext(),
+                threadPool,
+                1,
+                [&](OperationContext*, const std::string&, const Cache::ValueHandle&) {
+                    // Wait until noticed
+                    lookupStartedBarrier.countDownAndWait();
+                    completeLookupBarrier.countDownAndWait();
+                    uasserted(ErrorCodes::InterruptedAtShutdown, "Interrupted at shutdown");
+                    return Cache::LookupResult(boost::none);
+                });
+
+    // Join threads before destroying cache. This ensure the internal asynchronous processing tasks
+    // are completed before the cache resources are released.
+    ON_BLOCK_EXIT([&] {
+        threadPool.shutdown();
+        threadPool.join();
+    });
+
+    auto future = cache.acquireAsync("async", CacheCausalConsistency::kLatestCached);
+
+    lookupStartedBarrier.countDownAndWait();
+    cache.invalidate("async");
+    completeLookupBarrier.countDownAndWait();
+
+    ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InterruptedAtShutdown);
+}
+
 class MockThreadPool : public ThreadPoolInterface {
 public:
     ~MockThreadPool() {

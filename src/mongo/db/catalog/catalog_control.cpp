@@ -104,7 +104,9 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     return minVisibleTimestampMap;
 }
 
-void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisibleTimestampMap) {
+void openCatalog(OperationContext* opCtx,
+                 const MinVisibleTimestampMap& minVisibleTimestampMap,
+                 Timestamp stableTimestamp) {
     invariant(opCtx->lockState()->isW());
 
     // Load the catalog in the storage engine.
@@ -197,8 +199,18 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
                           << "failed to get valid collection pointer for namespace " << collNss);
 
             if (minVisibleTimestampMap.count(collection->uuid()) > 0) {
-                collection->setMinimumVisibleSnapshot(
-                    minVisibleTimestampMap.find(collection->uuid())->second);
+                // After rolling back to a stable timestamp T, the minimum visible timestamp for
+                // each collection must be reset to (at least) its value at T. Additionally, there
+                // cannot exist a minimum visible timestamp greater than lastApplied. This allows us
+                // to upper bound what the minimum visible timestamp can be coming out of rollback.
+                //
+                // Because we only save the latest minimum visible timestamp for each collection, we
+                // bound the minimum visible timestamp (where necessary) to the stable timestamp.
+                // The benefit of fine grained tracking is assumed to be low-value compared to the
+                // cost/effort.
+                auto minVisible = std::min(stableTimestamp,
+                                           minVisibleTimestampMap.find(collection->uuid())->second);
+                collection->setMinimumVisibleSnapshot(minVisible);
             }
 
             // If this is the oplog collection, re-establish the replication system's cached pointer

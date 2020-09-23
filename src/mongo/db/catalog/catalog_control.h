@@ -50,6 +50,8 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx);
  *
  * Must be called with the global lock acquired in exclusive mode.
  */
-void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& catalogState);
+void openCatalog(OperationContext* opCtx,
+                 const MinVisibleTimestampMap& catalogState,
+                 Timestamp stableTimestamp);
 }  // namespace catalog
 }  // namespace mongo

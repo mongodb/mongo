@@ -134,7 +134,7 @@ private:
  */
 class CanTrackStats {
 public:
-    CanTrackStats(StringData stageType) : _commonStats(stageType) {}
+    CanTrackStats(StringData stageType, PlanNodeId nodeId) : _commonStats(stageType, nodeId) {}
 
     /**
      * Returns a tree of stats. If the stage has any children it must propagate the request for
@@ -223,13 +223,13 @@ class PlanStage : public CanSwitchOperationContext,
                   public CanTrackStats,
                   public CanInterrupt {
 public:
-    PlanStage(StringData stageType, PlanYieldPolicy* yieldPolicy)
+    PlanStage(StringData stageType, PlanYieldPolicy* yieldPolicy, PlanNodeId nodeId)
         : CanSwitchOperationContext{this},
           CanChangeState{this},
-          CanTrackStats{stageType},
+          CanTrackStats{stageType, nodeId},
           CanInterrupt{yieldPolicy} {}
 
-    explicit PlanStage(StringData stageType) : PlanStage(stageType, nullptr) {}
+    PlanStage(StringData stageType, PlanNodeId nodeId) : PlanStage(stageType, nullptr, nodeId) {}
 
     virtual ~PlanStage() = default;
 

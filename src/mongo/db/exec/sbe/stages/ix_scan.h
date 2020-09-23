@@ -70,7 +70,8 @@ public:
                    boost::optional<value::SlotId> seekKeySlotLow,
                    boost::optional<value::SlotId> seekKeySlotHi,
                    PlanYieldPolicy* yieldPolicy,
-                   TrialRunProgressTracker* tracker);
+                   TrialRunProgressTracker* tracker,
+                   PlanNodeId nodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

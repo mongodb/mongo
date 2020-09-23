@@ -138,8 +138,16 @@ function SnapshotReadsTest({primaryDB, secondaryDB, awaitCommittedFn}) {
                     // This update is not visible to reads at insertTimestamp.
                     res = assert.commandWorked(primaryDB.runCommand(
                         {update: collName, updates: [{q: {}, u: {$set: {x: true}}, multi: true}]}));
-
                     jsTestLog(`Updated collection "${collName}" at timestamp ${
+                        tojson(res.operationTime)}`);
+
+                    awaitCommittedFn(db, res.operationTime);
+
+                    // This index is not visible to reads at insertTimestamp and does not cause the
+                    // operation to fail.
+                    res = assert.commandWorked(primaryDB.runCommand(
+                        {createIndexes: collName, indexes: [{key: {x: 1}, name: 'x_1'}]}));
+                    jsTestLog(`Created an index on collection "${collName}" at timestamp ${
                         tojson(res.operationTime)}`);
                     awaitCommittedFn(db, res.operationTime);
 

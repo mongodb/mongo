@@ -453,6 +453,39 @@ boost::intrusive_ptr<Expression> translateFunctionObject(
             return make_intrusive<ExpressionSetIsSubset>(expCtx.get(), std::move(expressions));
         case KeyFieldname::setUnion:
             return make_intrusive<ExpressionSetUnion>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::sin:
+            return make_intrusive<ExpressionSine>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::cos:
+            return make_intrusive<ExpressionCosine>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::tan:
+            return make_intrusive<ExpressionTangent>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::sinh:
+            return make_intrusive<ExpressionHyperbolicSine>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::cosh:
+            return make_intrusive<ExpressionHyperbolicCosine>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::tanh:
+            return make_intrusive<ExpressionHyperbolicTangent>(expCtx.get(),
+                                                               std::move(expressions));
+        case KeyFieldname::asin:
+            return make_intrusive<ExpressionArcSine>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::acos:
+            return make_intrusive<ExpressionArcCosine>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::atan:
+            return make_intrusive<ExpressionArcTangent>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::asinh:
+            return make_intrusive<ExpressionHyperbolicArcSine>(expCtx.get(),
+                                                               std::move(expressions));
+        case KeyFieldname::acosh:
+            return make_intrusive<ExpressionHyperbolicArcCosine>(expCtx.get(),
+                                                                 std::move(expressions));
+        case KeyFieldname::atanh:
+            return make_intrusive<ExpressionHyperbolicArcTangent>(expCtx.get(),
+                                                                  std::move(expressions));
+        case KeyFieldname::degreesToRadians:
+            return make_intrusive<ExpressionDegreesToRadians>(expCtx.get(), std::move(expressions));
+        case KeyFieldname::radiansToDegrees:
+            return make_intrusive<ExpressionRadiansToDegrees>(expCtx.get(), std::move(expressions));
+
         default:
             MONGO_UNREACHABLE;
     }

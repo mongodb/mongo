@@ -37,7 +37,8 @@ class LimitSkipStage final : public PlanStage {
 public:
     LimitSkipStage(std::unique_ptr<PlanStage> input,
                    boost::optional<long long> limit,
-                   boost::optional<long long> skip);
+                   boost::optional<long long> skip,
+                   PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

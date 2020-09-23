@@ -14,6 +14,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
+load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const donorRst = new ReplSetTest(
@@ -49,18 +50,6 @@ const kNumInitialDocs = 2;  // num initial docs to insert into test collections.
 const kMaxSize = 1024;      // max size of capped collections.
 const kTxnNumber = NumberLong(0);
 const kMaxTimeMS = 1 * 1000;
-
-function startMigration(host, dbName, recipientConnString) {
-    const primary = new Mongo(host);
-    const dbPrefix = dbName.split('_')[0];
-    return primary.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: recipientConnString,
-        databasePrefix: dbPrefix,
-        readPreference: {mode: "primary"}
-    });
-}
 
 /**
  * To be used to resume a migration that is paused after entering the blocking state. Waits for the
@@ -233,13 +222,16 @@ function testWriteNoMigration(testCase, testOpts) {
  */
 function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts) {
     const dbPrefix = testOpts.dbName.split('_')[0];
-    assert.commandWorked(testOpts.primaryDB.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: kRecipientConnString,
-        databasePrefix: dbPrefix,
-        readPreference: {mode: "primary"}
-    }));
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        dbPrefix: dbPrefix,
+        readPreference: {mode: "primary"},
+    };
+
+    const res = assert.commandWorked(
+        TenantMigrationUtil.startMigration(testOpts.primaryHost, migrationOpts));
+    assert.eq(res.state, "committed");
 
     runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
@@ -249,16 +241,18 @@ function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts)
  * Tests that the donor does not reject writes after the migration aborts.
  */
 function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
-    let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
     const dbPrefix = testOpts.dbName.split('_')[0];
-    assert.commandFailedWithCode(testOpts.primaryDB.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: kRecipientConnString,
-        databasePrefix: dbPrefix,
-        readPreference: {mode: "primary"}
-    }),
-                                 ErrorCodes.TenantMigrationAborted);
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        dbPrefix: dbPrefix,
+        readPreference: {mode: "primary"},
+    };
+
+    let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const res = assert.commandWorked(
+        TenantMigrationUtil.startMigration(testOpts.primaryHost, migrationOpts));
+    assert.eq(res.state, "aborted");
     abortFp.off();
 
     // Wait until the in-memory migration state is updated after the migration has majority
@@ -278,10 +272,18 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
  * Tests that the donor blocks writes that are executed in the blocking state.
  */
 function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
+    const dbPrefix = testOpts.dbName.split('_')[0];
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        dbPrefix: dbPrefix,
+        readPreference: {mode: "primary"},
+    };
+
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
     let migrationThread =
-        new Thread(startMigration, testOpts.primaryHost, testOpts.dbName, kRecipientConnString);
+        new Thread(TenantMigrationUtil.startMigration, testOpts.primaryHost, migrationOpts);
 
     // Run the command after the migration enters the blocking state.
     migrationThread.start();
@@ -292,7 +294,8 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
     // Allow the migration to complete.
     blockingFp.off();
     migrationThread.join();
-    assert.commandWorked(migrationThread.returnData());
+    const res = assert.commandWorked(migrationThread.returnData());
+    assert.eq(res.state, "committed");
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
@@ -302,6 +305,14 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
  * the migration commits.
  */
 function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, testOpts) {
+    const dbPrefix = testOpts.dbName.split('_')[0];
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        dbPrefix: dbPrefix,
+        readPreference: {mode: "primary"},
+    };
+
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
     const targetBlockedWrites =
@@ -312,7 +323,7 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
         1;
 
     let migrationThread =
-        new Thread(startMigration, testOpts.primaryHost, testOpts.dbName, kRecipientConnString);
+        new Thread(TenantMigrationUtil.startMigration, testOpts.primaryHost, migrationOpts);
     let resumeMigrationThread =
         new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, targetBlockedWrites);
 
@@ -328,7 +339,8 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
     // Verify that the migration succeeded.
     resumeMigrationThread.join();
     migrationThread.join();
-    assert.commandWorked(migrationThread.returnData());
+    const res = assert.commandWorked(migrationThread.returnData());
+    assert.eq(res.state, "committed");
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }
@@ -338,6 +350,14 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
  * the migration aborts.
  */
 function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
+    const dbPrefix = testOpts.dbName.split('_')[0];
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        dbPrefix: dbPrefix,
+        readPreference: {mode: "primary"},
+    };
+
     let blockingFp =
         configureFailPoint(testOpts.primaryDB, "pauseTenantMigrationAfterBlockingStarts");
     let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
@@ -349,7 +369,7 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, tes
         1;
 
     let migrationThread =
-        new Thread(startMigration, testOpts.primaryHost, testOpts.dbName, kRecipientConnString);
+        new Thread(TenantMigrationUtil.startMigration, testOpts.primaryHost, migrationOpts);
     let resumeMigrationThread =
         new Thread(resumeMigrationAfterBlockingWrite, testOpts.primaryHost, targetBlockedWrites);
 
@@ -366,7 +386,8 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, tes
     resumeMigrationThread.join();
     migrationThread.join();
     abortFp.off();
-    assert.commandFailedWithCode(migrationThread.returnData(), ErrorCodes.TenantMigrationAborted);
+    const res = assert.commandWorked(migrationThread.returnData());
+    assert.eq(res.state, "aborted");
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
 }

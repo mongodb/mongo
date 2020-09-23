@@ -111,15 +111,6 @@ private:
  * PlanStages, which can then be handed to a PlanRunner for execution.
  */
 struct QuerySolutionNode {
-    /**
-     * Each node in a 'QuerySolution' tree is assigned a unique identifier of this type. The
-     * identifiers are unique within the tree, but not across trees.
-     *
-     * Ids are assigned as sequential positive integers starting from 1. An id of 0 means that no id
-     * was explicit assigned during construction of the QuerySolution.
-     */
-    using NodeId = uint32_t;
-
     QuerySolutionNode() = default;
 
     /**
@@ -248,7 +239,14 @@ struct QuerySolutionNode {
      */
     bool hasNode(StageType type) const;
 
-    NodeId nodeId() const {
+    /**
+     * Returns the id associated with this node. Each node in a 'QuerySolution' tree is assigned a
+     * unique identifier, which are assigned as sequential positive integers starting from 1.  An id
+     * of 0 means that no id was explicitly assigned during construction of the QuerySolution.
+     *
+     * The identifiers are unique within the tree, but not across trees.
+     */
+    PlanNodeId nodeId() const {
         return _nodeId;
     }
 
@@ -280,7 +278,7 @@ private:
     QuerySolutionNode(const QuerySolutionNode&) = delete;
     QuerySolutionNode& operator=(const QuerySolutionNode&) = delete;
 
-    NodeId _nodeId{0u};
+    PlanNodeId _nodeId{0u};
 };
 
 struct QuerySolutionNodeWithSortSet : public QuerySolutionNode {
@@ -370,7 +368,7 @@ public:
     std::unique_ptr<SolutionCacheData> cacheData;
 
 private:
-    using QsnIdGenerator = IdGenerator<QuerySolutionNode::NodeId>;
+    using QsnIdGenerator = IdGenerator<PlanNodeId>;
 
     QuerySolution(const QuerySolution&) = delete;
     QuerySolution& operator=(const QuerySolution&) = delete;

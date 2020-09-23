@@ -152,7 +152,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
     databaseHolder->close(opCtx, dbName);
 
     // Reopening db is necessary for repairCollections.
-    auto db = databaseHolder->openDb(opCtx, dbName);
+    databaseHolder->openDb(opCtx, dbName);
 
     auto status = repairCollections(opCtx, engine, dbName);
     if (!status.isOK()) {
@@ -166,19 +166,6 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const std:
     try {
         // Ensure that we don't trigger an exception when attempting to take locks.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
-        // Set the minimum snapshot for all Collections in this db. This ensures that readers
-        // using majority readConcern level can only use the collections after their repaired
-        // versions are in the committed view.
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-
-        for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
-            auto collection =
-                collIt.getWritableCollection(opCtx, CollectionCatalog::LifetimeMode::kInplace);
-            if (collection) {
-                collection->setMinimumVisibleSnapshot(currentTime.clusterTime().asTimestamp());
-            }
-        }
 
         // Restore oplog Collection pointer cache.
         repl::acquireOplogCollectionForLogging(opCtx);

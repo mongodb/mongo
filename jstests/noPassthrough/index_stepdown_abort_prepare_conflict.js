@@ -100,6 +100,7 @@ assert.commandWorked(newSession.abortTransaction_forTesting());
 
 IndexBuildTest.waitForIndexBuildToStop(newPrimary.getDB(dbName), collName, indexName);
 IndexBuildTest.waitForIndexBuildToStop(primary.getDB(dbName), collName, indexName);
+rst.awaitReplication();
 
 IndexBuildTest.assertIndexes(newPrimary.getDB(dbName).getCollection(collName), 1, ["_id_"], []);
 IndexBuildTest.assertIndexes(primaryColl, 1, ["_id_"], []);

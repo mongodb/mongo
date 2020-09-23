@@ -626,7 +626,6 @@ public:
     }
 
     std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> getAllPromisesOnError(WithLock) {
-        invariant(_valid);
         std::vector<std::unique_ptr<SharedPromise<ValueHandle>>> ret;
         for (auto it = _outstanding.begin(); it != _outstanding.end();) {
             ret.emplace_back(std::move(it->second));

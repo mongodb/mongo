@@ -1291,6 +1291,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/db/transaction',
+        'oplog_entry',
         'tenant_migration_state_machine_idl',
     ]
 )

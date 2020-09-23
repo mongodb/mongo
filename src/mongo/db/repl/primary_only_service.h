@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -82,9 +83,11 @@ public:
      * released from the PrimaryOnlyService object on stepdown, instance objects may continue to
      * exist until the subsequent stepUp. During stepUp, however, we join() any remaining tasks from
      * the previous term, guaranteeing that there will never be 2 Instance objects representing the
-     * same conceptual task coexisting.
-     * NOTE: PrimaryOnlyService implementations shouldn't have their Instance subclass extended this
-     * Instance class directly, instead they should extend TypedInstance, defined below.
+     * same conceptual task coexisting. Instance objects are released from the PrimaryOnlyService
+     * object when their corresponding state documents are removed.
+     * NOTE: PrimaryOnlyService
+     * implementations shouldn't have their Instance subclass extended this Instance class directly,
+     * instead they should extend TypedInstance, defined below.
      */
     class Instance {
     public:
@@ -92,19 +95,20 @@ public:
 
         virtual ~Instance() = default;
 
-        SharedSemiFuture<void> getCompletionFuture() {
-            return _completionPromise.getFuture();
-        }
-
     protected:
         /**
          * This is the main function that PrimaryOnlyService implementations will need to implement,
          * and is where the bulk of the work those services perform is scheduled. All work run for
          * this Instance *must* be scheduled on 'executor'. Instances are responsible for inserting,
          * updating, and deleting their state documents as needed.
+         *
+         * IMPORTANT NOTE: Once the state document for this Instance is deleted, all shared_ptr
+         * references to this Instance that are managed by the PrimaryOnlyService machinery are
+         * removed, so all work running on behalf of this Instance must extend the Instance's
+         * lifetime by getting a shared_ptr via 'shared_from_this' or else the Instance may be
+         * destroyed out from under them.
          */
-        virtual SemiFuture<void> run(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
+        virtual void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept = 0;
 
         /**
          * This is the function that is called when this running Instance needs to be interrupted.
@@ -113,11 +117,18 @@ public:
          */
         virtual void interrupt(Status status) = 0;
 
+        /**
+         * Returns a BSONObj containing information about the state of this running Instance, to be
+         * reported in currentOp() output, or boost::none if this Instance should not show up in
+         * currentOp, based on the given 'connMode' and 'sessionMode' that currentOp() is running
+         * with.
+         */
+        virtual boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept = 0;
+
     private:
         bool _running = false;
-
-        // Promise that gets emplaced when the future returned by run() resolves.
-        SharedPromise<void> _completionPromise;
     };
 
     /**
@@ -135,9 +146,10 @@ public:
          * Same functionality as PrimaryOnlyService::lookupInstance, but returns a pointer of
          * the proper derived class for the Instance.
          */
-        static boost::optional<std::shared_ptr<InstanceType>> lookup(PrimaryOnlyService* service,
+        static boost::optional<std::shared_ptr<InstanceType>> lookup(OperationContext* opCtx,
+                                                                     PrimaryOnlyService* service,
                                                                      const InstanceID& id) {
-            auto instance = service->lookupInstance(id);
+            auto instance = service->lookupInstance(opCtx, id);
             if (!instance) {
                 return boost::none;
             }
@@ -229,6 +241,16 @@ public:
      */
     size_t getNumberOfInstances();
 
+    /**
+     * Adds information about the Instances belonging to this service to 'ops', to show up in
+     * currentOp(). 'connMode' and 'sessionMode' are arguments provided to currentOp, and can be
+     * used to make decisions about whether or not various Instances should actually show up in the
+     * currentOp() output for this invocation of currentOp().
+     */
+    void reportInstanceInfoForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode connMode,
+                                        MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+                                        std::vector<BSONObj>* ops) noexcept;
+
 protected:
     /**
      * Constructs a new Instance object with the given initial state.
@@ -237,9 +259,11 @@ protected:
 
     /**
      * Given an InstanceId returns the corresponding running Instance object, or boost::none if
-     * there is none.
+     * there is none. If the service is in State::kRebuilding, will wait (interruptibly on the
+     * opCtx) for the rebuild to complete.
      */
-    boost::optional<std::shared_ptr<Instance>> lookupInstance(const InstanceID& id);
+    boost::optional<std::shared_ptr<Instance>> lookupInstance(OperationContext* opCtx,
+                                                              const InstanceID& id);
 
     /**
      * Extracts an InstanceID from the _id field of the given 'initialState' object. If an Instance
@@ -344,7 +368,18 @@ public:
      * Adds a 'primaryOnlyServices' sub-obj to the 'result' BSONObjBuilder containing a count of the
      * number of active instances for each registered service.
      */
-    void reportServiceInfo(BSONObjBuilder* result);
+    void reportServiceInfoForServerStatus(BSONObjBuilder* result) noexcept;
+
+
+    /**
+     * Adds information about the Instances running in all registered services to 'ops', to show up
+     * in currentOp(). 'connMode' and 'sessionMode' are arguments provided to currentOp, and can be
+     * used to make decisions about whether or not various Instances should actually show up in the
+     * currentOp() output for this invocation of currentOp().
+     */
+    void reportServiceInfoForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode connMode,
+                                       MongoProcessInterface::CurrentOpSessionsMode sessionMode,
+                                       std::vector<BSONObj>* ops) noexcept;
 
     void onStartup(OperationContext*) final;
     void onShutdown() final;

@@ -849,9 +849,15 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(Operation
     auto action = TemporaryRecordStore::FinalizationAction::kDelete;
     boost::optional<ResumeIndexInfo> resumeInfo;
 
-    if (isResumable && (shutdown || IndexBuildPhaseEnum::kCollectionScan == _phase)) {
+    if (isResumable && (shutdown || IndexBuildPhaseEnum::kDrainWrites != _phase)) {
         invariant(_buildUUID);
         invariant(_method == IndexBuildMethod::kHybrid);
+
+        // Index builds do not yield locks during the bulk load phase so it is not possible for
+        // rollback to interrupt an index build during this phase.
+        if (!shutdown) {
+            invariant(IndexBuildPhaseEnum::kBulkLoad != _phase, str::stream() << *_buildUUID);
+        }
 
         _writeStateToDisk(opCtx, collection);
         action = TemporaryRecordStore::FinalizationAction::kKeep;

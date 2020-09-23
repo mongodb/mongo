@@ -430,10 +430,6 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
         for (BSONArrayIteratorSorted oplogIter(oplogArray); oplogIter.more();) {
             try {
                 lastResult = processSessionOplog(oplogIter.next().Obj(), lastResult);
-            } catch (const ExceptionFor<ErrorCodes::ConfigurationInProgress>&) {
-                // This means that the server has a newer txnNumber than the oplog being
-                // migrated, so just skip it
-                continue;
             } catch (const ExceptionFor<ErrorCodes::TransactionTooOld>&) {
                 // This means that the server has a newer txnNumber than the oplog being
                 // migrated, so just skip it

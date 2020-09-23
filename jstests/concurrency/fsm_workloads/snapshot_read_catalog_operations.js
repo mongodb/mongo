@@ -5,8 +5,7 @@
  * snapshot reads and CRUD operations will all contend for locks on db and collName. Since the
  * snapshot read does not release its locks until the transaction is committed, it is expected that
  * once the read has begun, catalog operations with conflicting locks will block until the read is
- * finished. Additionally, index operations running concurrently with the snapshot read may cause
- * the read to fail with a SnapshotUnavailable error.
+ * finished.
  *
  * @tags: [creates_background_indexes, uses_transactions]
  */
@@ -32,7 +31,6 @@ var $config = (function() {
             const sortByAscending = sortOptions[Random.randInt(2)];
             const readErrorCodes = [
                 ErrorCodes.NoSuchTransaction,
-                ErrorCodes.SnapshotUnavailable,
                 ErrorCodes.SnapshotTooOld,
                 ErrorCodes.StaleChunkHistory,
                 ErrorCodes.LockTimeout,

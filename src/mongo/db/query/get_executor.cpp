@@ -892,7 +892,8 @@ protected:
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildEofPlan() final {
         auto result = makeResult();
         result->emplace(
-            {sbe::makeS<sbe::LimitSkipStage>(sbe::makeS<sbe::CoScanStage>(), 0, boost::none),
+            {sbe::makeS<sbe::LimitSkipStage>(
+                 sbe::makeS<sbe::CoScanStage>(kEmptyPlanNodeId), 0, boost::none, kEmptyPlanNodeId),
              stage_builder::PlanStageData{std::make_unique<sbe::RuntimeEnvironment>()}},
             nullptr);
         return result;

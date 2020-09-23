@@ -34,264 +34,157 @@
 
 namespace mongo {
 
-namespace details {
-/**
- * Complimentary class to synchronized_value. This class is an implementation detail of
- * synchronized_value.
- *
- * Holds a lock and a reference to the value protected by synchronized_value.
- */
-template <class T>
-class update_guard {
-public:
-    /**
-     * Take lock on construction to guard value.
-     */
-    explicit update_guard(T& value, Mutex& mtx) : _lock(mtx), _value(value) {}
-    ~update_guard() = default;
-
-    // Only move construction is permitted so that synchronized_value may return update_guard
-    update_guard(update_guard&&) = default;
-    update_guard& operator=(update_guard&&) = default;
-
-    // Disallow any copy
-    update_guard(update_guard const&) = delete;
-    update_guard& operator=(update_guard const&) = delete;
-
-    T& operator*() noexcept {
-        return _value;
+template <int level = 0>
+struct LeveledSynchronizedValueMutexPolicy {
+    using mutex_type = Mutex;
+    static mutex_type construct() {
+        return MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(level), "synchronized_value::_mutex");
     }
-
-    T* operator->() noexcept {
-        return &_value;
-    }
-
-    update_guard& operator=(const T& value) {
-        _value = value;
-        return *this;
-    }
-
-    update_guard& operator=(T&& value) {
-        _value = std::move(value);
-        return *this;
-    }
-
-    operator T() const {
-        return _value;
-    }
-
-private:
-    // Held lock from synchronized_value
-    stdx::unique_lock<Latch> _lock;
-
-    // Reference to the value from synchronized_value
-    T& _value;
 };
 
-/**
- * Const version of update_guard
- */
-template <class T>
-class const_update_guard {
-public:
-    /**
-     * Take lock on construction to guard value.
-     */
-    explicit const_update_guard(const T& value, Mutex& mtx) : _lock(mtx), _value(value) {}
-    ~const_update_guard() = default;
-
-    // Only move construction is permitted so that synchronized_value may return const_update_guard
-    const_update_guard(const_update_guard&&) = default;
-    const_update_guard& operator=(const_update_guard&&) = default;
-
-    // Disallow any copy
-    const_update_guard(const_update_guard const&) = delete;
-    const_update_guard& operator=(const_update_guard const&) = delete;
-
-    T& operator*() const noexcept {
-        return _value;
+struct RawSynchronizedValueMutexPolicy {
+    using mutex_type = stdx::mutex;  // NOLINT
+    static mutex_type construct() {
+        return {};
     }
-
-    T* operator->() const noexcept {
-        return &_value;
-    }
-
-    operator T() const {
-        return _value;
-    }
-
-private:
-    // Held lock from synchronized_value
-    stdx::unique_lock<Latch> _lock;
-
-    // Reference to the value from synchronized_value
-    const T& _value;
 };
 
-}  // namespace details
 
 /**
  * Provides mutex guarded access to an object.
  *
- * The protect object can be accessed by either:
+ * The protected object can be accessed by either:
  * 1. auto tmp = sv.synchronize()
- *    This is useful if you need to do multiple operators
+ *    This is useful if you need to do multiple operations on it
  * 2. operator* or operator->
- *    Holds the lock for the duration of the call.
+ *    Creates a temporary that holds the lock for the duration of the complete expression.
  * 3. get() - makes a copy of the object while the lock is held
  *
  * Inspired by https://isocpp.org/files/papers/n4033.html and boost::synchronized_value
  */
-template <typename T>
+template <typename T, typename MutexPolicy = LeveledSynchronizedValueMutexPolicy<>>
 class synchronized_value {
 public:
+    using value_type = T;
+    using mutex_policy_type = MutexPolicy;
+
+    using mutex_type = typename MutexPolicy::mutex_type;
+
+    template <typename SV>
+    class UpdateGuard {
+        template <typename SV_>
+        using RequiresMutable = std::enable_if_t<!std::is_const_v<SV_>>;
+
+    public:
+        explicit UpdateGuard(SV& sv) : _sv(sv), _lock(_sv._mutex) {}
+
+        // Accessors, always available.
+        const value_type& operator*() const {
+            return _sv._value;
+        }
+        const value_type* operator->() const {
+            return &_sv._value;
+        }
+        operator value_type() const {
+            return **this;
+        }
+
+        // Mutators, only available if non-const.
+        template <typename SV_ = SV, typename = RequiresMutable<SV_>>
+        value_type& operator*() {
+            return _sv._value;
+        }
+
+        template <typename SV_ = SV, typename = RequiresMutable<SV_>>
+        value_type* operator->() {
+            return &_sv._value;
+        }
+
+        template <typename SV_ = SV, typename = RequiresMutable<SV_>>
+        UpdateGuard& operator=(const value_type& v) {
+            _sv._value = v;
+            return *this;
+        }
+
+        template <typename SV_ = SV, typename = RequiresMutable<SV_>>
+        UpdateGuard& operator=(value_type&& v) {
+            _sv._value = std::move(v);
+            return *this;
+        }
+
+    private:
+        SV& _sv;
+        stdx::unique_lock<mutex_type> _lock;
+    };
+
     synchronized_value() = default;
-    explicit synchronized_value(T value) : _value(std::move(value)) {}
+    explicit synchronized_value(value_type value) : _value(std::move(value)) {}
 
-    ~synchronized_value() = default;
+    synchronized_value(const synchronized_value&) = delete;
+    synchronized_value& operator=(const synchronized_value&) = delete;
 
-    // Disallow copy and copy assignment
-    synchronized_value(synchronized_value const&) = delete;
-    synchronized_value& operator=(synchronized_value const&) = delete;
+    auto synchronize() const {
+        return UpdateGuard<std::remove_reference_t<decltype(*this)>>{*this};
+    }
 
-    // Support assigning from the contained value
-    synchronized_value& operator=(const T& value) {
-        {
-            stdx::lock_guard<Latch> lock(_mutex);
-            _value = value;
-        }
+    auto synchronize() {
+        return UpdateGuard<std::remove_reference_t<decltype(*this)>>{*this};
+    }
+
+    /** Lock and return a holder to the value and lock. Const or non-const. */
+    auto operator-> () const {
+        return synchronize();
+    }
+    auto operator*() const {
+        return synchronize();
+    }
+    /** Return a copy of the protected object. */
+    value_type get() const {
+        return *synchronize();
+    }
+
+    /** Mutators */
+    auto operator-> () {
+        return synchronize();
+    }
+    auto operator*() {
+        return synchronize();
+    }
+
+    /** Support assigning from the contained value */
+    synchronized_value& operator=(const value_type& v) {
+        *synchronize() = v;
+        return *this;
+    }
+    synchronized_value& operator=(value_type&& v) {
+        *synchronize() = std::move(v);
         return *this;
     }
 
-    synchronized_value& operator=(T&& value) {
-        {
-            stdx::lock_guard<Latch> lock(_mutex);
-            _value = std::move(value);
-        }
-        return *this;
+    friend bool operator==(const synchronized_value& a, const synchronized_value& b) {
+        std::scoped_lock lk(a._mutex, b._mutex);
+        return a._value == b._value;
+    }
+    friend bool operator==(const synchronized_value& a, const value_type& b) {
+        return **a == b;
+    }
+    friend bool operator==(const value_type& a, const synchronized_value& b) {
+        return b == a;
     }
 
-    /**
-     * Return a copy of the protected object.
-     */
-    T get() {
-        stdx::lock_guard<Latch> lock(_mutex);
-        return _value;
+    friend bool operator!=(const synchronized_value& a, const synchronized_value& b) {
+        return !(a == b);
     }
-
-    details::update_guard<T> operator->() {
-        return details::update_guard<T>(_value, _mutex);
+    friend bool operator!=(const synchronized_value& a, const value_type& b) {
+        return !(a == b);
     }
-
-    const details::const_update_guard<T> operator->() const {
-        return details::update_guard<T>(_value, _mutex);
+    friend bool operator!=(const value_type& a, const synchronized_value& b) {
+        return !(a == b);
     }
-
-    details::update_guard<T> operator*() {
-        return details::update_guard<T>(_value, _mutex);
-    }
-
-    const details::const_update_guard<T> operator*() const {
-        return details::const_update_guard<T>(_value, _mutex);
-    }
-
-    /**
-     * Lock the synchronized_value and return a holder to the value and lock.
-     */
-    details::update_guard<T> synchronize() {
-        return details::update_guard<T>(_value, _mutex);
-    }
-
-    bool operator==(synchronized_value const& rhs) const {
-        // TODO: C++17 - move from std::lock to std::scoped_lock
-        std::lock(_mutex, rhs._mutex);
-        stdx::lock_guard<Latch> lk1(_mutex, stdx::adopt_lock);
-        stdx::lock_guard<Latch> lk2(rhs._mutex, stdx::adopt_lock);
-        return _value == rhs._value;
-    }
-
-    bool operator!=(synchronized_value const& rhs) const {
-        // TODO: C++17 - move from std::lock to std::scoped_lock
-        std::lock(_mutex, rhs._mutex);
-        stdx::lock_guard<Latch> lk1(_mutex, stdx::adopt_lock);
-        stdx::lock_guard<Latch> lk2(rhs._mutex, stdx::adopt_lock);
-        return _value != rhs._value;
-    }
-
-    bool operator==(T const& rhs) const {
-        stdx::lock_guard<Latch> lock1(_mutex);
-        return _value == rhs;
-    }
-
-    bool operator!=(T const& rhs) const {
-        stdx::lock_guard<Latch> lock1(_mutex);
-        return _value != rhs;
-    }
-
-    template <class U>
-    friend bool operator==(const synchronized_value<U>& lhs, const U& rhs);
-
-    template <class U>
-    friend bool operator!=(const synchronized_value<U>& lhs, const U& rhs);
-
-    template <class U>
-    friend bool operator==(const U& lhs, const synchronized_value<U>& rhs);
-
-    template <class U>
-    friend bool operator!=(const U& lhs, const synchronized_value<U>& rhs);
-
-    template <class U>
-    friend bool operator==(const synchronized_value<U>& lhs, const synchronized_value<U>& rhs);
-
-    template <class U>
-    friend bool operator!=(const synchronized_value<U>& lhs, const synchronized_value<U>& rhs);
 
 private:
-    // Value guarded by mutex
-    T _value;
-
-    // Mutex to guard value
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "synchronized_value::_mutex");
+    value_type _value;  ///< guarded by _mutex
+    mutable mutex_type _mutex = mutex_policy_type::construct();
 };
-
-template <class T>
-bool operator==(const synchronized_value<T>& lhs, const T& rhs) {
-    stdx::lock_guard<Latch> lock(lhs._mutex);
-
-    return lhs._value == rhs;
-}
-
-template <class T>
-bool operator!=(const synchronized_value<T>& lhs, const T& rhs) {
-    return !(lhs == rhs);
-}
-
-template <class T>
-bool operator==(const T& lhs, const synchronized_value<T>& rhs) {
-    stdx::lock_guard<Latch> lock(rhs._mutex);
-
-    return lhs == rhs._value;
-}
-
-template <class T>
-bool operator!=(const T& lhs, const synchronized_value<T>& rhs) {
-    return !(lhs == rhs);
-}
-
-template <class T>
-bool operator==(const synchronized_value<T>& lhs, const synchronized_value<T>& rhs) {
-    // TODO: C++17 - move from std::lock to std::scoped_lock
-    std::lock(lhs._mutex, rhs._mutex);
-    stdx::lock_guard<Latch> lk1(lhs._mutex, stdx::adopt_lock);
-    stdx::lock_guard<Latch> lk2(rhs._mutex, stdx::adopt_lock);
-
-    return lhs._value == rhs._value;
-}
-
-template <class T>
-bool operator!=(const synchronized_value<T>& lhs, const synchronized_value<T>& rhs) {
-    return !(lhs == rhs);
-}
 
 }  // namespace mongo

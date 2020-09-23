@@ -92,7 +92,7 @@ protected:
 
 private:
     value::SlotIdGenerator _slotIdGenerator;
-    CoScanStage _emptyStage;
+    CoScanStage _emptyStage{kEmptyPlanNodeId};
     CompileCtx _ctx;
     vm::ByteCode _vm;
 };

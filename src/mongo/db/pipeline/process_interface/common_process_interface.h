@@ -106,6 +106,14 @@ protected:
     virtual void _reportCurrentOpsForTransactionCoordinators(OperationContext* opCtx,
                                                              bool includeIdle,
                                                              std::vector<BSONObj>* ops) const = 0;
+
+    /**
+     * Reports information about PrimaryOnlyServices.
+     */
+    virtual void _reportCurrentOpsForPrimaryOnlyServices(OperationContext* opCtx,
+                                                         CurrentOpConnectionsMode connMode,
+                                                         CurrentOpSessionsMode sessionMode,
+                                                         std::vector<BSONObj>* ops) const = 0;
 };
 
 }  // namespace mongo

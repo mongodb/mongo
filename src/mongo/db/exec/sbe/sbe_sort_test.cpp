@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-/**
- * This file contains tests for sbe::SortStage.
- */
-
 #include "mongo/platform/basic.h"
 
 #include <string_view>
@@ -63,7 +59,8 @@ TEST_F(SortStageTest, SortNumbersTest) {
                              std::numeric_limits<std::size_t>::max(),
                              204857600,
                              false,
-                             nullptr);
+                             nullptr,
+                             kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));
     };

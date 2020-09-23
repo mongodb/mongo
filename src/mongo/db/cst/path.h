@@ -100,6 +100,20 @@ struct AggregationVariablePath {
     std::vector<std::string> components;
 };
 
+/**
+ * A path occurring in a sort specification.
+ */
+struct SortPath {
+    auto operator==(const SortPath& other) const {
+        return components == other.components;
+    }
+    auto operator!=(const SortPath& other) const {
+        return !(*this == other);
+    }
+
+    std::vector<std::string> components;
+};
+
 namespace path {
 
 template <typename StringType>
@@ -121,7 +135,7 @@ inline auto vectorToString(const PathType& path) {
 /**
  * A path in the fieldname position in input BSON syntax. Such as "a.b" in '{"a.b": ""}'.
  */
-using FieldnamePath = stdx::variant<ProjectionPath, PositionalProjectionPath>;
+using FieldnamePath = stdx::variant<ProjectionPath, PositionalProjectionPath, SortPath>;
 
 /**
  * A path in the value position in input BSON syntax. Such as "$a.b" in '{"": "$a.b"}'.

@@ -68,14 +68,27 @@ public:
 
     class Instance final : public PrimaryOnlyService::TypedInstance<Instance> {
     public:
+        struct DurableState {
+            TenantMigrationDonorStateEnum state;
+            boost::optional<Status> abortReason;
+        };
+
         Instance(ServiceContext* serviceContext, const BSONObj& initialState);
 
         ~Instance();
 
-        SemiFuture<void> run(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
 
         void interrupt(Status status) override;
+
+        /**
+         * TODO(SERVER-50975) Report TenantMigrationDonorService Instances in currentOp().
+         */
+        boost::optional<BSONObj> reportForCurrentOp(
+            MongoProcessInterface::CurrentOpConnectionsMode connMode,
+            MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept override {
+            return boost::none;
+        }
 
         /**
          * To be called on the instance returned by PrimaryOnlyService::getOrCreate. Returns an
@@ -85,10 +98,16 @@ public:
         Status checkIfOptionsConflict(BSONObj options);
 
         /**
-         * Returns a Future that will be resolved when the migration has committed or aborted.
+         * Returns the latest durable migration state.
          */
-        SharedSemiFuture<void> getDecisionFuture() const {
-            return _decisionPromise.getFuture();
+        DurableState getDurableState(OperationContext* opCtx);
+
+        /**
+         * Returns a Future that will be resolved when all work associated with this Instance has
+         * completed running.
+         */
+        SharedSemiFuture<void> getCompletionFuture() const {
+            return _completionPromise.getFuture();
         }
 
         void onReceiveDonorForgetMigration();
@@ -153,14 +172,21 @@ public:
         TenantMigrationDonorDocument _stateDoc;
         boost::optional<Status> _abortReason;
 
-        // Protects the promises below.
+        // Protects the durable state and the promises below.
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorService::_mutex");
 
-        // Promise that is resolved when the donor has majority-committed the migration decision.
-        SharedPromise<void> _decisionPromise;
+        // The latest majority-committed migration state.
+        DurableState _durableState;
+
+        // Promise that is resolved when the donor has majority-committed the write to insert the
+        // donor state doc for the migration.
+        SharedPromise<void> _initialDonorStateDurablePromise;
 
         // Promise that is resolved when the donor receives the donorForgetMigration command.
         SharedPromise<void> _receiveDonorForgetMigrationPromise;
+
+        // Promise that is resolved when the chain of work kicked off by run() has completed.
+        SharedPromise<void> _completionPromise;
     };
 
 private:

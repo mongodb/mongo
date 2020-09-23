@@ -48,9 +48,8 @@ RecipientStateMachine::RecipientStateMachine(const BSONObj& recipientDoc)
           IDLParserErrorContext("ReshardingRecipientDocument"), recipientDoc)),
       _id(_recipientDoc.getCommonReshardingMetadata().get_id()) {}
 
-SemiFuture<void> RecipientStateMachine::run(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
-    return ExecutorFuture<void>(**executor)
+void RecipientStateMachine::run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
+    ExecutorFuture<void>(**executor)
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToInitialized(); })
         .then([this, executor] {
             return _awaitAllDonorsPreparedToDonateThenTransitionToCloning(executor);
@@ -75,7 +74,7 @@ SemiFuture<void> RecipientStateMachine::run(
             this->_transitionStateToError(status);
             return status;
         })
-        .semi();
+        .getAsync([](Status) {});
 }
 
 void onReshardingFieldsChanges(boost::optional<TypeCollectionReshardingFields> reshardingFields) {}

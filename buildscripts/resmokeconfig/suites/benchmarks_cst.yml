@@ -1,0 +1,15 @@
+# This benchmark computes the performance of the grammar-based bison parser, which involves
+# building a concrete syntax tree (CST) and translating to the relevant execution tree.
+test_kind: benchmark_test
+
+selector:
+  root: build/benchmarks.txt
+  include_files:
+  # The trailing asterisk is for handling the .exe extension on Windows.
+  - build/**/system_resource_canary_bm*
+  - build/install/bin/cst_bm*
+
+executor:
+  config: {}
+  hooks:
+  - class: CombineBenchmarkResults

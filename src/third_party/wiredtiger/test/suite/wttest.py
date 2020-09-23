@@ -449,10 +449,8 @@ class WiredTigerTestCase(unittest.TestCase):
 
         try:
             self.fdTearDown()
-            # Only check for unexpected output if the test passed
-            if passed:
-                self.captureout.check(self)
-                self.captureerr.check(self)
+            self.captureout.check(self)
+            self.captureerr.check(self)
         finally:
             # always get back to original directory
             os.chdir(self.origcwd)

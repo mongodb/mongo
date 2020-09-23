@@ -69,7 +69,8 @@ public:
                      const CheckBoundsParams& params,
                      value::SlotId inKeySlot,
                      value::SlotId inRecordIdSlot,
-                     value::SlotId outSlot);
+                     value::SlotId outSlot,
+                     PlanNodeId planNodeId);
 
     std::unique_ptr<PlanStage> clone() const final;
 

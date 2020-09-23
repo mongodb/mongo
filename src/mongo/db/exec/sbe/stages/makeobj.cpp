@@ -42,8 +42,9 @@ MakeObjStage::MakeObjStage(std::unique_ptr<PlanStage> input,
                            std::vector<std::string> projectFields,
                            value::SlotVector projectVars,
                            bool forceNewObject,
-                           bool returnOldObject)
-    : PlanStage("mkobj"_sd),
+                           bool returnOldObject,
+                           PlanNodeId planNodeId)
+    : PlanStage("mkobj"_sd, planNodeId),
       _objSlot(objSlot),
       _rootSlot(rootSlot),
       _restrictFields(std::move(restrictFields)),
@@ -63,7 +64,8 @@ std::unique_ptr<PlanStage> MakeObjStage::clone() const {
                                           _projectFields,
                                           _projectVars,
                                           _forceNewObject,
-                                          _returnOldObject);
+                                          _returnOldObject,
+                                          _commonStats.nodeId);
 }
 
 void MakeObjStage::prepare(CompileCtx& ctx) {

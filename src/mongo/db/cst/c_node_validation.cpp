@@ -36,6 +36,7 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/cst/c_node_validation.h"
 #include "mongo/db/cst/path.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/stdx/variant.h"
@@ -297,7 +298,6 @@ Status validateVariableNameAndPathSuffix(const std::vector<std::string>& nameAnd
     return Status::OK();
 }
 
-
 StatusWith<IsPositional> validateProjectionPathAsNormalOrPositional(
     const std::vector<std::string>& components) {
     if (components.size() > BSONDepth::getMaxAllowableDepth())
@@ -313,6 +313,17 @@ StatusWith<IsPositional> validateProjectionPathAsNormalOrPositional(
             return status.withReason("component " + std::to_string(n) + " of projection "s +
                                      status.reason());
     return isPositional;
+}
+
+Status validateSortPath(const std::vector<std::string>& pathComponents) {
+    try {
+        for (auto&& component : pathComponents) {
+            FieldPath::uassertValidFieldName(component);
+        }
+    } catch (AssertionException& ae) {
+        return Status{ae.code(), ae.reason()};
+    }
+    return Status::OK();
 }
 
 }  // namespace mongo::c_node_validation
