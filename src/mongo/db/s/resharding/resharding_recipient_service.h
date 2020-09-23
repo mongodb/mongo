@@ -103,8 +103,11 @@ private:
 
     void _renameTemporaryReshardingCollectionThenDeleteLocalState();
 
+    void _fulfillAllDonorsPreparedToDonate(Timestamp);
+
     // Transitions the state on-disk and in-memory to 'endState'.
-    void _transitionState(RecipientStateEnum endState);
+    void _transitionState(RecipientStateEnum endState,
+                          boost::optional<Timestamp> fetchTimestamp = boost::none);
 
     // Transitions the state on-disk and in-memory to kError.
     void _transitionStateToError(const Status& status);
@@ -118,7 +121,7 @@ private:
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<void> _allDonorsPreparedToDonate;
+    SharedPromise<Timestamp> _allDonorsPreparedToDonate;
 
     SharedPromise<void> _allDonorsMirroring;
 

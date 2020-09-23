@@ -95,9 +95,11 @@ ExecutorFuture<void> RecipientStateMachine::_awaitAllDonorsPreparedToDonateThenT
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    return _allDonorsPreparedToDonate.getFuture().thenRunOn(**executor).then([this]() {
-        _transitionState(RecipientStateEnum::kCloning);
-    });
+    return _allDonorsPreparedToDonate.getFuture()
+        .thenRunOn(**executor)
+        .then([this](Timestamp fetchTimestamp) {
+            _transitionState(RecipientStateEnum::kCloning, fetchTimestamp);
+        });
 }
 
 void RecipientStateMachine::_cloneThenTransitionToApplying() {
@@ -147,9 +149,24 @@ void RecipientStateMachine::_renameTemporaryReshardingCollectionThenDeleteLocalS
     _transitionState(RecipientStateEnum::kDone);
 }
 
-void RecipientStateMachine::_transitionState(RecipientStateEnum endState) {
+void RecipientStateMachine::_fulfillAllDonorsPreparedToDonate(Timestamp fetchTimestamp) {
+    _allDonorsPreparedToDonate.emplaceValue(fetchTimestamp);
+}
+
+void RecipientStateMachine::_transitionState(RecipientStateEnum endState,
+                                             boost::optional<Timestamp> fetchTimestamp) {
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(endState);
+    if (fetchTimestamp) {
+        auto& fetchTimestampStruct = replacementDoc.getFetchTimestampStruct();
+
+        // If the recipient is recovering and already knows the fetchTimestamp, it cannot change
+        if (fetchTimestampStruct.getFetchTimestamp())
+            invariant(fetchTimestampStruct.getFetchTimestamp().get() == fetchTimestamp.get());
+
+        fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
+    }
+
     _updateRecipientDocument(std::move(replacementDoc));
 }
 
