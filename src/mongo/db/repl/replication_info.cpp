@@ -76,7 +76,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(impersonateFullyUpgradedFutureVersion);
 
 constexpr auto kHelloString = "hello"_sd;
-// Aliases for the hello command in order to provide backwards compatibility.
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
 constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 
@@ -221,7 +220,7 @@ public:
 
 class CmdHello : public BasicCommand {
 public:
-    CmdHello() : BasicCommand(kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
+    CmdHello() : CmdHello(kHelloString, {}) {}
 
     bool requiresAuth() const override {
         return false;
@@ -231,7 +230,7 @@ public:
     }
     std::string help() const override {
         return "Check if this server is primary for a replica set\n"
-               "{ isMaster : 1 }";
+               "{ hello : 1 }";
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -249,11 +248,6 @@ public:
         if (cmdObj["forShell"].trueValue()) {
             LastError::get(opCtx->getClient()).disable();
         }
-
-        // Parse the command name, which should be one of the following: hello, isMaster, or
-        // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
-        // instead of "ismaster" and "secondaryDelaySecs" response field instead of "slaveDelay".
-        bool useLegacyResponseFields = (cmdObj.firstElementFieldName() != kHelloString);
 
         transport::Session::TagMask sessionTagsToSet = 0;
         transport::Session::TagMask sessionTagsToUnset = 0;
@@ -363,7 +357,7 @@ public:
                 });
         }
 
-        appendReplicationInfo(opCtx, result, 0, useLegacyResponseFields);
+        appendReplicationInfo(opCtx, result, 0, useLegacyResponseFields());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             const int configServerModeNumber = 2;
@@ -409,7 +403,35 @@ public:
 
         return true;
     }
+
+protected:
+    CmdHello(const StringData cmdName, const std::initializer_list<StringData>& alias)
+        : BasicCommand(cmdName, alias) {}
+
+    virtual bool useLegacyResponseFields() {
+        return false;
+    }
+
 } cmdhello;
+
+class CmdIsMaster : public CmdHello {
+public:
+    CmdIsMaster() : CmdHello(kCamelCaseIsMasterString, {kLowerCaseIsMasterString}) {}
+
+    std::string help() const override {
+        return "Check if this server is primary for a replica set\n"
+               "{ isMaster : 1 }";
+    }
+
+protected:
+    // Parse the command name, which should be one of the following: hello, isMaster, or
+    // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
+    // instead of "ismaster" and "secondaryDelaySecs" response field instead of "slaveDelay".
+    bool useLegacyResponseFields() override {
+        return true;
+    }
+
+} cmdIsMaster;
 
 OpCounterServerStatusSection replOpCounterServerStatusSection("opcountersRepl", &replOpCounters);
 
