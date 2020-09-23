@@ -486,6 +486,200 @@ TEST(CstExpressionTest, ParsesConcat) {
         "\"<UserString item>\", \"<UserString  - >\", \"<AggregationPath description>\" ] } } }");
 }
 
+TEST(CstExpressionTest, ParsesArrayElemAt) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $arrayElemAt: [ [1, 2, 3, 4] , 1 ] }}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+              "arrayElemAt>: [ [ \"<UserInt 1>\", "
+              "\"<UserInt 2>\", \"<UserInt 3>\", \"<UserInt 4>\" ], \"<UserInt 1>\" ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesArrayToObject) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $arrayToObject: [ [1, 2], [3, 4] ] }}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+              "arrayToObject>: [ [ \"<UserInt 1>\", "
+              "\"<UserInt 2>\" ], [ \"<UserInt 3>\", \"<UserInt 4>\" ] ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesConcatArrays) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $concatArrays: [ [1, 2], [3, 4] ] }}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+              "concatArrays>: [ [ \"<UserInt 1>\", "
+              "\"<UserInt 2>\" ], [ \"<UserInt 3>\", \"<UserInt 4>\" ] ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesFilter) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $filter: {input: [0, 2], as: \"var\", cond: { $gt: [ \"$$var\", 1 ] }}}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname filter>: { "
+              "<KeyFieldname asArg>: \"<UserString var>\", <KeyFieldname condArg>: "
+              "{ <KeyFieldname gt>: [ \"<AggregationVariablePath var>\", \"<UserInt 1>\" ] }, "
+              "<KeyFieldname inputArg>: [ \"<UserInt 0>\", "
+              "\"<UserInt 2>\" ] } } } }");
+}
+
+TEST(CstExpressionTest, ParsesFirst) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $first: [0, 2]}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+              "first>: [ \"<UserInt 0>\", \"<UserInt 2>\" ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesIn) {
+    CNode output;
+    auto input = fromjson(
+        "{pipeline: [{$project: { "
+        "a: { $in: [1, [0, 2]]}}}]}");
+    BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+    auto parseTree = ParserGen(lexer, &output);
+    ASSERT_EQ(0, parseTree.parse());
+    auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+    ASSERT_EQ(1, stages.size());
+    ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+    ASSERT_EQ(stages[0].toBson().toString(),
+              "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname in>: [ "
+              "\"<UserInt 1>\", [ \"<UserInt 0>\", \"<UserInt 2>\" "
+              "] ] } } }");
+}
+
+TEST(CstExpressionTest, ParsesIndexOfArray) {
+    // Parses with Start and End Arguments
+    {
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: { "
+            "a: { $indexOfArray: [ [0, 2], \"$searchExpression\", 0, 1 ]}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "indexOfArray>: [ [ \"<UserInt 0>\", \"<UserInt 2>\" ], \"<AggregationPath "
+                  "searchExpression>\", \"<UserInt 0>\", \"<UserInt 1>\" ] } } }");
+    }
+    // Parses with just Start argument
+    {
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: { "
+            "a: { $indexOfArray: [ [0, 2], \"$searchExpression\", 0 ]}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "indexOfArray>: [ [ \"<UserInt 0>\", \"<UserInt 2>\" ], \"<AggregationPath "
+                  "searchExpression>\", \"<UserInt 0>\" ] } } }");
+    }
+    // Parses without Start and End arguments
+    {
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: { "
+            "a: { $indexOfArray: [ [0, 2], \"$searchExpression\" ]}}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "indexOfArray>: [ [ \"<UserInt 0>\", \"<UserInt 2>\" ], \"<AggregationPath "
+                  "searchExpression>\" ] } } }");
+    }
+}
+
+TEST(CstExpressionTest, ParsesIsArray) {
+    // Parses with argument wrapped in array
+    {
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: { "
+            "a: { $isArray: [ [0, 2] ] }}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(stages[0].toBson().toString(),
+                  "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname "
+                  "isArray>: [ [ "
+                  "\"<UserInt 0>\", \"<UserInt 2>\" ] ] } } }");
+    }
+    // Parses without argument wrapped in array
+    {
+        CNode output;
+        auto input = fromjson(
+            "{pipeline: [{$project: { "
+            "a: { $isArray: \"$maybeAnArrayLivesHere\" }}}]}");
+        BSONLexer lexer(input["pipeline"].embeddedObject(), ParserGen::token::START_PIPELINE);
+        auto parseTree = ParserGen(lexer, &output);
+        ASSERT_EQ(0, parseTree.parse());
+        auto stages = stdx::get<CNode::ArrayChildren>(output.payload);
+        ASSERT_EQ(1, stages.size());
+        ASSERT(KeyFieldname::projectInclusion == stages[0].firstKeyFieldname());
+        ASSERT_EQ(
+            stages[0].toBson().toString(),
+            "{ <KeyFieldname projectInclusion>: { <ProjectionPath a>: { <KeyFieldname isArray>: "
+            "\"<AggregationPath maybeAnArrayLivesHere>\" } } }");
+    }
+}
+
 TEST(CstExpressionTest, FailsToParseTripleDollar) {
     CNode output;
     auto input = BSON("pipeline" << BSON_ARRAY(BSON("$project" << BSON("a"

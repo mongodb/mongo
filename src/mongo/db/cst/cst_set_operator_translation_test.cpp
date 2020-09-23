@@ -56,7 +56,8 @@ TEST(CstPipelineTranslationTest, AllElementsTrueTest) {
         {KeyFieldname::allElementsTrue,
          CNode{CNode::ArrayChildren{CNode{AggregationPath{makeVector<std::string>("set"s)}}}}}}};
     auto expCtx = getExpCtx();
-    auto expr = cst_pipeline_translation::translateExpression(cst, &expCtx);
+    auto expr =
+        cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$allElementsTrue: [\"$set\"]}")) ==
                                            expr->serialize(false)));
 }
@@ -66,7 +67,8 @@ TEST(CstPipelineTranslationTest, AnyElementsTrueTest) {
         {KeyFieldname::anyElementTrue,
          CNode{CNode::ArrayChildren{CNode{AggregationPath{makeVector<std::string>("set"s)}}}}}}};
     auto expCtx = getExpCtx();
-    auto expr = cst_pipeline_translation::translateExpression(cst, &expCtx);
+    auto expr =
+        cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$anyElementTrue: [\"$set\"]}")) ==
                                            expr->serialize(false)));
 }
@@ -77,7 +79,8 @@ TEST(CstPipelineTranslationTest, SetDifferenceTest) {
          CNode{CNode::ArrayChildren{CNode{AggregationPath{makeVector<std::string>("set"s)}},
                                     CNode{AggregationPath{makeVector<std::string>("set2"s)}}}}}}};
     auto expCtx = getExpCtx();
-    auto expr = cst_pipeline_translation::translateExpression(cst, &expCtx);
+    auto expr =
+        cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setDifference: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
 }
@@ -88,7 +91,8 @@ TEST(CstPipelineTranslationTest, SetEqualsTest) {
          CNode{CNode::ArrayChildren{CNode{AggregationPath{makeVector<std::string>("set"s)}},
                                     CNode{AggregationPath{makeVector<std::string>("set2"s)}}}}}}};
     auto expCtx = getExpCtx();
-    auto expr = cst_pipeline_translation::translateExpression(cst, &expCtx);
+    auto expr =
+        cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$setEquals: [\"$set\", \"$set2\"]}")) ==
                                            expr->serialize(false)));
 }
@@ -100,7 +104,8 @@ TEST(CstPipelineTranslationTest, SetIntersectionTest) {
                                     CNode{AggregationPath{makeVector<std::string>("set2"s)}},
                                     CNode{AggregationPath{makeVector<std::string>("set3"s)}}}}}}};
     auto expCtx = getExpCtx();
-    auto expr = cst_pipeline_translation::translateExpression(cst, &expCtx);
+    auto expr =
+        cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setIntersection: [\"$set\", \"$set2\", \"$set3\"]}")) ==
         expr->serialize(false)));
@@ -112,7 +117,8 @@ TEST(CstPipelineTranslationTest, SetIsSubsetTest) {
          CNode{CNode::ArrayChildren{CNode{AggregationPath{makeVector<std::string>("set"s)}},
                                     CNode{AggregationPath{makeVector<std::string>("set2"s)}}}}}}};
     auto expCtx = getExpCtx();
-    auto expr = cst_pipeline_translation::translateExpression(cst, &expCtx);
+    auto expr =
+        cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setIsSubset: [\"$set\", \"$set2\"]}")) == expr->serialize(false)));
 }
@@ -124,7 +130,8 @@ TEST(CstPipelineTranslationTest, SetUnionTest) {
                                     CNode{AggregationPath{makeVector<std::string>("set2"s)}},
                                     CNode{AggregationPath{makeVector<std::string>("set3"s)}}}}}}};
     auto expCtx = getExpCtx();
-    auto expr = cst_pipeline_translation::translateExpression(cst, &expCtx);
+    auto expr =
+        cst_pipeline_translation::translateExpression(cst, &expCtx, expCtx.variablesParseState);
     ASSERT_TRUE(ValueComparator().evaluate(
         Value(fromjson("{$setUnion: [\"$set\", \"$set2\", \"$set3\"]}")) ==
         expr->serialize(false)));

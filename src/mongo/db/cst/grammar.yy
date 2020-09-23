@@ -127,8 +127,12 @@
     AND
     ANY_ELEMENT_TRUE "anyElementTrue"
     ARG_CASE_SENSITIVE "$caseSensitive argument"
+    ARRAY_ELEM_AT
+    ARRAY_TO_OBJECT
+    ARG_AS "as argument"
     ARG_CHARS "chars argument"
     ARG_COLL "coll argument"
+    ARG_COND "cond argument"
     ARG_DATE "date argument"
     ARG_DATE_STRING "dateString argument"
     ARG_DAY "day argument"
@@ -169,6 +173,7 @@
     CMP
     COMMENT
     CONCAT
+    CONCAT_ARRAYS
     CONST_EXPR
     CONVERT
     COS
@@ -195,6 +200,8 @@
     EXISTS
     EXPONENT
     EXPR
+    FILTER
+    FIRST
     FLOOR
     GEO_NEAR_DISTANCE "geoNearDistance"
     GEO_NEAR_POINT "geoNearPoint"
@@ -202,12 +209,15 @@
     GTE
     HOUR
     ID
+    IN
     INDEX_KEY "indexKey"
+    INDEX_OF_ARRAY
     INDEX_OF_BYTES
     INDEX_OF_CP
     INT_NEGATIVE_ONE "-1 (int)"
     INT_ONE "1 (int)"
     INT_ZERO "zero (int)"
+    IS_ARRAY
     ISO_DAY_OF_WEEK
     ISO_WEEK
     ISO_WEEK_YEAR
@@ -359,7 +369,9 @@
 %nterm <CNode> typeExpression convert toBool toDate toDecimal toDouble toInt toLong
 %nterm <CNode> toObjectId toString type
 %nterm <CNode> abs ceil divide exponent floor ln log logten mod multiply pow round sqrt subtract trunc
+%nterm <CNode> arrayExps arrayElemAt arrayToObject concatArrays filter first in indexOfArray isArray
 %nterm <std::pair<CNode::Fieldname, CNode>> onErrorArg onNullArg
+%nterm <std::pair<CNode::Fieldname, CNode>> asArg
 %nterm <std::pair<CNode::Fieldname, CNode>> formatArg timezoneArg charsArg optionsArg
 %nterm <std::pair<CNode::Fieldname, CNode>> hourArg minuteArg secondArg millisecondArg dayArg
 %nterm <std::pair<CNode::Fieldname, CNode>> isoWeekArg iso8601Arg monthArg isoDayOfWeekArg
@@ -1043,6 +1055,12 @@ arg:
     | ARG_DIACRITIC_SENSITIVE {
         $$ = UserFieldname{"$diacriticSensitive"};
     }
+    | ARG_AS {
+        $$ = UserFieldname{"as"};
+    }
+    | ARG_COND {
+        $$ = UserFieldname{"cond"};
+    }
 ;
 
 aggExprAsUserFieldname:
@@ -1345,6 +1363,30 @@ aggExprAsUserFieldname:
     | RADIANS_TO_DEGREES {
         $$ = UserFieldname{"$radiansToDegrees"};
     }
+    | ARRAY_ELEM_AT {
+        $$ = UserFieldname{"$arrayElemAt"};
+    }
+    | ARRAY_TO_OBJECT {
+        $$ = UserFieldname{"$arrayToObject"};
+    }
+    | CONCAT_ARRAYS {
+        $$ = UserFieldname{"$concatArrays"};
+    }
+    | FILTER {
+        $$ = UserFieldname{"$filter"};
+    }
+    | FIRST {
+        $$ = UserFieldname{"$first"};
+    }
+    | IN {
+        $$ = UserFieldname{"$in"};
+    }
+    | INDEX_OF_ARRAY {
+        $$ = UserFieldname{"$indexOfArray"};
+    }
+    | IS_ARRAY {
+        $$ = UserFieldname{"$isArray"};
+    }
 ;
 
 // Rules for literal non-terminals.
@@ -1615,7 +1657,7 @@ aggregationOperator:
 
 aggregationOperatorWithoutSlice:
     maths | boolExprs | literalEscapes | compExprs | typeExpression | stringExps | setExpression
-    | trig | meta | dateExps
+    | trig | meta | dateExps | arrayExps
 ;
 
 // Helper rule for expressions which take exactly two expression arguments.
@@ -1941,6 +1983,81 @@ not:
     }
 ;
 
+arrayExps:
+    arrayElemAt | arrayToObject | concatArrays | filter | first | in | indexOfArray | isArray
+;
+
+arrayElemAt:
+    START_OBJECT ARRAY_ELEM_AT exprFixedTwoArg END_OBJECT {
+          $$ = CNode{CNode::ObjectChildren{{KeyFieldname::arrayElemAt,
+                                             $exprFixedTwoArg}}};
+    }
+;
+
+arrayToObject:
+    START_OBJECT ARRAY_TO_OBJECT expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::arrayToObject, $expression}}};
+    }
+;
+
+concatArrays:
+    START_OBJECT CONCAT_ARRAYS START_ARRAY expressions END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::concatArrays,
+                                          CNode{$expressions}}}};
+    }
+;
+
+asArg:
+    %empty {
+        $$ = std::pair{KeyFieldname::asArg, CNode{KeyValue::absentKey}};
+    }
+    | ARG_AS string {
+        $$ = std::pair{KeyFieldname::asArg, $string};
+    }
+;
+
+filter:
+    START_OBJECT FILTER START_ORDERED_OBJECT asArg ARG_COND expression[cond] ARG_INPUT expression[input] END_OBJECT END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::filter, CNode{CNode::ObjectChildren{
+                                        $asArg, {KeyFieldname::condArg, $cond}, {KeyFieldname::inputArg, $input}}}}}};
+      }
+;
+
+first:
+    START_OBJECT FIRST expression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::first, $expression}}};
+      }
+;
+
+in:
+  START_OBJECT IN exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::in,
+                                           $exprFixedTwoArg}}};
+    }
+;
+
+indexOfArray:
+    START_OBJECT INDEX_OF_ARRAY START_ARRAY expression[array] expression[search] expression[start]
+      expression[end] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::indexOfArray,
+                                           CNode{CNode::ArrayChildren{$array, $search, $start, $end}}}}};
+    }
+    | START_OBJECT INDEX_OF_ARRAY exprFixedTwoArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::indexOfArray,
+                                          $exprFixedTwoArg}}};
+    }
+    | START_OBJECT INDEX_OF_ARRAY exprFixedThreeArg END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::indexOfArray,
+                                          $exprFixedThreeArg}}};
+    }
+;
+
+isArray:
+    START_OBJECT IS_ARRAY singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::isArray, $singleArgExpression}}};
+    }
+;
+
 stringExps:
     concat | dateFromString | dateToString | indexOfBytes | indexOfCP | ltrim | regexFind
     | regexFindAll | regexMatch | replaceOne | replaceAll | rtrim | split | strLenBytes | strLenCP
@@ -1950,10 +2067,7 @@ stringExps:
 concat:
     START_OBJECT CONCAT START_ARRAY expressions END_ARRAY END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::concat,
-                                          CNode{CNode::ArrayChildren{}}}}};
-        auto&& others = $expressions;
-        auto&& array = $$.objectChildren()[0].second.arrayChildren();
-        array.insert(array.end(), others.begin(), others.end());
+                                          CNode{$expressions}}}};
     }
 ;
 

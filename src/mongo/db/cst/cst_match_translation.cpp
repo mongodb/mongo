@@ -231,7 +231,9 @@ std::unique_ptr<MatchExpression> translateMatchPredicate(
                 // The ExprMatchExpression maintains (shared) ownership of expCtx,
                 // which the Expression from translateExpression depends on.
                 return std::make_unique<ExprMatchExpression>(
-                    cst_pipeline_translation::translateExpression(cst, expCtx.get()), expCtx);
+                    cst_pipeline_translation::translateExpression(
+                        cst, expCtx.get(), expCtx->variablesParseState),
+                    expCtx);
             }
             case KeyFieldname::text: {
                 const auto& args = cst.objectChildren();

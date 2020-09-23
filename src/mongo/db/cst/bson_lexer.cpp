@@ -207,7 +207,16 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"$caseSensitive", ParserGen::token::ARG_CASE_SENSITIVE},
     {"$diacriticSensitive", ParserGen::token::ARG_DIACRITIC_SENSITIVE},
     {"$mod", ParserGen::token::MOD},
-};
+    {"$arrayElemAt", ParserGen::token::ARRAY_ELEM_AT},
+    {"$arrayToObject", ParserGen::token::ARRAY_TO_OBJECT},
+    {"$concatArrays", ParserGen::token::CONCAT_ARRAYS},
+    {"$filter", ParserGen::token::FILTER},
+    {"$first", ParserGen::token::FIRST},
+    {"$in", ParserGen::token::IN},
+    {"$indexOfArray", ParserGen::token::INDEX_OF_ARRAY},
+    {"$isArray", ParserGen::token::IS_ARRAY},
+    {"as", ParserGen::token::ARG_AS},
+    {"cond", ParserGen::token::ARG_COND}};
 
 // Mapping of reserved key values to BSON token. Any key which is not included in this map is
 // assumed to be a user value.

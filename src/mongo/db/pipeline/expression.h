@@ -884,6 +884,9 @@ public:
     explicit ExpressionArrayElemAt(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx) {}
 
+    ExpressionArrayElemAt(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionArrayElemAt, 2>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
 
@@ -896,6 +899,9 @@ class ExpressionFirst final : public ExpressionFixedArity<ExpressionFirst, 1> {
 public:
     explicit ExpressionFirst(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionFirst, 1>(expCtx) {}
+
+    ExpressionFirst(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionFirst, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -935,6 +941,9 @@ class ExpressionArrayToObject final : public ExpressionFixedArity<ExpressionArra
 public:
     explicit ExpressionArrayToObject(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx) {}
+
+    ExpressionArrayToObject(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionArrayToObject, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1071,6 +1080,9 @@ class ExpressionConcatArrays final : public ExpressionVariadic<ExpressionConcatA
 public:
     explicit ExpressionConcatArrays(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionConcatArrays>(expCtx) {}
+
+    ExpressionConcatArrays(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionVariadic<ExpressionConcatArrays>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
@@ -1468,6 +1480,12 @@ public:
                                                   BSONElement expr,
                                                   const VariablesParseState& vps);
 
+    ExpressionFilter(ExpressionContext* const expCtx,
+                     std::string varName,
+                     Variables::Id varId,
+                     boost::intrusive_ptr<Expression> input,
+                     boost::intrusive_ptr<Expression> filter);
+
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
     }
@@ -1480,12 +1498,6 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
 private:
-    ExpressionFilter(ExpressionContext* const expCtx,
-                     std::string varName,
-                     Variables::Id varId,
-                     boost::intrusive_ptr<Expression> input,
-                     boost::intrusive_ptr<Expression> filter);
-
     // The name of the variable to set to each element in the array.
     std::string _varName;
     // The id of the variable to set.
@@ -1550,7 +1562,11 @@ public:
     explicit ExpressionIn(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionIn, 2>(expCtx) {}
 
+    ExpressionIn(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionIn, 2>(expCtx, std::move(children)) {}
+
     Value evaluate(const Document& root, Variables* variables) const final;
+
     const char* getOpName() const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
@@ -1564,6 +1580,8 @@ public:
     explicit ExpressionIndexOfArray(ExpressionContext* const expCtx)
         : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx) {}
 
+    ExpressionIndexOfArray(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionRangedArity<ExpressionIndexOfArray, 2, 4>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const;
     boost::intrusive_ptr<Expression> optimize() final;
@@ -2291,6 +2309,9 @@ class ExpressionIsArray final : public ExpressionFixedArity<ExpressionIsArray, 1
 public:
     explicit ExpressionIsArray(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionIsArray, 1>(expCtx) {}
+
+    ExpressionIsArray(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionIsArray, 1>(expCtx, std::move(children)) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;

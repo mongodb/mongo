@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/variables.h"
 
 namespace mongo::cst_pipeline_translation {
 
@@ -42,7 +43,9 @@ namespace mongo::cst_pipeline_translation {
  *
  * Caller must ensure the ExpressionContext outlives the Expression.
  */
-boost::intrusive_ptr<Expression> translateExpression(const CNode& cst, ExpressionContext* expCtx);
+boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
+                                                     ExpressionContext* expCtx,
+                                                     const VariablesParseState& vps);
 
 /**
  * Walk a pipeline array CNode and produce a Pipeline.

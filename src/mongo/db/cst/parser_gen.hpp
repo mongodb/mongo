@@ -1,8 +1,8 @@
-// A Bison parser, made by GNU Bison 3.5.
+// A Bison parser, made by GNU Bison 3.7.1.
 
 // Skeleton interface for Bison LALR(1) parsers in C++
 
-// Copyright (C) 2002-2015, 2018-2019 Free Software Foundation, Inc.
+// Copyright (C) 2002-2015, 2018-2020 Free Software Foundation, Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -32,19 +32,20 @@
 
 
 /**
- ** \file src/mongo/db/cst/parser_gen.hpp
+ ** \file parser_gen.hpp
  ** Define the mongo::parser class.
  */
 
 // C++ LALR(1) parser skeleton written by Akim Demaille.
 
-// Undocumented macros, especially those whose name start with YY_,
-// are private implementation details.  Do not rely on them.
+// DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+// especially those whose name start with YY_ or yy_.  They are
+// private implementation details that can be changed or removed.
 
-#ifndef YY_YY_SRC_MONGO_DB_CST_PARSER_GEN_HPP_INCLUDED
-#define YY_YY_SRC_MONGO_DB_CST_PARSER_GEN_HPP_INCLUDED
+#ifndef YY_YY_PARSER_GEN_HPP_INCLUDED
+#define YY_YY_PARSER_GEN_HPP_INCLUDED
 // "%code requires" blocks.
-#line 66 "src/mongo/db/cst/grammar.yy"
+#line 66 "grammar.yy"
 
 #include "mongo/db/cst/bson_location.h"
 #include "mongo/db/cst/c_node.h"
@@ -59,7 +60,7 @@ class BSONLexer;
 #pragma warning(disable : 4065)
 #endif
 
-#line 63 "src/mongo/db/cst/parser_gen.hpp"
+#line 64 "parser_gen.hpp"
 
 #include <cassert>
 #include <cstdlib>  // std::abort
@@ -188,9 +189,9 @@ class BSONLexer;
 #define YYDEBUG 0
 #endif
 
-#line 57 "src/mongo/db/cst/grammar.yy"
+#line 57 "grammar.yy"
 namespace mongo {
-#line 198 "src/mongo/db/cst/parser_gen.hpp"
+#line 199 "parser_gen.hpp"
 
 
 /// A Bison parser.
@@ -216,6 +217,13 @@ public:
             YY_ASSERT(sizeof(T) <= size);
             new (yyas_<T>()) T(YY_MOVE(t));
         }
+
+#if 201103L <= YY_CPLUSPLUS
+        /// Non copyable.
+        semantic_type(const self_type&) = delete;
+        /// Non copyable.
+        self_type& operator=(const self_type&) = delete;
+#endif
 
         /// Destruction, allowed only if empty.
         ~semantic_type() YY_NOEXCEPT {
@@ -335,9 +343,12 @@ public:
         }
 
     private:
-        /// Prohibit blind copies.
-        self_type& operator=(const self_type&);
+#if YY_CPLUSPLUS < 201103L
+        /// Non copyable.
         semantic_type(const self_type&);
+        /// Non copyable.
+        self_type& operator=(const self_type&);
+#endif
 
         /// Accessor to raw memory as \a T.
         template <typename T>
@@ -510,6 +521,15 @@ public:
             // sqrt
             // subtract
             // trunc
+            // arrayExps
+            // arrayElemAt
+            // arrayToObject
+            // concatArrays
+            // filter
+            // first
+            // in
+            // indexOfArray
+            // isArray
             // setExpression
             // allElementsTrue
             // anyElementTrue
@@ -621,6 +641,7 @@ public:
             // valueField
             // onErrorArg
             // onNullArg
+            // asArg
             // formatArg
             // timezoneArg
             // charsArg
@@ -702,229 +723,722 @@ public:
         location_type location;
     };
 
-    /// Tokens.
+    /// Token kinds.
     struct token {
-        enum yytokentype {
-            END_OF_FILE = 0,
-            ABS = 3,
-            ACOS = 4,
-            ACOSH = 5,
-            ADD = 6,
-            ALL_ELEMENTS_TRUE = 7,
-            AND = 8,
-            ANY_ELEMENT_TRUE = 9,
-            ARG_CASE_SENSITIVE = 10,
-            ARG_CHARS = 11,
-            ARG_COLL = 12,
-            ARG_DATE = 13,
-            ARG_DATE_STRING = 14,
-            ARG_DAY = 15,
-            ARG_DIACRITIC_SENSITIVE = 16,
-            ARG_FILTER = 17,
-            ARG_FIND = 18,
-            ARG_FORMAT = 19,
-            ARG_HOUR = 20,
-            ARG_INPUT = 21,
-            ARG_ISO_8601 = 22,
-            ARG_ISO_DAY_OF_WEEK = 23,
-            ARG_ISO_WEEK = 24,
-            ARG_ISO_WEEK_YEAR = 25,
-            ARG_LANGUAGE = 26,
-            ARG_MILLISECOND = 27,
-            ARG_MINUTE = 28,
-            ARG_MONTH = 29,
-            ARG_ON_ERROR = 30,
-            ARG_ON_NULL = 31,
-            ARG_OPTIONS = 32,
-            ARG_PIPELINE = 33,
-            ARG_REGEX = 34,
-            ARG_REPLACEMENT = 35,
-            ARG_SEARCH = 36,
-            ARG_SECOND = 37,
-            ARG_SIZE = 38,
-            ARG_TIMEZONE = 39,
-            ARG_TO = 40,
-            ARG_YEAR = 41,
-            ASIN = 42,
-            ASINH = 43,
-            ATAN = 44,
-            ATAN2 = 45,
-            ATANH = 46,
-            BOOL_FALSE = 47,
-            BOOL_TRUE = 48,
-            CEIL = 49,
-            CMP = 50,
-            COMMENT = 51,
-            CONCAT = 52,
-            CONST_EXPR = 53,
-            CONVERT = 54,
-            COS = 55,
-            COSH = 56,
-            DATE_FROM_PARTS = 57,
-            DATE_FROM_STRING = 58,
-            DATE_TO_PARTS = 59,
-            DATE_TO_STRING = 60,
-            DAY_OF_MONTH = 61,
-            DAY_OF_WEEK = 62,
-            DAY_OF_YEAR = 63,
-            DECIMAL_NEGATIVE_ONE = 64,
-            DECIMAL_ONE = 65,
-            DECIMAL_ZERO = 66,
-            DEGREES_TO_RADIANS = 67,
-            DIVIDE = 68,
-            DOUBLE_NEGATIVE_ONE = 69,
-            DOUBLE_ONE = 70,
-            DOUBLE_ZERO = 71,
-            ELEM_MATCH = 72,
-            END_ARRAY = 73,
-            END_OBJECT = 74,
-            EQ = 75,
-            EXISTS = 76,
-            EXPONENT = 77,
-            EXPR = 78,
-            FLOOR = 79,
-            GEO_NEAR_DISTANCE = 80,
-            GEO_NEAR_POINT = 81,
-            GT = 82,
-            GTE = 83,
-            HOUR = 84,
-            ID = 85,
-            INDEX_KEY = 86,
-            INDEX_OF_BYTES = 87,
-            INDEX_OF_CP = 88,
-            INT_NEGATIVE_ONE = 89,
-            INT_ONE = 90,
-            INT_ZERO = 91,
-            ISO_DAY_OF_WEEK = 92,
-            ISO_WEEK = 93,
-            ISO_WEEK_YEAR = 94,
-            LITERAL = 95,
-            LN = 96,
-            LOG = 97,
-            LOGTEN = 98,
-            LONG_NEGATIVE_ONE = 99,
-            LONG_ONE = 100,
-            LONG_ZERO = 101,
-            LT = 102,
-            LTE = 103,
-            LTRIM = 104,
-            META = 105,
-            MILLISECOND = 106,
-            MINUTE = 107,
-            MOD = 108,
-            MONTH = 109,
-            MULTIPLY = 110,
-            NE = 111,
-            NOR = 112,
-            NOT = 113,
-            OR = 114,
-            POW = 115,
-            RADIANS_TO_DEGREES = 116,
-            RAND_VAL = 117,
-            RECORD_ID = 118,
-            REGEX_FIND = 119,
-            REGEX_FIND_ALL = 120,
-            REGEX_MATCH = 121,
-            REPLACE_ALL = 122,
-            REPLACE_ONE = 123,
-            ROUND = 124,
-            RTRIM = 125,
-            SEARCH_HIGHLIGHTS = 126,
-            SEARCH_SCORE = 127,
-            SECOND = 128,
-            SET_DIFFERENCE = 129,
-            SET_EQUALS = 130,
-            SET_INTERSECTION = 131,
-            SET_IS_SUBSET = 132,
-            SET_UNION = 133,
-            SIN = 134,
-            SINH = 135,
-            SLICE = 136,
-            SORT_KEY = 137,
-            SPLIT = 138,
-            SQRT = 139,
-            STAGE_INHIBIT_OPTIMIZATION = 140,
-            STAGE_LIMIT = 141,
-            STAGE_MATCH = 142,
-            STAGE_PROJECT = 143,
-            STAGE_SAMPLE = 144,
-            STAGE_SKIP = 145,
-            STAGE_UNION_WITH = 146,
-            START_ARRAY = 147,
-            START_OBJECT = 148,
-            STR_CASE_CMP = 149,
-            STR_LEN_BYTES = 150,
-            STR_LEN_CP = 151,
-            SUBSTR = 152,
-            SUBSTR_BYTES = 153,
-            SUBSTR_CP = 154,
-            SUBTRACT = 155,
-            TAN = 156,
-            TANH = 157,
-            TEXT = 158,
-            TEXT_SCORE = 159,
-            TO_BOOL = 160,
-            TO_DATE = 161,
-            TO_DECIMAL = 162,
-            TO_DOUBLE = 163,
-            TO_INT = 164,
-            TO_LONG = 165,
-            TO_LOWER = 166,
-            TO_OBJECT_ID = 167,
-            TO_STRING = 168,
-            TO_UPPER = 169,
-            TRIM = 170,
-            TRUNC = 171,
-            TYPE = 172,
-            WEEK = 173,
-            WHERE = 174,
-            YEAR = 175,
-            FIELDNAME = 176,
-            DOTTED_FIELDNAME = 177,
-            DOLLAR_PREF_FIELDNAME = 178,
-            STRING = 179,
-            DOLLAR_STRING = 180,
-            DOLLAR_DOLLAR_STRING = 181,
-            BINARY = 182,
-            UNDEFINED = 183,
-            OBJECT_ID = 184,
-            DATE_LITERAL = 185,
-            JSNULL = 186,
-            REGEX = 187,
-            DB_POINTER = 188,
-            JAVASCRIPT = 189,
-            SYMBOL = 190,
-            JAVASCRIPT_W_SCOPE = 191,
-            INT_OTHER = 192,
-            LONG_OTHER = 193,
-            DOUBLE_OTHER = 194,
-            DECIMAL_OTHER = 195,
-            TIMESTAMP = 196,
-            MIN_KEY = 197,
-            MAX_KEY = 198,
-            START_PIPELINE = 199,
-            START_MATCH = 200,
-            START_PROJECT = 201,
-            START_SORT = 202
+        enum token_kind_type {
+            YYEMPTY = -2,
+            END_OF_FILE = 0,                   // "EOF"
+            YYerror = 1,                       // error
+            YYUNDEF = 2,                       // "invalid token"
+            ABS = 3,                           // ABS
+            ACOS = 4,                          // ACOS
+            ACOSH = 5,                         // ACOSH
+            ADD = 6,                           // ADD
+            ALL_ELEMENTS_TRUE = 7,             // "allElementsTrue"
+            AND = 8,                           // AND
+            ANY_ELEMENT_TRUE = 9,              // "anyElementTrue"
+            ARG_CASE_SENSITIVE = 10,           // "$caseSensitive argument"
+            ARRAY_ELEM_AT = 11,                // ARRAY_ELEM_AT
+            ARRAY_TO_OBJECT = 12,              // ARRAY_TO_OBJECT
+            ARG_AS = 13,                       // "as argument"
+            ARG_CHARS = 14,                    // "chars argument"
+            ARG_COLL = 15,                     // "coll argument"
+            ARG_COND = 16,                     // "cond argument"
+            ARG_DATE = 17,                     // "date argument"
+            ARG_DATE_STRING = 18,              // "dateString argument"
+            ARG_DAY = 19,                      // "day argument"
+            ARG_DIACRITIC_SENSITIVE = 20,      // "$diacriticSensitive argument"
+            ARG_FILTER = 21,                   // "filter"
+            ARG_FIND = 22,                     // "find argument"
+            ARG_FORMAT = 23,                   // "format argument"
+            ARG_HOUR = 24,                     // "hour argument"
+            ARG_INPUT = 25,                    // "input argument"
+            ARG_ISO_8601 = 26,                 // "ISO 8601 argument"
+            ARG_ISO_DAY_OF_WEEK = 27,          // "ISO day of week argument"
+            ARG_ISO_WEEK = 28,                 // "ISO week argument"
+            ARG_ISO_WEEK_YEAR = 29,            // "ISO week year argument"
+            ARG_LANGUAGE = 30,                 // "$language argument"
+            ARG_MILLISECOND = 31,              // "millisecond argument"
+            ARG_MINUTE = 32,                   // "minute argument"
+            ARG_MONTH = 33,                    // "month argument"
+            ARG_ON_ERROR = 34,                 // "onError argument"
+            ARG_ON_NULL = 35,                  // "onNull argument"
+            ARG_OPTIONS = 36,                  // "options argument"
+            ARG_PIPELINE = 37,                 // "pipeline argument"
+            ARG_REGEX = 38,                    // "regex argument"
+            ARG_REPLACEMENT = 39,              // "replacement argument"
+            ARG_SEARCH = 40,                   // "$search argument"
+            ARG_SECOND = 41,                   // "second argument"
+            ARG_SIZE = 42,                     // "size argument"
+            ARG_TIMEZONE = 43,                 // "timezone argument"
+            ARG_TO = 44,                       // "to argument"
+            ARG_YEAR = 45,                     // "year argument"
+            ASIN = 46,                         // ASIN
+            ASINH = 47,                        // ASINH
+            ATAN = 48,                         // ATAN
+            ATAN2 = 49,                        // ATAN2
+            ATANH = 50,                        // ATANH
+            BOOL_FALSE = 51,                   // "false"
+            BOOL_TRUE = 52,                    // "true"
+            CEIL = 53,                         // CEIL
+            CMP = 54,                          // CMP
+            COMMENT = 55,                      // COMMENT
+            CONCAT = 56,                       // CONCAT
+            CONCAT_ARRAYS = 57,                // CONCAT_ARRAYS
+            CONST_EXPR = 58,                   // CONST_EXPR
+            CONVERT = 59,                      // CONVERT
+            COS = 60,                          // COS
+            COSH = 61,                         // COSH
+            DATE_FROM_PARTS = 62,              // DATE_FROM_PARTS
+            DATE_FROM_STRING = 63,             // DATE_FROM_STRING
+            DATE_TO_PARTS = 64,                // DATE_TO_PARTS
+            DATE_TO_STRING = 65,               // DATE_TO_STRING
+            DAY_OF_MONTH = 66,                 // DAY_OF_MONTH
+            DAY_OF_WEEK = 67,                  // DAY_OF_WEEK
+            DAY_OF_YEAR = 68,                  // DAY_OF_YEAR
+            DECIMAL_NEGATIVE_ONE = 69,         // "-1 (decimal)"
+            DECIMAL_ONE = 70,                  // "1 (decimal)"
+            DECIMAL_ZERO = 71,                 // "zero (decimal)"
+            DEGREES_TO_RADIANS = 72,           // DEGREES_TO_RADIANS
+            DIVIDE = 73,                       // DIVIDE
+            DOUBLE_NEGATIVE_ONE = 74,          // "-1 (double)"
+            DOUBLE_ONE = 75,                   // "1 (double)"
+            DOUBLE_ZERO = 76,                  // "zero (double)"
+            ELEM_MATCH = 77,                   // "elemMatch operator"
+            END_ARRAY = 78,                    // "end of array"
+            END_OBJECT = 79,                   // "end of object"
+            EQ = 80,                           // EQ
+            EXISTS = 81,                       // EXISTS
+            EXPONENT = 82,                     // EXPONENT
+            EXPR = 83,                         // EXPR
+            FILTER = 84,                       // FILTER
+            FIRST = 85,                        // FIRST
+            FLOOR = 86,                        // FLOOR
+            GEO_NEAR_DISTANCE = 87,            // "geoNearDistance"
+            GEO_NEAR_POINT = 88,               // "geoNearPoint"
+            GT = 89,                           // GT
+            GTE = 90,                          // GTE
+            HOUR = 91,                         // HOUR
+            ID = 92,                           // ID
+            IN = 93,                           // IN
+            INDEX_KEY = 94,                    // "indexKey"
+            INDEX_OF_ARRAY = 95,               // INDEX_OF_ARRAY
+            INDEX_OF_BYTES = 96,               // INDEX_OF_BYTES
+            INDEX_OF_CP = 97,                  // INDEX_OF_CP
+            INT_NEGATIVE_ONE = 98,             // "-1 (int)"
+            INT_ONE = 99,                      // "1 (int)"
+            INT_ZERO = 100,                    // "zero (int)"
+            IS_ARRAY = 101,                    // IS_ARRAY
+            ISO_DAY_OF_WEEK = 102,             // ISO_DAY_OF_WEEK
+            ISO_WEEK = 103,                    // ISO_WEEK
+            ISO_WEEK_YEAR = 104,               // ISO_WEEK_YEAR
+            LITERAL = 105,                     // LITERAL
+            LN = 106,                          // LN
+            LOG = 107,                         // LOG
+            LOGTEN = 108,                      // LOGTEN
+            LONG_NEGATIVE_ONE = 109,           // "-1 (long)"
+            LONG_ONE = 110,                    // "1 (long)"
+            LONG_ZERO = 111,                   // "zero (long)"
+            LT = 112,                          // LT
+            LTE = 113,                         // LTE
+            LTRIM = 114,                       // LTRIM
+            META = 115,                        // META
+            MILLISECOND = 116,                 // MILLISECOND
+            MINUTE = 117,                      // MINUTE
+            MOD = 118,                         // MOD
+            MONTH = 119,                       // MONTH
+            MULTIPLY = 120,                    // MULTIPLY
+            NE = 121,                          // NE
+            NOR = 122,                         // NOR
+            NOT = 123,                         // NOT
+            OR = 124,                          // OR
+            POW = 125,                         // POW
+            RADIANS_TO_DEGREES = 126,          // RADIANS_TO_DEGREES
+            RAND_VAL = 127,                    // "randVal"
+            RECORD_ID = 128,                   // "recordId"
+            REGEX_FIND = 129,                  // REGEX_FIND
+            REGEX_FIND_ALL = 130,              // REGEX_FIND_ALL
+            REGEX_MATCH = 131,                 // REGEX_MATCH
+            REPLACE_ALL = 132,                 // REPLACE_ALL
+            REPLACE_ONE = 133,                 // REPLACE_ONE
+            ROUND = 134,                       // ROUND
+            RTRIM = 135,                       // RTRIM
+            SEARCH_HIGHLIGHTS = 136,           // "searchHighlights"
+            SEARCH_SCORE = 137,                // "searchScore"
+            SECOND = 138,                      // SECOND
+            SET_DIFFERENCE = 139,              // "setDifference"
+            SET_EQUALS = 140,                  // "setEquals"
+            SET_INTERSECTION = 141,            // "setIntersection"
+            SET_IS_SUBSET = 142,               // "setIsSubset"
+            SET_UNION = 143,                   // "setUnion"
+            SIN = 144,                         // SIN
+            SINH = 145,                        // SINH
+            SLICE = 146,                       // "slice"
+            SORT_KEY = 147,                    // "sortKey"
+            SPLIT = 148,                       // SPLIT
+            SQRT = 149,                        // SQRT
+            STAGE_INHIBIT_OPTIMIZATION = 150,  // STAGE_INHIBIT_OPTIMIZATION
+            STAGE_LIMIT = 151,                 // STAGE_LIMIT
+            STAGE_MATCH = 152,                 // STAGE_MATCH
+            STAGE_PROJECT = 153,               // STAGE_PROJECT
+            STAGE_SAMPLE = 154,                // STAGE_SAMPLE
+            STAGE_SKIP = 155,                  // STAGE_SKIP
+            STAGE_UNION_WITH = 156,            // STAGE_UNION_WITH
+            START_ARRAY = 157,                 // "array"
+            START_OBJECT = 158,                // "object"
+            STR_CASE_CMP = 159,                // STR_CASE_CMP
+            STR_LEN_BYTES = 160,               // STR_LEN_BYTES
+            STR_LEN_CP = 161,                  // STR_LEN_CP
+            SUBSTR = 162,                      // SUBSTR
+            SUBSTR_BYTES = 163,                // SUBSTR_BYTES
+            SUBSTR_CP = 164,                   // SUBSTR_CP
+            SUBTRACT = 165,                    // SUBTRACT
+            TAN = 166,                         // TAN
+            TANH = 167,                        // TANH
+            TEXT = 168,                        // TEXT
+            TEXT_SCORE = 169,                  // "textScore"
+            TO_BOOL = 170,                     // TO_BOOL
+            TO_DATE = 171,                     // TO_DATE
+            TO_DECIMAL = 172,                  // TO_DECIMAL
+            TO_DOUBLE = 173,                   // TO_DOUBLE
+            TO_INT = 174,                      // TO_INT
+            TO_LONG = 175,                     // TO_LONG
+            TO_LOWER = 176,                    // TO_LOWER
+            TO_OBJECT_ID = 177,                // TO_OBJECT_ID
+            TO_STRING = 178,                   // TO_STRING
+            TO_UPPER = 179,                    // TO_UPPER
+            TRIM = 180,                        // TRIM
+            TRUNC = 181,                       // TRUNC
+            TYPE = 182,                        // TYPE
+            WEEK = 183,                        // WEEK
+            WHERE = 184,                       // WHERE
+            YEAR = 185,                        // YEAR
+            FIELDNAME = 186,                   // "fieldname"
+            DOTTED_FIELDNAME = 187,            // "fieldname containing dotted path"
+            DOLLAR_PREF_FIELDNAME = 188,       // "$-prefixed fieldname"
+            STRING = 189,                      // "string"
+            DOLLAR_STRING = 190,               // "$-prefixed string"
+            DOLLAR_DOLLAR_STRING = 191,        // "$$-prefixed string"
+            BINARY = 192,                      // "BinData"
+            UNDEFINED = 193,                   // "undefined"
+            OBJECT_ID = 194,                   // "ObjectID"
+            DATE_LITERAL = 195,                // "Date"
+            JSNULL = 196,                      // "null"
+            REGEX = 197,                       // "regex"
+            DB_POINTER = 198,                  // "dbPointer"
+            JAVASCRIPT = 199,                  // "Code"
+            SYMBOL = 200,                      // "Symbol"
+            JAVASCRIPT_W_SCOPE = 201,          // "CodeWScope"
+            INT_OTHER = 202,                   // "arbitrary integer"
+            LONG_OTHER = 203,                  // "arbitrary long"
+            DOUBLE_OTHER = 204,                // "arbitrary double"
+            DECIMAL_OTHER = 205,               // "arbitrary decimal"
+            TIMESTAMP = 206,                   // "Timestamp"
+            MIN_KEY = 207,                     // "minKey"
+            MAX_KEY = 208,                     // "maxKey"
+            START_PIPELINE = 209,              // START_PIPELINE
+            START_MATCH = 210,                 // START_MATCH
+            START_PROJECT = 211,               // START_PROJECT
+            START_SORT = 212                   // START_SORT
+        };
+        /// Backward compatibility alias (Bison 3.6).
+        typedef token_kind_type yytokentype;
+    };
+
+    /// Token kind, as returned by yylex.
+    typedef token::yytokentype token_kind_type;
+
+    /// Backward compatibility alias (Bison 3.6).
+    typedef token_kind_type token_type;
+
+    /// Symbol kinds.
+    struct symbol_kind {
+        enum symbol_kind_type {
+            YYNTOKENS = 213,  ///< Number of tokens.
+            S_YYEMPTY = -2,
+            S_YYEOF = 0,                                // "EOF"
+            S_YYerror = 1,                              // error
+            S_YYUNDEF = 2,                              // "invalid token"
+            S_ABS = 3,                                  // ABS
+            S_ACOS = 4,                                 // ACOS
+            S_ACOSH = 5,                                // ACOSH
+            S_ADD = 6,                                  // ADD
+            S_ALL_ELEMENTS_TRUE = 7,                    // "allElementsTrue"
+            S_AND = 8,                                  // AND
+            S_ANY_ELEMENT_TRUE = 9,                     // "anyElementTrue"
+            S_ARG_CASE_SENSITIVE = 10,                  // "$caseSensitive argument"
+            S_ARRAY_ELEM_AT = 11,                       // ARRAY_ELEM_AT
+            S_ARRAY_TO_OBJECT = 12,                     // ARRAY_TO_OBJECT
+            S_ARG_AS = 13,                              // "as argument"
+            S_ARG_CHARS = 14,                           // "chars argument"
+            S_ARG_COLL = 15,                            // "coll argument"
+            S_ARG_COND = 16,                            // "cond argument"
+            S_ARG_DATE = 17,                            // "date argument"
+            S_ARG_DATE_STRING = 18,                     // "dateString argument"
+            S_ARG_DAY = 19,                             // "day argument"
+            S_ARG_DIACRITIC_SENSITIVE = 20,             // "$diacriticSensitive argument"
+            S_ARG_FILTER = 21,                          // "filter"
+            S_ARG_FIND = 22,                            // "find argument"
+            S_ARG_FORMAT = 23,                          // "format argument"
+            S_ARG_HOUR = 24,                            // "hour argument"
+            S_ARG_INPUT = 25,                           // "input argument"
+            S_ARG_ISO_8601 = 26,                        // "ISO 8601 argument"
+            S_ARG_ISO_DAY_OF_WEEK = 27,                 // "ISO day of week argument"
+            S_ARG_ISO_WEEK = 28,                        // "ISO week argument"
+            S_ARG_ISO_WEEK_YEAR = 29,                   // "ISO week year argument"
+            S_ARG_LANGUAGE = 30,                        // "$language argument"
+            S_ARG_MILLISECOND = 31,                     // "millisecond argument"
+            S_ARG_MINUTE = 32,                          // "minute argument"
+            S_ARG_MONTH = 33,                           // "month argument"
+            S_ARG_ON_ERROR = 34,                        // "onError argument"
+            S_ARG_ON_NULL = 35,                         // "onNull argument"
+            S_ARG_OPTIONS = 36,                         // "options argument"
+            S_ARG_PIPELINE = 37,                        // "pipeline argument"
+            S_ARG_REGEX = 38,                           // "regex argument"
+            S_ARG_REPLACEMENT = 39,                     // "replacement argument"
+            S_ARG_SEARCH = 40,                          // "$search argument"
+            S_ARG_SECOND = 41,                          // "second argument"
+            S_ARG_SIZE = 42,                            // "size argument"
+            S_ARG_TIMEZONE = 43,                        // "timezone argument"
+            S_ARG_TO = 44,                              // "to argument"
+            S_ARG_YEAR = 45,                            // "year argument"
+            S_ASIN = 46,                                // ASIN
+            S_ASINH = 47,                               // ASINH
+            S_ATAN = 48,                                // ATAN
+            S_ATAN2 = 49,                               // ATAN2
+            S_ATANH = 50,                               // ATANH
+            S_BOOL_FALSE = 51,                          // "false"
+            S_BOOL_TRUE = 52,                           // "true"
+            S_CEIL = 53,                                // CEIL
+            S_CMP = 54,                                 // CMP
+            S_COMMENT = 55,                             // COMMENT
+            S_CONCAT = 56,                              // CONCAT
+            S_CONCAT_ARRAYS = 57,                       // CONCAT_ARRAYS
+            S_CONST_EXPR = 58,                          // CONST_EXPR
+            S_CONVERT = 59,                             // CONVERT
+            S_COS = 60,                                 // COS
+            S_COSH = 61,                                // COSH
+            S_DATE_FROM_PARTS = 62,                     // DATE_FROM_PARTS
+            S_DATE_FROM_STRING = 63,                    // DATE_FROM_STRING
+            S_DATE_TO_PARTS = 64,                       // DATE_TO_PARTS
+            S_DATE_TO_STRING = 65,                      // DATE_TO_STRING
+            S_DAY_OF_MONTH = 66,                        // DAY_OF_MONTH
+            S_DAY_OF_WEEK = 67,                         // DAY_OF_WEEK
+            S_DAY_OF_YEAR = 68,                         // DAY_OF_YEAR
+            S_DECIMAL_NEGATIVE_ONE = 69,                // "-1 (decimal)"
+            S_DECIMAL_ONE = 70,                         // "1 (decimal)"
+            S_DECIMAL_ZERO = 71,                        // "zero (decimal)"
+            S_DEGREES_TO_RADIANS = 72,                  // DEGREES_TO_RADIANS
+            S_DIVIDE = 73,                              // DIVIDE
+            S_DOUBLE_NEGATIVE_ONE = 74,                 // "-1 (double)"
+            S_DOUBLE_ONE = 75,                          // "1 (double)"
+            S_DOUBLE_ZERO = 76,                         // "zero (double)"
+            S_ELEM_MATCH = 77,                          // "elemMatch operator"
+            S_END_ARRAY = 78,                           // "end of array"
+            S_END_OBJECT = 79,                          // "end of object"
+            S_EQ = 80,                                  // EQ
+            S_EXISTS = 81,                              // EXISTS
+            S_EXPONENT = 82,                            // EXPONENT
+            S_EXPR = 83,                                // EXPR
+            S_FILTER = 84,                              // FILTER
+            S_FIRST = 85,                               // FIRST
+            S_FLOOR = 86,                               // FLOOR
+            S_GEO_NEAR_DISTANCE = 87,                   // "geoNearDistance"
+            S_GEO_NEAR_POINT = 88,                      // "geoNearPoint"
+            S_GT = 89,                                  // GT
+            S_GTE = 90,                                 // GTE
+            S_HOUR = 91,                                // HOUR
+            S_ID = 92,                                  // ID
+            S_IN = 93,                                  // IN
+            S_INDEX_KEY = 94,                           // "indexKey"
+            S_INDEX_OF_ARRAY = 95,                      // INDEX_OF_ARRAY
+            S_INDEX_OF_BYTES = 96,                      // INDEX_OF_BYTES
+            S_INDEX_OF_CP = 97,                         // INDEX_OF_CP
+            S_INT_NEGATIVE_ONE = 98,                    // "-1 (int)"
+            S_INT_ONE = 99,                             // "1 (int)"
+            S_INT_ZERO = 100,                           // "zero (int)"
+            S_IS_ARRAY = 101,                           // IS_ARRAY
+            S_ISO_DAY_OF_WEEK = 102,                    // ISO_DAY_OF_WEEK
+            S_ISO_WEEK = 103,                           // ISO_WEEK
+            S_ISO_WEEK_YEAR = 104,                      // ISO_WEEK_YEAR
+            S_LITERAL = 105,                            // LITERAL
+            S_LN = 106,                                 // LN
+            S_LOG = 107,                                // LOG
+            S_LOGTEN = 108,                             // LOGTEN
+            S_LONG_NEGATIVE_ONE = 109,                  // "-1 (long)"
+            S_LONG_ONE = 110,                           // "1 (long)"
+            S_LONG_ZERO = 111,                          // "zero (long)"
+            S_LT = 112,                                 // LT
+            S_LTE = 113,                                // LTE
+            S_LTRIM = 114,                              // LTRIM
+            S_META = 115,                               // META
+            S_MILLISECOND = 116,                        // MILLISECOND
+            S_MINUTE = 117,                             // MINUTE
+            S_MOD = 118,                                // MOD
+            S_MONTH = 119,                              // MONTH
+            S_MULTIPLY = 120,                           // MULTIPLY
+            S_NE = 121,                                 // NE
+            S_NOR = 122,                                // NOR
+            S_NOT = 123,                                // NOT
+            S_OR = 124,                                 // OR
+            S_POW = 125,                                // POW
+            S_RADIANS_TO_DEGREES = 126,                 // RADIANS_TO_DEGREES
+            S_RAND_VAL = 127,                           // "randVal"
+            S_RECORD_ID = 128,                          // "recordId"
+            S_REGEX_FIND = 129,                         // REGEX_FIND
+            S_REGEX_FIND_ALL = 130,                     // REGEX_FIND_ALL
+            S_REGEX_MATCH = 131,                        // REGEX_MATCH
+            S_REPLACE_ALL = 132,                        // REPLACE_ALL
+            S_REPLACE_ONE = 133,                        // REPLACE_ONE
+            S_ROUND = 134,                              // ROUND
+            S_RTRIM = 135,                              // RTRIM
+            S_SEARCH_HIGHLIGHTS = 136,                  // "searchHighlights"
+            S_SEARCH_SCORE = 137,                       // "searchScore"
+            S_SECOND = 138,                             // SECOND
+            S_SET_DIFFERENCE = 139,                     // "setDifference"
+            S_SET_EQUALS = 140,                         // "setEquals"
+            S_SET_INTERSECTION = 141,                   // "setIntersection"
+            S_SET_IS_SUBSET = 142,                      // "setIsSubset"
+            S_SET_UNION = 143,                          // "setUnion"
+            S_SIN = 144,                                // SIN
+            S_SINH = 145,                               // SINH
+            S_SLICE = 146,                              // "slice"
+            S_SORT_KEY = 147,                           // "sortKey"
+            S_SPLIT = 148,                              // SPLIT
+            S_SQRT = 149,                               // SQRT
+            S_STAGE_INHIBIT_OPTIMIZATION = 150,         // STAGE_INHIBIT_OPTIMIZATION
+            S_STAGE_LIMIT = 151,                        // STAGE_LIMIT
+            S_STAGE_MATCH = 152,                        // STAGE_MATCH
+            S_STAGE_PROJECT = 153,                      // STAGE_PROJECT
+            S_STAGE_SAMPLE = 154,                       // STAGE_SAMPLE
+            S_STAGE_SKIP = 155,                         // STAGE_SKIP
+            S_STAGE_UNION_WITH = 156,                   // STAGE_UNION_WITH
+            S_START_ARRAY = 157,                        // "array"
+            S_START_OBJECT = 158,                       // "object"
+            S_STR_CASE_CMP = 159,                       // STR_CASE_CMP
+            S_STR_LEN_BYTES = 160,                      // STR_LEN_BYTES
+            S_STR_LEN_CP = 161,                         // STR_LEN_CP
+            S_SUBSTR = 162,                             // SUBSTR
+            S_SUBSTR_BYTES = 163,                       // SUBSTR_BYTES
+            S_SUBSTR_CP = 164,                          // SUBSTR_CP
+            S_SUBTRACT = 165,                           // SUBTRACT
+            S_TAN = 166,                                // TAN
+            S_TANH = 167,                               // TANH
+            S_TEXT = 168,                               // TEXT
+            S_TEXT_SCORE = 169,                         // "textScore"
+            S_TO_BOOL = 170,                            // TO_BOOL
+            S_TO_DATE = 171,                            // TO_DATE
+            S_TO_DECIMAL = 172,                         // TO_DECIMAL
+            S_TO_DOUBLE = 173,                          // TO_DOUBLE
+            S_TO_INT = 174,                             // TO_INT
+            S_TO_LONG = 175,                            // TO_LONG
+            S_TO_LOWER = 176,                           // TO_LOWER
+            S_TO_OBJECT_ID = 177,                       // TO_OBJECT_ID
+            S_TO_STRING = 178,                          // TO_STRING
+            S_TO_UPPER = 179,                           // TO_UPPER
+            S_TRIM = 180,                               // TRIM
+            S_TRUNC = 181,                              // TRUNC
+            S_TYPE = 182,                               // TYPE
+            S_WEEK = 183,                               // WEEK
+            S_WHERE = 184,                              // WHERE
+            S_YEAR = 185,                               // YEAR
+            S_FIELDNAME = 186,                          // "fieldname"
+            S_DOTTED_FIELDNAME = 187,                   // "fieldname containing dotted path"
+            S_DOLLAR_PREF_FIELDNAME = 188,              // "$-prefixed fieldname"
+            S_STRING = 189,                             // "string"
+            S_DOLLAR_STRING = 190,                      // "$-prefixed string"
+            S_DOLLAR_DOLLAR_STRING = 191,               // "$$-prefixed string"
+            S_BINARY = 192,                             // "BinData"
+            S_UNDEFINED = 193,                          // "undefined"
+            S_OBJECT_ID = 194,                          // "ObjectID"
+            S_DATE_LITERAL = 195,                       // "Date"
+            S_JSNULL = 196,                             // "null"
+            S_REGEX = 197,                              // "regex"
+            S_DB_POINTER = 198,                         // "dbPointer"
+            S_JAVASCRIPT = 199,                         // "Code"
+            S_SYMBOL = 200,                             // "Symbol"
+            S_JAVASCRIPT_W_SCOPE = 201,                 // "CodeWScope"
+            S_INT_OTHER = 202,                          // "arbitrary integer"
+            S_LONG_OTHER = 203,                         // "arbitrary long"
+            S_DOUBLE_OTHER = 204,                       // "arbitrary double"
+            S_DECIMAL_OTHER = 205,                      // "arbitrary decimal"
+            S_TIMESTAMP = 206,                          // "Timestamp"
+            S_MIN_KEY = 207,                            // "minKey"
+            S_MAX_KEY = 208,                            // "maxKey"
+            S_START_PIPELINE = 209,                     // START_PIPELINE
+            S_START_MATCH = 210,                        // START_MATCH
+            S_START_PROJECT = 211,                      // START_PROJECT
+            S_START_SORT = 212,                         // START_SORT
+            S_YYACCEPT = 213,                           // $accept
+            S_aggregationProjectionFieldname = 214,     // aggregationProjectionFieldname
+            S_projectionFieldname = 215,                // projectionFieldname
+            S_expressionFieldname = 216,                // expressionFieldname
+            S_stageAsUserFieldname = 217,               // stageAsUserFieldname
+            S_argAsUserFieldname = 218,                 // argAsUserFieldname
+            S_argAsProjectionPath = 219,                // argAsProjectionPath
+            S_aggExprAsUserFieldname = 220,             // aggExprAsUserFieldname
+            S_invariableUserFieldname = 221,            // invariableUserFieldname
+            S_sortFieldname = 222,                      // sortFieldname
+            S_idAsUserFieldname = 223,                  // idAsUserFieldname
+            S_elemMatchAsUserFieldname = 224,           // elemMatchAsUserFieldname
+            S_idAsProjectionPath = 225,                 // idAsProjectionPath
+            S_valueFieldname = 226,                     // valueFieldname
+            S_predFieldname = 227,                      // predFieldname
+            S_aggregationProjectField = 228,            // aggregationProjectField
+            S_aggregationProjectionObjectField = 229,   // aggregationProjectionObjectField
+            S_expressionField = 230,                    // expressionField
+            S_valueField = 231,                         // valueField
+            S_arg = 232,                                // arg
+            S_dbPointer = 233,                          // dbPointer
+            S_javascript = 234,                         // javascript
+            S_symbol = 235,                             // symbol
+            S_javascriptWScope = 236,                   // javascriptWScope
+            S_int = 237,                                // int
+            S_timestamp = 238,                          // timestamp
+            S_long = 239,                               // long
+            S_double = 240,                             // double
+            S_decimal = 241,                            // decimal
+            S_minKey = 242,                             // minKey
+            S_maxKey = 243,                             // maxKey
+            S_value = 244,                              // value
+            S_string = 245,                             // string
+            S_aggregationFieldPath = 246,               // aggregationFieldPath
+            S_binary = 247,                             // binary
+            S_undefined = 248,                          // undefined
+            S_objectId = 249,                           // objectId
+            S_bool = 250,                               // bool
+            S_date = 251,                               // date
+            S_null = 252,                               // null
+            S_regex = 253,                              // regex
+            S_simpleValue = 254,                        // simpleValue
+            S_compoundValue = 255,                      // compoundValue
+            S_valueArray = 256,                         // valueArray
+            S_valueObject = 257,                        // valueObject
+            S_valueFields = 258,                        // valueFields
+            S_variable = 259,                           // variable
+            S_typeArray = 260,                          // typeArray
+            S_typeValue = 261,                          // typeValue
+            S_pipeline = 262,                           // pipeline
+            S_stageList = 263,                          // stageList
+            S_stage = 264,                              // stage
+            S_inhibitOptimization = 265,                // inhibitOptimization
+            S_unionWith = 266,                          // unionWith
+            S_skip = 267,                               // skip
+            S_limit = 268,                              // limit
+            S_matchStage = 269,                         // matchStage
+            S_project = 270,                            // project
+            S_sample = 271,                             // sample
+            S_aggregationProjectFields = 272,           // aggregationProjectFields
+            S_aggregationProjectionObjectFields = 273,  // aggregationProjectionObjectFields
+            S_topLevelAggregationProjection = 274,      // topLevelAggregationProjection
+            S_aggregationProjection = 275,              // aggregationProjection
+            S_projectionCommon = 276,                   // projectionCommon
+            S_aggregationProjectionObject = 277,        // aggregationProjectionObject
+            S_num = 278,                                // num
+            S_expression = 279,                         // expression
+            S_exprFixedTwoArg = 280,                    // exprFixedTwoArg
+            S_exprFixedThreeArg = 281,                  // exprFixedThreeArg
+            S_slice = 282,                              // slice
+            S_expressionArray = 283,                    // expressionArray
+            S_expressionObject = 284,                   // expressionObject
+            S_expressionFields = 285,                   // expressionFields
+            S_maths = 286,                              // maths
+            S_meta = 287,                               // meta
+            S_add = 288,                                // add
+            S_boolExprs = 289,                          // boolExprs
+            S_and = 290,                                // and
+            S_or = 291,                                 // or
+            S_not = 292,                                // not
+            S_literalEscapes = 293,                     // literalEscapes
+            S_const = 294,                              // const
+            S_literal = 295,                            // literal
+            S_stringExps = 296,                         // stringExps
+            S_concat = 297,                             // concat
+            S_dateFromString = 298,                     // dateFromString
+            S_dateToString = 299,                       // dateToString
+            S_indexOfBytes = 300,                       // indexOfBytes
+            S_indexOfCP = 301,                          // indexOfCP
+            S_ltrim = 302,                              // ltrim
+            S_regexFind = 303,                          // regexFind
+            S_regexFindAll = 304,                       // regexFindAll
+            S_regexMatch = 305,                         // regexMatch
+            S_regexArgs = 306,                          // regexArgs
+            S_replaceOne = 307,                         // replaceOne
+            S_replaceAll = 308,                         // replaceAll
+            S_rtrim = 309,                              // rtrim
+            S_split = 310,                              // split
+            S_strLenBytes = 311,                        // strLenBytes
+            S_strLenCP = 312,                           // strLenCP
+            S_strcasecmp = 313,                         // strcasecmp
+            S_substr = 314,                             // substr
+            S_substrBytes = 315,                        // substrBytes
+            S_substrCP = 316,                           // substrCP
+            S_toLower = 317,                            // toLower
+            S_toUpper = 318,                            // toUpper
+            S_trim = 319,                               // trim
+            S_compExprs = 320,                          // compExprs
+            S_cmp = 321,                                // cmp
+            S_eq = 322,                                 // eq
+            S_gt = 323,                                 // gt
+            S_gte = 324,                                // gte
+            S_lt = 325,                                 // lt
+            S_lte = 326,                                // lte
+            S_ne = 327,                                 // ne
+            S_dateExps = 328,                           // dateExps
+            S_dateFromParts = 329,                      // dateFromParts
+            S_dateToParts = 330,                        // dateToParts
+            S_dayOfMonth = 331,                         // dayOfMonth
+            S_dayOfWeek = 332,                          // dayOfWeek
+            S_dayOfYear = 333,                          // dayOfYear
+            S_hour = 334,                               // hour
+            S_isoDayOfWeek = 335,                       // isoDayOfWeek
+            S_isoWeek = 336,                            // isoWeek
+            S_isoWeekYear = 337,                        // isoWeekYear
+            S_millisecond = 338,                        // millisecond
+            S_minute = 339,                             // minute
+            S_month = 340,                              // month
+            S_second = 341,                             // second
+            S_week = 342,                               // week
+            S_year = 343,                               // year
+            S_typeExpression = 344,                     // typeExpression
+            S_convert = 345,                            // convert
+            S_toBool = 346,                             // toBool
+            S_toDate = 347,                             // toDate
+            S_toDecimal = 348,                          // toDecimal
+            S_toDouble = 349,                           // toDouble
+            S_toInt = 350,                              // toInt
+            S_toLong = 351,                             // toLong
+            S_toObjectId = 352,                         // toObjectId
+            S_toString = 353,                           // toString
+            S_type = 354,                               // type
+            S_abs = 355,                                // abs
+            S_ceil = 356,                               // ceil
+            S_divide = 357,                             // divide
+            S_exponent = 358,                           // exponent
+            S_floor = 359,                              // floor
+            S_ln = 360,                                 // ln
+            S_log = 361,                                // log
+            S_logten = 362,                             // logten
+            S_mod = 363,                                // mod
+            S_multiply = 364,                           // multiply
+            S_pow = 365,                                // pow
+            S_round = 366,                              // round
+            S_sqrt = 367,                               // sqrt
+            S_subtract = 368,                           // subtract
+            S_trunc = 369,                              // trunc
+            S_arrayExps = 370,                          // arrayExps
+            S_arrayElemAt = 371,                        // arrayElemAt
+            S_arrayToObject = 372,                      // arrayToObject
+            S_concatArrays = 373,                       // concatArrays
+            S_filter = 374,                             // filter
+            S_first = 375,                              // first
+            S_in = 376,                                 // in
+            S_indexOfArray = 377,                       // indexOfArray
+            S_isArray = 378,                            // isArray
+            S_onErrorArg = 379,                         // onErrorArg
+            S_onNullArg = 380,                          // onNullArg
+            S_asArg = 381,                              // asArg
+            S_formatArg = 382,                          // formatArg
+            S_timezoneArg = 383,                        // timezoneArg
+            S_charsArg = 384,                           // charsArg
+            S_optionsArg = 385,                         // optionsArg
+            S_hourArg = 386,                            // hourArg
+            S_minuteArg = 387,                          // minuteArg
+            S_secondArg = 388,                          // secondArg
+            S_millisecondArg = 389,                     // millisecondArg
+            S_dayArg = 390,                             // dayArg
+            S_isoWeekArg = 391,                         // isoWeekArg
+            S_iso8601Arg = 392,                         // iso8601Arg
+            S_monthArg = 393,                           // monthArg
+            S_isoDayOfWeekArg = 394,                    // isoDayOfWeekArg
+            S_expressions = 395,                        // expressions
+            S_values = 396,                             // values
+            S_exprZeroToTwo = 397,                      // exprZeroToTwo
+            S_setExpression = 398,                      // setExpression
+            S_allElementsTrue = 399,                    // allElementsTrue
+            S_anyElementTrue = 400,                     // anyElementTrue
+            S_setDifference = 401,                      // setDifference
+            S_setEquals = 402,                          // setEquals
+            S_setIntersection = 403,                    // setIntersection
+            S_setIsSubset = 404,                        // setIsSubset
+            S_setUnion = 405,                           // setUnion
+            S_trig = 406,                               // trig
+            S_sin = 407,                                // sin
+            S_cos = 408,                                // cos
+            S_tan = 409,                                // tan
+            S_sinh = 410,                               // sinh
+            S_cosh = 411,                               // cosh
+            S_tanh = 412,                               // tanh
+            S_asin = 413,                               // asin
+            S_acos = 414,                               // acos
+            S_atan = 415,                               // atan
+            S_asinh = 416,                              // asinh
+            S_acosh = 417,                              // acosh
+            S_atanh = 418,                              // atanh
+            S_atan2 = 419,                              // atan2
+            S_degreesToRadians = 420,                   // degreesToRadians
+            S_radiansToDegrees = 421,                   // radiansToDegrees
+            S_nonArrayExpression = 422,                 // nonArrayExpression
+            S_nonArrayCompoundExpression = 423,         // nonArrayCompoundExpression
+            S_aggregationOperator = 424,                // aggregationOperator
+            S_aggregationOperatorWithoutSlice = 425,    // aggregationOperatorWithoutSlice
+            S_expressionSingletonArray = 426,           // expressionSingletonArray
+            S_singleArgExpression = 427,                // singleArgExpression
+            S_nonArrayNonObjExpression = 428,           // nonArrayNonObjExpression
+            S_matchExpression = 429,                    // matchExpression
+            S_predicates = 430,                         // predicates
+            S_compoundMatchExprs = 431,                 // compoundMatchExprs
+            S_predValue = 432,                          // predValue
+            S_additionalExprs = 433,                    // additionalExprs
+            S_predicate = 434,                          // predicate
+            S_fieldPredicate = 435,                     // fieldPredicate
+            S_logicalExpr = 436,                        // logicalExpr
+            S_operatorExpression = 437,                 // operatorExpression
+            S_notExpr = 438,                            // notExpr
+            S_matchMod = 439,                           // matchMod
+            S_existsExpr = 440,                         // existsExpr
+            S_typeExpr = 441,                           // typeExpr
+            S_commentExpr = 442,                        // commentExpr
+            S_logicalExprField = 443,                   // logicalExprField
+            S_typeValues = 444,                         // typeValues
+            S_matchExpr = 445,                          // matchExpr
+            S_matchText = 446,                          // matchText
+            S_matchWhere = 447,                         // matchWhere
+            S_textArgCaseSensitive = 448,               // textArgCaseSensitive
+            S_textArgDiacriticSensitive = 449,          // textArgDiacriticSensitive
+            S_textArgLanguage = 450,                    // textArgLanguage
+            S_textArgSearch = 451,                      // textArgSearch
+            S_findProject = 452,                        // findProject
+            S_findProjectFields = 453,                  // findProjectFields
+            S_topLevelFindProjection = 454,             // topLevelFindProjection
+            S_findProjection = 455,                     // findProjection
+            S_findProjectionSlice = 456,                // findProjectionSlice
+            S_elemMatch = 457,                          // elemMatch
+            S_findProjectionObject = 458,               // findProjectionObject
+            S_findProjectionObjectFields = 459,         // findProjectionObjectFields
+            S_findProjectField = 460,                   // findProjectField
+            S_findProjectionObjectField = 461,          // findProjectionObjectField
+            S_sortSpecs = 462,                          // sortSpecs
+            S_specList = 463,                           // specList
+            S_metaSort = 464,                           // metaSort
+            S_oneOrNegOne = 465,                        // oneOrNegOne
+            S_metaSortKeyword = 466,                    // metaSortKeyword
+            S_sortSpec = 467,                           // sortSpec
+            S_start = 468,                              // start
+            S_START_ORDERED_OBJECT = 469                // START_ORDERED_OBJECT
         };
     };
 
-    /// (External) token type, as returned by yylex.
-    typedef token::yytokentype token_type;
+    /// (Internal) symbol kind.
+    typedef symbol_kind::symbol_kind_type symbol_kind_type;
 
-    /// Symbol type: an internal symbol number.
-    typedef int symbol_number_type;
-
-    /// The symbol type number to denote an empty symbol.
-    enum { empty_symbol = -2 };
-
-    /// Internal symbol number for tokens (subsumed by symbol_number_type).
-    typedef unsigned char token_number_type;
+    /// The number of tokens.
+    static const symbol_kind_type YYNTOKENS = symbol_kind::YYNTOKENS;
 
     /// A complete symbol.
     ///
-    /// Expects its Base type to provide access to the symbol type
-    /// via type_get ().
+    /// Expects its Base type to provide access to the symbol kind
+    /// via kind ().
     ///
     /// Provide access to semantic value and location.
     template <typename Base>
@@ -937,7 +1451,363 @@ public:
 
 #if 201103L <= YY_CPLUSPLUS
         /// Move constructor.
-        basic_symbol(basic_symbol&& that);
+        basic_symbol(basic_symbol&& that)
+            : Base(std::move(that)), value(), location(std::move(that.location)) {
+            switch (this->kind()) {
+                case symbol_kind::S_BINARY:  // "BinData"
+                    value.move<BSONBinData>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_JAVASCRIPT:  // "Code"
+                    value.move<BSONCode>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
+                    value.move<BSONCodeWScope>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_DB_POINTER:  // "dbPointer"
+                    value.move<BSONDBRef>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_REGEX:  // "regex"
+                    value.move<BSONRegEx>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_SYMBOL:  // "Symbol"
+                    value.move<BSONSymbol>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_dbPointer:                 // dbPointer
+                case symbol_kind::S_javascript:                // javascript
+                case symbol_kind::S_symbol:                    // symbol
+                case symbol_kind::S_javascriptWScope:          // javascriptWScope
+                case symbol_kind::S_int:                       // int
+                case symbol_kind::S_timestamp:                 // timestamp
+                case symbol_kind::S_long:                      // long
+                case symbol_kind::S_double:                    // double
+                case symbol_kind::S_decimal:                   // decimal
+                case symbol_kind::S_minKey:                    // minKey
+                case symbol_kind::S_maxKey:                    // maxKey
+                case symbol_kind::S_value:                     // value
+                case symbol_kind::S_string:                    // string
+                case symbol_kind::S_aggregationFieldPath:      // aggregationFieldPath
+                case symbol_kind::S_binary:                    // binary
+                case symbol_kind::S_undefined:                 // undefined
+                case symbol_kind::S_objectId:                  // objectId
+                case symbol_kind::S_bool:                      // bool
+                case symbol_kind::S_date:                      // date
+                case symbol_kind::S_null:                      // null
+                case symbol_kind::S_regex:                     // regex
+                case symbol_kind::S_simpleValue:               // simpleValue
+                case symbol_kind::S_compoundValue:             // compoundValue
+                case symbol_kind::S_valueArray:                // valueArray
+                case symbol_kind::S_valueObject:               // valueObject
+                case symbol_kind::S_valueFields:               // valueFields
+                case symbol_kind::S_variable:                  // variable
+                case symbol_kind::S_typeArray:                 // typeArray
+                case symbol_kind::S_typeValue:                 // typeValue
+                case symbol_kind::S_pipeline:                  // pipeline
+                case symbol_kind::S_stageList:                 // stageList
+                case symbol_kind::S_stage:                     // stage
+                case symbol_kind::S_inhibitOptimization:       // inhibitOptimization
+                case symbol_kind::S_unionWith:                 // unionWith
+                case symbol_kind::S_skip:                      // skip
+                case symbol_kind::S_limit:                     // limit
+                case symbol_kind::S_matchStage:                // matchStage
+                case symbol_kind::S_project:                   // project
+                case symbol_kind::S_sample:                    // sample
+                case symbol_kind::S_aggregationProjectFields:  // aggregationProjectFields
+                case symbol_kind::
+                    S_aggregationProjectionObjectFields:  // aggregationProjectionObjectFields
+                case symbol_kind::S_topLevelAggregationProjection:  // topLevelAggregationProjection
+                case symbol_kind::S_aggregationProjection:          // aggregationProjection
+                case symbol_kind::S_projectionCommon:               // projectionCommon
+                case symbol_kind::S_aggregationProjectionObject:    // aggregationProjectionObject
+                case symbol_kind::S_num:                            // num
+                case symbol_kind::S_expression:                     // expression
+                case symbol_kind::S_exprFixedTwoArg:                // exprFixedTwoArg
+                case symbol_kind::S_exprFixedThreeArg:              // exprFixedThreeArg
+                case symbol_kind::S_slice:                          // slice
+                case symbol_kind::S_expressionArray:                // expressionArray
+                case symbol_kind::S_expressionObject:               // expressionObject
+                case symbol_kind::S_expressionFields:               // expressionFields
+                case symbol_kind::S_maths:                          // maths
+                case symbol_kind::S_meta:                           // meta
+                case symbol_kind::S_add:                            // add
+                case symbol_kind::S_boolExprs:                      // boolExprs
+                case symbol_kind::S_and:                            // and
+                case symbol_kind::S_or:                             // or
+                case symbol_kind::S_not:                            // not
+                case symbol_kind::S_literalEscapes:                 // literalEscapes
+                case symbol_kind::S_const:                          // const
+                case symbol_kind::S_literal:                        // literal
+                case symbol_kind::S_stringExps:                     // stringExps
+                case symbol_kind::S_concat:                         // concat
+                case symbol_kind::S_dateFromString:                 // dateFromString
+                case symbol_kind::S_dateToString:                   // dateToString
+                case symbol_kind::S_indexOfBytes:                   // indexOfBytes
+                case symbol_kind::S_indexOfCP:                      // indexOfCP
+                case symbol_kind::S_ltrim:                          // ltrim
+                case symbol_kind::S_regexFind:                      // regexFind
+                case symbol_kind::S_regexFindAll:                   // regexFindAll
+                case symbol_kind::S_regexMatch:                     // regexMatch
+                case symbol_kind::S_regexArgs:                      // regexArgs
+                case symbol_kind::S_replaceOne:                     // replaceOne
+                case symbol_kind::S_replaceAll:                     // replaceAll
+                case symbol_kind::S_rtrim:                          // rtrim
+                case symbol_kind::S_split:                          // split
+                case symbol_kind::S_strLenBytes:                    // strLenBytes
+                case symbol_kind::S_strLenCP:                       // strLenCP
+                case symbol_kind::S_strcasecmp:                     // strcasecmp
+                case symbol_kind::S_substr:                         // substr
+                case symbol_kind::S_substrBytes:                    // substrBytes
+                case symbol_kind::S_substrCP:                       // substrCP
+                case symbol_kind::S_toLower:                        // toLower
+                case symbol_kind::S_toUpper:                        // toUpper
+                case symbol_kind::S_trim:                           // trim
+                case symbol_kind::S_compExprs:                      // compExprs
+                case symbol_kind::S_cmp:                            // cmp
+                case symbol_kind::S_eq:                             // eq
+                case symbol_kind::S_gt:                             // gt
+                case symbol_kind::S_gte:                            // gte
+                case symbol_kind::S_lt:                             // lt
+                case symbol_kind::S_lte:                            // lte
+                case symbol_kind::S_ne:                             // ne
+                case symbol_kind::S_dateExps:                       // dateExps
+                case symbol_kind::S_dateFromParts:                  // dateFromParts
+                case symbol_kind::S_dateToParts:                    // dateToParts
+                case symbol_kind::S_dayOfMonth:                     // dayOfMonth
+                case symbol_kind::S_dayOfWeek:                      // dayOfWeek
+                case symbol_kind::S_dayOfYear:                      // dayOfYear
+                case symbol_kind::S_hour:                           // hour
+                case symbol_kind::S_isoDayOfWeek:                   // isoDayOfWeek
+                case symbol_kind::S_isoWeek:                        // isoWeek
+                case symbol_kind::S_isoWeekYear:                    // isoWeekYear
+                case symbol_kind::S_millisecond:                    // millisecond
+                case symbol_kind::S_minute:                         // minute
+                case symbol_kind::S_month:                          // month
+                case symbol_kind::S_second:                         // second
+                case symbol_kind::S_week:                           // week
+                case symbol_kind::S_year:                           // year
+                case symbol_kind::S_typeExpression:                 // typeExpression
+                case symbol_kind::S_convert:                        // convert
+                case symbol_kind::S_toBool:                         // toBool
+                case symbol_kind::S_toDate:                         // toDate
+                case symbol_kind::S_toDecimal:                      // toDecimal
+                case symbol_kind::S_toDouble:                       // toDouble
+                case symbol_kind::S_toInt:                          // toInt
+                case symbol_kind::S_toLong:                         // toLong
+                case symbol_kind::S_toObjectId:                     // toObjectId
+                case symbol_kind::S_toString:                       // toString
+                case symbol_kind::S_type:                           // type
+                case symbol_kind::S_abs:                            // abs
+                case symbol_kind::S_ceil:                           // ceil
+                case symbol_kind::S_divide:                         // divide
+                case symbol_kind::S_exponent:                       // exponent
+                case symbol_kind::S_floor:                          // floor
+                case symbol_kind::S_ln:                             // ln
+                case symbol_kind::S_log:                            // log
+                case symbol_kind::S_logten:                         // logten
+                case symbol_kind::S_mod:                            // mod
+                case symbol_kind::S_multiply:                       // multiply
+                case symbol_kind::S_pow:                            // pow
+                case symbol_kind::S_round:                          // round
+                case symbol_kind::S_sqrt:                           // sqrt
+                case symbol_kind::S_subtract:                       // subtract
+                case symbol_kind::S_trunc:                          // trunc
+                case symbol_kind::S_arrayExps:                      // arrayExps
+                case symbol_kind::S_arrayElemAt:                    // arrayElemAt
+                case symbol_kind::S_arrayToObject:                  // arrayToObject
+                case symbol_kind::S_concatArrays:                   // concatArrays
+                case symbol_kind::S_filter:                         // filter
+                case symbol_kind::S_first:                          // first
+                case symbol_kind::S_in:                             // in
+                case symbol_kind::S_indexOfArray:                   // indexOfArray
+                case symbol_kind::S_isArray:                        // isArray
+                case symbol_kind::S_setExpression:                  // setExpression
+                case symbol_kind::S_allElementsTrue:                // allElementsTrue
+                case symbol_kind::S_anyElementTrue:                 // anyElementTrue
+                case symbol_kind::S_setDifference:                  // setDifference
+                case symbol_kind::S_setEquals:                      // setEquals
+                case symbol_kind::S_setIntersection:                // setIntersection
+                case symbol_kind::S_setIsSubset:                    // setIsSubset
+                case symbol_kind::S_setUnion:                       // setUnion
+                case symbol_kind::S_trig:                           // trig
+                case symbol_kind::S_sin:                            // sin
+                case symbol_kind::S_cos:                            // cos
+                case symbol_kind::S_tan:                            // tan
+                case symbol_kind::S_sinh:                           // sinh
+                case symbol_kind::S_cosh:                           // cosh
+                case symbol_kind::S_tanh:                           // tanh
+                case symbol_kind::S_asin:                           // asin
+                case symbol_kind::S_acos:                           // acos
+                case symbol_kind::S_atan:                           // atan
+                case symbol_kind::S_asinh:                          // asinh
+                case symbol_kind::S_acosh:                          // acosh
+                case symbol_kind::S_atanh:                          // atanh
+                case symbol_kind::S_atan2:                          // atan2
+                case symbol_kind::S_degreesToRadians:               // degreesToRadians
+                case symbol_kind::S_radiansToDegrees:               // radiansToDegrees
+                case symbol_kind::S_nonArrayExpression:             // nonArrayExpression
+                case symbol_kind::S_nonArrayCompoundExpression:     // nonArrayCompoundExpression
+                case symbol_kind::S_aggregationOperator:            // aggregationOperator
+                case symbol_kind::
+                    S_aggregationOperatorWithoutSlice:           // aggregationOperatorWithoutSlice
+                case symbol_kind::S_expressionSingletonArray:    // expressionSingletonArray
+                case symbol_kind::S_singleArgExpression:         // singleArgExpression
+                case symbol_kind::S_nonArrayNonObjExpression:    // nonArrayNonObjExpression
+                case symbol_kind::S_matchExpression:             // matchExpression
+                case symbol_kind::S_predicates:                  // predicates
+                case symbol_kind::S_compoundMatchExprs:          // compoundMatchExprs
+                case symbol_kind::S_predValue:                   // predValue
+                case symbol_kind::S_additionalExprs:             // additionalExprs
+                case symbol_kind::S_textArgCaseSensitive:        // textArgCaseSensitive
+                case symbol_kind::S_textArgDiacriticSensitive:   // textArgDiacriticSensitive
+                case symbol_kind::S_textArgLanguage:             // textArgLanguage
+                case symbol_kind::S_textArgSearch:               // textArgSearch
+                case symbol_kind::S_findProject:                 // findProject
+                case symbol_kind::S_findProjectFields:           // findProjectFields
+                case symbol_kind::S_topLevelFindProjection:      // topLevelFindProjection
+                case symbol_kind::S_findProjection:              // findProjection
+                case symbol_kind::S_findProjectionSlice:         // findProjectionSlice
+                case symbol_kind::S_elemMatch:                   // elemMatch
+                case symbol_kind::S_findProjectionObject:        // findProjectionObject
+                case symbol_kind::S_findProjectionObjectFields:  // findProjectionObjectFields
+                case symbol_kind::S_sortSpecs:                   // sortSpecs
+                case symbol_kind::S_specList:                    // specList
+                case symbol_kind::S_metaSort:                    // metaSort
+                case symbol_kind::S_oneOrNegOne:                 // oneOrNegOne
+                case symbol_kind::S_metaSortKeyword:             // metaSortKeyword
+                    value.move<CNode>(std::move(that.value));
+                    break;
+
+                case symbol_kind::
+                    S_aggregationProjectionFieldname:          // aggregationProjectionFieldname
+                case symbol_kind::S_projectionFieldname:       // projectionFieldname
+                case symbol_kind::S_expressionFieldname:       // expressionFieldname
+                case symbol_kind::S_stageAsUserFieldname:      // stageAsUserFieldname
+                case symbol_kind::S_argAsUserFieldname:        // argAsUserFieldname
+                case symbol_kind::S_argAsProjectionPath:       // argAsProjectionPath
+                case symbol_kind::S_aggExprAsUserFieldname:    // aggExprAsUserFieldname
+                case symbol_kind::S_invariableUserFieldname:   // invariableUserFieldname
+                case symbol_kind::S_sortFieldname:             // sortFieldname
+                case symbol_kind::S_idAsUserFieldname:         // idAsUserFieldname
+                case symbol_kind::S_elemMatchAsUserFieldname:  // elemMatchAsUserFieldname
+                case symbol_kind::S_idAsProjectionPath:        // idAsProjectionPath
+                case symbol_kind::S_valueFieldname:            // valueFieldname
+                case symbol_kind::S_predFieldname:             // predFieldname
+                case symbol_kind::S_logicalExprField:          // logicalExprField
+                    value.move<CNode::Fieldname>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_DATE_LITERAL:  // "Date"
+                    value.move<Date_t>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
+                    value.move<Decimal128>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_OBJECT_ID:  // "ObjectID"
+                    value.move<OID>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_TIMESTAMP:  // "Timestamp"
+                    value.move<Timestamp>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_MAX_KEY:  // "maxKey"
+                    value.move<UserMaxKey>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_MIN_KEY:  // "minKey"
+                    value.move<UserMinKey>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_JSNULL:  // "null"
+                    value.move<UserNull>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_UNDEFINED:  // "undefined"
+                    value.move<UserUndefined>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
+                    value.move<double>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
+                    value.move<int>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
+                    value.move<long long>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_aggregationProjectField:  // aggregationProjectField
+                case symbol_kind::
+                    S_aggregationProjectionObjectField:         // aggregationProjectionObjectField
+                case symbol_kind::S_expressionField:            // expressionField
+                case symbol_kind::S_valueField:                 // valueField
+                case symbol_kind::S_onErrorArg:                 // onErrorArg
+                case symbol_kind::S_onNullArg:                  // onNullArg
+                case symbol_kind::S_asArg:                      // asArg
+                case symbol_kind::S_formatArg:                  // formatArg
+                case symbol_kind::S_timezoneArg:                // timezoneArg
+                case symbol_kind::S_charsArg:                   // charsArg
+                case symbol_kind::S_optionsArg:                 // optionsArg
+                case symbol_kind::S_hourArg:                    // hourArg
+                case symbol_kind::S_minuteArg:                  // minuteArg
+                case symbol_kind::S_secondArg:                  // secondArg
+                case symbol_kind::S_millisecondArg:             // millisecondArg
+                case symbol_kind::S_dayArg:                     // dayArg
+                case symbol_kind::S_isoWeekArg:                 // isoWeekArg
+                case symbol_kind::S_iso8601Arg:                 // iso8601Arg
+                case symbol_kind::S_monthArg:                   // monthArg
+                case symbol_kind::S_isoDayOfWeekArg:            // isoDayOfWeekArg
+                case symbol_kind::S_predicate:                  // predicate
+                case symbol_kind::S_fieldPredicate:             // fieldPredicate
+                case symbol_kind::S_logicalExpr:                // logicalExpr
+                case symbol_kind::S_operatorExpression:         // operatorExpression
+                case symbol_kind::S_notExpr:                    // notExpr
+                case symbol_kind::S_matchMod:                   // matchMod
+                case symbol_kind::S_existsExpr:                 // existsExpr
+                case symbol_kind::S_typeExpr:                   // typeExpr
+                case symbol_kind::S_commentExpr:                // commentExpr
+                case symbol_kind::S_matchExpr:                  // matchExpr
+                case symbol_kind::S_matchText:                  // matchText
+                case symbol_kind::S_matchWhere:                 // matchWhere
+                case symbol_kind::S_findProjectField:           // findProjectField
+                case symbol_kind::S_findProjectionObjectField:  // findProjectionObjectField
+                case symbol_kind::S_sortSpec:                   // sortSpec
+                    value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_FIELDNAME:              // "fieldname"
+                case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+                case symbol_kind::S_STRING:                 // "string"
+                case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
+                case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
+                case symbol_kind::S_arg:                    // arg
+                    value.move<std::string>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_expressions:    // expressions
+                case symbol_kind::S_values:         // values
+                case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+                case symbol_kind::S_typeValues:     // typeValues
+                    value.move<std::vector<CNode>>(std::move(that.value));
+                    break;
+
+                case symbol_kind::S_DOTTED_FIELDNAME:  // "fieldname containing dotted path"
+                    value.move<std::vector<std::string>>(std::move(that.value));
+                    break;
+
+                default:
+                    break;
+            }
+        }
 #endif
 
         /// Copy constructor.
@@ -1128,349 +1998,363 @@ public:
         /// Destroy contents, and record that is empty.
         void clear() {
             // User destructor.
-            symbol_number_type yytype = this->type_get();
+            symbol_kind_type yykind = this->kind();
             basic_symbol<Base>& yysym = *this;
             (void)yysym;
-            switch (yytype) {
+            switch (yykind) {
                 default:
                     break;
             }
 
-            // Type destructor.
-            switch (yytype) {
-                case 182:  // "BinData"
+            // Value type destructor.
+            switch (yykind) {
+                case symbol_kind::S_BINARY:  // "BinData"
                     value.template destroy<BSONBinData>();
                     break;
 
-                case 189:  // "Code"
+                case symbol_kind::S_JAVASCRIPT:  // "Code"
                     value.template destroy<BSONCode>();
                     break;
 
-                case 191:  // "CodeWScope"
+                case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
                     value.template destroy<BSONCodeWScope>();
                     break;
 
-                case 188:  // "dbPointer"
+                case symbol_kind::S_DB_POINTER:  // "dbPointer"
                     value.template destroy<BSONDBRef>();
                     break;
 
-                case 187:  // "regex"
+                case symbol_kind::S_REGEX:  // "regex"
                     value.template destroy<BSONRegEx>();
                     break;
 
-                case 190:  // "Symbol"
+                case symbol_kind::S_SYMBOL:  // "Symbol"
                     value.template destroy<BSONSymbol>();
                     break;
 
-                case 223:  // dbPointer
-                case 224:  // javascript
-                case 225:  // symbol
-                case 226:  // javascriptWScope
-                case 227:  // int
-                case 228:  // timestamp
-                case 229:  // long
-                case 230:  // double
-                case 231:  // decimal
-                case 232:  // minKey
-                case 233:  // maxKey
-                case 234:  // value
-                case 235:  // string
-                case 236:  // aggregationFieldPath
-                case 237:  // binary
-                case 238:  // undefined
-                case 239:  // objectId
-                case 240:  // bool
-                case 241:  // date
-                case 242:  // null
-                case 243:  // regex
-                case 244:  // simpleValue
-                case 245:  // compoundValue
-                case 246:  // valueArray
-                case 247:  // valueObject
-                case 248:  // valueFields
-                case 249:  // variable
-                case 250:  // typeArray
-                case 251:  // typeValue
-                case 252:  // pipeline
-                case 253:  // stageList
-                case 254:  // stage
-                case 255:  // inhibitOptimization
-                case 256:  // unionWith
-                case 257:  // skip
-                case 258:  // limit
-                case 259:  // matchStage
-                case 260:  // project
-                case 261:  // sample
-                case 262:  // aggregationProjectFields
-                case 263:  // aggregationProjectionObjectFields
-                case 264:  // topLevelAggregationProjection
-                case 265:  // aggregationProjection
-                case 266:  // projectionCommon
-                case 267:  // aggregationProjectionObject
-                case 268:  // num
-                case 269:  // expression
-                case 270:  // exprFixedTwoArg
-                case 271:  // exprFixedThreeArg
-                case 272:  // slice
-                case 273:  // expressionArray
-                case 274:  // expressionObject
-                case 275:  // expressionFields
-                case 276:  // maths
-                case 277:  // meta
-                case 278:  // add
-                case 279:  // boolExprs
-                case 280:  // and
-                case 281:  // or
-                case 282:  // not
-                case 283:  // literalEscapes
-                case 284:  // const
-                case 285:  // literal
-                case 286:  // stringExps
-                case 287:  // concat
-                case 288:  // dateFromString
-                case 289:  // dateToString
-                case 290:  // indexOfBytes
-                case 291:  // indexOfCP
-                case 292:  // ltrim
-                case 293:  // regexFind
-                case 294:  // regexFindAll
-                case 295:  // regexMatch
-                case 296:  // regexArgs
-                case 297:  // replaceOne
-                case 298:  // replaceAll
-                case 299:  // rtrim
-                case 300:  // split
-                case 301:  // strLenBytes
-                case 302:  // strLenCP
-                case 303:  // strcasecmp
-                case 304:  // substr
-                case 305:  // substrBytes
-                case 306:  // substrCP
-                case 307:  // toLower
-                case 308:  // toUpper
-                case 309:  // trim
-                case 310:  // compExprs
-                case 311:  // cmp
-                case 312:  // eq
-                case 313:  // gt
-                case 314:  // gte
-                case 315:  // lt
-                case 316:  // lte
-                case 317:  // ne
-                case 318:  // dateExps
-                case 319:  // dateFromParts
-                case 320:  // dateToParts
-                case 321:  // dayOfMonth
-                case 322:  // dayOfWeek
-                case 323:  // dayOfYear
-                case 324:  // hour
-                case 325:  // isoDayOfWeek
-                case 326:  // isoWeek
-                case 327:  // isoWeekYear
-                case 328:  // millisecond
-                case 329:  // minute
-                case 330:  // month
-                case 331:  // second
-                case 332:  // week
-                case 333:  // year
-                case 334:  // typeExpression
-                case 335:  // convert
-                case 336:  // toBool
-                case 337:  // toDate
-                case 338:  // toDecimal
-                case 339:  // toDouble
-                case 340:  // toInt
-                case 341:  // toLong
-                case 342:  // toObjectId
-                case 343:  // toString
-                case 344:  // type
-                case 345:  // abs
-                case 346:  // ceil
-                case 347:  // divide
-                case 348:  // exponent
-                case 349:  // floor
-                case 350:  // ln
-                case 351:  // log
-                case 352:  // logten
-                case 353:  // mod
-                case 354:  // multiply
-                case 355:  // pow
-                case 356:  // round
-                case 357:  // sqrt
-                case 358:  // subtract
-                case 359:  // trunc
-                case 378:  // setExpression
-                case 379:  // allElementsTrue
-                case 380:  // anyElementTrue
-                case 381:  // setDifference
-                case 382:  // setEquals
-                case 383:  // setIntersection
-                case 384:  // setIsSubset
-                case 385:  // setUnion
-                case 386:  // trig
-                case 387:  // sin
-                case 388:  // cos
-                case 389:  // tan
-                case 390:  // sinh
-                case 391:  // cosh
-                case 392:  // tanh
-                case 393:  // asin
-                case 394:  // acos
-                case 395:  // atan
-                case 396:  // asinh
-                case 397:  // acosh
-                case 398:  // atanh
-                case 399:  // atan2
-                case 400:  // degreesToRadians
-                case 401:  // radiansToDegrees
-                case 402:  // nonArrayExpression
-                case 403:  // nonArrayCompoundExpression
-                case 404:  // aggregationOperator
-                case 405:  // aggregationOperatorWithoutSlice
-                case 406:  // expressionSingletonArray
-                case 407:  // singleArgExpression
-                case 408:  // nonArrayNonObjExpression
-                case 409:  // matchExpression
-                case 410:  // predicates
-                case 411:  // compoundMatchExprs
-                case 412:  // predValue
-                case 413:  // additionalExprs
-                case 428:  // textArgCaseSensitive
-                case 429:  // textArgDiacriticSensitive
-                case 430:  // textArgLanguage
-                case 431:  // textArgSearch
-                case 432:  // findProject
-                case 433:  // findProjectFields
-                case 434:  // topLevelFindProjection
-                case 435:  // findProjection
-                case 436:  // findProjectionSlice
-                case 437:  // elemMatch
-                case 438:  // findProjectionObject
-                case 439:  // findProjectionObjectFields
-                case 442:  // sortSpecs
-                case 443:  // specList
-                case 444:  // metaSort
-                case 445:  // oneOrNegOne
-                case 446:  // metaSortKeyword
+                case symbol_kind::S_dbPointer:                 // dbPointer
+                case symbol_kind::S_javascript:                // javascript
+                case symbol_kind::S_symbol:                    // symbol
+                case symbol_kind::S_javascriptWScope:          // javascriptWScope
+                case symbol_kind::S_int:                       // int
+                case symbol_kind::S_timestamp:                 // timestamp
+                case symbol_kind::S_long:                      // long
+                case symbol_kind::S_double:                    // double
+                case symbol_kind::S_decimal:                   // decimal
+                case symbol_kind::S_minKey:                    // minKey
+                case symbol_kind::S_maxKey:                    // maxKey
+                case symbol_kind::S_value:                     // value
+                case symbol_kind::S_string:                    // string
+                case symbol_kind::S_aggregationFieldPath:      // aggregationFieldPath
+                case symbol_kind::S_binary:                    // binary
+                case symbol_kind::S_undefined:                 // undefined
+                case symbol_kind::S_objectId:                  // objectId
+                case symbol_kind::S_bool:                      // bool
+                case symbol_kind::S_date:                      // date
+                case symbol_kind::S_null:                      // null
+                case symbol_kind::S_regex:                     // regex
+                case symbol_kind::S_simpleValue:               // simpleValue
+                case symbol_kind::S_compoundValue:             // compoundValue
+                case symbol_kind::S_valueArray:                // valueArray
+                case symbol_kind::S_valueObject:               // valueObject
+                case symbol_kind::S_valueFields:               // valueFields
+                case symbol_kind::S_variable:                  // variable
+                case symbol_kind::S_typeArray:                 // typeArray
+                case symbol_kind::S_typeValue:                 // typeValue
+                case symbol_kind::S_pipeline:                  // pipeline
+                case symbol_kind::S_stageList:                 // stageList
+                case symbol_kind::S_stage:                     // stage
+                case symbol_kind::S_inhibitOptimization:       // inhibitOptimization
+                case symbol_kind::S_unionWith:                 // unionWith
+                case symbol_kind::S_skip:                      // skip
+                case symbol_kind::S_limit:                     // limit
+                case symbol_kind::S_matchStage:                // matchStage
+                case symbol_kind::S_project:                   // project
+                case symbol_kind::S_sample:                    // sample
+                case symbol_kind::S_aggregationProjectFields:  // aggregationProjectFields
+                case symbol_kind::
+                    S_aggregationProjectionObjectFields:  // aggregationProjectionObjectFields
+                case symbol_kind::S_topLevelAggregationProjection:  // topLevelAggregationProjection
+                case symbol_kind::S_aggregationProjection:          // aggregationProjection
+                case symbol_kind::S_projectionCommon:               // projectionCommon
+                case symbol_kind::S_aggregationProjectionObject:    // aggregationProjectionObject
+                case symbol_kind::S_num:                            // num
+                case symbol_kind::S_expression:                     // expression
+                case symbol_kind::S_exprFixedTwoArg:                // exprFixedTwoArg
+                case symbol_kind::S_exprFixedThreeArg:              // exprFixedThreeArg
+                case symbol_kind::S_slice:                          // slice
+                case symbol_kind::S_expressionArray:                // expressionArray
+                case symbol_kind::S_expressionObject:               // expressionObject
+                case symbol_kind::S_expressionFields:               // expressionFields
+                case symbol_kind::S_maths:                          // maths
+                case symbol_kind::S_meta:                           // meta
+                case symbol_kind::S_add:                            // add
+                case symbol_kind::S_boolExprs:                      // boolExprs
+                case symbol_kind::S_and:                            // and
+                case symbol_kind::S_or:                             // or
+                case symbol_kind::S_not:                            // not
+                case symbol_kind::S_literalEscapes:                 // literalEscapes
+                case symbol_kind::S_const:                          // const
+                case symbol_kind::S_literal:                        // literal
+                case symbol_kind::S_stringExps:                     // stringExps
+                case symbol_kind::S_concat:                         // concat
+                case symbol_kind::S_dateFromString:                 // dateFromString
+                case symbol_kind::S_dateToString:                   // dateToString
+                case symbol_kind::S_indexOfBytes:                   // indexOfBytes
+                case symbol_kind::S_indexOfCP:                      // indexOfCP
+                case symbol_kind::S_ltrim:                          // ltrim
+                case symbol_kind::S_regexFind:                      // regexFind
+                case symbol_kind::S_regexFindAll:                   // regexFindAll
+                case symbol_kind::S_regexMatch:                     // regexMatch
+                case symbol_kind::S_regexArgs:                      // regexArgs
+                case symbol_kind::S_replaceOne:                     // replaceOne
+                case symbol_kind::S_replaceAll:                     // replaceAll
+                case symbol_kind::S_rtrim:                          // rtrim
+                case symbol_kind::S_split:                          // split
+                case symbol_kind::S_strLenBytes:                    // strLenBytes
+                case symbol_kind::S_strLenCP:                       // strLenCP
+                case symbol_kind::S_strcasecmp:                     // strcasecmp
+                case symbol_kind::S_substr:                         // substr
+                case symbol_kind::S_substrBytes:                    // substrBytes
+                case symbol_kind::S_substrCP:                       // substrCP
+                case symbol_kind::S_toLower:                        // toLower
+                case symbol_kind::S_toUpper:                        // toUpper
+                case symbol_kind::S_trim:                           // trim
+                case symbol_kind::S_compExprs:                      // compExprs
+                case symbol_kind::S_cmp:                            // cmp
+                case symbol_kind::S_eq:                             // eq
+                case symbol_kind::S_gt:                             // gt
+                case symbol_kind::S_gte:                            // gte
+                case symbol_kind::S_lt:                             // lt
+                case symbol_kind::S_lte:                            // lte
+                case symbol_kind::S_ne:                             // ne
+                case symbol_kind::S_dateExps:                       // dateExps
+                case symbol_kind::S_dateFromParts:                  // dateFromParts
+                case symbol_kind::S_dateToParts:                    // dateToParts
+                case symbol_kind::S_dayOfMonth:                     // dayOfMonth
+                case symbol_kind::S_dayOfWeek:                      // dayOfWeek
+                case symbol_kind::S_dayOfYear:                      // dayOfYear
+                case symbol_kind::S_hour:                           // hour
+                case symbol_kind::S_isoDayOfWeek:                   // isoDayOfWeek
+                case symbol_kind::S_isoWeek:                        // isoWeek
+                case symbol_kind::S_isoWeekYear:                    // isoWeekYear
+                case symbol_kind::S_millisecond:                    // millisecond
+                case symbol_kind::S_minute:                         // minute
+                case symbol_kind::S_month:                          // month
+                case symbol_kind::S_second:                         // second
+                case symbol_kind::S_week:                           // week
+                case symbol_kind::S_year:                           // year
+                case symbol_kind::S_typeExpression:                 // typeExpression
+                case symbol_kind::S_convert:                        // convert
+                case symbol_kind::S_toBool:                         // toBool
+                case symbol_kind::S_toDate:                         // toDate
+                case symbol_kind::S_toDecimal:                      // toDecimal
+                case symbol_kind::S_toDouble:                       // toDouble
+                case symbol_kind::S_toInt:                          // toInt
+                case symbol_kind::S_toLong:                         // toLong
+                case symbol_kind::S_toObjectId:                     // toObjectId
+                case symbol_kind::S_toString:                       // toString
+                case symbol_kind::S_type:                           // type
+                case symbol_kind::S_abs:                            // abs
+                case symbol_kind::S_ceil:                           // ceil
+                case symbol_kind::S_divide:                         // divide
+                case symbol_kind::S_exponent:                       // exponent
+                case symbol_kind::S_floor:                          // floor
+                case symbol_kind::S_ln:                             // ln
+                case symbol_kind::S_log:                            // log
+                case symbol_kind::S_logten:                         // logten
+                case symbol_kind::S_mod:                            // mod
+                case symbol_kind::S_multiply:                       // multiply
+                case symbol_kind::S_pow:                            // pow
+                case symbol_kind::S_round:                          // round
+                case symbol_kind::S_sqrt:                           // sqrt
+                case symbol_kind::S_subtract:                       // subtract
+                case symbol_kind::S_trunc:                          // trunc
+                case symbol_kind::S_arrayExps:                      // arrayExps
+                case symbol_kind::S_arrayElemAt:                    // arrayElemAt
+                case symbol_kind::S_arrayToObject:                  // arrayToObject
+                case symbol_kind::S_concatArrays:                   // concatArrays
+                case symbol_kind::S_filter:                         // filter
+                case symbol_kind::S_first:                          // first
+                case symbol_kind::S_in:                             // in
+                case symbol_kind::S_indexOfArray:                   // indexOfArray
+                case symbol_kind::S_isArray:                        // isArray
+                case symbol_kind::S_setExpression:                  // setExpression
+                case symbol_kind::S_allElementsTrue:                // allElementsTrue
+                case symbol_kind::S_anyElementTrue:                 // anyElementTrue
+                case symbol_kind::S_setDifference:                  // setDifference
+                case symbol_kind::S_setEquals:                      // setEquals
+                case symbol_kind::S_setIntersection:                // setIntersection
+                case symbol_kind::S_setIsSubset:                    // setIsSubset
+                case symbol_kind::S_setUnion:                       // setUnion
+                case symbol_kind::S_trig:                           // trig
+                case symbol_kind::S_sin:                            // sin
+                case symbol_kind::S_cos:                            // cos
+                case symbol_kind::S_tan:                            // tan
+                case symbol_kind::S_sinh:                           // sinh
+                case symbol_kind::S_cosh:                           // cosh
+                case symbol_kind::S_tanh:                           // tanh
+                case symbol_kind::S_asin:                           // asin
+                case symbol_kind::S_acos:                           // acos
+                case symbol_kind::S_atan:                           // atan
+                case symbol_kind::S_asinh:                          // asinh
+                case symbol_kind::S_acosh:                          // acosh
+                case symbol_kind::S_atanh:                          // atanh
+                case symbol_kind::S_atan2:                          // atan2
+                case symbol_kind::S_degreesToRadians:               // degreesToRadians
+                case symbol_kind::S_radiansToDegrees:               // radiansToDegrees
+                case symbol_kind::S_nonArrayExpression:             // nonArrayExpression
+                case symbol_kind::S_nonArrayCompoundExpression:     // nonArrayCompoundExpression
+                case symbol_kind::S_aggregationOperator:            // aggregationOperator
+                case symbol_kind::
+                    S_aggregationOperatorWithoutSlice:           // aggregationOperatorWithoutSlice
+                case symbol_kind::S_expressionSingletonArray:    // expressionSingletonArray
+                case symbol_kind::S_singleArgExpression:         // singleArgExpression
+                case symbol_kind::S_nonArrayNonObjExpression:    // nonArrayNonObjExpression
+                case symbol_kind::S_matchExpression:             // matchExpression
+                case symbol_kind::S_predicates:                  // predicates
+                case symbol_kind::S_compoundMatchExprs:          // compoundMatchExprs
+                case symbol_kind::S_predValue:                   // predValue
+                case symbol_kind::S_additionalExprs:             // additionalExprs
+                case symbol_kind::S_textArgCaseSensitive:        // textArgCaseSensitive
+                case symbol_kind::S_textArgDiacriticSensitive:   // textArgDiacriticSensitive
+                case symbol_kind::S_textArgLanguage:             // textArgLanguage
+                case symbol_kind::S_textArgSearch:               // textArgSearch
+                case symbol_kind::S_findProject:                 // findProject
+                case symbol_kind::S_findProjectFields:           // findProjectFields
+                case symbol_kind::S_topLevelFindProjection:      // topLevelFindProjection
+                case symbol_kind::S_findProjection:              // findProjection
+                case symbol_kind::S_findProjectionSlice:         // findProjectionSlice
+                case symbol_kind::S_elemMatch:                   // elemMatch
+                case symbol_kind::S_findProjectionObject:        // findProjectionObject
+                case symbol_kind::S_findProjectionObjectFields:  // findProjectionObjectFields
+                case symbol_kind::S_sortSpecs:                   // sortSpecs
+                case symbol_kind::S_specList:                    // specList
+                case symbol_kind::S_metaSort:                    // metaSort
+                case symbol_kind::S_oneOrNegOne:                 // oneOrNegOne
+                case symbol_kind::S_metaSortKeyword:             // metaSortKeyword
                     value.template destroy<CNode>();
                     break;
 
-                case 204:  // aggregationProjectionFieldname
-                case 205:  // projectionFieldname
-                case 206:  // expressionFieldname
-                case 207:  // stageAsUserFieldname
-                case 208:  // argAsUserFieldname
-                case 209:  // argAsProjectionPath
-                case 210:  // aggExprAsUserFieldname
-                case 211:  // invariableUserFieldname
-                case 212:  // sortFieldname
-                case 213:  // idAsUserFieldname
-                case 214:  // elemMatchAsUserFieldname
-                case 215:  // idAsProjectionPath
-                case 216:  // valueFieldname
-                case 217:  // predFieldname
-                case 423:  // logicalExprField
+                case symbol_kind::
+                    S_aggregationProjectionFieldname:          // aggregationProjectionFieldname
+                case symbol_kind::S_projectionFieldname:       // projectionFieldname
+                case symbol_kind::S_expressionFieldname:       // expressionFieldname
+                case symbol_kind::S_stageAsUserFieldname:      // stageAsUserFieldname
+                case symbol_kind::S_argAsUserFieldname:        // argAsUserFieldname
+                case symbol_kind::S_argAsProjectionPath:       // argAsProjectionPath
+                case symbol_kind::S_aggExprAsUserFieldname:    // aggExprAsUserFieldname
+                case symbol_kind::S_invariableUserFieldname:   // invariableUserFieldname
+                case symbol_kind::S_sortFieldname:             // sortFieldname
+                case symbol_kind::S_idAsUserFieldname:         // idAsUserFieldname
+                case symbol_kind::S_elemMatchAsUserFieldname:  // elemMatchAsUserFieldname
+                case symbol_kind::S_idAsProjectionPath:        // idAsProjectionPath
+                case symbol_kind::S_valueFieldname:            // valueFieldname
+                case symbol_kind::S_predFieldname:             // predFieldname
+                case symbol_kind::S_logicalExprField:          // logicalExprField
                     value.template destroy<CNode::Fieldname>();
                     break;
 
-                case 185:  // "Date"
+                case symbol_kind::S_DATE_LITERAL:  // "Date"
                     value.template destroy<Date_t>();
                     break;
 
-                case 195:  // "arbitrary decimal"
+                case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
                     value.template destroy<Decimal128>();
                     break;
 
-                case 184:  // "ObjectID"
+                case symbol_kind::S_OBJECT_ID:  // "ObjectID"
                     value.template destroy<OID>();
                     break;
 
-                case 196:  // "Timestamp"
+                case symbol_kind::S_TIMESTAMP:  // "Timestamp"
                     value.template destroy<Timestamp>();
                     break;
 
-                case 198:  // "maxKey"
+                case symbol_kind::S_MAX_KEY:  // "maxKey"
                     value.template destroy<UserMaxKey>();
                     break;
 
-                case 197:  // "minKey"
+                case symbol_kind::S_MIN_KEY:  // "minKey"
                     value.template destroy<UserMinKey>();
                     break;
 
-                case 186:  // "null"
+                case symbol_kind::S_JSNULL:  // "null"
                     value.template destroy<UserNull>();
                     break;
 
-                case 183:  // "undefined"
+                case symbol_kind::S_UNDEFINED:  // "undefined"
                     value.template destroy<UserUndefined>();
                     break;
 
-                case 194:  // "arbitrary double"
+                case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
                     value.template destroy<double>();
                     break;
 
-                case 192:  // "arbitrary integer"
+                case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
                     value.template destroy<int>();
                     break;
 
-                case 193:  // "arbitrary long"
+                case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
                     value.template destroy<long long>();
                     break;
 
-                case 218:  // aggregationProjectField
-                case 219:  // aggregationProjectionObjectField
-                case 220:  // expressionField
-                case 221:  // valueField
-                case 360:  // onErrorArg
-                case 361:  // onNullArg
-                case 362:  // formatArg
-                case 363:  // timezoneArg
-                case 364:  // charsArg
-                case 365:  // optionsArg
-                case 366:  // hourArg
-                case 367:  // minuteArg
-                case 368:  // secondArg
-                case 369:  // millisecondArg
-                case 370:  // dayArg
-                case 371:  // isoWeekArg
-                case 372:  // iso8601Arg
-                case 373:  // monthArg
-                case 374:  // isoDayOfWeekArg
-                case 414:  // predicate
-                case 415:  // fieldPredicate
-                case 416:  // logicalExpr
-                case 417:  // operatorExpression
-                case 418:  // notExpr
-                case 419:  // matchMod
-                case 420:  // existsExpr
-                case 421:  // typeExpr
-                case 422:  // commentExpr
-                case 425:  // matchExpr
-                case 426:  // matchText
-                case 427:  // matchWhere
-                case 440:  // findProjectField
-                case 441:  // findProjectionObjectField
-                case 447:  // sortSpec
+                case symbol_kind::S_aggregationProjectField:  // aggregationProjectField
+                case symbol_kind::
+                    S_aggregationProjectionObjectField:         // aggregationProjectionObjectField
+                case symbol_kind::S_expressionField:            // expressionField
+                case symbol_kind::S_valueField:                 // valueField
+                case symbol_kind::S_onErrorArg:                 // onErrorArg
+                case symbol_kind::S_onNullArg:                  // onNullArg
+                case symbol_kind::S_asArg:                      // asArg
+                case symbol_kind::S_formatArg:                  // formatArg
+                case symbol_kind::S_timezoneArg:                // timezoneArg
+                case symbol_kind::S_charsArg:                   // charsArg
+                case symbol_kind::S_optionsArg:                 // optionsArg
+                case symbol_kind::S_hourArg:                    // hourArg
+                case symbol_kind::S_minuteArg:                  // minuteArg
+                case symbol_kind::S_secondArg:                  // secondArg
+                case symbol_kind::S_millisecondArg:             // millisecondArg
+                case symbol_kind::S_dayArg:                     // dayArg
+                case symbol_kind::S_isoWeekArg:                 // isoWeekArg
+                case symbol_kind::S_iso8601Arg:                 // iso8601Arg
+                case symbol_kind::S_monthArg:                   // monthArg
+                case symbol_kind::S_isoDayOfWeekArg:            // isoDayOfWeekArg
+                case symbol_kind::S_predicate:                  // predicate
+                case symbol_kind::S_fieldPredicate:             // fieldPredicate
+                case symbol_kind::S_logicalExpr:                // logicalExpr
+                case symbol_kind::S_operatorExpression:         // operatorExpression
+                case symbol_kind::S_notExpr:                    // notExpr
+                case symbol_kind::S_matchMod:                   // matchMod
+                case symbol_kind::S_existsExpr:                 // existsExpr
+                case symbol_kind::S_typeExpr:                   // typeExpr
+                case symbol_kind::S_commentExpr:                // commentExpr
+                case symbol_kind::S_matchExpr:                  // matchExpr
+                case symbol_kind::S_matchText:                  // matchText
+                case symbol_kind::S_matchWhere:                 // matchWhere
+                case symbol_kind::S_findProjectField:           // findProjectField
+                case symbol_kind::S_findProjectionObjectField:  // findProjectionObjectField
+                case symbol_kind::S_sortSpec:                   // sortSpec
                     value.template destroy<std::pair<CNode::Fieldname, CNode>>();
                     break;
 
-                case 176:  // "fieldname"
-                case 178:  // "$-prefixed fieldname"
-                case 179:  // "string"
-                case 180:  // "$-prefixed string"
-                case 181:  // "$$-prefixed string"
-                case 222:  // arg
+                case symbol_kind::S_FIELDNAME:              // "fieldname"
+                case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+                case symbol_kind::S_STRING:                 // "string"
+                case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
+                case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
+                case symbol_kind::S_arg:                    // arg
                     value.template destroy<std::string>();
                     break;
 
-                case 375:  // expressions
-                case 376:  // values
-                case 377:  // exprZeroToTwo
-                case 424:  // typeValues
+                case symbol_kind::S_expressions:    // expressions
+                case symbol_kind::S_values:         // values
+                case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+                case symbol_kind::S_typeValues:     // typeValues
                     value.template destroy<std::vector<CNode>>();
                     break;
 
-                case 177:  // "fieldname containing dotted path"
+                case symbol_kind::S_DOTTED_FIELDNAME:  // "fieldname containing dotted path"
                     value.template destroy<std::vector<std::string>>();
                     break;
 
@@ -1480,6 +2364,14 @@ public:
 
             Base::clear();
         }
+
+        /// The user-facing name of this symbol.
+        std::string name() const YY_NOEXCEPT {
+            return ParserGen::symbol_name(this->kind());
+        }
+
+        /// Backward compatibility (Bison 3.6).
+        symbol_kind_type type_get() const YY_NOEXCEPT;
 
         /// Whether empty.
         bool empty() const YY_NOEXCEPT;
@@ -1501,44 +2393,49 @@ public:
     };
 
     /// Type access provider for token (enum) based symbols.
-    struct by_type {
+    struct by_kind {
         /// Default constructor.
-        by_type();
+        by_kind();
 
 #if 201103L <= YY_CPLUSPLUS
         /// Move constructor.
-        by_type(by_type&& that);
+        by_kind(by_kind&& that);
 #endif
 
         /// Copy constructor.
-        by_type(const by_type& that);
+        by_kind(const by_kind& that);
 
-        /// The symbol type as needed by the constructor.
-        typedef token_type kind_type;
+        /// The symbol kind as needed by the constructor.
+        typedef token_kind_type kind_type;
 
         /// Constructor from (external) token numbers.
-        by_type(kind_type t);
+        by_kind(kind_type t);
 
         /// Record that this symbol is empty.
         void clear();
 
-        /// Steal the symbol type from \a that.
-        void move(by_type& that);
+        /// Steal the symbol kind from \a that.
+        void move(by_kind& that);
 
         /// The (internal) type number (corresponding to \a type).
         /// \a empty when empty.
-        symbol_number_type type_get() const YY_NOEXCEPT;
+        symbol_kind_type kind() const YY_NOEXCEPT;
 
-        /// The symbol type.
-        /// \a empty_symbol when empty.
-        /// An int, not token_number_type, to be able to store empty_symbol.
-        int type;
+        /// Backward compatibility (Bison 3.6).
+        symbol_kind_type type_get() const YY_NOEXCEPT;
+
+        /// The symbol kind.
+        /// \a S_YYEMPTY when empty.
+        symbol_kind_type kind_;
     };
 
+    /// Backward compatibility for a private implementation detail (Bison 3.6).
+    typedef by_kind by_type;
+
     /// "External" symbols: returned by the scanner.
-    struct symbol_type : basic_symbol<by_type> {
+    struct symbol_type : basic_symbol<by_kind> {
         /// Superclass.
-        typedef basic_symbol<by_type> super_type;
+        typedef basic_symbol<by_kind> super_type;
 
         /// Empty symbol.
         symbol_type() {}
@@ -1547,11 +2444,13 @@ public:
 #if 201103L <= YY_CPLUSPLUS
         symbol_type(int tok, location_type l) : super_type(token_type(tok), std::move(l)) {
             YY_ASSERT(
-                tok == token::END_OF_FILE || tok == token::ABS || tok == token::ACOS ||
-                tok == token::ACOSH || tok == token::ADD || tok == token::ALL_ELEMENTS_TRUE ||
-                tok == token::AND || tok == token::ANY_ELEMENT_TRUE ||
-                tok == token::ARG_CASE_SENSITIVE || tok == token::ARG_CHARS ||
-                tok == token::ARG_COLL || tok == token::ARG_DATE || tok == token::ARG_DATE_STRING ||
+                tok == token::END_OF_FILE || tok == token::YYerror || tok == token::YYUNDEF ||
+                tok == token::ABS || tok == token::ACOS || tok == token::ACOSH ||
+                tok == token::ADD || tok == token::ALL_ELEMENTS_TRUE || tok == token::AND ||
+                tok == token::ANY_ELEMENT_TRUE || tok == token::ARG_CASE_SENSITIVE ||
+                tok == token::ARRAY_ELEM_AT || tok == token::ARRAY_TO_OBJECT ||
+                tok == token::ARG_AS || tok == token::ARG_CHARS || tok == token::ARG_COLL ||
+                tok == token::ARG_COND || tok == token::ARG_DATE || tok == token::ARG_DATE_STRING ||
                 tok == token::ARG_DAY || tok == token::ARG_DIACRITIC_SENSITIVE ||
                 tok == token::ARG_FILTER || tok == token::ARG_FIND || tok == token::ARG_FORMAT ||
                 tok == token::ARG_HOUR || tok == token::ARG_INPUT || tok == token::ARG_ISO_8601 ||
@@ -1567,23 +2466,25 @@ public:
                 tok == token::ASINH || tok == token::ATAN || tok == token::ATAN2 ||
                 tok == token::ATANH || tok == token::BOOL_FALSE || tok == token::BOOL_TRUE ||
                 tok == token::CEIL || tok == token::CMP || tok == token::COMMENT ||
-                tok == token::CONCAT || tok == token::CONST_EXPR || tok == token::CONVERT ||
-                tok == token::COS || tok == token::COSH || tok == token::DATE_FROM_PARTS ||
-                tok == token::DATE_FROM_STRING || tok == token::DATE_TO_PARTS ||
-                tok == token::DATE_TO_STRING || tok == token::DAY_OF_MONTH ||
-                tok == token::DAY_OF_WEEK || tok == token::DAY_OF_YEAR ||
-                tok == token::DECIMAL_NEGATIVE_ONE || tok == token::DECIMAL_ONE ||
-                tok == token::DECIMAL_ZERO || tok == token::DEGREES_TO_RADIANS ||
-                tok == token::DIVIDE || tok == token::DOUBLE_NEGATIVE_ONE ||
-                tok == token::DOUBLE_ONE || tok == token::DOUBLE_ZERO || tok == token::ELEM_MATCH ||
-                tok == token::END_ARRAY || tok == token::END_OBJECT || tok == token::EQ ||
-                tok == token::EXISTS || tok == token::EXPONENT || tok == token::EXPR ||
-                tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
+                tok == token::CONCAT || tok == token::CONCAT_ARRAYS || tok == token::CONST_EXPR ||
+                tok == token::CONVERT || tok == token::COS || tok == token::COSH ||
+                tok == token::DATE_FROM_PARTS || tok == token::DATE_FROM_STRING ||
+                tok == token::DATE_TO_PARTS || tok == token::DATE_TO_STRING ||
+                tok == token::DAY_OF_MONTH || tok == token::DAY_OF_WEEK ||
+                tok == token::DAY_OF_YEAR || tok == token::DECIMAL_NEGATIVE_ONE ||
+                tok == token::DECIMAL_ONE || tok == token::DECIMAL_ZERO ||
+                tok == token::DEGREES_TO_RADIANS || tok == token::DIVIDE ||
+                tok == token::DOUBLE_NEGATIVE_ONE || tok == token::DOUBLE_ONE ||
+                tok == token::DOUBLE_ZERO || tok == token::ELEM_MATCH || tok == token::END_ARRAY ||
+                tok == token::END_OBJECT || tok == token::EQ || tok == token::EXISTS ||
+                tok == token::EXPONENT || tok == token::EXPR || tok == token::FILTER ||
+                tok == token::FIRST || tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
                 tok == token::GEO_NEAR_POINT || tok == token::GT || tok == token::GTE ||
-                tok == token::HOUR || tok == token::ID || tok == token::INDEX_KEY ||
+                tok == token::HOUR || tok == token::ID || tok == token::IN ||
+                tok == token::INDEX_KEY || tok == token::INDEX_OF_ARRAY ||
                 tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
                 tok == token::INT_NEGATIVE_ONE || tok == token::INT_ONE || tok == token::INT_ZERO ||
-                tok == token::ISO_DAY_OF_WEEK || tok == token::ISO_WEEK ||
+                tok == token::IS_ARRAY || tok == token::ISO_DAY_OF_WEEK || tok == token::ISO_WEEK ||
                 tok == token::ISO_WEEK_YEAR || tok == token::LITERAL || tok == token::LN ||
                 tok == token::LOG || tok == token::LOGTEN || tok == token::LONG_NEGATIVE_ONE ||
                 tok == token::LONG_ONE || tok == token::LONG_ZERO || tok == token::LT ||
@@ -1621,11 +2522,13 @@ public:
 #else
         symbol_type(int tok, const location_type& l) : super_type(token_type(tok), l) {
             YY_ASSERT(
-                tok == token::END_OF_FILE || tok == token::ABS || tok == token::ACOS ||
-                tok == token::ACOSH || tok == token::ADD || tok == token::ALL_ELEMENTS_TRUE ||
-                tok == token::AND || tok == token::ANY_ELEMENT_TRUE ||
-                tok == token::ARG_CASE_SENSITIVE || tok == token::ARG_CHARS ||
-                tok == token::ARG_COLL || tok == token::ARG_DATE || tok == token::ARG_DATE_STRING ||
+                tok == token::END_OF_FILE || tok == token::YYerror || tok == token::YYUNDEF ||
+                tok == token::ABS || tok == token::ACOS || tok == token::ACOSH ||
+                tok == token::ADD || tok == token::ALL_ELEMENTS_TRUE || tok == token::AND ||
+                tok == token::ANY_ELEMENT_TRUE || tok == token::ARG_CASE_SENSITIVE ||
+                tok == token::ARRAY_ELEM_AT || tok == token::ARRAY_TO_OBJECT ||
+                tok == token::ARG_AS || tok == token::ARG_CHARS || tok == token::ARG_COLL ||
+                tok == token::ARG_COND || tok == token::ARG_DATE || tok == token::ARG_DATE_STRING ||
                 tok == token::ARG_DAY || tok == token::ARG_DIACRITIC_SENSITIVE ||
                 tok == token::ARG_FILTER || tok == token::ARG_FIND || tok == token::ARG_FORMAT ||
                 tok == token::ARG_HOUR || tok == token::ARG_INPUT || tok == token::ARG_ISO_8601 ||
@@ -1641,23 +2544,25 @@ public:
                 tok == token::ASINH || tok == token::ATAN || tok == token::ATAN2 ||
                 tok == token::ATANH || tok == token::BOOL_FALSE || tok == token::BOOL_TRUE ||
                 tok == token::CEIL || tok == token::CMP || tok == token::COMMENT ||
-                tok == token::CONCAT || tok == token::CONST_EXPR || tok == token::CONVERT ||
-                tok == token::COS || tok == token::COSH || tok == token::DATE_FROM_PARTS ||
-                tok == token::DATE_FROM_STRING || tok == token::DATE_TO_PARTS ||
-                tok == token::DATE_TO_STRING || tok == token::DAY_OF_MONTH ||
-                tok == token::DAY_OF_WEEK || tok == token::DAY_OF_YEAR ||
-                tok == token::DECIMAL_NEGATIVE_ONE || tok == token::DECIMAL_ONE ||
-                tok == token::DECIMAL_ZERO || tok == token::DEGREES_TO_RADIANS ||
-                tok == token::DIVIDE || tok == token::DOUBLE_NEGATIVE_ONE ||
-                tok == token::DOUBLE_ONE || tok == token::DOUBLE_ZERO || tok == token::ELEM_MATCH ||
-                tok == token::END_ARRAY || tok == token::END_OBJECT || tok == token::EQ ||
-                tok == token::EXISTS || tok == token::EXPONENT || tok == token::EXPR ||
-                tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
+                tok == token::CONCAT || tok == token::CONCAT_ARRAYS || tok == token::CONST_EXPR ||
+                tok == token::CONVERT || tok == token::COS || tok == token::COSH ||
+                tok == token::DATE_FROM_PARTS || tok == token::DATE_FROM_STRING ||
+                tok == token::DATE_TO_PARTS || tok == token::DATE_TO_STRING ||
+                tok == token::DAY_OF_MONTH || tok == token::DAY_OF_WEEK ||
+                tok == token::DAY_OF_YEAR || tok == token::DECIMAL_NEGATIVE_ONE ||
+                tok == token::DECIMAL_ONE || tok == token::DECIMAL_ZERO ||
+                tok == token::DEGREES_TO_RADIANS || tok == token::DIVIDE ||
+                tok == token::DOUBLE_NEGATIVE_ONE || tok == token::DOUBLE_ONE ||
+                tok == token::DOUBLE_ZERO || tok == token::ELEM_MATCH || tok == token::END_ARRAY ||
+                tok == token::END_OBJECT || tok == token::EQ || tok == token::EXISTS ||
+                tok == token::EXPONENT || tok == token::EXPR || tok == token::FILTER ||
+                tok == token::FIRST || tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
                 tok == token::GEO_NEAR_POINT || tok == token::GT || tok == token::GTE ||
-                tok == token::HOUR || tok == token::ID || tok == token::INDEX_KEY ||
+                tok == token::HOUR || tok == token::ID || tok == token::IN ||
+                tok == token::INDEX_KEY || tok == token::INDEX_OF_ARRAY ||
                 tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
                 tok == token::INT_NEGATIVE_ONE || tok == token::INT_ONE || tok == token::INT_ZERO ||
-                tok == token::ISO_DAY_OF_WEEK || tok == token::ISO_WEEK ||
+                tok == token::IS_ARRAY || tok == token::ISO_DAY_OF_WEEK || tok == token::ISO_WEEK ||
                 tok == token::ISO_WEEK_YEAR || tok == token::LITERAL || tok == token::LN ||
                 tok == token::LOG || tok == token::LOGTEN || tok == token::LONG_NEGATIVE_ONE ||
                 tok == token::LONG_ONE || tok == token::LONG_ZERO || tok == token::LT ||
@@ -1912,6 +2817,13 @@ public:
     ParserGen(BSONLexer& lexer_yyarg, CNode* cst_yyarg);
     virtual ~ParserGen();
 
+#if 201103L <= YY_CPLUSPLUS
+    /// Non copyable.
+    ParserGen(const ParserGen&) = delete;
+    /// Non copyable.
+    ParserGen& operator=(const ParserGen&) = delete;
+#endif
+
     /// Parse.  An alias for parse ().
     /// \returns  0 iff parsing succeeded.
     int operator()();
@@ -1942,6 +2854,10 @@ public:
     /// Report a syntax error.
     void error(const syntax_error& err);
 
+    /// The user-facing name of the symbol whose (internal) number is
+    /// YYSYMBOL.  No bounds checking.
+    static std::string symbol_name(symbol_kind_type yysymbol);
+
     // Implementation of make_symbol for each symbol type.
 #if 201103L <= YY_CPLUSPLUS
     static symbol_type make_END_OF_FILE(location_type l) {
@@ -1950,6 +2866,24 @@ public:
 #else
     static symbol_type make_END_OF_FILE(const location_type& l) {
         return symbol_type(token::END_OF_FILE, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_YYerror(location_type l) {
+        return symbol_type(token::YYerror, std::move(l));
+    }
+#else
+    static symbol_type make_YYerror(const location_type& l) {
+        return symbol_type(token::YYerror, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_YYUNDEF(location_type l) {
+        return symbol_type(token::YYUNDEF, std::move(l));
+    }
+#else
+    static symbol_type make_YYUNDEF(const location_type& l) {
+        return symbol_type(token::YYUNDEF, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2025,6 +2959,33 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARRAY_ELEM_AT(location_type l) {
+        return symbol_type(token::ARRAY_ELEM_AT, std::move(l));
+    }
+#else
+    static symbol_type make_ARRAY_ELEM_AT(const location_type& l) {
+        return symbol_type(token::ARRAY_ELEM_AT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARRAY_TO_OBJECT(location_type l) {
+        return symbol_type(token::ARRAY_TO_OBJECT, std::move(l));
+    }
+#else
+    static symbol_type make_ARRAY_TO_OBJECT(const location_type& l) {
+        return symbol_type(token::ARRAY_TO_OBJECT, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_AS(location_type l) {
+        return symbol_type(token::ARG_AS, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_AS(const location_type& l) {
+        return symbol_type(token::ARG_AS, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_ARG_CHARS(location_type l) {
         return symbol_type(token::ARG_CHARS, std::move(l));
     }
@@ -2040,6 +3001,15 @@ public:
 #else
     static symbol_type make_ARG_COLL(const location_type& l) {
         return symbol_type(token::ARG_COLL, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_ARG_COND(location_type l) {
+        return symbol_type(token::ARG_COND, std::move(l));
+    }
+#else
+    static symbol_type make_ARG_COND(const location_type& l) {
+        return symbol_type(token::ARG_COND, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2403,6 +3373,15 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_CONCAT_ARRAYS(location_type l) {
+        return symbol_type(token::CONCAT_ARRAYS, std::move(l));
+    }
+#else
+    static symbol_type make_CONCAT_ARRAYS(const location_type& l) {
+        return symbol_type(token::CONCAT_ARRAYS, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_CONST_EXPR(location_type l) {
         return symbol_type(token::CONST_EXPR, std::move(l));
     }
@@ -2637,6 +3616,24 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_FILTER(location_type l) {
+        return symbol_type(token::FILTER, std::move(l));
+    }
+#else
+    static symbol_type make_FILTER(const location_type& l) {
+        return symbol_type(token::FILTER, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_FIRST(location_type l) {
+        return symbol_type(token::FIRST, std::move(l));
+    }
+#else
+    static symbol_type make_FIRST(const location_type& l) {
+        return symbol_type(token::FIRST, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_FLOOR(location_type l) {
         return symbol_type(token::FLOOR, std::move(l));
     }
@@ -2700,12 +3697,30 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_IN(location_type l) {
+        return symbol_type(token::IN, std::move(l));
+    }
+#else
+    static symbol_type make_IN(const location_type& l) {
+        return symbol_type(token::IN, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
     static symbol_type make_INDEX_KEY(location_type l) {
         return symbol_type(token::INDEX_KEY, std::move(l));
     }
 #else
     static symbol_type make_INDEX_KEY(const location_type& l) {
         return symbol_type(token::INDEX_KEY, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_INDEX_OF_ARRAY(location_type l) {
+        return symbol_type(token::INDEX_OF_ARRAY, std::move(l));
+    }
+#else
+    static symbol_type make_INDEX_OF_ARRAY(const location_type& l) {
+        return symbol_type(token::INDEX_OF_ARRAY, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -2751,6 +3766,15 @@ public:
 #else
     static symbol_type make_INT_ZERO(const location_type& l) {
         return symbol_type(token::INT_ZERO, l);
+    }
+#endif
+#if 201103L <= YY_CPLUSPLUS
+    static symbol_type make_IS_ARRAY(location_type l) {
+        return symbol_type(token::IS_ARRAY, std::move(l));
+    }
+#else
+    static symbol_type make_IS_ARRAY(const location_type& l) {
+        return symbol_type(token::IS_ARRAY, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
@@ -3755,19 +4779,49 @@ public:
 #endif
 
 
+    class context {
+    public:
+        context(const ParserGen& yyparser, const symbol_type& yyla);
+        const symbol_type& lookahead() const {
+            return yyla_;
+        }
+        symbol_kind_type token() const {
+            return yyla_.kind();
+        }
+        const location_type& location() const {
+            return yyla_.location;
+        }
+
+        /// Put in YYARG at most YYARGN of the expected tokens, and return the
+        /// number of tokens stored in YYARG.  If YYARG is null, return the
+        /// number of expected tokens (guaranteed to be less than YYNTOKENS).
+        int expected_tokens(symbol_kind_type yyarg[], int yyargn) const;
+
+    private:
+        const ParserGen& yyparser_;
+        const symbol_type& yyla_;
+    };
+
 private:
-    /// This class is not copyable.
+#if YY_CPLUSPLUS < 201103L
+    /// Non copyable.
     ParserGen(const ParserGen&);
+    /// Non copyable.
     ParserGen& operator=(const ParserGen&);
+#endif
+
 
     /// Stored state numbers (used for stacks).
     typedef short state_type;
 
-    /// Generate an error message.
-    /// \param yystate   the state where the error occurred.
-    /// \param yyla      the lookahead token.
-    virtual std::string yysyntax_error_(state_type yystate, const symbol_type& yyla) const;
+    /// The arguments of the error message.
+    int yy_syntax_error_arguments_(const context& yyctx,
+                                   symbol_kind_type yyarg[],
+                                   int yyargn) const;
 
+    /// Generate an error message.
+    /// \param yyctx     the context in which the error occurred.
+    virtual std::string yysyntax_error_(const context& yyctx) const;
     /// Compute post-reduction state.
     /// \param yystate   the current state
     /// \param yysym     the nonterminal to push on the stack
@@ -3784,10 +4838,17 @@ private:
     static const short yypact_ninf_;
     static const short yytable_ninf_;
 
-    /// Convert a scanner token number \a t to a symbol number.
-    /// In theory \a t should be a token_type, but character literals
+    /// Convert a scanner token kind \a t to a symbol kind.
+    /// In theory \a t should be a token_kind_type, but character literals
     /// are valid, yet not members of the token_type enum.
-    static token_number_type yytranslate_(int t);
+    static symbol_kind_type yytranslate_(int t);
+
+    /// Convert the symbol name \a n to a form suitable for a diagnostic.
+    static std::string yytnamerr_(const char* yystr);
+
+    /// For a symbol, its name in clear.
+    static const char* const yytname_[];
+
 
     // Tables.
     // YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
@@ -3823,26 +4884,20 @@ private:
     static const signed char yyr2_[];
 
 
-    /// Convert the symbol name \a n to a form suitable for a diagnostic.
-    static std::string yytnamerr_(const char* n);
-
-
-    /// For a symbol, its name in clear.
-    static const char* const yytname_[];
 #if YYDEBUG
     // YYRLINE[YYN] -- Source line where rule number YYN was defined.
     static const short yyrline_[];
     /// Report on the debug stream that the rule \a r is going to be reduced.
-    virtual void yy_reduce_print_(int r);
+    virtual void yy_reduce_print_(int r) const;
     /// Print the state stack on the debug stream.
-    virtual void yystack_print_();
+    virtual void yy_stack_print_() const;
 
     /// Debugging level.
     int yydebug_;
     /// Debug stream.
     std::ostream* yycdebug_;
 
-    /// \brief Display a symbol type, value and location.
+    /// \brief Display a symbol kind, value and location.
     /// \param yyo    The output stream.
     /// \param yysym  The symbol.
     template <typename Base>
@@ -3862,7 +4917,7 @@ private:
         /// Default constructor.
         by_state() YY_NOEXCEPT;
 
-        /// The symbol type as needed by the constructor.
+        /// The symbol kind as needed by the constructor.
         typedef state_type kind_type;
 
         /// Constructor.
@@ -3874,12 +4929,12 @@ private:
         /// Record that this symbol is empty.
         void clear() YY_NOEXCEPT;
 
-        /// Steal the symbol type from \a that.
+        /// Steal the symbol kind from \a that.
         void move(by_state& that);
 
-        /// The (internal) type number (corresponding to \a state).
-        /// \a empty_symbol when empty.
-        symbol_number_type type_get() const YY_NOEXCEPT;
+        /// The symbol kind (corresponding to \a state).
+        /// \a symbol_kind::S_YYEMPTY when empty.
+        symbol_kind_type kind() const YY_NOEXCEPT;
 
         /// The state number used to denote an empty symbol.
         /// We use the initial state, as it does not have a value.
@@ -3916,12 +4971,19 @@ private:
     class stack {
     public:
         // Hide our reversed order.
-        typedef typename S::reverse_iterator iterator;
-        typedef typename S::const_reverse_iterator const_iterator;
+        typedef typename S::iterator iterator;
+        typedef typename S::const_iterator const_iterator;
         typedef typename S::size_type size_type;
         typedef typename std::ptrdiff_t index_type;
 
         stack(size_type n = 200) : seq_(n) {}
+
+#if 201103L <= YY_CPLUSPLUS
+        /// Non copyable.
+        stack(const stack&) = delete;
+        /// Non copyable.
+        stack& operator=(const stack&) = delete;
+#endif
 
         /// Random access.
         ///
@@ -3961,18 +5023,14 @@ private:
             return index_type(seq_.size());
         }
 
-        std::ptrdiff_t ssize() const YY_NOEXCEPT {
-            return std::ptrdiff_t(size());
-        }
-
         /// Iterator on top of the stack (going downwards).
         const_iterator begin() const YY_NOEXCEPT {
-            return seq_.rbegin();
+            return seq_.begin();
         }
 
         /// Bottom of the stack.
         const_iterator end() const YY_NOEXCEPT {
-            return seq_.rend();
+            return seq_.end();
         }
 
         /// Present a slice of the top of a stack.
@@ -3990,8 +5048,12 @@ private:
         };
 
     private:
+#if YY_CPLUSPLUS < 201103L
+        /// Non copyable.
         stack(const stack&);
+        /// Non copyable.
         stack& operator=(const stack&);
+#endif
         /// The wrapped container.
         S seq_;
     };
@@ -4021,17 +5083,11 @@ private:
     /// Pop \a n symbols from the stack.
     void yypop_(int n = 1);
 
-    /// Some specific tokens.
-    static const token_number_type yy_error_token_ = 1;
-    static const token_number_type yy_undef_token_ = 2;
-
     /// Constants.
     enum {
-        yyeof_ = 0,
-        yylast_ = 4831,   ///< Last index in yytable_.
-        yynnts_ = 247,    ///< Number of nonterminal symbols.
-        yyfinal_ = 14,    ///< Termination state number.
-        yyntokens_ = 203  ///< Number of tokens.
+        yylast_ = 5490,  ///< Last index in yytable_.
+        yynnts_ = 257,   ///< Number of nonterminal symbols.
+        yyfinal_ = 14    ///< Termination state number.
     };
 
 
@@ -4040,695 +5096,358 @@ private:
     CNode* cst;
 };
 
-inline ParserGen::token_number_type ParserGen::yytranslate_(int t) {
-    return static_cast<token_number_type>(t);
+inline ParserGen::symbol_kind_type ParserGen::yytranslate_(int t) {
+    return static_cast<symbol_kind_type>(t);
 }
 
 // basic_symbol.
-#if 201103L <= YY_CPLUSPLUS
-template <typename Base>
-ParserGen::basic_symbol<Base>::basic_symbol(basic_symbol&& that)
-    : Base(std::move(that)), value(), location(std::move(that.location)) {
-    switch (this->type_get()) {
-        case 182:  // "BinData"
-            value.move<BSONBinData>(std::move(that.value));
-            break;
-
-        case 189:  // "Code"
-            value.move<BSONCode>(std::move(that.value));
-            break;
-
-        case 191:  // "CodeWScope"
-            value.move<BSONCodeWScope>(std::move(that.value));
-            break;
-
-        case 188:  // "dbPointer"
-            value.move<BSONDBRef>(std::move(that.value));
-            break;
-
-        case 187:  // "regex"
-            value.move<BSONRegEx>(std::move(that.value));
-            break;
-
-        case 190:  // "Symbol"
-            value.move<BSONSymbol>(std::move(that.value));
-            break;
-
-        case 223:  // dbPointer
-        case 224:  // javascript
-        case 225:  // symbol
-        case 226:  // javascriptWScope
-        case 227:  // int
-        case 228:  // timestamp
-        case 229:  // long
-        case 230:  // double
-        case 231:  // decimal
-        case 232:  // minKey
-        case 233:  // maxKey
-        case 234:  // value
-        case 235:  // string
-        case 236:  // aggregationFieldPath
-        case 237:  // binary
-        case 238:  // undefined
-        case 239:  // objectId
-        case 240:  // bool
-        case 241:  // date
-        case 242:  // null
-        case 243:  // regex
-        case 244:  // simpleValue
-        case 245:  // compoundValue
-        case 246:  // valueArray
-        case 247:  // valueObject
-        case 248:  // valueFields
-        case 249:  // variable
-        case 250:  // typeArray
-        case 251:  // typeValue
-        case 252:  // pipeline
-        case 253:  // stageList
-        case 254:  // stage
-        case 255:  // inhibitOptimization
-        case 256:  // unionWith
-        case 257:  // skip
-        case 258:  // limit
-        case 259:  // matchStage
-        case 260:  // project
-        case 261:  // sample
-        case 262:  // aggregationProjectFields
-        case 263:  // aggregationProjectionObjectFields
-        case 264:  // topLevelAggregationProjection
-        case 265:  // aggregationProjection
-        case 266:  // projectionCommon
-        case 267:  // aggregationProjectionObject
-        case 268:  // num
-        case 269:  // expression
-        case 270:  // exprFixedTwoArg
-        case 271:  // exprFixedThreeArg
-        case 272:  // slice
-        case 273:  // expressionArray
-        case 274:  // expressionObject
-        case 275:  // expressionFields
-        case 276:  // maths
-        case 277:  // meta
-        case 278:  // add
-        case 279:  // boolExprs
-        case 280:  // and
-        case 281:  // or
-        case 282:  // not
-        case 283:  // literalEscapes
-        case 284:  // const
-        case 285:  // literal
-        case 286:  // stringExps
-        case 287:  // concat
-        case 288:  // dateFromString
-        case 289:  // dateToString
-        case 290:  // indexOfBytes
-        case 291:  // indexOfCP
-        case 292:  // ltrim
-        case 293:  // regexFind
-        case 294:  // regexFindAll
-        case 295:  // regexMatch
-        case 296:  // regexArgs
-        case 297:  // replaceOne
-        case 298:  // replaceAll
-        case 299:  // rtrim
-        case 300:  // split
-        case 301:  // strLenBytes
-        case 302:  // strLenCP
-        case 303:  // strcasecmp
-        case 304:  // substr
-        case 305:  // substrBytes
-        case 306:  // substrCP
-        case 307:  // toLower
-        case 308:  // toUpper
-        case 309:  // trim
-        case 310:  // compExprs
-        case 311:  // cmp
-        case 312:  // eq
-        case 313:  // gt
-        case 314:  // gte
-        case 315:  // lt
-        case 316:  // lte
-        case 317:  // ne
-        case 318:  // dateExps
-        case 319:  // dateFromParts
-        case 320:  // dateToParts
-        case 321:  // dayOfMonth
-        case 322:  // dayOfWeek
-        case 323:  // dayOfYear
-        case 324:  // hour
-        case 325:  // isoDayOfWeek
-        case 326:  // isoWeek
-        case 327:  // isoWeekYear
-        case 328:  // millisecond
-        case 329:  // minute
-        case 330:  // month
-        case 331:  // second
-        case 332:  // week
-        case 333:  // year
-        case 334:  // typeExpression
-        case 335:  // convert
-        case 336:  // toBool
-        case 337:  // toDate
-        case 338:  // toDecimal
-        case 339:  // toDouble
-        case 340:  // toInt
-        case 341:  // toLong
-        case 342:  // toObjectId
-        case 343:  // toString
-        case 344:  // type
-        case 345:  // abs
-        case 346:  // ceil
-        case 347:  // divide
-        case 348:  // exponent
-        case 349:  // floor
-        case 350:  // ln
-        case 351:  // log
-        case 352:  // logten
-        case 353:  // mod
-        case 354:  // multiply
-        case 355:  // pow
-        case 356:  // round
-        case 357:  // sqrt
-        case 358:  // subtract
-        case 359:  // trunc
-        case 378:  // setExpression
-        case 379:  // allElementsTrue
-        case 380:  // anyElementTrue
-        case 381:  // setDifference
-        case 382:  // setEquals
-        case 383:  // setIntersection
-        case 384:  // setIsSubset
-        case 385:  // setUnion
-        case 386:  // trig
-        case 387:  // sin
-        case 388:  // cos
-        case 389:  // tan
-        case 390:  // sinh
-        case 391:  // cosh
-        case 392:  // tanh
-        case 393:  // asin
-        case 394:  // acos
-        case 395:  // atan
-        case 396:  // asinh
-        case 397:  // acosh
-        case 398:  // atanh
-        case 399:  // atan2
-        case 400:  // degreesToRadians
-        case 401:  // radiansToDegrees
-        case 402:  // nonArrayExpression
-        case 403:  // nonArrayCompoundExpression
-        case 404:  // aggregationOperator
-        case 405:  // aggregationOperatorWithoutSlice
-        case 406:  // expressionSingletonArray
-        case 407:  // singleArgExpression
-        case 408:  // nonArrayNonObjExpression
-        case 409:  // matchExpression
-        case 410:  // predicates
-        case 411:  // compoundMatchExprs
-        case 412:  // predValue
-        case 413:  // additionalExprs
-        case 428:  // textArgCaseSensitive
-        case 429:  // textArgDiacriticSensitive
-        case 430:  // textArgLanguage
-        case 431:  // textArgSearch
-        case 432:  // findProject
-        case 433:  // findProjectFields
-        case 434:  // topLevelFindProjection
-        case 435:  // findProjection
-        case 436:  // findProjectionSlice
-        case 437:  // elemMatch
-        case 438:  // findProjectionObject
-        case 439:  // findProjectionObjectFields
-        case 442:  // sortSpecs
-        case 443:  // specList
-        case 444:  // metaSort
-        case 445:  // oneOrNegOne
-        case 446:  // metaSortKeyword
-            value.move<CNode>(std::move(that.value));
-            break;
-
-        case 204:  // aggregationProjectionFieldname
-        case 205:  // projectionFieldname
-        case 206:  // expressionFieldname
-        case 207:  // stageAsUserFieldname
-        case 208:  // argAsUserFieldname
-        case 209:  // argAsProjectionPath
-        case 210:  // aggExprAsUserFieldname
-        case 211:  // invariableUserFieldname
-        case 212:  // sortFieldname
-        case 213:  // idAsUserFieldname
-        case 214:  // elemMatchAsUserFieldname
-        case 215:  // idAsProjectionPath
-        case 216:  // valueFieldname
-        case 217:  // predFieldname
-        case 423:  // logicalExprField
-            value.move<CNode::Fieldname>(std::move(that.value));
-            break;
-
-        case 185:  // "Date"
-            value.move<Date_t>(std::move(that.value));
-            break;
-
-        case 195:  // "arbitrary decimal"
-            value.move<Decimal128>(std::move(that.value));
-            break;
-
-        case 184:  // "ObjectID"
-            value.move<OID>(std::move(that.value));
-            break;
-
-        case 196:  // "Timestamp"
-            value.move<Timestamp>(std::move(that.value));
-            break;
-
-        case 198:  // "maxKey"
-            value.move<UserMaxKey>(std::move(that.value));
-            break;
-
-        case 197:  // "minKey"
-            value.move<UserMinKey>(std::move(that.value));
-            break;
-
-        case 186:  // "null"
-            value.move<UserNull>(std::move(that.value));
-            break;
-
-        case 183:  // "undefined"
-            value.move<UserUndefined>(std::move(that.value));
-            break;
-
-        case 194:  // "arbitrary double"
-            value.move<double>(std::move(that.value));
-            break;
-
-        case 192:  // "arbitrary integer"
-            value.move<int>(std::move(that.value));
-            break;
-
-        case 193:  // "arbitrary long"
-            value.move<long long>(std::move(that.value));
-            break;
-
-        case 218:  // aggregationProjectField
-        case 219:  // aggregationProjectionObjectField
-        case 220:  // expressionField
-        case 221:  // valueField
-        case 360:  // onErrorArg
-        case 361:  // onNullArg
-        case 362:  // formatArg
-        case 363:  // timezoneArg
-        case 364:  // charsArg
-        case 365:  // optionsArg
-        case 366:  // hourArg
-        case 367:  // minuteArg
-        case 368:  // secondArg
-        case 369:  // millisecondArg
-        case 370:  // dayArg
-        case 371:  // isoWeekArg
-        case 372:  // iso8601Arg
-        case 373:  // monthArg
-        case 374:  // isoDayOfWeekArg
-        case 414:  // predicate
-        case 415:  // fieldPredicate
-        case 416:  // logicalExpr
-        case 417:  // operatorExpression
-        case 418:  // notExpr
-        case 419:  // matchMod
-        case 420:  // existsExpr
-        case 421:  // typeExpr
-        case 422:  // commentExpr
-        case 425:  // matchExpr
-        case 426:  // matchText
-        case 427:  // matchWhere
-        case 440:  // findProjectField
-        case 441:  // findProjectionObjectField
-        case 447:  // sortSpec
-            value.move<std::pair<CNode::Fieldname, CNode>>(std::move(that.value));
-            break;
-
-        case 176:  // "fieldname"
-        case 178:  // "$-prefixed fieldname"
-        case 179:  // "string"
-        case 180:  // "$-prefixed string"
-        case 181:  // "$$-prefixed string"
-        case 222:  // arg
-            value.move<std::string>(std::move(that.value));
-            break;
-
-        case 375:  // expressions
-        case 376:  // values
-        case 377:  // exprZeroToTwo
-        case 424:  // typeValues
-            value.move<std::vector<CNode>>(std::move(that.value));
-            break;
-
-        case 177:  // "fieldname containing dotted path"
-            value.move<std::vector<std::string>>(std::move(that.value));
-            break;
-
-        default:
-            break;
-    }
-}
-#endif
-
 template <typename Base>
 ParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
     : Base(that), value(), location(that.location) {
-    switch (this->type_get()) {
-        case 182:  // "BinData"
+    switch (this->kind()) {
+        case symbol_kind::S_BINARY:  // "BinData"
             value.copy<BSONBinData>(YY_MOVE(that.value));
             break;
 
-        case 189:  // "Code"
+        case symbol_kind::S_JAVASCRIPT:  // "Code"
             value.copy<BSONCode>(YY_MOVE(that.value));
             break;
 
-        case 191:  // "CodeWScope"
+        case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
             value.copy<BSONCodeWScope>(YY_MOVE(that.value));
             break;
 
-        case 188:  // "dbPointer"
+        case symbol_kind::S_DB_POINTER:  // "dbPointer"
             value.copy<BSONDBRef>(YY_MOVE(that.value));
             break;
 
-        case 187:  // "regex"
+        case symbol_kind::S_REGEX:  // "regex"
             value.copy<BSONRegEx>(YY_MOVE(that.value));
             break;
 
-        case 190:  // "Symbol"
+        case symbol_kind::S_SYMBOL:  // "Symbol"
             value.copy<BSONSymbol>(YY_MOVE(that.value));
             break;
 
-        case 223:  // dbPointer
-        case 224:  // javascript
-        case 225:  // symbol
-        case 226:  // javascriptWScope
-        case 227:  // int
-        case 228:  // timestamp
-        case 229:  // long
-        case 230:  // double
-        case 231:  // decimal
-        case 232:  // minKey
-        case 233:  // maxKey
-        case 234:  // value
-        case 235:  // string
-        case 236:  // aggregationFieldPath
-        case 237:  // binary
-        case 238:  // undefined
-        case 239:  // objectId
-        case 240:  // bool
-        case 241:  // date
-        case 242:  // null
-        case 243:  // regex
-        case 244:  // simpleValue
-        case 245:  // compoundValue
-        case 246:  // valueArray
-        case 247:  // valueObject
-        case 248:  // valueFields
-        case 249:  // variable
-        case 250:  // typeArray
-        case 251:  // typeValue
-        case 252:  // pipeline
-        case 253:  // stageList
-        case 254:  // stage
-        case 255:  // inhibitOptimization
-        case 256:  // unionWith
-        case 257:  // skip
-        case 258:  // limit
-        case 259:  // matchStage
-        case 260:  // project
-        case 261:  // sample
-        case 262:  // aggregationProjectFields
-        case 263:  // aggregationProjectionObjectFields
-        case 264:  // topLevelAggregationProjection
-        case 265:  // aggregationProjection
-        case 266:  // projectionCommon
-        case 267:  // aggregationProjectionObject
-        case 268:  // num
-        case 269:  // expression
-        case 270:  // exprFixedTwoArg
-        case 271:  // exprFixedThreeArg
-        case 272:  // slice
-        case 273:  // expressionArray
-        case 274:  // expressionObject
-        case 275:  // expressionFields
-        case 276:  // maths
-        case 277:  // meta
-        case 278:  // add
-        case 279:  // boolExprs
-        case 280:  // and
-        case 281:  // or
-        case 282:  // not
-        case 283:  // literalEscapes
-        case 284:  // const
-        case 285:  // literal
-        case 286:  // stringExps
-        case 287:  // concat
-        case 288:  // dateFromString
-        case 289:  // dateToString
-        case 290:  // indexOfBytes
-        case 291:  // indexOfCP
-        case 292:  // ltrim
-        case 293:  // regexFind
-        case 294:  // regexFindAll
-        case 295:  // regexMatch
-        case 296:  // regexArgs
-        case 297:  // replaceOne
-        case 298:  // replaceAll
-        case 299:  // rtrim
-        case 300:  // split
-        case 301:  // strLenBytes
-        case 302:  // strLenCP
-        case 303:  // strcasecmp
-        case 304:  // substr
-        case 305:  // substrBytes
-        case 306:  // substrCP
-        case 307:  // toLower
-        case 308:  // toUpper
-        case 309:  // trim
-        case 310:  // compExprs
-        case 311:  // cmp
-        case 312:  // eq
-        case 313:  // gt
-        case 314:  // gte
-        case 315:  // lt
-        case 316:  // lte
-        case 317:  // ne
-        case 318:  // dateExps
-        case 319:  // dateFromParts
-        case 320:  // dateToParts
-        case 321:  // dayOfMonth
-        case 322:  // dayOfWeek
-        case 323:  // dayOfYear
-        case 324:  // hour
-        case 325:  // isoDayOfWeek
-        case 326:  // isoWeek
-        case 327:  // isoWeekYear
-        case 328:  // millisecond
-        case 329:  // minute
-        case 330:  // month
-        case 331:  // second
-        case 332:  // week
-        case 333:  // year
-        case 334:  // typeExpression
-        case 335:  // convert
-        case 336:  // toBool
-        case 337:  // toDate
-        case 338:  // toDecimal
-        case 339:  // toDouble
-        case 340:  // toInt
-        case 341:  // toLong
-        case 342:  // toObjectId
-        case 343:  // toString
-        case 344:  // type
-        case 345:  // abs
-        case 346:  // ceil
-        case 347:  // divide
-        case 348:  // exponent
-        case 349:  // floor
-        case 350:  // ln
-        case 351:  // log
-        case 352:  // logten
-        case 353:  // mod
-        case 354:  // multiply
-        case 355:  // pow
-        case 356:  // round
-        case 357:  // sqrt
-        case 358:  // subtract
-        case 359:  // trunc
-        case 378:  // setExpression
-        case 379:  // allElementsTrue
-        case 380:  // anyElementTrue
-        case 381:  // setDifference
-        case 382:  // setEquals
-        case 383:  // setIntersection
-        case 384:  // setIsSubset
-        case 385:  // setUnion
-        case 386:  // trig
-        case 387:  // sin
-        case 388:  // cos
-        case 389:  // tan
-        case 390:  // sinh
-        case 391:  // cosh
-        case 392:  // tanh
-        case 393:  // asin
-        case 394:  // acos
-        case 395:  // atan
-        case 396:  // asinh
-        case 397:  // acosh
-        case 398:  // atanh
-        case 399:  // atan2
-        case 400:  // degreesToRadians
-        case 401:  // radiansToDegrees
-        case 402:  // nonArrayExpression
-        case 403:  // nonArrayCompoundExpression
-        case 404:  // aggregationOperator
-        case 405:  // aggregationOperatorWithoutSlice
-        case 406:  // expressionSingletonArray
-        case 407:  // singleArgExpression
-        case 408:  // nonArrayNonObjExpression
-        case 409:  // matchExpression
-        case 410:  // predicates
-        case 411:  // compoundMatchExprs
-        case 412:  // predValue
-        case 413:  // additionalExprs
-        case 428:  // textArgCaseSensitive
-        case 429:  // textArgDiacriticSensitive
-        case 430:  // textArgLanguage
-        case 431:  // textArgSearch
-        case 432:  // findProject
-        case 433:  // findProjectFields
-        case 434:  // topLevelFindProjection
-        case 435:  // findProjection
-        case 436:  // findProjectionSlice
-        case 437:  // elemMatch
-        case 438:  // findProjectionObject
-        case 439:  // findProjectionObjectFields
-        case 442:  // sortSpecs
-        case 443:  // specList
-        case 444:  // metaSort
-        case 445:  // oneOrNegOne
-        case 446:  // metaSortKeyword
+        case symbol_kind::S_dbPointer:                          // dbPointer
+        case symbol_kind::S_javascript:                         // javascript
+        case symbol_kind::S_symbol:                             // symbol
+        case symbol_kind::S_javascriptWScope:                   // javascriptWScope
+        case symbol_kind::S_int:                                // int
+        case symbol_kind::S_timestamp:                          // timestamp
+        case symbol_kind::S_long:                               // long
+        case symbol_kind::S_double:                             // double
+        case symbol_kind::S_decimal:                            // decimal
+        case symbol_kind::S_minKey:                             // minKey
+        case symbol_kind::S_maxKey:                             // maxKey
+        case symbol_kind::S_value:                              // value
+        case symbol_kind::S_string:                             // string
+        case symbol_kind::S_aggregationFieldPath:               // aggregationFieldPath
+        case symbol_kind::S_binary:                             // binary
+        case symbol_kind::S_undefined:                          // undefined
+        case symbol_kind::S_objectId:                           // objectId
+        case symbol_kind::S_bool:                               // bool
+        case symbol_kind::S_date:                               // date
+        case symbol_kind::S_null:                               // null
+        case symbol_kind::S_regex:                              // regex
+        case symbol_kind::S_simpleValue:                        // simpleValue
+        case symbol_kind::S_compoundValue:                      // compoundValue
+        case symbol_kind::S_valueArray:                         // valueArray
+        case symbol_kind::S_valueObject:                        // valueObject
+        case symbol_kind::S_valueFields:                        // valueFields
+        case symbol_kind::S_variable:                           // variable
+        case symbol_kind::S_typeArray:                          // typeArray
+        case symbol_kind::S_typeValue:                          // typeValue
+        case symbol_kind::S_pipeline:                           // pipeline
+        case symbol_kind::S_stageList:                          // stageList
+        case symbol_kind::S_stage:                              // stage
+        case symbol_kind::S_inhibitOptimization:                // inhibitOptimization
+        case symbol_kind::S_unionWith:                          // unionWith
+        case symbol_kind::S_skip:                               // skip
+        case symbol_kind::S_limit:                              // limit
+        case symbol_kind::S_matchStage:                         // matchStage
+        case symbol_kind::S_project:                            // project
+        case symbol_kind::S_sample:                             // sample
+        case symbol_kind::S_aggregationProjectFields:           // aggregationProjectFields
+        case symbol_kind::S_aggregationProjectionObjectFields:  // aggregationProjectionObjectFields
+        case symbol_kind::S_topLevelAggregationProjection:      // topLevelAggregationProjection
+        case symbol_kind::S_aggregationProjection:              // aggregationProjection
+        case symbol_kind::S_projectionCommon:                   // projectionCommon
+        case symbol_kind::S_aggregationProjectionObject:        // aggregationProjectionObject
+        case symbol_kind::S_num:                                // num
+        case symbol_kind::S_expression:                         // expression
+        case symbol_kind::S_exprFixedTwoArg:                    // exprFixedTwoArg
+        case symbol_kind::S_exprFixedThreeArg:                  // exprFixedThreeArg
+        case symbol_kind::S_slice:                              // slice
+        case symbol_kind::S_expressionArray:                    // expressionArray
+        case symbol_kind::S_expressionObject:                   // expressionObject
+        case symbol_kind::S_expressionFields:                   // expressionFields
+        case symbol_kind::S_maths:                              // maths
+        case symbol_kind::S_meta:                               // meta
+        case symbol_kind::S_add:                                // add
+        case symbol_kind::S_boolExprs:                          // boolExprs
+        case symbol_kind::S_and:                                // and
+        case symbol_kind::S_or:                                 // or
+        case symbol_kind::S_not:                                // not
+        case symbol_kind::S_literalEscapes:                     // literalEscapes
+        case symbol_kind::S_const:                              // const
+        case symbol_kind::S_literal:                            // literal
+        case symbol_kind::S_stringExps:                         // stringExps
+        case symbol_kind::S_concat:                             // concat
+        case symbol_kind::S_dateFromString:                     // dateFromString
+        case symbol_kind::S_dateToString:                       // dateToString
+        case symbol_kind::S_indexOfBytes:                       // indexOfBytes
+        case symbol_kind::S_indexOfCP:                          // indexOfCP
+        case symbol_kind::S_ltrim:                              // ltrim
+        case symbol_kind::S_regexFind:                          // regexFind
+        case symbol_kind::S_regexFindAll:                       // regexFindAll
+        case symbol_kind::S_regexMatch:                         // regexMatch
+        case symbol_kind::S_regexArgs:                          // regexArgs
+        case symbol_kind::S_replaceOne:                         // replaceOne
+        case symbol_kind::S_replaceAll:                         // replaceAll
+        case symbol_kind::S_rtrim:                              // rtrim
+        case symbol_kind::S_split:                              // split
+        case symbol_kind::S_strLenBytes:                        // strLenBytes
+        case symbol_kind::S_strLenCP:                           // strLenCP
+        case symbol_kind::S_strcasecmp:                         // strcasecmp
+        case symbol_kind::S_substr:                             // substr
+        case symbol_kind::S_substrBytes:                        // substrBytes
+        case symbol_kind::S_substrCP:                           // substrCP
+        case symbol_kind::S_toLower:                            // toLower
+        case symbol_kind::S_toUpper:                            // toUpper
+        case symbol_kind::S_trim:                               // trim
+        case symbol_kind::S_compExprs:                          // compExprs
+        case symbol_kind::S_cmp:                                // cmp
+        case symbol_kind::S_eq:                                 // eq
+        case symbol_kind::S_gt:                                 // gt
+        case symbol_kind::S_gte:                                // gte
+        case symbol_kind::S_lt:                                 // lt
+        case symbol_kind::S_lte:                                // lte
+        case symbol_kind::S_ne:                                 // ne
+        case symbol_kind::S_dateExps:                           // dateExps
+        case symbol_kind::S_dateFromParts:                      // dateFromParts
+        case symbol_kind::S_dateToParts:                        // dateToParts
+        case symbol_kind::S_dayOfMonth:                         // dayOfMonth
+        case symbol_kind::S_dayOfWeek:                          // dayOfWeek
+        case symbol_kind::S_dayOfYear:                          // dayOfYear
+        case symbol_kind::S_hour:                               // hour
+        case symbol_kind::S_isoDayOfWeek:                       // isoDayOfWeek
+        case symbol_kind::S_isoWeek:                            // isoWeek
+        case symbol_kind::S_isoWeekYear:                        // isoWeekYear
+        case symbol_kind::S_millisecond:                        // millisecond
+        case symbol_kind::S_minute:                             // minute
+        case symbol_kind::S_month:                              // month
+        case symbol_kind::S_second:                             // second
+        case symbol_kind::S_week:                               // week
+        case symbol_kind::S_year:                               // year
+        case symbol_kind::S_typeExpression:                     // typeExpression
+        case symbol_kind::S_convert:                            // convert
+        case symbol_kind::S_toBool:                             // toBool
+        case symbol_kind::S_toDate:                             // toDate
+        case symbol_kind::S_toDecimal:                          // toDecimal
+        case symbol_kind::S_toDouble:                           // toDouble
+        case symbol_kind::S_toInt:                              // toInt
+        case symbol_kind::S_toLong:                             // toLong
+        case symbol_kind::S_toObjectId:                         // toObjectId
+        case symbol_kind::S_toString:                           // toString
+        case symbol_kind::S_type:                               // type
+        case symbol_kind::S_abs:                                // abs
+        case symbol_kind::S_ceil:                               // ceil
+        case symbol_kind::S_divide:                             // divide
+        case symbol_kind::S_exponent:                           // exponent
+        case symbol_kind::S_floor:                              // floor
+        case symbol_kind::S_ln:                                 // ln
+        case symbol_kind::S_log:                                // log
+        case symbol_kind::S_logten:                             // logten
+        case symbol_kind::S_mod:                                // mod
+        case symbol_kind::S_multiply:                           // multiply
+        case symbol_kind::S_pow:                                // pow
+        case symbol_kind::S_round:                              // round
+        case symbol_kind::S_sqrt:                               // sqrt
+        case symbol_kind::S_subtract:                           // subtract
+        case symbol_kind::S_trunc:                              // trunc
+        case symbol_kind::S_arrayExps:                          // arrayExps
+        case symbol_kind::S_arrayElemAt:                        // arrayElemAt
+        case symbol_kind::S_arrayToObject:                      // arrayToObject
+        case symbol_kind::S_concatArrays:                       // concatArrays
+        case symbol_kind::S_filter:                             // filter
+        case symbol_kind::S_first:                              // first
+        case symbol_kind::S_in:                                 // in
+        case symbol_kind::S_indexOfArray:                       // indexOfArray
+        case symbol_kind::S_isArray:                            // isArray
+        case symbol_kind::S_setExpression:                      // setExpression
+        case symbol_kind::S_allElementsTrue:                    // allElementsTrue
+        case symbol_kind::S_anyElementTrue:                     // anyElementTrue
+        case symbol_kind::S_setDifference:                      // setDifference
+        case symbol_kind::S_setEquals:                          // setEquals
+        case symbol_kind::S_setIntersection:                    // setIntersection
+        case symbol_kind::S_setIsSubset:                        // setIsSubset
+        case symbol_kind::S_setUnion:                           // setUnion
+        case symbol_kind::S_trig:                               // trig
+        case symbol_kind::S_sin:                                // sin
+        case symbol_kind::S_cos:                                // cos
+        case symbol_kind::S_tan:                                // tan
+        case symbol_kind::S_sinh:                               // sinh
+        case symbol_kind::S_cosh:                               // cosh
+        case symbol_kind::S_tanh:                               // tanh
+        case symbol_kind::S_asin:                               // asin
+        case symbol_kind::S_acos:                               // acos
+        case symbol_kind::S_atan:                               // atan
+        case symbol_kind::S_asinh:                              // asinh
+        case symbol_kind::S_acosh:                              // acosh
+        case symbol_kind::S_atanh:                              // atanh
+        case symbol_kind::S_atan2:                              // atan2
+        case symbol_kind::S_degreesToRadians:                   // degreesToRadians
+        case symbol_kind::S_radiansToDegrees:                   // radiansToDegrees
+        case symbol_kind::S_nonArrayExpression:                 // nonArrayExpression
+        case symbol_kind::S_nonArrayCompoundExpression:         // nonArrayCompoundExpression
+        case symbol_kind::S_aggregationOperator:                // aggregationOperator
+        case symbol_kind::S_aggregationOperatorWithoutSlice:    // aggregationOperatorWithoutSlice
+        case symbol_kind::S_expressionSingletonArray:           // expressionSingletonArray
+        case symbol_kind::S_singleArgExpression:                // singleArgExpression
+        case symbol_kind::S_nonArrayNonObjExpression:           // nonArrayNonObjExpression
+        case symbol_kind::S_matchExpression:                    // matchExpression
+        case symbol_kind::S_predicates:                         // predicates
+        case symbol_kind::S_compoundMatchExprs:                 // compoundMatchExprs
+        case symbol_kind::S_predValue:                          // predValue
+        case symbol_kind::S_additionalExprs:                    // additionalExprs
+        case symbol_kind::S_textArgCaseSensitive:               // textArgCaseSensitive
+        case symbol_kind::S_textArgDiacriticSensitive:          // textArgDiacriticSensitive
+        case symbol_kind::S_textArgLanguage:                    // textArgLanguage
+        case symbol_kind::S_textArgSearch:                      // textArgSearch
+        case symbol_kind::S_findProject:                        // findProject
+        case symbol_kind::S_findProjectFields:                  // findProjectFields
+        case symbol_kind::S_topLevelFindProjection:             // topLevelFindProjection
+        case symbol_kind::S_findProjection:                     // findProjection
+        case symbol_kind::S_findProjectionSlice:                // findProjectionSlice
+        case symbol_kind::S_elemMatch:                          // elemMatch
+        case symbol_kind::S_findProjectionObject:               // findProjectionObject
+        case symbol_kind::S_findProjectionObjectFields:         // findProjectionObjectFields
+        case symbol_kind::S_sortSpecs:                          // sortSpecs
+        case symbol_kind::S_specList:                           // specList
+        case symbol_kind::S_metaSort:                           // metaSort
+        case symbol_kind::S_oneOrNegOne:                        // oneOrNegOne
+        case symbol_kind::S_metaSortKeyword:                    // metaSortKeyword
             value.copy<CNode>(YY_MOVE(that.value));
             break;
 
-        case 204:  // aggregationProjectionFieldname
-        case 205:  // projectionFieldname
-        case 206:  // expressionFieldname
-        case 207:  // stageAsUserFieldname
-        case 208:  // argAsUserFieldname
-        case 209:  // argAsProjectionPath
-        case 210:  // aggExprAsUserFieldname
-        case 211:  // invariableUserFieldname
-        case 212:  // sortFieldname
-        case 213:  // idAsUserFieldname
-        case 214:  // elemMatchAsUserFieldname
-        case 215:  // idAsProjectionPath
-        case 216:  // valueFieldname
-        case 217:  // predFieldname
-        case 423:  // logicalExprField
+        case symbol_kind::S_aggregationProjectionFieldname:  // aggregationProjectionFieldname
+        case symbol_kind::S_projectionFieldname:             // projectionFieldname
+        case symbol_kind::S_expressionFieldname:             // expressionFieldname
+        case symbol_kind::S_stageAsUserFieldname:            // stageAsUserFieldname
+        case symbol_kind::S_argAsUserFieldname:              // argAsUserFieldname
+        case symbol_kind::S_argAsProjectionPath:             // argAsProjectionPath
+        case symbol_kind::S_aggExprAsUserFieldname:          // aggExprAsUserFieldname
+        case symbol_kind::S_invariableUserFieldname:         // invariableUserFieldname
+        case symbol_kind::S_sortFieldname:                   // sortFieldname
+        case symbol_kind::S_idAsUserFieldname:               // idAsUserFieldname
+        case symbol_kind::S_elemMatchAsUserFieldname:        // elemMatchAsUserFieldname
+        case symbol_kind::S_idAsProjectionPath:              // idAsProjectionPath
+        case symbol_kind::S_valueFieldname:                  // valueFieldname
+        case symbol_kind::S_predFieldname:                   // predFieldname
+        case symbol_kind::S_logicalExprField:                // logicalExprField
             value.copy<CNode::Fieldname>(YY_MOVE(that.value));
             break;
 
-        case 185:  // "Date"
+        case symbol_kind::S_DATE_LITERAL:  // "Date"
             value.copy<Date_t>(YY_MOVE(that.value));
             break;
 
-        case 195:  // "arbitrary decimal"
+        case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
             value.copy<Decimal128>(YY_MOVE(that.value));
             break;
 
-        case 184:  // "ObjectID"
+        case symbol_kind::S_OBJECT_ID:  // "ObjectID"
             value.copy<OID>(YY_MOVE(that.value));
             break;
 
-        case 196:  // "Timestamp"
+        case symbol_kind::S_TIMESTAMP:  // "Timestamp"
             value.copy<Timestamp>(YY_MOVE(that.value));
             break;
 
-        case 198:  // "maxKey"
+        case symbol_kind::S_MAX_KEY:  // "maxKey"
             value.copy<UserMaxKey>(YY_MOVE(that.value));
             break;
 
-        case 197:  // "minKey"
+        case symbol_kind::S_MIN_KEY:  // "minKey"
             value.copy<UserMinKey>(YY_MOVE(that.value));
             break;
 
-        case 186:  // "null"
+        case symbol_kind::S_JSNULL:  // "null"
             value.copy<UserNull>(YY_MOVE(that.value));
             break;
 
-        case 183:  // "undefined"
+        case symbol_kind::S_UNDEFINED:  // "undefined"
             value.copy<UserUndefined>(YY_MOVE(that.value));
             break;
 
-        case 194:  // "arbitrary double"
+        case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
             value.copy<double>(YY_MOVE(that.value));
             break;
 
-        case 192:  // "arbitrary integer"
+        case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
             value.copy<int>(YY_MOVE(that.value));
             break;
 
-        case 193:  // "arbitrary long"
+        case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
             value.copy<long long>(YY_MOVE(that.value));
             break;
 
-        case 218:  // aggregationProjectField
-        case 219:  // aggregationProjectionObjectField
-        case 220:  // expressionField
-        case 221:  // valueField
-        case 360:  // onErrorArg
-        case 361:  // onNullArg
-        case 362:  // formatArg
-        case 363:  // timezoneArg
-        case 364:  // charsArg
-        case 365:  // optionsArg
-        case 366:  // hourArg
-        case 367:  // minuteArg
-        case 368:  // secondArg
-        case 369:  // millisecondArg
-        case 370:  // dayArg
-        case 371:  // isoWeekArg
-        case 372:  // iso8601Arg
-        case 373:  // monthArg
-        case 374:  // isoDayOfWeekArg
-        case 414:  // predicate
-        case 415:  // fieldPredicate
-        case 416:  // logicalExpr
-        case 417:  // operatorExpression
-        case 418:  // notExpr
-        case 419:  // matchMod
-        case 420:  // existsExpr
-        case 421:  // typeExpr
-        case 422:  // commentExpr
-        case 425:  // matchExpr
-        case 426:  // matchText
-        case 427:  // matchWhere
-        case 440:  // findProjectField
-        case 441:  // findProjectionObjectField
-        case 447:  // sortSpec
+        case symbol_kind::S_aggregationProjectField:           // aggregationProjectField
+        case symbol_kind::S_aggregationProjectionObjectField:  // aggregationProjectionObjectField
+        case symbol_kind::S_expressionField:                   // expressionField
+        case symbol_kind::S_valueField:                        // valueField
+        case symbol_kind::S_onErrorArg:                        // onErrorArg
+        case symbol_kind::S_onNullArg:                         // onNullArg
+        case symbol_kind::S_asArg:                             // asArg
+        case symbol_kind::S_formatArg:                         // formatArg
+        case symbol_kind::S_timezoneArg:                       // timezoneArg
+        case symbol_kind::S_charsArg:                          // charsArg
+        case symbol_kind::S_optionsArg:                        // optionsArg
+        case symbol_kind::S_hourArg:                           // hourArg
+        case symbol_kind::S_minuteArg:                         // minuteArg
+        case symbol_kind::S_secondArg:                         // secondArg
+        case symbol_kind::S_millisecondArg:                    // millisecondArg
+        case symbol_kind::S_dayArg:                            // dayArg
+        case symbol_kind::S_isoWeekArg:                        // isoWeekArg
+        case symbol_kind::S_iso8601Arg:                        // iso8601Arg
+        case symbol_kind::S_monthArg:                          // monthArg
+        case symbol_kind::S_isoDayOfWeekArg:                   // isoDayOfWeekArg
+        case symbol_kind::S_predicate:                         // predicate
+        case symbol_kind::S_fieldPredicate:                    // fieldPredicate
+        case symbol_kind::S_logicalExpr:                       // logicalExpr
+        case symbol_kind::S_operatorExpression:                // operatorExpression
+        case symbol_kind::S_notExpr:                           // notExpr
+        case symbol_kind::S_matchMod:                          // matchMod
+        case symbol_kind::S_existsExpr:                        // existsExpr
+        case symbol_kind::S_typeExpr:                          // typeExpr
+        case symbol_kind::S_commentExpr:                       // commentExpr
+        case symbol_kind::S_matchExpr:                         // matchExpr
+        case symbol_kind::S_matchText:                         // matchText
+        case symbol_kind::S_matchWhere:                        // matchWhere
+        case symbol_kind::S_findProjectField:                  // findProjectField
+        case symbol_kind::S_findProjectionObjectField:         // findProjectionObjectField
+        case symbol_kind::S_sortSpec:                          // sortSpec
             value.copy<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(that.value));
             break;
 
-        case 176:  // "fieldname"
-        case 178:  // "$-prefixed fieldname"
-        case 179:  // "string"
-        case 180:  // "$-prefixed string"
-        case 181:  // "$$-prefixed string"
-        case 222:  // arg
+        case symbol_kind::S_FIELDNAME:              // "fieldname"
+        case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+        case symbol_kind::S_STRING:                 // "string"
+        case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
+        case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
+        case symbol_kind::S_arg:                    // arg
             value.copy<std::string>(YY_MOVE(that.value));
             break;
 
-        case 375:  // expressions
-        case 376:  // values
-        case 377:  // exprZeroToTwo
-        case 424:  // typeValues
+        case symbol_kind::S_expressions:    // expressions
+        case symbol_kind::S_values:         // values
+        case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+        case symbol_kind::S_typeValues:     // typeValues
             value.copy<std::vector<CNode>>(YY_MOVE(that.value));
             break;
 
-        case 177:  // "fieldname containing dotted path"
+        case symbol_kind::S_DOTTED_FIELDNAME:  // "fieldname containing dotted path"
             value.copy<std::vector<std::string>>(YY_MOVE(that.value));
             break;
 
@@ -4739,347 +5458,362 @@ ParserGen::basic_symbol<Base>::basic_symbol(const basic_symbol& that)
 
 
 template <typename Base>
+ParserGen::symbol_kind_type ParserGen::basic_symbol<Base>::type_get() const YY_NOEXCEPT {
+    return this->kind();
+}
+
+template <typename Base>
 bool ParserGen::basic_symbol<Base>::empty() const YY_NOEXCEPT {
-    return Base::type_get() == empty_symbol;
+    return this->kind() == symbol_kind::S_YYEMPTY;
 }
 
 template <typename Base>
 void ParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     super_type::move(s);
-    switch (this->type_get()) {
-        case 182:  // "BinData"
+    switch (this->kind()) {
+        case symbol_kind::S_BINARY:  // "BinData"
             value.move<BSONBinData>(YY_MOVE(s.value));
             break;
 
-        case 189:  // "Code"
+        case symbol_kind::S_JAVASCRIPT:  // "Code"
             value.move<BSONCode>(YY_MOVE(s.value));
             break;
 
-        case 191:  // "CodeWScope"
+        case symbol_kind::S_JAVASCRIPT_W_SCOPE:  // "CodeWScope"
             value.move<BSONCodeWScope>(YY_MOVE(s.value));
             break;
 
-        case 188:  // "dbPointer"
+        case symbol_kind::S_DB_POINTER:  // "dbPointer"
             value.move<BSONDBRef>(YY_MOVE(s.value));
             break;
 
-        case 187:  // "regex"
+        case symbol_kind::S_REGEX:  // "regex"
             value.move<BSONRegEx>(YY_MOVE(s.value));
             break;
 
-        case 190:  // "Symbol"
+        case symbol_kind::S_SYMBOL:  // "Symbol"
             value.move<BSONSymbol>(YY_MOVE(s.value));
             break;
 
-        case 223:  // dbPointer
-        case 224:  // javascript
-        case 225:  // symbol
-        case 226:  // javascriptWScope
-        case 227:  // int
-        case 228:  // timestamp
-        case 229:  // long
-        case 230:  // double
-        case 231:  // decimal
-        case 232:  // minKey
-        case 233:  // maxKey
-        case 234:  // value
-        case 235:  // string
-        case 236:  // aggregationFieldPath
-        case 237:  // binary
-        case 238:  // undefined
-        case 239:  // objectId
-        case 240:  // bool
-        case 241:  // date
-        case 242:  // null
-        case 243:  // regex
-        case 244:  // simpleValue
-        case 245:  // compoundValue
-        case 246:  // valueArray
-        case 247:  // valueObject
-        case 248:  // valueFields
-        case 249:  // variable
-        case 250:  // typeArray
-        case 251:  // typeValue
-        case 252:  // pipeline
-        case 253:  // stageList
-        case 254:  // stage
-        case 255:  // inhibitOptimization
-        case 256:  // unionWith
-        case 257:  // skip
-        case 258:  // limit
-        case 259:  // matchStage
-        case 260:  // project
-        case 261:  // sample
-        case 262:  // aggregationProjectFields
-        case 263:  // aggregationProjectionObjectFields
-        case 264:  // topLevelAggregationProjection
-        case 265:  // aggregationProjection
-        case 266:  // projectionCommon
-        case 267:  // aggregationProjectionObject
-        case 268:  // num
-        case 269:  // expression
-        case 270:  // exprFixedTwoArg
-        case 271:  // exprFixedThreeArg
-        case 272:  // slice
-        case 273:  // expressionArray
-        case 274:  // expressionObject
-        case 275:  // expressionFields
-        case 276:  // maths
-        case 277:  // meta
-        case 278:  // add
-        case 279:  // boolExprs
-        case 280:  // and
-        case 281:  // or
-        case 282:  // not
-        case 283:  // literalEscapes
-        case 284:  // const
-        case 285:  // literal
-        case 286:  // stringExps
-        case 287:  // concat
-        case 288:  // dateFromString
-        case 289:  // dateToString
-        case 290:  // indexOfBytes
-        case 291:  // indexOfCP
-        case 292:  // ltrim
-        case 293:  // regexFind
-        case 294:  // regexFindAll
-        case 295:  // regexMatch
-        case 296:  // regexArgs
-        case 297:  // replaceOne
-        case 298:  // replaceAll
-        case 299:  // rtrim
-        case 300:  // split
-        case 301:  // strLenBytes
-        case 302:  // strLenCP
-        case 303:  // strcasecmp
-        case 304:  // substr
-        case 305:  // substrBytes
-        case 306:  // substrCP
-        case 307:  // toLower
-        case 308:  // toUpper
-        case 309:  // trim
-        case 310:  // compExprs
-        case 311:  // cmp
-        case 312:  // eq
-        case 313:  // gt
-        case 314:  // gte
-        case 315:  // lt
-        case 316:  // lte
-        case 317:  // ne
-        case 318:  // dateExps
-        case 319:  // dateFromParts
-        case 320:  // dateToParts
-        case 321:  // dayOfMonth
-        case 322:  // dayOfWeek
-        case 323:  // dayOfYear
-        case 324:  // hour
-        case 325:  // isoDayOfWeek
-        case 326:  // isoWeek
-        case 327:  // isoWeekYear
-        case 328:  // millisecond
-        case 329:  // minute
-        case 330:  // month
-        case 331:  // second
-        case 332:  // week
-        case 333:  // year
-        case 334:  // typeExpression
-        case 335:  // convert
-        case 336:  // toBool
-        case 337:  // toDate
-        case 338:  // toDecimal
-        case 339:  // toDouble
-        case 340:  // toInt
-        case 341:  // toLong
-        case 342:  // toObjectId
-        case 343:  // toString
-        case 344:  // type
-        case 345:  // abs
-        case 346:  // ceil
-        case 347:  // divide
-        case 348:  // exponent
-        case 349:  // floor
-        case 350:  // ln
-        case 351:  // log
-        case 352:  // logten
-        case 353:  // mod
-        case 354:  // multiply
-        case 355:  // pow
-        case 356:  // round
-        case 357:  // sqrt
-        case 358:  // subtract
-        case 359:  // trunc
-        case 378:  // setExpression
-        case 379:  // allElementsTrue
-        case 380:  // anyElementTrue
-        case 381:  // setDifference
-        case 382:  // setEquals
-        case 383:  // setIntersection
-        case 384:  // setIsSubset
-        case 385:  // setUnion
-        case 386:  // trig
-        case 387:  // sin
-        case 388:  // cos
-        case 389:  // tan
-        case 390:  // sinh
-        case 391:  // cosh
-        case 392:  // tanh
-        case 393:  // asin
-        case 394:  // acos
-        case 395:  // atan
-        case 396:  // asinh
-        case 397:  // acosh
-        case 398:  // atanh
-        case 399:  // atan2
-        case 400:  // degreesToRadians
-        case 401:  // radiansToDegrees
-        case 402:  // nonArrayExpression
-        case 403:  // nonArrayCompoundExpression
-        case 404:  // aggregationOperator
-        case 405:  // aggregationOperatorWithoutSlice
-        case 406:  // expressionSingletonArray
-        case 407:  // singleArgExpression
-        case 408:  // nonArrayNonObjExpression
-        case 409:  // matchExpression
-        case 410:  // predicates
-        case 411:  // compoundMatchExprs
-        case 412:  // predValue
-        case 413:  // additionalExprs
-        case 428:  // textArgCaseSensitive
-        case 429:  // textArgDiacriticSensitive
-        case 430:  // textArgLanguage
-        case 431:  // textArgSearch
-        case 432:  // findProject
-        case 433:  // findProjectFields
-        case 434:  // topLevelFindProjection
-        case 435:  // findProjection
-        case 436:  // findProjectionSlice
-        case 437:  // elemMatch
-        case 438:  // findProjectionObject
-        case 439:  // findProjectionObjectFields
-        case 442:  // sortSpecs
-        case 443:  // specList
-        case 444:  // metaSort
-        case 445:  // oneOrNegOne
-        case 446:  // metaSortKeyword
+        case symbol_kind::S_dbPointer:                          // dbPointer
+        case symbol_kind::S_javascript:                         // javascript
+        case symbol_kind::S_symbol:                             // symbol
+        case symbol_kind::S_javascriptWScope:                   // javascriptWScope
+        case symbol_kind::S_int:                                // int
+        case symbol_kind::S_timestamp:                          // timestamp
+        case symbol_kind::S_long:                               // long
+        case symbol_kind::S_double:                             // double
+        case symbol_kind::S_decimal:                            // decimal
+        case symbol_kind::S_minKey:                             // minKey
+        case symbol_kind::S_maxKey:                             // maxKey
+        case symbol_kind::S_value:                              // value
+        case symbol_kind::S_string:                             // string
+        case symbol_kind::S_aggregationFieldPath:               // aggregationFieldPath
+        case symbol_kind::S_binary:                             // binary
+        case symbol_kind::S_undefined:                          // undefined
+        case symbol_kind::S_objectId:                           // objectId
+        case symbol_kind::S_bool:                               // bool
+        case symbol_kind::S_date:                               // date
+        case symbol_kind::S_null:                               // null
+        case symbol_kind::S_regex:                              // regex
+        case symbol_kind::S_simpleValue:                        // simpleValue
+        case symbol_kind::S_compoundValue:                      // compoundValue
+        case symbol_kind::S_valueArray:                         // valueArray
+        case symbol_kind::S_valueObject:                        // valueObject
+        case symbol_kind::S_valueFields:                        // valueFields
+        case symbol_kind::S_variable:                           // variable
+        case symbol_kind::S_typeArray:                          // typeArray
+        case symbol_kind::S_typeValue:                          // typeValue
+        case symbol_kind::S_pipeline:                           // pipeline
+        case symbol_kind::S_stageList:                          // stageList
+        case symbol_kind::S_stage:                              // stage
+        case symbol_kind::S_inhibitOptimization:                // inhibitOptimization
+        case symbol_kind::S_unionWith:                          // unionWith
+        case symbol_kind::S_skip:                               // skip
+        case symbol_kind::S_limit:                              // limit
+        case symbol_kind::S_matchStage:                         // matchStage
+        case symbol_kind::S_project:                            // project
+        case symbol_kind::S_sample:                             // sample
+        case symbol_kind::S_aggregationProjectFields:           // aggregationProjectFields
+        case symbol_kind::S_aggregationProjectionObjectFields:  // aggregationProjectionObjectFields
+        case symbol_kind::S_topLevelAggregationProjection:      // topLevelAggregationProjection
+        case symbol_kind::S_aggregationProjection:              // aggregationProjection
+        case symbol_kind::S_projectionCommon:                   // projectionCommon
+        case symbol_kind::S_aggregationProjectionObject:        // aggregationProjectionObject
+        case symbol_kind::S_num:                                // num
+        case symbol_kind::S_expression:                         // expression
+        case symbol_kind::S_exprFixedTwoArg:                    // exprFixedTwoArg
+        case symbol_kind::S_exprFixedThreeArg:                  // exprFixedThreeArg
+        case symbol_kind::S_slice:                              // slice
+        case symbol_kind::S_expressionArray:                    // expressionArray
+        case symbol_kind::S_expressionObject:                   // expressionObject
+        case symbol_kind::S_expressionFields:                   // expressionFields
+        case symbol_kind::S_maths:                              // maths
+        case symbol_kind::S_meta:                               // meta
+        case symbol_kind::S_add:                                // add
+        case symbol_kind::S_boolExprs:                          // boolExprs
+        case symbol_kind::S_and:                                // and
+        case symbol_kind::S_or:                                 // or
+        case symbol_kind::S_not:                                // not
+        case symbol_kind::S_literalEscapes:                     // literalEscapes
+        case symbol_kind::S_const:                              // const
+        case symbol_kind::S_literal:                            // literal
+        case symbol_kind::S_stringExps:                         // stringExps
+        case symbol_kind::S_concat:                             // concat
+        case symbol_kind::S_dateFromString:                     // dateFromString
+        case symbol_kind::S_dateToString:                       // dateToString
+        case symbol_kind::S_indexOfBytes:                       // indexOfBytes
+        case symbol_kind::S_indexOfCP:                          // indexOfCP
+        case symbol_kind::S_ltrim:                              // ltrim
+        case symbol_kind::S_regexFind:                          // regexFind
+        case symbol_kind::S_regexFindAll:                       // regexFindAll
+        case symbol_kind::S_regexMatch:                         // regexMatch
+        case symbol_kind::S_regexArgs:                          // regexArgs
+        case symbol_kind::S_replaceOne:                         // replaceOne
+        case symbol_kind::S_replaceAll:                         // replaceAll
+        case symbol_kind::S_rtrim:                              // rtrim
+        case symbol_kind::S_split:                              // split
+        case symbol_kind::S_strLenBytes:                        // strLenBytes
+        case symbol_kind::S_strLenCP:                           // strLenCP
+        case symbol_kind::S_strcasecmp:                         // strcasecmp
+        case symbol_kind::S_substr:                             // substr
+        case symbol_kind::S_substrBytes:                        // substrBytes
+        case symbol_kind::S_substrCP:                           // substrCP
+        case symbol_kind::S_toLower:                            // toLower
+        case symbol_kind::S_toUpper:                            // toUpper
+        case symbol_kind::S_trim:                               // trim
+        case symbol_kind::S_compExprs:                          // compExprs
+        case symbol_kind::S_cmp:                                // cmp
+        case symbol_kind::S_eq:                                 // eq
+        case symbol_kind::S_gt:                                 // gt
+        case symbol_kind::S_gte:                                // gte
+        case symbol_kind::S_lt:                                 // lt
+        case symbol_kind::S_lte:                                // lte
+        case symbol_kind::S_ne:                                 // ne
+        case symbol_kind::S_dateExps:                           // dateExps
+        case symbol_kind::S_dateFromParts:                      // dateFromParts
+        case symbol_kind::S_dateToParts:                        // dateToParts
+        case symbol_kind::S_dayOfMonth:                         // dayOfMonth
+        case symbol_kind::S_dayOfWeek:                          // dayOfWeek
+        case symbol_kind::S_dayOfYear:                          // dayOfYear
+        case symbol_kind::S_hour:                               // hour
+        case symbol_kind::S_isoDayOfWeek:                       // isoDayOfWeek
+        case symbol_kind::S_isoWeek:                            // isoWeek
+        case symbol_kind::S_isoWeekYear:                        // isoWeekYear
+        case symbol_kind::S_millisecond:                        // millisecond
+        case symbol_kind::S_minute:                             // minute
+        case symbol_kind::S_month:                              // month
+        case symbol_kind::S_second:                             // second
+        case symbol_kind::S_week:                               // week
+        case symbol_kind::S_year:                               // year
+        case symbol_kind::S_typeExpression:                     // typeExpression
+        case symbol_kind::S_convert:                            // convert
+        case symbol_kind::S_toBool:                             // toBool
+        case symbol_kind::S_toDate:                             // toDate
+        case symbol_kind::S_toDecimal:                          // toDecimal
+        case symbol_kind::S_toDouble:                           // toDouble
+        case symbol_kind::S_toInt:                              // toInt
+        case symbol_kind::S_toLong:                             // toLong
+        case symbol_kind::S_toObjectId:                         // toObjectId
+        case symbol_kind::S_toString:                           // toString
+        case symbol_kind::S_type:                               // type
+        case symbol_kind::S_abs:                                // abs
+        case symbol_kind::S_ceil:                               // ceil
+        case symbol_kind::S_divide:                             // divide
+        case symbol_kind::S_exponent:                           // exponent
+        case symbol_kind::S_floor:                              // floor
+        case symbol_kind::S_ln:                                 // ln
+        case symbol_kind::S_log:                                // log
+        case symbol_kind::S_logten:                             // logten
+        case symbol_kind::S_mod:                                // mod
+        case symbol_kind::S_multiply:                           // multiply
+        case symbol_kind::S_pow:                                // pow
+        case symbol_kind::S_round:                              // round
+        case symbol_kind::S_sqrt:                               // sqrt
+        case symbol_kind::S_subtract:                           // subtract
+        case symbol_kind::S_trunc:                              // trunc
+        case symbol_kind::S_arrayExps:                          // arrayExps
+        case symbol_kind::S_arrayElemAt:                        // arrayElemAt
+        case symbol_kind::S_arrayToObject:                      // arrayToObject
+        case symbol_kind::S_concatArrays:                       // concatArrays
+        case symbol_kind::S_filter:                             // filter
+        case symbol_kind::S_first:                              // first
+        case symbol_kind::S_in:                                 // in
+        case symbol_kind::S_indexOfArray:                       // indexOfArray
+        case symbol_kind::S_isArray:                            // isArray
+        case symbol_kind::S_setExpression:                      // setExpression
+        case symbol_kind::S_allElementsTrue:                    // allElementsTrue
+        case symbol_kind::S_anyElementTrue:                     // anyElementTrue
+        case symbol_kind::S_setDifference:                      // setDifference
+        case symbol_kind::S_setEquals:                          // setEquals
+        case symbol_kind::S_setIntersection:                    // setIntersection
+        case symbol_kind::S_setIsSubset:                        // setIsSubset
+        case symbol_kind::S_setUnion:                           // setUnion
+        case symbol_kind::S_trig:                               // trig
+        case symbol_kind::S_sin:                                // sin
+        case symbol_kind::S_cos:                                // cos
+        case symbol_kind::S_tan:                                // tan
+        case symbol_kind::S_sinh:                               // sinh
+        case symbol_kind::S_cosh:                               // cosh
+        case symbol_kind::S_tanh:                               // tanh
+        case symbol_kind::S_asin:                               // asin
+        case symbol_kind::S_acos:                               // acos
+        case symbol_kind::S_atan:                               // atan
+        case symbol_kind::S_asinh:                              // asinh
+        case symbol_kind::S_acosh:                              // acosh
+        case symbol_kind::S_atanh:                              // atanh
+        case symbol_kind::S_atan2:                              // atan2
+        case symbol_kind::S_degreesToRadians:                   // degreesToRadians
+        case symbol_kind::S_radiansToDegrees:                   // radiansToDegrees
+        case symbol_kind::S_nonArrayExpression:                 // nonArrayExpression
+        case symbol_kind::S_nonArrayCompoundExpression:         // nonArrayCompoundExpression
+        case symbol_kind::S_aggregationOperator:                // aggregationOperator
+        case symbol_kind::S_aggregationOperatorWithoutSlice:    // aggregationOperatorWithoutSlice
+        case symbol_kind::S_expressionSingletonArray:           // expressionSingletonArray
+        case symbol_kind::S_singleArgExpression:                // singleArgExpression
+        case symbol_kind::S_nonArrayNonObjExpression:           // nonArrayNonObjExpression
+        case symbol_kind::S_matchExpression:                    // matchExpression
+        case symbol_kind::S_predicates:                         // predicates
+        case symbol_kind::S_compoundMatchExprs:                 // compoundMatchExprs
+        case symbol_kind::S_predValue:                          // predValue
+        case symbol_kind::S_additionalExprs:                    // additionalExprs
+        case symbol_kind::S_textArgCaseSensitive:               // textArgCaseSensitive
+        case symbol_kind::S_textArgDiacriticSensitive:          // textArgDiacriticSensitive
+        case symbol_kind::S_textArgLanguage:                    // textArgLanguage
+        case symbol_kind::S_textArgSearch:                      // textArgSearch
+        case symbol_kind::S_findProject:                        // findProject
+        case symbol_kind::S_findProjectFields:                  // findProjectFields
+        case symbol_kind::S_topLevelFindProjection:             // topLevelFindProjection
+        case symbol_kind::S_findProjection:                     // findProjection
+        case symbol_kind::S_findProjectionSlice:                // findProjectionSlice
+        case symbol_kind::S_elemMatch:                          // elemMatch
+        case symbol_kind::S_findProjectionObject:               // findProjectionObject
+        case symbol_kind::S_findProjectionObjectFields:         // findProjectionObjectFields
+        case symbol_kind::S_sortSpecs:                          // sortSpecs
+        case symbol_kind::S_specList:                           // specList
+        case symbol_kind::S_metaSort:                           // metaSort
+        case symbol_kind::S_oneOrNegOne:                        // oneOrNegOne
+        case symbol_kind::S_metaSortKeyword:                    // metaSortKeyword
             value.move<CNode>(YY_MOVE(s.value));
             break;
 
-        case 204:  // aggregationProjectionFieldname
-        case 205:  // projectionFieldname
-        case 206:  // expressionFieldname
-        case 207:  // stageAsUserFieldname
-        case 208:  // argAsUserFieldname
-        case 209:  // argAsProjectionPath
-        case 210:  // aggExprAsUserFieldname
-        case 211:  // invariableUserFieldname
-        case 212:  // sortFieldname
-        case 213:  // idAsUserFieldname
-        case 214:  // elemMatchAsUserFieldname
-        case 215:  // idAsProjectionPath
-        case 216:  // valueFieldname
-        case 217:  // predFieldname
-        case 423:  // logicalExprField
+        case symbol_kind::S_aggregationProjectionFieldname:  // aggregationProjectionFieldname
+        case symbol_kind::S_projectionFieldname:             // projectionFieldname
+        case symbol_kind::S_expressionFieldname:             // expressionFieldname
+        case symbol_kind::S_stageAsUserFieldname:            // stageAsUserFieldname
+        case symbol_kind::S_argAsUserFieldname:              // argAsUserFieldname
+        case symbol_kind::S_argAsProjectionPath:             // argAsProjectionPath
+        case symbol_kind::S_aggExprAsUserFieldname:          // aggExprAsUserFieldname
+        case symbol_kind::S_invariableUserFieldname:         // invariableUserFieldname
+        case symbol_kind::S_sortFieldname:                   // sortFieldname
+        case symbol_kind::S_idAsUserFieldname:               // idAsUserFieldname
+        case symbol_kind::S_elemMatchAsUserFieldname:        // elemMatchAsUserFieldname
+        case symbol_kind::S_idAsProjectionPath:              // idAsProjectionPath
+        case symbol_kind::S_valueFieldname:                  // valueFieldname
+        case symbol_kind::S_predFieldname:                   // predFieldname
+        case symbol_kind::S_logicalExprField:                // logicalExprField
             value.move<CNode::Fieldname>(YY_MOVE(s.value));
             break;
 
-        case 185:  // "Date"
+        case symbol_kind::S_DATE_LITERAL:  // "Date"
             value.move<Date_t>(YY_MOVE(s.value));
             break;
 
-        case 195:  // "arbitrary decimal"
+        case symbol_kind::S_DECIMAL_OTHER:  // "arbitrary decimal"
             value.move<Decimal128>(YY_MOVE(s.value));
             break;
 
-        case 184:  // "ObjectID"
+        case symbol_kind::S_OBJECT_ID:  // "ObjectID"
             value.move<OID>(YY_MOVE(s.value));
             break;
 
-        case 196:  // "Timestamp"
+        case symbol_kind::S_TIMESTAMP:  // "Timestamp"
             value.move<Timestamp>(YY_MOVE(s.value));
             break;
 
-        case 198:  // "maxKey"
+        case symbol_kind::S_MAX_KEY:  // "maxKey"
             value.move<UserMaxKey>(YY_MOVE(s.value));
             break;
 
-        case 197:  // "minKey"
+        case symbol_kind::S_MIN_KEY:  // "minKey"
             value.move<UserMinKey>(YY_MOVE(s.value));
             break;
 
-        case 186:  // "null"
+        case symbol_kind::S_JSNULL:  // "null"
             value.move<UserNull>(YY_MOVE(s.value));
             break;
 
-        case 183:  // "undefined"
+        case symbol_kind::S_UNDEFINED:  // "undefined"
             value.move<UserUndefined>(YY_MOVE(s.value));
             break;
 
-        case 194:  // "arbitrary double"
+        case symbol_kind::S_DOUBLE_OTHER:  // "arbitrary double"
             value.move<double>(YY_MOVE(s.value));
             break;
 
-        case 192:  // "arbitrary integer"
+        case symbol_kind::S_INT_OTHER:  // "arbitrary integer"
             value.move<int>(YY_MOVE(s.value));
             break;
 
-        case 193:  // "arbitrary long"
+        case symbol_kind::S_LONG_OTHER:  // "arbitrary long"
             value.move<long long>(YY_MOVE(s.value));
             break;
 
-        case 218:  // aggregationProjectField
-        case 219:  // aggregationProjectionObjectField
-        case 220:  // expressionField
-        case 221:  // valueField
-        case 360:  // onErrorArg
-        case 361:  // onNullArg
-        case 362:  // formatArg
-        case 363:  // timezoneArg
-        case 364:  // charsArg
-        case 365:  // optionsArg
-        case 366:  // hourArg
-        case 367:  // minuteArg
-        case 368:  // secondArg
-        case 369:  // millisecondArg
-        case 370:  // dayArg
-        case 371:  // isoWeekArg
-        case 372:  // iso8601Arg
-        case 373:  // monthArg
-        case 374:  // isoDayOfWeekArg
-        case 414:  // predicate
-        case 415:  // fieldPredicate
-        case 416:  // logicalExpr
-        case 417:  // operatorExpression
-        case 418:  // notExpr
-        case 419:  // matchMod
-        case 420:  // existsExpr
-        case 421:  // typeExpr
-        case 422:  // commentExpr
-        case 425:  // matchExpr
-        case 426:  // matchText
-        case 427:  // matchWhere
-        case 440:  // findProjectField
-        case 441:  // findProjectionObjectField
-        case 447:  // sortSpec
+        case symbol_kind::S_aggregationProjectField:           // aggregationProjectField
+        case symbol_kind::S_aggregationProjectionObjectField:  // aggregationProjectionObjectField
+        case symbol_kind::S_expressionField:                   // expressionField
+        case symbol_kind::S_valueField:                        // valueField
+        case symbol_kind::S_onErrorArg:                        // onErrorArg
+        case symbol_kind::S_onNullArg:                         // onNullArg
+        case symbol_kind::S_asArg:                             // asArg
+        case symbol_kind::S_formatArg:                         // formatArg
+        case symbol_kind::S_timezoneArg:                       // timezoneArg
+        case symbol_kind::S_charsArg:                          // charsArg
+        case symbol_kind::S_optionsArg:                        // optionsArg
+        case symbol_kind::S_hourArg:                           // hourArg
+        case symbol_kind::S_minuteArg:                         // minuteArg
+        case symbol_kind::S_secondArg:                         // secondArg
+        case symbol_kind::S_millisecondArg:                    // millisecondArg
+        case symbol_kind::S_dayArg:                            // dayArg
+        case symbol_kind::S_isoWeekArg:                        // isoWeekArg
+        case symbol_kind::S_iso8601Arg:                        // iso8601Arg
+        case symbol_kind::S_monthArg:                          // monthArg
+        case symbol_kind::S_isoDayOfWeekArg:                   // isoDayOfWeekArg
+        case symbol_kind::S_predicate:                         // predicate
+        case symbol_kind::S_fieldPredicate:                    // fieldPredicate
+        case symbol_kind::S_logicalExpr:                       // logicalExpr
+        case symbol_kind::S_operatorExpression:                // operatorExpression
+        case symbol_kind::S_notExpr:                           // notExpr
+        case symbol_kind::S_matchMod:                          // matchMod
+        case symbol_kind::S_existsExpr:                        // existsExpr
+        case symbol_kind::S_typeExpr:                          // typeExpr
+        case symbol_kind::S_commentExpr:                       // commentExpr
+        case symbol_kind::S_matchExpr:                         // matchExpr
+        case symbol_kind::S_matchText:                         // matchText
+        case symbol_kind::S_matchWhere:                        // matchWhere
+        case symbol_kind::S_findProjectField:                  // findProjectField
+        case symbol_kind::S_findProjectionObjectField:         // findProjectionObjectField
+        case symbol_kind::S_sortSpec:                          // sortSpec
             value.move<std::pair<CNode::Fieldname, CNode>>(YY_MOVE(s.value));
             break;
 
-        case 176:  // "fieldname"
-        case 178:  // "$-prefixed fieldname"
-        case 179:  // "string"
-        case 180:  // "$-prefixed string"
-        case 181:  // "$$-prefixed string"
-        case 222:  // arg
+        case symbol_kind::S_FIELDNAME:              // "fieldname"
+        case symbol_kind::S_DOLLAR_PREF_FIELDNAME:  // "$-prefixed fieldname"
+        case symbol_kind::S_STRING:                 // "string"
+        case symbol_kind::S_DOLLAR_STRING:          // "$-prefixed string"
+        case symbol_kind::S_DOLLAR_DOLLAR_STRING:   // "$$-prefixed string"
+        case symbol_kind::S_arg:                    // arg
             value.move<std::string>(YY_MOVE(s.value));
             break;
 
-        case 375:  // expressions
-        case 376:  // values
-        case 377:  // exprZeroToTwo
-        case 424:  // typeValues
+        case symbol_kind::S_expressions:    // expressions
+        case symbol_kind::S_values:         // values
+        case symbol_kind::S_exprZeroToTwo:  // exprZeroToTwo
+        case symbol_kind::S_typeValues:     // typeValues
             value.move<std::vector<CNode>>(YY_MOVE(s.value));
             break;
 
-        case 177:  // "fieldname containing dotted path"
+        case symbol_kind::S_DOTTED_FIELDNAME:  // "fieldname containing dotted path"
             value.move<std::vector<std::string>>(YY_MOVE(s.value));
             break;
 
@@ -5090,35 +5824,39 @@ void ParserGen::basic_symbol<Base>::move(basic_symbol& s) {
     location = YY_MOVE(s.location);
 }
 
-// by_type.
-inline ParserGen::by_type::by_type() : type(empty_symbol) {}
+// by_kind.
+inline ParserGen::by_kind::by_kind() : kind_(symbol_kind::S_YYEMPTY) {}
 
 #if 201103L <= YY_CPLUSPLUS
-inline ParserGen::by_type::by_type(by_type&& that) : type(that.type) {
+inline ParserGen::by_kind::by_kind(by_kind&& that) : kind_(that.kind_) {
     that.clear();
 }
 #endif
 
-inline ParserGen::by_type::by_type(const by_type& that) : type(that.type) {}
+inline ParserGen::by_kind::by_kind(const by_kind& that) : kind_(that.kind_) {}
 
-inline ParserGen::by_type::by_type(token_type t) : type(yytranslate_(t)) {}
+inline ParserGen::by_kind::by_kind(token_kind_type t) : kind_(yytranslate_(t)) {}
 
-inline void ParserGen::by_type::clear() {
-    type = empty_symbol;
+inline void ParserGen::by_kind::clear() {
+    kind_ = symbol_kind::S_YYEMPTY;
 }
 
-inline void ParserGen::by_type::move(by_type& that) {
-    type = that.type;
+inline void ParserGen::by_kind::move(by_kind& that) {
+    kind_ = that.kind_;
     that.clear();
 }
 
-inline int ParserGen::by_type::type_get() const YY_NOEXCEPT {
-    return type;
+inline ParserGen::symbol_kind_type ParserGen::by_kind::kind() const YY_NOEXCEPT {
+    return kind_;
 }
 
-#line 57 "src/mongo/db/cst/grammar.yy"
+inline ParserGen::symbol_kind_type ParserGen::by_kind::type_get() const YY_NOEXCEPT {
+    return this->kind();
+}
+
+#line 57 "grammar.yy"
 }  // namespace mongo
-#line 6493 "src/mongo/db/cst/parser_gen.hpp"
+#line 7287 "parser_gen.hpp"
 
 
-#endif  // !YY_YY_SRC_MONGO_DB_CST_PARSER_GEN_HPP_INCLUDED
+#endif  // !YY_YY_PARSER_GEN_HPP_INCLUDED

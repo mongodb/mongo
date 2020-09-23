@@ -44,6 +44,9 @@
     ENUMIFY(asin)                \
     ENUMIFY(asinh)               \
     ENUMIFY(atan)                \
+    ENUMIFY(arrayElemAt)         \
+    ENUMIFY(arrayToObject)       \
+    ENUMIFY(asArg)               \
     ENUMIFY(atan2)               \
     ENUMIFY(atanh)               \
     ENUMIFY(caseSensitive)       \
@@ -53,6 +56,8 @@
     ENUMIFY(collArg)             \
     ENUMIFY(commentExpr)         \
     ENUMIFY(concat)              \
+    ENUMIFY(concatArrays)        \
+    ENUMIFY(condArg)             \
     ENUMIFY(constExpr)           \
     ENUMIFY(convert)             \
     ENUMIFY(cos)                 \
@@ -76,6 +81,8 @@
     ENUMIFY(exponent)            \
     ENUMIFY(expr)                \
     ENUMIFY(findArg)             \
+    ENUMIFY(filter)              \
+    ENUMIFY(first)               \
     ENUMIFY(floor)               \
     ENUMIFY(formatArg)           \
     ENUMIFY(gt)                  \
@@ -83,10 +90,13 @@
     ENUMIFY(hour)                \
     ENUMIFY(hourArg)             \
     ENUMIFY(id)                  \
+    ENUMIFY(in)                  \
+    ENUMIFY(indexOfArray)        \
     ENUMIFY(indexOfBytes)        \
     ENUMIFY(indexOfCP)           \
     ENUMIFY(inhibitOptimization) \
     ENUMIFY(inputArg)            \
+    ENUMIFY(isArray)             \
     ENUMIFY(iso8601Arg)          \
     ENUMIFY(isoDayOfWeek)        \
     ENUMIFY(isoDayOfWeekArg)     \

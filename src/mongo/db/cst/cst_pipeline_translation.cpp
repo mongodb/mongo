@@ -58,6 +58,8 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_trigonometric.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/visit_helper.h"
@@ -65,7 +67,6 @@
 namespace mongo::cst_pipeline_translation {
 namespace {
 Value translateLiteralToValue(const CNode& cst);
-
 /**
  * Walk a literal array payload and produce a Value. This function is necessary because Aggregation
  * Expression literals are required to be collapsed into Values inside ExpressionConst but
@@ -116,11 +117,13 @@ Value translateLiteralToValue(const CNode& cst) {
  *
  * Caller must ensure the ExpressionContext outlives the result.
  */
-auto translateLiteralArray(const CNode::ArrayChildren& array, ExpressionContext* expCtx) {
+auto translateLiteralArray(const CNode::ArrayChildren& array,
+                           ExpressionContext* expCtx,
+                           const VariablesParseState& vps) {
     auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
     static_cast<void>(std::transform(
         array.begin(), array.end(), std::back_inserter(expressions), [&](auto&& elem) {
-            return translateExpression(elem, expCtx);
+            return translateExpression(elem, expCtx, vps);
         }));
     return ExpressionArray::create(expCtx, std::move(expressions));
 }
@@ -130,12 +133,14 @@ auto translateLiteralArray(const CNode::ArrayChildren& array, ExpressionContext*
  *
  * Caller must ensure the ExpressionContext outlives the result.
  */
-auto translateLiteralObject(const CNode::ObjectChildren& object, ExpressionContext* expCtx) {
+auto translateLiteralObject(const CNode::ObjectChildren& object,
+                            ExpressionContext* expCtx,
+                            const VariablesParseState& vps) {
     auto fields = std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>>{};
     static_cast<void>(
         std::transform(object.begin(), object.end(), std::back_inserter(fields), [&](auto&& field) {
             return std::pair{std::string{stdx::get<UserFieldname>(field.first)},
-                             translateExpression(field.second, expCtx)};
+                             translateExpression(field.second, expCtx, vps)};
         }));
     return ExpressionObject::create(expCtx, std::move(fields));
 }
@@ -145,14 +150,16 @@ auto translateLiteralObject(const CNode::ObjectChildren& object, ExpressionConte
  *
  * Caller must ensure the ExpressionContext outlives the result.
  */
-auto transformInputExpression(const CNode::ObjectChildren& object, ExpressionContext* expCtx) {
+auto transformInputExpression(const CNode::ObjectChildren& object,
+                              ExpressionContext* expCtx,
+                              const VariablesParseState& vps) {
     auto expressions = std::vector<boost::intrusive_ptr<Expression>>{};
     stdx::visit(
         visit_helper::Overloaded{
             [&](const CNode::ArrayChildren& array) {
                 static_cast<void>(std::transform(
                     array.begin(), array.end(), std::back_inserter(expressions), [&](auto&& elem) {
-                        return translateExpression(elem, expCtx);
+                        return translateExpression(elem, expCtx, vps);
                     }));
             },
             [&](const CNode::ObjectChildren& object) {
@@ -160,10 +167,12 @@ auto transformInputExpression(const CNode::ObjectChildren& object, ExpressionCon
                     object.begin(),
                     object.end(),
                     std::back_inserter(expressions),
-                    [&](auto&& elem) { return translateExpression(elem.second, expCtx); }));
+                    [&](auto&& elem) { return translateExpression(elem.second, expCtx, vps); }));
             },
             // Everything else is a literal.
-            [&](auto&&) { expressions.push_back(translateExpression(object[0].second, expCtx)); }},
+            [&](auto&&) {
+                expressions.push_back(translateExpression(object[0].second, expCtx, vps));
+            }},
         object[0].second.payload);
     return expressions;
 }
@@ -213,13 +222,40 @@ auto translateMeta(const CNode::ObjectChildren& object, ExpressionContext* expCt
     }
 }
 
+auto translateFilter(const CNode::ObjectChildren& object,
+                     ExpressionContext* expCtx,
+                     const VariablesParseState& vps) {
+    // $filter's syntax guarantees that it's payload is ObjectChildren
+    auto&& children = stdx::get<CNode::ObjectChildren>(object[0].second.payload);
+    auto&& inputElem = children[0].second;
+    auto&& asElem = children[1].second;
+    auto&& condElem = children[2].second;
+    // The cond expression has a different VPS, where the variable the user gives in the "as"
+    // argument is defined.
+    auto vpsSub = VariablesParseState{vps};
+    auto varName = [&]() -> std::string {
+        if (auto x = stdx::get_if<UserString>(&asElem.payload)) {
+            return *x;
+        }
+        return "this"s;
+    }();
+    variableValidation::validateNameForUserWrite(varName);
+    auto varId = vpsSub.defineVariable(varName);
+    return make_intrusive<ExpressionFilter>(expCtx,
+                                            std::move(varName),
+                                            varId,
+                                            translateExpression(inputElem, expCtx, vps),
+                                            translateExpression(condElem, expCtx, vpsSub));
+}
+
 /**
  * Walk an agg function/operator object payload and produce an Expression.
  *
  * Caller must ensure the ExpressionContext outlives the result.
  */
 boost::intrusive_ptr<Expression> translateFunctionObject(const CNode::ObjectChildren& object,
-                                                         ExpressionContext* expCtx) {
+                                                         ExpressionContext* expCtx,
+                                                         const VariablesParseState& vps) {
     // Constants require using Value instead of Expression to build the tree in agg.
     if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::constExpr ||
         stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::literal)
@@ -228,8 +264,11 @@ boost::intrusive_ptr<Expression> translateFunctionObject(const CNode::ObjectChil
     // Meta is an exception since it has no Expression children but rather an enum member.
     if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::meta)
         return translateMeta(object, expCtx);
-
-    auto expressions = transformInputExpression(object, expCtx);
+    // Filter is an exception because its Expression children need to be given particular variable
+    // states before they are translated.
+    if (stdx::get<KeyFieldname>(object[0].first) == KeyFieldname::filter)
+        return translateFilter(object, expCtx, vps);
+    auto expressions = transformInputExpression(object, expCtx, vps);
     switch (stdx::get<KeyFieldname>(object[0].first)) {
         case KeyFieldname::add:
             return make_intrusive<ExpressionAdd>(expCtx, std::move(expressions));
@@ -585,6 +624,20 @@ boost::intrusive_ptr<Expression> translateFunctionObject(const CNode::ObjectChil
                 expCtx,
                 std::move(expressions[0]),
                 (expressions.size() == 2) ? std::move(expressions[1]) : nullptr);
+        case KeyFieldname::arrayElemAt:
+            return make_intrusive<ExpressionArrayElemAt>(expCtx, std::move(expressions));
+        case KeyFieldname::arrayToObject:
+            return make_intrusive<ExpressionArrayToObject>(expCtx, std::move(expressions));
+        case KeyFieldname::concatArrays:
+            return make_intrusive<ExpressionConcatArrays>(expCtx, std::move(expressions));
+        case KeyFieldname::in:
+            return make_intrusive<ExpressionIn>(expCtx, std::move(expressions));
+        case KeyFieldname::indexOfArray:
+            return make_intrusive<ExpressionIndexOfArray>(expCtx, std::move(expressions));
+        case KeyFieldname::isArray:
+            return make_intrusive<ExpressionIsArray>(expCtx, std::move(expressions));
+        case KeyFieldname::first:
+            return make_intrusive<ExpressionFirst>(expCtx, std::move(expressions));
         default:
             MONGO_UNREACHABLE;
     }
@@ -620,8 +673,9 @@ auto translateCompoundProjection(const CompoundPayload& payload,
                 resultPaths.emplace_back(path::vectorToString(currentPath), boost::none);
             // Everything else is an agg expression to translate.
             else
-                resultPaths.emplace_back(path::vectorToString(currentPath),
-                                         translateExpression(child.second, expCtx));
+                resultPaths.emplace_back(
+                    path::vectorToString(currentPath),
+                    translateExpression(child.second, expCtx, expCtx->variablesParseState));
         }
     };
     translateProjectionObject(translateProjectionObject, payload.obj->objectChildren(), path);
@@ -673,8 +727,9 @@ auto translateProjectInclusion(const CNode& cst,
             }
         else
             // This is a computed projection.
-            executor->getRoot()->addExpressionForPath(FieldPath{path::vectorToString(path)},
-                                                      translateExpression(child, expCtx.get()));
+            executor->getRoot()->addExpressionForPath(
+                FieldPath{path::vectorToString(path)},
+                translateExpression(child, expCtx.get(), expCtx->variablesParseState));
     }
 
     // If we didn't see _id we need to add it in manually for inclusion.
@@ -791,19 +846,21 @@ boost::intrusive_ptr<DocumentSource> translateSource(
  *
  * Caller must ensure the ExpressionContext outlives the result.
  */
-boost::intrusive_ptr<Expression> translateExpression(const CNode& cst, ExpressionContext* expCtx) {
+boost::intrusive_ptr<Expression> translateExpression(const CNode& cst,
+                                                     ExpressionContext* expCtx,
+                                                     const VariablesParseState& vps) {
     return stdx::visit(
         visit_helper::Overloaded{
             // When we're not inside an agg operator/function, this is a non-leaf literal.
             [&](const CNode::ArrayChildren& array) -> boost::intrusive_ptr<Expression> {
-                return translateLiteralArray(array, expCtx);
+                return translateLiteralArray(array, expCtx, vps);
             },
             // This is either a literal object or an agg operator/function.
             [&](const CNode::ObjectChildren& object) -> boost::intrusive_ptr<Expression> {
                 if (!object.empty() && stdx::holds_alternative<KeyFieldname>(object[0].first))
-                    return translateFunctionObject(object, expCtx);
+                    return translateFunctionObject(object, expCtx, vps);
                 else
-                    return translateLiteralObject(object, expCtx);
+                    return translateLiteralObject(object, expCtx, vps);
             },
             // If a key occurs outside a particular agg operator/function, it was misplaced.
             [](const KeyValue& keyValue) -> boost::intrusive_ptr<Expression> {
@@ -818,18 +875,15 @@ boost::intrusive_ptr<Expression> translateExpression(const CNode& cst, Expressio
             [](const NonZeroKey&) -> boost::intrusive_ptr<Expression> { MONGO_UNREACHABLE; },
             [&](const ValuePath& vp) -> boost::intrusive_ptr<Expression> {
                 return stdx::visit(
-                    visit_helper::Overloaded{[&](const AggregationPath& ap) {
-                                                 return ExpressionFieldPath::createPathFromString(
-                                                     expCtx,
-                                                     path::vectorToString(ap.components),
-                                                     expCtx->variablesParseState);
-                                             },
-                                             [&](const AggregationVariablePath& avp) {
-                                                 return ExpressionFieldPath::createVarFromString(
-                                                     expCtx,
-                                                     path::vectorToString(avp.components),
-                                                     expCtx->variablesParseState);
-                                             }},
+                    visit_helper::Overloaded{
+                        [&](const AggregationPath& ap) {
+                            return ExpressionFieldPath::createPathFromString(
+                                expCtx, path::vectorToString(ap.components), vps);
+                        },
+                        [&](const AggregationVariablePath& avp) {
+                            return ExpressionFieldPath::createVarFromString(
+                                expCtx, path::vectorToString(avp.components), vps);
+                        }},
                     vp);
             },
             // Everything else is a literal leaf.
