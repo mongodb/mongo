@@ -178,23 +178,23 @@ void TenantMigrationAccessBlocker::commit(repl::OpTime commitOpTime) {
     _commitOrAbortOpTime = commitOpTime;
 
     _waitForOpTimeToMajorityCommit(commitOpTime)
-        .then([self = shared_from_this(), commitOpTime]() {
-            stdx::lock_guard<Latch> lg(self->_mutex);
+        .then([this, self = shared_from_this(), commitOpTime]() {
+            stdx::lock_guard<Latch> lg(_mutex);
 
-            invariant(self->_access == Access::kBlockWritesAndReads);
-            invariant(self->_blockTimestamp);
-            invariant(self->_commitOrAbortOpTime == commitOpTime);
-            invariant(!self->_waitForCommitOrAbortToMajorityCommitOpCtx);
+            invariant(_access == Access::kBlockWritesAndReads);
+            invariant(_blockTimestamp);
+            invariant(_commitOrAbortOpTime == commitOpTime);
+            invariant(!_waitForCommitOrAbortToMajorityCommitOpCtx);
 
-            self->_access = Access::kReject;
-            self->_transitionOutOfBlockingCV.notify_all();
-            self->_completionPromise.emplaceValue();
+            _access = Access::kReject;
+            _transitionOutOfBlockingCV.notify_all();
+            _completionPromise.emplaceValue();
         })
-        .getAsync([self = shared_from_this()](Status status) {
-            stdx::lock_guard<Latch> lg(self->_mutex);
+        .getAsync([this, self = shared_from_this()](Status status) {
+            stdx::lock_guard<Latch> lg(_mutex);
             LOGV2(5093803,
                   "Tenant migration finished waiting for commit OpTime to be majority-committed",
-                  "tenantId"_attr = self->_dbPrefix,
+                  "tenantId"_attr = _dbPrefix,
                   "status"_attr = status);
         });
 }
@@ -214,22 +214,22 @@ void TenantMigrationAccessBlocker::abort(repl::OpTime abortOpTime) {
     _commitOrAbortOpTime = abortOpTime;
 
     _waitForOpTimeToMajorityCommit(abortOpTime)
-        .then([self = shared_from_this(), abortOpTime]() {
-            stdx::lock_guard<Latch> lg(self->_mutex);
+        .then([this, self = shared_from_this(), abortOpTime]() {
+            stdx::lock_guard<Latch> lg(_mutex);
 
-            invariant(self->_commitOrAbortOpTime == abortOpTime);
-            invariant(!self->_waitForCommitOrAbortToMajorityCommitOpCtx);
+            invariant(_commitOrAbortOpTime == abortOpTime);
+            invariant(!_waitForCommitOrAbortToMajorityCommitOpCtx);
 
-            self->_access = Access::kAllow;
-            self->_transitionOutOfBlockingCV.notify_all();
-            self->_completionPromise.setError(
+            _access = Access::kAllow;
+            _transitionOutOfBlockingCV.notify_all();
+            _completionPromise.setError(
                 {ErrorCodes::TenantMigrationAborted, "tenant migration aborted"});
         })
-        .getAsync([self = shared_from_this()](Status status) {
-            stdx::lock_guard<Latch> lg(self->_mutex);
+        .getAsync([this, self = shared_from_this()](Status status) {
+            stdx::lock_guard<Latch> lg(_mutex);
             LOGV2(5093805,
                   "Tenant migration finished waiting for abort OpTime to be majority-committed",
-                  "tenantId"_attr = self->_dbPrefix,
+                  "tenantId"_attr = _dbPrefix,
                   "status"_attr = status);
         });
 }
@@ -253,38 +253,38 @@ SharedSemiFuture<void> TenantMigrationAccessBlocker::onCompletion() {
 
 ExecutorFuture<void> TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommit(
     repl::OpTime opTime) {
-    return AsyncTry([self = shared_from_this(), opTime] {
-               ThreadClient tc("TenantMigrationAccessBlocker", self->_serviceContext);
+    return AsyncTry([this, self = shared_from_this(), opTime] {
+               ThreadClient tc("TenantMigrationAccessBlocker", _serviceContext);
                const auto opCtxHolder = tc->makeOperationContext();
                const auto opCtx = opCtxHolder.get();
 
                // We will save 'opCtx' below, so make sure we clear it before 'opCtx' is destroyed.
                const auto guard = makeGuard([&] {
-                   stdx::lock_guard<Latch> lg(self->_mutex);
-                   self->_waitForCommitOrAbortToMajorityCommitOpCtx = nullptr;
+                   stdx::lock_guard<Latch> lg(_mutex);
+                   _waitForCommitOrAbortToMajorityCommitOpCtx = nullptr;
                });
 
                {
-                   stdx::lock_guard<Latch> lg(self->_mutex);
+                   stdx::lock_guard<Latch> lg(_mutex);
 
                    uassert(ErrorCodes::TenantMigrationAccessBlockerShuttingDown,
                            "TenantMigrationAccessBlocker was shut down",
-                           !self->_inShutdown);
+                           !_inShutdown);
 
                    // Save 'opCtx' so that if shutDown() is called after this point, 'opCtx' will be
                    // interrupted and 'waitUntilMajorityOpTime' will return an interrupt error.
-                   self->_waitForCommitOrAbortToMajorityCommitOpCtx = opCtx;
+                   _waitForCommitOrAbortToMajorityCommitOpCtx = opCtx;
                }
                uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilMajorityOpTime(
                    opCtx, opTime));
            })
-        .until([self = shared_from_this(), opTime](Status status) {
+        .until([this, self = shared_from_this(), opTime](Status status) {
             bool shouldStop =
                 status.isOK() || status == ErrorCodes::TenantMigrationAccessBlockerShuttingDown;
             if (!shouldStop) {
                 LOGV2(5093806,
                       "Tenant migration retrying waiting for OpTime to be majority-committed",
-                      "tenantId"_attr = self->_dbPrefix,
+                      "tenantId"_attr = _dbPrefix,
                       "opTime"_attr = opTime,
                       "status"_attr = status);
             }

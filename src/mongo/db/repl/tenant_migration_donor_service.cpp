@@ -162,7 +162,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
     invariant(_stateDoc.getState() == TenantMigrationDonorStateEnum::kUninitialized);
     _stateDoc.setState(TenantMigrationDonorStateEnum::kDataSync);
 
-    return AsyncTry([this] {
+    return AsyncTry([this, self = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
                DBDirectClient dbClient(opCtx);
@@ -197,7 +197,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
     const TenantMigrationDonorStateEnum nextState) {
     const auto originalStateDocBson = _stateDoc.toBSON();
 
-    return AsyncTry([this, executor, nextState, originalStateDocBson] {
+    return AsyncTry([this, self = shared_from_this(), executor, nextState, originalStateDocBson] {
                boost::optional<repl::OpTime> updateOpTime;
 
                auto opCtxHolder = cc().makeOperationContext();
@@ -272,7 +272,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 ExecutorFuture<repl::OpTime>
 TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    return AsyncTry([this] {
+    return AsyncTry([this, self = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
                DBDirectClient dbClient(opCtx);
@@ -311,7 +311,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
     return WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(std::move(opTime))
         .thenRunOn(**executor)
-        .then([this] {
+        .then([this, self = shared_from_this()] {
             stdx::lock_guard<Latch> lg(_mutex);
             _durableState.state = _stateDoc.getState();
             switch (_durableState.state) {
@@ -337,7 +337,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const BSONObj& cmdObj) {
-    return AsyncTry([this, executor, recipientTargeterRS, cmdObj] {
+    return AsyncTry([this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
 
@@ -372,7 +372,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
 
                return std::move(recipientSyncDataResponsePF.future)
                    .thenRunOn(**executor)
-                   .then([this](auto args) -> Status {
+                   .then([this, self = shared_from_this()](auto args) -> Status {
                        if (!args.response.status.isOK()) {
                            return args.response.status;
                        }
@@ -421,46 +421,48 @@ void TenantMigrationDonorService::Instance::run(
         uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()));
     auto recipientTargeterRS = std::shared_ptr<RemoteCommandTargeterRS>(
         new RemoteCommandTargeterRS(recipientUri.getSetName(), recipientUri.getServers()),
-        [this, setName = recipientUri.getSetName()](RemoteCommandTargeterRS* p) {
+        [this, self = shared_from_this(), setName = recipientUri.getSetName()](
+            RemoteCommandTargeterRS* p) {
             ReplicaSetMonitor::remove(setName);
             delete p;
         });
 
     ExecutorFuture<void>(**executor)
-        .then([this, executor] {
+        .then([this, self = shared_from_this(), executor] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
             // Enter "dataSync" state.
-            return _insertStateDocument(executor).then([this, executor](repl::OpTime opTime) {
-                return _waitForMajorityWriteConcern(executor, std::move(opTime));
-            });
+            return _insertStateDocument(executor).then(
+                [this, self = shared_from_this(), executor](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime));
+                });
         })
-        .then([this, executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kDataSync) {
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
             return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
-                .then([this] {
+                .then([this, self = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
                     pauseTenantMigrationAfterDataSync.pauseWhileSet(opCtx);
                 })
-                .then([this, executor] {
+                .then([this, self = shared_from_this(), executor] {
                     // Enter "blocking" state.
                     auto mtab = getTenantMigrationAccessBlocker(_serviceContext,
                                                                 _stateDoc.getDatabasePrefix());
                     invariant(mtab);
                     mtab->startBlockingWrites();
                     return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kBlocking)
-                        .then([this, executor](repl::OpTime opTime) {
+                        .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                             return _waitForMajorityWriteConcern(executor, std::move(opTime));
                         });
                 });
         })
-        .then([this, executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
@@ -468,7 +470,7 @@ void TenantMigrationDonorService::Instance::run(
             invariant(_stateDoc.getBlockTimestamp());
 
             return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
-                .then([this] {
+                .then([this, self = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
 
@@ -486,15 +488,15 @@ void TenantMigrationDonorService::Instance::run(
                         uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
                     });
                 })
-                .then([this, executor] {
+                .then([this, self = shared_from_this(), executor] {
                     // Enter "commit" state.
                     return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kCommitted)
-                        .then([this, executor](repl::OpTime opTime) {
+                        .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                             return _waitForMajorityWriteConcern(executor, std::move(opTime));
                         });
                 });
         })
-        .onError([this, executor](Status status) {
+        .onError([this, self = shared_from_this(), executor](Status status) {
             if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
                 // The migration was resumed on stepup and it was already aborted.
                 return ExecutorFuture<void>(**executor, Status::OK());
@@ -514,12 +516,12 @@ void TenantMigrationDonorService::Instance::run(
                 // Enter "abort" state.
                 _abortReason.emplace(status);
                 return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kAborted)
-                    .then([this, executor](repl::OpTime opTime) {
+                    .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                         return _waitForMajorityWriteConcern(executor, std::move(opTime));
                     });
             }
         })
-        .onCompletion([this](Status status) {
+        .onCompletion([this, self = shared_from_this()](Status status) {
             LOGV2(5006601,
                   "Tenant migration completed",
                   "migrationId"_attr = _stateDoc.getId(),
@@ -527,7 +529,7 @@ void TenantMigrationDonorService::Instance::run(
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
         })
-        .then([this, executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
             if (_stateDoc.getExpireAt()) {
                 // The migration state has already been marked as garbage collectable. Set the
                 // donorForgetMigration promise here since the Instance's destructor has an
@@ -539,15 +541,17 @@ void TenantMigrationDonorService::Instance::run(
             // Wait for the donorForgetMigration command.
             return std::move(_receiveDonorForgetMigrationPromise.getFuture())
                 .thenRunOn(**executor)
-                .then([this, executor, recipientTargeterRS] {
+                .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
                     return _sendRecipientForgetMigrationCommand(executor, recipientTargeterRS);
                 })
-                .then([this, executor] { return _markStateDocumentAsGarbageCollectable(executor); })
-                .then([this, executor](repl::OpTime opTime) {
+                .then([this, self = shared_from_this(), executor] {
+                    return _markStateDocumentAsGarbageCollectable(executor);
+                })
+                .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
         })
-        .getAsync([this](Status status) {
+        .getAsync([this, self = shared_from_this()](Status status) {
             LOGV2(4920400,
                   "Marked migration state as garbage collectable",
                   "migrationId"_attr = _stateDoc.getId(),
