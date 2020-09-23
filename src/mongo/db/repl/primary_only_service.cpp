@@ -340,10 +340,11 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     // previous writes to state documents are also committed, and then schedule work to rebuild
     // Instances from their persisted state documents.
     stdx::lock_guard lk(_mutex);
+    auto term = _term;
     WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(stepUpOpTime)
         .thenRunOn(**_scopedExecutor)
-        .then([this] { _rebuildInstances(); })
+        .then([this, term] { _rebuildInstances(term); })
         .getAsync([](auto&&) {});  // Ignore the result Future
 }
 
@@ -480,7 +481,7 @@ void PrimaryOnlyService::releaseAllInstances() {
     _instances.clear();
 }
 
-void PrimaryOnlyService::_rebuildInstances() noexcept {
+void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
     if (MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
         return;
     }
@@ -520,26 +521,36 @@ void PrimaryOnlyService::_rebuildInstances() noexcept {
                               << getStateDocumentsNS() << "\" failed");
 
             stdx::lock_guard lk(_mutex);
-            if (_state != State::kShutdown) {
-                _state = State::kRebuildFailed;
+            if (_state != State::kRebuilding || _term != term) {
+                _rebuildCV.notify_all();
+                return;
             }
+            _state = State::kRebuildFailed;
             _rebuildStatus = std::move(status);
             _rebuildCV.notify_all();
             return;
         }
     }
 
-    if (MONGO_unlikely(PrimaryOnlyServiceHangBeforeRebuildingInstances.shouldFail())) {
-        PrimaryOnlyServiceHangBeforeRebuildingInstances.pauseWhileSet();
+    while (MONGO_unlikely(PrimaryOnlyServiceHangBeforeRebuildingInstances.shouldFail())) {
+        {
+            stdx::lock_guard lk(_mutex);
+            if (_state != State::kRebuilding || _term != term) {  // Node stepped down
+                _rebuildCV.notify_all();
+                return;
+            }
+        }
+        sleepmillis(100);
     }
 
     stdx::lock_guard lk(_mutex);
-    if (_state != State::kRebuilding) {
+    if (_state != State::kRebuilding || _term != term) {
         // Node stepped down before finishing rebuilding service from previous stepUp.
         _rebuildCV.notify_all();
         return;
     }
     invariant(_instances.empty());
+    invariant(_term == term);
 
     for (auto&& doc : stateDocuments) {
         auto idElem = doc["_id"];

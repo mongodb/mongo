@@ -281,7 +281,7 @@ private:
      * PrimaryOnlyService, constructs Instance objects for each document found, and schedules work
      * to run all the newly recreated Instances.
      */
-    void _rebuildInstances() noexcept;
+    void _rebuildInstances(long long term) noexcept;
 
     /**
      * Schedules work to call the provided instance's 'run' method. Must be called while holding
