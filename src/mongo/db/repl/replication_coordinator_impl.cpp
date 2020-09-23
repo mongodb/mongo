@@ -4449,6 +4449,29 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
         LOGV2_OPTIONS(21391, {logv2::LogTag::kStartupWarnings}, "");
     }
 
+    // Emit a warning at startup if there are IP addresses in the SplitHorizon field of the
+    // replset config.
+    std::vector<std::string> offendingConfigs;
+    for (const MemberConfig& member : oldConfig.members()) {
+        // Check that no horizon mappings contain IP addresses
+        for (auto& mapping : member.getHorizonMappings()) {
+            // Emit a startup warning for any SplitHorizon mapping that can be parsed as
+            // a valid CIDR range, except for the default horizon.
+            if (mapping.first != SplitHorizon::kDefaultHorizon &&
+                CIDR::parse(mapping.second.host()).isOK()) {
+                offendingConfigs.emplace_back(str::stream() << mapping.second.host() << ":"
+                                                            << mapping.second.port());
+            }
+        }
+    }
+    if (!offendingConfigs.empty()) {
+        LOGV2_WARNING_OPTIONS(4907900,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Found split horizon configuration using IP "
+                              "address(es), which is disallowed.",
+                              "offendingConfigs"_attr = offendingConfigs);
+    }
+
     // If the SplitHorizon has changed, reply to all waiting isMasters with an error.
     _errorOnPromisesIfHorizonChanged(lk, opCtx, oldConfig, newConfig, _selfIndex, myIndex);
 
