@@ -62,7 +62,7 @@ public:
     Status shutdown(Milliseconds timeout) override;
     Status scheduleTask(Task task, ScheduleFlags flags) override;
 
-    void runOnDataAvailable(Session* session,
+    void runOnDataAvailable(const SessionHandle& session,
                             OutOfLineExecutor::Task onCompletionCallback) override;
 
     Mode transportMode() const override {

@@ -256,7 +256,7 @@ public:
     /*
      * Releases all the resources associated with the session and call the cleanupHook.
      */
-    void cleanupSession();
+    void cleanupSession(const Status& status);
 
     /*
      * This is the initial function called at the beginning of a thread's lifecycle in the
@@ -522,8 +522,8 @@ void ServiceStateMachine::Impl::start(ServiceExecutorContext seCtx) {
 
     auto cb = [this, anchor = shared_from_this()](Status status) {
         _clientStrand->run([&] {
-            if (ErrorCodes::isCancelationError(status)) {
-                cleanupSession();
+            if (ErrorCodes::isCancelationError(status) || ErrorCodes::isNetworkError(status)) {
+                cleanupSession(status);
                 return;
             }
             invariant(status);
@@ -531,7 +531,7 @@ void ServiceStateMachine::Impl::start(ServiceExecutorContext seCtx) {
             runOnce();
         });
     };
-    executor()->schedule(std::move(cb));
+    executor()->runOnDataAvailable(session(), std::move(cb));
 }
 
 void ServiceStateMachine::Impl::runOnce() {
@@ -567,18 +567,16 @@ void ServiceStateMachine::Impl::runOnce() {
                                       "Terminating session due to error",
                                       "error"_attr = status);
                 terminate();
+                cleanupSession(status);
 
-                auto cb = [this, anchor = shared_from_this()](Status status) {
-                    _clientStrand->run([&] { cleanupSession(); });
-                };
-                executor()->schedule(std::move(cb));
                 return;
             }
 
             auto cb = [this, anchor = shared_from_this()](Status status) {
                 _clientStrand->run([&] {
-                    if (ErrorCodes::isCancelationError(status)) {
-                        cleanupSession();
+                    if (ErrorCodes::isCancelationError(status) ||
+                        ErrorCodes::isNetworkError(status)) {
+                        cleanupSession(status);
                         return;
                     }
                     invariant(status);
@@ -586,7 +584,14 @@ void ServiceStateMachine::Impl::runOnce() {
                     runOnce();
                 });
             };
-            executor()->schedule(std::move(cb));
+
+            // Start our loop again with a new stack.
+            if (_inExhaust) {
+                // If we're in exhaust, we're not expecting more data.
+                executor()->schedule(std::move(cb));
+            } else {
+                executor()->runOnDataAvailable(session(), std::move(cb));
+            }
         });
 }
 
@@ -651,7 +656,9 @@ void ServiceStateMachine::Impl::setCleanupHook(std::function<void()> hook) {
     _cleanupHook = std::move(hook);
 }
 
-void ServiceStateMachine::Impl::cleanupSession() {
+void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
+    LOGV2_INFO(5127900, "Ending session", "error"_attr = status);
+
     // Ensure the delayed destruction of opCtx always happens before doing the cleanup.
     if (MONGO_likely(_killedOpCtx)) {
         _killedOpCtx.reset();

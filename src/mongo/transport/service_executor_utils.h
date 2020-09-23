@@ -46,7 +46,7 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept;
  * thread until data is available for reading. On success, it schedules "callback" on "executor".
  * Other implementations (e.g., "ServiceExecutorFixed") may provide asynchronous variants.
  */
-void scheduleCallbackOnDataAvailable(transport::Session* session,
+void scheduleCallbackOnDataAvailable(const transport::SessionHandle& session,
                                      unique_function<void(Status)> callback,
                                      transport::ServiceExecutor* executor) noexcept;
 

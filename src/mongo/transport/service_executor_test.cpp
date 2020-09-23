@@ -361,7 +361,7 @@ TEST_F(ServiceExecutorFixedFixture, RunTaskAfterWaitingForData) {
     AtomicWord<bool> ranOnDataAvailable{false};
     auto barrier = std::make_shared<unittest::Barrier>(2);
     executorHandle->runOnDataAvailable(
-        session.get(), [&ranOnDataAvailable, mainThreadId, barrier](Status) mutable -> void {
+        session, [&ranOnDataAvailable, mainThreadId, barrier](Status) mutable -> void {
             ranOnDataAvailable.store(true);
             ASSERT(stdx::this_thread::get_id() != mainThreadId);
             barrier->countDownAndWait();
