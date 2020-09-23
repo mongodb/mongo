@@ -232,7 +232,14 @@ TEST_F(LogicalSessionIdTest, GenWithMultipleAuthedUsers) {
     addSimpleUser(UserName("simple", "test"));
     addSimpleUser(UserName("simple", "test2"));
 
-    ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), AssertionException);
+    ASSERT_THROWS_WITH_CHECK(makeLogicalSessionId(_opCtx.get()),
+                             AssertionException,
+                             [](const AssertionException& exception) {
+                                 ASSERT_EQ(exception.code(), ErrorCodes::Unauthorized);
+                                 ASSERT_STRING_CONTAINS(
+                                     exception.reason(),
+                                     "docs.mongodb.com/manual/core/authentication");
+                             });
 }
 
 TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {

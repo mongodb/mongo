@@ -194,7 +194,10 @@ User* AuthorizationSessionImpl::getSingleUser() {
     if (userNameItr.more()) {
         userName = userNameItr.next();
         if (userNameItr.more()) {
-            uasserted(ErrorCodes::Unauthorized, "too many users are authenticated");
+            uasserted(
+                ErrorCodes::Unauthorized,
+                "logical sessions can't have multiple authenticated users (for more details see: "
+                "https://docs.mongodb.com/manual/core/authentication/#authentication-methods)");
         }
     } else {
         uasserted(ErrorCodes::Unauthorized, "there are no users authenticated");
