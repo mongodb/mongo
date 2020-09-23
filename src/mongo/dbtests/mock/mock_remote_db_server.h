@@ -183,12 +183,13 @@ public:
     double getSoTimeout() const;
 
     /**
-     * @return the exact std::string address passed to hostAndPort parameter of the
+     * @returns the value passed to hostAndPort parameter of the
      *     constructor. In other words, doesn't automatically append a
      *     'default' port if none is specified.
      */
     std::string getServerAddress() const;
     std::string toString();
+    const HostAndPort& getServerHostAndPort() const;
 
     //
     // Call counters
@@ -241,7 +242,7 @@ private:
 
     bool _isRunning;
 
-    const std::string _hostAndPort;
+    const HostAndPort _hostAndPort;
     long long _delayMilliSec;
 
     //

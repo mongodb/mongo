@@ -164,8 +164,6 @@ public:
     //
 
     mongo::ConnectionString::ConnectionType type() const override;
-    std::string getServerAddress() const override;
-    std::string toString() const override;
 
     Message getLastSentMessage() {
         stdx::lock_guard lk(_netMutex);
@@ -203,7 +201,7 @@ private:
     void checkConnection() override;
 
     MockRemoteDBServer::InstanceID _remoteServerInstanceID;
-    MockRemoteDBServer* _remoteServer;
+    MockRemoteDBServer* const _remoteServer;
     uint64_t _sockCreationTime;
     boost::optional<OpMsgRequest> _lastCursorMessage;
 

@@ -42,6 +42,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
@@ -89,6 +90,33 @@ OplogEntry makeOplogEntry(OpTime opTime,
                       boost::none);  // ShardId of resharding recipient
 }
 
+/**
+ * Generates a listDatabases response for an TenantAllDatabaseCloner to consume.
+ */
+BSONObj makeListDatabasesResponse(std::vector<std::string> databaseNames) {
+    BSONObjBuilder bob;
+    {
+        BSONArrayBuilder databasesBob(bob.subarrayStart("databases"));
+        for (const auto& name : databaseNames) {
+            BSONObjBuilder nameBob(databasesBob.subobjStart());
+            nameBob.append("name", name);
+        }
+    }
+    bob.append("ok", 1);
+    return bob.obj();
+}
+
+BSONObj makeFindResponse(ErrorCodes::Error code = ErrorCodes::OK) {
+    BSONObjBuilder bob;
+    if (code != ErrorCodes::OK) {
+        bob.append("ok", 0);
+        bob.append("code", code);
+    } else {
+        bob.append("ok", 1);
+    }
+    return bob.obj();
+}
+
 }  // namespace
 
 class TenantMigrationRecipientServiceTest : public ServiceContextMongoDTest {
@@ -96,6 +124,7 @@ public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
+
         // Only the ReplicaSetMonitor scanning protocol supports mock connections.
         ReplicaSetMonitorProtocolTestUtil::setRSMProtocol(ReplicaSetMonitorProtocol::kScanning);
         ConnectionString::setConnectionHook(mongo::MockConnRegistry::get()->getConnStrHook());
@@ -124,6 +153,30 @@ public:
             _registry->onStartup(opCtx.get());
         }
         stepUp();
+
+        auto storageInterfaceMock = std::make_unique<StorageInterfaceMock>();
+        storageInterfaceMock->createCollFn = [this](OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const CollectionOptions& options) -> Status {
+            this->_collCreated = true;
+            return Status::OK();
+        };
+        storageInterfaceMock->createIndexesOnEmptyCollFn =
+            [this](OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const std::vector<BSONObj>& secondaryIndexSpecs) -> Status {
+            this->_numSecondaryIndexesCreated += secondaryIndexSpecs.size();
+            return Status::OK();
+        };
+        storageInterfaceMock->insertDocumentsFn = [this](OperationContext* opCtx,
+                                                         const NamespaceStringOrUUID& nsOrUUID,
+                                                         const std::vector<InsertStatement>& ops) {
+            this->_numDocsInserted += ops.size();
+            return Status::OK();
+        };
+
+        // Set the mock storge interface for the tests.
+        StorageInterface::set(serviceContext, std::move(storageInterfaceMock));
 
         _service = _registry->lookupServiceByName(
             TenantMigrationRecipientService::kTenantMigrationRecipientServiceName);
@@ -168,6 +221,10 @@ protected:
     PrimaryOnlyServiceRegistry* _registry;
     PrimaryOnlyService* _service;
     long long _term = 0;
+
+    bool _collCreated = false;
+    size_t _numSecondaryIndexesCreated{0};
+    size_t _numDocsInserted{0};
 
     void checkStateDocPersisted(OperationContext* opCtx,
                                 const TenantMigrationRecipientService::Instance* instance) {
@@ -227,11 +284,17 @@ protected:
 private:
     unittest::MinimumLoggedSeverityGuard _replicationSeverityGuard{
         logv2::LogComponent::kReplication, logv2::LogSeverity::Debug(1)};
+    StorageInterfaceMock::CreateCollectionFn _standardCreateCollectionFn;
+    StorageInterfaceMock::CreateIndexesOnEmptyCollectionFn
+        _standardCreateIndexesOnEmptyCollectionFn;
+    std::unique_ptr<StorageInterfaceMock> _storageInterface;
 };
 
 
 TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientServiceInstanceCreation) {
-    FailPointEnableBlock fp("stopAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+    FailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+                            BSON("action"
+                                 << "stop"));
 
     const UUID migrationUUID = UUID::gen();
 
@@ -254,7 +317,9 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
 
 
 TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePersisitingStateDoc) {
-    FailPointEnableBlock failPoint("failWhilePersistingTenantMigrationRecipientInstanceStateDoc");
+    FailPointEnableBlock failPoint("failWhilePersistingTenantMigrationRecipientInstanceStateDoc",
+                                   BSON("action"
+                                        << "stop"));
 
     const UUID migrationUUID = UUID::gen();
 
@@ -277,7 +342,12 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Primary) {
-    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -295,8 +365,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
     ASSERT(instance.get());
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
 
     auto* client = getClient(instance.get());
     auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
@@ -313,10 +382,20 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
     ASSERT(client->isStillConnected());
     ASSERT_EQ(primary, oplogFetcherClient->getServerAddress());
     ASSERT(oplogFetcherClient->isStillConnected());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Secondary) {
-    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -334,8 +413,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
         opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
     ASSERT(instance.get());
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
 
     auto* client = getClient(instance.get());
     auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
@@ -352,12 +430,23 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
     ASSERT(client->isStillConnected());
     ASSERT_EQ(secondary, oplogFetcherClient->getServerAddress());
     ASSERT(oplogFetcherClient->isStillConnected());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_PrimaryFails) {
-    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
+
     FailPointEnableBlock timeoutFp("setTenantMigrationRecipientInstanceHostTimeout",
                                    BSON("findHostTimeoutMillis" << 100));
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -377,29 +466,45 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
-    // Keep scanning the replica set while waiting for task completion.  This would normally
+    AtomicWord<bool> runReplMonitor{true};
+    // Keep scanning the replica set while waiting to reach the failpoint. This would normally
     // be automatic but that doesn't work with mock replica sets.
-    while (!instance->getCompletionFuture().isReady()) {
-        auto monitor = ReplicaSetMonitor::get(replSet.getSetName());
-        // Monitor may not have been created yet.
-        if (monitor) {
-            monitor->runScanForMockReplicaSet();
+    stdx::thread replMonitorThread([&] {
+        Client::initThread("replMonitorThread");
+        while (runReplMonitor.load()) {
+            auto monitor = ReplicaSetMonitor::get(replSet.getSetName());
+            // Monitor may not have been created yet.
+            if (monitor) {
+                monitor->runScanForMockReplicaSet();
+            }
+            mongo::sleepmillis(100);
         }
-        mongo::sleepmillis(50);
-    }
-    // Wait for task completion failure.
-    ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
-                  instance->getCompletionFuture().getNoThrow().code());
+    });
+
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+    runReplMonitor.store(false);
+    replMonitorThread.join();
 
     auto* client = getClient(instance.get());
     auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
     // Neither client should be populated.
     ASSERT_FALSE(client);
     ASSERT_FALSE(oplogFetcherClient);
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion failure.
+    ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
+                  instance->getCompletionFuture().getNoThrow().code());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_PrimaryFailsOver) {
-    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
 
@@ -420,8 +525,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
 
     auto* client = getClient(instance.get());
     auto* oplogFetcherClient = getOplogFetcherClient(instance.get());
@@ -438,10 +542,17 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
     ASSERT(client->isStillConnected());
     ASSERT_EQ(secondary, oplogFetcherClient->getServerAddress());
     ASSERT(oplogFetcherClient->isStillConnected());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_BadConnectString) {
-    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
 
     const UUID migrationUUID = UUID::gen();
 
@@ -463,7 +574,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientConnection_NonSetConnectString) {
-    FailPointEnableBlock fp("stopAfterConnectingTenantMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
 
     const UUID migrationUUID = UUID::gen();
 
@@ -484,7 +597,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_NoTransaction) {
-    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
 
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
@@ -514,7 +629,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientGetStartOpTime_Advances_NoTransaction) {
-    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
     auto pauseFailPoint =
         globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
     auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
@@ -551,7 +668,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_Transaction) {
-    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
 
     const UUID migrationUUID = UUID::gen();
     const OpTime txnStartOpTime(Timestamp(3, 1), 1);
@@ -588,7 +707,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientGetStartOpTime_Advances_Transaction) {
-    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
     auto pauseFailPoint =
         globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
     auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
@@ -633,7 +754,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientGetStartOpTimes_RemoteOplogQueryFails) {
-    FailPointEnableBlock fp("stopAfterRetrievingStartOpTimesMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
 
     const UUID migrationUUID = UUID::gen();
 
@@ -659,7 +782,12 @@ TEST_F(TenantMigrationRecipientServiceTest,
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFetcher) {
-    FailPointEnableBlock fp("stopAfterStartingOplogFetcherMigrationRecipientInstance");
+    FailPointEnableBlock fp("fpAfterStartingOplogFetcherMigrationRecipientInstance",
+                            BSON("action"
+                                 << "stop"));
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
@@ -684,13 +812,79 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
         instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
     }
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+
     checkStateDocPersisted(opCtx.get(), instance.get());
     // The oplog fetcher should exist and be running.
     auto oplogFetcher = getDonorOplogFetcher(instance.get());
     ASSERT_TRUE(oplogFetcher != nullptr);
     ASSERT_TRUE(oplogFetcher->isActive());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner) {
+    FailPointEnableBlock fp("fpAfterCollectionClonerDone",
+                            BSON("action"
+                                 << "stop"));
+
+    auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
+    auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
+
+    const UUID migrationUUID = UUID::gen();
+    const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /*dollarPrefixHosts */);
+    insertTopOfOplog(&replSet, topOfOplogOpTime);
+
+    // Skip the cloners in this test, so we provide an empty list of databases.
+    MockRemoteDBServer* const _donorServer =
+        mongo::MockConnRegistry::get()->getMockRemoteDBServer(replSet.getPrimary());
+    _donorServer->setCommandReply("listDatabases", makeListDatabasesResponse({}));
+    _donorServer->setCommandReply("find", makeFindResponse());
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "tenantA",
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    OpTime cloneCompletionRecipientOpTime;
+    {
+        FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
+                                BSON("action"
+                                     << "hang"));
+        // Create and start the instance.
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+        instance->setCreateOplogFetcherFn_forTest(std::make_unique<CreateOplogFetcherMockFn>());
+
+        fp->waitForTimesEntered(fp.initialTimesEntered() + 1);
+
+        // since the listDatabase would return empty, cloner will not make any new writes. So,
+        // it's safe to assume the  donor opime at clone completion point will be the
+        // optime at which migration start optimes got persisted.
+        cloneCompletionRecipientOpTime =
+            ReplicationCoordinator::get(getServiceContext())->getMyLastAppliedOpTime();
+    }
+
+    taskFp->waitForTimesEntered(initialTimesEntered + 1);
+
+    ASSERT_EQ(OpTime(Timestamp(0, 0), OpTime::kUninitializedTerm),
+              getStateDoc(instance.get()).getDataConsistentStopOpTime());
+    ASSERT_EQ(cloneCompletionRecipientOpTime, getStateDoc(instance.get()).getCloneFinishedOpTime());
+    checkStateDocPersisted(opCtx.get(), instance.get());
+
+    taskFp->setMode(FailPoint::off);
+
+    // Wait for task completion success.
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 }  // namespace repl

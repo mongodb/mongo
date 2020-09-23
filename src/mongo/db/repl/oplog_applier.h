@@ -242,7 +242,9 @@ std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount);
 /**
  * Creates a thread pool suitable for writer tasks, with the specified name
  */
-std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount, StringData name);
+std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount,
+                                               StringData name,
+                                               bool isKillableByStepdown = false);
 
 }  // namespace repl
 }  // namespace mongo

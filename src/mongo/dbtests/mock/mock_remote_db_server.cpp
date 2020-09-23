@@ -74,7 +74,7 @@ StatusWith<BSONObj> MockRemoteDBServer::CircularBSONIterator::next() {
 
 MockRemoteDBServer::MockRemoteDBServer(const string& hostAndPort)
     : _isRunning(true),
-      _hostAndPort(hostAndPort),
+      _hostAndPort(HostAndPort(hostAndPort)),
       _delayMilliSec(0),
       _cmdCount(0),
       _queryCount(0),
@@ -250,10 +250,14 @@ void MockRemoteDBServer::clearCounters() {
 }
 
 string MockRemoteDBServer::getServerAddress() const {
-    return _hostAndPort;
+    return _hostAndPort.toString();
 }
 
 string MockRemoteDBServer::toString() {
+    return _hostAndPort.toString();
+}
+
+const HostAndPort& MockRemoteDBServer::getServerHostAndPort() const {
     return _hostAndPort;
 }
 
@@ -261,7 +265,7 @@ void MockRemoteDBServer::checkIfUp(InstanceID id) const {
     scoped_spinlock sLock(_lock);
 
     if (!_isRunning || id < _instanceID) {
-        throwSocketError(mongo::SocketErrorKind::CLOSED, _hostAndPort);
+        throwSocketError(mongo::SocketErrorKind::CLOSED, _hostAndPort.toString());
     }
 }
 }  // namespace mongo

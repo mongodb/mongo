@@ -70,7 +70,8 @@ public:
                        const std::string& tenantId,
                        OpTime applyFromOpTime,
                        RandomAccessOplogBuffer* oplogBuffer,
-                       std::shared_ptr<executor::TaskExecutor> executor);
+                       std::shared_ptr<executor::TaskExecutor> executor,
+                       ThreadPool* writerPool);
 
     virtual ~TenantOplogApplier();
 
@@ -88,10 +89,6 @@ public:
 
     void setBatchLimits_forTest(TenantOplogBatcher::BatchLimits limits) {
         _limits = limits;
-    }
-
-    void setThreadCount_forTest(int threadCount) {
-        _applierThreadCount = threadCount;
     }
 
 private:
@@ -137,21 +134,28 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
 
     // Handles consuming oplog entries from the OplogBuffer for oplog application.
-    std::unique_ptr<TenantOplogBatcher> _oplogBatcher;                    // (R)
-    const UUID _migrationUuid;                                            // (R)
-    const std::string _tenantId;                                          // (R)
-    const OpTime _beginApplyingAfterOpTime;                               // (R)
-    RandomAccessOplogBuffer* _oplogBuffer;                                // (R)
-    std::shared_ptr<executor::TaskExecutor> _executor;                    // (R)
-    std::unique_ptr<ThreadPool> _writerPool;                              // (S)
-    OpTimePair _lastBatchCompletedOpTimes;                                // (M)
-    std::vector<OpTimePair> _opTimeMapping;                               // (M)
+    std::unique_ptr<TenantOplogBatcher> _oplogBatcher;  // (R)
+    const UUID _migrationUuid;                          // (R)
+    const std::string _tenantId;                        // (R)
+    const OpTime _beginApplyingAfterOpTime;             // (R)
+    RandomAccessOplogBuffer* _oplogBuffer;              // (R)
+    std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
+    OpTimePair _lastBatchCompletedOpTimes;              // (M)
+    std::vector<OpTimePair> _opTimeMapping;             // (M)
+    // Pool of worker threads for writing ops to the databases.
+    // Not owned by us.
+    ThreadPool* const _writerPool;                                        // (S)
     TenantOplogBatcher::BatchLimits _limits;                              // (R)
     std::map<OpTime, SharedPromise<OpTimePair>> _opTimeNotificationList;  // (M)
     Status _finalStatus = Status::OK();                                   // (M)
     stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)
-    int _applierThreadCount;  // (R) -- set for testing only
 };
+
+/**
+ * Creates the default thread pool for writer tasks.
+ */
+std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool();
+std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool(int threadCount);
 
 }  // namespace repl
 }  // namespace mongo

@@ -242,7 +242,7 @@ public:
     std::string getServerAddress() const override {
         return _serverAddress.toString();
     }
-    const HostAndPort& getServerHostAndPort() const {
+    virtual const HostAndPort& getServerHostAndPort() const {
         return _serverAddress;
     }
 

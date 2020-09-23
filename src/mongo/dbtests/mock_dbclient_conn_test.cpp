@@ -58,9 +58,11 @@ namespace mongo_test {
 TEST(MockDBClientConnTest, ServerAddress) {
     MockRemoteDBServer server("test");
     MockDBClientConnection conn(&server);
+    uassertStatusOK(conn.connect(server.getServerHostAndPort(), mongo::StringData()));
 
-    ASSERT_EQUALS("test", conn.getServerAddress());
-    ASSERT_EQUALS("test", conn.toString());
+    ASSERT_EQUALS("test:27017", conn.getServerAddress());
+    ASSERT_EQUALS("test:27017", conn.toString());
+    ASSERT_EQUALS(mongo::HostAndPort("test"), conn.getServerHostAndPort());
 }
 
 TEST(MockDBClientConnTest, QueryCount) {

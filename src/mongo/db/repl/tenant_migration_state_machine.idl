@@ -67,10 +67,14 @@ structs:
                 cpp_name: id
             recipientConnectionString:
                 type: string
-                description: "The URI string that the donor will utilize to create a connection with the recipient."
+                description: >-
+                    The URI string that the donor will utilize to create a connection with
+                    the recipient.
             readPreference:
                 type: readPreference
-                description: "The read preference setting that the recipient will use to determine which node in the donor replica set to clone from."
+                description: >-
+                    The read preference setting that the recipient will use to determine
+                    which node in the donor replica set to clone from.
             databasePrefix:
                 type: string
                 description: "The database prefix for the migration."
@@ -80,14 +84,15 @@ structs:
                 default: kUninitialized
             blockTimestamp:
                 type: timestamp
-                description:
-                    "The timestamp at which writes and causal reads against the databases
-                    being migrated should start blocking."
+                description: >-
+                    The timestamp at which writes and causal reads against the databases
+                    being migrated should start blocking.
                 optional: true
             commitOrAbortOpTime:
                 type: optime
                 description:
-                    "The opTime at which the donor's state document was set to 'committed' or 'aborted'."
+                    The opTime at which the donor's state document was set to 'committed'
+                    or 'aborted'.
                 optional: true
             abortReason:
                 type: object
@@ -95,7 +100,9 @@ structs:
                 optional: true
             expireAt:
                 type: date
-                description: "The wall-clock time at which the state machine document should be removed by the TTL monitor."
+                description: >-
+                    The wall-clock time at which the state machine document should be
+                    removed by the TTL monitor.
                 optional: true
 
     tenantMigrationRecipientDocument:
@@ -108,7 +115,9 @@ structs:
                 cpp_name: id
             donorConnectionString:
                 type: string
-                description: "The URI string that the donor will utilize to create a connection with the recipient."
+                description: >-
+                    The URI string that the recipient will utilize to create a connection
+                    with the donor.
             databasePrefix:
                 type: string
                 description: "The database prefix for the migration."
@@ -116,24 +125,40 @@ structs:
                     callback: "validateDbPrefix"
             readPreference:
                 type: readPreference
-                description: "The read preference setting that the recipient will use to determine which node in the donor replica set to clone from."
+                description: >-
+                    The read preference setting that the recipient will use to determine
+                    which node in the donor replica set to clone from.
             state:
                 type: TenantMigrationRecipientState
                 description: "The state of the tenant migration."
                 default: kUninitialized
             garbageCollect:
                 type: bool
-                description: "A boolean that determines whether the state machine should be deleted after a delay via the TTL monitor."
+                description: >-
+                    A boolean that determines whether the state machine should be deleted
+                    after a delay via the TTL monitor.
                 default: false
             startApplyingOpTime:
-                description: "Populated during data sync; the donor's operation time when the data cloning starts."
+                description: >-
+                    Populated during data sync; the donor's operation time when the data
+                    cloning starts.
                 type: optime
                 optional: true
             startFetchingOpTime:
-                description: "Populated during data sync; the donor's operation time of the last open transaction when the data cloning started."
+                description: >-
+                    Populated during data sync; the donor's operation time of the last open
+                    transaction when the data cloning started.
                 type: optime
                 optional: true
-            cloneFinishedOptime:
-                description: "Populated during data sync; the recipient operation time when the data cloning finishes."
+            dataConsistentStopOpTime:
+                description: >-
+                    Populated during data sync; the donor's operation time when the data
+                    cloning finishes.
+                type: optime
+                optional: true
+            cloneFinishedOpTime:
+                description: >-
+                    Populated during data sync; the recipient operation time when the data
+                    cloning finishes.
                 type: optime
                 optional: true

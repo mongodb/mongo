@@ -69,16 +69,16 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const std::string& tenantId,
                                        OpTime applyFromOpTime,
                                        RandomAccessOplogBuffer* oplogBuffer,
-                                       std::shared_ptr<executor::TaskExecutor> executor)
+                                       std::shared_ptr<executor::TaskExecutor> executor,
+                                       ThreadPool* writerPool)
     : AbstractAsyncComponent(executor.get(), std::string("TenantOplogApplier_") + tenantId),
       _migrationUuid(migrationUuid),
       _tenantId(tenantId),
       _beginApplyingAfterOpTime(applyFromOpTime),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
-      _limits(kTenantApplierBatchSizeBytes, kTenantApplierBatchSizeOps),
-      _applierThreadCount(kTenantApplierThreadCount) {}
-
+      _writerPool(writerPool),
+      _limits(kTenantApplierBatchSizeBytes, kTenantApplierBatchSizeOps) {}
 
 TenantOplogApplier::~TenantOplogApplier() {
     shutdown();
@@ -104,7 +104,6 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
 }
 
 Status TenantOplogApplier::_doStartup_inlock() noexcept {
-    _writerPool = makeReplWriterPool(_applierThreadCount, "TenantOplogWriter"_sd);
     _oplogBatcher = std::make_unique<TenantOplogBatcher>(_tenantId, _oplogBuffer, _executor);
     auto status = _oplogBatcher->startup();
     if (!status.isOK())
@@ -167,8 +166,6 @@ void TenantOplogApplier::_finishShutdown(WithLock, Status status) {
         listEntry.second.setError(status);
     }
     _opTimeNotificationList.clear();
-    _writerPool->shutdown();
-    _writerPool->join();
     _finalStatus = status;
     _transitionToComplete_inlock();
 }
@@ -501,6 +498,15 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<const OplogEntr
                     "error"_attr = redact(status));
     }
     return status;
+}
+
+std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool() {
+    return makeTenantMigrationWriterPool(kTenantApplierThreadCount);
+}
+
+std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool(int threadCount) {
+    return makeReplWriterPool(
+        threadCount, "TenantMigrationWriter"_sd, true /*  isKillableByStepdown */);
 }
 
 }  // namespace repl

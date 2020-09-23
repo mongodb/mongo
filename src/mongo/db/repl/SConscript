@@ -1302,7 +1302,9 @@ env.Library(
         'oplog_entry',
         'oplog_fetcher',
         'repl_server_parameters',
+        'tenant_migration_cloners',
         'tenant_migration_state_machine_idl',
+        'tenant_oplog_processing',
     ]
 )
 

@@ -70,6 +70,13 @@ public:
      */
     bool removeServer(const std::string& hostName);
 
+
+    /**
+     * @return the pointer to MockRemoteDBServer for the given hostname if available in
+     * the registry. Otherwise, returns nullptr.
+     */
+    MockRemoteDBServer* const getMockRemoteDBServer(const std::string& hostName) const;
+
     /**
      * Clears the registry.
      */
@@ -116,7 +123,7 @@ private:
     MockConnHook _mockConnStrHook;
 
     // protects _registry
-    Mutex _registryMutex = MONGO_MAKE_LATCH("MockConnRegistry::_registryMutex");
+    mutable Mutex _registryMutex = MONGO_MAKE_LATCH("MockConnRegistry::_registryMutex");
     stdx::unordered_map<std::string, MockRemoteDBServer*> _registry;
 };
 }  // namespace mongo

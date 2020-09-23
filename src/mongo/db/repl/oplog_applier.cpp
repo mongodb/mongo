@@ -143,14 +143,22 @@ std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
     return makeReplWriterPool(replWriterThreadCount, "ReplWriterWorker"_sd);
 }
 
-std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount, StringData name) {
+std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount,
+                                               StringData name,
+                                               bool isKillableByStepdown) {
     ThreadPool::Options options;
     options.threadNamePrefix = name + "-";
     options.poolName = name + "ThreadPool";
     options.maxThreads = options.minThreads = static_cast<size_t>(threadCount);
-    options.onCreateThread = [](const std::string&) {
+    options.onCreateThread = [isKillableByStepdown](const std::string&) {
         Client::initThread(getThreadName());
-        AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
+        auto client = Client::getCurrent();
+        AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+
+        if (isKillableByStepdown) {
+            stdx::lock_guard<Client> lk(*client);
+            client->setSystemOperationKillableByStepdown(lk);
+        }
     };
     auto pool = std::make_unique<ThreadPool>(options);
     pool->startup();

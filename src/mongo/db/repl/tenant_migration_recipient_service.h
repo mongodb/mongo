@@ -34,7 +34,9 @@
 
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/tenant_all_database_cloner.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/repl/tenant_oplog_applier.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 
 namespace mongo {
@@ -46,7 +48,6 @@ class ServiceContext;
 
 namespace repl {
 class OplogBufferCollection;
-
 /**
  * TenantMigrationRecipientService is a primary only service to handle
  * data copy portion of a multitenant migration on recipient side.
@@ -78,6 +79,10 @@ public:
 
         void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
 
+        /*
+         * Interrupts the running instance and cause the completion future to complete with
+         * 'status'.
+         */
         void interrupt(Status status) override;
 
         /**
@@ -108,6 +113,21 @@ public:
         const std::string& getTenantId() const;
 
         /*
+         * Blocks the thread until the tenant migration reaches consistent state in an interruptible
+         * mode. Returns the donor optime at which the migration reached consistent state. Throws
+         * exceptions on error.
+         */
+        OpTime waitUntilMigrationReachesConsistentState(OperationContext* opCtx) const;
+
+        /*
+         * Blocks the thread until the tenant oplog applier applied data past the given 'donorTs'
+         * in an interruptible mode. Returns the majority applied donor optime which may be greater
+         * or equal to given 'donorTs'. Throws throw exceptions on error.
+         */
+        OpTime waitUntilTimestampIsMajorityCommitted(OperationContext* opCtx,
+                                                     const Timestamp& donorTs) const;
+
+        /*
          *  Set the oplog creator functor, to allow use of a mock oplog fetcher.
          */
         void setCreateOplogFetcherFn_forTest(
@@ -118,13 +138,103 @@ public:
     private:
         friend class TenantMigrationRecipientServiceTest;
 
+        using ConnectionPair =
+            std::pair<std::unique_ptr<DBClientConnection>, std::unique_ptr<DBClientConnection>>;
+
+        // Represents the instance task state.
+        class TaskState {
+        public:
+            enum StateFlag {
+                kNotStarted = 1 << 0,
+                kRunning = 1 << 1,
+                kInterrupted = 1 << 2,
+                kDone = 1 << 3,
+            };
+
+            using StateSet = int;
+            bool isSet(StateSet stateSet) const {
+                return _state & stateSet;
+            }
+
+            bool checkIfValidTransition(StateFlag newState) {
+                switch (_state) {
+                    case kNotStarted:
+                        return newState == kRunning || newState == kInterrupted ||
+                            newState == kDone;
+                    case kRunning:
+                        return newState == kInterrupted || newState == kDone;
+                    case kInterrupted:
+                        return newState == kDone;
+                    case kDone:
+                        return false;
+                }
+                MONGO_UNREACHABLE;
+            }
+
+            void setState(StateFlag state, boost::optional<Status> interruptStatus = boost::none) {
+                invariant(checkIfValidTransition(state),
+                          str::stream() << "current state :" << toString(_state)
+                                        << ", new state: " << toString(state));
+
+                _state = state;
+                if (interruptStatus) {
+                    invariant(_state == kInterrupted && !interruptStatus->isOK());
+                    _interruptStatus = interruptStatus.get();
+                }
+            }
+
+            bool isNotStarted() const {
+                return _state == kNotStarted;
+            }
+
+            bool isRunning() const {
+                return _state == kRunning;
+            }
+
+            bool isInterrupted() const {
+                return _state == kInterrupted;
+            }
+
+            bool isDone() const {
+                return _state == kDone;
+            }
+
+            Status getInterruptStatus() const {
+                return _interruptStatus;
+            }
+
+            std::string toString() const {
+                return toString(_state);
+            }
+
+            static std::string toString(StateFlag state) {
+                switch (state) {
+                    case kNotStarted:
+                        return "Not started";
+                    case kRunning:
+                        return "Running";
+                    case kInterrupted:
+                        return "Interrupted";
+                    case kDone:
+                        return "Done";
+                }
+                MONGO_UNREACHABLE;
+            }
+
+        private:
+            // task state.
+            StateFlag _state = kNotStarted;
+            // task interrupt status.
+            Status _interruptStatus = Status{ErrorCodes::InternalError, "Uninitialized value"};
+        };
+
         /*
          * Transitions the instance state to 'kStarted'.
          *
          * Persists the instance state doc and waits for it to be majority replicated.
          * Throws an user assertion on failure.
          */
-        SharedSemiFuture<void> _initializeStateDoc();
+        SharedSemiFuture<void> _initializeStateDoc(WithLock);
 
         /**
          * Creates a client, connects it to the donor, and authenticates it if authParams is
@@ -139,7 +249,7 @@ public:
          * Creates and connects both the oplog fetcher client and the client used for other
          * operations.
          */
-        SemiFuture<void> _createAndConnectClients();
+        SemiFuture<ConnectionPair> _createAndConnectClients();
 
         /**
          * Retrieves the start optimes from the donor and updates the in-memory state accordingly.
@@ -173,41 +283,100 @@ public:
          */
         BSONObj _getOplogFetcherFilter() const;
 
-        std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;
+        /*
+         * Indicates that the recipient has completed the tenant cloning phase.
+         */
+        bool _isCloneCompletedMarkerSet(WithLock) const;
 
-        // Protects below non-const data members.
+        /*
+         * Starts the tenant cloner.
+         * Returns future that will be fulfilled when the cloner completes.
+         */
+        Future<void> _startTenantAllDatabaseCloner(WithLock lk);
+
+        /*
+         * Gets called when the cloner completes cloning data successfully.
+         * And, it is responsible to populate the 'dataConsistentStopOpTime'
+         * and 'cloneFinishedOpTime' fields in the state doc.
+         */
+        SharedSemiFuture<void> _onCloneSuccess();
+
+        /*
+         * Returns a future that will be fulfilled when the tenant migration reaches consistent
+         * state.
+         */
+        ExecutorFuture<void> _getDataConsistentFuture();
+
+        /*
+         * Shuts down all components that are started by the instance.
+         */
+        void _shutdownComponents(WithLock lk);
+
+        /*
+         * Performs some cleanup work on task completion, like, shutting down the components or
+         * fulfilling any instance promises.
+         */
+        void _cleanupOnTaskCompletion(Status status);
+
+        /*
+         * Makes the failpoint to stop or hang based on failpoint data "action" field.
+         */
+        void _stopOrHangOnFailPoint(FailPoint* fp);
+
         mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientService::_mutex");
 
-        TenantMigrationRecipientDocument _stateDoc;
+        // All member variables are labeled with one of the following codes indicating the
+        // synchronization rules for accessing them.
+        //
+        // (R)  Read-only in concurrent operation; no synchronization required.
+        // (S)  Self-synchronizing; access according to class's own rules.
+        // (M)  Reads and writes guarded by _mutex.
+        // (W)  Synchronization required only for writes.
+
+        std::shared_ptr<executor::ScopedTaskExecutor> _scopedExecutor;  // (M)
+        TenantMigrationRecipientDocument _stateDoc;                     // (M)
 
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
-        const std::string _tenantId;
-        const UUID _migrationUuid;
-        const std::string _donorConnectionString;
-        const ReadPreferenceSetting _readPreference;
+        const std::string _tenantId;                  // (R)
+        const UUID _migrationUuid;                    // (R)
+        const std::string _donorConnectionString;     // (R)
+        const ReadPreferenceSetting _readPreference;  // (R)
         // TODO(SERVER-50670): Populate authParams
-        const BSONObj _authParams;
-        // Promise that is resolved when the chain of work kicked off by run() has completed.
-        SharedPromise<void> _completionPromise;
+        const BSONObj _authParams;  // (M)
 
-        std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;
+        std::shared_ptr<ReplicaSetMonitor> _donorReplicaSetMonitor;  // (M)
 
         // Because the cloners and oplog fetcher use exhaust, we need a separate connection for
         // each.  The '_client' will be used for the cloners and other operations such as fetching
         // optimes while the '_oplogFetcherClient' will be reserved for the oplog fetcher only.
-        std::unique_ptr<DBClientConnection> _client;
-        std::unique_ptr<DBClientConnection> _oplogFetcherClient;
-
+        std::unique_ptr<DBClientConnection> _client;              // (M)
+        std::unique_ptr<DBClientConnection> _oplogFetcherClient;  // (M)
 
         std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
-            std::make_unique<CreateOplogFetcherFn>();
-        std::unique_ptr<OplogBufferCollection> _donorOplogBuffer;
-        std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;
-        std::unique_ptr<OplogFetcher> _donorOplogFetcher;
+            std::make_unique<CreateOplogFetcherFn>();                               // (M)
+        std::unique_ptr<OplogBufferCollection> _donorOplogBuffer;                   // (M)
+        std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (M)
+        std::unique_ptr<OplogFetcher> _donorOplogFetcher;                           // (M)
+        std::unique_ptr<TenantAllDatabaseCloner> _tenantAllDatabaseCloner;          // (M)
+        std::unique_ptr<TenantOplogApplier> _tenantOplogApplier;                    // (M)
+
+        // Writer pool to do storage write operation. Used by tenant collection cloner and by
+        // tenant oplog applier.
+        std::unique_ptr<ThreadPool> _writerPool;  //(M)
+        // Data shared by cloners. Follow TenantMigrationSharedData synchronization rules.
+        std::unique_ptr<TenantMigrationSharedData> _sharedData;  // (S)
+        // Indicates whether the main task future continuation chain state kicked off by run().
+        TaskState _taskState;  // (M)
+
+        // Promise that is resolved when the chain of work kicked off by run() has completed.
+        SharedPromise<void> _completionPromise;  // (W)
+        // Promise that is resolved Signaled when the instance has started tenant database cloner
+        // and tenant oplog fetcher.
+        SharedPromise<void> _dataSyncStartedPromise;  // (W)
+        // Promise that is resolved Signaled when the tenant data sync has reached consistent point.
+        SharedPromise<OpTime> _dataConsistentPromise;  // (W)
     };
 };
-
-
 }  // namespace repl
 }  // namespace mongo
