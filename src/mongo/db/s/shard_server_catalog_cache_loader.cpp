@@ -102,6 +102,10 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         update.setDefaultCollation(collAndChunks.defaultCollation.getOwned());
     }
 
+    if (collAndChunks.reshardingFields) {
+        update.setReshardingFields(collAndChunks.reshardingFields.get());
+    }
+
     // Mark the chunk metadata as refreshing, so that secondaries are aware of refresh.
     update.setRefreshing(true);
 
@@ -234,7 +238,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),
                                       shardCollectionEntry.getUnique(),
-                                      boost::none,
+                                      shardCollectionEntry.getReshardingFields(),
                                       std::move(changedChunks)};
 }
 

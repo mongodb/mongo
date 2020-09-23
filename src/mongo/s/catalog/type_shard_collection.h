@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/s/catalog/type_shard_collection_gen.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {
 
@@ -43,6 +44,7 @@ public:
     using ShardCollectionTypeBase::kLastRefreshedCollectionVersionFieldName;
     using ShardCollectionTypeBase::kNssFieldName;
     using ShardCollectionTypeBase::kRefreshingFieldName;
+    using ShardCollectionTypeBase::kReshardingFieldsFieldName;
     using ShardCollectionTypeBase::kUniqueFieldName;
     using ShardCollectionTypeBase::kUuidFieldName;
 
@@ -54,6 +56,7 @@ public:
     using ShardCollectionTypeBase::getLastRefreshedCollectionVersion;
     using ShardCollectionTypeBase::getNss;
     using ShardCollectionTypeBase::getRefreshing;
+    using ShardCollectionTypeBase::getReshardingFields;
     using ShardCollectionTypeBase::getUnique;
     using ShardCollectionTypeBase::getUuid;
     using ShardCollectionTypeBase::setDefaultCollation;
@@ -63,6 +66,7 @@ public:
     using ShardCollectionTypeBase::setLastRefreshedCollectionVersion;
     using ShardCollectionTypeBase::setNss;
     using ShardCollectionTypeBase::setRefreshing;
+    using ShardCollectionTypeBase::setReshardingFields;
     using ShardCollectionTypeBase::setUnique;
     using ShardCollectionTypeBase::setUuid;
 

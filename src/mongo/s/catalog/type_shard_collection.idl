@@ -47,6 +47,21 @@
 #      "refreshing" : true,                                 // optional
 #      "lastRefreshedCollectionVersion" : Timestamp(1, 0),  // optional
 #      "enterCriticalSectionCounter" : 4                    // optional
+#      "reshardingFields": {                                // optional
+#          "uuid" : UUID,
+#          "state" : CoordinatorState<kInitialized>,
+#          // Only populated if this collection is the original sharded collection.
+#          "donorFields" : {
+#              "reshardingKey" : {
+#                  "_notTheID" : 1
+#              }
+#          },
+#          // Only populated if this collection is the temporary resharding collection
+#          "recipientFields" : {
+#              "fetchTimestamp" : Timestamp(3, 4),
+#              "originalNamespace" : "foo.bar",
+#          }
+#       }
 #   }
 #
 
@@ -57,6 +72,7 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/keypattern.idl"
     - "mongo/s/chunk_version.idl"
+    - "mongo/s/resharding/type_collection_fields.idl"
 
 structs:
     ShardCollectionTypeBase:
@@ -111,3 +127,10 @@ structs:
                 type: int
                 description: "Currently just an OpObserver signal, thus otherwise ignored."
                 optional: true
+            reshardingFields:
+                description: "Resharding-related fields. Only set when this collection is either the
+                              original collection undergoing a resharding operation or this
+                              collection is the temporary resharding collection."
+                type: TypeCollectionReshardingFields
+                optional: true
+

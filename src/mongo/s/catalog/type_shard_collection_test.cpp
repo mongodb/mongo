@@ -104,5 +104,25 @@ TEST(ShardCollectionType, ToBSONEmptyDefaultCollationNotIncluded) {
     ASSERT_TRUE(obj.hasField(ShardCollectionType::kDefaultCollationFieldName));
 }
 
+TEST(ShardCollectionType, ReshardingFieldsIncluded) {
+    ShardCollectionType shardCollType;
+    shardCollType.setNss(kNss);
+    shardCollType.setEpoch(OID::gen());
+    shardCollType.setKeyPattern(kKeyPattern);
+    shardCollType.setUnique(true);
+
+    TypeCollectionReshardingFields reshardingFields;
+    const auto reshardingUuid = UUID::gen();
+    reshardingFields.setUuid(reshardingUuid);
+    shardCollType.setReshardingFields(std::move(reshardingFields));
+
+    BSONObj obj = shardCollType.toBSON();
+    ASSERT(obj.hasField(ShardCollectionType::kReshardingFieldsFieldName));
+
+    auto shardCollTypeFromBSON = assertGet(ShardCollectionType::fromBSON(obj));
+    ASSERT(shardCollType.getReshardingFields());
+    ASSERT_EQ(reshardingUuid, shardCollType.getReshardingFields()->getUuid());
+}
+
 }  // namespace
 }  // namespace mongo

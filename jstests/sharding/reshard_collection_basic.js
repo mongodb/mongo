@@ -142,5 +142,27 @@ assert.commandWorked(mongos.adminCommand({
 }));
 
 assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+
+// TODO remove test case below once the resharding command actually writes to config.collections
+// itself Test that shards correctly cache 'reshardingFields' in config.cache.collections
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+st.ensurePrimaryShard(kDbName, st.shard0.shardName);
+assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
+
+let donorReshardingFields = {
+    "uuid": UUID(),
+    "state": "initializing",
+    "donorFields": {"reshardingKey": {x: 1}}
+};
+assert.commandWorked(st.configRS.getPrimary().getDB("config").collections.update(
+    {_id: ns}, {"$set": {"reshardingFields": donorReshardingFields}}));
+
+// Run moveChunk to force shard0 to pick up the new info in config.collections
+assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+
+let cachedEntry = st.rs0.getPrimary().getDB('config').cache.collections.findOne({_id: ns});
+assert.docEq(cachedEntry.reshardingFields, donorReshardingFields);
+
+assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 st.stop();
 })();
