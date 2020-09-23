@@ -44,13 +44,16 @@ namespace mongo {
 
 struct PlanEnumeratorParams {
     PlanEnumeratorParams()
-        : intersect(false),
-          maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions.load()),
+        : maxSolutionsPerOr(internalQueryEnumerationMaxOrSolutions.load()),
           maxIntersectPerAnd(internalQueryEnumerationMaxIntersectPerAnd.load()) {}
 
     // Do we provide solutions that use more indices than the minimum required to provide
     // an indexed solution?
-    bool intersect;
+    bool intersect = false;
+
+    // Do we enumerate children of an $or in a special order to prioritize solutions which have the
+    // same assignment on each branch?
+    bool enumerateOrChildrenLockstep = false;
 
     // Not owned here.
     MatchExpression* root;
@@ -95,14 +98,13 @@ public:
     Status init();
 
     /**
-     * Outputs a possible plan. Leaves in the plan are tagged with an index to use.
-     * Returns a MatchExpression representing a point in the query tree (which can be
-     * used to build a QueryAssignment) or nullptr if no more plans will be outputted.
-     * While owned by the caller, the MatchExpression returned points into data that is
-     * owned elsewhere.
+     * Outputs a possible plan. Leaves in the plan are tagged with an index to use. Returns a
+     * MatchExpression representing a point in the query tree (which can be used to build a
+     * QuerySolutionNode tree) or nullptr if no more plans will be outputted. While owned by the
+     * caller, the MatchExpression returned points into data that is owned elsewhere.
      *
-     * Nodes in 'tree' are tagged with indices that should be used to answer the tagged nodes.
-     * Only nodes that have a field name (getCategory() != kLogical) will be tagged.
+     * Nodes in 'tree' are tagged with indices that should be used to answer the tagged nodes. Only
+     * nodes that have a field name (getCategory() != kLogical) will be tagged.
      *
      * The output tree is a clone identical to that used to initialize the enumerator, with tags
      * added in order to indicate index usage.
@@ -225,6 +227,29 @@ private:
         size_t counter;
     };
 
+    struct LockstepOrAssignment {
+        struct PreferFirstSubNode {
+            MemoID memoId;
+            size_t iterationCount;
+            boost::optional<size_t> maxIterCount;
+        };
+        std::vector<PreferFirstSubNode> subnodes;
+
+        bool exhaustedLockstepIteration = false;
+        size_t totalEnumerated = 0;
+
+        /**
+         * Returns true if 'totalEnumerated' matches the total number of expected plans for this
+         * assignment.
+         */
+        bool shouldResetBeforeProceeding(size_t totalEnumerated) const;
+
+        /**
+         * Returns true if each sub node is at the same iterationCount.
+         */
+        bool allIdentical() const;
+    };
+
     // This is used by AndAssignment and is not an actual assignment.
     struct OneIndexAssignment {
         // 'preds[i]' is uses index 'index' at position 'positions[i]'
@@ -267,6 +292,7 @@ private:
      */
     struct NodeAssignment {
         std::unique_ptr<OrAssignment> orAssignment;
+        std::unique_ptr<LockstepOrAssignment> lockstepOrAssignment;
         std::unique_ptr<AndAssignment> andAssignment;
         std::unique_ptr<ArrayAssignment> arrayAssignment;
         std::string toString() const;
@@ -525,6 +551,11 @@ private:
      */
     MemoID memoIDForNode(MatchExpression* node);
 
+    /**
+     * Helper for advancing the enumeration for a LockstepOrAssignment node.
+     */
+    bool _nextMemoForLockstepOrAssignment(LockstepOrAssignment*);
+
     std::string dumpMemo();
 
     // Map from expression to its MemoID.
@@ -549,6 +580,10 @@ private:
 
     // Do we output >1 index per AND (index intersection)?
     bool _ixisect;
+
+    // Do we enumerate children of an $or in a special order to prioritize solutions which have the
+    // same assignment on each branch?
+    bool _enumerateOrChildrenLockstep;
 
     // How many enumerations are we willing to produce from each OR?
     size_t _orLimit;

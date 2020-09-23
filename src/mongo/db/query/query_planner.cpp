@@ -58,8 +58,8 @@
 
 namespace mongo {
 
-using std::unique_ptr;
 using std::numeric_limits;
+using std::unique_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
 
@@ -137,6 +137,10 @@ string optionString(size_t options) {
                 break;
             case QueryPlannerParams::TRACK_LATEST_OPLOG_TS:
                 ss << "TRACK_LATEST_OPLOG_TS ";
+                break;
+            case QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP:
+                ss << "ENUMERATE_OR_CHILDREN_LOCKSTEP ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;
@@ -863,12 +867,15 @@ Status QueryPlanner::plan(const CanonicalQuery& query,
         enumParams.intersect = params.options & QueryPlannerParams::INDEX_INTERSECTION;
         enumParams.root = query.root();
         enumParams.indices = &relevantIndices;
+        enumParams.enumerateOrChildrenLockstep =
+            params.options & QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
 
-        PlanEnumerator isp(enumParams);
-        isp.init().transitional_ignore();
+        PlanEnumerator planEnumerator(enumParams);
+        uassertStatusOK(planEnumerator.init());
 
         unique_ptr<MatchExpression> nextTaggedTree;
-        while ((nextTaggedTree = isp.getNext()) && (out->size() < params.maxIndexedSolutions)) {
+        while ((nextTaggedTree = planEnumerator.getNext()) &&
+               (out->size() < params.maxIndexedSolutions)) {
             LOG(5) << "About to build solntree from tagged tree:" << endl
                    << redact(nextTaggedTree->toString());
 
