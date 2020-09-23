@@ -271,6 +271,7 @@ Status UpdateDriver::update(OperationContext* opCtx,
         // Updates may be run as part of the startup sequence, before the global FCV state has been
         // initialized. We conservatively do not permit the use of $v:2 oplog entries in these
         // situations.
+
         // TODO SERVER-51075: Remove FCV check for $v:2 delta oplog entries.
         const bool fcvAllowsV2Entries = fcvState.isVersionInitialized() &&
             fcvState.isGreaterThanOrEqualTo(

@@ -1274,7 +1274,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
             // TODO SERVER-51075: Remove FCV checks for $v:2 delta oplog entries.
             if (updateMod.type() == write_ops::UpdateModification::Type::kDelta) {
-                // If we are validating features as master, only allow $v:2 delta entries if we are
+                // If we are validating features as primary, only allow $v:2 delta entries if we are
                 // at FCV 4.7 or newer to prevent them from being written to the oplog.
                 if (serverGlobalParams.validateFeaturesAsMaster.load()) {
                     uassert(4773100,
