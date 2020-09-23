@@ -272,22 +272,8 @@ bool QuorumChecker::hasReceivedSufficientResponses() const {
         // Vetoed or everybody has responded.  All done.
         return true;
     }
-    if (_rsConfig->getConfigVersion() == 1) {
-        // Have not received responses from every member, and the proposed config
-        // version is 1 (initial configuration).  Keep waiting.
-        return false;
-    }
-    if (_numElectable == 0) {
-        // Have not heard from at least one electable node.  Keep waiting.
-        return false;
-    }
-    if (int(_voters.size()) < _rsConfig->getMajorityVoteCount()) {
-        // Have not heard from a majority of voters.  Keep waiting.
-        return false;
-    }
 
-    // Have heard from a majority of voters and one electable node.  All done.
-    return true;
+    return false;
 }
 
 Status checkQuorumGeneral(executor::TaskExecutor* executor,

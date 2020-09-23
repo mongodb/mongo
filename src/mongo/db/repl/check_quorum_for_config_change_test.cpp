@@ -187,7 +187,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToSeveralDownNodes) {
     for (int i = 0; i < numCommandsExpected; ++i) {
         getNet()->scheduleResponse(getNet()->getNextReadyRequest(),
                                    startDate + Milliseconds(10),
-                                   {ErrorCodes::NoSuchKey, "No reply"});
+                                   {ErrorCodes::HostUnreachable, "No reply"});
     }
     getNet()->runUntil(startDate + Milliseconds(10));
     getNet()->exitNetwork();
@@ -319,7 +319,7 @@ TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToOneDownNode) {
             << "Already saw " << request.target.toString();
         if (request.target == HostAndPort("h2", 1)) {
             getNet()->scheduleResponse(
-                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::HostUnreachable, "No response"});
         } else {
             getNet()->scheduleResponse(noi,
                                        startDate + Milliseconds(10),
@@ -519,7 +519,9 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWhenOtherNodesHaveHigherVersio
                 startDate + Milliseconds(10),
                 makeHeartbeatResponse(rsConfig, Milliseconds(8), configVersion));
         } else {
-            getNet()->blackHole(noi);
+            getNet()->scheduleResponse(noi,
+                                       startDate + Milliseconds(10),
+                                       makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         }
     }
     getNet()->runUntil(startDate + Milliseconds(10));
@@ -567,7 +569,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToIncompatibleSetName) {
                     Milliseconds(8))));
         } else {
             getNet()->scheduleResponse(
-                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::HostUnreachable, "No response"});
         }
     }
     getNet()->runUntil(startDate + Milliseconds(10));
@@ -623,7 +625,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToInsufficientVoters) {
                                        makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         } else {
             getNet()->scheduleResponse(
-                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::HostUnreachable, "No response"});
         }
     }
     getNet()->runUntil(startDate + Milliseconds(10));
@@ -679,7 +681,7 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
                                        makeHeartbeatResponse(rsConfig, Milliseconds(8)));
         } else {
             getNet()->scheduleResponse(
-                noi, startDate + Milliseconds(10), {ErrorCodes::NoSuchKey, "No response"});
+                noi, startDate + Milliseconds(10), {ErrorCodes::HostUnreachable, "No response"});
         }
     }
     getNet()->runUntil(startDate + Milliseconds(10));
@@ -689,10 +691,10 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckFailsDueToNoElectableNodeResponding) {
     ASSERT_REASON_CONTAINS(status, "no electable nodes responded");
 }
 
-TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
+TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsIfMinoritySetTimesOut) {
     // In this test, "we" are host "h4".  Only "h1", "h2" and "h3" can vote.
-    // This test should succeed as soon as h1 and h2 respond, so we block
-    // h3 and h5 from responding or timing out until the test completes.
+    // The quorum check should succeed even if we do not respond to a minority number of heartbeats,
+    // since those heartbeat requests will eventually time out.
 
     const ReplSetConfig rsConfig =
         assertMakeRSConfig(BSON("_id"
@@ -733,7 +735,9 @@ TEST_F(CheckQuorumForReconfig, QuorumCheckSucceedsWithAsSoonAsPossible) {
             getNet()->blackHole(noi);
         }
     }
-    getNet()->runUntil(startDate + Milliseconds(10));
+
+    // Advance the time by more than the heartbeat timeout set in the config.
+    getNet()->runUntil(startDate + rsConfig.getHeartbeatTimeoutPeriodMillis());
     getNet()->exitNetwork();
     ASSERT_OK(waitForQuorumCheck());
 }

@@ -1274,7 +1274,7 @@ TEST_F(ReplCoordReconfigTest,
 
     // Do a first reconfig that should succeed since the current config is committed.
     configVersion = 3;
-    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), configVersion, Cb_members, 3 /* quorumHbs */));
 
     // Try to reconfig out of Cb which should fail.
     configVersion = 4;
@@ -1448,13 +1448,6 @@ TEST_F(ReplCoordReconfigTest, StepdownShouldInterruptConfigWrite) {
         status = getReplCoord()->processReplSetReconfig(opCtx.get(), args, &result);
     });
 
-    getNet()->enterNetwork();
-    // Wait for the next heartbeat of quorum check and blackhole it.
-    // The reconfig is hung during the quorum check.
-    auto request = getNet()->getNextReadyRequest();
-    getNet()->blackHole(request);
-    getNet()->exitNetwork();
-
     // Step down due to a higher term.
     TopologyCoordinator::UpdateTermResult termUpdated;
     auto updateTermEvh = getReplCoord()->updateTerm_forTest(2, &termUpdated);
@@ -1509,7 +1502,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsTrueForNewMembersInReconfig) {
     const auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    Status status = doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */);
+    Status status = doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */);
     ASSERT_OK(status);
     stopCapturingLogMessages();
 
@@ -1538,7 +1531,7 @@ TEST_F(ReplCoordReconfigTest, NewlyAddedFieldIsNotPresentForNodesWithVotesZero) 
                                                    << "votes" << 0 << "priority" << 0));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1610,7 +1603,7 @@ TEST_F(ReplCoordReconfigTest, ForceReconfigDoesNotPersistNewlyAddedFieldFromOldN
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1764,7 +1757,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1787,7 +1780,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForMem
     members = BSON_ARRAY(member(2, "n2:1") << member(1, "n1:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1810,7 +1803,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1835,7 +1828,7 @@ TEST_F(ReplCoordReconfigTest, ReconfigNeverModifiesExistingNewlyAddedFieldForPre
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
     stopCapturingLogMessages();
 
     rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1859,7 +1852,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetAreTreatedAsVotesZero) 
     auto members = BSON_ARRAY(member(1, "n1:1") << member(2, "n2:1") << member(3, "n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
@@ -1891,7 +1884,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
     initialSyncNodes.emplace_back(HostAndPort("n3:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 2, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1,
@@ -1923,7 +1916,7 @@ TEST_F(ReplCoordReconfigTest, NodesWithNewlyAddedFieldSetHavePriorityZero) {
     initialSyncNodes.emplace_back(HostAndPort("n4:1"));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 3 /* quorumHbs */));
     stopCapturingLogMessages();
 
     ASSERT_EQUALS(1,
@@ -1954,7 +1947,7 @@ TEST_F(ReplCoordReconfigTest, ArbiterNodesShouldNeverHaveNewlyAddedField) {
                                                               << "arbiterOnly" << true));
 
     startCapturingLogMessages();
-    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 1 /* quorumHbs */));
+    ASSERT_OK(doSafeReconfig(opCtx.get(), 3, members, 2 /* quorumHbs */));
     stopCapturingLogMessages();
 
     const auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
