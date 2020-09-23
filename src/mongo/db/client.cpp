@@ -155,7 +155,7 @@ bool haveClient() {
 }
 
 ServiceContext::UniqueClient Client::releaseCurrent() {
-    invariant(haveClient());
+    invariant(haveClient(), "No client to release");
     return std::move(currentClient);
 }
 
