@@ -1222,10 +1222,11 @@ __checkpoint_lock_dirty_tree(
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
     WT_DECL_RET;
+    uint64_t now;
     u_int max_ckpt_drop;
     char *name_alloc;
     const char *name;
-    bool hot_backup_locked, is_wt_ckpt;
+    bool hot_backup_locked, is_drop, is_wt_ckpt, skip_ckpt;
 
     btree = S2BT(session);
     conn = S2C(session);
@@ -1233,9 +1234,6 @@ __checkpoint_lock_dirty_tree(
     dhandle = session->dhandle;
     hot_backup_locked = false;
     name_alloc = NULL;
-
-    /* Only referenced in diagnostic builds. */
-    WT_UNUSED(is_checkpoint);
 
     /*
      * Only referenced in diagnostic builds and gcc 5.1 isn't satisfied with wrapping the entire
@@ -1252,20 +1250,56 @@ __checkpoint_lock_dirty_tree(
      */
     WT_ASSERT(session, !need_tracking || WT_IS_METADATA(dhandle) || WT_META_TRACKING(session));
 
-    /* Get the list of checkpoints for this file. */
-    WT_RET(__wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase));
-
     /* This may be a named checkpoint, check the configuration. */
     cval.len = 0;
+    is_drop = is_wt_ckpt = false;
     if (cfg != NULL)
         WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
-    if (cval.len == 0)
+    if (cval.len == 0) {
         name = WT_CHECKPOINT;
-    else {
+        is_wt_ckpt = true;
+    } else {
         WT_ERR(__checkpoint_name_ok(session, cval.str, cval.len));
         WT_ERR(__wt_strndup(session, cval.str, cval.len, &name_alloc));
         name = name_alloc;
     }
+
+    /*
+     * Determine if a drop is part of the configuration. It usually isn't, so delay processing more
+     * until we know if we need to process this tree.
+     */
+    if (cfg != NULL) {
+        cval.len = 0;
+        WT_ERR(__wt_config_gets(session, cfg, "drop", &cval));
+        if (cval.len != 0)
+            is_drop = true;
+    }
+
+    /*
+     * This is a complicated test to determine if we can avoid the expensive call of getting the
+     * list of checkpoints for this file. We want to avoid that for clean files. But on clean files
+     * we want to periodically check if we need to delete old checkpoints that may have been in use
+     * by an open cursor.
+     */
+    if (!btree->modified && !force && is_checkpoint && is_wt_ckpt && !is_drop) {
+        /* In the common case of the timer set forever, don't even check the time. */
+        skip_ckpt = true;
+        if (btree->clean_ckpt_timer != WT_BTREE_CLEAN_CKPT_FOREVER) {
+            __wt_seconds64(session, &now);
+            if (now > btree->clean_ckpt_timer)
+                skip_ckpt = false;
+        }
+        if (skip_ckpt) {
+            F_SET(btree, WT_BTREE_SKIP_CKPT);
+            goto skip;
+        }
+    }
+
+    /* If we have to process this btree for any reason, reset the timer. */
+    WT_BTREE_CLEAN_CKPT(session, btree, 0);
+
+    /* Get the list of checkpoints for this file. */
+    WT_ERR(__wt_meta_ckptlist_get(session, dhandle->name, true, &ckptbase));
 
     /* We may be dropping specific checkpoints, check the configuration. */
     if (cfg != NULL) {
@@ -1378,6 +1412,7 @@ __checkpoint_lock_dirty_tree(
                 continue;
             if (ret == EBUSY && WT_PREFIX_MATCH(ckpt->name, WT_CHECKPOINT)) {
                 F_CLR(ckpt, WT_CKPT_DELETE);
+                ret = 0;
                 continue;
             }
             WT_ERR_MSG(session, ret, "checkpoints cannot be dropped when in-use");
@@ -1396,13 +1431,14 @@ __checkpoint_lock_dirty_tree(
     WT_ASSERT(session, btree->ckpt == NULL && !F_ISSET(btree, WT_BTREE_SKIP_CKPT));
     btree->ckpt = ckptbase;
 
-    return (0);
-
+    if (0) {
 err:
-    if (hot_backup_locked)
-        __wt_readunlock(session, &conn->hot_backup_lock);
+        if (hot_backup_locked)
+            __wt_readunlock(session, &conn->hot_backup_lock);
 
-    __wt_meta_ckptlist_free(session, &ckptbase);
+        __wt_meta_ckptlist_free(session, &ckptbase);
+    }
+skip:
     __wt_free(session, name_alloc);
 
     return (ret);
@@ -1417,6 +1453,7 @@ __checkpoint_mark_skip(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, bool force)
 {
     WT_BTREE *btree;
     WT_CKPT *ckpt;
+    uint64_t timer;
     int deleted;
     const char *name;
 
@@ -1465,6 +1502,19 @@ __checkpoint_mark_skip(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, bool force)
               (WT_PREFIX_MATCH(name, WT_CHECKPOINT) &&
                 WT_PREFIX_MATCH((ckpt - 2)->name, WT_CHECKPOINT)))) {
             F_SET(btree, WT_BTREE_SKIP_CKPT);
+            /*
+             * If there are potentially extra checkpoints to delete, we set the timer to recheck
+             * later. If there are at most two checkpoints, the current one and possibly a previous
+             * one, then we know there are no additional ones to delete. In that case, set the timer
+             * to forever. If the table gets dirtied or a checkpoint is forced that will clear the
+             * timer.
+             */
+            if (ckpt - ckptbase > 2) {
+                __wt_seconds64(session, &timer);
+                timer += WT_MINUTE * WT_BTREE_CLEAN_MINUTES;
+                WT_BTREE_CLEAN_CKPT(session, btree, timer);
+            } else
+                WT_BTREE_CLEAN_CKPT(session, btree, WT_BTREE_CLEAN_CKPT_FOREVER);
             return (0);
         }
     }

@@ -84,7 +84,7 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session)
     for (i = 0; i < WT_SESSION_CURSOR_SWEEP_MAX && productive; i++) {
         ++nbuckets;
         cached_list = &session->cursor_cache[position];
-        position = (position + 1) % WT_HASH_ARRAY_SIZE;
+        position = (position + 1) & (S2C(session)->hash_size - 1);
         TAILQ_FOREACH_SAFE(cursor, cached_list, q, cursor_tmp)
         {
             /*
@@ -248,9 +248,9 @@ static int
 __session_close_cached_cursors(WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
-    int i;
+    uint64_t i;
 
-    for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+    for (i = 0; i < S2C(session)->hash_size; i++)
         WT_TRET(__session_close_cursors(session, &session->cursor_cache[i]));
     return (ret);
 }
@@ -2085,16 +2085,16 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
      * array as well.
      */
     if (session_ret->cursor_cache == NULL)
-        WT_ERR(__wt_calloc_def(session, WT_HASH_ARRAY_SIZE, &session_ret->cursor_cache));
+        WT_ERR(__wt_calloc_def(session, conn->hash_size, &session_ret->cursor_cache));
     if (session_ret->dhhash == NULL)
-        WT_ERR(__wt_calloc_def(session, WT_HASH_ARRAY_SIZE, &session_ret->dhhash));
+        WT_ERR(__wt_calloc_def(session, conn->dh_hash_size, &session_ret->dhhash));
 
     /* Initialize the dhandle hash array. */
-    for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+    for (i = 0; i < (uint32_t)conn->dh_hash_size; i++)
         TAILQ_INIT(&session_ret->dhhash[i]);
 
     /* Initialize the cursor cache hash buckets and sweep trigger. */
-    for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
+    for (i = 0; i < (uint32_t)conn->hash_size; i++)
         TAILQ_INIT(&session_ret->cursor_cache[i]);
     session_ret->cursor_sweep_countdown = WT_SESSION_CURSOR_SWEEP_COUNTDOWN;
 
@@ -2113,8 +2113,14 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         session_ret->nhazard = 0;
     }
 
-    /* Cache the offset of this session's statistics bucket. */
-    session_ret->stat_bucket = WT_STATS_SLOT_ID(session);
+    /*
+     * Cache the offset of this session's statistics bucket. It's important we pass the correct
+     * session to the hash define here or we'll calculate the stat bucket with the wrong session id.
+     */
+    session_ret->stat_bucket = WT_STATS_SLOT_ID(session_ret);
+
+    /* Safety check to make sure we're doing the right thing. */
+    WT_ASSERT(session, session_ret->stat_bucket == session_ret->id % WT_COUNTER_SLOTS);
 
     /* Allocate the buffer for operation tracking */
     if (F_ISSET(conn, WT_CONN_OPTRACK)) {

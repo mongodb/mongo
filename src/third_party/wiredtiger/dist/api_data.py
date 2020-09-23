@@ -924,6 +924,18 @@ wiredtiger_open_common =\
         size and the default config would extend log files in allocations of
         the maximum log file size.''',
         type='list', choices=['data', 'log']),
+    Config('hash', '', r'''
+        manage resources around hash bucket arrays. All values must be a power of two.
+        Note that setting large values can significantly increase memory usage inside
+        WiredTiger''',
+        type='category', subconfig=[
+        Config('buckets', 512, r'''
+            configure the number of hash buckets for most system hash arrays''',
+            min='64', max='65536'),
+        Config('dhandle_buckets', 512, r'''
+            configure the number of hash buckets for hash arrays relating to data handles''',
+            min='64', max='65536'),
+        ]),
     Config('hazard_max', '1000', r'''
         maximum number of simultaneous hazard pointers per session
         handle''',

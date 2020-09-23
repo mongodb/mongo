@@ -94,7 +94,7 @@ __block_destroy(WT_SESSION_IMPL *session, WT_BLOCK *block)
     uint64_t bucket;
 
     conn = S2C(session);
-    bucket = block->name_hash % WT_HASH_ARRAY_SIZE;
+    bucket = block->name_hash & (conn->hash_size - 1);
     WT_CONN_BLOCK_REMOVE(conn, block, bucket);
 
     __wt_free(session, block->name);
@@ -148,7 +148,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, const char *cfg[
 
     conn = S2C(session);
     hash = __wt_hash_city64(filename, strlen(filename));
-    bucket = hash % WT_HASH_ARRAY_SIZE;
+    bucket = hash & (conn->hash_size - 1);
     __wt_spin_lock(session, &conn->block_lock);
     TAILQ_FOREACH (block, &conn->blockhash[bucket], hashq) {
         if (strcmp(filename, block->name) == 0) {

@@ -16,14 +16,8 @@ int
 __wt_connection_init(WT_CONNECTION_IMPL *conn)
 {
     WT_SESSION_IMPL *session;
-    u_int i;
 
     session = conn->default_session;
-
-    for (i = 0; i < WT_HASH_ARRAY_SIZE; i++) {
-        TAILQ_INIT(&conn->dhhash[i]); /* Data handle hash lists */
-        TAILQ_INIT(&conn->fhhash[i]); /* File handle hash lists */
-    }
 
     TAILQ_INIT(&conn->dhqh);        /* Data handle list */
     TAILQ_INIT(&conn->dlhqh);       /* Library list */
@@ -79,9 +73,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
      * opaque, but for now this is simpler.
      */
     WT_RET(__wt_spin_init(session, &conn->block_lock, "block manager"));
-    for (i = 0; i < WT_HASH_ARRAY_SIZE; i++)
-        TAILQ_INIT(&conn->blockhash[i]); /* Block handle hash lists */
-    TAILQ_INIT(&conn->blockqh);          /* Block manager list */
+    TAILQ_INIT(&conn->blockqh); /* Block manager list */
 
     return (0);
 }
@@ -123,6 +115,12 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_spin_destroy(session, &conn->schema_lock);
     __wt_rwlock_destroy(session, &conn->table_lock);
     __wt_spin_destroy(session, &conn->turtle_lock);
+
+    /* Free allocated hash buckets. */
+    __wt_free(session, conn->blockhash);
+    __wt_free(session, conn->dh_bucket_count);
+    __wt_free(session, conn->dhhash);
+    __wt_free(session, conn->fhhash);
 
     /* Free allocated memory. */
     __wt_free(session, conn->cfg);

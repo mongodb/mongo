@@ -472,6 +472,8 @@ struct __wt_connection_stats {
     int64_t cond_auto_wait;
     int64_t time_travel;
     int64_t file_open;
+    int64_t buckets_dh;
+    int64_t buckets;
     int64_t memory_allocation;
     int64_t memory_free;
     int64_t memory_grow;
@@ -687,6 +689,12 @@ struct __wt_connection_stats {
     int64_t txn_checkpoint_generation;
     int64_t txn_checkpoint_time_max;
     int64_t txn_checkpoint_time_min;
+    int64_t txn_checkpoint_handle_duration;
+    int64_t txn_checkpoint_handle_duration_apply;
+    int64_t txn_checkpoint_handle_duration_skip;
+    int64_t txn_checkpoint_handle_applied;
+    int64_t txn_checkpoint_handle_skipped;
+    int64_t txn_checkpoint_handle_walked;
     int64_t txn_checkpoint_time_recent;
     int64_t txn_checkpoint_scrub_target;
     int64_t txn_checkpoint_scrub_time;
@@ -736,6 +744,7 @@ struct __wt_dsrc_stats {
     int64_t block_size;
     int64_t block_minor;
     int64_t btree_checkpoint_generation;
+    int64_t btree_clean_checkpoint_timer;
     int64_t btree_column_fix;
     int64_t btree_column_internal;
     int64_t btree_column_rle;

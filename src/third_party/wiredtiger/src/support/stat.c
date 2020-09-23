@@ -15,8 +15,8 @@ static const char *const __stats_dsrc_desc[] = {
   "block-manager: file bytes available for reuse", "block-manager: file magic number",
   "block-manager: file major version number", "block-manager: file size in bytes",
   "block-manager: minor version number", "btree: btree checkpoint generation",
-  "btree: column-store fixed-size leaf pages", "btree: column-store internal pages",
-  "btree: column-store variable-size RLE encoded values",
+  "btree: btree clean tree checkpoint expiration time", "btree: column-store fixed-size leaf pages",
+  "btree: column-store internal pages", "btree: column-store variable-size RLE encoded values",
   "btree: column-store variable-size deleted values",
   "btree: column-store variable-size leaf pages", "btree: fixed-record size",
   "btree: maximum internal page key size", "btree: maximum internal page size",
@@ -149,6 +149,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->block_size = 0;
     stats->block_minor = 0;
     /* not clearing btree_checkpoint_generation */
+    /* not clearing btree_clean_checkpoint_timer */
     stats->btree_column_fix = 0;
     stats->btree_column_internal = 0;
     stats->btree_column_rle = 0;
@@ -308,6 +309,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     if (from->block_minor > to->block_minor)
         to->block_minor = from->block_minor;
     to->btree_checkpoint_generation += from->btree_checkpoint_generation;
+    to->btree_clean_checkpoint_timer += from->btree_clean_checkpoint_timer;
     to->btree_column_fix += from->btree_column_fix;
     to->btree_column_internal += from->btree_column_internal;
     to->btree_column_rle += from->btree_column_rle;
@@ -468,6 +470,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     if ((v = WT_STAT_READ(from, block_minor)) > to->block_minor)
         to->block_minor = v;
     to->btree_checkpoint_generation += WT_STAT_READ(from, btree_checkpoint_generation);
+    to->btree_clean_checkpoint_timer += WT_STAT_READ(from, btree_clean_checkpoint_timer);
     to->btree_column_fix += WT_STAT_READ(from, btree_column_fix);
     to->btree_column_internal += WT_STAT_READ(from, btree_column_internal);
     to->btree_column_rle += WT_STAT_READ(from, btree_column_rle);
@@ -712,7 +715,9 @@ static const char *const __stats_connection_desc[] = {
   "capacity: time waiting during read (usecs)", "connection: auto adjusting condition resets",
   "connection: auto adjusting condition wait calls",
   "connection: detected system time went backwards", "connection: files currently open",
-  "connection: memory allocations", "connection: memory frees", "connection: memory re-allocations",
+  "connection: hash bucket array size for data handles",
+  "connection: hash bucket array size general", "connection: memory allocations",
+  "connection: memory frees", "connection: memory re-allocations",
   "connection: pthread mutex condition wait calls",
   "connection: pthread mutex shared lock read-lock calls",
   "connection: pthread mutex shared lock write-lock calls", "connection: total fsync I/Os",
@@ -855,6 +860,12 @@ static const char *const __stats_connection_desc[] = {
   "transaction: transaction checkpoint generation",
   "transaction: transaction checkpoint max time (msecs)",
   "transaction: transaction checkpoint min time (msecs)",
+  "transaction: transaction checkpoint most recent duration for gathering all handles (usecs)",
+  "transaction: transaction checkpoint most recent duration for gathering applied handles (usecs)",
+  "transaction: transaction checkpoint most recent duration for gathering skipped handles (usecs)",
+  "transaction: transaction checkpoint most recent handles applied",
+  "transaction: transaction checkpoint most recent handles skipped",
+  "transaction: transaction checkpoint most recent handles walked",
   "transaction: transaction checkpoint most recent time (msecs)",
   "transaction: transaction checkpoint scrub dirty target",
   "transaction: transaction checkpoint scrub time (msecs)",
@@ -1078,6 +1089,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cond_auto_wait = 0;
     stats->time_travel = 0;
     /* not clearing file_open */
+    /* not clearing buckets_dh */
+    /* not clearing buckets */
     stats->memory_allocation = 0;
     stats->memory_free = 0;
     stats->memory_grow = 0;
@@ -1293,6 +1306,12 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing txn_checkpoint_generation */
     /* not clearing txn_checkpoint_time_max */
     /* not clearing txn_checkpoint_time_min */
+    /* not clearing txn_checkpoint_handle_duration */
+    /* not clearing txn_checkpoint_handle_duration_apply */
+    /* not clearing txn_checkpoint_handle_duration_skip */
+    stats->txn_checkpoint_handle_applied = 0;
+    stats->txn_checkpoint_handle_skipped = 0;
+    stats->txn_checkpoint_handle_walked = 0;
     /* not clearing txn_checkpoint_time_recent */
     /* not clearing txn_checkpoint_scrub_target */
     /* not clearing txn_checkpoint_scrub_time */
@@ -1516,6 +1535,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cond_auto_wait += WT_STAT_READ(from, cond_auto_wait);
     to->time_travel += WT_STAT_READ(from, time_travel);
     to->file_open += WT_STAT_READ(from, file_open);
+    to->buckets_dh += WT_STAT_READ(from, buckets_dh);
+    to->buckets += WT_STAT_READ(from, buckets);
     to->memory_allocation += WT_STAT_READ(from, memory_allocation);
     to->memory_free += WT_STAT_READ(from, memory_free);
     to->memory_grow += WT_STAT_READ(from, memory_grow);
@@ -1735,6 +1756,14 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_checkpoint_generation += WT_STAT_READ(from, txn_checkpoint_generation);
     to->txn_checkpoint_time_max += WT_STAT_READ(from, txn_checkpoint_time_max);
     to->txn_checkpoint_time_min += WT_STAT_READ(from, txn_checkpoint_time_min);
+    to->txn_checkpoint_handle_duration += WT_STAT_READ(from, txn_checkpoint_handle_duration);
+    to->txn_checkpoint_handle_duration_apply +=
+      WT_STAT_READ(from, txn_checkpoint_handle_duration_apply);
+    to->txn_checkpoint_handle_duration_skip +=
+      WT_STAT_READ(from, txn_checkpoint_handle_duration_skip);
+    to->txn_checkpoint_handle_applied += WT_STAT_READ(from, txn_checkpoint_handle_applied);
+    to->txn_checkpoint_handle_skipped += WT_STAT_READ(from, txn_checkpoint_handle_skipped);
+    to->txn_checkpoint_handle_walked += WT_STAT_READ(from, txn_checkpoint_handle_walked);
     to->txn_checkpoint_time_recent += WT_STAT_READ(from, txn_checkpoint_time_recent);
     to->txn_checkpoint_scrub_target += WT_STAT_READ(from, txn_checkpoint_scrub_target);
     to->txn_checkpoint_scrub_time += WT_STAT_READ(from, txn_checkpoint_scrub_time);

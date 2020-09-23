@@ -23,7 +23,7 @@ __session_add_dhandle(WT_SESSION_IMPL *session)
 
     dhandle_cache->dhandle = session->dhandle;
 
-    bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+    bucket = dhandle_cache->dhandle->name_hash & (S2C(session)->dh_hash_size - 1);
     TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
     TAILQ_INSERT_HEAD(&session->dhhash[bucket], dhandle_cache, hashq);
 
@@ -39,7 +39,7 @@ __session_discard_dhandle(WT_SESSION_IMPL *session, WT_DATA_HANDLE_CACHE *dhandl
 {
     uint64_t bucket;
 
-    bucket = dhandle_cache->dhandle->name_hash % WT_HASH_ARRAY_SIZE;
+    bucket = dhandle_cache->dhandle->name_hash & (S2C(session)->dh_hash_size - 1);
     TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
     TAILQ_REMOVE(&session->dhhash[bucket], dhandle_cache, hashq);
 
@@ -61,7 +61,7 @@ __session_find_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *ch
 
     dhandle = NULL;
 
-    bucket = __wt_hash_city64(uri, strlen(uri)) % WT_HASH_ARRAY_SIZE;
+    bucket = __wt_hash_city64(uri, strlen(uri)) & (S2C(session)->dh_hash_size - 1);
 retry:
     TAILQ_FOREACH (dhandle_cache, &session->dhhash[bucket], hashq) {
         dhandle = dhandle_cache->dhandle;
