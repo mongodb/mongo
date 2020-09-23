@@ -373,7 +373,8 @@ void runCommand(OperationContext* opCtx,
     opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
     const auto session = opCtx->getClient()->session();
     if (session) {
-        if (!opCtx->isExhaust() || command->getName() != "hello"_sd) {
+        if (!opCtx->isExhaust() ||
+            (command->getName() != "hello"_sd && command->getName() != "isMaster"_sd)) {
             InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
         }
     }
