@@ -450,6 +450,7 @@ env.Library(
     source=[
         'baton.cpp',
         'client.cpp',
+        'client_strand.cpp',
         'default_baton.cpp',
         'operation_context.cpp',
         'operation_context_group.cpp',
@@ -2220,6 +2221,7 @@ envWithAsio.CppUnitTest(
     target='db_unittest_test',
     source=[
         'catalog_raii_test.cpp',
+        'client_strand_test.cpp',
         'collection_index_usage_tracker_test.cpp',
         'commands_test.cpp',
         'curop_test.cpp',

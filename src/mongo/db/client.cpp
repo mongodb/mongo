@@ -156,7 +156,7 @@ bool haveClient() {
 }
 
 ServiceContext::UniqueClient Client::releaseCurrent() {
-    invariant(haveClient());
+    invariant(haveClient(), "No client to release");
     if (auto opCtx = currentClient->_opCtx)
         if (auto timer = OperationCPUTimer::get(opCtx))
             timer->onThreadDetach();
