@@ -98,6 +98,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isNumber
     0,  // isBinData
     0,  // isDate
+    0,  // isNaN
     0,  // typeMatch
 
     0,  // function is special, the stack offset is encoded in the instruction itself
@@ -318,6 +319,10 @@ void CodeFragment::appendIsBinData() {
 
 void CodeFragment::appendIsDate() {
     appendSimpleInstruction(Instruction::isDate);
+}
+
+void CodeFragment::appendIsNaN() {
+    appendSimpleInstruction(Instruction::isNaN);
 }
 
 void CodeFragment::appendTypeMatch(uint32_t typeMask) {
@@ -802,6 +807,54 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAbs(uint8_t ari
     auto [_, tagOperand, valOperand] = getFromStack(0);
 
     return genericAbs(tagOperand, valOperand);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCeil(uint8_t arity) {
+    invariant(arity == 1);
+
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    return genericCeil(tagOperand, valOperand);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinFloor(uint8_t arity) {
+    invariant(arity == 1);
+
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    return genericFloor(tagOperand, valOperand);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinExp(uint8_t arity) {
+    invariant(arity == 1);
+
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    return genericExp(tagOperand, valOperand);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinLn(uint8_t arity) {
+    invariant(arity == 1);
+
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    return genericLn(tagOperand, valOperand);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinLog10(uint8_t arity) {
+    invariant(arity == 1);
+
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    return genericLog10(tagOperand, valOperand);
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSqrt(uint8_t arity) {
+    invariant(arity == 1);
+
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    return genericSqrt(tagOperand, valOperand);
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAddToArray(uint8_t arity) {
@@ -1392,6 +1445,18 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinNewKeyString(arity);
         case Builtin::abs:
             return builtinAbs(arity);
+        case Builtin::ceil:
+            return builtinCeil(arity);
+        case Builtin::floor:
+            return builtinFloor(arity);
+        case Builtin::exp:
+            return builtinExp(arity);
+        case Builtin::ln:
+            return builtinLn(arity);
+        case Builtin::log10:
+            return builtinLog10(arity);
+        case Builtin::sqrt:
+            return builtinSqrt(arity);
         case Builtin::addToArray:
             return builtinAddToArray(arity);
         case Builtin::addToSet:
@@ -2014,6 +2079,18 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
 
                     if (tag != value::TypeTags::Nothing) {
                         topStack(false, value::TypeTags::Boolean, tag == value::TypeTags::Date);
+                    }
+
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::isNaN: {
+                    auto [owned, tag, val] = getFromStack(0);
+
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false, value::TypeTags::Boolean, value::isNaN(tag, val));
                     }
 
                     if (owned) {

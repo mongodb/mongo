@@ -32,6 +32,7 @@
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -401,14 +402,18 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverse(
 /**
  * Generates an EExpression that checks if the input expression is null or missing.
  */
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
-                                                        const sbe::value::SlotId slotId) {
-    sbe::EVariable var{frameId, slotId};
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
     return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::logicOr,
         sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
                                     sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(var.clone()))),
         sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(var.clone())));
+}
+
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
+                                                        const sbe::value::SlotId slotId) {
+    sbe::EVariable var{frameId, slotId};
+    return generateNullOrMissing(var);
 }
 
 /**
@@ -429,7 +434,7 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
                          getBSONTypeMask(sbe::value::TypeTags::Date) |
                          getBSONTypeMask(sbe::value::TypeTags::Timestamp));
     auto checkValidTypeExpr = sbe::makeE<sbe::ETypeMatch>(inputRef.clone(), typeMask);
-    auto checkNullorMissing = generateNullOrMissing(frameId, 0);
+    auto checkNullorMissing = generateNullOrMissing(inputRef);
     auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
 
     auto caseConversionExpr = sbe::makeE<sbe::EIf>(
@@ -447,6 +452,99 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
                              std::move(caseConversionExpr));
     _context->pushExpr(
         sbe::makeE<sbe::ELocalBind>(frameId, std::move(str), std::move(totalCaseConversionExpr)));
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is a non-numeric type _assuming
+ * that_ it has already been verified to be neither null nor missing.
+ */
+std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EPrimUnary>(
+        sbe::EPrimUnary::logicNot,
+        sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(var.clone())));
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is the value NumberLong(-2^64).
+ */
+std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::logicAnd,
+        sbe::makeE<sbe::ETypeMatch>(var.clone(),
+                                    MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask()),
+        sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::eq,
+            var.clone(),
+            sbe::makeE<sbe::EConstant>(
+                sbe::value::TypeTags::NumberInt64,
+                sbe::value::bitcastFrom(std::numeric_limits<int64_t>::min()))));
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is NaN _assuming that_ it has
+ * already been verified to be numeric.
+ */
+std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EFunction>("isNaN", sbe::makeEs(var.clone()));
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is a non-positive number (i.e. <= 0)
+ * _assuming that_ it has already been verified to be numeric.
+ */
+std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::EPrimBinary::lessEq,
+        var.clone(),
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom(0)));
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is a negative (i.e., < 0) number
+ * _assuming that_ it has already been verified to be numeric.
+ */
+std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::EPrimBinary::less,
+        var.clone(),
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom(0)));
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is _not_ an object, _assuming that_
+ * it has already been verified to be neither null nor missing.
+ */
+std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EPrimUnary>(
+        sbe::EPrimUnary::logicNot,
+        sbe::makeE<sbe::EFunction>("isObject", sbe::makeEs(var.clone())));
+}
+
+/**
+ * A pair representing a 1) true/false condition and 2) the value that should be returned if that
+ * condition evaluates to true.
+ */
+using CaseValuePair =
+    std::pair<std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::EExpression>>;
+
+/**
+ * Convert a list of CaseValuePairs into a chain of EIf expressions, with the final else case
+ * evaluating to the 'defaultValue' EExpression.
+ */
+template <typename... Ts>
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(Ts... cases);
+
+template <typename... Ts>
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(CaseValuePair headCase, Ts... rest) {
+    return sbe::makeE<sbe::EIf>(std::move(headCase.first),
+                                std::move(headCase.second),
+                                buildMultiBranchConditional(std::move(rest)...));
+}
+
+template <>
+std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
+    std::unique_ptr<sbe::EExpression> defaultCase) {
+    return defaultCase;
 }
 
 class ExpressionPreVisitor final : public ExpressionVisitor {
@@ -952,16 +1050,16 @@ public:
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
 
-        auto checkNullOrEmpty = generateNullOrMissing(frameId, 0);
-
-        auto absExpr = sbe::makeE<sbe::EIf>(
-            std::move(checkNullOrEmpty),
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
-            sbe::makeE<sbe::EIf>(
-                sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(inputRef.clone())),
-                sbe::makeE<sbe::EFunction>("abs", sbe::makeEs(inputRef.clone())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4822870},
-                                       "$abs only supports numeric types, not string")));
+        auto absExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonNumericCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903700},
+                                                 "$abs only supports numeric types")},
+            CaseValuePair{generateLongLongMinCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903701},
+                                                 "can't take $abs of long long min")},
+            sbe::makeE<sbe::EFunction>("abs", sbe::makeEs(inputRef.clone())));
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(absExpr)));
@@ -1101,20 +1199,32 @@ public:
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
 
-        auto bsonSizeExpr = sbe::makeE<sbe::EIf>(
-            generateNullOrMissing(frameId, 0),
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
-            sbe::makeE<sbe::EIf>(
-                sbe::makeE<sbe::EFunction>("isObject", sbe::makeEs(inputRef.clone())),
-                sbe::makeE<sbe::EFunction>("bsonSize", sbe::makeEs(inputRef.clone())),
-                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5043001},
-                                       "$bsonSize requires a document input")));
+        auto bsonSizeExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonObjectCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5043001},
+                                                 "$bsonSize requires a document input")},
+            sbe::makeE<sbe::EFunction>("bsonSize", sbe::makeEs(inputRef.clone())));
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(bsonSizeExpr)));
     }
     void visit(ExpressionCeil* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto ceilExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonNumericCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903702},
+                                                 "$ceil only supports numeric types")},
+            sbe::makeE<sbe::EFunction>("ceil", sbe::makeEs(inputRef.clone())));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(ceilExpr)));
     }
     void visit(ExpressionCoerceToBool* expr) final {
         // Since $coerceToBool is internal-only and there are not yet any input expressions that
@@ -1497,7 +1607,20 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionExp* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto expExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonNumericCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903703},
+                                                 "$exp only supports numeric types")},
+            sbe::makeE<sbe::EFunction>("exp", sbe::makeEs(inputRef.clone())));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(expExpr)));
     }
     void visit(ExpressionFieldPath* expr) final {
         if (expr->getVariableId() == Variables::kRemoveId) {
@@ -1538,7 +1661,20 @@ public:
         unsupportedExpression("$filter");
     }
     void visit(ExpressionFloor* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto floorExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonNumericCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903704},
+                                                 "$floor only supports numeric types")},
+            sbe::makeE<sbe::EFunction>("floor", sbe::makeEs(inputRef.clone())));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(floorExpr)));
     }
     void visit(ExpressionIfNull* expr) final {
         _context->ensureArity(2);
@@ -1609,13 +1745,55 @@ public:
         // The AST parser already enforces scope rules.
     }
     void visit(ExpressionLn* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto lnExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonNumericCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903705},
+                                                 "$ln only supports numeric types")},
+            // Note: In MQL, $ln on a NumberDecimal NaN historically evaluates to a NumberDouble
+            // NaN.
+            CaseValuePair{generateNaNCheck(inputRef),
+                          sbe::makeE<sbe::ENumericConvert>(inputRef.clone(),
+                                                           sbe::value::TypeTags::NumberDouble)},
+            CaseValuePair{generateNonPositiveCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903706},
+                                                 "$ln's argument must be a positive number")},
+            sbe::makeE<sbe::EFunction>("ln", sbe::makeEs(inputRef.clone())));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(lnExpr)));
     }
     void visit(ExpressionLog* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionLog10* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto log10Expr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonNumericCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903707},
+                                                 "$log10 only supports numeric types")},
+            // Note: In MQL, $log10 on a NumberDecimal NaN historically evaluates to a NumberDouble
+            // NaN.
+            CaseValuePair{generateNaNCheck(inputRef),
+                          sbe::makeE<sbe::ENumericConvert>(inputRef.clone(),
+                                                           sbe::value::TypeTags::NumberDouble)},
+            CaseValuePair{generateNonPositiveCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903708},
+                                                 "$log10's argument must be a positive number")},
+            sbe::makeE<sbe::EFunction>("log10", sbe::makeEs(inputRef.clone())));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(log10Expr)));
     }
     void visit(ExpressionMap* expr) final {
         unsupportedExpression("$map");
@@ -1694,7 +1872,24 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSqrt* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto lnExpr = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(inputRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonNumericCheck(inputRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903709},
+                                                 "$sqrt only supports numeric types")},
+            CaseValuePair{
+                generateNegativeCheck(inputRef),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4903710},
+                                       "$sqrt's argument must be greater than or equal to 0")},
+            sbe::makeE<sbe::EFunction>("sqrt", sbe::makeEs(inputRef.clone())));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(lnExpr)));
     }
     void visit(ExpressionStrcasecmp* expr) final {
         unsupportedExpression(expr->getOpName());

@@ -187,6 +187,8 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                                         TypeTags rhsTag,
                                         Value rhsValue);
 
+bool isNaN(TypeTags tag, Value val);
+
 /**
  * A simple hash combination.
  */

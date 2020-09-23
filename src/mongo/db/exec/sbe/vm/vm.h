@@ -150,6 +150,7 @@ struct Instruction {
         isNumber,
         isBinData,
         isDate,
+        isNaN,
         typeMatch,
 
         function,
@@ -177,9 +178,15 @@ enum class Builtin : uint8_t {
     datePartsWeekYear,
     dropFields,
     newObj,
-    ksToString,       // KeyString to string
-    newKs,            // new KeyString
-    abs,              // absolute value
+    ksToString,  // KeyString to string
+    newKs,       // new KeyString
+    abs,         // absolute value
+    ceil,
+    floor,
+    exp,
+    ln,
+    log10,
+    sqrt,
     addToArray,       // agg function to append to an array
     addToSet,         // agg function to append to a set
     doubleDoubleSum,  // special double summation
@@ -279,6 +286,7 @@ public:
     void appendIsNumber();
     void appendIsBinData();
     void appendIsDate();
+    void appendIsNaN();
     void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, uint8_t arity);
     void appendJump(int jumpOffset);
@@ -357,6 +365,18 @@ private:
                                                                value::Value rhsValue);
     std::tuple<bool, value::TypeTags, value::Value> genericAbs(value::TypeTags operandTag,
                                                                value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericCeil(value::TypeTags operandTag,
+                                                                value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericFloor(value::TypeTags operandTag,
+                                                                 value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericExp(value::TypeTags operandTag,
+                                                               value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericLn(value::TypeTags operandTag,
+                                                              value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericLog10(value::TypeTags operandTag,
+                                                                 value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericSqrt(value::TypeTags operandTag,
+                                                                value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericNot(value::TypeTags tag,
                                                                value::Value value);
     std::tuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags lhsTag,
@@ -469,6 +489,12 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewKeyString(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAbs(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinCeil(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinFloor(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinExp(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinLn(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinLog10(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinSqrt(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToArray(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinAddToSet(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(uint8_t arity);
