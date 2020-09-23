@@ -237,12 +237,10 @@ private:
 
     std::unique_ptr<QueryRequest> _qr;
 
-    CNode _filterCst;
     std::unique_ptr<MatchExpression> _root;
 
     boost::optional<projection_ast::Projection> _proj;
 
-    CNode _sortCst;
     boost::optional<SortPattern> _sortPattern;
 
     // Keeps track of what metadata has been explicitly requested.

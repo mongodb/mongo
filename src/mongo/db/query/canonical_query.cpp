@@ -35,10 +35,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/cst/bson_lexer.h"
-#include "mongo/db/cst/c_node.h"
-#include "mongo/db/cst/cst_match_translation.h"
-#include "mongo/db/cst/cst_sort_translation.h"
+#include "mongo/db/cst/cst_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/namespace_string.h"
@@ -125,9 +122,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     StatusWithMatchExpression statusWithMatcher = [&]() -> StatusWithMatchExpression {
         if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
             try {
-                BSONLexer lexer{qr->getFilter(), ParserGen::token::START_MATCH};
-                ParserGen(lexer, &cq->_filterCst).parse();
-                return cst_match_translation::translateMatchExpression(cq->_filterCst, newExpCtx);
+                return cst::parseToMatchExpression(qr->getFilter(), newExpCtx);
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
@@ -257,9 +252,7 @@ void CanonicalQuery::initSortPattern(QueryMetadataBitSet unavailableMetadata) {
     }
 
     if (getTestCommandsEnabled() && internalQueryEnableCSTParser.load()) {
-        BSONLexer lexer{_qr->getSort(), ParserGen::token::START_SORT};
-        ParserGen(lexer, &_sortCst).parse();
-        _sortPattern = cst_sort_translation::translateSortSpec(_sortCst, _expCtx);
+        _sortPattern = cst::parseToSortPattern(_qr->getSort(), _expCtx);
     } else {
         _sortPattern = SortPattern{_qr->getSort(), _expCtx};
     }

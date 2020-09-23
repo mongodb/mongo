@@ -80,9 +80,13 @@ public:
           _nonLeafArrayBehavior(nonLeafArrayBehavior),
           _fieldRef(path) {}
 
-    // TODO: replace uses of members below with regular construction.
-    ElementPath() {}
-    void init(StringData path);
+    /**
+     * Resets this ElementPath to 'newPath'. Note that this method will make a copy of 'newPath'
+     * such that there's no lifetime requirements for the string which 'newPath' points into.
+     */
+    void reset(StringData newPath) {
+        _fieldRef.parse(newPath);
+    }
 
     void setLeafArrayBehavior(LeafArrayBehavior leafArrBehavior) {
         _leafArrayBehavior = leafArrBehavior;
