@@ -78,20 +78,19 @@ const Status kExecutorShutdownStatus(ErrorCodes::InterruptedDueToReplStateChange
  */
 struct PrimaryOnlyServiceClientState {
     PrimaryOnlyService* primaryOnlyService = nullptr;
-    bool allowOpCtxWhenServiceNotRunning = false;
+    bool allowOpCtxWhenServiceRebuilding = false;
 };
 
 const auto primaryOnlyServiceStateForClient =
     Client::declareDecoration<PrimaryOnlyServiceClientState>();
 
 /**
- * A ClientObserver that adds a hook for every time an OpCtx is created on a thread that is part of
- * a PrimaryOnlyService and ensures that the OpCtx is immediately interrupted if the associated
- * service is not running at the time that the OpCtx is created.  This protects against the case
- * where work for a service is scheduled and then the node steps down and back up before the work
- * creates an OpCtx. This works because even though the node has stepped back up already, the
- * service isn't "running" until it's finished its recovery which involves waiting for all work
- * from the previous term as primary to complete.
+ * A ClientObserver that adds hooks for every time an OpCtx is created on a thread that is part of a
+ * PrimaryOnlyService. OpCtxs created on PrimaryOnlyService threads get registered with the
+ * associated service, which can then ensure that all associated OpCtxs get interrupted any time
+ * this service is interrupted due to a replica set stepDown. Additionally, we ensure that any
+ * OpCtxs created while the node is *already* stepped down get created in an already-interrupted
+ * state.
  */
 class PrimaryOnlyServiceClientObserver final : public ServiceContext::ClientObserver {
 public:
@@ -106,17 +105,31 @@ public:
             return;
         }
 
-        // Ensure this OpCtx will get interrupted at stepDown.
+        // Ensure this OpCtx will get interrupted at stepDown by the ReplicationCoordinator
+        // machinery when it tries to take the RSTL lock. This isn't strictly necessary for
+        // correctness since registering the OpCtx below will ensure that the OpCtx gets interrupted
+        // at stepDown anyway, but setting this lets it get interrupted a little earlier in the
+        // stepDown process.
         opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-        // If the PrimaryOnlyService this OpCtx is a part of isn't running when it's created, then
-        // ensure the OpCtx starts off immediately interrupted.
-        if (!clientState.allowOpCtxWhenServiceNotRunning &&
-            !clientState.primaryOnlyService->isRunning()) {
-            opCtx->markKilled(ErrorCodes::NotWritablePrimary);
-        }
+        // Register the opCtx with the PrimaryOnlyService so it will get interrupted on stepDown. We
+        // need this, and cannot simply rely on the ReplicationCoordinator to interrupt this OpCtx
+        // for us, as new OpCtxs can be created on PrimaryOnlyService threads even after the
+        // ReplicationCoordinator has finished its stepDown procedure.
+        clientState.primaryOnlyService->registerOpCtx(opCtx,
+                                                      clientState.allowOpCtxWhenServiceRebuilding);
     }
-    void onDestroyOperationContext(OperationContext* opCtx) override {}
+
+    void onDestroyOperationContext(OperationContext* opCtx) override {
+        auto client = opCtx->getClient();
+        auto clientState = primaryOnlyServiceStateForClient(client);
+        if (!clientState.primaryOnlyService) {
+            // This OpCtx/Client is not a part of a PrimaryOnlyService
+            return;
+        }
+
+        clientState.primaryOnlyService->unregisterOpCtx(opCtx);
+    }
 };
 
 ServiceContext::ConstructorActionRegisterer primaryOnlyServiceClientObserverRegisterer{
@@ -126,21 +139,22 @@ ServiceContext::ConstructorActionRegisterer primaryOnlyServiceClientObserverRegi
 
 /**
  * Allows OpCtxs created on PrimaryOnlyService threads to remain uninterrupted, even if the service
- * they are associated with isn't running. Used during the stepUp process to allow the database
- * read required to rebuild a service and get it running in the first place.
- * Does not prevent other forms of OpCtx interruption, such as from stepDown or calls to killOp.
+ * they are associated with aren't in state kRunning, so long as the state is kRebuilding instead.
+ * Used during the stepUp process to allow the database read required to rebuild a service and get
+ * it running in the first place. Does not prevent other forms of OpCtx interruption, such as from
+ * stepDown or calls to killOp.
  */
-class AllowOpCtxWhenServiceNotRunningBlock {
+class AllowOpCtxWhenServiceRebuildingBlock {
 public:
-    explicit AllowOpCtxWhenServiceNotRunningBlock(Client* client)
+    explicit AllowOpCtxWhenServiceRebuildingBlock(Client* client)
         : _client(client), _clientState(&primaryOnlyServiceStateForClient(_client)) {
         invariant(_clientState->primaryOnlyService);
-        invariant(_clientState->allowOpCtxWhenServiceNotRunning == false);
-        _clientState->allowOpCtxWhenServiceNotRunning = true;
+        invariant(_clientState->allowOpCtxWhenServiceRebuilding == false);
+        _clientState->allowOpCtxWhenServiceRebuilding = true;
     }
-    ~AllowOpCtxWhenServiceNotRunningBlock() {
-        invariant(_clientState->allowOpCtxWhenServiceNotRunning == true);
-        _clientState->allowOpCtxWhenServiceNotRunning = false;
+    ~AllowOpCtxWhenServiceRebuildingBlock() {
+        invariant(_clientState->allowOpCtxWhenServiceRebuilding == true);
+        _clientState->allowOpCtxWhenServiceRebuilding = false;
     }
 
 private:
@@ -271,6 +285,29 @@ bool PrimaryOnlyService::isRunning() const {
     return _state == State::kRunning;
 }
 
+void PrimaryOnlyService::registerOpCtx(OperationContext* opCtx, bool allowOpCtxWhileRebuilding) {
+    stdx::lock_guard lk(_mutex);
+    auto [_, inserted] = _opCtxs.emplace(opCtx);
+    invariant(inserted);
+
+    if (_state == State::kRunning || (_state == State::kRebuilding && allowOpCtxWhileRebuilding)) {
+        return;
+    } else {
+        // If this service isn't running when an OpCtx associated with this service is created, then
+        // ensure that the OpCtx starts off immediately interrupted.
+        // We don't use ServiceContext::killOperation to avoid taking the Client lock unnecessarily,
+        // given that we're running on behalf of the thread that owns the OpCtx.
+        opCtx->markKilled(ErrorCodes::NotWritablePrimary);
+    }
+}
+
+void PrimaryOnlyService::unregisterOpCtx(OperationContext* opCtx) {
+    stdx::lock_guard lk(_mutex);
+    auto wasRegistered = _opCtxs.erase(opCtx);
+    invariant(wasRegistered);
+}
+
+
 void PrimaryOnlyService::startup(OperationContext* opCtx) {
     // Initialize the thread pool options with the service-specific limits on pool size.
     ThreadPool::Options threadPoolOptions(getThreadPoolLimits());
@@ -354,13 +391,19 @@ void PrimaryOnlyService::onStepDown() {
         return;
     }
 
+    if (_scopedExecutor) {
+        (*_scopedExecutor)->shutdown();
+    }
+
     for (auto& instance : _instances) {
         instance.second->interrupt({ErrorCodes::InterruptedDueToReplStateChange,
                                     "PrimaryOnlyService interrupted due to stepdown"});
     }
 
-    if (_scopedExecutor) {
-        (*_scopedExecutor)->shutdown();
+    for (auto opCtx : _opCtxs) {
+        stdx::lock_guard<Client> clientLock(*opCtx->getClient());
+        _serviceContext->killOperation(
+            clientLock, opCtx, ErrorCodes::InterruptedDueToReplStateChange);
     }
 
     _state = State::kPaused;
@@ -489,7 +532,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
         // Since we are in State::kRebuilding here, we need to install a
         // AllowOpCtxWhenServiceNotRunningBlock so that the database read we need to do can complete
         // successfully.
-        AllowOpCtxWhenServiceNotRunningBlock allowOpCtxBlock(Client::getCurrent());
+        AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
         auto opCtx = cc().makeOperationContext();
         DBDirectClient client(opCtx.get());
         try {

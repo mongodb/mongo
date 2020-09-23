@@ -59,7 +59,8 @@ MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringInitialization);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringStateOne);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringStateTwo);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringCompletion);
-MONGO_FAIL_POINT_DEFINE(TestServiceHangBeforeWritingStateDoc);
+MONGO_FAIL_POINT_DEFINE(TestServiceHangBeforeMakingOpCtx);
+MONGO_FAIL_POINT_DEFINE(TestServiceHangAfterMakingOpCtx);
 }  // namespace
 
 class TestService final : public PrimaryOnlyService {
@@ -218,12 +219,19 @@ public:
 
             // Hang before creating OpCtx so that we can test that OpCtxs created after stepping
             // down still get interrupted.
-            if (MONGO_unlikely(TestServiceHangBeforeWritingStateDoc.shouldFail())) {
-                TestServiceHangBeforeWritingStateDoc.pauseWhileSet();
+            if (MONGO_unlikely(TestServiceHangBeforeMakingOpCtx.shouldFail())) {
+                TestServiceHangBeforeMakingOpCtx.pauseWhileSet();
             }
 
             try {
                 auto opCtx = cc().makeOperationContext();
+
+                // Hang after creating OpCtx but before doing the document write so that we can test
+                // that the OpCtx gets interrupted at stepdown.
+                if (MONGO_unlikely(TestServiceHangAfterMakingOpCtx.shouldFail())) {
+                    TestServiceHangAfterMakingOpCtx.pauseWhileSet();
+                }
+
                 DBDirectClient client(opCtx.get());
                 if (targetState == State::kDone) {
                     client.remove("admin.test_service", _id);
@@ -690,19 +698,37 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
     }
 }
 
-TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
+TEST_F(PrimaryOnlyServiceTest, OpCtxCreatedAfterStepdownIsAlreadyInterrupted) {
     // Ensure that if work has already been scheduled on the executor, but hasn't yet created an
     // OpCtx, and then we stepDown, that the OpCtx that gets created still gets interrupted.
-    auto timesEntered = TestServiceHangBeforeWritingStateDoc.setMode(FailPoint::alwaysOn);
+    auto timesEntered = TestServiceHangBeforeMakingOpCtx.setMode(FailPoint::alwaysOn);
 
     auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangBeforeWritingStateDoc.waitForTimesEntered(++timesEntered);
+    TestServiceHangBeforeMakingOpCtx.waitForTimesEntered(++timesEntered);
     stepDown();
     ASSERT(!instance->getDocumentWriteException().isReady());
-    TestServiceHangBeforeWritingStateDoc.setMode(FailPoint::off);
+    TestServiceHangBeforeMakingOpCtx.setMode(FailPoint::off);
 
     ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange,
               instance->getCompletionFuture().getNoThrow());
+    ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getDocumentWriteException().getNoThrow());
+}
+
+
+TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
+    // Ensure that OpCtxs for PrimaryOnlyService work get interrupted by stepDown.
+    auto timesEntered = TestServiceHangAfterMakingOpCtx.setMode(FailPoint::alwaysOn);
+
+    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    TestServiceHangAfterMakingOpCtx.waitForTimesEntered(++timesEntered);
+    stepDown();
+    ASSERT(!instance->getDocumentWriteException().isReady());
+    TestServiceHangAfterMakingOpCtx.setMode(FailPoint::off);
+
+    ASSERT_EQ(ErrorCodes::InterruptedDueToReplStateChange,
+              instance->getCompletionFuture().getNoThrow());
+    // TODO(SERVER-51118): The error returned here should be InterruptedDueToReplStateChange, but
+    // due to SERVER-51118 it gets converted to NotWritablePrimary.
     ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getDocumentWriteException().getNoThrow());
 }
 
