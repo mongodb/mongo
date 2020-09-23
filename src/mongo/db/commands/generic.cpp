@@ -284,10 +284,8 @@ public:
         // Sort the command names before building the result BSON.
         std::vector<std::string> commandNames;
         for (const auto command : allCommands()) {
-            // Don't show oldnames unless it's "isMaster". The output of the listCommands command
-            // must include "isMaster," even though it's an alias for the "hello" command, in order
-            // to preserve backwards compatibility with Ops Manager 4.4.
-            if (command.first == command.second->getName() || command.first == kIsMasterString)
+            // Don't show oldnames
+            if (command.first == command.second->getName())
                 commandNames.push_back(command.first);
         }
         std::sort(commandNames.begin(), commandNames.end());

@@ -50,13 +50,12 @@ namespace mongo {
 namespace {
 
 constexpr auto kHelloString = "hello"_sd;
-// Aliases for the hello command in order to provide backwards compatibility.
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
 constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 
 class CmdHello : public BasicCommand {
 public:
-    CmdHello() : BasicCommand(kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
+    CmdHello() : CmdHello(kHelloString, {}) {}
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -84,11 +83,6 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        // Parse the command name, which should be one of the following: hello, isMaster, or
-        // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
-        // instead of "ismaster".
-        bool useLegacyResponseFields = (cmdObj.firstElementFieldName() != kHelloString);
-
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
         if (!seenIsMaster) {
@@ -123,7 +117,7 @@ public:
                 opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
         }
 
-        if (useLegacyResponseFields) {
+        if (useLegacyResponseFields()) {
             result.appendBool("ismaster", true);
         } else {
             result.appendBool("isWritablePrimary", true);
@@ -156,7 +150,27 @@ public:
         return true;
     }
 
+protected:
+    CmdHello(const StringData cmdName, const std::initializer_list<StringData>& alias)
+        : BasicCommand(cmdName, alias) {}
+
+    virtual bool useLegacyResponseFields() {
+        return false;
+    }
+
 } hello;
+
+class CmdIsMaster : public CmdHello {
+
+public:
+    CmdIsMaster() : CmdHello(kCamelCaseIsMasterString, {kLowerCaseIsMasterString}) {}
+
+protected:
+    bool useLegacyResponseFields() override {
+        return true;
+    }
+
+} isMaster;
 
 }  // namespace
 }  // namespace mongo
