@@ -146,16 +146,18 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
     return Status::OK();
 }
 
-void scheduleCallbackOnDataAvailable(transport::Session* session,
+void scheduleCallbackOnDataAvailable(const transport::SessionHandle& session,
                                      unique_function<void(Status)> callback,
                                      transport::ServiceExecutor* executor) noexcept {
     invariant(session);
-    try {
-        session->waitForData().get();
-        executor->schedule(std::move(callback));
-    } catch (DBException& e) {
-        callback(e.toStatus());
-    }
+    executor->schedule([session, callback = std::move(callback)](Status status) {
+        if (!status.isOK()) {
+            callback(std::move(status));
+            return;
+        }
+
+        callback(session->waitForData());
+    });
 }
 
 }  // namespace mongo

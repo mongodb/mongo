@@ -156,7 +156,7 @@ void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
          << static_cast<int>(_numRunningWorkerThreads.loadRelaxed());
 }
 
-void ServiceExecutorSynchronous::runOnDataAvailable(Session* session,
+void ServiceExecutorSynchronous::runOnDataAvailable(const SessionHandle& session,
                                                     OutOfLineExecutor::Task onCompletionCallback) {
     scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
 }

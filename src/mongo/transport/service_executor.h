@@ -100,7 +100,7 @@ public:
      * schedule the callback on current executor. Otherwise, it will invoke the callback with a
      * non-okay status on the caller thread.
      */
-    virtual void runOnDataAvailable(Session* session,
+    virtual void runOnDataAvailable(const SessionHandle& session,
                                     OutOfLineExecutor::Task onCompletionCallback) = 0;
 
     /*

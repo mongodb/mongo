@@ -169,10 +169,12 @@ Status ServiceExecutorFixed::scheduleTask(Task task, ScheduleFlags flags) {
     return Status::OK();
 }
 
-void ServiceExecutorFixed::runOnDataAvailable(Session* session,
+void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
                                               OutOfLineExecutor::Task onCompletionCallback) {
     invariant(session);
-    session->waitForData().thenRunOn(shared_from_this()).getAsync(std::move(onCompletionCallback));
+    session->asyncWaitForData()
+        .thenRunOn(shared_from_this())
+        .getAsync(std::move(onCompletionCallback));
 }
 
 void ServiceExecutorFixed::appendStats(BSONObjBuilder* bob) const {

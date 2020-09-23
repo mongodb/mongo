@@ -221,7 +221,7 @@ void ServiceExecutorReserved::appendStats(BSONObjBuilder* bob) const {
          << static_cast<int>(_numStartingThreads);
 }
 
-void ServiceExecutorReserved::runOnDataAvailable(Session* session,
+void ServiceExecutorReserved::runOnDataAvailable(const SessionHandle& session,
                                                  OutOfLineExecutor::Task onCompletionCallback) {
     scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
 }

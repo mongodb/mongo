@@ -167,12 +167,16 @@ public:
         return sourceMessageImpl(baton);
     }
 
-    Future<void> waitForData() override {
-#ifdef MONGO_CONFIG_SSL
-        if (_sslSocket)
-            return asio::async_read(*_sslSocket, asio::null_buffers(), UseFuture{}).ignoreValue();
-#endif
-        return asio::async_read(_socket, asio::null_buffers(), UseFuture{}).ignoreValue();
+    Status waitForData() override {
+        ensureSync();
+        asio::error_code ec;
+        getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
+        return errorCodeToStatus(ec);
+    }
+
+    Future<void> asyncWaitForData() override {
+        ensureAsync();
+        return getSocket().async_wait(asio::ip::tcp::socket::wait_read, UseFuture{});
     }
 
     Status sinkMessage(Message message) override {

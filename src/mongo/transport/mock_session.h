@@ -103,7 +103,11 @@ public:
         return Future<Message>::makeReady(sourceMessage());
     }
 
-    Future<void> waitForData() override {
+    Status waitForData() override {
+        return asyncWaitForData().getNoThrow();
+    }
+
+    Future<void> asyncWaitForData() override {
         auto fp = makePromiseFuture<void>();
         stdx::lock_guard<Latch> lk(_waitForDataMutex);
         _waitForDataQueue.emplace_back(std::move(fp.promise));
