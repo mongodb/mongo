@@ -92,10 +92,11 @@ Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCt
     if (op == dbMsg || (op == dbQuery && NamespaceString(dbm.getns()).isCommand())) {
         auto dbResponse = Strategy::clientCommand(opCtx, message);
 
-        // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
+        // The hello/isMaster commands should take kMaxAwaitTimeMs at most, log if it takes twice
+        // that.
         boost::optional<long long> slowMsOverride;
         if (auto command = CurOp::get(opCtx)->getCommand();
-            command && (command->getName() == "hello")) {
+            command && (command->getName() == "hello" || command->getName() == "isMaster")) {
             slowMsOverride =
                 2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
         }

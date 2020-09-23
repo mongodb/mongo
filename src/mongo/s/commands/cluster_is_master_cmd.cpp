@@ -57,16 +57,13 @@ MONGO_FAIL_POINT_DEFINE(waitInIsMaster);
 namespace {
 
 constexpr auto kHelloString = "hello"_sd;
-// Aliases for the hello command in order to provide backwards compatibility.
 constexpr auto kCamelCaseIsMasterString = "isMaster"_sd;
 constexpr auto kLowerCaseIsMasterString = "ismaster"_sd;
 
 
 class CmdHello : public BasicCommandWithReplyBuilderInterface {
 public:
-    CmdHello()
-        : BasicCommandWithReplyBuilderInterface(
-              kHelloString, {kCamelCaseIsMasterString, kLowerCaseIsMasterString}) {}
+    CmdHello() : CmdHello(kHelloString, {}) {}
 
     const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
@@ -101,11 +98,6 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
         waitInIsMaster.pauseWhileSet(opCtx);
-
-        // Parse the command name, which should be one of the following: hello, isMaster, or
-        // ismaster. If the command is "hello", we must attach an "isWritablePrimary" response field
-        // instead of "ismaster".
-        bool useLegacyResponseFields = (cmdObj.firstElementFieldNameStringData() != kHelloString);
 
         auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
         bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
@@ -175,7 +167,7 @@ public:
         auto mongosIsMasterResponse =
             mongosTopCoord->awaitIsMasterResponse(opCtx, clientTopologyVersion, deadline);
 
-        mongosIsMasterResponse->appendToBuilder(&result, useLegacyResponseFields);
+        mongosIsMasterResponse->appendToBuilder(&result, useLegacyResponseFields());
         // The isMaster response always includes a topologyVersion.
         auto currentMongosTopologyVersion = mongosIsMasterResponse->getTopologyVersion();
 
@@ -242,7 +234,27 @@ public:
         return true;
     }
 
+protected:
+    CmdHello(const StringData cmdName, const std::initializer_list<StringData>& alias)
+        : BasicCommandWithReplyBuilderInterface(cmdName, alias) {}
+
+    virtual bool useLegacyResponseFields() {
+        return false;
+    }
+
 } hello;
+
+class CmdIsMaster : public CmdHello {
+
+public:
+    CmdIsMaster() : CmdHello(kCamelCaseIsMasterString, {kLowerCaseIsMasterString}) {}
+
+protected:
+    bool useLegacyResponseFields() override {
+        return true;
+    }
+
+} isMaster;
 
 }  // namespace
 }  // namespace mongo

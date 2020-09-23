@@ -1167,9 +1167,11 @@ void execCommandDatabase(OperationContext* opCtx,
         int maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
         int maxTimeMSOpOnly = uassertStatusOK(QueryRequest::parseMaxTimeMS(maxTimeMSOpOnlyField));
 
-        // The "hello" command should not inherit the deadline from the user op it is operating as a
-        // part of as that can interfere with replica set monitoring and host selection.
-        bool ignoreMaxTimeMSOpOnly = command->getName() == "hello"_sd;
+        // The "hello" or "isMaster" commands should not inherit the deadline from the user op it is
+        // operating as a part of as that can interfere with replica set monitoring and host
+        // selection.
+        bool ignoreMaxTimeMSOpOnly =
+            command->getName() == "hello"_sd || command->getName() == "isMaster"_sd;
 
         if ((maxTimeMS > 0 || maxTimeMSOpOnly > 0) &&
             command->getLogicalOp() != LogicalOp::opGetMore) {
@@ -1448,7 +1450,8 @@ DbResponse receivedCommands(OperationContext* opCtx,
 
             const auto session = opCtx->getClient()->session();
             if (session) {
-                if (!opCtx->isExhaust() || c->getName() != "hello"_sd) {
+                if (!opCtx->isExhaust() ||
+                    (c->getName() != "hello"_sd && c->getName() != "isMaster"_sd)) {
                     InExhaustIsMaster::get(session.get())->setInExhaustIsMaster(false);
                 }
             }
@@ -1729,9 +1732,10 @@ struct CommandOpRunner : HandleRequest::OpRunner {
     using HandleRequest::OpRunner::OpRunner;
     DbResponse run() override {
         DbResponse r = receivedCommands(hr->opCtx, hr->m, hr->behaviors);
-        // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
+        // The hello/isMaster commands should take kMaxAwaitTimeMs at most, log if it takes twice
+        // that.
         if (auto command = hr->currentOp().getCommand();
-            command && (command->getName() == "hello")) {
+            command && (command->getName() == "hello" || command->getName() == "isMaster")) {
             hr->slowMsOverride =
                 2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
         }
