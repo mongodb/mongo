@@ -192,6 +192,10 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->options |= QueryPlannerParams::INDEX_INTERSECTION;
     }
 
+    if (internalQueryEnumerationPreferLockstepOrEnumeration.load()) {
+        plannerParams->options |= QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
+    }
+
     if (internalQueryPlannerGenerateCoveredWholeIndexScans.load()) {
         plannerParams->options |= QueryPlannerParams::GENERATE_COVERED_IXSCANS;
     }
