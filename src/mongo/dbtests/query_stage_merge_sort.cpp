@@ -885,21 +885,22 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        auto idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
+
+        // Wrap 'idxScan' with a FETCH stage so a document is fetched and MERGE_SORT is forced to
+        // use the provided collator 'collator'. Also, this permits easier retrieval of result
+        // objects in the result verification code.
+        ms->addChild(
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
+        ms->addChild(
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
-        unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
-        // Must fetch if we want to easily pull out an obj.
-        auto statusWithPlanExecutor =
-            plan_executor_factory::make(_expCtx,
-                                        std::move(ws),
-                                        std::move(fetchStage),
-                                        coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        auto statusWithPlanExecutor = plan_executor_factory::make(
+            _expCtx, std::move(ws), std::move(ms), coll, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

@@ -135,7 +135,7 @@ selector:
   - jstests/core/explain_shell_helpers.js
   - jstests/core/explain_sort_type.js
   - jstests/core/explain_winning_plan.js
-  - jstests/core/explode_for_sort_collation.js
+  - jstests/core/merge_sort_collation.js
   - jstests/core/explode_for_sort_fetch.js
   - jstests/core/expr.js
   - jstests/core/expr_index_use.js
