@@ -867,7 +867,6 @@ TEST(CstPipelineTranslationTest, TranslatesTypeExpression) {
     ASSERT(dynamic_cast<ExpressionType*>(expr.get()));
 }
 
-
 TEST(CstPipelineTranslationTest, AbsConstantTranslation) {
     auto cst = CNode{CNode::ObjectChildren{{KeyFieldname::abs, CNode{UserInt{-1}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
@@ -884,6 +883,14 @@ TEST(CstPipelineTranslationTest, AbsVariableTransation) {
         {KeyFieldname::abs, CNode{AggregationPath{makeVector<std::string>("foo")}}}}};
     auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
     ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [\"$foo\"]}")) ==
+                                           expr->serialize(false)));
+}
+
+TEST(CstPipelineTranslationTest, AbsSingletonArrayTranslation) {
+    auto cst = CNode{CNode::ObjectChildren{
+        {KeyFieldname::abs, CNode{CNode::ArrayChildren{CNode{UserInt{-1}}}}}}};
+    auto expr = cst_pipeline_translation::translateExpression(cst, getExpCtx());
+    ASSERT_TRUE(ValueComparator().evaluate(Value(fromjson("{$abs: [{$const: -1}]}")) ==
                                            expr->serialize(false)));
 }
 

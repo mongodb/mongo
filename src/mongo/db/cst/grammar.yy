@@ -1649,13 +1649,13 @@ atan2:
     }
 ;
 abs:
-    START_OBJECT ABS expression END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::abs, $expression}}};
+    START_OBJECT ABS singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::abs, $singleArgExpression}}};
     }
 ;
 ceil:
-    START_OBJECT CEIL expression END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ceil, $expression}}};
+    START_OBJECT CEIL singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ceil, $singleArgExpression}}};
     }
 ;
 divide:
@@ -1665,18 +1665,18 @@ divide:
     }
 ;
 exponent:
-        START_OBJECT EXPONENT expression END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::exponent, $expression}}};
+        START_OBJECT EXPONENT singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::exponent, $singleArgExpression}}};
     }
 ;
 floor:
-     START_OBJECT FLOOR expression END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::floor, $expression}}};
+     START_OBJECT FLOOR singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::floor, $singleArgExpression}}};
     }
 ;
 ln:
-  START_OBJECT LN expression END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ln, $expression}}};
+  START_OBJECT LN singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::ln, $singleArgExpression}}};
  }
 ;
 log:
@@ -1686,8 +1686,8 @@ log:
   }
 ;
 logten:
-      START_OBJECT LOGTEN expression END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::logten, $expression}}};
+      START_OBJECT LOGTEN singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::logten, $singleArgExpression}}};
      }
 ;
 mod:
@@ -1718,8 +1718,8 @@ round:
     }
 ;
 sqrt:
-      START_OBJECT SQRT expression END_OBJECT {
-        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::sqrt, $expression}}};
+      START_OBJECT SQRT singleArgExpression END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::sqrt, $singleArgExpression}}};
    }
 ;
 subtract:
