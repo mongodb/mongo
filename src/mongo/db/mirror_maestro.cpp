@@ -379,7 +379,12 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
                 return;
             }
 
-            if (MONGO_unlikely(!args.response.isOK())) {
+            if (ErrorCodes::isRetriableError(args.response.status)) {
+                LOGV2_WARNING(5089200,
+                              "Received mirroring response with a retriable failure",
+                              "error"_attr = args.response);
+                return;
+            } else if (!args.response.isOK()) {
                 LOGV2_FATAL(4717301,
                             "Received mirroring response with a non-okay status",
                             "error"_attr = args.response);
