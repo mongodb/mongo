@@ -41,9 +41,16 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
+
+}  // namespace
 
 bool OplogCapMaintainerThread::_deleteExcessDocuments() {
     if (!getGlobalServiceContext()->getStorageEngine()) {
@@ -89,6 +96,11 @@ void OplogCapMaintainerThread::run() {
     ThreadClient tc(_name, getGlobalServiceContext());
 
     while (!globalInShutdownDeprecated()) {
+        if (MONGO_unlikely(hangOplogCapMaintainerThread.shouldFail())) {
+            LOGV2(5095500, "Hanging the oplog cap maintainer thread due to fail point");
+            hangOplogCapMaintainerThread.pauseWhileSet();
+        }
+
         if (!_deleteExcessDocuments()) {
             sleepmillis(1000);  // Back off in case there were problems deleting.
         }
