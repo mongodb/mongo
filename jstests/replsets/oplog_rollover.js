@@ -8,9 +8,19 @@
 function doTest(storageEngine) {
     jsTestLog("Testing with storageEngine: " + storageEngine);
 
+    // Pause the oplog cap maintainer thread for this test until oplog truncation is needed. The
+    // truncation thread can hold a mutex for a short period of time which prevents new oplog stones
+    // from being created during an insertion if the mutex cannot be obtained immediately. Instead,
+    // the next insertion will attempt to create a new oplog stone, which this test does not do.
     const replSet = new ReplSetTest({
         // Set the syncdelay to 1s to speed up checkpointing.
-        nodeOptions: {syncdelay: 1, setParameter: {logComponentVerbosity: tojson({storage: 1})}},
+        nodeOptions: {
+            syncdelay: 1,
+            setParameter: {
+                logComponentVerbosity: tojson({storage: 1}),
+                'failpoint.hangOplogCapMaintainerThread': tojson({mode: 'alwaysOn'})
+            }
+        },
         nodes: [{}, {rsConfig: {priority: 0, votes: 0}}]
     });
     // Set max oplog size to 1MB.
@@ -21,6 +31,10 @@ function doTest(storageEngine) {
     const primaryOplog = primary.getDB("local").oplog.rs;
     const secondary = replSet.getSecondary();
     const secondaryOplog = secondary.getDB("local").oplog.rs;
+
+    // Verify that the oplog cap maintainer thread is paused.
+    checkLog.containsJson(primary, 5095500);
+    checkLog.containsJson(secondary, 5095500);
 
     const coll = primary.getDB("test").foo;
     // 400KB each so that oplog can keep at most two insert oplog entries.
@@ -97,6 +111,17 @@ function doTest(storageEngine) {
                 .operationTime;
         jsTestLog("Third insert timestamp: " + tojson(thirdInsertTimestamp));
 
+        // Verify that there are three oplog entries while the oplog cap maintainer thread is
+        // paused.
+        assert.eq(3, numInsertOplogEntry(primaryOplog));
+        assert.eq(3, numInsertOplogEntry(secondaryOplog));
+
+        // Let the oplog cap maintainer thread start truncating the oplog.
+        assert.commandWorked(primary.adminCommand(
+            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+        assert.commandWorked(secondary.adminCommand(
+            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+
         // Test that oplog entry of the initial insert rolls over on both primary and secondary.
         // Use assert.soon to wait for oplog cap maintainer thread to run.
         assert.soon(() => {
@@ -111,6 +136,12 @@ function doTest(storageEngine) {
         assert.eq(res.oplogTruncation.truncateCount, 1, tojson(res.oplogTruncation));
         assert.gt(res.oplogTruncation.totalTimeTruncatingMicros, 0, tojson(res.oplogTruncation));
     } else {
+        // Let the oplog cap maintainer thread start truncating the oplog.
+        assert.commandWorked(primary.adminCommand(
+            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+        assert.commandWorked(secondary.adminCommand(
+            {configureFailPoint: "hangOplogCapMaintainerThread", mode: "off"}));
+
         // Only test that oplog truncation will eventually happen.
         let numInserted = 2;
         assert.soon(function() {
