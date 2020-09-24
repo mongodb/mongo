@@ -6851,38 +6851,15 @@ tasks:
       fallback_num_sub_suites: 15
 
 - <<: *task_template
-  name: replica_sets_multiversion
+  name: replica_sets_multiversion_gen
   tags: ["random_multiversion_ds"]
   commands:
-  - func: "git get project"
-  - func: "do setup"
-  - func: "do multiversion setup"
-  - command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o errexit
-        set -o verbose
-
-        ${activate_virtualenv}
-        $python buildscripts/evergreen_gen_multiversion_tests.py generate-exclude-tags --task-path-suffix=/data/multiversion --output=multiversion_exclude_tags.yml
-
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: multiversion_exclude_tags.yml
-      remote_file: ${project}/${build_variant}/${revision}/exclude_tags/${task_name}-${build_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: atext-plain
-      display_name: Multiversion Exclude Tags - Execution ${execution}
-      optional: true
-
-  - func: "run tests"
+  - func: "generate randomized multiversion tasks"
     vars:
-      task_path_suffix: /data/multiversion
-      resmoke_args: --suites=replica_sets_multiversion --storageEngine=wiredTiger
+      resmoke_args: --storageEngine=wiredTiger --tagFile=generated_resmoke_config/multiversion_exclude_tags.yml
+      fallback_num_sub_suites: 8
+      use_multiversion: /data/multiversion
+      suite: replica_sets_multiversion
 
 - <<: *task_template
   name: sasl
