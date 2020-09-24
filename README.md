@@ -1,3 +1,10 @@
+<div align="center">
+  <br />
+  <p>
+    <a href="https://webassets.mongodb.com/_com_assets/cms/MongoDB_Logo_FullColorBlack_RGB-4td3yuxzjs.png"><img src="https://webassets.mongodb.com/_com_assets/cms/MongoDB_Logo_FullColorBlack_RGB-4td3yuxzjs.png" width="256" height="256" alt="Normal" /></a>
+  </p>
+ </div>
+
 # MongoDB README
 
 Welcome to MongoDB!
