@@ -5,7 +5,7 @@ variables:
   ###
   # Leave this section uncommented to enable compile.
   _real_remote_file: &_remote_file
-      ${project}/${version_id}/${revision}/mongodb${compile-variant|}-${version_id}.tar.gz
+      ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz
   _real_compile: &_compile
     - variant: linux-wt-standalone
       name: compile
@@ -29,6 +29,8 @@ variables:
   _src_dir: &src_dir src/mongo
   _modules: &modules
     - enterprise
+    - mongo-tools
+    - wtdevelop
 
     - dsi
     - signal-processing
@@ -43,6 +45,10 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
+  branch: master
+- name: mongo-tools
+  repo: git@github.com:mongodb/mongo-tools.git
+  prefix: mongo-tools/src/github.com/mongodb
   branch: master
 - name: mongo-perf
   repo: git@github.com:mongodb/mongo-perf.git
@@ -264,6 +270,117 @@ functions:
               /opt/mongodbtoolchain/v3/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
           fi
 
+  ###
+  # Compile
+  "compile mongodb":
+    # We create a virtual environment with the Python dependencies for compiling the server
+    # installed.
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python3 "${workdir}/compile_venv"
+          /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python2 "${workdir}/venv"
+          source "${workdir}/compile_venv/bin/activate"
+
+          python -m pip install -r etc/pip/compile-requirements.txt
+
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          mkdir -p mongodb/bin
+
+          # We get the raw version string (r1.2.3-45-gabcdef) from git
+          MONGO_VERSION=$(git describe --abbrev=7)
+
+          # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
+          # that githash to version string.
+          if [ "${compile-variant|}" = "-wtdevelop" ]; then
+            WT_VERSION=$(cd src/third_party/wtdevelop; git describe --abbrev=7 | cut -c 9-)
+            MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
+          fi
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch|false}" = "true" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          fi
+
+          # This script converts the generated version string into a sanitized version string for
+          # use by scons and uploading artifacts as well as information about for the scons cache.
+          source "${workdir}/compile_venv/bin/activate"
+          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src/mongo-tools/src/github.com/mongodb/mongo-tools
+        script: |
+          set -o verbose
+          set -o errexit
+
+          # make sure newlines in the scripts are handled correctly by windows
+          if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+          fi;
+
+          # set_goenv provides set_goenv(), print_ldflags() and print_tags() used below
+          . ./set_goenv.sh
+          GOROOT="" set_goenv || exit
+          go version
+
+          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
+          if [ "${build_mongoreplay}" = "true" ]; then
+              build_tools="$build_tools mongoreplay"
+          fi
+          for i in $build_tools; do
+              go build -ldflags "$(print_ldflags)" ${args} -tags "$(print_tags ${tooltags})" -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
+              "../../../../../mongodb/bin/$i${exe|}" --version
+          done
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          source "${workdir}/compile_venv/bin/activate"
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} install-core MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb
+          mkdir -p mongodb/jstests/hooks
+          if [ -d jstests/hooks ]
+          then
+            echo "Fetching JS test DB correctness checks from directory jstests"
+            cp -a jstests/* mongodb/jstests
+
+            echo "Now adding our own special run_validate_collections.js wrapper"
+            mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
+
+            cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
+            print("NOTE: run_validate_collections.js will skip the oplog!");
+            TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
+            load('jstests/hooks/run_validate_collections.actual.js');
+          EOF
+          fi
+          tar czf mongodb${compile-variant|}.tar.gz mongodb
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb${compile-variant|}.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile-variant|}-${version_id}.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongodb${compile-variant|}.tar.gz
+  ###
+
+
   # This gets replaced by mongodb_setup
   "f_start_server": &f_start_server
     - command: s3.get
@@ -279,7 +396,7 @@ functions:
         script: |
           set -e
           set -v
-          tar xvf mongodb.tar.gz
+          tar xf mongodb.tar.gz
     - command: shell.exec
       params:
         background: true
@@ -292,7 +409,7 @@ functions:
           chmod 600 "${workdir}/key"
           # We provide the key file for mongod here, rather than in mongod_flags next to the --auth
           # option, because the path to key file requires expanding the {workdir} variable.
-          ${mongod_exec_wrapper} ./bin/mongod --dbpath ./dbdata ${mongod_flags} --keyFile "${workdir}/key" --logpath "${workdir}/mongod.log"
+          ${mongod_exec_wrapper} ./mongodb/bin/mongod --dbpath ./dbdata ${mongod_flags} --keyFile "${workdir}/key" --logpath "${workdir}/mongod.log"
     - command: shell.exec
       params:
         working_dir: src
@@ -308,7 +425,7 @@ functions:
           #       As a result, writeConcernMajorityJournalDefault can be set to false. If this becomes configurable later
           #       then the correct value should be passed to rs.initiate or getCmdLineOpts needs to interrogated (but
           #       only after db.createUser).
-          ./bin/mongo --eval "if(db.isMaster().isreplicaset){\
+          ./mongodb/bin/mongo --eval "if(db.isMaster().isreplicaset){\
                              rs.initiate({_id: 'test', version: 1, members: [ { _id: 0, host : 'localhost:27017' }], writeConcernMajorityJournalDefault:false});\
                              assert.soon(function(){return db.isMaster().ismaster}, 'no primary');\
                           }"
@@ -316,12 +433,12 @@ functions:
           # benchRun() authenticates against the admin db, with a user that must has admin access.
           # Note: This is possibly a legacy requirement from times when it would call serverStatus.
           # Btw, when mongod is started without --auth, these should be harmless no-ops
-          ./bin/mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
+          ./mongodb/bin/mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
                          [ { role: 'root', db: 'admin' } ] })"\
                            admin
 
           # print the replset config unless this is a standalone
-          ./bin/mongo --eval "if( db.isMaster().hosts ) { printjson(rs.config()); }" --username admin --password password admin
+          ./mongodb/bin/mongo --eval "if( db.isMaster().hosts ) { printjson(rs.config()); }" --username admin --password password admin
           echo "MONGOD STARTED."
 
   # This gets replaced by subset of f_run_dsi_workload's invocation of analysis
@@ -425,7 +542,7 @@ functions:
 
           sleep 5
           ${perf_exec_wrapper} python benchrun.py \
-              --shell ../bin/mongo                \
+              --shell ../mongodb/bin/mongo          \
               -t ${threads}                       \
               --trialCount 5                      \
               -f testcases/*.js                   \
@@ -439,7 +556,7 @@ functions:
               --password password
 
           echo "Oplog size at end of tests..."
-          ../bin/mongo              \
+          ../mongodb/bin/mongo        \
               --username admin      \
               --password password   \
               --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" \
@@ -543,63 +660,28 @@ tasks:
 
 - name: compile
   commands:
+    - command: manifest.load
     - command: git.get_project
       params:
         directory: src
         revisions:
           enterprise: ${enterprise_rev}
-    # We create a virtual environment with the Python dependencies for compiling the server
-    # installed.
+          wtdevelop: ${wtdevelop_rev}
+          mongo-tools: ${mongo-tools_rev}
     - command: shell.exec
       params:
         working_dir: src
         script: |
           set -o errexit
           set -o verbose
-          /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python3 "${workdir}/compile_venv"
-          /opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python2 "${workdir}/venv"
-          source "${workdir}/compile_venv/bin/activate"
-          python -m pip install -r etc/pip/compile-requirements.txt
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          # We get the raw version string (r1.2.3-45-gabcdef) from git
-          MONGO_VERSION=$(git describe --abbrev=7)
-          # If this is a patch build, we add the patch version id to the version string so we know
-          # this build was a patch, and which evergreen task it came from
-          if [ "${is_patch|}" = "true" ]; then
-            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          if [ "${compile-variant|}" = "-wtdevelop" ]; then
+            cd src/third_party
+            for wtdir in dist examples ext lang src test tools ; do
+              rm -rf wiredtiger/$wtdir
+              mv wtdevelop/$wtdir wiredtiger/
+            done
           fi
-          # This script converts the generated version string into a sanitized version string for
-          # use by scons and uploading artifacts as well as information about for the scons cache.
-          source "${workdir}/compile_venv/bin/activate"
-          MONGO_VERSION=$MONGO_VERSION USE_SCONS_CACHE=${use_scons_cache|false} python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
-    # Then we load the generated version data into the agent so we can use it in task definitions
-    - command: expansions.update
-      params:
-        file: src/compile_expansions.yml
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          source "${workdir}/compile_venv/bin/activate"
-          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} install-mongo{,d} DESTDIR=$(pwd)/mongodb
-          tar czf mongodb${compile-variant|}.tar.gz -C mongodb .
-    - command: s3.put
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/mongodb${compile-variant|}.tar.gz
-        remote_file: ${project}/${version_id}/${revision}/mongodb${compile-variant|}-${version_id}.tar.gz
-        bucket: mciuploads
-        permissions: public-read
-        content_type: ${content_type|application/x-gzip}
-        display_name: mongodb${compile-variant|}.tar.gz
+    - func: "compile mongodb"
 
 
 - name: genny_scale_InsertRemove
@@ -840,7 +922,8 @@ buildvariants:
       --storageEngine inMemory
       --syncdelay 0
     use_scons_cache: true
-    project: &project perf
+    platform: linux
+    project_dir: &project_dir perf
   run_on:
   - "centos6-perf"
   tasks:
@@ -885,7 +968,8 @@ buildvariants:
       --setParameter ttlMonitorEnabled=false
       --storageEngine inMemory
       --syncdelay 0
-    project: *project
+    platform: linux
+    project_dir: *project_dir
   run_on:
   - "centos6-perf"
   tasks:
