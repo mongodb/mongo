@@ -15,13 +15,13 @@ let db = mongod.getDB("test");
 assert.commandWorked(db.adminCommand({
     configureFailPoint: "skipUnindexingDocumentWhenDeleted",
     mode: "alwaysOn",
-    data: {indexName: "a_1"}
+    data: {indexName: "a_1_b_1"}
 }));
 
 let coll = db.getCollection(name);
 coll.drop();
 
-assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 // Corrupt the collection by inserting a document and then deleting it without deleting its index
 // entry (thanks to the "skipUnindexingDocumentWhenDeleted" failpoint).
@@ -39,17 +39,17 @@ function createDanglingIndexEntry(doc) {
     assert.eq(error.code, ErrorCodes.DataCorruptionDetected, error);
 }
 
-createDanglingIndexEntry({a: 1});
+createDanglingIndexEntry({a: 1, b: 1});
 
 // Fix the index by rebuilding it, and ensure that it validates.
-assert.commandWorked(coll.dropIndex({a: 1}));
-assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.dropIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 let validateRes = assert.commandWorked(coll.validate());
 assert.eq(true, validateRes.valid, tojson(validateRes));
 
 // Reintroduce the dangling index entry, and this time fix it using the "repair" flag.
-createDanglingIndexEntry({a: 1});
+createDanglingIndexEntry({a: 1, b: 1});
 
 MongoRunner.stopMongod(mongod, MongoRunner.EXIT_CLEAN, {skipValidation: true});
 mongod = MongoRunner.runMongod({dbpath: dbpath, noCleanData: true, repair: ""});

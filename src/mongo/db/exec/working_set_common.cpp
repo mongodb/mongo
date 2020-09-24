@@ -42,6 +42,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -92,7 +93,10 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                                       })) != member->keyData.end()) {
             auto indexKeyEntryToObjFn = [](const IndexKeyDatum& ikd) {
                 BSONObjBuilder builder;
-                builder.append("key"_sd, redact(ikd.keyData));
+                // Rehydrate the index key fields to prevent duplicate "" fields from being logged.
+                builder.append(
+                    "key"_sd,
+                    redact(IndexKeyEntry::rehydrateKey(ikd.indexKeyPattern, ikd.keyData)));
                 builder.append("pattern"_sd, ikd.indexKeyPattern);
                 return builder.obj();
             };
@@ -106,8 +110,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 "recordId"_attr = member->recordId,
                 "indexKeyData"_attr = logv2::seqLog(
                     boost::make_transform_iterator(member->keyData.begin(), indexKeyEntryToObjFn),
-                    boost::make_transform_iterator(member->keyData.end(), indexKeyEntryToObjFn)),
-                "indexKeyPattern"_attr = keyDataIt->indexKeyPattern);
+                    boost::make_transform_iterator(member->keyData.end(), indexKeyEntryToObjFn)));
         }
         return false;
     }
