@@ -49,11 +49,14 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
 
 std::set<NamespaceString> _backgroundThreadNamespaces;
 Mutex _backgroundThreadMutex;
@@ -132,6 +135,11 @@ public:
         ThreadClient tc(_name, getGlobalServiceContext());
 
         while (!globalInShutdownDeprecated()) {
+            if (MONGO_FAIL_POINT(hangOplogCapMaintainerThread)) {
+                log() << "Hanging the oplog cap maintainer thread due to fail point";
+                MONGO_FAIL_POINT_PAUSE_WHILE_SET(hangOplogCapMaintainerThread);
+            }
+
             if (!_deleteExcessDocuments()) {
                 sleepmillis(1000);  // Back off in case there were problems deleting.
             }
