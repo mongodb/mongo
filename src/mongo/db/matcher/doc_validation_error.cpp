@@ -206,14 +206,14 @@ struct ValidationErrorContext {
     }
 
     bool haveLatestCompleteError() {
-        return !std::holds_alternative<std::monostate>(latestCompleteError);
+        return !stdx::holds_alternative<std::monostate>(latestCompleteError);
     }
 
     /**
      * Appends the latest complete error to 'builder'.
      */
     void appendLatestCompleteError(BSONObjBuilder* builder) {
-        std::visit(
+        stdx::visit(
             visit_helper::Overloaded{
                 [&](const auto& details) -> void { builder->append("details", details); },
                 [&](const std::monostate& arr) -> void { MONGO_UNREACHABLE }},
@@ -225,7 +225,7 @@ struct ValidationErrorContext {
      * caller expects an object.
      */
     BSONObj getLatestCompleteErrorObject() const {
-        return std::get<BSONObj>(latestCompleteError);
+        return stdx::get<BSONObj>(latestCompleteError);
     }
 
     /**
@@ -279,7 +279,7 @@ struct ValidationErrorContext {
     // in an array and passed to the parent expression.
     // - Finally, BSONObj indicates the most common case of an error: a detailed object which
     // describes the reasons for failure. The final error will be of this type.
-    std::variant<std::monostate, BSONObj, BSONArray> latestCompleteError = std::monostate();
+    stdx::variant<std::monostate, BSONObj, BSONArray> latestCompleteError = std::monostate();
     // Document which failed to match against the collection's validator.
     const BSONObj& rootDoc;
 };
