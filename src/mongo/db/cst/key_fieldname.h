@@ -48,7 +48,6 @@
     ENUMIFY(atanh)               \
     ENUMIFY(ceil)                \
     ENUMIFY(charsArg)            \
-    ENUMIFY(commentExpr)         \
     ENUMIFY(cmp)                 \
     ENUMIFY(collArg)             \
     ENUMIFY(concat)              \
@@ -63,7 +62,6 @@
     ENUMIFY(degreesToRadians)    \
     ENUMIFY(divide)              \
     ENUMIFY(eq)                  \
-    ENUMIFY(existsExpr)          \
     ENUMIFY(exponent)            \
     ENUMIFY(findArg)             \
     ENUMIFY(floor)               \

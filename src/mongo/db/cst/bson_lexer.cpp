@@ -149,8 +149,6 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"$type", ParserGen::token::TYPE},
     {"chars", ParserGen::token::ARG_CHARS},
     {"date", ParserGen::token::ARG_DATE},
-    {"$comment", ParserGen::token::COMMENT},
-    {"$exists", ParserGen::token::EXISTS},
     {"dateString", ParserGen::token::ARG_DATE_STRING},
     {"find", ParserGen::token::ARG_FIND},
     {"format", ParserGen::token::ARG_FORMAT},

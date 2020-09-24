@@ -150,7 +150,6 @@
     BOOL_FALSE "false"
     BOOL_TRUE "true"
     CEIL
-    COMMENT
     CMP
     CONCAT
     CONST_EXPR
@@ -170,7 +169,6 @@
     END_ARRAY "end of array"
     END_OBJECT "end of object"
     EQ
-    EXISTS
     EXPONENT
     FLOOR
     GEO_NEAR_DISTANCE "geoNearDistance"
@@ -290,7 +288,7 @@
 //
 
 // Possible fieldnames.
-%nterm <CNode::Fieldname> aggregationProjectionFieldname projectionFieldname expressionFieldname
+%nterm <CNode::Fieldname> aggregationProjectionFieldname projectionFieldname expressionFieldname 
 %nterm <CNode::Fieldname> stageAsUserFieldname argAsUserFieldname argAsProjectionPath
 %nterm <CNode::Fieldname> aggExprAsUserFieldname invariableUserFieldname sortFieldname
 %nterm <CNode::Fieldname> idAsUserFieldname idAsProjectionPath valueFieldname predFieldname
@@ -302,7 +300,6 @@
 %nterm <CNode> dbPointer javascript symbol javascriptWScope int timestamp long double decimal
 %nterm <CNode> minKey maxKey value string aggregationFieldPath binary undefined objectId bool date
 %nterm <CNode> null regex simpleValue compoundValue valueArray valueObject valueFields variable
-%nterm <CNode> typeArray typeValue
 
 // Pipeline stages and related non-terminals.
 %nterm <CNode> pipeline stageList stage inhibitOptimization unionWith skip limit project sample
@@ -333,9 +330,7 @@
 // Match expressions.
 %nterm <CNode> match predicates compoundMatchExprs predValue additionalExprs
 %nterm <std::pair<CNode::Fieldname, CNode>> predicate logicalExpr operatorExpression notExpr
-%nterm <std::pair<CNode::Fieldname, CNode>> existsExpr typeExpr commentExpr
 %nterm <CNode::Fieldname> logicalExprField
-%nterm <std::vector<CNode>> typeValues
 
 // Sort related rules
 %nterm <CNode> sortSpecs specList metaSort oneOrNegOne metaSortKeyword
@@ -636,8 +631,9 @@ predicates:
 predicate: predFieldname predValue {
         $$ = {$predFieldname, $predValue};
     }
-    | logicalExpr
-    | commentExpr
+    | logicalExpr {
+        $$ = $logicalExpr;
+    }
 ;
 
 // TODO SERVER-48847: This rule assumes that object predicates always contain sub-expressions.
@@ -661,58 +657,7 @@ compoundMatchExprs:
 ;
 
 // Rules for the operators which act on a path.
-operatorExpression:
-    notExpr | existsExpr | typeExpr
-;
-
-existsExpr:
-    EXISTS value {
-        $$ = std::pair{KeyFieldname::existsExpr, $value};
-    }
-;
-
-typeArray:
-    START_ARRAY typeValues END_ARRAY {
-        $$ = CNode{$typeValues};
-    }
-;
-
-typeValues:
-    %empty { }
-    | typeValues[ts] typeValue {
-        $$ = $ts;
-        $$.emplace_back($typeValue);
-    }
-;
-
-typeValue:
-    num | string
-;
-
-typeExpr:
-    TYPE typeValue {
-        auto&& type = $typeValue;
-        if (auto status = c_node_validation::validateTypeOperatorArgument(type); !status.isOK()) {
-          // TODO SERVER-50498: error() on the offending literal rather than the TYPE token.
-          // This will require removing the offending literal indicators in the error strings provided by the validation function.
-          error(@1, status.reason());
-        }
-        $$ = std::pair{KeyFieldname::type, std::move(type)};
-    }
-    | TYPE typeArray {
-        auto&& types = $typeArray;
-        if (auto status = c_node_validation::validateTypeOperatorArgument(types); !status.isOK()) {
-          error(@1, status.reason());
-        }
-       $$ = std::pair{KeyFieldname::type, std::move(types)};
-    }
-;
-
-commentExpr:
-   COMMENT value {
-      $$ = std::pair{KeyFieldname::commentExpr, $value};
-   }
-;
+operatorExpression: notExpr
 
 notExpr:
     NOT regex {
@@ -925,7 +870,7 @@ aggExprAsUserFieldname:
     }
     | TO_LONG {
         $$ = UserFieldname{"$toLong"};
-      }
+    }
     | TO_OBJECT_ID {
         $$ = UserFieldname{"$toObjectId"};
     }
