@@ -5916,7 +5916,7 @@ tasks:
       fallback_num_sub_suites: 1
 
 - name: causally_consistent_hedged_reads_jscore_passthrough_gen
-  tags: ["causally_consistent"]
+  tags: ["causally_consistent", "sharding", "jscore"]
   depends_on:
     - name: jsCore
   commands:
