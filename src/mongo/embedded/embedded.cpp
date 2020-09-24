@@ -173,12 +173,12 @@ void shutdown(ServiceContext* srvContext) {
             if (serviceContext->getStorageEngine()) {
                 shutdownGlobalStorageEngineCleanly(serviceContext);
             }
-
-            Status status = mongo::runGlobalDeinitializers();
-            uassertStatusOKWithContext(status, "Global deinitilization failed");
         }
     }
     setGlobalServiceContext(nullptr);
+
+    Status status = mongo::runGlobalDeinitializers();
+    uassertStatusOKWithContext(status, "Global deinitilization failed");
 
     LOGV2_OPTIONS(22551, {LogComponent::kControl}, "now exiting");
 }
