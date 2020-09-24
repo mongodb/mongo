@@ -7,8 +7,12 @@
 package options
 
 import (
+	"bytes"
 	"github.com/mongodb/mongo-tools/common/connstring"
+	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/testtype"
 	. "github.com/smartystreets/goconvey/convey"
+	"os"
 
 	"runtime"
 	"testing"
@@ -422,3 +426,37 @@ func TestHiddenOptionsDefaults(t *testing.T) {
 	})
 
 }
+
+func TestDeprecationWarning(t *testing.T) {
+	if !(testtype.HasTestType(testtype.SSLTestType)) {
+		t.SkipNow()
+	}
+
+	Convey("deprecate message", t, func() {
+		var buffer bytes.Buffer
+
+		log.SetWriter(&buffer)
+		defer log.SetWriter(os.Stderr)
+
+		Convey("Warning for sslAllowInvalidHostnames", func() {
+			enabled := EnabledOptions{Connection: true}
+			opts := New("test", "", enabled)
+			args := []string{"--sslAllowInvalidHostnames", "mongodb://user:pass@foo/"}
+			_, err := opts.ParseArgs(args)
+			So(err, ShouldBeNil)
+			result := buffer.String()
+			So(result, ShouldContainSubstring, deprecationWarningSSLAllow)
+		})
+
+		Convey("Warning for sslAllowInvalidCertificates", func() {
+			enabled := EnabledOptions{Connection: true}
+			opts := New("test", "", enabled)
+			args := []string{"--ssl", "--sslAllowInvalidCertificates", "mongodb://user:pass@foo/"}
+			_, err := opts.ParseArgs(args)
+			So(err, ShouldBeNil)
+			result := buffer.String()
+			So(result, ShouldContainSubstring, deprecationWarningSSLAllow)
+		})
+	})
+}
+

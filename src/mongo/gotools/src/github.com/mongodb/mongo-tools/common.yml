@@ -274,7 +274,7 @@ mongo_tools_variables:
       mongod_args: ""
       mongod_port: 33333
     ssl: &mongod_ssl_startup_args
-      mongod_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem"
+      mongod_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca-ia.pem --sslPEMKeyFile common/db/openssl/testdata/test-server.pem"
       mongod_port: 33333
     # Set storage engine as mmapv1 for 32 bit variants because WiredTiger requires 64 bit support.
     win32: &mongod_win32_startup_args
@@ -286,7 +286,7 @@ mongo_tools_variables:
       mongo_args: &mongo_default_startup_args_string "--port 33333"
       mongod_port: 33333
     ssl: &mongo_ssl_startup_args
-      mongo_args: "--port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca.pem --sslPEMKeyFile ./common/db/openssl/testdata/server.pem --sslAllowInvalidCertificates"
+      mongo_args: "--port 33333 --ssl --sslCAFile ./common/db/openssl/testdata/ca-ia.pem --sslPEMKeyFile ./common/db/openssl/testdata/test-server.pem --sslAllowInvalidCertificates"
       mongod_port: 33333
 
 functions:
