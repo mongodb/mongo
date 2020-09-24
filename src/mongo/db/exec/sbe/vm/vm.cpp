@@ -35,6 +35,7 @@
 #include <boost/algorithm/string.hpp>
 #include <pcrecpp.h>
 
+#include "mongo/bson/oid.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -1146,6 +1147,117 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateWeekYear(ui
         timezoneTuple);
 }
 
+TimeZone getTimezone(value::TypeTags timezoneTag,
+                     value::Value timezoneVal,
+                     TimeZoneDatabase* timezoneDB) {
+    auto timezoneStr = value::getStringView(timezoneTag, timezoneVal);
+    if (timezoneStr == "") {
+        return timezoneDB->utcZone();
+    } else {
+        return timezoneDB->getTimeZone(StringData{timezoneStr.data(), timezoneStr.size()});
+    }
+}
+
+Date_t getDate(value::TypeTags dateTag, value::Value dateVal) {
+    switch (dateTag) {
+        case value::TypeTags::Date: {
+            return Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(dateVal));
+        }
+        case value::TypeTags::Timestamp: {
+            return Date_t::fromMillisSinceEpoch(
+                Timestamp(value::bitcastTo<uint64_t>(dateVal)).getSecs() * 1000LL);
+        }
+        case value::TypeTags::ObjectId: {
+            auto objIdBuf = value::getObjectIdView(dateVal);
+            auto objId = OID::from(objIdBuf);
+            return objId.asDateT();
+        }
+        case value::TypeTags::bsonObjectId: {
+            auto objIdBuf = value::getRawPointerView(dateVal);
+            auto objId = OID::from(objIdBuf);
+            return objId.asDateT();
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateToParts(uint8_t arity) {
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
+    auto [dateOwn, dateTag, dateVal] = getFromStack(1);
+
+    // Get timezone.
+    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(2);
+    if (!value::isString(timezoneTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    TimeZone timezone = getTimezone(timezoneTag, timezoneVal, timezoneDB);
+
+    // Get date.
+    if (dateTag != value::TypeTags::Date && dateTag != value::TypeTags::Timestamp &&
+        dateTag != value::TypeTags::ObjectId && dateTag != value::TypeTags::bsonObjectId) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    Date_t date = getDate(dateTag, dateVal);
+
+    // Get date parts.
+    auto dateParts = timezone.dateParts(date);
+    auto [dateObjTag, dateObjVal] = value::makeNewObject();
+    value::ValueGuard guard{dateObjTag, dateObjVal};
+    auto dateObj = value::getObjectView(dateObjVal);
+    dateObj->push_back("year", value::TypeTags::NumberInt32, dateParts.year);
+    dateObj->push_back("month", value::TypeTags::NumberInt32, dateParts.month);
+    dateObj->push_back("day", value::TypeTags::NumberInt32, dateParts.dayOfMonth);
+    dateObj->push_back("hour", value::TypeTags::NumberInt32, dateParts.hour);
+    dateObj->push_back("minute", value::TypeTags::NumberInt32, dateParts.minute);
+    dateObj->push_back("second", value::TypeTags::NumberInt32, dateParts.second);
+    dateObj->push_back("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
+    guard.reset();
+    return {true, dateObjTag, dateObjVal};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsoDateToParts(uint8_t arity) {
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
+    auto [dateOwn, dateTag, dateVal] = getFromStack(1);
+
+    // Get timezone.
+    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(2);
+    if (!value::isString(timezoneTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    TimeZone timezone = getTimezone(timezoneTag, timezoneVal, timezoneDB);
+
+    // Get date.
+    if (dateTag != value::TypeTags::Date && dateTag != value::TypeTags::Timestamp &&
+        dateTag != value::TypeTags::ObjectId && dateTag != value::TypeTags::bsonObjectId) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    Date_t date = getDate(dateTag, dateVal);
+
+    // Get date parts.
+    auto dateParts = timezone.dateIso8601Parts(date);
+    auto [dateObjTag, dateObjVal] = value::makeNewObject();
+    value::ValueGuard guard{dateObjTag, dateObjVal};
+    auto dateObj = value::getObjectView(dateObjVal);
+    dateObj->push_back("isoWeekYear", value::TypeTags::NumberInt32, dateParts.year);
+    dateObj->push_back("isoWeek", value::TypeTags::NumberInt32, dateParts.weekOfYear);
+    dateObj->push_back("isoDayOfWeek", value::TypeTags::NumberInt32, dateParts.dayOfWeek);
+    dateObj->push_back("hour", value::TypeTags::NumberInt32, dateParts.hour);
+    dateObj->push_back("minute", value::TypeTags::NumberInt32, dateParts.minute);
+    dateObj->push_back("second", value::TypeTags::NumberInt32, dateParts.second);
+    dateObj->push_back("millisecond", value::TypeTags::NumberInt32, dateParts.millisecond);
+    guard.reset();
+    return {true, dateObjTag, dateObjVal};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(uint8_t arity) {
     invariant(arity == 3);
 
@@ -1603,6 +1715,23 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(uint8
     return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(uint8_t arity) {
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBVal);
+    auto [timezoneOwn, timezoneTag, timezoneVal] = getFromStack(1);
+    if (!value::isString(timezoneTag)) {
+        return {false, value::TypeTags::Boolean, false};
+    }
+    auto timezoneStr = value::getStringView(timezoneTag, timezoneVal);
+    if (timezoneDB->isTimeZoneIdentifier((StringData{timezoneStr.data(), timezoneStr.size()}))) {
+        return {false, value::TypeTags::Boolean, true};
+    }
+    return {false, value::TypeTags::Boolean, false};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1610,6 +1739,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinDate(arity);
         case Builtin::datePartsWeekYear:
             return builtinDateWeekYear(arity);
+        case Builtin::dateToParts:
+            return builtinDateToParts(arity);
+        case Builtin::isoDateToParts:
+            return builtinIsoDateToParts(arity);
         case Builtin::split:
             return builtinSplit(arity);
         case Builtin::regexMatch:
@@ -1694,6 +1827,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinIndexOfBytes(arity);
         case Builtin::indexOfCP:
             return builtinIndexOfCP(arity);
+        case Builtin::isTimezone:
+            return builtinIsTimezone(arity);
     }
 
     MONGO_UNREACHABLE;

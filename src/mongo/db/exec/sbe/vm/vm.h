@@ -175,6 +175,8 @@ enum class Builtin : uint8_t {
     split,
     regexMatch,
     dateParts,
+    dateToParts,
+    isoDateToParts,
     datePartsWeekYear,
     dropFields,
     newObj,
@@ -216,6 +218,7 @@ enum class Builtin : uint8_t {
     isMember,
     indexOfBytes,
     indexOfCP,
+    isTimezone,
 };
 
 class CodeFragment {
@@ -490,6 +493,8 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSplit(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDate(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDateToParts(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinIsoDateToParts(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexMatch(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDropFields(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewObj(uint8_t arity);
@@ -531,6 +536,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinIsTimezone(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset) {

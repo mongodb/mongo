@@ -1606,8 +1606,112 @@ public:
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(operands), std::move(computeDateOrNull)));
     }
+
     void visit(ExpressionDateToParts* expr) final {
-        unsupportedExpression("$dateFromString");
+        auto frameId = _context->frameIdGenerator->generate();
+        auto children = expr->getChildren();
+        std::unique_ptr<sbe::EExpression> date, timezone, isoflag;
+        std::unique_ptr<sbe::EExpression> totalExprDateToParts;
+        std::vector<std::unique_ptr<sbe::EExpression>> args;
+        std::vector<std::unique_ptr<sbe::EExpression>> isoargs;
+        std::vector<std::unique_ptr<sbe::EExpression>> operands;
+        sbe::EVariable dateRef(frameId, 0);
+        sbe::EVariable timezoneRef(frameId, 1);
+        sbe::EVariable isoflagRef(frameId, 2);
+
+        // Initialize arguments with values from stack or default values.
+        if (children[2]) {
+            isoflag = _context->popExpr();
+        } else {
+            isoflag = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false);
+        }
+        if (children[1]) {
+            timezone = _context->popExpr();
+        } else {
+            auto [utcTag, utcVal] = sbe::value::makeNewString("UTC");
+            timezone = sbe::makeE<sbe::EConstant>(utcTag, utcVal);
+        }
+        if (children[0]) {
+            date = _context->popExpr();
+        } else {
+            _context->pushExpr(sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997700},
+                                                      "$dateToParts must include a date"));
+            return;
+        }
+
+        // Add timezoneDB to arguments.
+        args.push_back(
+            sbe::makeE<sbe::EVariable>(_context->runtimeEnvironment->getSlot("timeZoneDB"_sd)));
+        isoargs.push_back(
+            sbe::makeE<sbe::EVariable>(_context->runtimeEnvironment->getSlot("timeZoneDB"_sd)));
+
+        // Add date to arguments.
+        uint32_t dateTypeMask = (getBSONTypeMask(sbe::value::TypeTags::Date) |
+                                 getBSONTypeMask(sbe::value::TypeTags::Timestamp) |
+                                 getBSONTypeMask(sbe::value::TypeTags::ObjectId) |
+                                 getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
+        operands.push_back(std::move(date));
+        args.push_back(dateRef.clone());
+        isoargs.push_back(dateRef.clone());
+
+        // Add timezone to arguments.
+        operands.push_back(std::move(timezone));
+        args.push_back(timezoneRef.clone());
+        isoargs.push_back(timezoneRef.clone());
+
+        // Add iso8601 to arguments.
+        uint32_t isoTypeMask = getBSONTypeMask(sbe::value::TypeTags::Boolean);
+        operands.push_back(std::move(isoflag));
+        args.push_back(isoflagRef.clone());
+        isoargs.push_back(isoflagRef.clone());
+
+        // Determine whether to call dateToParts or isoDateToParts.
+        auto checkIsoflagValue = buildMultiBranchConditional(
+            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(
+                              sbe::EPrimBinary::eq,
+                              isoflagRef.clone(),
+                              sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false)),
+                          sbe::makeE<sbe::EFunction>("dateToParts", std::move(args))},
+            sbe::makeE<sbe::EFunction>("isoDateToParts", std::move(isoargs)));
+
+        // Check that each argument exists, is not null, and is the correct type.
+        auto totalDateToPartsFunc = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(frameId, 1),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::EFunction>("isString", sbe::makeEs(timezoneRef.clone()))),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997701},
+                                       "$dateToParts timezone must be a string")},
+            CaseValuePair{
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::EFunction>(
+                        "isTimezone",
+                        sbe::makeEs(sbe::makeE<sbe::EVariable>(
+                                        _context->runtimeEnvironment->getSlot("timeZoneDB"_sd)),
+                                    timezoneRef.clone()))),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997704},
+                                       "$dateToParts timezone must be a valid timezone")},
+            CaseValuePair{generateNullOrMissing(frameId, 2),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{sbe::makeE<sbe::EPrimUnary>(
+                              sbe::EPrimUnary::logicNot,
+                              sbe::makeE<sbe::ETypeMatch>(isoflagRef.clone(), isoTypeMask)),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997702},
+                                                 "$dateToParts iso8601 must be a boolean")},
+            CaseValuePair{generateNullOrMissing(frameId, 0),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask)),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997703},
+                                       "$dateToParts date must have the format of a date")},
+            std::move(checkIsoflagValue));
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            frameId, std::move(operands), std::move(totalDateToPartsFunc)));
     }
     void visit(ExpressionDateToString* expr) final {
         unsupportedExpression("$dateFromString");

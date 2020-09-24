@@ -347,6 +347,11 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
     return boost::none;
 }
 
+bool TimeZoneDatabase::isTimeZoneIdentifier(StringData timeZoneId) const {
+    return (_timeZones.find(timeZoneId) != _timeZones.end()) ||
+        static_cast<bool>(parseUtcOffset(timeZoneId));
+}
+
 TimeZone TimeZoneDatabase::getTimeZone(StringData timeZoneId) const {
     auto tz = _timeZones.find(timeZoneId);
     if (tz != _timeZones.end()) {

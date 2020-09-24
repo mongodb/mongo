@@ -421,6 +421,11 @@ public:
     static TimeZone utcZone();
 
     /**
+     * Returns a boolean based on if 'timeZoneId' represents a valid timezone.
+     */
+    bool isTimeZoneIdentifier(StringData timeZoneId) const;
+
+    /**
      * Returns a TimeZone object representing the zone given by 'timeZoneId', or boost::none if it
      * was not a recognized time zone.
      */
