@@ -83,7 +83,7 @@ StatusWith<IsInclusion> processAdditionalFieldsInclusionConfirmed(const Iter& it
                 return processAdditionalFieldsInclusionConfirmed(std::next(iter), isEnd);
             else
                 return Status{ErrorCodes::FailedToParse,
-                              "$project containing inclusion and/or computed fields must "
+                              "project containing inclusion and/or computed fields must "
                               "contain no exclusion fields"};
         }
     } else {
@@ -100,7 +100,7 @@ StatusWith<IsInclusion> processAdditionalFieldsExclusionConfirmed(const Iter& it
         } else {
             if (isInclusionField(iter->second))
                 return Status{ErrorCodes::FailedToParse,
-                              "$project containing exclusion fields must contain no "
+                              "project containing exclusion fields must contain no "
                               "inclusion and/or computed fields"};
             else
                 return processAdditionalFieldsExclusionConfirmed(std::next(iter), isEnd);
@@ -162,7 +162,7 @@ auto validateNotPrefix(const std::vector<StringData>& potentialPrefixOne,
         if (potentialPrefixOne[n] != potentialPrefixTwo[n])
             return Status::OK();
     return Status{ErrorCodes::FailedToParse,
-                  "paths appearing in $project conflict because one is a prefix of the other: "s +
+                  "paths appearing in project conflict because one is a prefix of the other: "s +
                       path::vectorToString(potentialPrefixOne) + " & " +
                       path::vectorToString(potentialPrefixTwo)};
 }
@@ -192,7 +192,7 @@ auto validateNotRedundantOrPrefixConflicting(const std::vector<StringData>& curr
         return Status::OK();
     } else {
         return Status{ErrorCodes::FailedToParse,
-                      "path appears more than once in $project: "s +
+                      "path appears more than once in project: "s +
                           path::vectorToString(currentPath)};
     }
 }
@@ -206,7 +206,8 @@ Status addPathsFromTreeToSet(const CNode::ObjectChildren& children,
         // like '{"a.b": 1}'.
         auto currentPath = previousPath;
         if (auto&& fieldname = stdx::get_if<FieldnamePath>(&child.first))
-            for (auto&& component : stdx::get<ProjectionPath>(*fieldname).components)
+            for (auto&& component :
+                 stdx::visit([](auto&& fn) -> auto&& { return fn.components; }, *fieldname))
                 currentPath.emplace_back(component);
         // Or add a translaiton of _id if we have a key for that.
         else

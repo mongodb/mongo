@@ -31,7 +31,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include <vector>
+
 #include "mongo/db/cst/c_node.h"
+#include "mongo/db/cst/c_node_validation.h"
 
 /**
  * Functions which perform additional disambiguation beyond what a context free grammar can handle.
@@ -43,5 +46,15 @@ namespace mongo::c_node_disambiguation {
  * Replace the syntax for compound projection with a tree explicitly representing it.
  */
 CNode disambiguateCompoundProjection(CNode project);
+
+inline FieldnamePath disambiguateProjectionPathType(std::vector<std::string> components,
+                                                    c_node_validation::IsPositional positional) {
+    if (positional == c_node_validation::IsPositional::yes)
+        // Omit the trailing '$' since it's just input syntax.
+        return PositionalProjectionPath{{std::make_move_iterator(components.begin()),
+                                         std::make_move_iterator(std::prev(components.end()))}};
+    else
+        return ProjectionPath{std::move(components)};
+}
 
 }  // namespace mongo::c_node_disambiguation

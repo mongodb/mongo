@@ -64,7 +64,7 @@ auto printFieldname(const CNode::Fieldname& fieldname) {
                             return "<ProjectionPath "s + path::vectorToString(projPath) + ">";
                         },
                         [&](const PositionalProjectionPath& posProjPath) {
-                            return "<PositionalionProjectionPath "s +
+                            return "<PositionalProjectionPath "s +
                                 path::vectorToString(posProjPath) + ">";
                         },
                         [&](const SortPath& sortPath) {

@@ -68,6 +68,7 @@
     ENUMIFY(dayOfWeek)           \
     ENUMIFY(dayOfYear)           \
     ENUMIFY(divide)              \
+    ENUMIFY(elemMatch)           \
     ENUMIFY(eq)                  \
     ENUMIFY(existsExpr)          \
     ENUMIFY(exponent)            \

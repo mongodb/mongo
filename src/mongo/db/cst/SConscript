@@ -31,6 +31,7 @@ env.CppUnitTest(
         'bson_lexer_test.cpp',
         'cst_error_test.cpp',
         'cst_expression_test.cpp',
+        'cst_find_project_test.cpp',
         'cst_match_test.cpp',
         'cst_match_translation_test.cpp',
         'cst_sort_translation_test.cpp',

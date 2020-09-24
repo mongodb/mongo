@@ -186,6 +186,7 @@
     DOUBLE_ZERO "zero (double)"
     END_ARRAY "end of array"
     END_OBJECT "end of object"
+    ELEM_MATCH "elemMatch operator"
     EQ
     EXISTS
     EXPONENT
@@ -320,9 +321,10 @@
 %nterm <CNode::Fieldname> aggregationProjectionFieldname projectionFieldname expressionFieldname
 %nterm <CNode::Fieldname> stageAsUserFieldname argAsUserFieldname argAsProjectionPath
 %nterm <CNode::Fieldname> aggExprAsUserFieldname invariableUserFieldname sortFieldname
-%nterm <CNode::Fieldname> idAsUserFieldname idAsProjectionPath valueFieldname predFieldname
-%nterm <std::pair<CNode::Fieldname, CNode>> projectField projectionObjectField expressionField
-%nterm <std::pair<CNode::Fieldname, CNode>> valueField
+%nterm <CNode::Fieldname> idAsUserFieldname elemMatchAsUserFieldname idAsProjectionPath
+%nterm <CNode::Fieldname> valueFieldname predFieldname
+%nterm <std::pair<CNode::Fieldname, CNode>> aggregationProjectField aggregationProjectionObjectField
+%nterm <std::pair<CNode::Fieldname, CNode>> expressionField valueField
 %nterm <std::string> arg
 
 // Literals.
@@ -333,16 +335,16 @@
 
 // Pipeline stages and related non-terminals.
 %nterm <CNode> pipeline stageList stage inhibitOptimization unionWith skip limit project sample
-%nterm <CNode> projectFields projectionObjectFields topLevelProjection projection projectionObject
-%nterm <CNode> num
+%nterm <CNode> aggregationProjectFields aggregationProjectionObjectFields
+%nterm <CNode> topLevelAggregationProjection aggregationProjection projectionCommon
+%nterm <CNode> aggregationProjectionObject num
 
-// Aggregate expressions
-%nterm <CNode> expression compoundNonObjectExpression exprFixedTwoArg exprFixedThreeArg
-%nterm <CNode> arrayManipulation slice expressionArray expressionObject expressionFields maths meta
-%nterm <CNode> add boolExprs and or not literalEscapes const literal stringExps concat
-%nterm <CNode> dateFromString dateToString indexOfBytes indexOfCP ltrim regexFind regexFindAll
-%nterm <CNode> regexMatch regexArgs replaceOne replaceAll rtrim split strLenBytes strLenCP
-%nterm <CNode> strcasecmp substr substrBytes substrCP toLower toUpper trim
+// Aggregate expressions.
+%nterm <CNode> expression exprFixedTwoArg exprFixedThreeArg slice expressionArray expressionObject
+%nterm <CNode> expressionFields maths meta add boolExprs and or not literalEscapes const literal
+%nterm <CNode> stringExps concat dateFromString dateToString indexOfBytes indexOfCP ltrim regexFind
+%nterm <CNode> regexFindAll regexMatch regexArgs replaceOne replaceAll rtrim split strLenBytes
+%nterm <CNode> strLenCP strcasecmp substr substrBytes substrCP toLower toUpper trim
 %nterm <CNode> compExprs cmp eq gt gte lt lte ne
 %nterm <CNode> dateExps dateFromParts dateToParts dayOfMonth dayOfWeek dayOfYear hour
 %nterm <CNode> isoDayOfWeek isoWeek isoWeekYear millisecond minute month second week year
@@ -359,8 +361,9 @@
 
 %nterm <CNode> trig sin cos tan sinh cosh tanh asin acos atan asinh acosh atanh atan2
 %nterm <CNode> degreesToRadians radiansToDegrees
-%nterm <CNode> nonArrayExpression nonArrayCompoundExpression nonArrayNonObjCompoundExpression
-%nterm <CNode> expressionSingletonArray singleArgExpression nonArrayNonObjExpression
+%nterm <CNode> nonArrayExpression nonArrayCompoundExpression aggregationOperator
+%nterm <CNode> aggregationOperatorWithoutSlice expressionSingletonArray singleArgExpression
+%nterm <CNode> nonArrayNonObjExpression
 // Match expressions.
 %nterm <CNode> match predicates compoundMatchExprs predValue additionalExprs
 %nterm <std::pair<CNode::Fieldname, CNode>> predicate logicalExpr operatorExpression notExpr
@@ -368,13 +371,18 @@
 %nterm <CNode::Fieldname> logicalExprField
 %nterm <std::vector<CNode>> typeValues
 
-// Sort related rules
+// Find Projection specific rules.
+%nterm <CNode> findProject findProjectFields topLevelFindProjection findProjection
+%nterm <CNode> findProjectionSlice elemMatch findProjectionObject findProjectionObjectFields
+%nterm <std::pair<CNode::Fieldname, CNode>> findProjectField findProjectionObjectField
+
+// Sort related rules.
 %nterm <CNode> sortSpecs specList metaSort oneOrNegOne metaSortKeyword
 %nterm <std::pair<CNode::Fieldname, CNode>> sortSpec
 
 %start start;
 // Sentinel tokens to indicate the starting point in the grammar.
-%token START_PIPELINE START_MATCH START_SORT
+%token START_PIPELINE START_MATCH START_PROJECT START_SORT
 
 //
 // Grammar rules
@@ -387,6 +395,9 @@ start:
     }
     | START_MATCH match {
         *cst = $match;
+    }
+    | START_PROJECT findProject {
+        *cst = $findProject;
     }
     | START_SORT sortSpecs {
         *cst = $sortSpecs;
@@ -456,8 +467,8 @@ limit:
 };
 
 project:
-    STAGE_PROJECT START_OBJECT projectFields END_OBJECT {
-        auto&& fields = $projectFields;
+    STAGE_PROJECT START_OBJECT aggregationProjectFields END_OBJECT {
+        auto&& fields = $aggregationProjectFields;
         if (auto status = c_node_validation::validateNoConflictingPathsInProjectFields(fields);
             !status.isOK())
             error(@1, status.reason());
@@ -474,27 +485,27 @@ project:
     }
 ;
 
-projectFields:
+aggregationProjectFields:
     %empty {
         $$ = CNode::noopLeaf();
     }
-    | projectFields[projectArg] projectField {
+    | aggregationProjectFields[projectArg] aggregationProjectField {
         $$ = $projectArg;
-        $$.objectChildren().emplace_back($projectField);
+        $$.objectChildren().emplace_back($aggregationProjectField);
     }
 ;
 
-projectField:
-    ID topLevelProjection {
-        $$ = {KeyFieldname::id, $topLevelProjection};
+aggregationProjectField:
+    ID topLevelAggregationProjection {
+        $$ = {KeyFieldname::id, $topLevelAggregationProjection};
     }
-    | aggregationProjectionFieldname topLevelProjection {
-        $$ = {$aggregationProjectionFieldname, $topLevelProjection};
+    | aggregationProjectionFieldname topLevelAggregationProjection {
+        $$ = {$aggregationProjectionFieldname, $topLevelAggregationProjection};
     }
 ;
 
-topLevelProjection:
-    projection {
+topLevelAggregationProjection:
+    aggregationProjection {
         auto projection = $1;
         $$ = stdx::holds_alternative<CNode::ObjectChildren>(projection.payload) &&
             stdx::holds_alternative<FieldnamePath>(projection.objectChildren()[0].first) ?
@@ -507,7 +518,13 @@ topLevelProjection:
     }
 ;
 
-projection:
+aggregationProjection:
+    projectionCommon
+    | aggregationProjectionObject
+    | aggregationOperator
+;
+
+projectionCommon:
     string
     | binary
     | undefined
@@ -576,8 +593,7 @@ projection:
     | timestamp
     | minKey
     | maxKey
-    | projectionObject
-    | compoundNonObjectExpression
+    | expressionArray
 ;
 
 // An aggregationProjectionFieldname is a projectionFieldname that is not positional.
@@ -587,6 +603,7 @@ aggregationProjectionFieldname:
         if (stdx::holds_alternative<PositionalProjectionPath>(stdx::get<FieldnamePath>($$)))
             error(@1, "positional projection forbidden in $project aggregation pipeline stage");
     }
+;
 
 // Dollar-prefixed fieldnames are illegal.
 projectionFieldname:
@@ -595,10 +612,8 @@ projectionFieldname:
         if (auto positional =
             c_node_validation::validateProjectionPathAsNormalOrPositional(components);
             positional.isOK()) {
-            if (positional.getValue() == c_node_validation::IsPositional::yes)
-                $$ = PositionalProjectionPath{std::move(components)};
-            else
-                $$ = ProjectionPath{std::move(components)};
+            $$ = c_node_disambiguation::disambiguateProjectionPathType(std::move(components),
+                                                                       positional.getValue());
         } else {
             error(@1, positional.getStatus().reason());
         }
@@ -609,10 +624,8 @@ projectionFieldname:
         if (auto positional =
             c_node_validation::validateProjectionPathAsNormalOrPositional(components);
             positional.isOK()) {
-            if (positional.getValue() == c_node_validation::IsPositional::yes)
-                $$ = PositionalProjectionPath{std::move(components)};
-            else
-                $$ = ProjectionPath{std::move(components)};
+            $$ = c_node_disambiguation::disambiguateProjectionPathType(std::move(components),
+                                                                       positional.getValue());
         } else {
             error(@1, positional.getStatus().reason());
         }
@@ -620,31 +633,31 @@ projectionFieldname:
 ;
 
 // These are permitted to contain fieldnames with multiple path components such as {"a.b.c": ""}.
-projectionObject:
-    START_OBJECT projectionObjectFields END_OBJECT {
-        $$ = $projectionObjectFields;
+aggregationProjectionObject:
+    START_OBJECT aggregationProjectionObjectFields END_OBJECT {
+        $$ = $aggregationProjectionObjectFields;
     }
 ;
 
 // Projection objects cannot be empty.
-projectionObjectFields:
-    projectionObjectField {
+aggregationProjectionObjectFields:
+    aggregationProjectionObjectField {
         $$ = CNode::noopLeaf();
-        $$.objectChildren().emplace_back($projectionObjectField);
+        $$.objectChildren().emplace_back($aggregationProjectionObjectField);
     }
-    | projectionObjectFields[projectArg] projectionObjectField {
+    | aggregationProjectionObjectFields[projectArg] aggregationProjectionObjectField {
         $$ = $projectArg;
-        $$.objectChildren().emplace_back($projectionObjectField);
+        $$.objectChildren().emplace_back($aggregationProjectionObjectField);
     }
 ;
 
-projectionObjectField:
+aggregationProjectionObjectField:
     // _id is no longer a key when we descend past the directly projected fields.
-    idAsProjectionPath projection {
-        $$ = {$idAsProjectionPath, $projection};
+    idAsProjectionPath aggregationProjection {
+        $$ = {$idAsProjectionPath, $aggregationProjection};
     }
-    | aggregationProjectionFieldname projection {
-        $$ = {$aggregationProjectionFieldname, $projection};
+    | aggregationProjectionFieldname aggregationProjection {
+        $$ = {$aggregationProjectionFieldname, $aggregationProjection};
     }
 ;
 
@@ -826,14 +839,11 @@ argAsProjectionPath:
         auto components = makeVector<std::string>($1);
         if (auto positional =
             c_node_validation::validateProjectionPathAsNormalOrPositional(components);
-            positional.isOK()) {
-            if (positional.getValue() == c_node_validation::IsPositional::yes)
-                $$ = PositionalProjectionPath{std::move(components)};
-            else
-                $$ = ProjectionPath{std::move(components)};
-        } else {
+            positional.isOK())
+            $$ = c_node_disambiguation::disambiguateProjectionPathType(std::move(components),
+                                                                       positional.getValue());
+        else
             error(@1, positional.getStatus().reason());
-        }
     }
 ;
 
@@ -1473,7 +1483,7 @@ expressions:
 ;
 
 expression:
-    simpleValue | expressionObject | expressionArray | nonArrayNonObjCompoundExpression
+    simpleValue | expressionObject | expressionArray | aggregationOperator
 ;
 
 nonArrayExpression:
@@ -1481,16 +1491,20 @@ nonArrayExpression:
 ;
 
 nonArrayNonObjExpression:
-    simpleValue | nonArrayNonObjCompoundExpression
+    simpleValue | aggregationOperator
 ;
 
 nonArrayCompoundExpression:
-    expressionObject | nonArrayNonObjCompoundExpression
+    expressionObject | aggregationOperator
 ;
 
-nonArrayNonObjCompoundExpression:
-    arrayManipulation | maths | meta | boolExprs | literalEscapes | compExprs | typeExpression
-    | stringExps | setExpression | trig | dateExps
+aggregationOperator:
+    aggregationOperatorWithoutSlice | slice
+;
+
+aggregationOperatorWithoutSlice:
+    maths | boolExprs | literalEscapes | compExprs | typeExpression | stringExps | setExpression
+    | trig | meta | dateExps
 ;
 
 // Helper rule for expressions which take exactly two expression arguments.
@@ -1507,14 +1521,7 @@ exprFixedThreeArg:
     }
 ;
 
-compoundNonObjectExpression:
-    expressionArray | nonArrayNonObjCompoundExpression
-
-arrayManipulation:
-    slice
-;
-
-slice :
+slice:
     START_OBJECT SLICE exprFixedTwoArg END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::slice,
                                           $exprFixedTwoArg}}};
@@ -1566,14 +1573,20 @@ expressionField:
     }
 ;
 
-// All fieldnames that don't indicate agg functons/operators.
+// All fieldnames that don't indicate agg functons/operators or start with dollars.
 expressionFieldname:
-    invariableUserFieldname | stageAsUserFieldname | argAsUserFieldname | idAsUserFieldname
+    invariableUserFieldname | argAsUserFieldname | idAsUserFieldname
 ;
 
 idAsUserFieldname:
     ID {
         $$ = UserFieldname{"_id"};
+    }
+;
+
+elemMatchAsUserFieldname:
+    ELEM_MATCH {
+        $$ = UserFieldname{"$elemMatch"};
     }
 ;
 
@@ -1584,8 +1597,8 @@ idAsProjectionPath:
 ;
 
 maths:
-    add | abs | ceil | divide | exponent | floor | ln | log | logten | mod | multiply | pow
-| round | sqrt | subtract | trunc
+    add | abs | ceil | divide | exponent | floor | ln | log | logten | mod | multiply | pow | round
+    | sqrt | subtract | trunc
 ;
 
 meta:
@@ -2423,6 +2436,111 @@ sortSpec:
     }
 ;
 
+findProject:
+    START_OBJECT findProjectFields END_OBJECT {
+        auto&& fields = $findProjectFields;
+        if (auto status = c_node_validation::validateNoConflictingPathsInProjectFields(fields);
+            !status.isOK())
+            error(@1, status.reason());
+        if (auto inclusion = c_node_validation::validateProjectionAsInclusionOrExclusion(fields);
+            inclusion.isOK())
+            $$ = CNode{CNode::ObjectChildren{std::pair{inclusion.getValue() ==
+                                                       c_node_validation::IsInclusion::yes ?
+                                                       KeyFieldname::projectInclusion :
+                                                       KeyFieldname::projectExclusion,
+                                                       std::move(fields)}}};
+        else
+            // Pass the location of the project token to the error reporting function.
+            error(@1, inclusion.getStatus().reason());
+    }
+;
+
+findProjectFields:
+    %empty {
+        $$ = CNode::noopLeaf();
+    }
+    | findProjectFields[projectArg] findProjectField {
+        $$ = $projectArg;
+        $$.objectChildren().emplace_back($findProjectField);
+    }
+;
+
+findProjectField:
+    ID topLevelFindProjection {
+        $$ = {KeyFieldname::id, $topLevelFindProjection};
+    }
+    | projectionFieldname topLevelFindProjection {
+        $$ = {$projectionFieldname, $topLevelFindProjection};
+    }
+;
+
+topLevelFindProjection:
+    findProjection {
+        auto projection = $1;
+        $$ = stdx::holds_alternative<CNode::ObjectChildren>(projection.payload) &&
+            stdx::holds_alternative<FieldnamePath>(projection.objectChildren()[0].first) ?
+            c_node_disambiguation::disambiguateCompoundProjection(std::move(projection)) :
+            std::move(projection);
+        if (stdx::holds_alternative<CompoundInconsistentKey>($$.payload))
+            // TODO SERVER-50498: error() instead of uasserting
+            uasserted(ErrorCodes::FailedToParse, "object project field cannot contain both "
+                                                 "inclusion and exclusion indicators");
+    }
+;
+
+findProjection:
+    projectionCommon
+    | findProjectionObject
+    | aggregationOperatorWithoutSlice
+    | findProjectionSlice
+    | elemMatch
+;
+
+elemMatch:
+    START_OBJECT ELEM_MATCH match END_OBJECT {
+        $$ = {CNode::ObjectChildren{{KeyFieldname::elemMatch, $match}}};
+    }
+;
+
+findProjectionSlice:
+    START_OBJECT SLICE num END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::slice, $num}}};
+    }
+    | START_OBJECT SLICE START_ARRAY num[leftNum] num[rightNum] END_ARRAY END_OBJECT {
+        $$ = CNode{CNode::ObjectChildren{{KeyFieldname::slice,
+                                          CNode{CNode::ArrayChildren{$leftNum, $rightNum}}}}};
+    }
+;
+
+// These are permitted to contain fieldnames with multiple path components such as {"a.b.c": ""}.
+findProjectionObject:
+    START_OBJECT findProjectionObjectFields END_OBJECT {
+        $$ = $findProjectionObjectFields;
+    }
+;
+
+// Projection objects cannot be empty.
+findProjectionObjectFields:
+    findProjectionObjectField {
+        $$ = CNode::noopLeaf();
+        $$.objectChildren().emplace_back($findProjectionObjectField);
+    }
+    | findProjectionObjectFields[projectArg] findProjectionObjectField {
+        $$ = $projectArg;
+        $$.objectChildren().emplace_back($findProjectionObjectField);
+    }
+;
+
+findProjectionObjectField:
+    // _id is no longer a key when we descend past the directly projected fields.
+    idAsProjectionPath findProjection {
+        $$ = {$idAsProjectionPath, $findProjection};
+    }
+    | projectionFieldname findProjection {
+        $$ = {$projectionFieldname, $findProjection};
+    }
+;
+
 setExpression:
     allElementsTrue | anyElementTrue | setDifference | setEquals | setIntersection | setIsSubset
     | setUnion
@@ -2556,6 +2674,7 @@ valueFieldname:
     | argAsUserFieldname
     | aggExprAsUserFieldname
     | idAsUserFieldname
+    | elemMatchAsUserFieldname
 ;
 
 compExprs: cmp | eq | gt | gte | lt | lte | ne;

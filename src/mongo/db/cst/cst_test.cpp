@@ -372,6 +372,7 @@ TEST(CstGrammarTest, FailsToParseRedundantPaths) {
         ASSERT_THROWS_CODE(parseTree.parse(), AssertionException, ErrorCodes::FailedToParse);
     }
 }
+
 TEST(CstGrammarTest, FailsToParsePrefixPaths) {
     {
         CNode output;

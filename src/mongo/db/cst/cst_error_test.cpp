@@ -183,7 +183,7 @@ TEST(CstErrorTest, MixedProjectionTypes) {
         ParserGen(lexer, nullptr).parse(),
         AssertionException,
         ErrorCodes::FailedToParse,
-        "$project containing inclusion and/or computed fields must contain no exclusion fields at "
+        "project containing inclusion and/or computed fields must contain no exclusion fields at "
         "element '$project' within array at index 0 of input pipeline");
 }
 

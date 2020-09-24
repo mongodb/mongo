@@ -79,6 +79,7 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"$dateToString", ParserGen::token::DATE_TO_STRING},
     {"$degreesToRadians", ParserGen::token::DEGREES_TO_RADIANS},
     {"$divide", ParserGen::token::DIVIDE},
+    {"$elemMatch", ParserGen::token::ELEM_MATCH},
     {"$eq", ParserGen::token::EQ},
     {"$exp", ParserGen::token::EXPONENT},
     {"$floor", ParserGen::token::FLOOR},
@@ -452,7 +453,9 @@ BSONLexer::BSONLexer(BSONObj obj, ParserGen::token_type startingToken) {
         this,
         startingToken == ParserGen::token::START_PIPELINE
             ? "pipeline"
-            : (startingToken == ParserGen::token::START_SORT ? "sort" : "filter")};
+            : (startingToken == ParserGen::token::START_SORT
+                   ? "sort"
+                   : (startingToken == ParserGen::token::START_PROJECT ? "project" : "filter"))};
     pushToken("start", startingToken);
 
     // If 'obj' is representing a pipeline, each element is a stage with the fieldname being the
