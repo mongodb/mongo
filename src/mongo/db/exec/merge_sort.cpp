@@ -33,6 +33,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/util/mongoutils/str.h"
@@ -206,11 +207,44 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
         BSONElement lhsElt;
         verify(lhsMember->getFieldDotted(fn, &lhsElt));
 
+        // Determine if the left-hand side sort key part comes from an index key.
+        auto lhsIsFromIndexKey = !lhsMember->hasObj();
+
         BSONElement rhsElt;
         verify(rhsMember->getFieldDotted(fn, &rhsElt));
 
+        // Determine if the right-hand side sort key part comes from an index key.
+        auto rhsIsFromIndexKey = !rhsMember->hasObj();
+
+        // A collator to use for comparing the sort keys. We need a collator when values of both
+        // operands are supplied from a document and the query is collated. Otherwise bit-wise
+        // comparison should be used.
+        const CollatorInterface* collatorToUse = nullptr;
+        BSONObj collationEncodedKeyPart;  // A backing storage for a collation-encoded key part
+                                          // (according to collator '_collator') of one of the
+                                          // operands - either 'lhsElt' or 'rhsElt'.
+
+        if (nullptr == _collator || (lhsIsFromIndexKey && rhsIsFromIndexKey)) {
+            // Either the query has no collation or both sort key parts come directly from index
+            // keys. If the query has no collation, then the query planner should have guaranteed
+            // that we don't need to perform any collation-aware comparisons here. If both sort key
+            // parts come from index keys, we may need to respect a collation but the index keys are
+            // already collation-encoded, therefore we don't need to perform a collation-aware
+            // comparison here.
+        } else if (!lhsIsFromIndexKey && !rhsIsFromIndexKey) {
+            // Both sort key parts were extracted from fetched documents. These parts are not
+            // collation-encoded, so we will need to perform a collation-aware comparison.
+            collatorToUse = _collator;
+        } else {
+            // One of the sort key parts was extracted from fetched documents. Encode that part
+            // using the query's collation.
+            auto& keyPartFetchedFromDocument = rhsIsFromIndexKey ? lhsElt : rhsElt;
+            collationEncodedKeyPart = encodeKeyPartWithCollation(keyPartFetchedFromDocument);
+            keyPartFetchedFromDocument = collationEncodedKeyPart.firstElement();
+        }
+
         // false means don't compare field name.
-        int x = lhsElt.woCompare(rhsElt, false, _collator);
+        int x = lhsElt.woCompare(rhsElt, false, collatorToUse);
         if (-1 == patternElt.number()) {
             x = -x;
         }
@@ -223,6 +257,13 @@ bool MergeSortStage::StageWithValueComparison::operator()(const MergingRef& lhs,
     // to satisfy irreflexivity we must return 'false' for elements that we consider
     // equivalent under the pattern.
     return false;
+}
+
+BSONObj MergeSortStage::StageWithValueComparison::encodeKeyPartWithCollation(
+    const BSONElement& keyPart) {
+    BSONObjBuilder objectBuilder;
+    CollationIndexKey::collationAwareIndexKeyAppend(keyPart, _collator, &objectBuilder);
+    return objectBuilder.obj();
 }
 
 unique_ptr<PlanStageStats> MergeSortStage::getStats() {
