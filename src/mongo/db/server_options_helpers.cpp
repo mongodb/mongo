@@ -154,7 +154,7 @@ Status validateBaseOptions(const moe::Environment& params) {
 
         // Must come after registerAllFailPointsAsServerParameters() above.
         const auto& spMap = ServerParameterSet::getGlobal()->getMap();
-        for (const auto setParam : parameters) {
+        for (const auto& setParam : parameters) {
             const auto it = spMap.find(setParam.first);
 
             if (it == spMap.end()) {

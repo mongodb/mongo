@@ -78,7 +78,7 @@ private:
                 BSONObjBuilder subBuilder(bob.subobjStart(""));
                 {
                     BSONObjBuilder eachBuilder(subBuilder.subarrayStart("$each"));
-                    for (const auto element : _elements)
+                    for (const auto& element : _elements)
                         eachBuilder << element;
                 }
             }

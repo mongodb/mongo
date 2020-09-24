@@ -1465,7 +1465,7 @@ void PlanEnumerator::assignMultikeySafePredicates(
 
     size_t posInIdx = 0;
 
-    for (const auto keyElem : thisIndex.keyPattern) {
+    for (const auto& keyElem : thisIndex.keyPattern) {
         // Attempt to assign the predicates to 'thisIndex' according to their position in the index
         // key pattern.
         for (auto* couldAssignPred : couldAssign) {

@@ -63,7 +63,7 @@ private:
         BSONObjBuilder bob;
         {
             BSONArrayBuilder subarrayBuilder(bob.subarrayStart(""));
-            for (const auto element : _elementsToMatch)
+            for (const auto& element : _elementsToMatch)
                 subarrayBuilder << element;
         }
         return bob.obj();

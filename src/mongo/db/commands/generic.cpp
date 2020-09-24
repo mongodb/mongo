@@ -166,7 +166,7 @@ public:
                      BSONObjBuilder& result) {
         // Sort the command names before building the result BSON.
         std::vector<Command*> commands;
-        for (const auto command : globalCommandRegistry()->allCommands()) {
+        for (const auto& command : globalCommandRegistry()->allCommands()) {
             // Don't show oldnames
             if (command.first == command.second->getName())
                 commands.push_back(command.second);

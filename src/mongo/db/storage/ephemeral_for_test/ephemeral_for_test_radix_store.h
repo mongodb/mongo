@@ -2110,7 +2110,7 @@ private:
         other._root = _makeHead(otherNode);
 
         // Merges insertions and updates from the master tree into the working tree, if possible.
-        for (const value_type otherVal : other) {
+        for (const value_type& otherVal : other) {
             RadixStore::const_iterator baseIter = base.find(otherVal.first);
             RadixStore::const_iterator thisIter = node.find(otherVal.first);
 
@@ -2148,7 +2148,7 @@ private:
         }
 
         // Perform deletions from the master tree in the working tree, if possible.
-        for (const value_type baseVal : base) {
+        for (const value_type& baseVal : base) {
             RadixStore::const_iterator otherIter = other.find(baseVal.first);
             RadixStore::const_iterator thisIter = node.find(baseVal.first);
 
@@ -2176,7 +2176,7 @@ private:
         node._root = _makeHead(current);
         other._root = _makeHead(otherNode);
 
-        for (const value_type otherVal : other) {
+        for (const value_type& otherVal : other) {
             RadixStore::const_iterator thisIter = node.find(otherVal.first);
 
             if (thisIter != node.end())

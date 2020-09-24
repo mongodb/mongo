@@ -114,7 +114,7 @@ TEST(BuiltinRoles, addPrivilegsForBuiltinRole) {
     const auto adminSystemJS =
         ResourcePattern::forExactNamespace(NamespaceString("admin", "system.js"));
 
-    for (const auto priv : privs) {
+    for (const auto& priv : privs) {
         auto resource = priv.getResourcePattern();
         ASSERT((resource == adminDB) || (resource == adminSystemJS));
         ASSERT(priv.getActions() == expSet);

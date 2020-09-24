@@ -552,7 +552,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
     size_t posInIdx = 0;
 
     // We output keys in the same order as the fields we index.
-    for (const auto keyElem : keyPattern) {
+    for (const auto& keyElem : keyPattern) {
         // First, we get the keys that this field adds.  Either they're added literally from
         // the value of the field, or they're transformed if the field is geo.
         BSONElementSet fieldElements;

@@ -362,7 +362,7 @@ private:
 
             auto tagsObj = server.getObjectField("tags");
             const auto keys = tagsObj.getFieldNames<std::set<std::string>>();
-            for (const auto key : keys) {
+            for (const auto& key : keys) {
                 serverDescription.withTag(key, tagsObj.getStringField(key));
             }
 

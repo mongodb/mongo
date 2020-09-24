@@ -582,7 +582,7 @@ void ConnectionRegistry::killOperationsOnAllConnections(bool withPrompt) const {
             continue;
         }
         auto inprog = currentOpRes["inprog"].embeddedObject();
-        for (const auto op : inprog) {
+        for (const auto& op : inprog) {
             // For sharded clusters, `client_s` is used instead and `client` is not present.
             std::string client;
             if (auto elem = op["client"]) {

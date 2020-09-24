@@ -1815,7 +1815,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
                                                           UUID uuid,
                                                           const BSONObj& filter) const override {
             int numFields = 0;
-            for (const auto element : filter) {
+            for (const auto& element : filter) {
                 ++numFields;
                 ASSERT_EQUALS("_id", element.fieldNameStringData()) << filter;
             }
@@ -2502,7 +2502,7 @@ TEST_F(RSRollbackTest, RollbackFetchesTransactionOperationBeforeCommonPoint) {
                 // This unit test does not test transaction table fetches.
                 return {BSONObj(), NamespaceString::kSessionTransactionsTableNamespace};
             }
-            for (const auto element : filter) {
+            for (const auto& element : filter) {
                 ++numFields;
                 ASSERT_EQUALS("_id", element.fieldNameStringData()) << filter;
             }

@@ -209,7 +209,7 @@ BSONObj PushNode::operatorValue() const {
             // This serialization function always produces $each regardless of whether the input
             // contained it.
             BSONObjBuilder eachBuilder(subBuilder.subarrayStart("$each"));
-            for (const auto value : _valuesToPush)
+            for (const auto& value : _valuesToPush)
                 eachBuilder << value;
         }
         if (_slice)

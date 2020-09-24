@@ -90,7 +90,7 @@ OplogApplicationValidity validateApplyOpsCommand(const BSONObj& cmdObj) {
 
     auto operationContainsUUID = [](const BSONObj& opObj) {
         auto anyTopLevelElementIsUUID = [](const BSONObj& opObj) {
-            for (const BSONElement opElement : opObj) {
+            for (const BSONElement& opElement : opObj) {
                 if (opElement.type() == BSONType::BinData &&
                     opElement.binDataType() == BinDataType::newUUID) {
                     return true;

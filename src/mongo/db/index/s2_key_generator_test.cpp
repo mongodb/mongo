@@ -65,9 +65,9 @@ std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
     std::stringstream ss;
 
     ss << "[ ";
-    for (const auto multikeyComponents : multikeyPaths) {
+    for (const auto& multikeyComponents : multikeyPaths) {
         ss << "[ ";
-        for (const auto multikeyComponent : multikeyComponents) {
+        for (const auto& multikeyComponent : multikeyComponents) {
             ss << multikeyComponent << " ";
         }
         ss << "] ";

@@ -57,7 +57,7 @@ void appendMultikeyPathsAsBytes(BSONObj keyPattern,
     char multikeyPathsEncodedAsBytes[kMaxKeyPatternPathLength];
 
     size_t i = 0;
-    for (const auto keyElem : keyPattern) {
+    for (const auto& keyElem : keyPattern) {
         StringData keyName = keyElem.fieldNameStringData();
         size_t numParts = FieldRef{keyName}.numParts();
         invariant(numParts > 0);

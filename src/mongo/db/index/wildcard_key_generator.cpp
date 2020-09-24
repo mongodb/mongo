@@ -137,7 +137,7 @@ void WildcardKeyGenerator::_traverseWildcard(SharedBufferFragmentBuilder& pooled
                                              KeyStringSet::sequence_type* keys,
                                              KeyStringSet::sequence_type* multikeyPaths,
                                              boost::optional<RecordId> id) const {
-    for (const auto elem : obj) {
+    for (const auto& elem : obj) {
         // If the element's fieldName contains a ".", fast-path skip it because it's not queryable.
         if (elem.fieldNameStringData().find('.', 0) != std::string::npos)
             continue;

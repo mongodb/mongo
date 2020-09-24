@@ -64,7 +64,7 @@ public:
                 uassertStatusOK(
                     MongoURI::parse(requestBody.getRecipientConnectionString().toString()))
                     .getServers();
-            for (const auto server : donorServers) {
+            for (const auto& server : donorServers) {
                 uassert(ErrorCodes::InvalidOptions,
                         "recipient and donor hosts must be different",
                         std::none_of(recipientServers.begin(),

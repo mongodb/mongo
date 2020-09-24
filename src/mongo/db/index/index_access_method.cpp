@@ -444,7 +444,7 @@ Status AbstractIndexAccessMethod::update(OperationContext* opCtx,
     }
 
     // Add all new data keys into the index.
-    for (const auto keyString : ticket.added) {
+    for (const auto& keyString : ticket.added) {
         Status status = _newInterface->insert(opCtx, keyString, ticket.dupsAllowed);
         if (!status.isOK())
             return status;

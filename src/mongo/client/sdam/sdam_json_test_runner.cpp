@@ -569,7 +569,7 @@ public:
             LOGV2(20209, "### Failed Test Results ###");
         }
 
-        for (const auto result : results) {
+        for (const auto& result : results) {
             auto file = result.file;
             auto testName = result.name;
             auto phaseResults = result.phaseResults;

@@ -136,12 +136,12 @@ void appendMultikeyPaths(const BSONObj& keyPattern,
     BSONObjBuilder subMultikeyPaths(bob->subobjStart("multiKeyPaths"));
 
     size_t i = 0;
-    for (const auto keyElem : keyPattern) {
+    for (const auto& keyElem : keyPattern) {
         const FieldRef path{keyElem.fieldNameStringData()};
 
         BSONArrayBuilder arrMultikeyComponents(
             subMultikeyPaths.subarrayStart(keyElem.fieldNameStringData()));
-        for (const auto multikeyComponent : multikeyPaths[i]) {
+        for (const auto& multikeyComponent : multikeyPaths[i]) {
             arrMultikeyComponents.append(path.dottedSubstring(0, multikeyComponent + 1));
         }
         arrMultikeyComponents.doneFast();

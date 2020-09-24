@@ -64,7 +64,7 @@ TEST(ICUTest, icuSaslPrep) {
         {"\xD8\xA7\x31", "(invalid)", false},
     };
 
-    for (const auto test : tests) {
+    for (const auto& test : tests) {
         auto ret = icuSaslPrep(test.original);
         ASSERT_EQ(ret.isOK(), test.success);
         if (test.success) {

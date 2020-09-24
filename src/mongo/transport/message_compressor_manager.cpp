@@ -214,7 +214,7 @@ void MessageCompressorManager::clientBegin(BSONObjBuilder* output) {
         return;
 
     BSONArrayBuilder sub(output->subarrayStart("compression"));
-    for (const auto e : _registry->getCompressorNames()) {
+    for (const auto& e : _registry->getCompressorNames()) {
         LOGV2_DEBUG(22929,
                     3,
                     "Offering {compressor} compressor to server",

@@ -71,7 +71,7 @@ void URIInfo::construct(JSContext* cx, JS::CallArgs args) {
     auto parsed = uassertStatusOK(sw);
 
     BSONArrayBuilder serversBuilder;
-    for (const auto hp : parsed.getServers()) {
+    for (const auto& hp : parsed.getServers()) {
         BSONObjBuilder b;
         b.append("server", hp.toString());
         b.append("host", hp.host());

@@ -505,7 +505,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
         // Generate a key for each element of the indexed array.
         std::vector<const char*> fieldNamesTemp;
         std::vector<BSONElement> fixedTemp;
-        for (const auto arrObjElem : arrObj) {
+        for (const auto& arrObjElem : arrObj) {
             _getKeysArrEltFixed(*fieldNames,
                                 *fixed,
                                 &fieldNamesTemp,

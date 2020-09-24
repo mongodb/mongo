@@ -212,7 +212,7 @@ Future<std::string> negotiateSaslMechanism(RunCommandHook runCommand,
 
             auto obj = mechsArrayObj.Obj();
             std::vector<std::string> availableMechanisms;
-            for (const auto elem : obj) {
+            for (const auto& elem : obj) {
                 if (elem.type() != String) {
                     return Status{ErrorCodes::BadValue, "Expected array of SASL mechanism names"};
                 }
