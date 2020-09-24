@@ -2248,7 +2248,7 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     invariant(deadline);
     const TopologyVersion topologyVersion = _topCoord->getTopologyVersion();
 
-    IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
+    HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
     lk.unlock();
 
     if (MONGO_unlikely(waitForIsMasterResponse.shouldFail())) {
@@ -2282,7 +2282,7 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
         // Return an IsMasterResponse with the current topology version on timeout when waiting for
         // a topology change.
         stdx::lock_guard lk(_mutex);
-        IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
+        HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
         // A topology change has not occured within the deadline so horizonString is still a good
         // indicator of whether we have a valid config.
         const bool hasValidConfig = horizonString != boost::none;
@@ -3926,7 +3926,7 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
                                "Received a reconfig that changed the horizon mappings."});
         }
         _sniToValidConfigPromiseMap.clear();
-        IsMasterMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
+        HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
     }
 
     if (oldIndex >= 0 && newIndex >= 0) {
@@ -3940,7 +3940,7 @@ void ReplicationCoordinatorImpl::_errorOnPromisesIfHorizonChanged(WithLock lk,
                                    "Received a reconfig that changed the horizon mappings."});
             }
             _createHorizonTopologyChangePromiseMapping(lk);
-            IsMasterMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
+            HelloMetrics::get(opCtx)->resetNumAwaitingTopologyChanges();
         }
     }
 }
@@ -3987,7 +3987,7 @@ void ReplicationCoordinatorImpl::_fulfillTopologyChangePromise(WithLock lock) {
         }
         _sniToValidConfigPromiseMap.clear();
     }
-    IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
+    HelloMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
 
     if (_inQuiesceMode) {
         // No more isMaster requests will wait for a topology change, so clear _horizonToPromiseMap.

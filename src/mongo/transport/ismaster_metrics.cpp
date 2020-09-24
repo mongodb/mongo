@@ -30,102 +30,102 @@
 
 namespace mongo {
 namespace {
-const auto IsMasterMetricsDecoration = ServiceContext::declareDecoration<IsMasterMetrics>();
-const auto InExhaustIsMasterDecoration = transport::Session::declareDecoration<InExhaustIsMaster>();
+const auto HelloMetricsDecoration = ServiceContext::declareDecoration<HelloMetrics>();
+const auto InExhaustHelloDecoration = transport::Session::declareDecoration<InExhaustHello>();
 }  // namespace
 
-IsMasterMetrics* IsMasterMetrics::get(ServiceContext* service) {
-    return &IsMasterMetricsDecoration(service);
+HelloMetrics* HelloMetrics::get(ServiceContext* service) {
+    return &HelloMetricsDecoration(service);
 }
 
-IsMasterMetrics* IsMasterMetrics::get(OperationContext* opCtx) {
+HelloMetrics* HelloMetrics::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-size_t IsMasterMetrics::getNumExhaustIsMaster() const {
+size_t HelloMetrics::getNumExhaustIsMaster() const {
     return _exhaustIsMasterConnections.load();
 }
 
-void IsMasterMetrics::incrementNumExhaustIsMaster() {
+void HelloMetrics::incrementNumExhaustIsMaster() {
     _exhaustIsMasterConnections.fetchAndAdd(1);
 }
 
-void IsMasterMetrics::decrementNumExhaustIsMaster() {
+void HelloMetrics::decrementNumExhaustIsMaster() {
     _exhaustIsMasterConnections.fetchAndSubtract(1);
 }
 
-size_t IsMasterMetrics::getNumExhaustHello() const {
+size_t HelloMetrics::getNumExhaustHello() const {
     return _exhaustHelloConnections.load();
 }
 
-void IsMasterMetrics::incrementNumExhaustHello() {
+void HelloMetrics::incrementNumExhaustHello() {
     _exhaustHelloConnections.fetchAndAdd(1);
 }
 
-void IsMasterMetrics::decrementNumExhaustHello() {
+void HelloMetrics::decrementNumExhaustHello() {
     _exhaustHelloConnections.fetchAndSubtract(1);
 }
 
-size_t IsMasterMetrics::getNumAwaitingTopologyChanges() const {
+size_t HelloMetrics::getNumAwaitingTopologyChanges() const {
     return _connectionsAwaitingTopologyChanges.load();
 }
 
-void IsMasterMetrics::incrementNumAwaitingTopologyChanges() {
+void HelloMetrics::incrementNumAwaitingTopologyChanges() {
     _connectionsAwaitingTopologyChanges.fetchAndAdd(1);
 }
 
-void IsMasterMetrics::decrementNumAwaitingTopologyChanges() {
+void HelloMetrics::decrementNumAwaitingTopologyChanges() {
     _connectionsAwaitingTopologyChanges.fetchAndSubtract(1);
 }
 
-void IsMasterMetrics::resetNumAwaitingTopologyChanges() {
+void HelloMetrics::resetNumAwaitingTopologyChanges() {
     _connectionsAwaitingTopologyChanges.store(0);
 }
 
-InExhaustIsMaster* InExhaustIsMaster::get(transport::Session* session) {
-    return &InExhaustIsMasterDecoration(session);
+InExhaustHello* InExhaustHello::get(transport::Session* session) {
+    return &InExhaustHelloDecoration(session);
 }
 
-InExhaustIsMaster::~InExhaustIsMaster() {
+InExhaustHello::~InExhaustHello() {
     if (_inExhaustIsMaster) {
-        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
+        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
     }
     if (_inExhaustHello) {
-        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
+        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
     }
 }
 
-bool InExhaustIsMaster::getInExhaustIsMaster() const {
+bool InExhaustHello::getInExhaustIsMaster() const {
     return _inExhaustIsMaster;
 }
 
-bool InExhaustIsMaster::getInExhaustHello() const {
+bool InExhaustHello::getInExhaustHello() const {
     return _inExhaustHello;
 }
 
-void InExhaustIsMaster::setInExhaustIsMaster(bool inExhaust, StringData commandName) {
+void InExhaustHello::setInExhaust(bool inExhaust, StringData commandName) {
     bool isHello = (commandName == "hello"_sd);
 
     // Transition out of exhaust hello if setting inExhaust to false or if
     // the isMaster command is used.
     if (_inExhaustHello && (!inExhaust || !isHello)) {
-        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
+        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustHello();
         _inExhaustHello = false;
     }
 
     // Transition out of exhaust isMaster if setting inExhaust to false or if
     // the hello command is used.
     if (_inExhaustIsMaster && (!inExhaust || isHello)) {
-        IsMasterMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
+        HelloMetrics::get(getGlobalServiceContext())->decrementNumExhaustIsMaster();
         _inExhaustIsMaster = false;
     }
 
     if (inExhaust) {
         if (isHello && !_inExhaustHello) {
-            IsMasterMetrics::get(getGlobalServiceContext())->incrementNumExhaustHello();
+            HelloMetrics::get(getGlobalServiceContext())->incrementNumExhaustHello();
             _inExhaustHello = inExhaust;
         } else if (!isHello && !_inExhaustIsMaster) {
-            IsMasterMetrics::get(getGlobalServiceContext())->incrementNumExhaustIsMaster();
+            HelloMetrics::get(getGlobalServiceContext())->incrementNumExhaustIsMaster();
             _inExhaustIsMaster = inExhaust;
         }
     }

@@ -136,8 +136,8 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
         // maxAwaitTimeMS.
         invariant(maxAwaitTimeMS);
 
-        IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
-        ON_BLOCK_EXIT([&] { IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
+        HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
+        ON_BLOCK_EXIT([&] { HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
         if (MONGO_unlikely(hangWaitingForIsMasterResponseOnStandalone.shouldFail())) {
             // Used in tests that wait for this failpoint to be entered to guarantee that the
             // request is waiting and metrics have been updated.
@@ -471,9 +471,8 @@ public:
                     maxAwaitTimeMSField);
             invariant(clientTopologyVersion);
 
-            InExhaustIsMaster::get(opCtx->getClient()->session().get())
-                ->setInExhaustIsMaster(true /* inExhaust */,
-                                       cmdObj.firstElementFieldNameStringData());
+            InExhaustHello::get(opCtx->getClient()->session().get())
+                ->setInExhaust(true /* inExhaust */, getName());
 
             if (clientTopologyVersion->getProcessId() == currentTopologyVersion.getProcessId() &&
                 clientTopologyVersion->getCounter() == currentTopologyVersion.getCounter()) {

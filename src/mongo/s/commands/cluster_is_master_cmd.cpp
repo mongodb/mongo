@@ -205,9 +205,8 @@ public:
                     maxAwaitTimeMSField);
             invariant(clientTopologyVersion);
 
-            InExhaustIsMaster::get(opCtx->getClient()->session().get())
-                ->setInExhaustIsMaster(true /* inExhaust */,
-                                       cmdObj.firstElementFieldNameStringData());
+            InExhaustHello::get(opCtx->getClient()->session().get())
+                ->setInExhaust(true /* inExhaust */, getName());
 
             if (clientTopologyVersion->getProcessId() ==
                     currentMongosTopologyVersion.getProcessId() &&

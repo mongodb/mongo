@@ -150,7 +150,7 @@ std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIs
     // deadline must also be not none.
     invariant(deadline);
 
-    IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
+    HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
     lk.unlock();
 
     if (MONGO_unlikely(waitForIsMasterResponse.shouldFail())) {
@@ -179,7 +179,7 @@ std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIs
         // Return a MongosIsMasterResponse with the current topology version on timeout when
         // waiting for a topology change.
         stdx::lock_guard lk(_mutex);
-        IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
+        HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
         return _makeIsMasterResponse(lk);
     }
 
@@ -205,7 +205,7 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
 
         // Reset counter to 0 since we will respond to all waiting isMaster requests with an error.
         // All new isMaster requests will immediately fail with ShutdownInProgress.
-        IsMasterMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
+        HelloMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
     }
 
     if (MONGO_unlikely(hangDuringQuiesceMode.shouldFail())) {

@@ -270,11 +270,10 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     if (auto sc = getGlobalServiceContext()) {
         bob->append("active", static_cast<int>(sc->getActiveClientOperations()));
         bob->append("exhaustIsMaster",
-                    static_cast<int>(IsMasterMetrics::get(sc)->getNumExhaustIsMaster()));
-        bob->append("exhaustHello",
-                    static_cast<int>(IsMasterMetrics::get(sc)->getNumExhaustHello()));
+                    static_cast<int>(HelloMetrics::get(sc)->getNumExhaustIsMaster()));
+        bob->append("exhaustHello", static_cast<int>(HelloMetrics::get(sc)->getNumExhaustHello()));
         bob->append("awaitingTopologyChanges",
-                    static_cast<int>(IsMasterMetrics::get(sc)->getNumAwaitingTopologyChanges()));
+                    static_cast<int>(HelloMetrics::get(sc)->getNumAwaitingTopologyChanges()));
     }
 
     if (_adminInternalPool) {
