@@ -31,8 +31,8 @@ all:
     test_file: jstests/core/geo_near_tailable.js
   - ticket: SERVER-48614
     test_file: jstests/core/wildcard_index_partial_index.js
-  - ticket: SERVER-48993
-    test_file: jstests/core/explode_for_sort_collation.js
+  - ticket: SERVER-51120
+    test_file: jstests/core/merge_sort_collation.js
   - ticket: SERVER-42825
     test_file: jstests/replsets/kill_reads_with_prepare_conflicts_during_step_down.js
   - ticket: SERVER-42825
