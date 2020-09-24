@@ -565,6 +565,30 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext
     return {{res.getValue(), ident, nss}};
 }
 
+StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_importEntry(OperationContext* opCtx,
+                                                                   NamespaceString nss,
+                                                                   const BSONObj& metadata) {
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+
+    uassert(ErrorCodes::BadValue,
+            "Attempted to import catalog entry without an ident",
+            metadata.hasField("ident"));
+    const string ident = metadata["ident"].String();
+    StatusWith<RecordId> res =
+        _rs->insertRecord(opCtx, metadata.objdata(), metadata.objsize(), Timestamp());
+    if (!res.isOK())
+        return res.getStatus();
+
+    stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
+    invariant(_catalogIdToEntryMap.find(res.getValue()) == _catalogIdToEntryMap.end());
+    _catalogIdToEntryMap[res.getValue()] = {res.getValue(), ident, nss};
+    opCtx->recoveryUnit()->registerChange(std::make_unique<AddIdentChange>(this, res.getValue()));
+
+    LOGV2_DEBUG(
+        5095101, 1, "imported meta data", "nss"_attr = nss.ns(), "metadata"_attr = res.getValue());
+    return {{res.getValue(), ident, nss}};
+}
+
 std::string DurableCatalogImpl::getIndexIdent(OperationContext* opCtx,
                                               RecordId catalogId,
                                               StringData idxName) const {
@@ -874,6 +898,82 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
     invariant(rs);
 
     return std::pair<RecordId, std::unique_ptr<RecordStore>>(entry.catalogId, std::move(rs));
+}
+
+StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
+    OperationContext* opCtx, const NamespaceString& nss, const BSONObj& metadata) {
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
+    invariant(nss.coll().size() > 0);
+
+    uassert(ErrorCodes::NamespaceExists,
+            str::stream() << "Collection already exists. NS: " << nss,
+            !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss));
+
+    BSONCollectionCatalogEntry::MetaData md;
+    const BSONElement mdElement = metadata["md"];
+    uassert(ErrorCodes::BadValue, "Malformed catalog metadata", mdElement.isABSONObj());
+    md.parse(mdElement.Obj());
+    uassert(ErrorCodes::BadValue, "Attempted to import collection without UUID", md.options.uuid);
+
+    uassert(ErrorCodes::BadValue,
+            "Attemped to import collection without idxIdent",
+            metadata.hasField("idxIdent"));
+
+    StatusWith<Entry> swEntry = _importEntry(opCtx, nss, metadata);
+    if (!swEntry.isOK())
+        return swEntry.getStatus();
+    Entry& entry = swEntry.getValue();
+
+    auto kvEngine = _engine->getEngine();
+    Status status = kvEngine->importRecordStore(opCtx, nss.ns(), entry.ident, md.options);
+    if (!status.isOK())
+        return status;
+
+    std::vector<std::string> indexIdents;
+    {
+        // TODO SERVER-51144: Additional sanity checks to validate the metadata for indexes.
+        const auto idxIdent = metadata["idxIdent"].Obj();
+        for (unsigned i = 0; i < md.indexes.size(); i++) {
+            auto spec = md.indexes[i].spec;
+            auto keyPattern = spec.getObjectField("key");
+            auto idxName = spec["name"].String();
+            auto ident = idxIdent[idxName].String();
+            IndexDescriptor idxDes(nullptr, IndexNames::findPluginName(keyPattern), spec);
+            status = kvEngine->importSortedDataInterface(opCtx, nss, md.options, ident, &idxDes);
+            if (!status.isOK()) {
+                return status;
+            }
+            indexIdents.push_back(ident);
+        }
+    }
+
+    // TODO SERVER-51145: Make sure we do not have ident collision in the future by using a new
+    // _rand if necessary.
+
+    // Mark collation feature as in use if the collection has a non-simple default collation.
+    if (!md.options.collation.isEmpty()) {
+        const auto feature = DurableCatalogImpl::FeatureTracker::NonRepairableFeature::kCollation;
+        if (getFeatureTracker()->isNonRepairableFeatureInUse(opCtx, feature)) {
+            getFeatureTracker()->markNonRepairableFeatureAsInUse(opCtx, feature);
+        }
+    }
+
+    auto ru = opCtx->recoveryUnit();
+    opCtx->recoveryUnit()->onRollback(
+        [opCtx, ru, catalog = this, nss, ident = entry.ident, indexIdents = indexIdents]() {
+            // TODO SERVER-51146: dropIdent without removing the files.
+            // Intentionally ignoring failure
+            catalog->_engine->getEngine()->dropIdent(opCtx, ru, ident).ignore();
+            for (const auto& indexIdent : indexIdents) {
+                catalog->_engine->getEngine()->dropIdent(opCtx, ru, indexIdent).ignore();
+            }
+        });
+
+    auto rs = _engine->getEngine()->getGroupedRecordStore(
+        opCtx, nss.ns(), entry.ident, md.options, md.prefix);
+    invariant(rs);
+
+    return DurableCatalog::ImportResult(entry.catalogId, std::move(rs), md.options.uuid.get());
 }
 
 Status DurableCatalogImpl::renameCollection(OperationContext* opCtx,

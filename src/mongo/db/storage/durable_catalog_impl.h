@@ -122,6 +122,10 @@ public:
         const CollectionOptions& options,
         bool allocateDefaultSpace);
 
+    StatusWith<ImportResult> importCollection(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const BSONObj& metadata) override;
+
     Status renameCollection(OperationContext* opCtx,
                             RecordId catalogId,
                             const NamespaceString& toNss,
@@ -223,6 +227,9 @@ private:
                                 NamespaceString nss,
                                 const CollectionOptions& options,
                                 KVPrefix prefix);
+    StatusWith<Entry> _importEntry(OperationContext* opCtx,
+                                   NamespaceString nss,
+                                   const BSONObj& metadata);
     Status _replaceEntry(OperationContext* opCtx,
                          RecordId catalogId,
                          const NamespaceString& toNss,

@@ -129,6 +129,19 @@ public:
         ASSERT(match);
     }
 
+    StatusWith<DurableCatalog::ImportResult> importCollectionTest(const NamespaceString& nss,
+                                                                  const BSONObj& metadata) {
+        Lock::DBLock dbLock(operationContext(), nss.db(), MODE_IX);
+        Lock::CollectionLock collLock(operationContext(), nss, MODE_X);
+
+        WriteUnitOfWork wuow(operationContext());
+        auto res = getCatalog()->importCollection(operationContext(), nss, metadata);
+        if (res.isOK()) {
+            wuow.commit();
+        }
+        return res;
+    }
+
 private:
     std::string dumpMultikeyPaths(const MultikeyPaths& multikeyPaths) {
         std::stringstream ss;
@@ -444,6 +457,82 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
 
     WriteUnitOfWork wuow(operationContext());
     catalog->setIndexIsMultikey(operationContext(), getCatalogId(), indexName, {{0U}, {0U}});
+}
+
+TEST_F(DurableCatalogTest, ImportCollection) {
+    // Import should fail if the namespace already exists.
+    ASSERT_THROWS_CODE(
+        importCollectionTest(ns(), {}), AssertionException, ErrorCodes::NamespaceExists);
+
+    const auto nss = NamespaceString("unittest.import");
+
+    // Import should fail with empty metadata.
+    ASSERT_THROWS_CODE(importCollectionTest(nss, {}), AssertionException, ErrorCodes::BadValue);
+
+    BSONCollectionCatalogEntry::MetaData md;
+
+    md.ns = nss.ns();
+
+    CollectionOptions options;
+    CollectionOptions optionsWithUUID;
+    optionsWithUUID.uuid = UUID::gen();
+    md.options = optionsWithUUID;
+
+    BSONCollectionCatalogEntry::IndexMetaData indexMetaData;
+    indexMetaData.spec = BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
+                                  << "_id_");
+    indexMetaData.ready = true;
+    md.indexes.push_back(indexMetaData);
+
+    auto mdObj = md.toBSON();
+    const auto ident = "collection-7-1792004489479993697";
+    const auto idxIdent = "index-8-1792004489479993697";
+    auto idxIdentObj = BSON("_id_" << idxIdent);
+
+    // Import should fail with missing "md" field.
+    ASSERT_THROWS_CODE(
+        importCollectionTest(
+            nss, BSON("idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident)),
+        AssertionException,
+        ErrorCodes::BadValue);
+
+    // Import should fail with missing "idxIdent" field.
+    ASSERT_THROWS_CODE(
+        importCollectionTest(nss, BSON("md" << mdObj << "ns" << nss.ns() << "ident" << ident)),
+        AssertionException,
+        ErrorCodes::BadValue);
+
+    // Import should fail with missing "ident" field.
+    ASSERT_THROWS_CODE(
+        importCollectionTest(nss,
+                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns())),
+        AssertionException,
+        ErrorCodes::BadValue);
+
+    // Import should fail with missing UUID from collection options.
+    md.options = options;
+    ASSERT_THROWS_CODE(importCollectionTest(nss,
+                                            BSON("md" << md.toBSON() << "idxIdent" << idxIdentObj
+                                                      << "ns" << nss.ns() << "ident" << ident)),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+
+    // Import should success with validate inputs.
+    const auto validMetaData =
+        BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident);
+    auto swImportResult = importCollectionTest(nss, validMetaData);
+    ASSERT_OK(swImportResult.getStatus());
+    DurableCatalog::ImportResult importResult = std::move(swImportResult.getValue());
+
+    // Validate the catalog entry for the imported collection.
+    auto entry = getCatalog()->getEntry(importResult.catalogId);
+    ASSERT_EQ(entry.nss, nss);
+    ASSERT_EQ(entry.ident, ident);
+    ASSERT_EQ(getCatalog()->getIndexIdent(operationContext(), importResult.catalogId, "_id_"),
+              idxIdent);
+    ASSERT_BSONOBJ_EQ(getCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
+                      validMetaData);
+    ASSERT_EQ(optionsWithUUID.uuid.get(), importResult.uuid);
 }
 
 }  // namespace

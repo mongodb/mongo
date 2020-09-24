@@ -59,6 +59,11 @@ public:
                                      StringData ident,
                                      const CollectionOptions& options);
 
+    virtual Status importRecordStore(OperationContext* opCtx,
+                                     StringData ns,
+                                     StringData ident,
+                                     const CollectionOptions& options);
+
     virtual std::unique_ptr<mongo::RecordStore> getRecordStore(OperationContext* opCtx,
                                                                StringData ns,
                                                                StringData ident,
@@ -68,6 +73,12 @@ public:
                                                                          StringData ident) override;
 
     virtual Status createSortedDataInterface(OperationContext* opCtx,
+                                             const CollectionOptions& collOptions,
+                                             StringData ident,
+                                             const IndexDescriptor* desc);
+
+    virtual Status importSortedDataInterface(OperationContext* opCtx,
+                                             const NamespaceString& nss,
                                              const CollectionOptions& collOptions,
                                              StringData ident,
                                              const IndexDescriptor* desc);

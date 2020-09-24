@@ -152,6 +152,17 @@ public:
         return createRecordStore(opCtx, ns, ident, options);
     }
 
+    /**
+     * Similar to createRecordStore but this imports from an existing table with the provided ident
+     * instead of creating a new one.
+     */
+    virtual Status importRecordStore(OperationContext* opCtx,
+                                     StringData ns,
+                                     StringData ident,
+                                     const CollectionOptions& options) {
+        MONGO_UNREACHABLE;
+    }
+
     virtual Status createSortedDataInterface(OperationContext* opCtx,
                                              const CollectionOptions& collOptions,
                                              StringData ident,
@@ -174,6 +185,18 @@ public:
                                                     KVPrefix prefix) {
         invariant(prefix == KVPrefix::kNotPrefixed);
         return createSortedDataInterface(opCtx, collOptions, ident, desc);
+    }
+
+    /**
+     * Similar to createSortedDataInterface but this imports from an existing table with the
+     * provided ident instead of creating a new one.
+     */
+    virtual Status importSortedDataInterface(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const CollectionOptions& collOptions,
+                                             StringData ident,
+                                             const IndexDescriptor* desc) {
+        MONGO_UNREACHABLE;
     }
 
     virtual Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) = 0;

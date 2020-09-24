@@ -75,6 +75,15 @@ Status KVEngine::createRecordStore(OperationContext* opCtx,
     return Status::OK();
 }
 
+Status KVEngine::importRecordStore(OperationContext* opCtx,
+                                   StringData ns,
+                                   StringData ident,
+                                   const CollectionOptions& options) {
+    stdx::lock_guard lock(_identsLock);
+    _idents[ident.toString()] = true;
+    return Status::OK();
+}
+
 std::unique_ptr<mongo::RecordStore> KVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
                                                                        StringData ident) {
     std::unique_ptr<mongo::RecordStore> recordStore =
@@ -129,6 +138,16 @@ Status KVEngine::createSortedDataInterface(OperationContext* opCtx,
     stdx::lock_guard lock(_identsLock);
     _idents[ident.toString()] = false;
     return Status::OK();  // I don't think we actually need to do anything here
+}
+
+Status KVEngine::importSortedDataInterface(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const CollectionOptions& collOptions,
+                                           StringData ident,
+                                           const IndexDescriptor* desc) {
+    stdx::lock_guard lock(_identsLock);
+    _idents[ident.toString()] = false;
+    return Status::OK();
 }
 
 std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(

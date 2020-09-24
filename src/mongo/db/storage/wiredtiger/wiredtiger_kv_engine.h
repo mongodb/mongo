@@ -168,6 +168,11 @@ public:
                                     const CollectionOptions& options,
                                     KVPrefix prefix) override;
 
+    Status importRecordStore(OperationContext* opCtx,
+                             StringData ns,
+                             StringData ident,
+                             const CollectionOptions& options) override;
+
     std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
                                                        StringData ns,
                                                        StringData ident,
@@ -179,6 +184,12 @@ public:
                                             StringData ident,
                                             const IndexDescriptor* desc,
                                             KVPrefix prefix) override;
+
+    Status importSortedDataInterface(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const CollectionOptions& collOptions,
+                                     StringData ident,
+                                     const IndexDescriptor* desc) override;
 
     /**
      * Drops the specified ident for resumable index builds.
