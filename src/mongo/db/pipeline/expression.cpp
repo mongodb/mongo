@@ -193,36 +193,6 @@ bool Expression::isExpressionName(StringData name) {
     return parserMap.find(name) != parserMap.end();
 }
 
-namespace {
-/**
- * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially
- * many continuation bytes of the form 10xxxxxx. This method checks whether 'charByte' is a leading
- * byte.
- */
-bool isLeadingByte(char charByte) {
-    return (charByte & 0xc0) == 0xc0;
-}
-
-/**
- * UTF-8 single-byte code points are of the form 0xxxxxxx. This method checks whether 'charByte' is
- * a single-byte code point.
- */
-bool isSingleByte(char charByte) {
-    return (charByte & 0x80) == 0x0;
-}
-
-size_t getCodePointLength(char charByte) {
-    if (isSingleByte(charByte)) {
-        return 1;
-    }
-
-    invariant(isLeadingByte(charByte));
-
-    // In UTF-8, the number of leading ones is the number of bytes the code point takes up.
-    return countLeadingZeros64(~(uint64_t(charByte) << (64 - 8)));
-}
-}  // namespace
-
 /* ------------------------- Register Date Expressions ----------------------------- */
 
 REGISTER_EXPRESSION(dayOfMonth, ExpressionDayOfMonth::parse);
@@ -3127,7 +3097,7 @@ Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) 
         uassert(40095,
                 "$indexOfCP found bad UTF-8 in the input",
                 !str::isUTF8ContinuationByte(input[byteIx]));
-        byteIx += getCodePointLength(input[byteIx]);
+        byteIx += str::getCodePointLength(input[byteIx]);
     }
 
     size_t endCodePointIndex = codePointLength;
@@ -3155,7 +3125,7 @@ Value ExpressionIndexOfCP::evaluate(const Document& root, Variables* variables) 
         if (stringHasTokenAtIndex(byteIx, input, token)) {
             return Value(static_cast<int>(currentCodePointIndex));
         }
-        byteIx += getCodePointLength(input[byteIx]);
+        byteIx += str::getCodePointLength(input[byteIx]);
     }
 
     return Value(-1);
@@ -4592,7 +4562,7 @@ Value ExpressionSubstrCP::evaluate(const Document& root, Variables* variables) c
         uassert(34456,
                 str::stream() << getOpName() << ": invalid UTF-8 string",
                 !str::isUTF8ContinuationByte(str[startIndexBytes]));
-        size_t codePointLength = getCodePointLength(str[startIndexBytes]);
+        size_t codePointLength = str::getCodePointLength(str[startIndexBytes]);
         uassert(
             34457, str::stream() << getOpName() << ": invalid UTF-8 string", codePointLength <= 4);
         startIndexBytes += codePointLength;
@@ -4604,7 +4574,7 @@ Value ExpressionSubstrCP::evaluate(const Document& root, Variables* variables) c
         uassert(34458,
                 str::stream() << getOpName() << ": invalid UTF-8 string",
                 !str::isUTF8ContinuationByte(str[endIndexBytes]));
-        size_t codePointLength = getCodePointLength(str[endIndexBytes]);
+        size_t codePointLength = str::getCodePointLength(str[endIndexBytes]);
         uassert(
             34459, str::stream() << getOpName() << ": invalid UTF-8 string", codePointLength <= 4);
         endIndexBytes += codePointLength;
@@ -6196,7 +6166,7 @@ Value ExpressionRegex::nextMatch(RegexExecutionState* regexState) const {
     // the byte offset to a code point offset.
     for (int byteIx = regexState->startBytePos; byteIx < matchStartByteIndex;
          ++(regexState->startCodePointPos)) {
-        byteIx += getCodePointLength(input[byteIx]);
+        byteIx += str::getCodePointLength(input[byteIx]);
     }
 
     // Set the start index for match to the new one.
@@ -6415,7 +6385,8 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
             // the character at startByteIndex matches the regex, we cannot return it since we are
             // already returing an empty string starting at this index. So we move on to the next
             // byte index.
-            executionState.startBytePos += getCodePointLength(input[executionState.startBytePos]);
+            executionState.startBytePos +=
+                str::getCodePointLength(input[executionState.startBytePos]);
             ++executionState.startCodePointPos;
             continue;
         }
@@ -6424,7 +6395,7 @@ Value ExpressionRegexFindAll::evaluate(const Document& root, Variables* variable
         // byte after 'matchStr'. We move the code point index also correspondingly.
         executionState.startBytePos += matchStr.size();
         for (size_t byteIx = 0; byteIx < matchStr.size(); ++executionState.startCodePointPos) {
-            byteIx += getCodePointLength(matchStr[byteIx]);
+            byteIx += str::getCodePointLength(matchStr[byteIx]);
         }
 
         invariant(executionState.startBytePos > 0);

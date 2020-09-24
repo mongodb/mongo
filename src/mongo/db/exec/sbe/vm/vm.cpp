@@ -1479,6 +1479,124 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsMember(uint8_
     return {false, resultTag, resultVal};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfBytes(uint8_t arity) {
+    auto [strOwn, strTag, strVal] = getFromStack(0);
+    auto [substrOwn, substrTag, substrVal] = getFromStack(1);
+    if ((!value::isString(strTag)) || (!value::isString(substrTag))) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto str = value::getStringView(strTag, strVal);
+    auto substring = value::getStringView(substrTag, substrVal);
+    int64_t startIndex = 0, endIndex = str.size();
+
+    if (arity >= 3) {
+        auto [startOwn, startTag, startVal] = getFromStack(2);
+        if (startTag != value::TypeTags::NumberInt64) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        startIndex = value::bitcastTo<int64_t>(startVal);
+        // Check index is positive.
+        if (startIndex < 0) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        // Check for valid bounds.
+        if (static_cast<size_t>(startIndex) > str.length()) {
+            return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
+        }
+    }
+    if (arity >= 4) {
+        auto [endOwn, endTag, endVal] = getFromStack(3);
+        if (endTag != value::TypeTags::NumberInt64) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        endIndex = value::bitcastTo<int64_t>(endVal);
+        // Check index is positive.
+        if (endIndex < 0) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        // Check for valid bounds.
+        if (endIndex < startIndex) {
+            return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
+        }
+    }
+    auto index = str.substr(0, endIndex).find(substring, startIndex);
+    if (index != std::string::npos) {
+        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(index)};
+    }
+    return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(uint8_t arity) {
+    auto [strOwn, strTag, strVal] = getFromStack(0);
+    auto [substrOwn, substrTag, substrVal] = getFromStack(1);
+    if ((!value::isString(strTag)) || (!value::isString(substrTag))) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto str = value::getStringView(strTag, strVal);
+    auto substr = value::getStringView(substrTag, substrVal);
+    int64_t startCodePointIndex = 0, endCodePointIndexArg = str.size();
+
+    if (arity >= 3) {
+        auto [startOwn, startTag, startVal] = getFromStack(2);
+        if (startTag != value::TypeTags::NumberInt64) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        startCodePointIndex = value::bitcastTo<int64_t>(startVal);
+        // Check index is positive.
+        if (startCodePointIndex < 0) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        // Check for valid bounds.
+        if (static_cast<size_t>(startCodePointIndex) > str.length()) {
+            return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
+        }
+    }
+    if (arity >= 4) {
+        auto [endOwn, endTag, endVal] = getFromStack(3);
+        if (endTag != value::TypeTags::NumberInt64) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        endCodePointIndexArg = value::bitcastTo<int64_t>(endVal);
+        // Check index is positive.
+        if (endCodePointIndexArg < 0) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        // Check for valid bounds.
+        if (endCodePointIndexArg < startCodePointIndex) {
+            return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
+        }
+    }
+
+    // Handle edge case if both string and substring are empty strings.
+    if (startCodePointIndex == 0 && str.empty() && substr.empty()) {
+        return {true, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)};
+    }
+
+    // Need to get byte indexes for start and end indexes.
+    int64_t startByteIndex = 0, byteIndex = 0, codePointIndex;
+    for (codePointIndex = 0; static_cast<size_t>(byteIndex) < str.size(); codePointIndex++) {
+        if (codePointIndex == startCodePointIndex) {
+            startByteIndex = byteIndex;
+        }
+        uassert(5075307,
+                "$indexOfCP found bad UTF-8 in the input",
+                !str::isUTF8ContinuationByte(str[byteIndex]));
+        byteIndex += str::getCodePointLength(str[byteIndex]);
+    }
+
+    int64_t endCodePointIndex = std::min(codePointIndex, endCodePointIndexArg);
+    byteIndex = startByteIndex;
+    for (codePointIndex = startCodePointIndex; codePointIndex < endCodePointIndex;
+         ++codePointIndex) {
+        if (str.compare(byteIndex, substr.size(), substr) == 0) {
+            return {
+                false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(codePointIndex)};
+        }
+        byteIndex += str::getCodePointLength(str[byteIndex]);
+    }
+    return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1566,6 +1684,10 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinConcat(arity);
         case Builtin::isMember:
             return builtinIsMember(arity);
+        case Builtin::indexOfBytes:
+            return builtinIndexOfBytes(arity);
+        case Builtin::indexOfCP:
+            return builtinIndexOfCP(arity);
     }
 
     MONGO_UNREACHABLE;

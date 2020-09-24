@@ -394,6 +394,10 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"tanh", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tanh, false}},
     {"concat", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::concat, false}},
     {"isMember", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isMember, false}},
+    {"indexOfBytes",
+     BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfBytes, false}},
+    {"indexOfCP",
+     BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfCP, false}},
 };
 
 /**

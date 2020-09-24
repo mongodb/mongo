@@ -214,6 +214,8 @@ enum class Builtin : uint8_t {
     tan,
     tanh,
     isMember,
+    indexOfBytes,
+    indexOfCP,
 };
 
 class CodeFragment {
@@ -527,7 +529,8 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinTanh(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinConcat(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(uint8_t arity);
-
+    std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset) {

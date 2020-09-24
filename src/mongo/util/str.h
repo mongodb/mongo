@@ -35,6 +35,7 @@
  * TODO: De-inline.
  */
 
+#include "absl/base/internal/bits.h"
 #include <boost/optional.hpp>
 #include <ctype.h>
 #include <memory>
@@ -258,6 +259,34 @@ inline mongo::StringData ltrim(mongo::StringData s) {
     for (; i != end && *i == ' '; ++i) {
     }
     return s.substr(i - s.rawData());
+}
+
+/**
+ * UTF-8 multi-byte code points consist of one leading byte of the form 11xxxxxx, and potentially
+ * many continuation bytes of the form 10xxxxxx. This method checks whether 'charByte' is a leading
+ * byte.
+ */
+inline bool isLeadingByte(char charByte) {
+    return (charByte & 0xc0) == 0xc0;
+}
+
+/**
+ * UTF-8 single-byte code points are of the form 0xxxxxxx. This method checks whether 'charByte' is
+ * a single-byte code point.
+ */
+inline bool isSingleByte(char charByte) {
+    return (charByte & 0x80) == 0x0;
+}
+
+inline size_t getCodePointLength(char charByte) {
+    if (isSingleByte(charByte)) {
+        return 1;
+    }
+
+    invariant(isLeadingByte(charByte));
+
+    // In UTF-8, the number of leading ones is the number of bytes the code point takes up.
+    return absl::base_internal::CountLeadingZeros64(~(uint64_t(charByte) << (64 - 8)));
 }
 
 /**

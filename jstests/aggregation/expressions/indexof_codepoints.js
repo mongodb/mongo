@@ -1,12 +1,28 @@
 // In SERVER-8951, $indexOfCP was introduced. In this file, we test the correctness and error
 // cases of the expression.
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and testExpression.
+load("jstests/libs/sbe_assert_error_override.js");
 
 (function() {
 "use strict";
 
 function testExpressionCodePoints(coll, expression, result, shouldTestEquivalence = true) {
     testExpression(coll, expression, result);
+    coll.drop();
+
+    // Test sbe $indexOfCP.
+    const arr = expression.$indexOfCP;
+    let args = ['$string', '$substring'];
+    if (arr.length == 3) {
+        args = ['$string', '$substring', arr[2]];
+    }
+    if (arr.length == 4) {
+        args = ['$string', '$substring', arr[2], arr[3]];
+    }
+    assert.commandWorked(coll.insert({string: arr[0], substring: arr[1]}));
+    const aggResult = coll.aggregate({$project: {byteLocation: {$indexOfCP: args}}}).toArray()[0];
+    assert.eq(result, aggResult.byteLocation);
+    coll.drop();
 
     var indexOfSpec = expression["$indexOfCP"];
     if (shouldTestEquivalence) {
@@ -30,11 +46,113 @@ function testExpressionCodePoints(coll, expression, result, shouldTestEquivalenc
     }
 }
 
-var coll = db.indexofcp;
+const coll = db.indexofcp;
+coll.drop();
+assert.commandWorked(coll.insert({item: 'foobar foobar'}));
+
+// Test that $indexOfCP throws an error when given a string or substring that is not a string.
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: [4, '$item']}}}])),
+                 40093);
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate([{$project: {byteLocation: {$indexOfCP: ['$item', 4]}}}])),
+                 40094);
+assert.commandFailedWithCode(
+    assert.throws(() =>
+                      coll.aggregate([{$project: {byteLocation: {$indexOfCP: ['$item', null]}}}])),
+                 40094);
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate(
+                      [{$project: {byteLocation: {$indexOfCP: ['$item', '$missing']}}}])),
+                 40094);
+
+// Test that $indexOfCP throws an error when given an invalid index.
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate(
+                      [{$project: {byteLocation: {$indexOfCP: ['$item', 'bar', 'hello']}}}])),
+                 40096);
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate(
+                      [{$project: {byteLocation: {$indexOfCP: ['$item', 'bar', -2]}}}])),
+                 40097);
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate(
+                      [{$project: {byteLocation: {$indexOfCP: ['$item', 'bar', 1, 'hello']}}}])),
+                 40096);
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate(
+                      [{$project: {byteLocation: {$indexOfCP: ['$item', 'bar', 1, -2]}}}])),
+                 40097);
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate(
+                      [{$project: {byteLocation: {$indexOfCP: ['$item', 'bar', 1.4]}}}])),
+                 40096);
+assert.commandFailedWithCode(
+    assert.throws(() => coll.aggregate(
+                      [{$project: {byteLocation: {$indexOfCP: ['$item', 'bar', 1, 5.2]}}}])),
+                 40096);
+
+// Test that $indexOfCP returns null when the first argument is null or missing.
+assert.eq(null,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: [null, '$item']}}})
+              .toArray()[0]
+              .byteLocation);
+assert.eq(null,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: ['$missing', '$item']}}})
+              .toArray()[0]
+              .byteLocation);
+assert.eq(null,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: [undefined, '$item']}}})
+              .toArray()[0]
+              .byteLocation);
+
+// Test that $indexOfCP returns null when given a string or substring that is not a string.
+assert.eq(null,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: ['$missing', null]}}})
+              .toArray()[0]
+              .byteLocation);
+assert.eq(null,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: ['$missing', 4]}}})
+              .toArray()[0]
+              .byteLocation);
+assert.eq(null,
+          coll.aggregate({$project: {byteLocation: {$indexOfCP: ['$missing', '$missing']}}})
+              .toArray()[0]
+              .byteLocation);
 coll.drop();
 
-// Insert a dummy document so something flows through the pipeline.
-assert.commandWorked(coll.insert({}));
+// Test that $indexOfCP works with ASCII strings and substrings.
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'bar']}, 3, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'bar', 5]}, 10, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'foo', 1, 5]}, -1, false);
+
+// Test that $indexOfCP returns -1 when the substring is not within bounds.
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'bar', 0, 2]}, -1, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'zzz']}, -1, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'zzz', 10]}, -1, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'zzz', 0, 20]}, -1, false);
+
+// Test that $indexOfCP works with indexes of different numeric types.
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'bar', 5.0]}, 10, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'foo', 1.0, 5.0]}, -1, false);
+
+// Test that $indexOfCP returns -1 when given poorly defined bounds.
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'bar', 20]}, -1, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['foobar foobar', 'bar', 4, 1]}, -1, false);
+
+// Test that $indexOfCP works for the edge case of both string and substring being empty.
+testExpressionCodePoints(coll, {$indexOfCP: ["", ""]}, 0, false);
+
+// Test that $indexOfCP works with strings with codepoints of different byte sizes.
+testExpressionCodePoints(coll, {$indexOfCP: ['\u039C\u039FNG\u039F', 'NG']}, 2, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['\u039C\u039FNG\u039F', '\u039F', 2]}, 4, false);
+
+// Test that $indexOfCP works with strings with codepoints of different sizes.
+testExpressionCodePoints(coll, {$indexOfCP: ['cafétéria', 'é']}, 3, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['cafétéria', 't']}, 4, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['cafétéria', 'é', 4]}, 5, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['cafétéria', 'é', 6]}, -1, false);
+testExpressionCodePoints(coll, {$indexOfCP: ['cafétéria', 'a', 3, 5]}, -1, false);
 
 testExpressionCodePoints(coll, {$indexOfCP: ["∫aƒ", "ƒ"]}, 2);
 

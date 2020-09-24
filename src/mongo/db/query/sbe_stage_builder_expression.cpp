@@ -188,7 +188,6 @@ struct ExpressionVisitorContext {
         pushExpr(sbe::makeE<sbe::EVariable>(unionStageResultSlot), std::move(stage));
     }
 
-
     std::unique_ptr<sbe::EExpression> popExpr() {
         auto expr = std::move(exprs.top());
         exprs.pop();
@@ -448,6 +447,32 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
                              std::move(caseConversionExpr));
     _context->pushExpr(
         sbe::makeE<sbe::ELocalBind>(frameId, std::move(str), std::move(totalCaseConversionExpr)));
+}
+
+/**
+ * Generates an EExpression that checks if the input expression is not a string, _assuming that
+ * it has already been verified to be neither null nor missing.
+ */
+std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EPrimUnary>(
+        sbe::EPrimUnary::logicNot,
+        sbe::makeE<sbe::EFunction>("isString", sbe::makeEs(var.clone())));
+}
+
+/**
+ * Generates an EExpression that checks whether the input expression is null, missing, or
+ * unable to be converted to the type NumberInt32.
+ */
+std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
+    const sbe::EVariable& var) {
+    auto numericConvert32 =
+        sbe::makeE<sbe::ENumericConvert>(var.clone(), sbe::value::TypeTags::NumberInt32);
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::logicOr,
+        generateNullOrMissing(var),
+        sbe::makeE<sbe::EPrimUnary>(
+            sbe::EPrimUnary::logicNot,
+            sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(std::move(numericConvert32)))));
 }
 
 class ExpressionPreVisitor final : public ExpressionVisitor {
@@ -1833,11 +1858,13 @@ public:
     void visit(ExpressionIndexOfArray* expr) final {
         unsupportedExpression(expr->getOpName());
     }
+
     void visit(ExpressionIndexOfBytes* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitIndexOfFunction(expr, _context, "indexOfBytes");
     }
+
     void visit(ExpressionIndexOfCP* expr) final {
-        unsupportedExpression(expr->getOpName());
+        visitIndexOfFunction(expr, _context, "indexOfCP");
     }
     void visit(ExpressionIsNumber* expr) final {
         auto frameId = _context->frameIdGenerator->generate();
@@ -2437,6 +2464,121 @@ private:
 
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(binds), std::move(genericTrignomentricExpr)));
+    }
+
+    /*
+     * Generates an EExpression that returns an index for $indexOfBytes or $indexOfCP.
+     */
+    void visitIndexOfFunction(Expression* expr,
+                              ExpressionVisitorContext* _context,
+                              const std::string& indexOfFunction) {
+        auto frameId = _context->frameIdGenerator->generate();
+        auto children = expr->getChildren();
+        auto operandSize = children.size() <= 3 ? 3 : 4;
+        std::vector<std::unique_ptr<sbe::EExpression>> operands(operandSize);
+        std::vector<std::unique_ptr<sbe::EExpression>> bindings;
+        sbe::EVariable strRef(frameId, 0);
+        sbe::EVariable substrRef(frameId, 1);
+        boost::optional<sbe::EVariable> startIndexRef;
+        boost::optional<sbe::EVariable> endIndexRef;
+
+        // Get arguments from stack.
+        switch (children.size()) {
+            case 2: {
+                operands[2] = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                                         sbe::value::bitcastFrom<int64_t>(0));
+                operands[1] = _context->popExpr();
+                operands[0] = _context->popExpr();
+                startIndexRef.emplace(frameId, 2);
+                break;
+            }
+            case 3: {
+                operands[2] = _context->popExpr();
+                operands[1] = _context->popExpr();
+                operands[0] = _context->popExpr();
+                startIndexRef.emplace(frameId, 2);
+                break;
+            }
+            case 4: {
+                operands[3] = _context->popExpr();
+                operands[2] = _context->popExpr();
+                operands[1] = _context->popExpr();
+                operands[0] = _context->popExpr();
+                startIndexRef.emplace(frameId, 2);
+                endIndexRef.emplace(frameId, 3);
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+
+        // Add string and substring operands.
+        bindings.push_back(strRef.clone());
+        bindings.push_back(substrRef.clone());
+
+        // Add start index operand.
+        if (startIndexRef) {
+            auto numericConvert64 = sbe::makeE<sbe::ENumericConvert>(
+                startIndexRef->clone(), sbe::value::TypeTags::NumberInt64);
+            auto checkValidStartIndex = buildMultiBranchConditional(
+                CaseValuePair{generateNullishOrNotRepresentableInt32Check(*startIndexRef),
+                              sbe::makeE<sbe::EFail>(
+                                  ErrorCodes::Error{5075303},
+                                  str::stream() << "$" << indexOfFunction
+                                                << " start index must resolve to a number")},
+                CaseValuePair{generateNegativeCheck(*startIndexRef),
+                              sbe::makeE<sbe::EFail>(ErrorCodes::Error{5075304},
+                                                     str::stream()
+                                                         << "$" << indexOfFunction
+                                                         << " start index must be positive")},
+                std::move(numericConvert64));
+            bindings.push_back(std::move(checkValidStartIndex));
+        }
+        // Add end index operand.
+        if (endIndexRef) {
+            auto numericConvert64 = sbe::makeE<sbe::ENumericConvert>(
+                endIndexRef->clone(), sbe::value::TypeTags::NumberInt64);
+            auto checkValidEndIndex = buildMultiBranchConditional(
+                CaseValuePair{generateNullishOrNotRepresentableInt32Check(*endIndexRef),
+                              sbe::makeE<sbe::EFail>(ErrorCodes::Error{5075305},
+                                                     str::stream()
+                                                         << "$" << indexOfFunction
+                                                         << " end index must resolve to a number")},
+                CaseValuePair{generateNegativeCheck(*endIndexRef),
+                              sbe::makeE<sbe::EFail>(ErrorCodes::Error{5075306},
+                                                     str::stream()
+                                                         << "$" << indexOfFunction
+                                                         << " end index must be positive")},
+                std::move(numericConvert64));
+            bindings.push_back(std::move(checkValidEndIndex));
+        }
+
+        // Check if string or substring are null or missing before calling indexOfFunction.
+        auto checkStringNullOrMissing = generateNullOrMissing(frameId, 0);
+        auto checkSubstringNullOrMissing = generateNullOrMissing(frameId, 1);
+        auto exprIndexOfFunction = sbe::makeE<sbe::EFunction>(indexOfFunction, std::move(bindings));
+
+        auto totalExprIndexOfFunction = buildMultiBranchConditional(
+            CaseValuePair{std::move(checkStringNullOrMissing),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonStringCheck(strRef),
+                          sbe::makeE<sbe::EFail>(
+                              ErrorCodes::Error{5075300},
+                              str::stream() << "$" << indexOfFunction
+                                            << " string must resolve to a string or null")},
+            CaseValuePair{std::move(checkSubstringNullOrMissing),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5075301},
+                                                 str::stream()
+                                                     << "$" << indexOfFunction
+                                                     << " substring must resolve to a string")},
+            CaseValuePair{generateNonStringCheck(substrRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5075302},
+                                                 str::stream()
+                                                     << "$" << indexOfFunction
+                                                     << " substring must resolve to a string")},
+            std::move(exprIndexOfFunction));
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            frameId, std::move(operands), std::move(totalExprIndexOfFunction)));
     }
 
     void unsupportedExpression(const char* op) const {
