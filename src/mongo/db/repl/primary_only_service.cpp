@@ -482,12 +482,8 @@ void PrimaryOnlyService::releaseAllInstances() {
 }
 
 void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
-    if (MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
-        return;
-    }
-
     std::vector<BSONObj> stateDocuments;
-    {
+    if (!MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
         // The PrimaryOnlyServiceClientObserver will make any OpCtx created as part of a
         // PrimaryOnlyService immediately get interrupted if the service is not in state kRunning.
         // Since we are in State::kRebuilding here, we need to install a
