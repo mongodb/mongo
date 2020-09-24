@@ -97,6 +97,9 @@ private:
         bool operator()(const MergingRef& lhs, const MergingRef& rhs);
 
     private:
+        // Encodes sort key part 'keyPart' according to the collation of the query.
+        BSONObj encodeKeyPartWithCollation(const BSONElement& keyPart);
+
         WorkingSet* _ws;
         BSONObj _pattern;
         const CollatorInterface* _collator;
