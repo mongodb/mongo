@@ -851,7 +851,7 @@ public:
         msparams.pattern = BSON("c" << 1 << "d" << 1);
         CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
         msparams.collator = &collator;
-        MergeSortStage* ms = new MergeSortStage(&_opCtx, msparams, ws.get(), coll);
+        auto ms = std::make_unique<MergeSortStage>(&_opCtx, msparams, ws.get(), coll);
 
         // a:1
         IndexScanParams params;
@@ -861,17 +861,20 @@ public:
         params.bounds.endKey = objWithMaxKey(1);
         params.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
         params.direction = 1;
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        auto idxScan = std::make_unique<IndexScan>(&_opCtx, params, ws.get(), nullptr);
+
+        // Wrap 'idxScan' with a FETCH stage so a document is fetched and MERGE_SORT is forced to
+        // use the provided collator 'collator'. Also, this permits easier retrieval of result
+        // objects in the result verification code.
+        ms->addChild(new FetchStage(&_opCtx, ws.get(), idxScan.release(), nullptr, coll));
 
         // b:1
         params.descriptor = getIndex(secondIndex, coll);
-        ms->addChild(new IndexScan(&_opCtx, params, ws.get(), NULL));
+        idxScan = std::make_unique<IndexScan>(&_opCtx, params, ws.get(), nullptr);
+        ms->addChild(new FetchStage(&_opCtx, ws.get(), idxScan.release(), nullptr, coll));
 
-        unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(&_opCtx, ws.get(), ms, nullptr, coll);
-        // Must fetch if we want to easily pull out an obj.
-        auto statusWithPlanExecutor = PlanExecutor::make(
-            &_opCtx, std::move(ws), std::move(fetchStage), coll, PlanExecutor::NO_YIELD);
+        auto statusWithPlanExecutor =
+            PlanExecutor::make(&_opCtx, std::move(ws), std::move(ms), coll, PlanExecutor::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
