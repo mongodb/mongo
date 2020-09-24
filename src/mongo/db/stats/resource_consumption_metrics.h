@@ -32,6 +32,7 @@
 #include <map>
 #include <string>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
@@ -43,8 +44,33 @@ namespace mongo {
  */
 class ResourceConsumption {
 public:
+    ResourceConsumption();
+
     static ResourceConsumption& get(OperationContext* opCtx);
     static ResourceConsumption& get(ServiceContext* svcCtx);
+
+    struct ReadMetrics {
+        void add(const ReadMetrics& other) {
+            docBytesRead += other.docBytesRead;
+            docUnitsRead += other.docUnitsRead;
+            idxEntriesRead += other.idxEntriesRead;
+            keysSorted += other.keysSorted;
+        }
+
+        ReadMetrics& operator+=(const ReadMetrics& other) {
+            add(other);
+            return *this;
+        }
+
+        // Number of document bytes read
+        uint64_t docBytesRead;
+        // Number of document units read
+        uint64_t docUnitsRead;
+        // Number of index entries read
+        uint64_t idxEntriesRead;
+        // Number of keys sorted for query operations
+        uint64_t keysSorted;
+    };
 
     /**
      * Metrics maintains a set of resource consumption metrics.
@@ -54,11 +80,34 @@ public:
         /**
          * Adds other Metrics to this one.
          */
-        void add(const Metrics& other){};
+        void add(const Metrics& other) {
+            primaryMetrics += other.primaryMetrics;
+            secondaryMetrics += other.secondaryMetrics;
+            cpuMillis += other.cpuMillis;
+            docBytesWritten += other.docBytesWritten;
+            docUnitsWritten += other.docUnitsWritten;
+            docUnitsReturned += other.docUnitsReturned;
+        };
+
         Metrics& operator+=(const Metrics& other) {
             add(other);
             return *this;
         }
+
+        // Read metrics recorded for queries processed while this node was primary
+        ReadMetrics primaryMetrics;
+        // Read metrics recorded for queries processed while this node was secondary
+        ReadMetrics secondaryMetrics;
+        // Amount of CPU time consumed by an operation in milliseconds
+        uint64_t cpuMillis;
+        // Number of document bytes written
+        uint64_t docBytesWritten;
+        // Number of document units written
+        uint64_t docUnitsWritten;
+        // Number of document units returned by a query.
+        uint64_t docUnitsReturned;
+
+        void toBson(BSONObjBuilder* builder) const;
     };
 
     /**
@@ -176,6 +225,16 @@ public:
     }
 
     /**
+     * Returns true if resource consumption metrics should be collected per-operation.
+     */
+    static bool isMetricsCollectionEnabled();
+
+    /**
+     * Returns true if resource consumption metrics should be aggregated globally.
+     */
+    static bool isMetricsAggregationEnabled();
+
+    /**
      * Adds a MetricsCollector's Metrics to an existing Metrics object in the map, keyed by
      * database name. If no Metrics exist for the database, the value is initialized with the
      * provided MetricsCollector's Metrics.
@@ -189,6 +248,12 @@ public:
      */
     using MetricsMap = std::map<std::string, Metrics>;
     MetricsMap getMetrics() const;
+
+    /**
+     * Returns the Metrics map and then clears the contents. This attempts to swap and return the
+     * metrics map rather than making a full copy like getMetrics.
+     */
+    MetricsMap getAndClearMetrics();
 
 private:
     // Protects _metrics

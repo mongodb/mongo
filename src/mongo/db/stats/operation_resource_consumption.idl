@@ -36,11 +36,11 @@ feature_flags:
     default: false
 
 server_parameters:
- aggregateOperationResourceConsumption:
-    description: "When true, globally aggregates per-operation resource consumption. Implies
-                  measureOperationResourceConsumption"
+ aggregateOperationResourceConsumptionMetrics:
+    description: "When true, globally aggregates per-operation resource consumption metrics.
+                  Requires measureOperationResourceConsumption to also be set"
     set_at:
       - startup
-    cpp_varname: gAggregateOperationResourceConsumption
+    cpp_varname: gAggregateOperationResourceConsumptionMetrics
     cpp_vartype: bool
     default: false

@@ -41,7 +41,7 @@ public:
     void setUp() {
         _opCtx = makeOperationContext();
         gMeasureOperationResourceConsumption = true;
-        gAggregateOperationResourceConsumption = true;
+        gAggregateOperationResourceConsumptionMetrics = true;
     }
 
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
@@ -126,6 +126,15 @@ TEST_F(ResourceConsumptionMetricsTest, ScopedMetricsCollector) {
     metricsCopy = globalResourceConsumption.getMetrics();
     ASSERT_EQ(metricsCopy.count("db1"), 1);
     ASSERT_EQ(metricsCopy.count("db2"), 1);
+
+    // Ensure fetch and clear works.
+    auto metrics = globalResourceConsumption.getAndClearMetrics();
+    ASSERT_EQ(metrics.count("db1"), 1);
+    ASSERT_EQ(metrics.count("db2"), 1);
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db1"), 0);
+    ASSERT_EQ(metricsCopy.count("db2"), 0);
 }
 
 TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
@@ -170,6 +179,15 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
     }
 
     metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db2"), 0);
+
+    // Ensure fetch and clear works.
+    auto metrics = globalResourceConsumption.getAndClearMetrics();
+    ASSERT_EQ(metrics.count("db1"), 1);
+    ASSERT_EQ(metrics.count("db2"), 0);
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy.count("db1"), 0);
     ASSERT_EQ(metricsCopy.count("db2"), 0);
 }
 }  // namespace mongo

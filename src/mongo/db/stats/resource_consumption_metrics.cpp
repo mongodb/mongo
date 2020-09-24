@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
+
 #include "mongo/db/stats/resource_consumption_metrics.h"
 
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace {
@@ -37,12 +40,65 @@ const OperationContext::Decoration<ResourceConsumption::MetricsCollector> getMet
     OperationContext::declareDecoration<ResourceConsumption::MetricsCollector>();
 const ServiceContext::Decoration<ResourceConsumption> getGlobalResourceConsumption =
     ServiceContext::declareDecoration<ResourceConsumption>();
+
+static constexpr StringData kPrimaryMetrics = "primaryMetrics"_sd;
+static constexpr StringData kSecondaryMetrics = "secondaryMetrics"_sd;
+static constexpr StringData kDocBytesRead = "docBytesRead"_sd;
+static constexpr StringData kDocUnitsRead = "docUnitsRead"_sd;
+static constexpr StringData kIdxEntriesRead = "idxEntriesRead"_sd;
+static constexpr StringData kKeysSorted = "keysSorted"_sd;
+static constexpr StringData kCpuMillis = "cpuMillis"_sd;
+static constexpr StringData kDocBytesWritten = "docBytesWritten"_sd;
+static constexpr StringData kDocUnitsWritten = "docUnitsWritten"_sd;
+static constexpr StringData kDocUnitsReturned = "docUnitsReturned"_sd;
+
 }  // namespace
 
+bool ResourceConsumption::isMetricsCollectionEnabled() {
+    return gMeasureOperationResourceConsumption;
+}
+
+bool ResourceConsumption::isMetricsAggregationEnabled() {
+    return gAggregateOperationResourceConsumptionMetrics;
+}
+
+ResourceConsumption::ResourceConsumption() {
+    if (gAggregateOperationResourceConsumptionMetrics && !gMeasureOperationResourceConsumption) {
+        LOGV2_FATAL_NOTRACE(
+            5091600,
+            "measureOperationResourceConsumption feature flag must be enabled to use "
+            "aggregateOperationResourceConsumptionMetrics");
+    }
+}
 
 ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::get(
     OperationContext* opCtx) {
     return getMetricsCollector(opCtx);
+}
+
+void ResourceConsumption::Metrics::toBson(BSONObjBuilder* builder) const {
+    {
+        BSONObjBuilder primaryBuilder = builder->subobjStart(kPrimaryMetrics);
+        primaryBuilder.appendNumber(kDocBytesRead, primaryMetrics.docBytesRead);
+        primaryBuilder.appendNumber(kDocUnitsRead, primaryMetrics.docUnitsRead);
+        primaryBuilder.appendNumber(kIdxEntriesRead, primaryMetrics.idxEntriesRead);
+        primaryBuilder.appendNumber(kKeysSorted, primaryMetrics.keysSorted);
+        primaryBuilder.done();
+    }
+
+    {
+        BSONObjBuilder secondaryBuilder = builder->subobjStart(kSecondaryMetrics);
+        secondaryBuilder.appendNumber(kDocBytesRead, secondaryMetrics.docBytesRead);
+        secondaryBuilder.appendNumber(kDocUnitsRead, secondaryMetrics.docUnitsRead);
+        secondaryBuilder.appendNumber(kIdxEntriesRead, secondaryMetrics.idxEntriesRead);
+        secondaryBuilder.appendNumber(kKeysSorted, secondaryMetrics.keysSorted);
+        secondaryBuilder.done();
+    }
+
+    builder->appendNumber(kCpuMillis, cpuMillis);
+    builder->appendNumber(kDocBytesWritten, docBytesWritten);
+    builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
+    builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,
@@ -57,7 +113,7 @@ ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationCon
         return;
     }
 
-    if (!commandCollectsMetrics || !gMeasureOperationResourceConsumption) {
+    if (!commandCollectsMetrics || !isMetricsCollectionEnabled()) {
         metrics.beginScopedNotCollecting();
         return;
     }
@@ -80,7 +136,7 @@ ResourceConsumption::ScopedMetricsCollector::~ScopedMetricsCollector() {
         return;
     }
 
-    if (!gAggregateOperationResourceConsumption) {
+    if (!isMetricsAggregationEnabled()) {
         return;
     }
 
@@ -105,6 +161,13 @@ void ResourceConsumption::add(const MetricsCollector& collector) {
 ResourceConsumption::MetricsMap ResourceConsumption::getMetrics() const {
     stdx::unique_lock<Mutex> lk(_mutex);
     return _metrics;
+}
+
+ResourceConsumption::MetricsMap ResourceConsumption::getAndClearMetrics() {
+    stdx::unique_lock<Mutex> lk(_mutex);
+    MetricsMap newMap;
+    _metrics.swap(newMap);
+    return newMap;
 }
 
 }  // namespace mongo

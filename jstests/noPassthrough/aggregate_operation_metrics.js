@@ -1,0 +1,140 @@
+/**
+ * Tests command output from the $operationMetrics aggregation stage.
+ * @tags: [
+ *   requires_replication
+ * ]
+ */
+(function() {
+'use strict';
+
+var rst = new ReplSetTest({
+    nodes: 2,
+    nodeOptions: {
+        setParameter: {
+            "measureOperationResourceConsumption": true,
+            "aggregateOperationResourceConsumptionMetrics": true
+        }
+    }
+});
+rst.startSet();
+rst.initiate();
+
+let assertMetricsExist = function(metrics) {
+    assert.neq(metrics, undefined);
+    let primaryMetrics = metrics.primaryMetrics;
+    let secondaryMetrics = metrics.secondaryMetrics;
+    [primaryMetrics, secondaryMetrics].forEach((readMetrics) => {
+        assert.gte(readMetrics.docBytesRead, 0);
+        assert.gte(readMetrics.docUnitsRead, 0);
+        assert.gte(readMetrics.idxEntriesRead, 0);
+        assert.gte(readMetrics.keysSorted, 0);
+    });
+
+    assert.gte(metrics.cpuMillis, 0);
+    assert.gte(metrics.docBytesWritten, 0);
+    assert.gte(metrics.docUnitsWritten, 0);
+    assert.gte(metrics.docUnitsReturned, 0);
+};
+
+// Perform very basic reads and writes on two different databases.
+const db1Name = 'db1';
+const primary = rst.getPrimary();
+const db1 = primary.getDB(db1Name);
+assert.commandWorked(db1.coll1.insert({a: 1}));
+assert.commandWorked(db1.coll2.insert({a: 1}));
+
+const db2Name = 'db2';
+const db2 = primary.getDB(db2Name);
+assert.commandWorked(db2.coll1.insert({a: 1}));
+assert.commandWorked(db2.coll2.insert({a: 1}));
+
+const secondary = rst.getSecondary();
+[primary, secondary].forEach(function(node) {
+    jsTestLog("Testing node: " + node);
+    rst.awaitReplication();
+
+    assert.eq(node.getDB(db1Name).coll1.find({a: 1}).itcount(), 1);
+    assert.eq(node.getDB(db1Name).coll2.find({a: 1}).itcount(), 1);
+    assert.eq(node.getDB(db2Name).coll1.find({a: 1}).itcount(), 1);
+    assert.eq(node.getDB(db2Name).coll2.find({a: 1}).itcount(), 1);
+
+    // Run an aggregation with a batch size of 1.
+    const adminDB = node.getDB('admin');
+    let cursor = adminDB.aggregate([{$operationMetrics: {}}], {cursor: {batchSize: 1}});
+    assert(cursor.hasNext());
+
+    // Merge all returned documents into a single object keyed by database name.
+    let allMetrics = {};
+    let doc = cursor.next();
+    allMetrics[doc.db] = doc;
+    assert.eq(cursor.objsLeftInBatch(), 0);
+
+    // Trigger a getMore to retrieve metrics for the other database.
+    assert(cursor.hasNext());
+    doc = cursor.next();
+    allMetrics[doc.db] = doc;
+    assert(!cursor.hasNext());
+
+    // Ensure the two user database have present metrics.
+    assertMetricsExist(allMetrics[db1Name]);
+    assertMetricsExist(allMetrics[db2Name]);
+
+    // Metrics for these databases should not be collected or reported.
+    assert.eq(allMetrics['admin'], undefined);
+    assert.eq(allMetrics['local'], undefined);
+    assert.eq(allMetrics['config'], undefined);
+
+    // Ensure this stage can be composed with other pipeline stages.
+    const newDbName = "newDB";
+    const newCollName = "metrics_out";
+    cursor = adminDB.aggregate([
+        {$operationMetrics: {}},
+        {$project: {db: 1}},
+        {$out: {db: newDbName, coll: newCollName}},
+    ]);
+
+    // No results from the aggregation because of the $out.
+    assert.eq(cursor.itcount(), 0);
+
+    // TODO (SERVER-51176): Ensure metrics are properly recorded for $out.
+    // This new database should appear with metrics, but it does not.
+    cursor = adminDB.aggregate([{$operationMetrics: {}}]);
+    assert.eq(cursor.itcount(), 2);
+
+    // Ensure the output collection has the 2 databases that existed at the start of the operation.
+    rst.awaitReplication();
+    cursor = node.getDB(newDbName)[newCollName].find({});
+    assert.eq(cursor.itcount(), 2);
+
+    primary.getDB(newDbName).dropDatabase();
+
+    // Fetch and don't clear metrics.
+    cursor = adminDB.aggregate([{$operationMetrics: {clearMetrics: false}}]);
+    assert.eq(cursor.itcount(), 3);
+
+    // Fetch and clear metrics.
+    cursor = adminDB.aggregate([{$operationMetrics: {clearMetrics: true}}]);
+    assert.eq(cursor.itcount(), 3);
+
+    // Ensure no metrics are reported.
+    cursor = adminDB.aggregate([{$operationMetrics: {}}]);
+    assert.eq(cursor.itcount(), 0);
+
+    // Insert something and ensure metrics are still reporting.
+    assert.commandWorked(db1.coll3.insert({a: 1}));
+    rst.awaitReplication();
+
+    // On the primary, this insert's metrics should be recorded, but not on the secondary. Since it
+    // is applied by the batch applier on the secondary, it is not a user operation and should not
+    // count toward any metrics.
+    cursor = adminDB.aggregate([{$operationMetrics: {}}]);
+    if (node === primary) {
+        assert.eq(cursor.itcount(), 1);
+    } else {
+        assert.eq(cursor.itcount(), 0);
+    }
+    db1.coll3.drop();
+});
+
+rst.stopSet();
+}());
