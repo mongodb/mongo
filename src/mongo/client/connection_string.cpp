@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <set>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/connection_string.h"
@@ -158,6 +160,15 @@ void ConnectionString::_finishInit() {
     }
 
     _string = ss.str();
+}
+
+ConnectionString ConnectionString::makeUnionWith(const ConnectionString& other) {
+    invariant(type() == other.type());
+    invariant(getSetName() == other.getSetName());
+    std::set<HostAndPort> servers{_servers.begin(), _servers.end()};
+    servers.insert(other._servers.begin(), other._servers.end());
+    return ConnectionString(
+        type(), std::vector<HostAndPort>(servers.begin(), servers.end()), getSetName());
 }
 
 bool ConnectionString::operator==(const ConnectionString& other) const {

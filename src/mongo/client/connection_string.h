@@ -116,6 +116,15 @@ public:
     }
 
     /**
+     * Creates a new ConnectionString object which contains all the servers in either this
+     * ConnectionString or the given one.  Useful for "extending" a connection string with
+     * (potentially) new servers.
+     *
+     * The given ConnectionString must have the same type() and getSetName() as this one.
+     */
+    ConnectionString makeUnionWith(const ConnectionString& other);
+
+    /**
      * Returns true if two connection strings match in terms of their type and the exact order of
      * their hosts.
      */

@@ -179,6 +179,11 @@ public:
     using ShardRemovalHook = std::function<void(const ShardId&)>;
 
     /**
+     * Used when informing updateReplSetHosts() of a new connection string for a shard.
+     */
+    enum class ConnectionStringUpdateType { kConfirmed, kPossible };
+
+    /**
      * Instantiates a new shard registry.
      *
      * @param shardFactory      Makes shards
@@ -256,7 +261,8 @@ public:
      * up the corresponding Shard object based on the replica set name, then updates the
      * ShardRegistry's notion of what hosts make up that shard.
      */
-    void updateReplSetHosts(const ConnectionString& newConnString);
+    void updateReplSetHosts(const ConnectionString& givenConnString,
+                            ConnectionStringUpdateType updateType);
 
     /**
      * Instantiates a new detached shard connection, which does not appear in the list of shards

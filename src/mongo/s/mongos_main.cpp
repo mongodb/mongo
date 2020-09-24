@@ -521,7 +521,10 @@ public:
             LOGV2(471693,
                   "Updating the shard registry with confirmed replica set",
                   "connectionString"_attr = connStr);
-            Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(connStr);
+            Grid::get(_serviceContext)
+                ->shardRegistry()
+                ->updateReplSetHosts(connStr,
+                                     ShardRegistry::ConnectionStringUpdateType::kConfirmed);
         } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
             LOGV2(471694,
                   "Unable to update the shard registry with confirmed replica set",
@@ -547,7 +550,10 @@ public:
 
     void onPossibleSet(const State& state) noexcept final {
         try {
-            Grid::get(_serviceContext)->shardRegistry()->updateReplSetHosts(state.connStr);
+            Grid::get(_serviceContext)
+                ->shardRegistry()
+                ->updateReplSetHosts(state.connStr,
+                                     ShardRegistry::ConnectionStringUpdateType::kPossible);
         } catch (const DBException& ex) {
             LOGV2_DEBUG(22849,
                         2,

@@ -370,11 +370,17 @@ ShardRegistry::_getLatestConnStrings() const {
     return {{_latestConnStrings.begin(), _latestConnStrings.end()}, _rsmIncrement.load()};
 }
 
-void ShardRegistry::updateReplSetHosts(const ConnectionString& newConnString) {
-    invariant(newConnString.type() == ConnectionString::SET ||
-              newConnString.type() == ConnectionString::CUSTOM);  // For dbtests
+void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
+                                       ConnectionStringUpdateType updateType) {
+    invariant(givenConnString.type() == ConnectionString::SET ||
+              givenConnString.type() == ConnectionString::CUSTOM);  // For dbtests
 
     stdx::lock_guard<Latch> lk(_mutex);
+    ConnectionString newConnString =
+        (updateType == ConnectionStringUpdateType::kPossible &&
+         _latestConnStrings.find(givenConnString.getSetName()) != _latestConnStrings.end())
+        ? _latestConnStrings[givenConnString.getSetName()].makeUnionWith(givenConnString)
+        : givenConnString;
     if (auto shard = _configShardData.findByRSName(newConnString.getSetName())) {
         auto newData = ShardRegistryData::createFromExisting(
             _configShardData, newConnString, _shardFactory.get());
