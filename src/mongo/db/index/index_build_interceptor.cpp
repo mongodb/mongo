@@ -51,21 +51,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-namespace {
-
-void checkDrainPhaseFailPoint(OperationContext* opCtx, FailPoint* fp, long long iteration) {
-    fp->executeIf(
-        [=](const BSONObj& data) {
-            LOGV2(4841800,
-                  "Hanging index build during drain writes phase",
-                  "iteration"_attr = iteration);
-
-            fp->pauseWhileSet(opCtx);
-        },
-        [iteration](const BSONObj& data) { return iteration == data["iteration"].numberLong(); });
-}
-
-}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhase);
@@ -242,8 +227,9 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             }
 
             const long long iteration = _numApplied + batchSize;
-            checkDrainPhaseFailPoint(opCtx, &hangIndexBuildDuringDrainWritesPhase, iteration);
-            checkDrainPhaseFailPoint(opCtx, &hangIndexBuildDuringDrainWritesPhaseSecond, iteration);
+            _checkDrainPhaseFailPoint(opCtx, &hangIndexBuildDuringDrainWritesPhase, iteration);
+            _checkDrainPhaseFailPoint(
+                opCtx, &hangIndexBuildDuringDrainWritesPhaseSecond, iteration);
 
             batchSize += 1;
             batchSizeBytes += objSize;
@@ -549,5 +535,26 @@ Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,
     return _skippedRecordTracker.retrySkippedRecords(opCtx, collection);
 }
 
+void IndexBuildInterceptor::_checkDrainPhaseFailPoint(OperationContext* opCtx,
+                                                      FailPoint* fp,
+                                                      long long iteration) const {
+    fp->executeIf(
+        [=](const BSONObj& data) {
+            LOGV2(4841800,
+                  "Hanging index build during drain writes phase",
+                  "iteration"_attr = iteration,
+                  "index"_attr = _indexCatalogEntry->descriptor()->indexName());
+
+            fp->pauseWhileSet(opCtx);
+        },
+        [iteration,
+         &indexName = _indexCatalogEntry->descriptor()->indexName()](const BSONObj& data) {
+            auto indexNames = data.getObjectField("indexNames");
+            return iteration == data["iteration"].numberLong() &&
+                std::any_of(indexNames.begin(), indexNames.end(), [&indexName](const auto& elem) {
+                       return indexName == elem.String();
+                   });
+        });
+}
 
 }  // namespace mongo

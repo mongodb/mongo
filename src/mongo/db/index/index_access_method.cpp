@@ -494,9 +494,7 @@ public:
 
     int64_t getKeysInserted() const final;
 
-    Sorter::PersistedState getPersistedSorterState() const final;
-
-    void persistDataForShutdown() final;
+    Sorter::PersistedState persistDataForShutdown() final;
 
 private:
     void _insertMultikeyMetadataKeysIntoSorter();
@@ -627,13 +625,9 @@ int64_t AbstractIndexAccessMethod::BulkBuilderImpl::getKeysInserted() const {
 }
 
 AbstractIndexAccessMethod::BulkBuilder::Sorter::PersistedState
-AbstractIndexAccessMethod::BulkBuilderImpl::getPersistedSorterState() const {
-    return _sorter->getPersistedState();
-}
-
-void AbstractIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
+AbstractIndexAccessMethod::BulkBuilderImpl::persistDataForShutdown() {
     _insertMultikeyMetadataKeysIntoSorter();
-    _sorter->persistDataForShutdown();
+    return _sorter->persistDataForShutdown();
 }
 
 void AbstractIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIntoSorter() {
@@ -694,6 +688,25 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
     for (int64_t i = 0; it->more(); i++) {
         opCtx->checkForInterrupt();
 
+        hangIndexBuildDuringBulkLoadPhase.executeIf(
+            [opCtx, i, &indexName = _descriptor->indexName()](const BSONObj& data) {
+                LOGV2(4924400,
+                      "Hanging index build during bulk load phase due to "
+                      "'hangIndexBuildDuringBulkLoadPhase' failpoint",
+                      "iteration"_attr = i,
+                      "index"_attr = indexName);
+
+                hangIndexBuildDuringBulkLoadPhase.pauseWhileSet(opCtx);
+            },
+            [i, &indexName = _descriptor->indexName()](const BSONObj& data) {
+                auto indexNames = data.getObjectField("indexNames");
+                return i == data["iteration"].numberLong() &&
+                    std::any_of(
+                           indexNames.begin(), indexNames.end(), [&indexName](const auto& elem) {
+                               return indexName == elem.String();
+                           });
+            });
+
         // Get the next datum and add it to the builder.
         BulkBuilder::Sorter::Data data = it->next();
 
@@ -705,10 +718,10 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             if (cmpData < 0) {
                 LOGV2_FATAL_NOTRACE(
                     31171,
-                    "expected the next key{data_first} to be greater than or equal to the "
-                    "previous key{previousKey}",
-                    "data_first"_attr = data.first.toString(),
-                    "previousKey"_attr = previousKey.toString());
+                    "Expected the next key to be greater than or equal to the previous key",
+                    "nextKey"_attr = data.first.toString(),
+                    "previousKey"_attr = previousKey.toString(),
+                    "index"_attr = _descriptor->indexName());
             }
         }
 
@@ -721,17 +734,6 @@ Status AbstractIndexAccessMethod::commitBulk(OperationContext* opCtx,
             }
             continue;
         }
-
-        hangIndexBuildDuringBulkLoadPhase.executeIf(
-            [opCtx, i](const BSONObj& data) {
-                LOGV2(4924400,
-                      "Hanging index build during bulk load phase due to "
-                      "'hangIndexBuildDuringBulkLoadPhase' failpoint",
-                      "iteration"_attr = i);
-
-                hangIndexBuildDuringBulkLoadPhase.pauseWhileSet(opCtx);
-            },
-            [i](const BSONObj& data) { return i == data["iteration"].numberLong(); });
 
         WriteUnitOfWork wunit(opCtx);
         Status status = builder->addKey(data.first);

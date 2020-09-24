@@ -988,21 +988,17 @@ Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
 }
 
 template <typename Key, typename Value>
-std::vector<SorterRange> Sorter<Key, Value>::_getRanges() const {
+typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForShutdown() {
+    spill();
+    _shouldKeepFilesOnDestruction = true;
+
     std::vector<SorterRange> ranges;
     ranges.reserve(_iters.size());
-
     std::transform(_iters.begin(), _iters.end(), std::back_inserter(ranges), [](const auto it) {
         return it->getRange();
     });
 
-    return ranges;
-}
-
-template <typename Key, typename Value>
-void Sorter<Key, Value>::persistDataForShutdown() {
-    spill();
-    _shouldKeepFilesOnDestruction = true;
+    return {_fileName, ranges};
 }
 
 //

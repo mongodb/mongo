@@ -34,26 +34,28 @@ assert.commandWorked(coll.insert({a: 1}));
 
 jsTestLog("Testing when primary shuts down in the middle of the first drain");
 
-ResumableIndexBuildTest.run(rst,
-                            dbName,
-                            collName,
-                            {a: 1},
-                            "hangIndexBuildDuringDrainWritesPhase",
-                            {iteration: 0},
-                            "drain writes",
-                            {skippedPhaseLogID: 20392},
-                            [{a: 2}, {a: 3}],
-                            [{a: 4}, {a: 5}]);
-ResumableIndexBuildTest.run(rst,
-                            dbName,
-                            collName,
-                            {a: 1},
-                            "hangIndexBuildDuringDrainWritesPhase",
-                            {iteration: 1},
-                            "drain writes",
-                            {skippedPhaseLogID: 20392},
-                            [{a: 6}, {a: 7}],
-                            [{a: 8}, {a: 9}]);
+ResumableIndexBuildTest.run(
+    rst,
+    dbName,
+    collName,
+    [[{a: 1}]],
+    [{name: "hangIndexBuildDuringDrainWritesPhase", logIdWithIndexName: 4841800}],
+    0,
+    ["drain writes"],
+    [{skippedPhaseLogID: 20392}],
+    [{a: 2}, {a: 3}],
+    [{a: 4}, {a: 5}]);
+ResumableIndexBuildTest.run(
+    rst,
+    dbName,
+    collName,
+    [[{a: 1}]],
+    [{name: "hangIndexBuildDuringDrainWritesPhase", logIdWithIndexName: 4841800}],
+    1,
+    ["drain writes"],
+    [{skippedPhaseLogID: 20392}],
+    [{a: 6}, {a: 7}],
+    [{a: 8}, {a: 9}]);
 
 jsTestLog("Testing when primary shuts down after voting, but before commit quorum satisfied");
 

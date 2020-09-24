@@ -17,9 +17,9 @@ const RollbackResumableIndexBuildTest = class {
                collName,
                indexSpec,
                rollbackStartFailPointName,
-               rollbackStartFailPointData,
+               rollbackStartFailPointIteration,
                rollbackEndFailPointName,
-               rollbackEndFailPointData,
+               rollbackEndFailPointIteration,
                locksYieldedFailPointName,
                insertsToBeRolledBack,
                sideWrites = []) {
@@ -43,26 +43,35 @@ const RollbackResumableIndexBuildTest = class {
         const coll = originalPrimary.getDB(dbName).getCollection(collName);
         const indexName = "rollback_resumable_index_build";
 
-        const rollbackEndFp =
-            configureFailPoint(originalPrimary, rollbackEndFailPointName, rollbackEndFailPointData);
-        const rollbackStartFp = configureFailPoint(
-            originalPrimary, rollbackStartFailPointName, rollbackStartFailPointData);
-
         const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
             rollbackTest, function(collName, indexSpec, indexName) {
                 assert.commandFailedWithCode(
                     db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
                     ErrorCodes.InterruptedDueToReplStateChange);
-            }, coll, indexSpec, indexName, sideWrites);
-
-        // Wait until we've completed the last operation that won't be rolled back so that we can
-        // begin the operations that will be rolled back.
-        rollbackEndFp.wait();
+            }, coll, indexSpec, indexName, sideWrites, {hangBeforeBuildingIndex: true});
 
         const buildUUID = extractUUIDFromObject(
             IndexBuildTest
                 .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
                 .buildUUID);
+
+        const rollbackEndFp = configureFailPoint(originalPrimary, rollbackEndFailPointName, {
+            buildUUIDs: [buildUUID],
+            indexNames: [indexName],
+            iteration: rollbackEndFailPointIteration
+        });
+        const rollbackStartFp = configureFailPoint(originalPrimary, rollbackStartFailPointName, {
+            buildUUIDs: [buildUUID],
+            indexNames: [indexName],
+            iteration: rollbackStartFailPointIteration
+        });
+
+        assert.commandWorked(originalPrimary.adminCommand(
+            {configureFailPoint: "hangBeforeBuildingIndex", mode: "off"}));
+
+        // Wait until we've completed the last operation that won't be rolled back so that we can
+        // begin the operations that will be rolled back.
+        rollbackEndFp.wait();
 
         rollbackTest.transitionToRollbackOperations();
 
@@ -124,87 +133,7 @@ const RollbackResumableIndexBuildTest = class {
         rollbackTest.transitionToSteadyStateOperations();
 
         // Ensure that the index build completed after rollback.
-        ResumableIndexBuildTest.assertCompleted(
-            originalPrimary, coll, buildUUID, 2, ["_id_", indexName]);
-
-        assert.commandWorked(
-            rollbackTest.getPrimary().getDB(dbName).getCollection(collName).dropIndex(indexName));
-    }
-
-    /**
-     * Runs the resumable index build rollback test in the case where rollback begins after the
-     * index build has already completed. The point during the index build to roll back to is
-     * specified by rollbackEndFailPointName. If this point is in the drain writes phase, documents
-     * to insert into the side writes table must be specified by sideWrites. Documents specified by
-     * insertsToBeRolledBack are inserted after transitioning to rollback operations and will be
-     * rolled back.
-     */
-    static runIndexBuildComplete(rollbackTest,
-                                 dbName,
-                                 collName,
-                                 indexSpec,
-                                 rollbackEndFailPointName,
-                                 rollbackEndFailPointData,
-                                 insertsToBeRolledBack,
-                                 sideWrites = []) {
-        const originalPrimary = rollbackTest.getPrimary();
-
-        if (!ResumableIndexBuildTest.resumableIndexBuildsEnabled(originalPrimary)) {
-            jsTestLog("Skipping test because resumable index builds are not enabled");
-            return;
-        }
-
-        rollbackTest.awaitLastOpCommitted();
-
-        const coll = originalPrimary.getDB(dbName).getCollection(collName);
-        const indexName = "rollback_resumable_index_build";
-
-        const rollbackEndFp =
-            configureFailPoint(originalPrimary, rollbackEndFailPointName, rollbackEndFailPointData);
-
-        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
-            rollbackTest, function(collName, indexSpec, indexName) {
-                assert.commandWorked(db.runCommand({
-                    createIndexes: collName,
-                    indexes: [{key: indexSpec, name: indexName}],
-                    // Commit quorum is disabled so that the index build can
-                    // complete while the primary is isolated and will roll back.
-                    commitQuorum: 0
-                }));
-            }, coll, indexSpec, indexName, sideWrites);
-
-        // Wait until we reach the desired ending point so that we can begin the operations that
-        // will be rolled back.
-        rollbackEndFp.wait();
-
-        const buildUUID = extractUUIDFromObject(
-            IndexBuildTest
-                .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
-                .buildUUID);
-
-        rollbackTest.transitionToRollbackOperations();
-
-        assert.commandWorked(coll.insert(insertsToBeRolledBack));
-
-        // Disable the rollback end failpoint so that the index build can continue and wait for the
-        // index build to complete.
-        rollbackEndFp.off();
-        awaitCreateIndex();
-
-        rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
-        rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-        rollbackTest.transitionToSteadyStateOperations();
-
-        // Ensure that the index build restarted after rollback.
-        checkLog.containsJson(originalPrimary, 20660, {
-            buildUUID: function(uuid) {
-                return uuid["uuid"]["$uuid"] === buildUUID;
-            }
-        });
-
-        // Ensure that the index build completed after rollback.
-        ResumableIndexBuildTest.assertCompleted(
-            originalPrimary, coll, buildUUID, 2, ["_id_", indexName]);
+        ResumableIndexBuildTest.assertCompleted(originalPrimary, coll, [buildUUID], [indexName]);
 
         assert.commandWorked(
             rollbackTest.getPrimary().getDB(dbName).getCollection(collName).dropIndex(indexName));

@@ -263,18 +263,12 @@ public:
         return _usedDisk;
     }
 
-    PersistedState getPersistedState() const {
-        return {_fileName, _getRanges()};
-    }
-
-    void persistDataForShutdown();
+    PersistedState persistDataForShutdown();
 
 protected:
     Sorter() {}  // can only be constructed as a base
 
     virtual void spill() = 0;
-
-    std::vector<SorterRange> _getRanges() const;
 
     bool _usedDisk{false};  // Keeps track of whether the sorter used disk or not
 
@@ -283,8 +277,8 @@ protected:
 
     SortOptions _opts;
 
-    // Used by Sorter::getPersistedState() to return the base file name of the data persisted by
-    // this Sorter.
+    // Used by Sorter::persistDataForShutdown() to return the base file name of the data persisted
+    // by this Sorter.
     std::string _fileName;
 
     std::string _fileFullPath;

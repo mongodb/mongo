@@ -47,7 +47,7 @@ ResumableIndexBuildTest.runOnSecondary(rst,
                                        collName,
                                        {a: 1},
                                        "hangIndexBuildDuringDrainWritesPhase",
-                                       {iteration: 0},
+                                       0,
                                        undefined, /* primaryFailPointName */
                                        [{a: 2}, {a: 3}],
                                        [{a: 4}, {a: 5}]);
@@ -56,7 +56,7 @@ ResumableIndexBuildTest.runOnSecondary(rst,
                                        collName,
                                        {a: 1},
                                        "hangIndexBuildDuringDrainWritesPhase",
-                                       {iteration: 1},
+                                       1,
                                        undefined, /* primaryFailPointName */
                                        [{a: 6}, {a: 7}],
                                        [{a: 8}, {a: 9}]);

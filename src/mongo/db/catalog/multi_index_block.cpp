@@ -72,45 +72,6 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseBeforeInsertion);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringCollectionScanPhaseAfterInsertion);
 MONGO_FAIL_POINT_DEFINE(leaveIndexBuildUnfinishedForShutdown);
 
-namespace {
-
-Status failPointHangDuringBuild(OperationContext* opCtx,
-                                FailPoint* fp,
-                                StringData where,
-                                const BSONObj& doc,
-                                unsigned long long iteration) {
-    try {
-        fp->executeIf(
-            [=, &doc](const BSONObj& data) {
-                LOGV2(20386,
-                      "Hanging index build during collection scan phase insertion",
-                      "where"_attr = where,
-                      "doc"_attr = doc);
-
-                fp->pauseWhileSet(opCtx);
-            },
-            [&doc, iteration](const BSONObj& data) {
-                if (data.hasField("iteration")) {
-                    return iteration ==
-                        static_cast<unsigned long long>(data["iteration"].numberLong());
-                }
-
-                auto fieldsToMatch = data.getObjectField("fieldsToMatch");
-                return std::all_of(
-                    fieldsToMatch.begin(), fieldsToMatch.end(), [&doc](const auto& elem) {
-                        return SimpleBSONElementComparator::kInstance.evaluate(
-                            elem == doc[elem.fieldName()]);
-                    });
-            });
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        return exceptionToStatus();
-    }
-
-    return Status::OK();
-}
-
-}  // namespace
-
 MultiIndexBlock::~MultiIndexBlock() {
     invariant(_buildIsCleanedUp);
 }
@@ -478,21 +439,21 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
             progress->setTotalWhileRunning(collection->numRecords(opCtx));
 
             uassertStatusOK(
-                failPointHangDuringBuild(opCtx,
-                                         &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
-                                         "before",
-                                         objToIndex,
-                                         n));
+                _failPointHangDuringBuild(opCtx,
+                                          &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
+                                          "before",
+                                          objToIndex,
+                                          n));
 
             // The external sorter is not part of the storage engine and therefore does not need a
             // WriteUnitOfWork to write keys.
             uassertStatusOK(insertSingleDocumentForInitialSyncOrRecovery(opCtx, objToIndex, loc));
 
-            failPointHangDuringBuild(opCtx,
-                                     &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
-                                     "after",
-                                     objToIndex,
-                                     n)
+            _failPointHangDuringBuild(opCtx,
+                                      &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
+                                      "after",
+                                      objToIndex,
+                                      n)
                 .ignore();
 
             // Go to the next document.
@@ -885,7 +846,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
     if (!status.isOK()) {
         LOGV2_ERROR(4841501,
                     "Failed to write resumable index build state to disk",
-                    logAttrs(*_buildUUID),
+                    "buildUUID"_attr = *_buildUUID,
                     "error"_attr = status.getStatus());
         dassert(status,
                 str::stream() << "Failed to write resumable index build state to disk. UUID: "
@@ -897,7 +858,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
 
     wuow.commit();
 
-    LOGV2(4841502, "Wrote resumable index build state to disk", logAttrs(*_buildUUID));
+    LOGV2(4841502, "Wrote resumable index build state to disk", "buildUUID"_attr = *_buildUUID);
 
     rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kKeep);
 }
@@ -919,14 +880,12 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
 
     BSONArrayBuilder indexesArray(builder.subarrayStart("indexes"));
     for (const auto& index : _indexes) {
-        // Persist the data to disk so that we see all of the data that has been inserted into the
-        // Sorter.
-        index.bulk->persistDataForShutdown();
-
         BSONObjBuilder indexInfo(indexesArray.subobjStart());
 
         if (_phase != IndexBuildPhaseEnum::kDrainWrites) {
-            auto state = index.bulk->getPersistedSorterState();
+            // Persist the data to disk so that we see all of the data that has been inserted into
+            // the Sorter.
+            auto state = index.bulk->persistDataForShutdown();
 
             indexInfo.append("fileName", state.fileName);
             indexInfo.append("numKeys", index.bulk->getKeysInserted());
@@ -969,5 +928,50 @@ BSONObj MultiIndexBlock::_constructStateObject(OperationContext* opCtx,
     indexesArray.done();
 
     return builder.obj();
+}
+
+Status MultiIndexBlock::_failPointHangDuringBuild(OperationContext* opCtx,
+                                                  FailPoint* fp,
+                                                  StringData where,
+                                                  const BSONObj& doc,
+                                                  unsigned long long iteration) const {
+    try {
+        fp->executeIf(
+            [=, &doc](const BSONObj& data) {
+                LOGV2(20386,
+                      "Hanging index build during collection scan phase",
+                      "where"_attr = where,
+                      "doc"_attr = doc,
+                      "buildUUID"_attr = _buildUUID);
+
+                fp->pauseWhileSet(opCtx);
+            },
+            [&doc, iteration, buildUUID = _buildUUID](const BSONObj& data) {
+                if (data.hasField("fieldsToMatch")) {
+                    auto fieldsToMatch = data.getObjectField("fieldsToMatch");
+                    return std::all_of(
+                        fieldsToMatch.begin(), fieldsToMatch.end(), [&doc](const auto& elem) {
+                            return SimpleBSONElementComparator::kInstance.evaluate(
+                                elem == doc[elem.fieldName()]);
+                        });
+                }
+
+                if (!buildUUID)
+                    return false;
+
+                auto buildUUIDs = data.getObjectField("buildUUIDs");
+                return iteration ==
+                    static_cast<unsigned long long>(data["iteration"].numberLong()) &&
+                    std::any_of(buildUUIDs.begin(),
+                                buildUUIDs.end(),
+                                [buildUUID = *buildUUID](const auto& elem) {
+                                    return UUID::parse(elem.String()) == buildUUID;
+                                });
+            });
+    } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
+        return ex.toStatus(str::stream() << "Interrupted failpoint " << fp->getName());
+    }
+
+    return Status::OK();
 }
 }  // namespace mongo

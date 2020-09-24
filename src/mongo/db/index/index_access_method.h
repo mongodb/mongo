@@ -253,15 +253,10 @@ public:
         virtual int64_t getKeysInserted() const = 0;
 
         /**
-         * Returns the current state of this BulkBuilder's underlying Sorter that has been already
-         * persisted to disk.
+         * Persists on disk the keys that have been inserted using this BulkBuilder. Returns the
+         * state of the underlying Sorter.
          */
-        virtual Sorter::PersistedState getPersistedSorterState() const = 0;
-
-        /**
-         * Persists on disk the keys that have been inserted using this BulkBuilder.
-         */
-        virtual void persistDataForShutdown() = 0;
+        virtual Sorter::PersistedState persistDataForShutdown() = 0;
     };
 
     /**

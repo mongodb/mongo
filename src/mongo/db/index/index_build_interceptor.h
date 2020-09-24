@@ -191,6 +191,10 @@ private:
      */
     void _yield(OperationContext* opCtx);
 
+    void _checkDrainPhaseFailPoint(OperationContext* opCtx,
+                                   FailPoint* fp,
+                                   long long iteration) const;
+
     // The entry for the index that is being built.
     IndexCatalogEntry* _indexCatalogEntry;
 

@@ -2525,12 +2525,23 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
           "timeout"_attr = timeout,
           "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors);
 
-    if (MONGO_unlikely(hangIndexBuildBeforeWaitingUntilMajorityOpTime.shouldFail())) {
-        LOGV2(4940901,
-              "Hanging index build before waiting for the last optime before interceptors to be "
-              "majority committed due to hangIndexBuildBeforeWaitingUntilMajorityOpTime failpoint");
-        hangIndexBuildBeforeWaitingUntilMajorityOpTime.pauseWhileSet(opCtx);
-    }
+    hangIndexBuildBeforeWaitingUntilMajorityOpTime.executeIf(
+        [opCtx, buildUUID = replState->buildUUID](const BSONObj& data) {
+            LOGV2(
+                4940901,
+                "Hanging index build before waiting for the last optime before interceptors to be "
+                "majority committed due to hangIndexBuildBeforeWaitingUntilMajorityOpTime "
+                "failpoint",
+                "buildUUID"_attr = buildUUID);
+
+            hangIndexBuildBeforeWaitingUntilMajorityOpTime.pauseWhileSet(opCtx);
+        },
+        [buildUUID = replState->buildUUID](const BSONObj& data) {
+            auto buildUUIDs = data.getObjectField("buildUUIDs");
+            return std::any_of(buildUUIDs.begin(), buildUUIDs.end(), [buildUUID](const auto& elem) {
+                return UUID::parse(elem.String()) == buildUUID;
+            });
+        });
 
     auto status = replCoord->waitUntilMajorityOpTime(
         opCtx, replState->lastOpTimeBeforeInterceptors, deadline);
@@ -2557,7 +2568,10 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
                                          std::shared_ptr<ReplIndexBuildState> replState,
                                          const IndexBuildOptions& indexBuildOptions) {
     if (MONGO_unlikely(hangBeforeBuildingIndex.shouldFail())) {
-        LOGV2(4940900, "Hanging before building index due to hangBeforeBuildingIndex failpoint");
+        LOGV2(4940900,
+              "Hanging before building index due to hangBeforeBuildingIndex failpoint",
+              "buildUUID"_attr = replState->buildUUID);
+
         hangBeforeBuildingIndex.pauseWhileSet();
     }
 

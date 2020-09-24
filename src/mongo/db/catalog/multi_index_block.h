@@ -329,6 +329,11 @@ private:
 
     BSONObj _constructStateObject(OperationContext* opCtx, const Collection* collection) const;
 
+    Status _failPointHangDuringBuild(OperationContext* opCtx,
+                                     FailPoint* fp,
+                                     StringData where,
+                                     const BSONObj& doc,
+                                     unsigned long long iteration) const;
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;
