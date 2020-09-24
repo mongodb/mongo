@@ -85,8 +85,7 @@ bool shouldStopSendingRecipientCommand(Status status) {
 TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
                                                 const BSONObj& initialState)
     : repl::PrimaryOnlyService::TypedInstance<Instance>(), _serviceContext(serviceContext) {
-    _stateDoc =
-        TenantMigrationDonorDocument::parse(IDLParserErrorContext("initialStateDoc"), initialState);
+    _stateDoc = tenant_migration_donor::parseDonorStateDocument(initialState);
     if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
         // The migration was resumed on stepup.
         stdx::lock_guard<Latch> lg(_mutex);
@@ -137,7 +136,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
 }
 
 Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj options) {
-    auto stateDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("stateDoc"), options);
+    auto stateDoc = tenant_migration_donor::parseDonorStateDocument(options);
 
     if (stateDoc.getId() != _stateDoc.getId() ||
         stateDoc.getDatabasePrefix() != _stateDoc.getDatabasePrefix() ||
@@ -257,13 +256,30 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                        // Update the state.
                        _stateDoc.setState(nextState);
                        switch (nextState) {
-                           case TenantMigrationDonorStateEnum::kBlocking:
+                           case TenantMigrationDonorStateEnum::kBlocking: {
                                _stateDoc.setBlockTimestamp(oplogSlot.getTimestamp());
+
+                               auto mtab = getTenantMigrationAccessBlocker(
+                                   _serviceContext, _stateDoc.getDatabasePrefix());
+                               invariant(mtab);
+
+                               mtab->startBlockingWrites();
+                               opCtx->recoveryUnit()->onRollback(
+                                   [mtab] { mtab->rollBackStartBlocking(); });
                                break;
+                           }
                            case TenantMigrationDonorStateEnum::kCommitted:
-                           case TenantMigrationDonorStateEnum::kAborted:
                                _stateDoc.setCommitOrAbortOpTime(oplogSlot);
                                break;
+                           case TenantMigrationDonorStateEnum::kAborted: {
+                               _stateDoc.setCommitOrAbortOpTime(oplogSlot);
+
+                               invariant(_abortReason);
+                               BSONObjBuilder bob;
+                               _abortReason.get().serializeErrorToBSON(&bob);
+                               _stateDoc.setAbortReason(bob.obj());
+                               break;
+                           }
                            default:
                                MONGO_UNREACHABLE;
                        }
@@ -484,10 +500,6 @@ void TenantMigrationDonorService::Instance::run(
                 })
                 .then([this, self = shared_from_this(), executor] {
                     // Enter "blocking" state.
-                    auto mtab = getTenantMigrationAccessBlocker(_serviceContext,
-                                                                _stateDoc.getDatabasePrefix());
-                    invariant(mtab);
-                    mtab->startBlockingWrites();
                     return _updateStateDocument(executor, TenantMigrationDonorStateEnum::kBlocking)
                         .then([this, self = shared_from_this(), executor](repl::OpTime opTime) {
                             return _waitForMajorityWriteConcern(executor, std::move(opTime));

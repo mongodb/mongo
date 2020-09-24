@@ -172,6 +172,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
         donorPrimary.getDB("local").oplog.rs.findOne({ns: kConfigDonorsNS, op: "u", o: donorDoc});
     assert.eq(donorDoc.state, "aborted");
     assert.eq(donorDoc.commitOrAbortOpTime.ts, abortOplogEntry.ts);
+    assert.eq(donorDoc.abortReason.code, ErrorCodes.InternalError);
 
     let mtab;
     assert.soon(() => {

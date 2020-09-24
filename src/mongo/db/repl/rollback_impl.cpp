@@ -552,7 +552,6 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // rollback.
     _correctRecordStoreCounts(opCtx);
 
-    TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext()).shutDown();
     tenant_migration_donor::recoverTenantMigrationAccessBlockers(opCtx);
 
     // Reconstruct prepared transactions after counts have been adjusted. Since prepared

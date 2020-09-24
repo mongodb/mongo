@@ -123,6 +123,19 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
+     * Returns true if the durable and in-memory state for the migration 'migrationId' and
+     * 'dbPrefix' is in state "aborted", and false otherwise.
+     */
+    function isMigrationAborted(node, migrationId, dbPrefix) {
+        const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
+        if (configDonorsColl.findOne({_id: migrationId}).state != "aborted") {
+            return false;
+        }
+        const mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+        return mtabs[dbPrefix].access === TenantMigrationUtil.accessState.kAllow;
+    }
+
+    /**
      * Asserts that the migration 'migrationId' and 'dbPrefix' is in state "committed" on all the
      * given nodes.
      */
@@ -139,6 +152,16 @@ var TenantMigrationUtil = (function() {
     function waitForMigrationToCommit(nodes, migrationId, dbPrefix) {
         nodes.forEach(node => {
             assert.soon(() => isMigrationCommitted(node, migrationId, dbPrefix));
+        });
+    }
+
+    /**
+     * Asserts that the migration 'migrationId' and 'dbPrefix' eventually goes to state "aborted"
+     * on all the given nodes.
+     */
+    function waitForMigrationToAbort(nodes, migrationId, dbPrefix) {
+        nodes.forEach(node => {
+            assert.soon(() => isMigrationAborted(node, migrationId, dbPrefix));
         });
     }
 
@@ -179,6 +202,7 @@ var TenantMigrationUtil = (function() {
         forgetMigrationRetryOnRetryableErrors,
         assertMigrationCommitted,
         waitForMigrationToCommit,
+        waitForMigrationToAbort,
         waitForMigrationGarbageCollection,
         getTenantMigrationAccessBlocker
     };
