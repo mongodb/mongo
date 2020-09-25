@@ -54,6 +54,7 @@ variables:
     - linkbench
     - linkbench2
     - workloads
+    - mongo-perf
 
 modules:
 ###
@@ -87,6 +88,10 @@ modules:
   prefix: linkbench2
   branch: master
   ref: 63207190657737b32eb0e81c5b81ad1b8bad0e5a
+- name: mongo-perf
+  repo: git@github.com:mongodb/mongo-perf.git
+  prefix: ../../src
+  branch: master
 ###
 
 - name: enterprise
@@ -133,6 +138,7 @@ functions:
           genny: ${genny_rev}
           workloads: ${workloads_rev}
           signal-processing: ${signal-processing_rev}
+          mongo-perf: ${mongo-perf_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
