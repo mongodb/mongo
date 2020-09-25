@@ -42,6 +42,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/resharded_chunk_gen.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
 
@@ -64,6 +65,27 @@ UUID getCollectionUUIDFromChunkManger(const NamespaceString& nss, const ChunkMan
  */
 NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
                                                 const ChunkManager& cm);
+
+/**
+ * Constructs a BatchedCommandRequest with batch type 'Insert'.
+ */
+BatchedCommandRequest buildInsertOp(const NamespaceString& nss, std::vector<BSONObj> docs);
+
+/**
+ * Constructs a BatchedCommandRequest with batch type 'Update'.
+ */
+BatchedCommandRequest buildUpdateOp(const NamespaceString& nss,
+                                    const BSONObj& query,
+                                    const BSONObj& update,
+                                    bool upsert,
+                                    bool multi);
+
+/**
+ * Constructs a BatchedCommandRequest with batch type 'Delete'.
+ */
+BatchedCommandRequest buildDeleteOp(const NamespaceString& nss,
+                                    const BSONObj& query,
+                                    bool multiDelete);
 
 /**
  * Sends _flushRoutingTableCacheUpdatesWithWriteConcern to a list of shards. Throws if one of the
