@@ -38,14 +38,18 @@ replSet.waitForState(replSet.nodes[1], ReplSetTest.State.PRIMARY);
 // Unfreeze node 0 so it can seek election.
 assert.commandWorked(primary.adminCommand({replSetFreeze: 0}));
 
-// Eventually node 0 will stand for election again because it has a higher priorty.
+// Eventually node 0 will stand for election again because it has a higher priority.
 replSet.waitForState(replSet.nodes[0], ReplSetTest.State.PRIMARY);
 
 // Check that both the 'called' and 'successful' fields of the 'priorityTakeover' election
-// reason counter have been incremented in serverStatus.
+// reason counter have been incremented in serverStatus. We allow an increase of more than 1
+// in case a slow election causes a priority takeover to fail.
 const newPrimaryStatus = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
-verifyServerStatusElectionReasonCounterChange(
-    initialPrimaryStatus.electionMetrics, newPrimaryStatus.electionMetrics, "priorityTakeover", 1);
+verifyServerStatusElectionReasonCounterChange(initialPrimaryStatus.electionMetrics,
+                                              newPrimaryStatus.electionMetrics,
+                                              "priorityTakeover",
+                                              1,
+                                              true /* allowGreater */);
 
 replSet.stopSet();
 })();

@@ -27,7 +27,8 @@ function verifyServerStatusElectionReasonCounterChange(initialElectionMetrics,
                                                        newElectionMetrics,
                                                        fieldName,
                                                        expectedNumCalled,
-                                                       expectedNumSuccessful = undefined) {
+                                                       expectedNumSuccessful = undefined,
+                                                       allowGreater = false) {
     // If 'expectedNumSuccessful' is not passed in, we assume that the 'successful' field is equal
     // to the 'called' field.
     if (!expectedNumSuccessful) {
@@ -36,13 +37,22 @@ function verifyServerStatusElectionReasonCounterChange(initialElectionMetrics,
 
     const initialField = initialElectionMetrics[fieldName];
     const newField = newElectionMetrics[fieldName];
-    assert.eq(initialField["called"] + expectedNumCalled,
-              newField["called"],
-              `expected the 'called' field of '${fieldName}' to increase by ${expectedNumCalled}`);
-    assert.eq(initialField["successful"] + expectedNumSuccessful,
-              newField["successful"],
-              `expected the 'successful' field of '${fieldName}' to increase by ${
-                  expectedNumSuccessful}`);
+
+    const assertFunc = function(left, right, msg) {
+        if (allowGreater) {
+            assert.gte(left, right, msg);
+        } else {
+            assert.eq(left, right, msg);
+        }
+    };
+
+    assertFunc(initialField["called"] + expectedNumCalled,
+               newField["called"],
+               `expected the 'called' field of '${fieldName}' to increase by ${expectedNumCalled}`);
+    assertFunc(initialField["successful"] + expectedNumSuccessful,
+               newField["successful"],
+               `expected the 'successful' field of '${fieldName}' to increase by ${
+                   expectedNumSuccessful}`);
 }
 
 /**
