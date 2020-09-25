@@ -70,10 +70,12 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_xor.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
 namespace {
+
 /**
  * EvalExpr is a wrapper around an EExpression that can also carry a SlotId.
  */
@@ -159,21 +161,8 @@ struct EvalFrame {
 /**
  * Helper functions for building common EExpressions and PlanStage trees.
  */
-EvalStage makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1) {
-    return {sbe::makeS<sbe::LimitSkipStage>(
-                sbe::makeS<sbe::CoScanStage>(planNodeId), limit, boost::none, planNodeId),
-            sbe::makeSV()};
-}
-
-std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
-    return sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot, std::move(e));
-}
-
-std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e) {
-    using namespace std::literals;
-    return sbe::makeE<sbe::EFunction>(
-        "fillEmpty"sv,
-        sbe::makeEs(std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, 0)));
+EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit = 1) {
+    return {makeLimitCoScanTree(planNodeId, limit), sbe::makeSV()};
 }
 
 template <bool IsConst>
@@ -182,7 +171,7 @@ EvalStage makeFilter(EvalStage stage,
                      PlanNodeId planNodeId) {
     if (!stage.stage) {
         // If 'stage' is null, set it to be a limit-1/coscan tree.
-        stage = makeLimitCoScanTree(planNodeId);
+        stage = makeLimitCoScanStage(planNodeId);
     }
 
     return {sbe::makeS<sbe::FilterStage<IsConst>>(
@@ -194,7 +183,7 @@ template <typename... Ts>
 EvalStage makeProject(EvalStage stage, PlanNodeId planNodeId, Ts&&... pack) {
     if (!stage.stage) {
         // If 'stage' is null, set it to be a limit-1/coscan tree.
-        stage = makeLimitCoScanTree(planNodeId);
+        stage = makeLimitCoScanStage(planNodeId);
     }
 
     auto outSlots = std::move(stage.outSlots);
@@ -219,12 +208,12 @@ EvalStage makeTraverse(EvalStage outer,
                        boost::optional<size_t> nestedArraysDepth) {
     if (!outer.stage) {
         // If 'outer' is null, set it to be a limit-1/coscan tree.
-        outer = makeLimitCoScanTree(planNodeId);
+        outer = makeLimitCoScanStage(planNodeId);
     }
 
     if (!inner.stage) {
         // If 'inner' is null, set it to be a limit-1/coscan tree.
-        inner = makeLimitCoScanTree(planNodeId);
+        inner = makeLimitCoScanStage(planNodeId);
     }
 
     sbe::value::SlotVector outerCorrelated;
@@ -1216,7 +1205,7 @@ public:
         invariant(frame.inputSlot == _context->inputSlot);
 
         if (!frame.stage.stage) {
-            frame.stage = makeLimitCoScanTree(_context->planNodeId);
+            frame.stage = makeLimitCoScanStage(_context->planNodeId);
         }
 
         auto&& [_, expr, stage] = generateExpression(_context->opCtx,

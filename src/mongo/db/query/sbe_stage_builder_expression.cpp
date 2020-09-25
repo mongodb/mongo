@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/util/str.h"
 
 namespace mongo::stage_builder {
@@ -99,6 +100,15 @@ struct ExpressionVisitorContext {
             : savedTraverseStage(std::move(traverseStage)),
               savedRelevantSlots(relevantSlots),
               nextBranchResultSlot(nextBranchResultSlot) {}
+    };
+
+    struct FilterExpressionEvalFrame {
+        std::unique_ptr<sbe::PlanStage> traverseStage;
+        sbe::value::SlotVector relevantSlots;
+
+        FilterExpressionEvalFrame(std::unique_ptr<sbe::PlanStage> traverseStage,
+                                  const sbe::value::SlotVector& relevantSlots)
+            : traverseStage(std::move(traverseStage)), relevantSlots(relevantSlots) {}
     };
 
     ExpressionVisitorContext(std::unique_ptr<sbe::PlanStage> inputStage,
@@ -282,7 +292,10 @@ struct ExpressionVisitorContext {
     std::map<Variables::Id, sbe::value::SlotId> environment;
     std::stack<VarsFrame> varsFrameStack;
 
+    // TODO SERVER-51356: Replace these stacks with single stack of evaluation frames.
+    std::stack<FilterExpressionEvalFrame> filterExpressionEvalFrameStack;
     std::stack<LogicalExpressionEvalFrame> logicalExpressionEvalFrameStack;
+
     // See the comment above the generateExpression() declaration for an explanation of the
     // 'relevantSlots' list.
     sbe::value::SlotVector* relevantSlots;
@@ -400,23 +413,6 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverse(
 }
 
 /**
- * Generates an EExpression that checks if the input expression is null or missing.
- */
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicOr,
-        sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                    sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(var.clone()))),
-        sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(var.clone())));
-}
-
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,
-                                                        const sbe::value::SlotId slotId) {
-    sbe::EVariable var{frameId, slotId};
-    return generateNullOrMissing(var);
-}
-
-/**
  * Generates an EExpression that converts the input to upper or lower case.
  */
 void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
@@ -452,99 +448,6 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
                              std::move(caseConversionExpr));
     _context->pushExpr(
         sbe::makeE<sbe::ELocalBind>(frameId, std::move(str), std::move(totalCaseConversionExpr)));
-}
-
-/**
- * Generates an EExpression that checks if the input expression is a non-numeric type _assuming
- * that_ it has already been verified to be neither null nor missing.
- */
-std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(var.clone())));
-}
-
-/**
- * Generates an EExpression that checks if the input expression is the value NumberLong(-2^64).
- */
-std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicAnd,
-        sbe::makeE<sbe::ETypeMatch>(var.clone(),
-                                    MatcherTypeSet{BSONType::NumberLong}.getBSONTypeMask()),
-        sbe::makeE<sbe::EPrimBinary>(
-            sbe::EPrimBinary::eq,
-            var.clone(),
-            sbe::makeE<sbe::EConstant>(
-                sbe::value::TypeTags::NumberInt64,
-                sbe::value::bitcastFrom(std::numeric_limits<int64_t>::min()))));
-}
-
-/**
- * Generates an EExpression that checks if the input expression is NaN _assuming that_ it has
- * already been verified to be numeric.
- */
-std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EFunction>("isNaN", sbe::makeEs(var.clone()));
-}
-
-/**
- * Generates an EExpression that checks if the input expression is a non-positive number (i.e. <= 0)
- * _assuming that_ it has already been verified to be numeric.
- */
-std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::EPrimBinary::lessEq,
-        var.clone(),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom(0)));
-}
-
-/**
- * Generates an EExpression that checks if the input expression is a negative (i.e., < 0) number
- * _assuming that_ it has already been verified to be numeric.
- */
-std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::EPrimBinary::less,
-        var.clone(),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom(0)));
-}
-
-/**
- * Generates an EExpression that checks if the input expression is _not_ an object, _assuming that_
- * it has already been verified to be neither null nor missing.
- */
-std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::EFunction>("isObject", sbe::makeEs(var.clone())));
-}
-
-/**
- * A pair representing a 1) true/false condition and 2) the value that should be returned if that
- * condition evaluates to true.
- */
-using CaseValuePair =
-    std::pair<std::unique_ptr<sbe::EExpression>, std::unique_ptr<sbe::EExpression>>;
-
-/**
- * Convert a list of CaseValuePairs into a chain of EIf expressions, with the final else case
- * evaluating to the 'defaultValue' EExpression.
- */
-template <typename... Ts>
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(Ts... cases);
-
-template <typename... Ts>
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(CaseValuePair headCase, Ts... rest) {
-    return sbe::makeE<sbe::EIf>(std::move(headCase.first),
-                                std::move(headCase.second),
-                                buildMultiBranchConditional(std::move(rest)...));
-}
-
-template <>
-std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
-    std::unique_ptr<sbe::EExpression> defaultCase) {
-    return defaultCase;
 }
 
 class ExpressionPreVisitor final : public ExpressionVisitor {
@@ -752,7 +655,21 @@ public:
     void visit(ExpressionDivide* expr) final {}
     void visit(ExpressionExp* expr) final {}
     void visit(ExpressionFieldPath* expr) final {}
-    void visit(ExpressionFilter* expr) final {}
+    void visit(ExpressionFilter* expr) final {
+        // This visitor executes after visiting the expression that will evaluate to the array for
+        // filtering and before visiting the filter condition expression.
+        auto variableId = expr->getVariableId();
+        invariant(_context->environment.find(variableId) == _context->environment.end());
+
+        auto currentElementSlot = _context->slotIdGenerator->generate();
+        _context->environment.insert({variableId, currentElementSlot});
+
+        // Temporarily reset 'traverseStage' with limit 1/coscan tree to prevent from being
+        // rewritten by filter predicate's generated sub-tree.
+        _context->filterExpressionEvalFrameStack.emplace(std::move(_context->traverseStage),
+                                                         *_context->relevantSlots);
+        _context->traverseStage = makeLimitCoScanTree(_context->planNodeId);
+    }
     void visit(ExpressionFloor* expr) final {}
     void visit(ExpressionIfNull* expr) final {}
     void visit(ExpressionIn* expr) final {}
@@ -1741,7 +1658,141 @@ public:
         _context->relevantSlots->push_back(outputSlot);
     }
     void visit(ExpressionFilter* expr) final {
-        unsupportedExpression("$filter");
+        _context->ensureArity(2);
+
+        auto filterPredicate = _context->popExpr();
+        auto input = _context->popExpr();
+
+        // Extract 'traverseStage' generated for filter predicate.
+        auto filterTraverseStage = std::move(_context->traverseStage);
+
+        // Restore old value of 'traverseStage' and 'relevantSlots' after filter predicate tree
+        // was built.
+        auto& filterPredicateEvalFrame = _context->filterExpressionEvalFrameStack.top();
+        _context->traverseStage = std::move(filterPredicateEvalFrame.traverseStage);
+        *_context->relevantSlots = filterPredicateEvalFrame.relevantSlots;
+        _context->filterExpressionEvalFrameStack.pop();
+
+        // Filter predicate of $filter expression expects current array element to be stored in the
+        // specific variable. We already allocated slot for it in the "in" visitor, now we just need
+        // to retrieve it from the environment.
+        // This slot will be used in the traverse stage twice - to store the input array and to
+        // store current element in this array.
+        auto currentElementVariable = expr->getVariableId();
+        invariant(_context->environment.count(currentElementVariable));
+        auto inputArraySlot = _context->environment.at(currentElementVariable);
+
+        // We no longer need this mapping because filter predicate which expects it was already
+        // compiled.
+        _context->environment.erase(currentElementVariable);
+
+        // Construct 'from' branch of traverse stage. SBE tree stored in 'fromBranch' variable looks
+        // like this:
+        //
+        // project inputIsNotNullishSlot = !(isNull(inputArraySlot) || !exists(inputArraySlot))
+        // project inputArraySlot = (
+        //   let inputRef = input
+        //   in
+        //       if isArray(inputRef) || isNull(inputRef) || !exists(inputRef)
+        //         inputRef
+        //       else
+        //         fail()
+        // )
+        // _context->traverseStage
+        auto frameId = _context->frameIdGenerator->generate();
+        auto binds = sbe::makeEs(std::move(input));
+        sbe::EVariable inputRef(frameId, 0);
+
+        auto inputIsArrayOrNullish = sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::logicOr,
+            generateNullOrMissing(inputRef),
+            sbe::makeE<sbe::EFunction>("isArray", sbe::makeEs(inputRef.clone())));
+        auto checkInputArrayType =
+            sbe::makeE<sbe::EIf>(std::move(inputIsArrayOrNullish),
+                                 inputRef.clone(),
+                                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{5073201},
+                                                        "input to $filter must be an array"));
+        auto inputArray =
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(checkInputArrayType));
+
+        sbe::EVariable inputArrayVariable{inputArraySlot};
+        auto projectInputArray = sbe::makeProjectStage(std::move(_context->traverseStage),
+                                                       _context->planNodeId,
+                                                       inputArraySlot,
+                                                       std::move(inputArray));
+
+        auto inputIsNotNullish = makeNot(generateNullOrMissing(inputArrayVariable));
+        auto inputIsNotNullishSlot = _context->slotIdGenerator->generate();
+        auto fromBranch = sbe::makeProjectStage(std::move(projectInputArray),
+                                                _context->planNodeId,
+                                                inputIsNotNullishSlot,
+                                                std::move(inputIsNotNullish));
+
+        // Construct 'in' branch of traverse stage. SBE tree stored in 'inBranch' variable looks
+        // like this:
+        //
+        // cfilter Variable{inputIsNotNullishSlot}
+        // filter filterPredicate
+        // filterTraverseStage
+        //
+        // Filter predicate can return non-boolean values. To fix this, we generate expression to
+        // coerce it to bool type.
+        frameId = _context->frameIdGenerator->generate();
+        auto boolFilterPredicate =
+            sbe::makeE<sbe::ELocalBind>(frameId,
+                                        sbe::makeEs(std::move(filterPredicate)),
+                                        generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
+        auto filterWithPredicate = sbe::makeS<sbe::FilterStage<false>>(
+            std::move(filterTraverseStage), std::move(boolFilterPredicate), _context->planNodeId);
+
+        // If input array is null or missing, we do not evaluate filter predicate and return EOF.
+        auto innerBranch =
+            sbe::makeS<sbe::FilterStage<true>>(std::move(filterWithPredicate),
+                                               sbe::makeE<sbe::EVariable>(inputIsNotNullishSlot),
+                                               _context->planNodeId);
+
+        // Relevant slots from the _context->traverseStage might be used in the traverse 'in' branch
+        // by filter predicate through path expressions and variables. We need to pass them
+        // explicitly as correlated to traverse 'from' branch.
+        auto outerCorrelatedSlots = *_context->relevantSlots;
+
+        // Add all variables from the environment.
+        for (const auto& item : _context->environment) {
+            outerCorrelatedSlots.push_back(item.second);
+        }
+
+        // inputIsNotNullishSlot is used explicitly by cfilter stage added on top of traverse 'in'
+        // branch.
+        outerCorrelatedSlots.push_back(inputIsNotNullishSlot);
+
+        // Construct traverse stage with the following slots:
+        // * inputArraySlot - slot containing input array of $filter expression
+        // * filteredArraySlot - slot containing the array with items on which filter predicate has
+        //   evaluated to true
+        // * inputArraySlot - slot where 'in' branch of traverse stage stores current array
+        //   element if it satisfies the filter predicate
+        auto filteredArraySlot = _context->slotIdGenerator->generate();
+        auto traverseStage =
+            sbe::makeS<sbe::TraverseStage>(std::move(fromBranch),
+                                           std::move(innerBranch),
+                                           inputArraySlot /* inField */,
+                                           filteredArraySlot /* outField */,
+                                           inputArraySlot /* outFieldInner */,
+                                           std::move(outerCorrelatedSlots) /* outerCorrelated */,
+                                           nullptr /* foldExpr */,
+                                           nullptr /* finalExpr */,
+                                           _context->planNodeId,
+                                           1 /* nestedArraysDepth */);
+
+        // If input array is null or missing, 'in' stage of traverse will return EOF. In this case
+        // traverse sets output slot (filteredArraySlot) to Nothing. We replace it with Null to
+        // match $filter expression behaviour.
+        auto result = sbe::makeE<sbe::EFunction>(
+            "fillEmpty",
+            sbe::makeEs(sbe::makeE<sbe::EVariable>(filteredArraySlot),
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)));
+
+        _context->pushExpr(std::move(result), std::move(traverseStage));
     }
     void visit(ExpressionFloor* expr) final {
         auto frameId = _context->frameIdGenerator->generate();

@@ -1472,6 +1472,10 @@ public:
         return visitor->visit(this);
     }
 
+    Variables::Id getVariableId() const {
+        return _varId;
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 
