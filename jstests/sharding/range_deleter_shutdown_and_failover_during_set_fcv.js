@@ -6,10 +6,6 @@
  * requires_persistence - This test restarts shards and expects them to remember their data.
  * requires_fcv_44 - This test sets the FCV to 4.4.
  * @tags: [requires_persistence, requires_fcv_44]
- * 
- * Flickiness Note: SERVER-50451 fixed flackiness reproduced by setting large election timeout with:
- *    rs: {nodes: 3, settings: {electionTimeoutMillis: 26000}},
- *  the extended election timeout is also set by suite: buildscripts/resmokeconfig/suites/sharding_extended_election_timeout.yml
  */
 
 (function() {
@@ -34,13 +30,6 @@ function setUp() {
 
 function tearDown() {
     assert.commandWorked(st.s.getDB(dbName).dropDatabase());
-
-    // If the leader election is not complete, the feature set to 4.4 could be not complete yet,
-    // and the next test fails with error:
-    //   "cannot initiate setting featureCompatibilityVersion to 4.2 while a previous 
-    //   featureCompatibilityVersion upgrade to 4.4 has not completed."
-    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
-    checkFCV(st.rs0.getPrimary().getDB("admin"), "4.4");
 }
 
 const dbName = "db1";
@@ -64,7 +53,8 @@ const st = new ShardingTest({
     let failpoint =
         configureFailPoint(originalRS0Primary, "setFCVHangWhileEnumeratingOrphanedRanges");
     const awaitResult = startParallelShell(() => {
-        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
+        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}).ok,
+                    'failed to setFCV');
     }, st.s.port);
     failpoint.wait();
 
@@ -76,7 +66,7 @@ const st = new ShardingTest({
     awaitResult();
 
     // Reset the cluster state. No need to turn the failpoint off since the node was restarted.
-    st.rs0.start(originalRS0Primary, {waitForConnect: true}, true /* restart */, true /* waitForHealth */);
+    st.rs0.start(originalRS0Primary, {waitForConnect: true}, true /* restart */);
     tearDown();
 })();
 
@@ -88,7 +78,8 @@ const st = new ShardingTest({
     let failpoint =
         configureFailPoint(originalRS0Primary, "setFCVHangWhileEnumeratingOrphanedRanges");
     const awaitResult = startParallelShell(() => {
-        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
+        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}).ok,
+                    'failed to setFCV');
     }, st.s.port);
     failpoint.wait();
 
@@ -110,7 +101,8 @@ const st = new ShardingTest({
     let failpoint =
         configureFailPoint(originalRS0Primary, "setFCVHangWhileInsertingRangeDeletionTasks");
     const awaitResult = startParallelShell(() => {
-        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
+        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}).ok,
+                    'failed to setFCV');
     }, st.s.port);
     failpoint.wait();
 
@@ -122,7 +114,7 @@ const st = new ShardingTest({
     awaitResult();
 
     // Reset the cluster state. No need to turn the failpoint off since the node was restarted.
-    st.rs0.start(originalRS0Primary, {waitForConnect: true}, true /* restart */, true /* waitForHealth */);
+    st.rs0.start(originalRS0Primary, {waitForConnect: true}, true /* restart */);
     tearDown();
 })();
 
@@ -134,7 +126,8 @@ const st = new ShardingTest({
     let failpoint =
         configureFailPoint(originalRS0Primary, "setFCVHangWhileInsertingRangeDeletionTasks");
     const awaitResult = startParallelShell(() => {
-        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}));
+        assert.soon(() => db.adminCommand({setFeatureCompatibilityVersion: "4.4"}).ok,
+                    'failed to setFCV');
     }, st.s.port);
     failpoint.wait();
 
