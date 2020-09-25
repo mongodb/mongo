@@ -2682,7 +2682,9 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildFirstDrain.shouldFail())) {
-        LOGV2(20666, "Hanging after index build first drain");
+        LOGV2(20666,
+              "Hanging after index build first drain",
+              "buildUUID"_attr = replState->buildUUID);
         hangAfterIndexBuildFirstDrain.pauseWhileSet(opCtx);
     }
 }
