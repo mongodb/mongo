@@ -61,7 +61,10 @@ const testNodeForceSyncSource = forceSyncSource(rst, testNode, secondary);
 // Partition the nodes so that 'testNode' is in the same data center as the primary,
 const westDC = new DataCenter("westDC", [primary, testNode]);
 const eastDC = new DataCenter("eastDC", [secondary]);
-delayMessagesBetweenDataCenters(westDC, eastDC, 50 /* delayMillis */);
+// We set a high delay between data centers because we might only receive one or two heartbeats from
+// our sync source. Our delay should create a sufficient ping time difference with just a single
+// heartbeat.
+delayMessagesBetweenDataCenters(westDC, eastDC, 300 /* delayMillis */);
 
 // Hang 'testNode' in the oplog fetcher to ensure that sync source candidates are ahead of us.
 const hangOplogFetcherBeforeAdvancingLastFetched =
