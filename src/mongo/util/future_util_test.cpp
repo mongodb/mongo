@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
+#include <random>
 
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/unittest/barrier.h"
@@ -298,7 +299,9 @@ TEST_F(WhenAllSucceedTest, WhenAllSucceedMaintainsOrderingOfInputFutures) {
     for (auto i = 0; i < kNumInputs; ++i) {
         ordering.push_back(i);
     }
-    std::random_shuffle(ordering.begin(), ordering.end());
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(ordering.begin(), ordering.end(), g);
 
     for (auto idx : ordering) {
         ASSERT_FALSE(result.isReady());
