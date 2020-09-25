@@ -43,7 +43,6 @@ SCons.Node.FS.File.release_target_info = release_target_info_noop
 from buildscripts import utils
 from buildscripts import moduleconfig
 
-import libdeps
 import psutil
 
 scons_invocation = '{} {}'.format(sys.executable, ' '.join(sys.argv))
@@ -1730,7 +1729,7 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
 if get_option('build-tools') == 'next':
-    import libdeps_next
+    import libdeps_next as libdeps
 else:
     import libdeps
 
