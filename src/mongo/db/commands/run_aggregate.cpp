@@ -754,11 +754,11 @@ Status runAggregate(OperationContext* opCtx,
         if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
             Explain::explainPipelineExecutor(pipelineExec, *(expCtx->explain), &bodyBuilder);
         } else {
-            invariant(pins[0]->getExecutor()->lockPolicy() ==
-                      PlanExecutor::LockPolicy::kLockExternally);
             invariant(explainExecutor->getOpCtx() == opCtx);
-            // The explainStages() function for a non-pipeline executor expects to be called with
-            // the appropriate collection lock already held. Make sure it has not been released yet.
+            // The explainStages() function for a non-pipeline executor may need to execute the plan
+            // to collect statistics. If the PlanExecutor uses kLockExternally policy, the
+            // appropriate collection lock must be already held. Make sure it has not been released
+            // yet.
             invariant(ctx);
             Explain::explainStages(explainExecutor,
                                    ctx->getCollection(),
