@@ -1729,6 +1729,11 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # command but instead runs a function.
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
+if get_option('build-tools') == 'next':
+    import libdeps_next
+else:
+    import libdeps
+
 libdeps.setup_environment(
     env,
     emitting_shared=(link_model.startswith("dynamic")),
@@ -4790,3 +4795,8 @@ env.NoCache(env.FindInstalledFiles())
 # because SCons wants it to be a particular object.
 for i, s in enumerate(BUILD_TARGETS):
     BUILD_TARGETS[i] = env.subst(s)
+
+# Do any final checks the Libdeps linter may need to do once all
+# SConscripts have been read but before building begins.
+if get_option('build-tools') == 'next':
+    libdeps.LibdepLinter(env).final_checks()
