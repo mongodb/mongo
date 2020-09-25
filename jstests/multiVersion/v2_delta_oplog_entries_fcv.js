@@ -5,7 +5,8 @@
 (function() {
 "use strict";
 
-load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+load("jstests/libs/curop_helpers.js");          // For waitForCurOpByFailPoint().
+load("jstests/multiVersion/libs/multi_rs.js");  // For upgradeSet().
 
 const kLatest = "latest";
 const kLastStable = "4.4";
@@ -145,21 +146,18 @@ const rst = new ReplSetTest({nodes: 2, nodeOpts: {noCleanData: true}});
     // The error code used by 4.4 in this scenario is different from the one used in 4.7+.
     const k44ApplyOpsUnknownUpdateVersionErrorCode = 40682;
     checkApplyOpsOfV2Entries(coll, k44ApplyOpsUnknownUpdateVersionErrorCode);
-
-    rst.stopSet(
-        null,  // signal
-        true   // for restart
-    );
 })();
 
 // Start a latest replica set using the same data files. The set should start in FCV 4.4 by
 // default.
 (function runLatest() {
-    const nodes = rst.startSet({restart: true, binVersion: kLatest});
+    rst.upgradeSet({binVersion: kLatest});
+    // Wait until the set is fully operational and all nodes agree on the latest optime.
+    rst.awaitSecondaryNodes();
     rst.awaitNodesAgreeOnAppliedOpTime();
     // Step up node 0. Since we started with a high election timeout this would otherwise
     // take a while.
-    assert.commandWorked(nodes[0].adminCommand({replSetStepUp: 1}));
+    assert.commandWorked(rst.nodes[0].adminCommand({replSetStepUp: 1}));
 
     const primaryAdminDB = rst.getPrimary().getDB("admin");
     checkFCV(primaryAdminDB, kLastStable);
