@@ -34,38 +34,11 @@
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/shard_id.h"
-#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
-namespace resharding {
-CollectionType createTempReshardingCollectionType(
-    OperationContext* opCtx,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    const ChunkVersion& chunkVersion,
-    const BSONObj& collation);
-
-void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
-                                          const ReshardingCoordinatorDocument& coordinatorDoc,
-                                          std::vector<ChunkType> initialChunks,
-                                          std::vector<TagsType> newZones);
-
-void persistCommittedState(OperationContext* opCtx,
-                           const ReshardingCoordinatorDocument& coordinatorDoc,
-                           OID newCollectionEpoch,
-                           boost::optional<int> expectedNumChunksModified,
-                           boost::optional<int> expectedNumZonesModified);
-
-void persistStateTransition(OperationContext* opCtx,
-                            const ReshardingCoordinatorDocument& coordinatorDoc);
-
-void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             const ReshardingCoordinatorDocument& coordinatorDoc);
-
-}  // namespace resharding
 
 class ServiceContext;
 class OperationContext;
@@ -181,7 +154,7 @@ public:
          *
          * Transitions to 'kCommitted'.
          */
-        Future<void> _commit(const ReshardingCoordinatorDocument& updatedDoc);
+        Future<void> _commit(ReshardingCoordinatorDocument updatedDoc);
 
         /**
          * Waits on _reshardingCoordinatorObserver to notify that all recipients have renamed the
@@ -206,6 +179,17 @@ public:
                          boost::optional<Timestamp> fetchTimestamp = boost::none);
 
         /**
+         * Marks the state doc as garbage collectable so that it can be cleaned up by the TTL
+         * monitor.
+         */
+        void _markCoordinatorStateDocAsGarbageCollectable();
+
+        /**
+         * Removes the 'reshardingFields' from the config.collections entry.
+         */
+        void _removeReshardingFields();
+
+        /**
          * Sends 'flushRoutingTableCacheUpdates' for the temporary namespace to all recipient
          * shards.
          */
@@ -227,7 +211,7 @@ public:
         std::shared_ptr<ReshardingCoordinatorObserver> _reshardingCoordinatorObserver;
 
         // The updated coordinator state document.
-        ReshardingCoordinatorDocument _coordinatorDoc;
+        ReshardingCoordinatorDocument _stateDoc;
 
         // Protects promises below.
         mutable Mutex _mutex = MONGO_MAKE_LATCH("ReshardingCoordinatorService::_mutex");

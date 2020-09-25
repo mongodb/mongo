@@ -535,7 +535,6 @@ env.CppUnitTest(
         'resharding_util_refresh_test.cpp',
         'resharding_util_test.cpp',
         'resharding/resharding_coordinator_observer_test.cpp',
-        'resharding/resharding_coordinator_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
