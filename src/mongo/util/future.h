@@ -343,10 +343,17 @@ public:
     }
 
     /**
-     * This ends the Future continuation chain by calling a callback on completion. Use this to
-     * escape back into a callback-based API.
+     * Attaches a `func` callback that will consume the result of this `Future` when it completes. A
+     * `getAsync` call can be the tail end of a continuation chain, and that is only position at
+     * which it can appear.
      *
-     * For now, the callback must not fail, since there is nowhere to propagate the error to.
+     * The result argument passed to `func` is `Status` if `T` is `void`, otherwise `StatusWith<T>`.
+     * The `func(result)` return type must be `void`, and not a discarded return value.
+     *
+     * `func` must not throw an exception. It is invoked as if by a `noexcept` function, and it will
+     * `std::terminate` the process. This is because there is no appropriate context in which to
+     * handle such an asynchronous exception.
+     *
      * TODO decide how to handle func throwing.
      */
     TEMPLATE(typename Func)
@@ -607,6 +614,10 @@ public:
     // it should be doable, but will be fairly complicated.
     //
 
+    /**
+     * Attach a completion callback to asynchronously consume this `ExecutorFuture`'s result.
+     * \see `Future<T>::getAsync()`.
+     */
     TEMPLATE(typename Func)
     REQUIRES(future_details::isCallableExactR<void, Func, StatusOrStatusWith<T>>)
     void getAsync(Func&& func) && noexcept {
