@@ -913,13 +913,20 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     const BSONElement mdElement = metadata["md"];
     uassert(ErrorCodes::BadValue, "Malformed catalog metadata", mdElement.isABSONObj());
     md.parse(mdElement.Obj());
-    uassert(ErrorCodes::BadValue, "Attempted to import collection without UUID", md.options.uuid);
 
     uassert(ErrorCodes::BadValue,
             "Attemped to import collection without idxIdent",
             metadata.hasField("idxIdent"));
 
-    StatusWith<Entry> swEntry = _importEntry(opCtx, nss, metadata);
+    // Generate a new UUID for the collection.
+    md.options.uuid = CollectionUUID::gen();
+    BSONObjBuilder catalogEntry;
+    // Generate a new "md" field after setting the new UUID.
+    catalogEntry.append("md", md.toBSON());
+    // Append the rest of the metadata.
+    catalogEntry.appendElementsUnique(metadata);
+
+    StatusWith<Entry> swEntry = _importEntry(opCtx, nss, catalogEntry.obj());
     if (!swEntry.isOK())
         return swEntry.getStatus();
     Entry& entry = swEntry.getValue();

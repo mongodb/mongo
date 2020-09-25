@@ -473,7 +473,6 @@ TEST_F(DurableCatalogTest, ImportCollection) {
 
     md.ns = nss.ns();
 
-    CollectionOptions options;
     CollectionOptions optionsWithUUID;
     optionsWithUUID.uuid = UUID::gen();
     md.options = optionsWithUUID;
@@ -509,18 +508,10 @@ TEST_F(DurableCatalogTest, ImportCollection) {
         AssertionException,
         ErrorCodes::BadValue);
 
-    // Import should fail with missing UUID from collection options.
-    md.options = options;
-    ASSERT_THROWS_CODE(importCollectionTest(nss,
-                                            BSON("md" << md.toBSON() << "idxIdent" << idxIdentObj
-                                                      << "ns" << nss.ns() << "ident" << ident)),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-
     // Import should success with validate inputs.
-    const auto validMetaData =
-        BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident);
-    auto swImportResult = importCollectionTest(nss, validMetaData);
+    auto swImportResult = importCollectionTest(
+        nss,
+        BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident));
     ASSERT_OK(swImportResult.getStatus());
     DurableCatalog::ImportResult importResult = std::move(swImportResult.getValue());
 
@@ -530,9 +521,15 @@ TEST_F(DurableCatalogTest, ImportCollection) {
     ASSERT_EQ(entry.ident, ident);
     ASSERT_EQ(getCatalog()->getIndexIdent(operationContext(), importResult.catalogId, "_id_"),
               idxIdent);
+
+    // Test that a collection UUID is generated for import.
+    ASSERT_NE(optionsWithUUID.uuid.get(), importResult.uuid);
+    // Substitute in the generated UUID and check that the rest of fields in the catalog entry
+    // match.
+    md.options.uuid = importResult.uuid;
     ASSERT_BSONOBJ_EQ(getCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
-                      validMetaData);
-    ASSERT_EQ(optionsWithUUID.uuid.get(), importResult.uuid);
+                      BSON("md" << md.toBSON() << "idxIdent" << idxIdentObj << "ns" << nss.ns()
+                                << "ident" << ident));
 }
 
 }  // namespace
