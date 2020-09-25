@@ -98,7 +98,7 @@ function testNotEqualsNullSemantics() {
         const noProjectResults = coll.find(query).toArray();
         const expected = [
             {_id: "a_empty_subobject", a: {}},
-            {_id: "a_empty_subobject", a: 4},
+            {_id: "a_number", a: 4},
             {_id: "a_subobject_b_not_null", a: {b: "hi"}},
             {_id: "a_subobject_b_null", a: {b: null}},
             {_id: "a_subobject_b_undefined", a: {b: undefined}},

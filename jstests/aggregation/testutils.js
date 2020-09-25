@@ -54,8 +54,8 @@ const exampleDifferentIds = [
     {_id: 1, pageViews: 7, tags: ["fun", "nasty"]},
     {_id: 2, pageViews: 6, tags: ["nasty", "filthy"]}
 ];
-assert(resultsEq(example, exampleDifferentIds));
-assert(resultsEq(exampleDifferentIds, example));
+assertArrayEq({actual: example, expected: exampleDifferentIds, fieldsToSkip: ["_id"]});
+assertArrayEq({actual: exampleDifferentIds, expected: example, fieldsToSkip: ["_id"]});
 
 // Test using a custom comparator.
 assert(customDocumentEq({

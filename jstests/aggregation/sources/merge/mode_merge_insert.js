@@ -183,7 +183,8 @@ const pipeline = [mergeStage];
             {_id: 2, a: 2, b: "b"},
             {_id: 4, a: 30, b: "c", c: "y"},
             {_id: 5, a: 40, c: "z"}
-        ]
+        ],
+        fieldsToSkip: ["_id"]
     });
 
     // The 'on' fields contains multiple document fields.
@@ -205,7 +206,8 @@ const pipeline = [mergeStage];
             {_id: 2, a: 2, b: "b"},
             {_id: 4, a: 30, b: "c", c: "y"},
             {_id: 5, a: 40, c: "z"}
-        ]
+        ],
+        fieldsToSkip: ["_id"]
     });
     assert.commandWorked(source.dropIndex({a: 1, b: 1}));
     assert.commandWorked(target.dropIndex({a: 1, b: 1}));
@@ -239,7 +241,8 @@ const pipeline = [mergeStage];
             {_id: 1, a: {b: "b"}, c: "x"},
             {_id: 2, a: {b: "c"}, c: "y"},
             {_id: 3, a: {b: 30}, b: "c"}
-        ]
+        ],
+        fieldsToSkip: ["_id"]
     });
 })();
 

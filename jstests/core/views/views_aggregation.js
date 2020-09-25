@@ -74,7 +74,7 @@ assert.commandWorked(viewsDB.runCommand({
     // Aggregations work on views that sort.
     const doOrderedSort = true;
     assertAggResultEq("popSortedView", [], allDocuments.sort(byPopulation), doOrderedSort);
-    assertAggResultEq("popSortedView", [{$limit: 1}, {$project: {_id: 1}}], [{_id: "Palo Alto"}]);
+    assertAggResultEq("popSortedView", [{$limit: 1}, {$project: {_id: 1}}], [{_id: "Newark"}]);
 })();
 
 (function testAggStagesWritingToViews() {
