@@ -720,6 +720,22 @@ const ResumableIndexBuildTest = class {
     }
 
     /**
+     * Asserts that the temporary directory for the persisted Sorter data is empty.
+     */
+    static checkTempDirectoryCleared(primary) {
+        const tempDir = primary.dbpath + "/_tmp";
+
+        // If the index build was interrupted for shutdown before anything was inserted into
+        // the Sorter, the temp directory may not exist.
+        if (!fileExists(tempDir))
+            return;
+
+        // Ensure that the persisted Sorter data was cleaned up after failing to resume.
+        const files = listFiles(tempDir);
+        assert.eq(files.length, 0, files);
+    }
+
+    /**
      * Runs the resumable index build test specified by the provided index spec on the provided
      * replica set and namespace. This will be used to test that failing to resume an index build
      * during the setup phase will cause the index build to restart from the beginning instead.
@@ -785,26 +801,13 @@ const ResumableIndexBuildTest = class {
             checkLog.containsJson(primary, id);
         };
 
-        const checkTempDirectoryCleared = function(primary) {
-            const tempDir = primary.dbpath + "/_tmp";
-
-            // If the index build was interrupted for shutdown before anything was inserted into
-            // the Sorter, the temp directory may not exist.
-            if (!fileExists(tempDir))
-                return;
-
-            // Ensure that the persisted Sorter data was cleaned up after failing to resume.
-            const files = listFiles(tempDir);
-            assert.eq(files.length, 0, files);
-        };
-
         if (failWhileParsing) {
             // If we fail while parsing, the persisted Sorter data will only be cleaned up after
             // another restart.
             checkLogIdAfterRestart(primary, 5071100);
-            checkTempDirectoryCleared(primary);
+            ResumableIndexBuildTest.checkTempDirectoryCleared(primary);
         } else {
-            checkTempDirectoryCleared(primary);
+            ResumableIndexBuildTest.checkTempDirectoryCleared(primary);
 
             // If we fail after parsing, any remaining internal idents will only be cleaned up
             // after another restart.
