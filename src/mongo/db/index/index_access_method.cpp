@@ -847,7 +847,8 @@ std::shared_ptr<Ident> AbstractIndexAccessMethod::getSharedIdent() const {
 
 /**
  * Generates a new file name on each call using a static, atomic and monotonically increasing
- * number.
+ * number. Each name is suffixed with a random number generated at startup, to prevent name
+ * collisions when the index build external sort files are preserved across restarts.
  *
  * Each user of the Sorter must implement this function to ensure that all temporary files that the
  * Sorter instances produce are uniquely identified using a unique file name extension with separate
@@ -856,7 +857,9 @@ std::shared_ptr<Ident> AbstractIndexAccessMethod::getSharedIdent() const {
  */
 std::string nextFileName() {
     static AtomicWord<unsigned> indexAccessMethodFileCounter;
-    return "extsort-index." + std::to_string(indexAccessMethodFileCounter.fetchAndAdd(1));
+    static const int64_t randomSuffix = SecureRandom().nextInt64();
+    return str::stream() << "extsort-index." << indexAccessMethodFileCounter.fetchAndAdd(1) << '-'
+                         << randomSuffix;
 }
 
 Status AbstractIndexAccessMethod::_handleDuplicateKey(OperationContext* opCtx,
