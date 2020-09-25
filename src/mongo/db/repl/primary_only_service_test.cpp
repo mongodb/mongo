@@ -451,7 +451,7 @@ TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
 }
 
-TEST_F(PrimaryOnlyServiceTest, ReportServiceInfo) {
+TEST_F(PrimaryOnlyServiceTest, ReportServerStatusInfo) {
     {
         BSONObjBuilder resultBuilder;
         _registry->reportServiceInfoForServerStatus(&resultBuilder);
@@ -733,6 +733,9 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
 }
 
 TEST_F(PrimaryOnlyServiceTest, ReportCurOpInfo) {
+    // Make sure the instance doesn't complete before we try to report its state.
+    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
     auto unreportedInstance =
         TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
     auto reportedInstance = TestService::Instance::getOrCreate(
