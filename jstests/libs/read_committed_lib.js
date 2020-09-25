@@ -4,24 +4,24 @@
  * by a mongos instance then the associated cluster should have only a single shard. 'rst' is the
  * ReplSetTest instance associated with the replica set/shard.
  */
+
+load("jstests/libs/write_concern_util.js");
+
 function testReadCommittedLookup(db, secondary, rst) {
     /**
-     * Uses the 'rsSyncApplyStop' fail point to stop application of oplog entries on the given
-     * secondary.
+     * stopServerReplication uses the 'stopReplProducer' fail point to stop server replication on
+     * the given secondary.
      */
     function pauseReplication(sec) {
-        assert.commandWorked(
-            sec.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}),
-            "failed to enable fail point on secondary");
+        stopServerReplication(sec);
     }
 
     /**
-     * Turns off the 'rsSyncApplyStop' fail point to resume application of oplog entries on the
+     * Turns off the 'stopReplProducer' fail point to resume server replication on the
      * given secondary.
      */
     function resumeReplication(sec) {
-        assert.commandWorked(sec.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}),
-                             "failed to disable fail point on secondary");
+        restartServerReplication(sec);
     }
 
     const aggCmdLookupObj = {

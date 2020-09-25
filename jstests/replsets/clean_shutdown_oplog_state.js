@@ -11,6 +11,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/write_concern_util.js");
+
 // Skip db hash check because secondary restarted as standalone.
 TestData.skipCheckDBHashes = true;
 
@@ -28,10 +30,10 @@ printjson(conf);
 rst.initiate(conf);
 
 var primary = rst.getPrimary();  // Waits for PRIMARY state.
-var slave = rst.nodes[1];
+var secondary = rst.nodes[1];
 
 // Stop replication on the secondary.
-assert.commandWorked(slave.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
+stopServerReplication(secondary);
 
 // Prime the main collection.
 primary.getCollection("test.coll").insert({_id: -1});
@@ -51,13 +53,13 @@ assert.commandWorked(op.execute());
 
 // Resume replication and wait for ops to start replicating, then do a clean shutdown on the
 // secondary.
-assert.commandWorked(slave.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
+restartServerReplication(secondary);
 waitForReplStart();
 sleep(100);  // wait a bit to increase the chances of killing mid-batch.
 rst.stop(1);
 
 // Restart the secondary as a standalone node.
-var options = slave.savedOptions;
+var options = secondary.savedOptions;
 options.noCleanData = true;
 delete options.replSet;
 

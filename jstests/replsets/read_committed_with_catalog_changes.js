@@ -28,6 +28,7 @@
  */
 
 load("jstests/libs/parallelTester.js");  // For Thread.
+load("jstests/libs/write_concern_util.js");
 
 (function() {
 "use strict";
@@ -278,8 +279,7 @@ for (var testName in testCases) {
     // Return to the initial state, then stop the secondary from applying new writes to prevent
     // them from becoming committed.
     setUpInitialState();
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+    stopServerReplication(secondary);
 
     // If the tested operation isn't replicated, do a write to the side collection before
     // performing the operation. This will ensure that the operation happens after an
@@ -320,8 +320,7 @@ for (var testName in testCases) {
 
         // Restart oplog application on the secondary and ensure the blocked collections become
         // unblocked.
-        assert.commandWorked(
-            secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+        restartServerReplication(secondary);
         replTest.awaitReplication();
         test.blockedCollections.forEach((name) => assertReadsSucceed(mainDB[name]));
 

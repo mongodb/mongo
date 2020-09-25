@@ -5,6 +5,9 @@
 
 (function() {
 'use strict';
+
+load("jstests/libs/write_concern_util.js");
+
 var name = 'stepdown_catch_up_opt';
 // Only 2 nodes, so that we can control whether the secondary is caught up.
 var replTest = new ReplSetTest({name: name, nodes: 2});
@@ -39,14 +42,10 @@ assert.commandFailedWithCode(
      ' secondaryCatchUpPeriodSecs'));
 
 jsTestLog('Stop secondary syncing.');
-assert.commandWorked(
-    secondary.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}),
-    'Failed to configure rsSyncApplyStop failpoint.');
+stopServerReplication(secondary);
 
 function disableFailPoint() {
-    assert.commandWorked(
-        secondary.getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}),
-        'Failed to disable rsSyncApplyStop failpoint.');
+    restartServerReplication(secondary);
 }
 
 // If any of these assertions fail, we need to disable the fail point in order for the mongod to

@@ -7,6 +7,9 @@
  *
  * @tags: [requires_majority_read_concern]
  */
+
+load("jstests/libs/write_concern_util.js");
+
 (function() {
 "use strict";
 
@@ -132,8 +135,7 @@ for (var testName in testCases) {
     // Return to the initial state, then stop the secondary from applying new writes to prevent
     // them from becoming committed.
     setUpInitialState();
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+    stopServerReplication(secondary);
     const initialOplogTs = readLatestOplogEntry('local').ts;
 
     // Writes done without majority write concern must be immediately visible to dirty read
@@ -152,8 +154,7 @@ for (var testName in testCases) {
     assert.eq(readLatestOplogEntry('majority').ts, initialOplogTs);
 
     // Restart oplog application on the secondary and ensure the committed view is updated.
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+    restartServerReplication(secondary);
     coll.getDB().getLastError("majority", 60 * 1000);
     assert.eq(doCommittedRead(coll), test.expectedAfter);
     assert.neq(readLatestOplogEntry('majority').ts, initialOplogTs);

@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fail_point_util.js");
+load("jstests/libs/write_concern_util.js");
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -43,9 +43,8 @@ function testWriteConcern(pipeline, comment) {
     assert.eq(expectedWriteConcern, arr[0].command.writeConcern);
     outColl.drop({writeConcern: {w: 2}});
 
-    // Stop oplog application on the secondary.
-    const failPoint = configureFailPoint(secondary, "rsSyncApplyStop");
-    failPoint.wait();
+    // Stop the oplog fetcher on the secondary.
+    stopServerReplication(secondary);
 
     const res = secondaryDB.runCommand({
         aggregate: "inputColl",
@@ -58,8 +57,7 @@ function testWriteConcern(pipeline, comment) {
     assert(!res.hasOwnProperty("writeErrors"));
     assert(!res.hasOwnProperty("writeConcernError"));
 
-    assert.commandWorked(
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+    restartServerReplication(secondary);
 }
 
 const mergePipeline =

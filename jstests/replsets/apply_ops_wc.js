@@ -9,6 +9,8 @@
  * It finally stops replication at another secondary and confirms that applyOps commands fail.
  */
 
+load("jstests/libs/write_concern_util.js");
+
 (function() {
 "use strict";
 var nodeCount = 3;
@@ -82,8 +84,7 @@ function testMajorityWriteConcerns(wc) {
     jsTest.log("Testing " + tojson(wc));
 
     // Reset secondaries to ensure they can replicate.
-    secondaries[0].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
-    secondaries[1].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+    restartReplicationOnSecondaries(replTest);
 
     // Set the writeConcern of the applyOps command.
     applyOpsReq.writeConcern = wc;
@@ -101,8 +102,7 @@ function testMajorityWriteConcerns(wc) {
     dropTestCollection();
 
     // Stop replication at one secondary.
-    secondaries[0].getDB('admin').runCommand(
-        {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+    stopServerReplication(secondaries[0]);
 
     // applyOps should succeed with only 1 node not replicating.
     assert.commandWorked(coll.insert({_id: 1, x: "a"}));
@@ -116,8 +116,7 @@ function testMajorityWriteConcerns(wc) {
     dropTestCollection();
 
     // Stop replication at a second secondary.
-    secondaries[1].getDB('admin').runCommand(
-        {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+    stopServerReplication(secondaries[1]);
 
     // applyOps should fail after two nodes have stopped replicating.
     assert.commandWorked(coll.insert({_id: 1, x: "a"}));
@@ -131,8 +130,7 @@ function testMajorityWriteConcerns(wc) {
 majorityWriteConcerns.forEach(testMajorityWriteConcerns);
 
 // Allow clean shutdown
-secondaries[0].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
-secondaries[1].getDB('admin').runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+restartReplicationOnSecondaries(replTest);
 
 replTest.stopSet();
 })();

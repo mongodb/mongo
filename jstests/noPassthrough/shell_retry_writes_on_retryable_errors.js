@@ -7,6 +7,7 @@
 "use strict";
 
 load("jstests/libs/retryable_writes_util.js");
+load("jstests/libs/write_concern_util.js");
 
 if (!RetryableWritesUtil.storageEngineSupportsRetryableWrites(jsTest.options().storageEngine)) {
     jsTestLog("Retryable writes are not supported, skipping test");
@@ -77,7 +78,7 @@ testCommandIsRetried(
     function testInsertRetriedOnWriteConcernError(enableCapture, disableCapture) {
         disableCapture();
         const secondary = rst.getSecondary();
-        secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"});
+        stopServerReplication(secondary);
 
         try {
             enableCapture();
@@ -85,10 +86,9 @@ testCommandIsRetried(
             assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
             disableCapture();
         } finally {
-            // We disable the failpoint in a finally block to prevent a misleading fassert()
-            // message from being logged by the secondary when it is shut down with the
-            // failpoint enabled.
-            secondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"});
+            // We disable the failpoint in a finally block to prevent issues arising from shutting
+            // down the secondary with the failpoint enabled.
+            restartServerReplication(secondary);
         }
     },
     function assertInsertRetriedExactlyOnce(cmdObjsSeen) {

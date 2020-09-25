@@ -9,6 +9,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/write_concern_util.js");
+
 function doCommittedRead(coll) {
     var res = coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 10000});
     assert.commandWorked(res, 'reading from ' + coll.getFullName() + ' on ' + coll.getMongo().host);
@@ -87,9 +89,10 @@ assert.soon(function() {
     }
 });
 
-// Stop applier on pureSecondary to ensure that writes to newPrimary won't become committed yet.
-assert.commandWorked(
-    pureSecondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}));
+// Stop oplog fetcher on pureSecondary to ensure that writes to newPrimary won't become committed
+// yet. As there isn't anything in the oplog buffer at this time, it is safe to pause the oplog
+// fetcher.
+stopServerReplication(pureSecondary);
 assert.commandWorked(newPrimaryColl.save({_id: 1, state: 'new'}));
 assert.eq(doDirtyRead(newPrimaryColl), 'new');
 // Note that we still can't do a committed read from the new primary and reliably get anything,
@@ -112,10 +115,9 @@ assert.soon(function() {
 }, '', 60 * 1000);
 assert.eq(doDirtyRead(oldPrimaryColl), 'new');
 
-// Resume oplog application on pureSecondary to allow the 'new' write to be committed. It should
+// Resume oplog fetcher on pureSecondary to allow the 'new' write to be committed. It should
 // now be visible as a committed read to both oldPrimary and newPrimary.
-assert.commandWorked(
-    pureSecondary.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}));
+restartServerReplication(pureSecondary);
 // Do a write to the new primary so that the old primary can establish a sync source to learn
 // about the new commit.
 assert.commandWorked(newPrimary.getDB(name).unrelatedCollection.insert(

@@ -8,6 +8,7 @@
 "use strict";
 
 load('./jstests/libs/chunk_manipulation_util.js');
+load("jstests/libs/write_concern_util.js");
 
 // Set up a sharded cluster with two shards, two chunks, and one document in one of the chunks.
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}, config: 1});
@@ -45,9 +46,7 @@ st.rs1.awaitLastOpCommitted();
 // Disable replication on the recipient shard's secondary node, so the recipient shard's majority
 // commit point cannot advance.
 const destinationSec = st.rs1.getSecondary();
-assert.commandWorked(
-    destinationSec.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "alwaysOn"}),
-    "failed to enable fail point on secondary");
+stopServerReplication(destinationSec);
 
 // Allow the migration to begin cloning.
 unpauseMigrateAtStep(st.rs1.getPrimary(), 2);
@@ -64,9 +63,7 @@ assert.soon(() => {
     }) != null;
 });
 
-assert.commandWorked(
-    destinationSec.adminCommand({configureFailPoint: "rsSyncApplyStop", mode: "off"}),
-    "failed to enable fail point on secondary");
+restartServerReplication(destinationSec);
 
 awaitMigration();
 

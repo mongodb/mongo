@@ -4,6 +4,7 @@
  */
 
 load("jstests/libs/logv2_helpers.js");
+load("jstests/libs/write_concern_util.js");
 
 // Checking UUID and index consistency involves mongos being able to do a read from the config
 // server, but this test is designed to make mongos time out when reading from the config server.
@@ -28,8 +29,7 @@ var delayedConfigSecondary = configSecondaryList[1];
 
 assert.commandWorked(testDB.user.insert({_id: 1}));
 
-delayedConfigSecondary.getDB('admin').adminCommand(
-    {configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
+stopServerReplication(delayedConfigSecondary);
 
 // Do one metadata write in order to bump the optime on mongos
 assert.commandWorked(st.getDB('config').TestConfigColl.insert({TestKey: 'Test value'}));
@@ -72,8 +72,6 @@ assert.soon(
     300);
 
 // Can't do clean shutdown with this failpoint on.
-delayedConfigSecondary.getDB('admin').adminCommand(
-    {configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
-
+restartServerReplication(delayedConfigSecondary);
 st.stop();
 }());

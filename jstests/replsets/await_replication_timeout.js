@@ -3,6 +3,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/write_concern_util.js");
+
 var replTest = new ReplSetTest({nodes: 3});
 replTest.startSet();
 replTest.initiate();
@@ -60,18 +62,18 @@ assert.eq(ErrorCodes.WriteConcernFailed, res.writeConcernError.code);
 
 resetCollection(2);
 
-// Pause application on secondary so that commit point doesn't advance, meaning that a dropped
-// database on the primary will remain in 'drop-pending' state.
+// Pause the oplog fetcher on secondary so that commit point doesn't advance, meaning that a dropped
+// database on the primary will remain in 'drop-pending' state. As there isn't anything in the oplog
+// buffer at this time, it is safe to pause the oplog fetcher.
 var secondary = replTest.getSecondary();
-jsTestLog("Pausing oplog application on the secondary node.");
-assert.commandWorked(
-    secondary.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'}));
+jsTestLog("Pausing the oplog fetcher on the secondary node.");
+stopServerReplication(secondary);
 
 // dropDatabase defaults to 'majority' when a weaker 'w' field is provided, but respects
 // 'wtimeout'.
 res = testDB.runCommand({dropDatabase: 1, writeConcern: {w: 1, wtimeout: 1000}});
 assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
 
-assert.commandWorked(secondary.adminCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'}));
+restartServerReplication(secondary);
 replTest.stopSet();
 })();
