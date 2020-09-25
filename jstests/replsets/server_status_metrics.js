@@ -89,33 +89,11 @@ var secondary = rt.getSecondary();
 var primary = rt.getPrimary();
 var testDB = primary.getDB("test");
 
-// Even though initial sync has finished, the oplog exhaust cursor used by the oplog fetcher during
-// initial sync could be still alive because it has not yet reached an interrupt point. Do a dummy
-// write to unblock any oplog getMore that is currently waiting for inserts. After this, the oplog
-// exhaust cursor used by initial sync should terminate itself because the connection was closed.
-// Wait until there is only 1 oplog exhaust cursor in progress to avoid races on the oplog metrics.
-assert.commandWorked(testDB.dummy.insert({a: "dummy"}));
-assert.soon(() => testDB.currentOp({"appName": "OplogFetcher", "command.collection": "oplog.rs"})
-                      .inprog.length === 1,
-            `Timed out waiting for initial sync exhaust oplog stream to terminate: ${
-                tojson(testDB.currentOp())}`);
-
-// Hang steady state replication oplog getMore before awaitData to avoid races on the oplog metrics
-// between primary and secondary.
-var hangOplogGetMore = configureFailPoint(
-    primary, 'planExecutorHangBeforeShouldWaitForInserts', {namespace: "local.oplog.rs"});
-// Do a dummy write to unblock the oplog getMore that is currently waiting for inserts (if any)
-// after enabling the failpoint so the next oplog getMore that waits for inserts will block.
-assert.commandWorked(testDB.dummy.insert({a: "dummy"}));
-hangOplogGetMore.wait();
-
 // Record the base oplogGetMoresProcessed on primary and the base oplog getmores on secondary.
 const primaryBaseOplogGetMoresProcessedNum =
     primary.getDB("test").serverStatus().metrics.repl.network.oplogGetMoresProcessed.num;
 const secondaryBaseGetMoresNum =
     secondary.getDB("test").serverStatus().metrics.repl.network.getmores.num;
-
-hangOplogGetMore.off();
 
 assert.commandWorked(testDB.createCollection('a'));
 assert.commandWorked(testDB.b.insert({}, {writeConcern: {w: 2}}));
@@ -141,38 +119,20 @@ assert.commandWorked(testDB.a.update({}, {$set: {d: new Date()}}, options));
 
 testSecondaryMetrics(secondary, 2000, secondaryBaseOplogOpsApplied, secondaryBaseOplogOpsReceived);
 
-const localDB = primary.getDB("local");
-const oplogCursorId =
-    assert.commandWorked(localDB.runCommand({"find": "oplog.rs", batchSize: 0})).cursor.id;
-// Do an external oplog getMore.
-assert.commandWorked(
-    localDB.runCommand({"getMore": oplogCursorId, collection: "oplog.rs", batchSize: 1}));
-
-// Hang steady state replication oplog getMore before awaitData to avoid races on the oplog metrics
-// between primary and secondary.
-var hangOplogGetMore = configureFailPoint(
-    primary, 'planExecutorHangBeforeShouldWaitForInserts', {namespace: "local.oplog.rs"});
-// Do a dummy write to unblock the oplog getMore that is currently waiting for inserts (if any)
-// after enabling the failpoint so the next oplog getMore that waits for inserts will block.
-assert.commandWorked(testDB.dummy.insert({a: "dummy"}));
-hangOplogGetMore.wait();
-
-// Test that the number of oplog getMore requested by the secondary since the beginning of the test
-// is equal to the number of oplog getMore processed by the primary since the beginning of the test.
-// This will also imply that the external oplog getMore done above is excluded from the
-// oplogGetMoresProcessed.num metrics.
+// Test that the number of oplog getMore requested by the secondary and processed by the primary has
+// increased since the start of the test.
 const primaryOplogGetMoresProcessedNum =
     primary.getDB("test").serverStatus().metrics.repl.network.oplogGetMoresProcessed.num;
 const secondaryGetMoresNum =
     secondary.getDB("test").serverStatus().metrics.repl.network.getmores.num;
-assert.eq(
-    primaryOplogGetMoresProcessedNum - primaryBaseOplogGetMoresProcessedNum,
-    secondaryGetMoresNum - secondaryBaseGetMoresNum,
-    `primary and secondary oplog getmore count mismatch: primary ${
-        primaryOplogGetMoresProcessedNum}:${primaryBaseOplogGetMoresProcessedNum}, secondary ${
-        secondaryGetMoresNum}:${secondaryBaseGetMoresNum}`);
-
-hangOplogGetMore.off();
+assert.gt(primaryOplogGetMoresProcessedNum,
+          primaryBaseOplogGetMoresProcessedNum,
+          `primary getMores processed have not increased; final: ${
+              primaryOplogGetMoresProcessedNum}, base: ${primaryBaseOplogGetMoresProcessedNum}`);
+assert.gt(secondaryGetMoresNum,
+          secondaryBaseGetMoresNum,
+          `secondary getMores received have not increased; final: ${secondaryGetMoresNum}, base: ${
+              secondaryBaseGetMoresNum}`);
 
 // Test getLastError.wtime and that it only records stats for w > 1, see SERVER-9005
 var startMillis = testDB.serverStatus().metrics.getLastError.wtime.totalMillis;
