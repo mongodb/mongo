@@ -168,11 +168,11 @@ protected:
     PrimaryOnlyService* _service;
     long long _term = 0;
 
-    void checkStateDocPersisted(const TenantMigrationRecipientService::Instance* instance) {
-        auto opCtx = cc().makeOperationContext();
+    void checkStateDocPersisted(OperationContext* opCtx,
+                                const TenantMigrationRecipientService::Instance* instance) {
         auto memoryStateDoc = getStateDoc(instance);
         auto persistedStateDocWithStatus =
-            tenantMigrationRecipientEntryHelpers::getStateDoc(opCtx.get(), memoryStateDoc.getId());
+            tenantMigrationRecipientEntryHelpers::getStateDoc(opCtx, memoryStateDoc.getId());
         ASSERT_OK(persistedStateDocWithStatus.getStatus());
         ASSERT_BSONOBJ_EQ(memoryStateDoc.toBSON(), persistedStateDocWithStatus.getValue().toBSON());
     }
@@ -236,8 +236,9 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
     ASSERT(instance.get());
     ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
 
@@ -258,8 +259,9 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
     ASSERT(instance.get());
     ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
 
@@ -282,8 +284,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion success.
@@ -320,8 +323,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
         ReadPreferenceSetting(ReadPreference::SecondaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, TenantMigrationRecipientInstance.toBSON());
+        opCtx.get(), _service, TenantMigrationRecipientInstance.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion success.
@@ -362,8 +366,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     // Keep scanning the replica set while waiting for task completion.  This would normally
@@ -404,8 +409,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion success.
@@ -440,8 +446,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion failure.
@@ -461,8 +468,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion failure.
@@ -485,8 +493,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion success.
@@ -494,7 +503,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
-    checkStateDocPersisted(instance.get());
+    checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -518,8 +527,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     pauseFailPoint->waitForTimesEntered(timesEntered + 1);
@@ -531,7 +541,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
     ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
-    checkStateDocPersisted(instance.get());
+    checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_Transaction) {
@@ -557,8 +567,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion success.
@@ -566,7 +577,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
     ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
-    checkStateDocPersisted(instance.get());
+    checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -597,8 +608,9 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     pauseFailPoint->waitForTimesEntered(timesEntered + 1);
@@ -610,7 +622,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
     ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
-    checkStateDocPersisted(instance.get());
+    checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -628,15 +640,16 @@ TEST_F(TenantMigrationRecipientServiceTest,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Create and start the instance.  Fail to populate the remote oplog mock.
+    auto opCtx = makeOperationContext();
     auto instance = TenantMigrationRecipientService::Instance::getOrCreate(
-        _service, initialStateDocument.toBSON());
+        opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
     // Wait for task completion success.
     ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
 
     // Even though we failed, the memory state should still match the on-disk state.
-    checkStateDocPersisted(instance.get());
+    checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
 }  // namespace repl

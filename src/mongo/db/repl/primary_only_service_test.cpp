@@ -383,12 +383,15 @@ TEST_F(PrimaryOnlyServiceTest, StepUpAfterShutdown) {
 }
 
 TEST_F(PrimaryOnlyServiceTest, BasicCreateInstance) {
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
     ASSERT(instance.get());
     ASSERT_EQ(0, instance->getID());
     ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
 
-    auto instance2 = TestService::Instance::getOrCreate(_service, BSON("_id" << 1 << "state" << 0));
+    auto instance2 =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 1 << "state" << 0));
     ASSERT(instance2.get());
     ASSERT_EQ(1, instance2->getID());
     ASSERT_EQ(TestService::State::kInitializing, instance2->getInitialState());
@@ -404,11 +407,12 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstance) {
     // Make sure the instance doesn't complete before we try to look it up.
     TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
     ASSERT(instance.get());
     ASSERT_EQ(0, instance->getID());
 
-    auto opCtx = makeOperationContext();
     auto instance2 = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
 
     ASSERT_EQ(instance.get(), instance2.get());
@@ -435,17 +439,34 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceInterruptible) {
                        ErrorCodes::Interrupted);
 }
 
+TEST_F(PrimaryOnlyServiceTest, GetOrCreateInstanceInterruptible) {
+    stepDown();
+    // Make sure the service stays in state kRebuilding so that getOrCreate() has to try to wait on
+    // the opCtx for the state to change.
+    PrimaryOnlyServiceHangBeforeRebuildingInstances.setMode(FailPoint::alwaysOn);
+    stepUp();
+
+    auto opCtx = makeOperationContext();
+    opCtx->markKilled(ErrorCodes::Interrupted);
+    ASSERT_THROWS_CODE(TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0)),
+                       DBException,
+                       ErrorCodes::Interrupted);
+}
+
 TEST_F(PrimaryOnlyServiceTest, DoubleCreateInstance) {
     // Make sure the first instance doesn't complete before we try to create the second.
     TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
     ASSERT(instance.get());
     ASSERT_EQ(0, instance->getID());
 
     // Trying to create a new instance with the same _id but different state otherwise just returns
     // the already existing instance based on the _id only.
-    auto instance2 = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 1));
+    auto instance2 =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 1));
     ASSERT_EQ(instance.get(), instance2.get());
 
     TestServiceHangDuringInitialization.setMode(FailPoint::off);
@@ -462,7 +483,9 @@ TEST_F(PrimaryOnlyServiceTest, ReportServerStatusInfo) {
 
     // Make sure the instance doesn't complete.
     TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
 
     {
         BSONObjBuilder resultBuilder;
@@ -472,7 +495,8 @@ TEST_F(PrimaryOnlyServiceTest, ReportServerStatusInfo) {
                           resultBuilder.obj());
     }
 
-    auto instance2 = TestService::Instance::getOrCreate(_service, BSON("_id" << 1 << "state" << 0));
+    auto instance2 =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 1 << "state" << 0));
 
     {
         BSONObjBuilder resultBuilder;
@@ -487,31 +511,39 @@ TEST_F(PrimaryOnlyServiceTest, ReportServerStatusInfo) {
 
 TEST_F(PrimaryOnlyServiceTest, CreateWhenNotPrimary) {
     _registry->onStepDown();
+    auto opCtx = makeOperationContext();
 
     ASSERT_THROWS_CODE(
-        TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0)),
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0)),
         DBException,
         ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(PrimaryOnlyServiceTest, CreateWithoutID) {
+    auto opCtx = makeOperationContext();
     ASSERT_THROWS_CODE(
-        TestService::Instance::getOrCreate(_service, BSON("state" << 0)), DBException, 4908702);
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("state" << 0)),
+        DBException,
+        4908702);
 }
 
 TEST_F(PrimaryOnlyServiceTest, StepDownBeforePersisted) {
     // Prevent the instance from writing its initial state document to the storage engine.
     auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangDuringInitialization.waitForTimesEntered(++timesEntered);
-    stepDown();
-    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+    {
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+        TestServiceHangDuringInitialization.waitForTimesEntered(++timesEntered);
+        stepDown();
+        TestServiceHangDuringInitialization.setMode(FailPoint::off);
 
-    ASSERT_THROWS_CODE_AND_WHAT(instance->getCompletionFuture().get(),
-                                DBException,
-                                ErrorCodes::InterruptedDueToReplStateChange,
-                                "PrimaryOnlyService interrupted due to stepdown");
+        ASSERT_THROWS_CODE_AND_WHAT(instance->getCompletionFuture().get(),
+                                    DBException,
+                                    ErrorCodes::InterruptedDueToReplStateChange,
+                                    "PrimaryOnlyService interrupted due to stepdown");
+    }
 
     stepUp();
 
@@ -525,11 +557,15 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstanceOnStepUp) {
     // Cause the Instance to be interrupted after writing its initial state document in state 1.
     auto stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
+    {
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+        TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
 
-    ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
-    ASSERT_EQ(TestService::State::kOne, instance->getState());
+        ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
+        ASSERT_EQ(TestService::State::kOne, instance->getState());
+    }
 
     stepDown();
 
@@ -588,11 +624,15 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforeRebuildingInstances) {
     // Cause the Instance to be interrupted after writing its initial state document in state 1.
     auto stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
+    {
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+        TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
 
-    ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
-    ASSERT_EQ(TestService::State::kOne, instance->getState());
+        ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
+        ASSERT_EQ(TestService::State::kOne, instance->getState());
+    }
 
     stepDown();
 
@@ -606,18 +646,25 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforeRebuildingInstances) {
 
     // Start an async task to lookup the rebuilt instance, this will block waiting on the rebuild to
     // finish.
-    auto getInstanceFuture = SemiFuture<void>::makeReady().thenRunOn(_testExecutor).then([this]() {
-        return TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    });
-    PrimaryOnlyServiceHangBeforeRebuildingInstances.waitForTimesEntered(++rebuildingFPTimesEntered);
-    ASSERT_FALSE(getInstanceFuture.isReady());
+    {
+        auto getInstanceFuture =
+            SemiFuture<void>::makeReady().thenRunOn(_testExecutor).then([this]() {
+                auto opCtx = cc().makeOperationContext();
+                return TestService::Instance::getOrCreate(
+                    opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+            });
+        PrimaryOnlyServiceHangBeforeRebuildingInstances.waitForTimesEntered(
+            ++rebuildingFPTimesEntered);
+        ASSERT_FALSE(getInstanceFuture.isReady());
 
-    // Stepdown, interrupting the thread waiting for the rebuilt instance.
-    stepDown();
+        // Stepdown, interrupting the thread waiting for the rebuilt instance.
+        stepDown();
 
-    // Let the previous stepUp attempt continue and realize that the node has since stepped down.
-    PrimaryOnlyServiceHangBeforeRebuildingInstances.setMode(FailPoint::off);
-    ASSERT_THROWS_CODE(getInstanceFuture.get(), DBException, ErrorCodes::NotWritablePrimary);
+        // Let the previous stepUp attempt continue and realize that the node has since stepped
+        // down.
+        PrimaryOnlyServiceHangBeforeRebuildingInstances.setMode(FailPoint::off);
+        ASSERT_THROWS_CODE(getInstanceFuture.get(), DBException, ErrorCodes::NotWritablePrimary);
+    }
 
     // Now do another stepUp that is allowed to complete this time.
     stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
@@ -625,7 +672,7 @@ TEST_F(PrimaryOnlyServiceTest, StepDownBeforeRebuildingInstances) {
     TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
 
     auto opCtx = makeOperationContext();
-    instance = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
+    auto instance = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
     ASSERT_EQ(TestService::State::kOne, instance->getInitialState());
     ASSERT_EQ(TestService::State::kOne, instance->getState());
 
@@ -638,11 +685,15 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
     // Cause the Instance to be interrupted after writing its initial state document in state 1.
     auto stateOneFPTimesEntered = TestServiceHangDuringStateOne.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
-    TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
+    {
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+        TestServiceHangDuringStateOne.waitForTimesEntered(++stateOneFPTimesEntered);
 
-    ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
-    ASSERT_EQ(TestService::State::kOne, instance->getState());
+        ASSERT_EQ(TestService::State::kInitializing, instance->getInitialState());
+        ASSERT_EQ(TestService::State::kOne, instance->getState());
+    }
 
     stepDown();
 
@@ -659,10 +710,10 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
         ASSERT_THROWS_CODE(TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)),
                            DBException,
                            ErrorCodes::InternalError);
-        ASSERT_THROWS_CODE(
-            TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0)),
-            DBException,
-            ErrorCodes::InternalError);
+        ASSERT_THROWS_CODE(TestService::Instance::getOrCreate(
+                               opCtx.get(), _service, BSON("_id" << 0 << "state" << 0)),
+                           DBException,
+                           ErrorCodes::InternalError);
     }
 
     stepDown();
@@ -673,10 +724,10 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
         auto opCtx = makeOperationContext();
         ASSERT_FALSE(TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0))
                          .is_initialized());
-        ASSERT_THROWS_CODE(
-            TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0)),
-            DBException,
-            ErrorCodes::NotWritablePrimary);
+        ASSERT_THROWS_CODE(TestService::Instance::getOrCreate(
+                               opCtx.get(), _service, BSON("_id" << 0 << "state" << 0)),
+                           DBException,
+                           ErrorCodes::NotWritablePrimary);
     }
 
     // Allow the next stepUp to succeed.
@@ -689,7 +740,8 @@ TEST_F(PrimaryOnlyServiceTest, RecreateInstancesFails) {
     {
         // Instance should be recreated successfully.
         auto opCtx = makeOperationContext();
-        instance = TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
+        auto instance =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
         ASSERT_EQ(TestService::State::kOne, instance->getInitialState());
         ASSERT_EQ(TestService::State::kOne, instance->getState());
         TestServiceHangDuringStateOne.setMode(FailPoint::off);
@@ -703,7 +755,9 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxCreatedAfterStepdownIsAlreadyInterrupted) {
     // OpCtx, and then we stepDown, that the OpCtx that gets created still gets interrupted.
     auto timesEntered = TestServiceHangBeforeMakingOpCtx.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
     TestServiceHangBeforeMakingOpCtx.waitForTimesEntered(++timesEntered);
     stepDown();
     ASSERT(!instance->getDocumentWriteException().isReady());
@@ -719,7 +773,9 @@ TEST_F(PrimaryOnlyServiceTest, OpCtxInterruptedByStepdown) {
     // Ensure that OpCtxs for PrimaryOnlyService work get interrupted by stepDown.
     auto timesEntered = TestServiceHangAfterMakingOpCtx.setMode(FailPoint::alwaysOn);
 
-    auto instance = TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
     TestServiceHangAfterMakingOpCtx.waitForTimesEntered(++timesEntered);
     stepDown();
     ASSERT(!instance->getDocumentWriteException().isReady());
@@ -736,10 +792,11 @@ TEST_F(PrimaryOnlyServiceTest, ReportCurOpInfo) {
     // Make sure the instance doesn't complete before we try to report its state.
     TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
 
+    auto opCtx = makeOperationContext();
     auto unreportedInstance =
-        TestService::Instance::getOrCreate(_service, BSON("_id" << 0 << "state" << 0));
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
     auto reportedInstance = TestService::Instance::getOrCreate(
-        _service, BSON("_id" << 1 << "state" << 0 << "reportOp" << true));
+        opCtx.get(), _service, BSON("_id" << 1 << "state" << 0 << "reportOp" << true));
 
     std::vector<BSONObj> ops;
     _service->reportInstanceInfoForCurrentOp(

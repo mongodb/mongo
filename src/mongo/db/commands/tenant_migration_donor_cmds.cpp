@@ -84,8 +84,8 @@ public:
             auto donorService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(TenantMigrationDonorService::kServiceName);
-            auto donor =
-                TenantMigrationDonorService::Instance::getOrCreate(donorService, donorStateDoc);
+            auto donor = TenantMigrationDonorService::Instance::getOrCreate(
+                opCtx, donorService, donorStateDoc);
             uassertStatusOK(donor->checkIfOptionsConflict(donorStateDoc));
 
             auto durableState = donor->getDurableState(opCtx);

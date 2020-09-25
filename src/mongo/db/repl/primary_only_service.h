@@ -162,9 +162,10 @@ public:
          * Same functionality as PrimaryOnlyService::getOrCreateInstance, but returns a pointer of
          * the proper derived class for the Instance.
          */
-        static std::shared_ptr<InstanceType> getOrCreate(PrimaryOnlyService* service,
+        static std::shared_ptr<InstanceType> getOrCreate(OperationContext* opCtx,
+                                                         PrimaryOnlyService* service,
                                                          BSONObj initialState) {
-            auto instance = service->getOrCreateInstance(std::move(initialState));
+            auto instance = service->getOrCreateInstance(opCtx, std::move(initialState));
             return checked_pointer_cast<InstanceType>(instance);
         }
     };
@@ -289,7 +290,7 @@ protected:
      * _id but are otherwise not completely identical.
      * Throws NotWritablePrimary if the node is not currently primary.
      */
-    std::shared_ptr<Instance> getOrCreateInstance(BSONObj initialState);
+    std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
 
 private:
     /**

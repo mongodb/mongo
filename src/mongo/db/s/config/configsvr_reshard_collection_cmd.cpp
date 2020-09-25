@@ -171,7 +171,7 @@ public:
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
             auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
-                service, coordinatorDoc.toBSON());
+                opCtx, service, coordinatorDoc.toBSON());
         }
 
     private:
