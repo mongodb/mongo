@@ -461,7 +461,7 @@ def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-stateme
     """
     logging.basicConfig(
         format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
-        level=logging.DEBUG,
+        level=logging.INFO,
         stream=sys.stdout,
     )
 

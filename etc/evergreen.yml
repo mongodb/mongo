@@ -194,6 +194,9 @@ variables:
   setup_task:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
+    # NOTE: To disable the compile bypass feature, comment out the next line.
+  - func: "bypass compile and fetch binaries"
+  - func: "update bypass expansions"
   teardown_task:
   - func: "attach scons logs"
   - func: "attach report"
@@ -249,9 +252,6 @@ variables:
   - func: "set up virtualenv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
-  # NOTE: To disable the compile bypass feature, comment out the next line.
-  - func: "bypass compile and fetch binaries"
-  - func: "update bypass expansions"
   - func: "get buildnumber"
   - func: "set up credentials"
   - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
