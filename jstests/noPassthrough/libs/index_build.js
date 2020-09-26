@@ -814,4 +814,80 @@ const ResumableIndexBuildTest = class {
             checkLogIdAfterRestart(primary, 22257);
         }
     }
+
+    /**
+     * Runs the resumable index build test specified by the provided index spec on the provided
+     * replica set and namespace. This will be used to test that shutting down the server before
+     * completing an index build resumed during the setup phase will cause the index build to
+     * restart from the beginning on a subsequent startup.
+     * Two failpoints will be provided:
+     *     - the first will be used to pause the index build after the createIndexes command.
+     *     - the second will be used to pause the index build after resuming at startup.
+     * Documents specified by sideWrites will be inserted during the initialization phase so that
+     * they are inserted into the side writes table and processed during the drain writes phase.
+     */
+    static runResumeInterruptedByShutdown(rst,
+                                          dbName,
+                                          collName,
+                                          indexSpec,
+                                          indexName,
+                                          failpointBeforeShutdown,
+                                          expectedResumePhase,
+                                          initialDoc,
+                                          sideWrites,
+                                          postIndexBuildInserts) {
+        const primary = rst.getPrimary();
+        const coll = primary.getDB(dbName).getCollection(collName);
+
+        assert.commandWorked(coll.insert(initialDoc));
+
+        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
+            rst, function(collName, indexSpec, indexName) {
+                assert.commandFailedWithCode(
+                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
+                    ErrorCodes.InterruptedDueToReplStateChange);
+            }, coll, indexSpec, indexName, sideWrites, {hangBeforeBuildingIndex: true});
+
+        const failpointAfterStartup = {name: "hangAfterIndexBuildFirstDrain", logId: 20666};
+
+        const buildUUID = ResumableIndexBuildTest.restart(rst,
+                                                          primary,
+                                                          coll,
+                                                          [[indexName]],
+                                                          [failpointBeforeShutdown],
+                                                          0,
+                                                          false /* shouldComplete */,
+                                                          failpointAfterStartup.name)[0];
+
+        awaitCreateIndex();
+
+        // Ensure that the resume info contains the correct phase to resume from.
+        const equalsBuildUUID = function(uuid) {
+            return uuid["uuid"]["$uuid"] === buildUUID;
+        };
+        checkLog.containsJson(primary, 4841700, {
+            buildUUID: equalsBuildUUID,
+            phase: expectedResumePhase,
+        });
+
+        // Ensure that the resumed index build is paused at 'failpointAfterStartup'.
+        checkLog.containsJson(primary, failpointAfterStartup.logId, {buildUUID: equalsBuildUUID});
+
+        // After resuming the index build once, it should no longer be resumable if the server shuts
+        // down before index build completes. Therefore, we should not see any Sorter data in the
+        // temp directory.
+        rst.stop(primary);
+        ResumableIndexBuildTest.checkTempDirectoryCleared(primary);
+
+        // Interrupting the resumed index build should make it restart from the beginning on next
+        // server startup.
+        rst.start(primary, {noCleanData: true});
+        checkLog.containsJson(primary, 20660, {buildUUID: equalsBuildUUID});
+
+        // Ensure that the index build was completed after it was restarted.
+        ResumableIndexBuildTest.assertCompleted(primary, coll, [buildUUID], [indexName]);
+
+        ResumableIndexBuildTest.checkIndexes(
+            rst, dbName, collName, [indexName], postIndexBuildInserts);
+    }
 };
