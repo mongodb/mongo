@@ -113,15 +113,15 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         }
     }());
 
+    auto expectedNumModified = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
+        ? boost::none
+        : boost::make_optional(1);
     writeConfigDocs(opCtx,
                     NamespaceString::kConfigReshardingOperationsNamespace,
                     std::move(request),
                     true,  // startTransaction
                     txnNumber,
-                    (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
-                        ? boost::none
-                        : boost::make_optional(1)  // expectedNumModified
-    );
+                    expectedNumModified);
 }
 
 BSONObj createReshardingFieldsUpdateForOriginalNss(
@@ -244,15 +244,15 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
         }
     }());
 
+    auto expectedNumModified = (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
+        ? boost::none
+        : boost::make_optional(1);
     writeConfigDocs(opCtx,
                     CollectionType::ConfigNS,
                     std::move(request),
                     false,  // startTransaction
                     txnNumber,
-                    (request.getBatchType() == BatchedCommandRequest::BatchType_Insert)
-                        ? boost::none
-                        : boost::make_optional(1)  // expectedNumModified
-    );
+                    expectedNumModified);
 }
 
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
