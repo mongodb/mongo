@@ -64,7 +64,7 @@ TEST_F(SBECoerceToStringTest, BasicCoerceToString) {
     runAndAssertExpression(compiledExpr.get(), "42");
 
     // Int64_t test.
-    coerceToStringAccessor.reset(sbe::value::TypeTags::NumberInt32,
+    coerceToStringAccessor.reset(sbe::value::TypeTags::NumberInt64,
                                  value::bitcastFrom<int64_t>(42));
     runAndAssertExpression(compiledExpr.get(), "42");
 
