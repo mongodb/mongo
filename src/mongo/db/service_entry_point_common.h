@@ -84,7 +84,7 @@ struct ServiceEntryPointCommon {
 
         virtual void attachCurOpErrInfo(OperationContext* opCtx, const BSONObj& replyObj) const = 0;
 
-        virtual void handleException(const DBException& e, OperationContext* opCtx) const = 0;
+        virtual void handleException(const Status& status, OperationContext* opCtx) const = 0;
 
         virtual void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const = 0;
 

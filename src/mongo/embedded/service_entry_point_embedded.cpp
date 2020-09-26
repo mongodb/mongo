@@ -93,7 +93,7 @@ public:
 
     void attachCurOpErrInfo(OperationContext*, const BSONObj&) const override {}
 
-    void handleException(const DBException& e, OperationContext* opCtx) const override {}
+    void handleException(const Status& status, OperationContext* opCtx) const override {}
 
     void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {}
 

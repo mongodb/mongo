@@ -182,9 +182,9 @@ public:
         CurOp::get(opCtx)->debug().errInfo = getStatusFromCommandResult(replyObj);
     }
 
-    void handleException(const DBException& e, OperationContext* opCtx) const override {
+    void handleException(const Status& status, OperationContext* opCtx) const override {
         // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (auto sce = e.extraInfo<StaleConfigInfo>()) {
+        if (auto sce = status.extraInfo<StaleConfigInfo>()) {
             // A config server acting as a router may return a StaleConfig exception, but a config
             // server won't contain data for a sharded collection, so skip handling the exception.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -204,7 +204,7 @@ public:
                 onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
                     .ignore();
             }
-        } else if (auto sce = e.extraInfo<StaleDbRoutingVersion>()) {
+        } else if (auto sce = status.extraInfo<StaleDbRoutingVersion>()) {
             if (!opCtx->getClient()->isInDirectClient()) {
                 onDbVersionMismatchNoExcept(
                     opCtx, sce->getDb(), sce->getVersionReceived(), sce->getVersionWanted())
