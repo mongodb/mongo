@@ -163,7 +163,8 @@ User* AuthorizationSessionImpl::getSingleUser() {
     if (userNameItr.more()) {
         userName = userNameItr.next();
         if (userNameItr.more()) {
-            uasserted(ErrorCodes::Unauthorized,
+            uasserted(
+                ErrorCodes::Unauthorized,
                 "logical sessions can't have multiple authenticated users (for more details see: "
                 "https://docs.mongodb.com/manual/core/authentication/#authentication-methods)");
         }
