@@ -2,9 +2,6 @@
 @example ex_access.c
 Create, insert and access a simple table.
 
-@example ex_async.c
-Show how to configure and use asynchronous operations.
-
 @example ex_call_center.c
 A more complex schema based on a call center example, showing how to map
 some SQL constructs onto the WiredTiger API.

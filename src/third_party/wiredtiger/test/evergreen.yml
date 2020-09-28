@@ -2149,6 +2149,20 @@ tasks:
             cp ../../../bench/wtperf/split_heavy.wtperf .
             ./wtperf -O ./split_heavy.wtperf -o verbose=2
 
+  - name: format-failure-configs-test
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/test/evergreen"
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ./run_format_configs.sh
+
   - name: static-wt-build-test
     commands:
       - func: "get project"
@@ -2349,6 +2363,28 @@ tasks:
   - <<: *recovery-stress-test
     name: recovery-stress-test-3
     tags: ["stress-test-3", "stress-test-zseries-3"]
+  
+  - name: cyclomatic-complexity
+    tags: ["pull_request"]
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/src"
+          shell: bash
+          script: |
+            set -o verbose
+
+            git clone https://github.com/metrixplusplus/metrixplusplus metrixplusplus
+            python "metrixplusplus/metrix++.py" collect --std.code.lines.code --std.code.complexity.cyclomatic
+            python "metrixplusplus/metrix++.py" view
+
+            # Set the cyclomatic complexity limit to 20
+            python "metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
+
+            # Fail if there are functions with cyclomatic complexity larger than 92
+            set -o errexit
+            python "metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:92
 
 buildvariants:
 
@@ -2382,6 +2418,8 @@ buildvariants:
     - name: ftruncate-test
     - name: long-test
     - name: static-wt-build-test
+    - name: format-failure-configs-test
+    - name: cyclomatic-complexity
 
 - name: ubuntu1804-compilers
   display_name: "! Ubuntu 18.04 Compilers"

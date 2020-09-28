@@ -845,19 +845,6 @@ static const char *const __stats_connection_desc[] = {
   "LSM: tree maintenance operations executed",
   "LSM: tree maintenance operations scheduled",
   "LSM: tree queue hit maximum",
-  "async: current work queue length",
-  "async: maximum work queue length",
-  "async: number of allocation state races",
-  "async: number of flush calls",
-  "async: number of operation slots viewed for allocation",
-  "async: number of times operation allocation failed",
-  "async: number of times worker found no work",
-  "async: total allocations",
-  "async: total compact calls",
-  "async: total insert calls",
-  "async: total remove calls",
-  "async: total search calls",
-  "async: total update calls",
   "block-manager: blocks pre-loaded",
   "block-manager: blocks read",
   "block-manager: blocks written",
@@ -1383,19 +1370,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->lsm_work_units_done = 0;
     stats->lsm_work_units_created = 0;
     stats->lsm_work_queue_max = 0;
-    stats->async_cur_queue = 0;
-    /* not clearing async_max_queue */
-    stats->async_alloc_race = 0;
-    stats->async_flush = 0;
-    stats->async_alloc_view = 0;
-    stats->async_full = 0;
-    stats->async_nowork = 0;
-    stats->async_op_alloc = 0;
-    stats->async_op_compact = 0;
-    stats->async_op_insert = 0;
-    stats->async_op_remove = 0;
-    stats->async_op_search = 0;
-    stats->async_op_update = 0;
     stats->block_preload = 0;
     stats->block_read = 0;
     stats->block_write = 0;
@@ -1886,19 +1860,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->lsm_work_units_done += WT_STAT_READ(from, lsm_work_units_done);
     to->lsm_work_units_created += WT_STAT_READ(from, lsm_work_units_created);
     to->lsm_work_queue_max += WT_STAT_READ(from, lsm_work_queue_max);
-    to->async_cur_queue += WT_STAT_READ(from, async_cur_queue);
-    to->async_max_queue += WT_STAT_READ(from, async_max_queue);
-    to->async_alloc_race += WT_STAT_READ(from, async_alloc_race);
-    to->async_flush += WT_STAT_READ(from, async_flush);
-    to->async_alloc_view += WT_STAT_READ(from, async_alloc_view);
-    to->async_full += WT_STAT_READ(from, async_full);
-    to->async_nowork += WT_STAT_READ(from, async_nowork);
-    to->async_op_alloc += WT_STAT_READ(from, async_op_alloc);
-    to->async_op_compact += WT_STAT_READ(from, async_op_compact);
-    to->async_op_insert += WT_STAT_READ(from, async_op_insert);
-    to->async_op_remove += WT_STAT_READ(from, async_op_remove);
-    to->async_op_search += WT_STAT_READ(from, async_op_search);
-    to->async_op_update += WT_STAT_READ(from, async_op_update);
     to->block_preload += WT_STAT_READ(from, block_preload);
     to->block_read += WT_STAT_READ(from, block_read);
     to->block_write += WT_STAT_READ(from, block_write);

@@ -173,79 +173,6 @@ update_value_delta(WTPERF_THREAD *thread, int64_t delta)
     }
 }
 
-static int
-cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
-{
-    TRACK *trk;
-    WTPERF *wtperf;
-    WTPERF_THREAD *thread;
-    WT_ASYNC_OPTYPE type;
-    uint32_t *tables;
-    int t_ret;
-    char *value;
-
-    (void)cb;
-    (void)flags;
-
-    wtperf = NULL; /* -Wconditional-uninitialized */
-    thread = NULL; /* -Wconditional-uninitialized */
-
-    type = op->get_type(op);
-    if (type != WT_AOP_COMPACT) {
-        thread = (WTPERF_THREAD *)op->app_private;
-        wtperf = thread->wtperf;
-    }
-
-    trk = NULL;
-    switch (type) {
-    case WT_AOP_COMPACT:
-        tables = (uint32_t *)op->app_private;
-        (void)__wt_atomic_add32(tables, (uint32_t)-1);
-        break;
-    case WT_AOP_INSERT:
-        trk = &thread->insert;
-        break;
-    case WT_AOP_SEARCH:
-        trk = &thread->read;
-        if (ret == 0 && (t_ret = op->get_value(op, &value)) != 0) {
-            ret = t_ret;
-            lprintf(wtperf, ret, 0, "get_value in read.");
-            goto err;
-        }
-        break;
-    case WT_AOP_UPDATE:
-        trk = &thread->update;
-        break;
-    case WT_AOP_NONE:
-    case WT_AOP_REMOVE:
-        /* We never expect this type. */
-        lprintf(wtperf, ret, 0, "No type in op %" PRIu64, op->get_id(op));
-        goto err;
-    }
-
-    /*
-     * Either we have success and we track it, or failure and panic.
-     *
-     * Reads and updates can fail with WT_NOTFOUND: we may be searching in a random range, or an
-     * insert op might have updated the last record in the table but not yet finished the actual
-     * insert.
-     */
-    if (type == WT_AOP_COMPACT)
-        return (0);
-    if (ret == 0 || (ret == WT_NOTFOUND && type != WT_AOP_INSERT)) {
-        if (!wtperf->in_warmup)
-            (void)__wt_atomic_add64(&trk->ops, 1);
-        return (0);
-    }
-err:
-    /* Panic if error */
-    lprintf(wtperf, ret, 0, "Error in op %" PRIu64, op->get_id(op));
-    wtperf->error = wtperf->stop = true;
-    return (1);
-}
-
-static WT_ASYNC_CALLBACK cb = {cb_asyncop};
-
 /*
  * track_operation --
  *     Update an operation's tracking structure with new latency information.
@@ -308,119 +235,6 @@ op_name(uint8_t *op)
         return ("unknown");
     }
     /* NOTREACHED */
-}
-
-static WT_THREAD_RET
-worker_async(void *arg)
-{
-    CONFIG_OPTS *opts;
-    WTPERF *wtperf;
-    WTPERF_THREAD *thread;
-    WT_ASYNC_OP *asyncop;
-    WT_CONNECTION *conn;
-    uint64_t next_val;
-    uint8_t *op, *op_end;
-    int ret;
-    char *key_buf, *value_buf;
-
-    thread = (WTPERF_THREAD *)arg;
-    wtperf = thread->wtperf;
-    opts = wtperf->opts;
-    conn = wtperf->conn;
-
-    key_buf = thread->key_buf;
-    value_buf = thread->value_buf;
-
-    op = thread->workload->ops;
-    op_end = op + sizeof(thread->workload->ops);
-
-    while (!wtperf->stop) {
-        /*
-         * Generate the next key and setup operation specific statistics tracking objects.
-         */
-        switch (*op) {
-        case WORKER_INSERT:
-        case WORKER_INSERT_RMW:
-            if (opts->random_range)
-                next_val = wtperf_rand(thread);
-            else
-                next_val = opts->icount + get_next_incr(wtperf);
-            break;
-        case WORKER_READ:
-        case WORKER_UPDATE:
-            next_val = wtperf_rand(thread);
-
-            /*
-             * If the workload is started without a populate phase we rely on at least one insert to
-             * get a valid item id.
-             */
-            if (wtperf_value_range(wtperf) < next_val)
-                continue;
-            break;
-        default:
-            lprintf(wtperf, 0, 0, "invalid op!");
-            goto err; /* can't happen */
-        }
-
-        generate_key(opts, key_buf, next_val);
-
-        /*
-         * Spread the data out around the multiple databases. Sleep to allow workers a chance to run
-         * and process async ops. Then retry to get an async op.
-         */
-        while (
-          (ret = conn->async_new_op(conn, wtperf->uris[map_key_to_table(wtperf->opts, next_val)],
-             NULL, &cb, &asyncop)) == EBUSY)
-            (void)usleep(10000);
-        if (ret != 0) {
-            lprintf(wtperf, ret, 0, "failed async_new_op");
-            goto err;
-        }
-
-        asyncop->app_private = thread;
-        asyncop->set_key(asyncop, key_buf);
-        switch (*op) {
-        case WORKER_READ:
-            ret = asyncop->search(asyncop);
-            if (ret == 0)
-                break;
-            goto op_err;
-        case WORKER_INSERT:
-            if (opts->random_value)
-                randomize_value(thread, value_buf, 0);
-            asyncop->set_value(asyncop, value_buf);
-            if ((ret = asyncop->insert(asyncop)) == 0)
-                break;
-            goto op_err;
-        case WORKER_UPDATE:
-            if (opts->random_value)
-                randomize_value(
-                  thread, value_buf, thread->workload ? thread->workload->update_delta : 0);
-            asyncop->set_value(asyncop, value_buf);
-            if ((ret = asyncop->update(asyncop)) == 0)
-                break;
-            goto op_err;
-        default:
-op_err:
-            lprintf(wtperf, ret, 0, "%s failed for: %s, range: %" PRIu64, op_name(op), key_buf,
-              wtperf_value_range(wtperf));
-            goto err; /* can't happen */
-        }
-
-        /* Schedule the next operation */
-        if (++op == op_end)
-            op = thread->workload->ops;
-    }
-
-    if (conn->async_flush(conn) != 0)
-        goto err;
-
-    /* Notify our caller we failed and shut the system down. */
-    if (0) {
-err:
-        wtperf->error = wtperf->stop = true;
-    }
-    return (WT_THREAD_RET_VALUE);
 }
 
 /*
@@ -1194,103 +1008,6 @@ err:
 }
 
 static WT_THREAD_RET
-populate_async(void *arg)
-{
-    CONFIG_OPTS *opts;
-    TRACK *trk;
-    WTPERF *wtperf;
-    WTPERF_THREAD *thread;
-    WT_ASYNC_OP *asyncop;
-    WT_CONNECTION *conn;
-    WT_SESSION *session;
-    uint64_t op, start, stop, usecs;
-    int measure_latency, ret;
-    char *value_buf, *key_buf;
-
-    thread = (WTPERF_THREAD *)arg;
-    wtperf = thread->wtperf;
-    opts = wtperf->opts;
-    conn = wtperf->conn;
-    session = NULL;
-    ret = 0;
-    start = 0;
-    trk = &thread->insert;
-
-    key_buf = thread->key_buf;
-    value_buf = thread->value_buf;
-
-    if ((ret = conn->open_session(conn, NULL, opts->sess_config, &session)) != 0) {
-        lprintf(wtperf, ret, 0, "populate: WT_CONNECTION.open_session");
-        goto err;
-    }
-
-    /*
-     * Measuring latency of one async op is not meaningful. We will measure the time it takes to do
-     * all of them, including the time to process by workers.
-     */
-    measure_latency =
-      opts->sample_interval != 0 && trk->ops != 0 && (trk->ops % opts->sample_rate == 0);
-    if (measure_latency)
-        start = __wt_clock(NULL);
-
-    /* Populate the databases. */
-    for (;;) {
-        op = get_next_incr(wtperf);
-        if (op > (uint64_t)opts->icount + (uint64_t)opts->scan_icount)
-            break;
-        /*
-         * Allocate an async op for whichever table.
-         */
-        while ((ret = conn->async_new_op(conn, wtperf->uris[map_key_to_table(wtperf->opts, op)],
-                  NULL, &cb, &asyncop)) == EBUSY)
-            (void)usleep(10000);
-        if (ret != 0) {
-            lprintf(wtperf, ret, 0, "Failed async_new_op");
-            goto err;
-        }
-
-        asyncop->app_private = thread;
-        generate_key(opts, key_buf, op);
-        asyncop->set_key(asyncop, key_buf);
-        if (opts->random_value)
-            randomize_value(thread, value_buf, 0);
-        asyncop->set_value(asyncop, value_buf);
-        if ((ret = asyncop->insert(asyncop)) != 0) {
-            lprintf(wtperf, ret, 0, "Failed inserting");
-            goto err;
-        }
-    }
-
-    /*
-     * Gather statistics. We measure the latency of inserting a single key. If there are multiple
-     * tables, it is the time for insertion into all of them. Note that currently every populate
-     * thread will call async_flush and those calls will convoy. That is not the most efficient way,
-     * but we want to flush before measuring latency.
-     */
-    if (conn->async_flush(conn) != 0) {
-        lprintf(wtperf, ret, 0, "Failed async flush");
-        goto err;
-    }
-    if (measure_latency) {
-        stop = __wt_clock(NULL);
-        ++trk->latency_ops;
-        usecs = WT_CLOCKDIFF_US(stop, start);
-        track_operation(trk, usecs);
-    }
-    if ((ret = session->close(session, NULL)) != 0) {
-        lprintf(wtperf, ret, 0, "Error closing session in populate");
-        goto err;
-    }
-
-    /* Notify our caller we failed and shut the system down. */
-    if (0) {
-err:
-        wtperf->error = wtperf->stop = true;
-    }
-    return (WT_THREAD_RET_VALUE);
-}
-
-static WT_THREAD_RET
 monitor(void *arg)
 {
     struct timespec t;
@@ -1671,15 +1388,12 @@ static int
 execute_populate(WTPERF *wtperf)
 {
     CONFIG_OPTS *opts;
-    WT_ASYNC_OP *asyncop;
     WTPERF_THREAD *popth;
-    WT_THREAD_CALLBACK (*pfunc)(void *);
-    size_t i;
     uint64_t last_ops, max_key, msecs, print_ops_sec, start, stop;
-    uint32_t interval, tables;
+    uint32_t interval;
     wt_thread_t idle_table_cycle_thread;
     double print_secs;
-    int elapsed, ret;
+    int elapsed;
 
     opts = wtperf->opts;
     max_key = (uint64_t)opts->icount + (uint64_t)opts->scan_icount;
@@ -1693,12 +1407,7 @@ execute_populate(WTPERF *wtperf)
     wtperf->insert_key = 0;
 
     wtperf->popthreads = dcalloc(opts->populate_threads, sizeof(WTPERF_THREAD));
-    if (wtperf->use_asyncops) {
-        lprintf(wtperf, 0, 1, "Starting %" PRIu32 " async thread(s)", opts->async_threads);
-        pfunc = populate_async;
-    } else
-        pfunc = populate_thread;
-    start_threads(wtperf, NULL, wtperf->popthreads, opts->populate_threads, pfunc);
+    start_threads(wtperf, NULL, wtperf->popthreads, opts->populate_threads, populate_thread);
 
     start = __wt_clock(NULL);
     for (elapsed = 0, interval = 0, last_ops = 0; wtperf->insert_key < max_key && !wtperf->error;) {
@@ -1759,41 +1468,6 @@ execute_populate(WTPERF *wtperf)
       "load ops/sec: %" PRIu64,
       print_secs, print_ops_sec);
 
-    /*
-     * If configured, compact to allow LSM merging to complete. We set an unlimited timeout because
-     * if we close the connection then any in-progress compact/merge is aborted.
-     */
-    if (opts->compact) {
-        assert(opts->async_threads > 0);
-        lprintf(wtperf, 0, 1, "Compact after populate");
-        start = __wt_clock(NULL);
-        tables = opts->table_count;
-        for (i = 0; i < opts->table_count; i++) {
-            /*
-             * If no ops are available, retry. Any other error, return.
-             */
-            while ((ret = wtperf->conn->async_new_op(
-                      wtperf->conn, wtperf->uris[i], "timeout=0", &cb, &asyncop)) == EBUSY)
-                (void)usleep(10000);
-            if (ret != 0)
-                return (ret);
-
-            asyncop->app_private = &tables;
-            if ((ret = asyncop->compact(asyncop)) != 0) {
-                lprintf(wtperf, ret, 0, "Async compact failed.");
-                return (ret);
-            }
-        }
-        if ((ret = wtperf->conn->async_flush(wtperf->conn)) != 0) {
-            lprintf(wtperf, ret, 0, "Populate async flush failed.");
-            return (ret);
-        }
-        stop = __wt_clock(NULL);
-        lprintf(wtperf, 0, 1, "Compact completed in %" PRIu64 " seconds",
-          (uint64_t)(WT_CLOCKDIFF_SEC(stop, start)));
-        assert(tables == 0);
-    }
-
     /* Stop cycling idle tables. */
     stop_idle_table_cycle(wtperf, idle_table_cycle_thread);
 
@@ -1829,17 +1503,6 @@ close_reopen(WTPERF *wtperf)
         lprintf(wtperf, ret, 0, "Re-opening the connection failed");
         return (ret);
     }
-    /*
-     * If we started async threads only for the purposes of compact, then turn it off before
-     * starting the workload so that those extra threads looking for work that will never arrive
-     * don't affect performance.
-     */
-    if (opts->compact && !wtperf->use_asyncops) {
-        if ((ret = wtperf->conn->reconfigure(wtperf->conn, "async=(enabled=false)")) != 0) {
-            lprintf(wtperf, ret, 0, "Reconfigure async off failed");
-            return (ret);
-        }
-    }
     return (0);
 }
 
@@ -1851,7 +1514,6 @@ execute_workload(WTPERF *wtperf)
     WTPERF_THREAD *threads;
     WT_CONNECTION *conn;
     WT_SESSION **sessions;
-    WT_THREAD_CALLBACK (*pfunc)(void *);
     wt_thread_t idle_table_cycle_thread;
     uint64_t last_ckpts, last_scans;
     uint64_t last_inserts, last_reads, last_truncates;
@@ -1882,12 +1544,6 @@ execute_workload(WTPERF *wtperf)
     /* Allocate memory for the worker threads. */
     wtperf->workers = dcalloc((size_t)wtperf->workers_cnt, sizeof(WTPERF_THREAD));
 
-    if (wtperf->use_asyncops) {
-        lprintf(wtperf, 0, 1, "Starting %" PRIu32 " async thread(s)", opts->async_threads);
-        pfunc = worker_async;
-    } else
-        pfunc = worker;
-
     if (opts->session_count_idle != 0) {
         sessions = dcalloc((size_t)opts->session_count_idle, sizeof(WT_SESSION *));
         conn = wtperf->conn;
@@ -1911,7 +1567,7 @@ execute_workload(WTPERF *wtperf)
             goto err;
 
         /* Start the workload's threads. */
-        start_threads(wtperf, workp, threads, (u_int)workp->threads, pfunc);
+        start_threads(wtperf, workp, threads, (u_int)workp->threads, worker);
         threads += workp->threads;
     }
 
@@ -2174,9 +1830,6 @@ wtperf_copy(const WTPERF *src, WTPERF **retp)
             dest->uris[i] = dstrdup(src->uris[i]);
     }
 
-    if (src->async_config != NULL)
-        dest->async_config = dstrdup(src->async_config);
-
     dest->ckptthreads = NULL;
     dest->scanthreads = NULL;
     dest->popthreads = NULL;
@@ -2219,8 +1872,6 @@ wtperf_free(WTPERF *wtperf)
             free(wtperf->uris[i]);
         free(wtperf->uris);
     }
-
-    free(wtperf->async_config);
 
     free(wtperf->ckptthreads);
     free(wtperf->scanthreads);
@@ -2615,31 +2266,6 @@ main(int argc, char *argv[])
         goto err;
     }
 
-    wtperf->async_config = NULL;
-    /*
-     * If the user specified async_threads we use async for all ops. If the user wants compaction,
-     * then we also enable async for the compact operation, but not for the workloads.
-     */
-    if (opts->async_threads > 0) {
-        if (F_ISSET(wtperf, CFG_TRUNCATE)) {
-            lprintf(wtperf, 1, 0, "Cannot run truncate and async\n");
-            goto err;
-        }
-        wtperf->use_asyncops = true;
-    }
-    if (opts->compact && opts->async_threads == 0)
-        opts->async_threads = 2;
-    if (opts->async_threads > 0) {
-        /*
-         * The maximum number of async threads is two digits, so just use that to compute the space
-         * we need. Assume the default of 1024 for the max ops. Although we could bump that up to
-         * 4096 if needed.
-         */
-        req_len = strlen(",async=(enabled=true,threads=)") + 4;
-        wtperf->async_config = dmalloc(req_len);
-        testutil_check(__wt_snprintf(wtperf->async_config, req_len,
-          ",async=(enabled=true,threads=%" PRIu32 ")", opts->async_threads));
-    }
     if ((ret = config_compress(wtperf)) != 0)
         goto err;
 
@@ -2660,9 +2286,8 @@ main(int argc, char *argv[])
 
     /* Concatenate non-default configuration strings. */
     if (user_cconfig != NULL || opts->session_count_idle > 0 || wtperf->compress_ext != NULL ||
-      wtperf->async_config != NULL || opts->in_memory) {
+      opts->in_memory) {
         req_len = 20;
-        req_len += wtperf->async_config != NULL ? strlen(wtperf->async_config) : 0;
         req_len += wtperf->compress_ext != NULL ? strlen(wtperf->compress_ext) : 0;
         if (opts->session_count_idle > 0) {
             sreq_len = strlen("session_max=") + 6;
@@ -2677,11 +2302,6 @@ main(int argc, char *argv[])
 
         pos = 0;
         append_comma = "";
-        if (wtperf->async_config != NULL && strlen(wtperf->async_config) != 0) {
-            testutil_check(__wt_snprintf_len_incr(
-              cc_buf + pos, req_len - pos, &pos, "%s%s", append_comma, wtperf->async_config));
-            append_comma = ",";
-        }
         if (wtperf->compress_ext != NULL && strlen(wtperf->compress_ext) != 0) {
             testutil_check(__wt_snprintf_len_incr(
               cc_buf + pos, req_len - pos, &pos, "%s%s", append_comma, wtperf->compress_ext));

@@ -13,9 +13,6 @@ JDOCDIR = $(top_srcdir)/docs/java
 
 javadir = $(datadir)/java/$(PACKAGE)-$(PACKAGE_VERSION)
 JAVA_SRC = \
-		$(JAVADESTFULL)/AsyncCallback.java \
-		$(JAVADESTFULL)/AsyncOp.java \
-		$(JAVADESTFULL)/AsyncOpType.java \
 		$(JAVADESTFULL)/Connection.java \
 		$(JAVADESTFULL)/Cursor.java \
 		$(JAVADESTFULL)/Modify.java \
@@ -35,7 +32,6 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/WT_MODIFY_LIST.java \
 		$(JAVAEXAMPLES)/ex_access.java \
 		$(JAVAEXAMPLES)/ex_all.java \
-		$(JAVAEXAMPLES)/ex_async.java \
 		$(JAVAEXAMPLES)/ex_call_center.java \
 		$(JAVAEXAMPLES)/ex_cursor.java \
 		$(JAVAEXAMPLES)/ex_log.java \
@@ -45,7 +41,6 @@ JAVA_SRC = \
 
 JAVA_JUNIT = \
 		$(JAVATEST)/AutoCloseTest.java \
-		$(JAVATEST)/AsyncTest.java \
 		$(JAVATEST)/BackupCursorTest.java \
 		$(JAVATEST)/ConfigTest.java \
 		$(JAVATEST)/ConcurrentCloseTest.java \

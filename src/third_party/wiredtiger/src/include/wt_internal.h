@@ -69,16 +69,6 @@ struct __wt_addr;
 typedef struct __wt_addr WT_ADDR;
 struct __wt_addr_copy;
 typedef struct __wt_addr_copy WT_ADDR_COPY;
-struct __wt_async;
-typedef struct __wt_async WT_ASYNC;
-struct __wt_async_cursor;
-typedef struct __wt_async_cursor WT_ASYNC_CURSOR;
-struct __wt_async_format;
-typedef struct __wt_async_format WT_ASYNC_FORMAT;
-struct __wt_async_op_impl;
-typedef struct __wt_async_op_impl WT_ASYNC_OP_IMPL;
-struct __wt_async_worker_state;
-typedef struct __wt_async_worker_state WT_ASYNC_WORKER_STATE;
 struct __wt_blkincr;
 typedef struct __wt_blkincr WT_BLKINCR;
 struct __wt_block;
@@ -388,7 +378,6 @@ typedef uint64_t wt_timestamp_t;
 #include "timestamp.h" /* required by reconcile.h */
 
 #include "api.h"
-#include "async.h"
 #include "block.h"
 #include "bloom.h"
 #include "btmem.h"

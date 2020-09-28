@@ -4,6 +4,11 @@
 @section version_322 Upgrading to Version 3.2.2
 <dl>
 
+<dt>Asynchronous API</dt>
+<dd>
+The asynchronous API has been removed from WiredTiger.
+</dd>
+
 <dt>Named snapshots</dt>
 <dd>
 Named snapshot functionality has been removed from WiredTiger as timestamps offer a better solution

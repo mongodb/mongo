@@ -256,7 +256,3 @@
     if ((ret) == WT_PREPARE_CONFLICT) \
         (ret) = WT_ROLLBACK;          \
     TXN_API_END(s, ret)
-
-#define ASYNCOP_API_CALL(conn, s, n) \
-    s = (conn)->default_session;     \
-    API_CALL_NOCONF(s, asyncop, n, NULL)

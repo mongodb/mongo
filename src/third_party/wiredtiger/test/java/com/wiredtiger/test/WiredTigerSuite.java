@@ -32,7 +32,6 @@ import org.junit.runners.Suite;
 
 @RunWith(Suite.class)
 @Suite.SuiteClasses( {
-    AsyncTest.class,
     AutoCloseTest.class,
     BackupCursorTest.class,
     ConfigTest.class,

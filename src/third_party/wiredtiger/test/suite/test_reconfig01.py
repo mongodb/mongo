@@ -37,33 +37,6 @@ class test_reconfig01(wttest.WiredTigerTestCase):
     def test_reconfig_shared_cache(self):
         self.conn.reconfigure("shared_cache=(name=pool,size=300M)")
 
-    def test_reconfig_async(self):
-        # Async starts off.  Reconfigure through all the various cases, each
-        # building from the previous state.
-        # Async is off, and remains off.
-        self.conn.reconfigure("async=(enabled=false)")
-        # Async is off, turn it on.
-        self.conn.reconfigure("async=(enabled=true)")
-        # Async is on, and remains on.
-        self.conn.reconfigure("async=(enabled=true)")
-        # Async is on, turn it off.
-        self.conn.reconfigure("async=(enabled=false)")
-        # Async is off, turn it on with ops_max and threads.
-        self.conn.reconfigure("async=(enabled=true,ops_max=512,threads=10)")
-        # Reconfigure and use same thread count. (no-op)
-        self.conn.reconfigure("async=(threads=10)")
-        # Reconfigure more threads.
-        self.conn.reconfigure("async=(threads=14)")
-        # Reconfigure fewer threads.
-        self.conn.reconfigure("async=(threads=8)")
-        # Reconfigure illegal ops_max (ignored).
-        self.conn.reconfigure("async=(ops_max=1024)")
-        # Turn async off.
-        self.conn.reconfigure("async=(enabled=false)")
-        # Async is off, turn it on.  Should end up with the
-        # same ops_max of 512 and thread of 8.
-        self.conn.reconfigure("async=(enabled=true)")
-
     def test_reconfig_eviction(self):
         # Increase the max number of running threads (default 8).
         self.conn.reconfigure("eviction=(threads_max=10)")

@@ -128,9 +128,6 @@ struct __wtperf {         /* Per-database structure */
 
     FILE *logf; /* Logging handle */
 
-    char *async_config; /* Config string for async */
-    bool use_asyncops;  /* Use async operations */
-
     const char *compress_ext;   /* Compression extension for conn */
     const char *compress_table; /* Compression arg to table create */
 
