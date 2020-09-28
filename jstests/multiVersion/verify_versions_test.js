@@ -57,8 +57,18 @@ assertBinVersionComparesEqual("", version());
 assertBinVersionsNotEqual("latest", "last-lts");
 assertBinVersionsNotEqual("last-lts", version());
 
+assertBinVersionsNotEqual("latest", "last-continuous");
+assertBinVersionsNotEqual("last-continuous", version());
+
 assertBinVersionComparesHigher("latest", "last-lts");
 assertBinVersionComparesLower("last-lts", version());
+
+assertBinVersionComparesHigher("latest", "last-continuous");
+assertBinVersionComparesLower("last-continuous", version());
+
+if (lastContinuousFCV === lastLTSFCV) {
+    assertBinVersionComparesEqual("last-lts", "last-continuous");
+}
 
 // 3.2 means 3.2.z for any value of z. It does not mean 3.0 or 3.0.w.
 assertBinVersionsEqual("3.2", "3.2.4");
