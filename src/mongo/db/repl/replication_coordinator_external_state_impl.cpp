@@ -461,6 +461,9 @@ Status ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage(Operati
                            });
 
         FeatureCompatibilityVersion::setIfCleanStartup(opCtx, _storageInterface);
+        // Take an unstable checkpoint to ensure that the FCV document is persisted to disk.
+        opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,
+                                                                 false /* stableCheckpoint */);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
