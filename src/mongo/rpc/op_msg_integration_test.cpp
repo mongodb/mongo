@@ -722,16 +722,13 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
     }
 
     bool useLegacyCommandName = (commandName != "hello");
-    // Wait for stale exhuast streams to finish closing before testing the exhaust hello or metrics.
+    // Wait for stale exhaust streams to finish closing before testing the exhaust metrics.
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
         ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-        if (useLegacyCommandName) {
-            return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
-        } else {
-            return serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
-        }
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
+            serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
 
     // Issue a hello or isMaster command without a topology version.
@@ -801,16 +798,13 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
         return;
     }
 
-    // Wait for stale exhuast streams to finish closing before testing the exhaust metrics.
+    // Wait for stale exhaust streams to finish closing before testing the exhaust metrics.
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
         ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
-        if (useLegacyCommandNameAtStart) {
-            return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
-        } else {
-            return serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
-        }
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
+            serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
 
     // Issue a hello or isMaster command without a topology version.
@@ -943,16 +937,13 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
         return;
     }
 
-    // Wait for stale exhuast streams to finish closing before testing the exhaust metrics.
+    // Wait for stale exhaust streams to finish closing before testing the exhaust metrics.
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
         ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
-        if (useLegacyCommandName) {
-            return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
-        } else {
-            return serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
-        }
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
+            serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
 
     // Issue a hello or isMaster command without a topology version.
@@ -1061,16 +1052,13 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
         return;
     }
 
-    // Wait for stale exhuast streams to finish closing before testing the exhaust metrics.
+    // Wait for stale exhaust streams to finish closing before testing the exhaust metrics.
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
         ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
-        if (useLegacyCommandName) {
-            return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0;
-        } else {
-            return serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
-        }
+        return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
+            serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
 
     // Issue a hello or isMaster command without a topology version.
