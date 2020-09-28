@@ -1,6 +1,8 @@
 /**
  * Test that oplog (on both primary and secondary) rolls over when its size exceeds the configured
  * maximum. This test runs on wiredTiger storage engine and inMemory storage engine (if available).
+ *
+ * @tags: [multiversion_incompatible]
  */
 (function() {
 "use strict";
