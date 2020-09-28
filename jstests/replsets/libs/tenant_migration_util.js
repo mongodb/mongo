@@ -62,6 +62,56 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
+     * Runs the donorStartMigration command with the given migration options every 'intervalMS'
+     * until the migration commits or aborts, or until the command fails with error other than
+     * NotPrimary errors. Returns the last command response.
+     */
+    function startMigrationRetryOnNotPrimaryErrors(donorRstArgs, migrationOpts, intervalMS = 100) {
+        const cmdObj = {
+            donorStartMigration: 1,
+            migrationId: UUID(migrationOpts.migrationIdString),
+            recipientConnectionString: migrationOpts.recipientConnString,
+            databasePrefix: migrationOpts.dbPrefix,
+            readPreference: migrationOpts.readPreference
+        };
+
+        const donorRst = new ReplSetTest({rstArgs: donorRstArgs});
+        let primary = donorRst.getPrimary();
+
+        while (true) {
+            const res = primary.adminCommand(cmdObj);
+            if (!res.ok) {
+                if (!ErrorCodes.isNotPrimaryError(res.code)) {
+                    return res;
+                }
+                primary = donorRst.getPrimary();
+            } else if (res.state == "committed" || res.state == "aborted") {
+                return res;
+            }
+            sleep(intervalMS);
+        }
+    }
+
+    /**
+     * Runs the donorForgetMigration command with the given migrationId until the command succeeds
+     * or fails with error other than NotPrimary errors. Returns the last command response.
+     */
+    function forgetMigrationRetryOnNotPrimaryErrors(donorRstArgs, migrationIdString) {
+        const cmdObj = {donorForgetMigration: 1, migrationId: UUID(migrationIdString)};
+
+        const donorRst = new ReplSetTest({rstArgs: donorRstArgs});
+        let primary = donorRst.getPrimary();
+
+        while (true) {
+            const res = primary.adminCommand(cmdObj);
+            if (res.ok || !ErrorCodes.isNotPrimaryError(res.code)) {
+                return res;
+            }
+            primary = donorRst.getPrimary();
+        }
+    }
+
+    /**
      * Asserts that the migration 'migrationId' and 'dbPrefix' eventually goes to state "committed"
      * on all the given nodes.
      */
@@ -96,6 +146,8 @@ var TenantMigrationUtil = (function() {
         accessState,
         startMigration,
         forgetMigration,
+        startMigrationRetryOnNotPrimaryErrors,
+        forgetMigrationRetryOnNotPrimaryErrors,
         assertMigrationCommitted,
         waitForMigrationToCommit,
         waitForMigrationGarbageCollection
