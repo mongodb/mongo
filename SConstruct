@@ -452,6 +452,13 @@ add_option('link-model',
     type='choice'
 )
 
+add_option('linker',
+    choices=['auto', 'gold', 'lld', 'bfd'],
+    default='auto',
+    help='Specify the type of linker to use.',
+    type='choice'
+)
+
 variable_parse_mode_choices=['auto', 'posix', 'other']
 add_option('variable-parse-mode',
     choices=variable_parse_mode_choices,
@@ -3157,8 +3164,11 @@ def doConfigure(myenv):
         # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker
         # because it is much faster. Don't use it if the user has already configured another linker
         # selection manually.
-        if not any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
+        if any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
+            myenv.FatalError(f"Use the '--linker' option instead of modifying the LINKFLAGS directly.")
 
+        linker_ld = get_option('linker')
+        if linker_ld == 'auto':
             # lld has problems with separate debug info on some platforms. See:
             # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
             # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
@@ -3175,6 +3185,15 @@ def doConfigure(myenv):
                     AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
             else:
                 AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+        elif link_model.startswith("dynamic") and linker_ld == 'bfd':
+            # BFD is not supported due to issues with it causing warnings from some of
+            # the third party libraries that mongodb is linked with:
+            # https://jira.mongodb.org/browse/SERVER-49465
+            myenv.FatalError(f"Linker {linker_ld} is not supported with dynamic link model builds.")
+        else:
+            if not AddToLINKFLAGSIfSupported(myenv, f'-fuse-ld={linker_ld}'):
+                myenv.FatalError(f"Linker {linker_ld} could not be configured.")
+
 
         # Usually, --gdb-index is too expensive in big static binaries, but for dynamic
         # builds it works well.
