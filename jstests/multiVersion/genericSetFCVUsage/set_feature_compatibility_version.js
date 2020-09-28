@@ -25,6 +25,8 @@ const latest = "latest";
 function runStandaloneTest(downgradeVersion) {
     jsTestLog("Running standalone test with 'downgradeVersion': " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);
+    const unsupportedOldFCV = (parseFloat(downgradeFCV) - 1).toFixed(1);
+    const unsupportedFutureFCV = (parseFloat(latestFCV) + 0.1).toFixed(1);
 
     let conn;
     let adminDB;
@@ -38,9 +40,17 @@ function runStandaloneTest(downgradeVersion) {
 
     jsTestLog("EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to an invalid value");
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: 5}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "4.8"}));
-    assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: "3.4"}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: unsupportedOldFCV.toString()}));
+    assert.commandFailed(
+        adminDB.runCommand({setFeatureCompatibilityVersion: unsupportedFutureFCV.toString()}));
+    if (numVersionsSinceLastLTS > 2) {
+        // We do not support upgrading/downgrading to FCV's newer than last-lts but older than
+        // last-continuous.
+        const unsupportedFCV = (parseFloat(lastContinuous) - 0.1).toFixed(1);
+        assert.commandFailed(
+            adminDB.runCommand({setFeatureCompatibilityVersion: unsupportedFCV.toString()}));
+    }
 
     jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields.");
     assert.commandFailed(
@@ -431,6 +441,9 @@ function runReplicaSetTest(downgradeVersion) {
 function runShardingTest(downgradeVersion) {
     jsTestLog("Running sharding test with 'downgradeVersion': " + downgradeVersion);
     const downgradeFCV = binVersionToFCV(downgradeVersion);
+    const unsupportedOldFCV = (parseFloat(downgradeFCV) - 1).toFixed(1);
+    const unsupportedFutureFCV = (parseFloat(latestFCV) + 0.1).toFixed(1);
+
     let st;
     let mongosAdminDB;
     let configPrimaryAdminDB;
@@ -451,8 +464,10 @@ function runShardingTest(downgradeVersion) {
     jsTestLog(
         "EXPECTED TO FAIL: featureCompatibilityVersion cannot be set to invalid value on mongos");
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: 5}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "3.2"}));
-    assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: "4.8"}));
+    assert.commandFailed(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: unsupportedOldFCV.toString()}));
+    assert.commandFailed(mongosAdminDB.runCommand(
+        {setFeatureCompatibilityVersion: unsupportedFutureFCV.toString()}));
 
     jsTestLog("EXPECTED TO FAIL: setFeatureCompatibilityVersion rejects unknown fields on mongos");
     assert.commandFailed(

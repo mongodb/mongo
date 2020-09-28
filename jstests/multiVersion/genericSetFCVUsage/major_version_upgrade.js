@@ -39,7 +39,7 @@ const versions = [
     {binVersion: '4.4', featureCompatibilityVersion: '4.4', testCollection: 'four_four'},
     {binVersion: 'last-lts', testCollection: 'last_lts'},
     {binVersion: 'last-continuous', testCollection: 'last_continuous'},
-    {binVersion: 'latest', featureCompatibilityVersion: '4.7', testCollection: 'latest'},
+    {binVersion: 'latest', featureCompatibilityVersion: latestFCV, testCollection: 'latest'},
 ];
 
 // These key patterns are considered valid for existing v:0 and v:1 indexes, but are considered

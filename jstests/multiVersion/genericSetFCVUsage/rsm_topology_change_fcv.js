@@ -22,7 +22,7 @@ function runTest(downgradeFCV) {
         {mongos: [{setParameter: {replicaSetMonitorProtocol: "sdam"}}], config: 1, shards: 0});
 
     const latestWireVersion = st.configRS.getPrimary().getMaxWireVersion();
-    const downgradedWireVersion = downgradeFCV === "last-continuous"
+    const downgradedWireVersion = downgradeFCV === lastContinuousFCV
         ? latestWireVersion - 1
         : latestWireVersion - numVersionsSinceLastLTS;
     const downgradeRegex =

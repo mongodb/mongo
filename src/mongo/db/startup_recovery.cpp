@@ -115,12 +115,13 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
                           fcvColl,
                           BSON("_id" << FeatureCompatibilityVersionParser::kParameterName),
                           featureCompatibilityVersion)) {
+        // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         LOGV2(21000,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with version "
-              "{FeatureCompatibilityVersionParser_kVersion44}.",
+              "{FeatureCompatibilityVersionParser_kLastLTS}.",
               "Re-creating featureCompatibilityVersion document that was deleted",
-              "version"_attr = FeatureCompatibilityVersionParser::kVersion44);
+              "version"_attr = FeatureCompatibilityVersionParser::kLastLTS);
 
         FeatureCompatibilityVersionDocument fcvDoc;
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.

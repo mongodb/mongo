@@ -8,6 +8,7 @@ selector:
   exclude_with_any_tags:
   - multiversion_incompatible
   - requires_fcv_47
+  - requires_fcv_48
   - backport_required_multiversion
   - sharding_last_lts_mongos_and_mixed_shards_backport_required_multiversion
   exclude_files:

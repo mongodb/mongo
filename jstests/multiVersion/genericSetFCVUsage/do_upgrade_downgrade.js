@@ -153,6 +153,14 @@ let standaloneTest = function(nodeOptions, downgradeVersion) {
         checkUniqueIndexFormatVersion(adminDB);
 
         setFCV(adminDB, downgradeFCV);
+    } else {
+        checkFCV(adminDB, lastLTSFCV);
+
+        // Transitioning from last-lts to last-continuous is only allowed when
+        // setFeatureCompatibilityVersion is called with fromConfigServer: true.
+        assert.commandWorked(adminDB.runCommand(
+            {setFeatureCompatibilityVersion: downgradeFCV, fromConfigServer: true}));
+        checkFCV(adminDB, downgradeFCV);
     }
 
     // Ensure featureCompatibilityVersion is downgraded and all collections still have UUIDs.
@@ -243,6 +251,14 @@ let replicaSetTest = function(nodeOptions, downgradeVersion) {
         // Change featureCompatibilityVersion to downgradeFCV.
         setFCV(primaryAdminDB, downgradeFCV);
         rst.awaitReplication();
+    } else {
+        checkFCV(primaryAdminDB, lastLTSFCV);
+
+        // Transitioning from last-lts to last-continuous is only allowed when
+        // setFeatureCompatibilityVersion is called with fromConfigServer: true.
+        assert.commandWorked(primaryAdminDB.runCommand(
+            {setFeatureCompatibilityVersion: downgradeFCV, fromConfigServer: true}));
+        checkFCV(primaryAdminDB, downgradeFCV);
     }
 
     // Ensure featureCompatibilityVersion is 'downgradeVersion' and all collections still have

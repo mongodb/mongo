@@ -165,13 +165,13 @@ function runTest(downgradeFCV) {
     assert.eq(0, numAwaitingTopologyChangeOnSecondary);
 
     // Get the new topologyVersion.
-    const primaryResponseAfterDowngrade = helloAsInternalClient();
+    let primaryResponseAfterDowngrade = helloAsInternalClient();
     assert(primaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
            tojson(primaryResponseAfterDowngrade));
     let primaryTopologyVersionAfterDowngrade = primaryResponseAfterDowngrade.topologyVersion;
     let minWireVersionAfterDowngrade = primaryResponseAfterDowngrade.minWireVersion;
 
-    const secondaryResponseAfterDowngrade =
+    let secondaryResponseAfterDowngrade =
         assert.commandWorked(secondaryAdminDB.runCommand({hello: 1}));
     assert(secondaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
            tojson(secondaryResponseAfterDowngrade));

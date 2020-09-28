@@ -80,7 +80,9 @@ function runTest(downgradeFCV, downgradeWireVersion, maxWireVersion, cmd) {
 // Test upgrade/downgrade between 'latest' and 'last-continuous' if 'last-continuous' is not
 // 'last-lts'.
 if (lastContinuousFCV !== lastLTSFCV) {
-    runTest(lastContinuousFCV, res.maxWireVersion - 1, res.maxWireVersion);
+    runTest(lastContinuousFCV, res.maxWireVersion - 1, res.maxWireVersion, "hello");
+    runTest(lastContinuousFCV, res.maxWireVersion - 1, res.maxWireVersion, "isMaster");
+    runTest(lastContinuousFCV, res.maxWireVersion - 1, res.maxWireVersion, "ismaster");
 }
 
 // Test upgrade/downgrade between 'latest' and 'last-lts'.

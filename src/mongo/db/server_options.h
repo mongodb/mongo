@@ -197,29 +197,35 @@ struct ServerGlobalParams {
             kUnsetDefault44Behavior = 1,
             kFullyDowngradedTo44 = 2,
             kDowngradingFrom47To44 = 3,
-            kUpgradingFrom44To47 = 4,
-            kVersion47 = 5,
+            kDowngradingFrom48To44 = 4,
+            kUpgradingFrom44To47 = 5,
+            kUpgradingFrom44To48 = 6,
+            kVersion47 = 7,
+            kDowngradingFrom48To47 = 8,
+            kUpgradingFrom47To48 = 9,
+            kVersion48 = 10,
         };
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
-        static constexpr Version kLatest = Version::kVersion47;
-        static constexpr Version kLastContinuous = Version::kFullyDowngradedTo44;
+        static constexpr Version kLatest = Version::kVersion48;
+        static constexpr Version kLastContinuous = Version::kVersion47;
         static constexpr Version kLastLTS = Version::kFullyDowngradedTo44;
 
         // These constants should only be used for generic FCV references. Generic references are
         // FCV references that are expected to exist across LTS binary versions.
         // NOTE: DO NOT USE THEM FOR REGULAR FCV CHECKS.
-        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To47;
+        static constexpr Version kUpgradingFromLastLTSToLatest = Version::kUpgradingFrom44To48;
         static constexpr Version kUpgradingFromLastContinuousToLatest =
-            Version::kUpgradingFrom44To47;
-        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom47To44;
+            Version::kUpgradingFrom47To48;
+        static constexpr Version kDowngradingFromLatestToLastLTS = Version::kDowngradingFrom48To44;
         static constexpr Version kDowngradingFromLatestToLastContinuous =
-            Version::kDowngradingFrom47To44;
+            Version::kDowngradingFrom48To47;
         // kUpgradingFromLastLTSToLastContinuous is only ever set to a valid FCV when
         // kLastLTS and kLastContinuous are not equal. Otherwise, this value should be set to
         // kInvalid.
-        static constexpr Version kUpgradingFromLastLTSToLastContinuous = Version::kInvalid;
+        static constexpr Version kUpgradingFromLastLTSToLastContinuous =
+            Version::kUpgradingFrom44To47;
 
         /**
          * On startup, the featureCompatibilityVersion may not have been explicitly set yet. This

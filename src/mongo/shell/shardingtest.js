@@ -1008,7 +1008,8 @@ var ShardingTest = function(params) {
             // as well, because it does not update mongosOptions.binVersion.
             // TODO SERVER-50389: Differentiate between 'last-lts' and 'last-continuous' when
             // last-continuous is supported with shardMixedBinVersions.
-            if (jsTestOptions().shardMixedBinVersions ||
+            if ((MongoRunner.areBinVersionsTheSame(binVersion, "last-lts") &&
+                 jsTestOptions().shardMixedBinVersions) ||
                 (jsTestOptions().mongosBinVersion &&
                  MongoRunner.areBinVersionsTheSame(binVersion, jsTestOptions().mongosBinVersion))) {
                 return true;

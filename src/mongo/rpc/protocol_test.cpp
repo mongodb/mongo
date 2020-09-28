@@ -290,13 +290,16 @@ TEST(Protocol, validateWireVersion) {
 
     for (const auto& mongoSRange : mongoSBinaryRanges) {
         for (const auto& mongoDLatestRange : mongoDLatestBinaryRanges) {
-            // MongoS 'latest' binary can communicate with all FCV versions
-            // MongoS 'last-cont' binary can only communicate with MongoD downgraded 'last-cont' FCV
-            // MongoS 'last-lts' binary can only communicate with MongoD downgraded 'last-lts' FCV
+            // MongoS 'latest' binary can communicate with all FCV versions.
+            // MongoS 'last-cont' binary can only communicate with MongoD downgraded 'last-cont' and
+            // 'last-lts' FCV.
+            // MongoS 'last-lts' binary can only communicate with MongoD downgraded 'last-lts' FCV.
             if (mongoSRange.minWireVersion == WireVersion::LATEST_WIRE_VERSION ||
                 (mongoSRange.minWireVersion == WireVersion::LAST_CONT_WIRE_VERSION &&
                  mongoDLatestRange.minWireVersion == WireVersion::LAST_CONT_WIRE_VERSION) ||
                 (mongoSRange.minWireVersion == WireVersion::LAST_LTS_WIRE_VERSION &&
+                 mongoDLatestRange.minWireVersion == WireVersion::LAST_LTS_WIRE_VERSION) ||
+                (mongoSRange.minWireVersion == WireVersion::LAST_CONT_WIRE_VERSION &&
                  mongoDLatestRange.minWireVersion == WireVersion::LAST_LTS_WIRE_VERSION)) {
                 VALIDATE_WIRE_VERSION(ASSERT_OK,
                                       mongoSRange.minWireVersion,

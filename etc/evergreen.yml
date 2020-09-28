@@ -1358,7 +1358,7 @@ functions:
           --edition $edition                                 \
           --platform $platform                               \
           --architecture $architecture                       \
-          --useLatest 4.4
+          --useLatest 4.4 4.7
 
   "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
@@ -10516,7 +10516,7 @@ buildvariants:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-multiversion
     test_flags: >-
-      --excludeWithAnyTags=requires_fcv_47,multiversion_incompatible
+      --excludeWithAnyTags=requires_fcv_47,requires_fcv_48,multiversion_incompatible
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl
