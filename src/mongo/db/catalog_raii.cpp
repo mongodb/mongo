@@ -69,14 +69,13 @@ Database* AutoGetDb::ensureDbExists() {
     return _db;
 }
 
-template <typename CatalogCollectionLookupT>
-AutoGetCollectionBase<CatalogCollectionLookupT>::AutoGetCollectionBase(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    LockMode modeColl,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline)
-    : _autoDb(opCtx,
+AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     LockMode modeColl,
+                                     AutoGetCollectionViewMode viewMode,
+                                     Date_t deadline)
+    : _opCtx(opCtx),
+      _autoDb(opCtx,
               !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
               isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
               deadline) {
@@ -112,7 +111,7 @@ AutoGetCollectionBase<CatalogCollectionLookupT>::AutoGetCollectionBase(
     if (!db)
         return;
 
-    _coll = _lookup.lookupCollection(opCtx, _resolvedNss);
+    _coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, _resolvedNss);
     invariant(!nsOrUUID.uuid() || _coll,
               str::stream() << "Collection for " << _resolvedNss.ns()
                             << " disappeared after successufully resolving "
@@ -148,13 +147,6 @@ AutoGetCollectionBase<CatalogCollectionLookupT>::AutoGetCollectionBase(
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
             !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
 }
-
-AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     LockMode modeColl,
-                                     AutoGetCollectionViewMode viewMode,
-                                     Date_t deadline)
-    : AutoGetCollectionBase(opCtx, nsOrUUID, modeColl, viewMode, deadline), _opCtx(opCtx) {}
 
 Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::LifetimeMode mode) {
     // Acquire writable instance if not already available
@@ -320,18 +312,6 @@ void CollectionWriter::commitToCatalog() {
     _writableCollection = nullptr;
 }
 
-CatalogCollectionLookup::CollectionStorage CatalogCollectionLookup::lookupCollection(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-}
-
-CatalogCollectionLookupForRead::CollectionStorage CatalogCollectionLookupForRead::lookupCollection(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    auto ptr = CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForRead(opCtx, nss);
-    _collection = CollectionPtr(ptr);
-    return ptr;
-}
-
 LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {
     return nss.isSystemDotViews() ? MODE_X : mode;
 }
@@ -389,8 +369,5 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     _oplogInfo = repl::LocalOplogInfo::get(opCtx);
     _oplog = &_oplogInfo->getCollection();
 }
-
-template class AutoGetCollectionBase<CatalogCollectionLookup>;
-template class AutoGetCollectionBase<CatalogCollectionLookupForRead>;
 
 }  // namespace mongo

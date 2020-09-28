@@ -84,10 +84,12 @@ AutoStatsTracker::~AutoStatsTracker() {
                 curOp->getReadWriteType());
 }
 
-AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
-                                                   const NamespaceStringOrUUID& nsOrUUID,
-                                                   AutoGetCollectionViewMode viewMode,
-                                                   Date_t deadline) {
+template <typename AutoGetCollectionType>
+AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBase(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline) {
     // The caller was expecting to conflict with batch application before entering this function.
     // i.e. the caller does not currently have a ShouldNotConflict... block in scope.
     bool callerWasConflicting = opCtx->lockState()->shouldConflictWithSecondaryBatchApplication();
@@ -241,13 +243,13 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     }
 }
 
-
-AutoGetCollectionForReadCommand::AutoGetCollectionForReadCommand(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline,
-    AutoStatsTracker::LogMode logMode)
+template <typename AutoGetCollectionForReadType>
+AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
+    AutoGetCollectionForReadCommandBase(OperationContext* opCtx,
+                                        const NamespaceStringOrUUID& nsOrUUID,
+                                        AutoGetCollectionViewMode viewMode,
+                                        Date_t deadline,
+                                        AutoStatsTracker::LogMode logMode)
     : _autoCollForRead(opCtx, nsOrUUID, viewMode, deadline),
       _statsTracker(
           opCtx,
@@ -337,5 +339,8 @@ BlockSecondaryReadsDuringBatchApplication_DONT_USE::
     auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(_opCtx);
     allowSecondaryReads->swap(_originalSettings);
 }
+
+template class AutoGetCollectionForReadBase<AutoGetCollection>;
+template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;
 
 }  // namespace mongo

@@ -84,24 +84,13 @@ private:
     const LogMode _logMode;
 };
 
-/**
- * Same as calling AutoGetCollection with MODE_IS, but in addition ensures that the read will be
- * performed against an appropriately committed snapshot if the operation is using a readConcern of
- * 'majority'.
- *
- * Use this when you want to read the contents of a collection, but you are not at the top-level of
- * some command. This will ensure your reads obey any requested readConcern, but will not update the
- * status of CurrentOp, or add a Top entry.
- *
- * NOTE: Must not be used with any locks held, because it needs to block waiting on the committed
- * snapshot to become available.
- */
-class AutoGetCollectionForRead {
-    AutoGetCollectionForRead(const AutoGetCollectionForRead&) = delete;
-    AutoGetCollectionForRead& operator=(const AutoGetCollectionForRead&) = delete;
+template <typename AutoGetCollectionType>
+class AutoGetCollectionForReadBase {
+    AutoGetCollectionForReadBase(const AutoGetCollectionForReadBase&) = delete;
+    AutoGetCollectionForReadBase& operator=(const AutoGetCollectionForReadBase&) = delete;
 
 public:
-    AutoGetCollectionForRead(
+    AutoGetCollectionForReadBase(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
         AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
@@ -140,19 +129,39 @@ private:
 
     // This field is optional, because the code to wait for majority committed snapshot needs to
     // release locks in order to block waiting
-    boost::optional<AutoGetCollectionBase<CatalogCollectionLookupForRead>> _autoColl;
+    boost::optional<AutoGetCollectionType> _autoColl;
 };
 
 /**
- * Same as AutoGetCollectionForRead, but in addition will add a Top entry upon destruction and
- * ensure the CurrentOp object has the right namespace and has started its timer.
+ * Same as calling AutoGetCollection with MODE_IS, but in addition ensures that the read will be
+ * performed against an appropriately committed snapshot if the operation is using a readConcern of
+ * 'majority'.
+ *
+ * Use this when you want to read the contents of a collection, but you are not at the top-level of
+ * some command. This will ensure your reads obey any requested readConcern, but will not update the
+ * status of CurrentOp, or add a Top entry.
+ *
+ * NOTE: Must not be used with any locks held, because it needs to block waiting on the committed
+ * snapshot to become available.
  */
-class AutoGetCollectionForReadCommand {
-    AutoGetCollectionForReadCommand(const AutoGetCollectionForReadCommand&) = delete;
-    AutoGetCollectionForReadCommand& operator=(const AutoGetCollectionForReadCommand&) = delete;
+class AutoGetCollectionForRead : public AutoGetCollectionForReadBase<AutoGetCollection> {
+public:
+    AutoGetCollectionForRead(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max())
+        : AutoGetCollectionForReadBase(opCtx, nsOrUUID, viewMode, deadline) {}
+};
+
+template <typename AutoGetCollectionForReadType>
+class AutoGetCollectionForReadCommandBase {
+    AutoGetCollectionForReadCommandBase(const AutoGetCollectionForReadCommandBase&) = delete;
+    AutoGetCollectionForReadCommandBase& operator=(const AutoGetCollectionForReadCommandBase&) =
+        delete;
 
 public:
-    AutoGetCollectionForReadCommand(
+    AutoGetCollectionForReadCommandBase(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
         AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
@@ -184,8 +193,24 @@ public:
     }
 
 private:
-    AutoGetCollectionForRead _autoCollForRead;
+    AutoGetCollectionForReadType _autoCollForRead;
     AutoStatsTracker _statsTracker;
+};
+
+/**
+ * Same as AutoGetCollectionForRead, but in addition will add a Top entry upon destruction and
+ * ensure the CurrentOp object has the right namespace and has started its timer.
+ */
+class AutoGetCollectionForReadCommand
+    : public AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead> {
+public:
+    AutoGetCollectionForReadCommand(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max(),
+        AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp)
+        : AutoGetCollectionForReadCommandBase(opCtx, nsOrUUID, viewMode, deadline, logMode) {}
 };
 
 /**

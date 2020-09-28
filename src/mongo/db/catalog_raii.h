@@ -82,6 +82,8 @@ private:
     Database* _db;
 };
 
+enum class AutoGetCollectionViewMode { kViewsPermitted, kViewsForbidden };
+
 /**
  * RAII-style class, which acquires global, database, and collection locks according to the chart
  * below.
@@ -98,18 +100,12 @@ private:
  * Any acquired locks may be released when this object goes out of scope, therefore the database
  * and the collection references returned by this class should not be retained.
  */
-
-enum class AutoGetCollectionViewMode { kViewsPermitted, kViewsForbidden };
-
-template <typename CatalogCollectionLookupT>
-class AutoGetCollectionBase {
-    AutoGetCollectionBase(const AutoGetCollectionBase&) = delete;
-    AutoGetCollectionBase& operator=(const AutoGetCollectionBase&) = delete;
-
-    using CollectionStorage = typename CatalogCollectionLookupT::CollectionStorage;
+class AutoGetCollection {
+    AutoGetCollection(const AutoGetCollection&) = delete;
+    AutoGetCollection& operator=(const AutoGetCollection&) = delete;
 
 public:
-    AutoGetCollectionBase(
+    AutoGetCollection(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
         LockMode modeColl,
@@ -152,7 +148,7 @@ public:
      * Returns nullptr if the collection didn't exist.
      */
     const CollectionPtr& getCollection() const {
-        return _lookup.toCollectionPtr(_coll);
+        return _coll;
     }
 
     /**
@@ -169,54 +165,14 @@ public:
         return _resolvedNss;
     }
 
-protected:
-    AutoGetDb _autoDb;
-
-    // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
-    // the same as the input namespace string
-    NamespaceString _resolvedNss;
-
-    // This field is boost::optional, because in the case of lookup by UUID, the collection lock
-    // might need to be relocked for the correct namespace
-    boost::optional<Lock::CollectionLock> _collLock;
-
-    CollectionStorage _coll = nullptr;
-    CatalogCollectionLookupT _lookup;
-    std::shared_ptr<ViewDefinition> _view;
-};
-
-struct CatalogCollectionLookup {
-    using CollectionStorage = CollectionPtr;
-
-    CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
-    const CollectionPtr& toCollectionPtr(const CollectionStorage& collection) const {
-        return collection;
-    }
-};
-struct CatalogCollectionLookupForRead {
-    using CollectionStorage = std::shared_ptr<const Collection>;
-
-    CollectionStorage lookupCollection(OperationContext* opCtx, const NamespaceString& nss);
-    const CollectionPtr& toCollectionPtr(const CollectionStorage&) const {
-        return _collection;
-    }
-
-private:
-    CollectionPtr _collection;
-};
-
-class AutoGetCollection : public AutoGetCollectionBase<CatalogCollectionLookup> {
-public:
-    AutoGetCollection(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        LockMode modeColl,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max());
-
     /**
-     * Returns writable Collection. Necessary Collection lock mode is required.
-     * Any previous Collection that has been returned may be invalidated.
+     * Returns a writable Collection copy that will be returned by current and future calls to this
+     * function as well as getCollection(). Any previous Collection pointers that were returned may
+     * be invalidated.
+     *
+     * CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork will register an onCommit()
+     * handler to reset the pointers and an onRollback() handler that will reset getCollection() to
+     * the original Collection pointer.
      */
     Collection* getWritableCollection(
         CollectionCatalog::LifetimeMode mode =
@@ -226,9 +182,19 @@ public:
         return _opCtx;
     }
 
-private:
-    Collection* _writableColl = nullptr;
+protected:
     OperationContext* _opCtx = nullptr;
+    AutoGetDb _autoDb;
+    boost::optional<Lock::CollectionLock> _collLock;
+    CollectionPtr _coll = nullptr;
+    std::shared_ptr<ViewDefinition> _view;
+
+    // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
+    // the same as the input namespace string
+    NamespaceString _resolvedNss;
+
+    // Populated if getWritableCollection() is called.
+    Collection* _writableColl = nullptr;
 };
 
 /**
