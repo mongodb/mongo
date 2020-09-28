@@ -203,7 +203,7 @@ private:
 
     UUID _migrationId;
     LogicalSessionId _lsid;
-    TxnNumber _txnNumber;
+    TxnNumber _txnNumber{kUninitializedTxnNumber};
     NamespaceString _nss;
     boost::optional<UUID> _collUuid;
     ConnectionString _fromShardConnString;
