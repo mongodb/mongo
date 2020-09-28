@@ -107,20 +107,23 @@ bool CollectionPtr::_canYield() const {
 }
 
 void CollectionPtr::yield() const {
-    if (_canYield()) {
+    // Yield if we are yieldable and have a valid collection
+    if (_canYield() && _collection) {
         _uuid = _collection->uuid();
         _ns = _collection->ns();
         _collection = nullptr;
     }
 }
 void CollectionPtr::restore() const {
-    if (_canYield()) {
+    // Restore from yield if we are yieldable and if uuid was set in a previous yield.
+    if (_canYield() && _uuid) {
         // We may only do yield restore when we were holding locks that was yielded so we need to
         // refresh from the catalog to make sure we have a valid collection pointer.
         auto coll = _catalogLookup()(_opCtx, *_uuid, _catalogEpoch);
         if (coll && coll->ns() == _ns) {
             _collection = coll.get();
         }
+        _uuid.reset();
     }
 }
 
