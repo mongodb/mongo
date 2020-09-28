@@ -4,6 +4,8 @@
  * auth_privilege_consistency.js
  *
  * Validate user cache invalidation upon subordinate role removal.
+ *
+ * @tags: [requires_fcv_47]
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
