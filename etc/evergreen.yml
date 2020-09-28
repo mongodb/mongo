@@ -6410,7 +6410,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_replication_causal_consistency
-  tags: ["concurrency", "repl", "large"]
+  tags: ["concurrency", "repl", "large", "non_live_record"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6540,7 +6540,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: concurrency_sharded_causal_consistency_gen
-  tags: ["concurrency"]
+  tags: ["concurrency", "non_live_record"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6551,7 +6551,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_causal_consistency_and_balancer
-  tags: ["concurrency", "large"]
+  tags: ["concurrency", "large", "non_live_record"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -12803,6 +12803,7 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js !.non_live_record
+  - name: .concurrency !.ubsan !.no_txns !.debug_only !.stepdowns !.non_live_record
   - name: .encrypt
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
@@ -12810,16 +12811,7 @@ buildvariants:
   - name: jsCore_op_query
   - name: jsCore_txns_large_txns_format
   - name: jsonSchema
-  - name: jstestfuzz_gen
-  - name: jstestfuzz_interrupt_gen
-  - name: jstestfuzz_interrupt_replication_gen
-  - name: jstestfuzz_replication_gen
-  - name: jstestfuzz_replication_initsync_gen
-  - name: jstestfuzz_replication_session_gen
-  - name: jstestfuzz_sharded_gen
-  - name: jstestfuzz_sharded_causal_consistency_gen
-  - name: jstestfuzz_sharded_continuous_stepdown_gen
-  - name: jstestfuzz_sharded_session_gen
+  - name: .jstestfuzz !.flow_control !.stepdowns !.causal
   - name: multiversion_sanity_check_gen
   - name: mqlrun
   - name: .multi_shard
@@ -12832,6 +12824,7 @@ buildvariants:
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough
   - name: .read_only
+  - name: .rollbackfuzzer
   - name: sasl
   - name: search
   - name: search_auth
