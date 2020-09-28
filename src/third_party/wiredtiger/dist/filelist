@@ -50,6 +50,7 @@ src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
 src/checksum/arm64/crc32-arm64.c	ARM64_HOST
+src/checksum/mips64el/crc32-mips64el.c	MIPS_HOST
 src/checksum/power8/crc32.sx		POWERPC_HOST
 src/checksum/power8/crc32_wrapper.c	POWERPC_HOST
 src/checksum/software/checksum.c

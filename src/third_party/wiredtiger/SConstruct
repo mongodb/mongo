@@ -234,6 +234,7 @@ condition_map = {
     'WINDOWS_HOST' : env['PLATFORM'] == 'win32',
     'X86_HOST' : True,
     'ZSERIES_HOST' : False,
+	'MIPS_HOST' : env['PLATFORM'] == 'mips64el',
 }
 
 def filtered_filelist(f):
