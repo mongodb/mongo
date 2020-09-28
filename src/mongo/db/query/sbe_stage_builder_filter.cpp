@@ -108,6 +108,10 @@ struct EvalExpr {
     EvalExpr(sbe::value::SlotId s) : expr(sbe::makeE<sbe::EVariable>(s)), slot(s) {}
 
     EvalExpr& operator=(EvalExpr&& e) {
+        if (this == &e) {
+            return *this;
+        }
+
         expr = std::move(e.expr);
         slot = e.slot;
         e.slot = boost::none;
