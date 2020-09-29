@@ -194,6 +194,20 @@ var TenantMigrationUtil = (function() {
         return node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker[tenantId];
     }
 
+    /**
+     * Crafts a tenant database name, given the tenantId.
+     */
+    function tenantDB(tenantId, dbName) {
+        return `${tenantId}_${dbName}`;
+    }
+
+    /**
+     * Crafts a database name that does not belong to the tenant, given the tenantId.
+     */
+    function nonTenantDB(tenantId, dbName) {
+        return `non_${tenantId}_${dbName}`;
+    }
+
     return {
         accessState,
         startMigration,
@@ -204,6 +218,8 @@ var TenantMigrationUtil = (function() {
         waitForMigrationToCommit,
         waitForMigrationToAbort,
         waitForMigrationGarbageCollection,
-        getTenantMigrationAccessBlocker
+        getTenantMigrationAccessBlocker,
+        tenantDB,
+        nonTenantDB,
     };
 })();
