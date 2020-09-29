@@ -1172,7 +1172,7 @@ Sorter<Key, Value>* Sorter<Key, Value>::makeFromExistingRanges(
     checkNoExternalSortOnMongos(opts);
 
     invariant(opts.limit == 0,
-              str::stream() << "Creating a Sorter from existing ranges is only availble with the "
+              str::stream() << "Creating a Sorter from existing ranges is only available with the "
                                "NoLimitSorter (limit 0), but got limit "
                             << opts.limit);
 
