@@ -626,13 +626,11 @@ private:
         }
 
         void set(std::unique_ptr<T> p) {
-            T* old = get();
-            _ptr.store(reinterpret_cast<uintptr_t>(p.release()));
-            delete old;
+            delete _ptr.swap(p.release());
         }
 
         T* get() const {
-            return reinterpret_cast<T*>(_ptr.load());
+            return _ptr.load();
         }
 
         T* operator->() const {
@@ -648,7 +646,7 @@ private:
         }
 
     private:
-        AtomicWord<uintptr_t> _ptr{0};
+        AtomicWord<T*> _ptr{nullptr};
     };
 
     class ClientObserverHolder {
