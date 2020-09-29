@@ -9539,7 +9539,7 @@ buildvariants:
     push_name: linux
     push_arch: x86_64-amazon2
     compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: amazon
+    multiversion_platform: amazon2
     multiversion_edition: targeted
     has_packages: true
     packager_script: packager.py
