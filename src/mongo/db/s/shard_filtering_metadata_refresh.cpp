@@ -135,6 +135,37 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
         .share();
 }
 
+// Return true if joins a shard version update/recover/refresh (in that case, all locks are dropped)
+bool joinShardVersionOperation(OperationContext* opCtx,
+                               CollectionShardingRuntime* csr,
+                               boost::optional<AutoGetCollection>* collLock,
+                               boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
+    invariant(collLock->has_value());
+    invariant(csrLock->has_value());
+
+    // If another thread is currently holding the critical section or the shard version future, it
+    // will be necessary to wait on one of the two variables to finish the update/recover/refresh.
+    auto inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
+    auto critSecSignal =
+        csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
+
+    if (inRecoverOrRefresh || critSecSignal) {
+        // Drop the locks and wait for an ongoing shard version's recovery/refresh/update
+        csrLock->reset();
+        collLock->reset();
+
+        if (critSecSignal) {
+            critSecSignal->get(opCtx);
+        } else {
+            inRecoverOrRefresh->get(opCtx);
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 }  // namespace
 
 void onShardVersionMismatch(OperationContext* opCtx,
@@ -158,74 +189,48 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 "namespace"_attr = nss,
                 "shardVersionReceived"_attr = shardVersionReceived);
 
+    boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
     while (true) {
-        // If another thread is currently holding the critical section or the shard version future,
-        // it will be necessary to wait on one of the following variables to finish the
-        // update/recover/refresh.
-        std::shared_ptr<Notification<void>> critSecSignal;
-        boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
+        boost::optional<AutoGetCollection> autoColl;
+        autoColl.emplace(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
 
-        // Flag indicating wether the current thread has triggered a recover/refresh
-        bool triggeredRecoverRefresh = false;
+        auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
+        boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
+            CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-        {
-            AutoGetCollection autoColl(
-                opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
+        if (joinShardVersionOperation(opCtx, csr, &autoColl, &csrLock)) {
+            continue;
+        }
 
-            auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
-
-            inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-            critSecSignal =
-                csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
-
-            if (!inRecoverOrRefresh && !critSecSignal) {
-                const auto collDesc = csr->getCurrentMetadataIfKnown();
-
-                // Check if the current shard version is fresh enough
-                if (collDesc) {
-                    if (shardVersionReceived) {
-                        const auto currentShardVersion = collDesc->getShardVersion();
-                        // Don't need to remotely reload if we're in the same epoch and the
-                        // requested version is smaller than the one we know about. This means that
-                        // the remote side is behind.
-                        if (currentShardVersion.epoch() == shardVersionReceived->epoch() &&
-                            currentShardVersion.majorVersion() >=
-                                shardVersionReceived->majorVersion())
-                            return;
-                    }
-                }
-
-                // If the shard doesn't yet know its filtering metadata, recovery needs to be run
-                const bool runRecover = collDesc ? false : true;
-
-                // If the critical section is not busy and no recover/refresh is ongoing,
-                // initialize the RecoverRefreshThread thread and associate it to the CSR.
-                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-
-                inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-                critSecSignal =
-                    csr->getCriticalSectionSignal(opCtx, ShardingMigrationCriticalSection::kWrite);
-
-                if (!inRecoverOrRefresh && !critSecSignal) {
-                    csr->setShardVersionRecoverRefreshFuture(
-                        recoverRefreshShardVersion(opCtx->getServiceContext(), nss, runRecover),
-                        csrLock);
-                    inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-                    triggeredRecoverRefresh = true;
-                }
+        auto metadata = csr->getCurrentMetadataIfKnown();
+        if (metadata) {
+            // Check if the current shard version is fresh enough
+            if (shardVersionReceived) {
+                const auto currentShardVersion = metadata->getShardVersion();
+                // Don't need to remotely reload if we're in the same epoch and the requested
+                // version is smaller than the known one. This means that the remote side is behind.
+                if (currentShardVersion.epoch() == shardVersionReceived->epoch() &&
+                    currentShardVersion.majorVersion() >= shardVersionReceived->majorVersion())
+                    return;
             }
         }
 
-        // Wait for an ongoing shard version's recovery/refresh/update
-        if (critSecSignal) {
-            critSecSignal->get(opCtx);
-        } else {
-            inRecoverOrRefresh->get(opCtx);
-            if (triggeredRecoverRefresh) {
-                return;
-            }
+        csrLock.reset();
+        csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
+
+        // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
+        // thread and associate it to the CSR.
+        if (!joinShardVersionOperation(opCtx, csr, &autoColl, &csrLock)) {
+            // If the shard doesn't yet know its filtering metadata, recovery needs to be run
+            const bool runRecover = metadata ? false : true;
+            csr->setShardVersionRecoverRefreshFuture(
+                recoverRefreshShardVersion(opCtx->getServiceContext(), nss, runRecover), *csrLock);
+            inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
+            break;
         }
     }
+
+    inRecoverOrRefresh->get(opCtx);
 }
 
 ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationContext* opCtx,
@@ -233,55 +238,41 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
     : _opCtx(opCtx), _nss(std::move(nss)) {
 
     while (true) {
-        // If another thread is currently holding the critical section or the shard version future,
-        // it will be necessary to wait on one of the following variables to finish the
-        // update/recover/refresh.
-        std::shared_ptr<Notification<void>> critSecSignal;
-        boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
+        // This acquisition is performed with collection lock MODE_S in order to ensure that any
+        // ongoing writes have completed and become visible
+        boost::optional<AutoGetCollection> autoColl;
+        autoColl.emplace(_opCtx,
+                         _nss,
+                         MODE_S,
+                         AutoGetCollectionViewMode::kViewsForbidden,
+                         _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                             Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
 
-        {
-            // This acquisition is performed with collection lock MODE_S in order to ensure that any
-            // ongoing writes have completed and become visible
-            AutoGetCollection autoColl(_opCtx,
-                                       _nss,
-                                       MODE_S,
-                                       AutoGetCollectionViewMode::kViewsForbidden,
-                                       _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                           Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+        auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
+        boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
+            CollectionShardingRuntime::CSRLock::lockShared(_opCtx, csr);
 
-            auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
-
-            inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(_opCtx);
-            critSecSignal =
-                csr->getCriticalSectionSignal(_opCtx, ShardingMigrationCriticalSection::kWrite);
-
-            if (!inRecoverOrRefresh && !critSecSignal) {
-                auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-                inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(_opCtx);
-                critSecSignal =
-                    csr->getCriticalSectionSignal(_opCtx, ShardingMigrationCriticalSection::kWrite);
-
-                if (!inRecoverOrRefresh && !critSecSignal) {
-                    CollectionShardingRuntime::get(_opCtx, _nss)
-                        ->enterCriticalSectionCatchUpPhase(csrLock);
-                    break;
-                }
-            }
+        if (joinShardVersionOperation(_opCtx, csr, &autoColl, &csrLock)) {
+            continue;
         }
 
-        // Wait for an ongoing shard version's recovery/refresh/update
-        if (critSecSignal) {
-            critSecSignal->get(opCtx);
-        } else {
-            inRecoverOrRefresh->get(opCtx);
+        // Make sure metadata are not unknown before entering the critical section
+        auto metadata = csr->getCurrentMetadataIfKnown();
+        if (!metadata) {
+            csrLock.reset();
+            autoColl.reset();
+            onShardVersionMismatch(_opCtx, _nss, boost::none);
+            continue;
         }
-    }
 
-    // Holding the critical section ensures that a shard version recover/refresh will be perfomed by
-    // just one thread at a time
-    auto* const replCoord = repl::ReplicationCoordinator::get(_opCtx);
-    if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
-        migrationutil::recoverMigrationCoordinations(_opCtx, _nss);
+        csrLock.reset();
+        csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr));
+
+        if (!joinShardVersionOperation(_opCtx, csr, &autoColl, &csrLock)) {
+            CollectionShardingRuntime::get(_opCtx, _nss)
+                ->enterCriticalSectionCatchUpPhase(*csrLock);
+            break;
+        }
     }
 
     forceShardFilteringMetadataRefresh(_opCtx, _nss);
