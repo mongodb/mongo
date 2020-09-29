@@ -187,6 +187,8 @@ public:
 
                 // Step 5
 
+                const auto kTenSeconds = Milliseconds(10000);
+
                 // TODO: Refactor all of this
                 if (requestedVersion < collectionShardVersion &&
                     requestedVersion.epoch() == collectionShardVersion.epoch()) {
@@ -196,7 +198,12 @@ public:
                         collLock.reset();
                         autoDb.reset();
                         LOGV2(22056, "waiting till out of critical section");
-                        critSecSignal->waitFor(opCtx, Seconds(10));
+                        auto deadline = opCtx->getServiceContext()->getFastClockSource()->now() +
+                            std::min(opCtx->getRemainingMaxTimeMillis(), kTenSeconds);
+
+                        opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
+                            critSecSignal->wait(opCtx);
+                        });
                     }
 
                     errmsg = str::stream() << "shard global version for collection is higher "
@@ -217,7 +224,13 @@ public:
                         collLock.reset();
                         autoDb.reset();
                         LOGV2(22057, "waiting till out of critical section");
-                        critSecSignal->waitFor(opCtx, Seconds(10));
+
+                        auto deadline = opCtx->getServiceContext()->getFastClockSource()->now() +
+                            std::min(opCtx->getRemainingMaxTimeMillis(), kTenSeconds);
+
+                        opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
+                            critSecSignal->wait(opCtx);
+                        });
                     }
 
                     // need authoritative for first look

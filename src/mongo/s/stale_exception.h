@@ -45,7 +45,7 @@ public:
                     ChunkVersion received,
                     boost::optional<ChunkVersion> wanted,
                     ShardId shardId,
-                    std::shared_ptr<Notification<void>> criticalSectionSignal = nullptr);
+                    boost::optional<SharedSemiFuture<void>> = boost::none);
 
     const auto& getNss() const {
         return _nss;
@@ -79,7 +79,7 @@ private:
 
     // This signal does not get serialized and therefore does not get propagated
     // to the router.
-    std::shared_ptr<Notification<void>> _criticalSectionSignal;
+    boost::optional<SharedSemiFuture<void>> _criticalSectionSignal;
 };
 using StaleConfigException = ExceptionFor<ErrorCodes::StaleConfig>;
 

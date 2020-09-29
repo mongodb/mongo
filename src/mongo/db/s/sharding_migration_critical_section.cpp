@@ -41,7 +41,7 @@ ShardingMigrationCriticalSection::~ShardingMigrationCriticalSection() {
 
 void ShardingMigrationCriticalSection::enterCriticalSectionCatchUpPhase() {
     invariant(!_critSecSignal);
-    _critSecSignal = std::make_shared<Notification<void>>();
+    _critSecSignal.emplace();
     _readsShouldWaitOnCritSec = false;
 }
 
@@ -52,20 +52,20 @@ void ShardingMigrationCriticalSection::enterCriticalSectionCommitPhase() {
 
 void ShardingMigrationCriticalSection::exitCriticalSection() {
     if (_critSecSignal) {
-        _critSecSignal->set();
+        _critSecSignal->emplaceValue();
         _critSecSignal.reset();
     }
 }
 
-std::shared_ptr<Notification<void>> ShardingMigrationCriticalSection::getSignal(
+boost::optional<SharedSemiFuture<void>> ShardingMigrationCriticalSection::getSignal(
     Operation op) const {
     if (!_critSecSignal)
-        return nullptr;
+        return boost::none;
 
     if (op == kWrite || _readsShouldWaitOnCritSec)
-        return _critSecSignal;
+        return _critSecSignal->getFuture();
 
-    return nullptr;
+    return boost::none;
 }
 
 }  // namespace mongo

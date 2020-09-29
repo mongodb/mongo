@@ -145,12 +145,14 @@ bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationCont
     invariant(!opCtx->lockState()->isLocked());
 
     if (_migrationCriticalSectionSignal) {
-        _migrationCriticalSectionSignal->waitFor(
-            opCtx,
-            opCtx->hasDeadline()
-                ? std::min(opCtx->getRemainingMaxTimeMillis(), kMaxWaitForMigrationCriticalSection)
-                : kMaxWaitForMigrationCriticalSection);
-        _migrationCriticalSectionSignal = nullptr;
+        auto deadline = opCtx->getServiceContext()->getFastClockSource()->now() +
+            std::min(opCtx->getRemainingMaxTimeMillis(), kMaxWaitForMigrationCriticalSection);
+
+        opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
+            _migrationCriticalSectionSignal->wait(opCtx);
+        });
+
+        _migrationCriticalSectionSignal = boost::none;
         return true;
     }
 
@@ -158,7 +160,7 @@ bool OperationShardingState::waitForMigrationCriticalSectionSignal(OperationCont
 }
 
 void OperationShardingState::setMigrationCriticalSectionSignal(
-    std::shared_ptr<Notification<void>> critSecSignal) {
+    boost::optional<SharedSemiFuture<void>> critSecSignal) {
     invariant(critSecSignal);
     _migrationCriticalSectionSignal = std::move(critSecSignal);
 }
@@ -168,12 +170,14 @@ bool OperationShardingState::waitForMovePrimaryCriticalSectionSignal(OperationCo
     invariant(!opCtx->lockState()->isLocked());
 
     if (_movePrimaryCriticalSectionSignal) {
-        _movePrimaryCriticalSectionSignal->waitFor(
-            opCtx,
-            opCtx->hasDeadline() ? std::min(opCtx->getRemainingMaxTimeMillis(),
-                                            kMaxWaitForMovePrimaryCriticalSection)
-                                 : kMaxWaitForMovePrimaryCriticalSection);
-        _movePrimaryCriticalSectionSignal = nullptr;
+        auto deadline = opCtx->getServiceContext()->getFastClockSource()->now() +
+            std::min(opCtx->getRemainingMaxTimeMillis(), kMaxWaitForMovePrimaryCriticalSection);
+
+        opCtx->runWithDeadline(deadline, ErrorCodes::ExceededTimeLimit, [&] {
+            _movePrimaryCriticalSectionSignal->wait(opCtx);
+        });
+
+        _movePrimaryCriticalSectionSignal = boost::none;
         return true;
     }
 
@@ -181,7 +185,7 @@ bool OperationShardingState::waitForMovePrimaryCriticalSectionSignal(OperationCo
 }
 
 void OperationShardingState::setMovePrimaryCriticalSectionSignal(
-    std::shared_ptr<Notification<void>> critSecSignal) {
+    boost::optional<SharedSemiFuture<void>> critSecSignal) {
     invariant(critSecSignal);
     _movePrimaryCriticalSectionSignal = std::move(critSecSignal);
 }

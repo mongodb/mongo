@@ -52,7 +52,7 @@ StaleConfigInfo::StaleConfigInfo(NamespaceString nss,
                                  ChunkVersion received,
                                  boost::optional<ChunkVersion> wanted,
                                  ShardId shardId,
-                                 std::shared_ptr<Notification<void>> criticalSectionSignal)
+                                 boost::optional<SharedSemiFuture<void>> criticalSectionSignal)
     : _nss(std::move(nss)),
       _received(received),
       _wanted(wanted),

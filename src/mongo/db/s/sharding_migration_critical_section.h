@@ -29,7 +29,9 @@
 
 #pragma once
 
-#include "mongo/util/concurrency/notification.h"
+#include <boost/optional.hpp>
+
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -68,17 +70,17 @@ public:
     void exitCriticalSection();
 
     /**
-     * Retrieves a critical section notification to wait on. Will return nullptr if the migration is
+     * Retrieves a critical section future to wait on. Will return boost::none if the migration is
      * not yet in the critical section or if the caller is a reader and the migration is not yet in
      * the commit phase.
      */
     enum Operation { kRead, kWrite };
-    std::shared_ptr<Notification<void>> getSignal(Operation op) const;
+    boost::optional<SharedSemiFuture<void>> getSignal(Operation op) const;
 
 private:
-    // Whether the migration source is in a critical section. Tracked as a shared pointer so that
+    // Whether the migration source is in a critical section. Tracked as a shared promise so that
     // callers don't have to hold metadata locks in order to wait on it.
-    std::shared_ptr<Notification<void>> _critSecSignal;
+    boost::optional<SharedPromise<void>> _critSecSignal;
 
     // Used to delay blocking reads up until the commit of the metadata on the config server needs
     // to happen. This allows the shard to serve reads up until the config server metadata update

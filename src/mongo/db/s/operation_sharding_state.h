@@ -34,7 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version_gen.h"
-#include "mongo/util/concurrency/notification.h"
+#include "mongo/util/future.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -145,7 +145,7 @@ public:
      * migration for the namespace and that it would be prudent to wait for the critical section to
      * complete before retrying so the router doesn't make wasteful requests.
      */
-    void setMigrationCriticalSectionSignal(std::shared_ptr<Notification<void>> critSecSignal);
+    void setMigrationCriticalSectionSignal(boost::optional<SharedSemiFuture<void>> critSecSignal);
 
     /**
      * This call is a no op if there isn't a currently active movePrimary critical section.
@@ -162,7 +162,7 @@ public:
      * movePrimary for the namespace and that it would be prudent to wait for the critical section
      * to complete before retrying so the router doesn't make wasteful requests.
      */
-    void setMovePrimaryCriticalSectionSignal(std::shared_ptr<Notification<void>> critSecSignal);
+    void setMovePrimaryCriticalSectionSignal(boost::optional<SharedSemiFuture<void>> critSecSignal);
 
     /**
      * Stores the failed status in _shardingOperationFailedStatus.
@@ -195,12 +195,12 @@ private:
 
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a migration for that namespace, which was in critical section.
-    std::shared_ptr<Notification<void>> _migrationCriticalSectionSignal;
+    boost::optional<SharedSemiFuture<void>> _migrationCriticalSectionSignal;
 
     // This value will only be non-null if version check during the operation execution failed due
     // to stale version and there was a movePrimary for that namespace, which was in critical
     // section.
-    std::shared_ptr<Notification<void>> _movePrimaryCriticalSectionSignal;
+    boost::optional<SharedSemiFuture<void>> _movePrimaryCriticalSectionSignal;
 
     // This value can only be set when a rerouting exception occurs during a write operation, and
     // must be handled before this object gets destructed.

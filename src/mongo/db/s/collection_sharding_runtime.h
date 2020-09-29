@@ -137,7 +137,7 @@ public:
      *
      * This method internally acquires the CSRLock in IS to wait for eventual ongoing operations.
      */
-    std::shared_ptr<Notification<void>> getCriticalSectionSignal(
+    boost::optional<SharedSemiFuture<void>> getCriticalSectionSignal(
         OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op);
 
     /**
