@@ -43,6 +43,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
@@ -65,6 +66,15 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         opCtx->lockState()->getLockerInfo(&lockerInfo, CurOp::get(opCtx)->getLockStatsBase());
         CurOp::get(opCtx)->debug().append(
             opCtx, lockerInfo.stats, opCtx->lockState()->getFlowControlStats(), b);
+    }
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    if (ResourceConsumption::isMetricsCollectionEnabled() &&
+        !metricsCollector.getDbName().empty()) {
+        BSONObjBuilder metricsBuilder = b.subobjStart("operationMetrics");
+        const auto& metrics = metricsCollector.getMetrics();
+        metrics.toBson(&metricsBuilder);
+        metricsBuilder.done();
     }
 
     b.appendDate("ts", jsTime());

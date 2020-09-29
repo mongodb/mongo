@@ -10629,6 +10629,7 @@ buildvariants:
   - name: .replica_sets .common
   - name: .concurrency .common !.large
   - name: .concurrency .common .large
+  - name: sharding_jscore_passthrough
     distros:
     - rhel62-large
 

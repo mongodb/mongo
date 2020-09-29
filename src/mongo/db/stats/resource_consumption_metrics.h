@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -55,6 +56,12 @@ public:
             docUnitsRead += other.docUnitsRead;
             idxEntriesRead += other.idxEntriesRead;
             keysSorted += other.keysSorted;
+        }
+
+        ReadMetrics operator+(const ReadMetrics& other) const {
+            ReadMetrics copy = *this;
+            copy.add(other);
+            return copy;
         }
 
         ReadMetrics& operator+=(const ReadMetrics& other) {
@@ -107,7 +114,15 @@ public:
         // Number of document units returned by a query.
         long long docUnitsReturned;
 
+        /**
+         * Reports all metrics on a BSONObjectBuilder.
+         */
         void toBson(BSONObjBuilder* builder) const;
+
+        /**
+         * Reports all non-zero metrics for logging purposes.
+         */
+        void report(logv2::DynamicAttributes* pAttrs) const;
     };
 
     /**

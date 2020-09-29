@@ -41,17 +41,25 @@ const OperationContext::Decoration<ResourceConsumption::MetricsCollector> getMet
 const ServiceContext::Decoration<ResourceConsumption> getGlobalResourceConsumption =
     ServiceContext::declareDecoration<ResourceConsumption>();
 
-static constexpr StringData kPrimaryMetrics = "primaryMetrics"_sd;
-static constexpr StringData kSecondaryMetrics = "secondaryMetrics"_sd;
-static constexpr StringData kDocBytesRead = "docBytesRead"_sd;
-static constexpr StringData kDocUnitsRead = "docUnitsRead"_sd;
-static constexpr StringData kIdxEntriesRead = "idxEntriesRead"_sd;
-static constexpr StringData kKeysSorted = "keysSorted"_sd;
-static constexpr StringData kCpuMillis = "cpuMillis"_sd;
-static constexpr StringData kDocBytesWritten = "docBytesWritten"_sd;
-static constexpr StringData kDocUnitsWritten = "docUnitsWritten"_sd;
-static constexpr StringData kDocUnitsReturned = "docUnitsReturned"_sd;
+static const char kPrimaryMetrics[] = "primaryMetrics";
+static const char kSecondaryMetrics[] = "secondaryMetrics";
+static const char kDocBytesRead[] = "docBytesRead";
+static const char kDocUnitsRead[] = "docUnitsRead";
+static const char kIdxEntriesRead[] = "idxEntriesRead";
+static const char kKeysSorted[] = "keysSorted";
+static const char kCpuMillis[] = "cpuMillis";
+static const char kDocBytesWritten[] = "docBytesWritten";
+static const char kDocUnitsWritten[] = "docUnitsWritten";
+static const char kDocUnitsReturned[] = "docUnitsReturned";
 
+template <size_t N>
+inline void reportNonZeroMetric(logv2::DynamicAttributes* attrs,
+                                const char (&name)[N],
+                                long long value) {
+    if (value != 0) {
+        attrs->add(name, value);
+    }
+}
 }  // namespace
 
 bool ResourceConsumption::isMetricsCollectionEnabled() {
@@ -99,6 +107,21 @@ void ResourceConsumption::Metrics::toBson(BSONObjBuilder* builder) const {
     builder->appendNumber(kDocBytesWritten, docBytesWritten);
     builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
     builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
+}
+
+
+void ResourceConsumption::Metrics::report(logv2::DynamicAttributes* attrs) const {
+    // Report all read metrics together.
+    auto readMetrics = primaryMetrics + secondaryMetrics;
+    reportNonZeroMetric(attrs, kDocBytesRead, readMetrics.docBytesRead);
+    reportNonZeroMetric(attrs, kDocUnitsRead, readMetrics.docUnitsRead);
+    reportNonZeroMetric(attrs, kIdxEntriesRead, readMetrics.idxEntriesRead);
+    reportNonZeroMetric(attrs, kKeysSorted, readMetrics.keysSorted);
+
+    reportNonZeroMetric(attrs, kCpuMillis, cpuMillis);
+    reportNonZeroMetric(attrs, kDocBytesWritten, docBytesWritten);
+    reportNonZeroMetric(attrs, kDocUnitsWritten, docUnitsWritten);
+    reportNonZeroMetric(attrs, kDocUnitsReturned, docUnitsReturned);
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,

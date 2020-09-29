@@ -163,6 +163,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'auth/auth',
         'prepare_conflict_tracker',
+        'stats/resource_consumption_metrics',
     ],
 )
 
@@ -1011,6 +1012,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
        "concurrency/write_conflict_exception",
+       "stats/resource_consumption_metrics",
     ],
 )
 
