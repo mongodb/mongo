@@ -31,23 +31,20 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/sorter/sorter.h"
-
 #include <boost/filesystem.hpp>
+#include <memory>
 
 #include "mongo/base/data_type_endian.h"
-#include "mongo/base/init.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/sorter/sorter.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/str.h"
 
-#include "mongo/logv2/log.h"
-#include <memory>
 
 namespace mongo {
 
@@ -71,10 +68,8 @@ std::string nextFileName() {
 #include "mongo/db/sorter/sorter.cpp"
 
 namespace mongo {
-
-using namespace mongo::sorter;
-using std::make_shared;
-using std::pair;
+namespace sorter {
+namespace {
 
 //
 // Sorter framework testing utilities
@@ -106,7 +101,7 @@ private:
     int _i;
 };
 
-typedef pair<IntWrapper, IntWrapper> IWPair;
+typedef std::pair<IntWrapper, IntWrapper> IWPair;
 typedef SortIteratorInterface<IntWrapper, IntWrapper> IWIterator;
 typedef Sorter<IntWrapper, IntWrapper> IWSorter;
 
@@ -253,7 +248,7 @@ public:
             static const int zeroUpTo20[] = {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
                                              10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
             ASSERT_ITERATORS_EQUIVALENT(makeInMemIterator(zeroUpTo20),
-                                        make_shared<IntIterator>(0, 20));
+                                        std::make_shared<IntIterator>(0, 20));
         }
         {
             // make sure InMemIterator doesn't do any reordering on it's own
@@ -294,7 +289,7 @@ public:
             sorter.addAlreadySorted(3, -3);
             sorter.addAlreadySorted(4, -4);
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
-                                        make_shared<IntIterator>(0, 5));
+                                        std::make_shared<IntIterator>(0, 5));
 
             ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
@@ -305,7 +300,7 @@ public:
                 sorter.addAlreadySorted(i, -i);
 
             ASSERT_ITERATORS_EQUIVALENT(std::shared_ptr<IWIterator>(sorter.done()),
-                                        make_shared<IntIterator>(0, 10 * 1000 * 1000));
+                                        std::make_shared<IntIterator>(0, 10 * 1000 * 1000));
 
             ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
@@ -322,51 +317,46 @@ public:
             std::vector<std::shared_ptr<IWIterator>> vec;
             std::shared_ptr<IWIterator> mergeIter(
                 IWIterator::merge(vec, "", SortOptions(), IWComparator()));
-            ASSERT_ITERATORS_EQUIVALENT(mergeIter, make_shared<EmptyIterator>());
+            ASSERT_ITERATORS_EQUIVALENT(mergeIter, std::make_shared<EmptyIterator>());
         }
         {  // test empty (only empty inputs)
-            std::shared_ptr<IWIterator> iterators[] = {make_shared<EmptyIterator>(),
-                                                       make_shared<EmptyIterator>(),
-                                                       make_shared<EmptyIterator>()};
+            std::shared_ptr<IWIterator> iterators[] = {std::make_shared<EmptyIterator>(),
+                                                       std::make_shared<EmptyIterator>(),
+                                                       std::make_shared<EmptyIterator>()};
 
             ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, ASC),
-                                        make_shared<EmptyIterator>());
+                                        std::make_shared<EmptyIterator>());
         }
 
         {  // test ASC
             std::shared_ptr<IWIterator> iterators[] = {
-                make_shared<IntIterator>(1, 20, 2)  // 1, 3, ... 19
+                std::make_shared<IntIterator>(1, 20, 2)  // 1, 3, ... 19
                 ,
-                make_shared<IntIterator>(0, 20, 2)  // 0, 2, ... 18
+                std::make_shared<IntIterator>(0, 20, 2)  // 0, 2, ... 18
             };
 
             ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, ASC),
-                                        make_shared<IntIterator>(0, 20, 1));
+                                        std::make_shared<IntIterator>(0, 20, 1));
         }
 
         {  // test DESC with an empty source
             std::shared_ptr<IWIterator> iterators[] = {
-                make_shared<IntIterator>(30, 0, -3)  // 30, 27, ... 3
-                ,
-                make_shared<IntIterator>(29, 0, -3)  // 29, 26, ... 2
-                ,
-                make_shared<IntIterator>(28, 0, -3)  // 28, 25, ... 1
-                ,
-                make_shared<EmptyIterator>()};
+                std::make_shared<IntIterator>(30, 0, -3),  // 30, 27, ... 3
+                std::make_shared<IntIterator>(29, 0, -3),  // 29, 26, ... 2
+                std::make_shared<IntIterator>(28, 0, -3),  // 28, 25, ... 1
+                std::make_shared<EmptyIterator>()};
 
             ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iterators, DESC),
-                                        make_shared<IntIterator>(30, 0, -1));
+                                        std::make_shared<IntIterator>(30, 0, -1));
         }
         {  // test Limit
             std::shared_ptr<IWIterator> iterators[] = {
-                make_shared<IntIterator>(1, 20, 2)  // 1, 3, ... 19
-                ,
-                make_shared<IntIterator>(0, 20, 2)  // 0, 2, ... 18
-            };
+                std::make_shared<IntIterator>(1, 20, 2),   // 1, 3, ... 19
+                std::make_shared<IntIterator>(0, 20, 2)};  // 0, 2, ... 18
 
             ASSERT_ITERATORS_EQUIVALENT(
                 mergeIterators(iterators, ASC, SortOptions().Limit(10)),
-                make_shared<LimitIterator>(10, make_shared<IntIterator>(0, 20, 1)));
+                std::make_shared<LimitIterator>(10, std::make_shared<IntIterator>(0, 20, 1)));
         }
     }
 };
@@ -381,15 +371,15 @@ public:
         const SortOptions opts = SortOptions().TempDir(tempDir.path()).ExtSortAllowed();
 
         {  // test empty (no limit)
-            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(opts)), make_shared<EmptyIterator>());
+            ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(opts)), std::make_shared<EmptyIterator>());
         }
         {  // test empty (limit 1)
             ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(1))),
-                                        make_shared<EmptyIterator>());
+                                        std::make_shared<EmptyIterator>());
         }
         {  // test empty (limit 10)
             ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(10))),
-                                        make_shared<EmptyIterator>());
+                                        std::make_shared<EmptyIterator>());
         }
 
         {  // test all data ASC
@@ -452,12 +442,12 @@ public:
 
     // returns an iterator with the correct results
     virtual std::shared_ptr<IWIterator> correct() {
-        return make_shared<IntIterator>(0, 5);  // 0, 1, ... 4
+        return std::make_shared<IntIterator>(0, 5);  // 0, 1, ... 4
     }
 
     // like correct but with opposite sort direction
     virtual std::shared_ptr<IWIterator> correctReverse() {
-        return make_shared<IntIterator>(4, -1, -1);  // 4, 3, ... 0
+        return std::make_shared<IntIterator>(4, -1, -1);  // 4, 3, ... 0
     }
 
     virtual size_t correctNumRanges() const {
@@ -505,10 +495,10 @@ class Limit : public Basic {
         sorter->add(-1, 1);
     }
     std::shared_ptr<IWIterator> correct() override {
-        return make_shared<IntIterator>(-1, 4);
+        return std::make_shared<IntIterator>(-1, 4);
     }
     std::shared_ptr<IWIterator> correctReverse() override {
-        return make_shared<IntIterator>(4, -1, -1);
+        return std::make_shared<IntIterator>(4, -1, -1);
     }
 };
 
@@ -567,10 +557,10 @@ public:
     }
 
     std::shared_ptr<IWIterator> correct() override {
-        return make_shared<IntIterator>(0, NUM_ITEMS);
+        return std::make_shared<IntIterator>(0, NUM_ITEMS);
     }
     std::shared_ptr<IWIterator> correctReverse() override {
-        return make_shared<IntIterator>(NUM_ITEMS - 1, -1, -1);
+        return std::make_shared<IntIterator>(NUM_ITEMS - 1, -1, -1);
     }
 
     size_t correctNumRanges() const override {
@@ -604,10 +594,10 @@ class LotsOfDataWithLimit : public LotsOfDataLittleMemory<Random> {
         return opts.MaxMemoryUsageBytes(MEM_LIMIT).ExtSortAllowed().Limit(Limit);
     }
     std::shared_ptr<IWIterator> correct() override {
-        return make_shared<LimitIterator>(Limit, Parent::correct());
+        return std::make_shared<LimitIterator>(Limit, Parent::correct());
     }
     std::shared_ptr<IWIterator> correctReverse() override {
-        return make_shared<LimitIterator>(Limit, Parent::correctReverse());
+        return std::make_shared<LimitIterator>(Limit, Parent::correctReverse());
     }
     size_t correctNumRanges() const override {
         // For the TopKSorter, the number of ranges depends on the specific composition of the data
@@ -660,4 +650,7 @@ public:
 };
 
 mongo::unittest::OldStyleSuiteInitializer<SorterSuite> extSortTests;
+
+}  // namespace
+}  // namespace sorter
 }  // namespace mongo
