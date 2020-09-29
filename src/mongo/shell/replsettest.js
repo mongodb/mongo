@@ -2161,87 +2161,21 @@ var ReplSetTest = function(opts) {
 
     this.getCollectionDiffUsingSessions = function(
         primarySession, secondarySession, dbName, collNameOrUUID) {
-        function PeekableCursor(cursor) {
-            let _stashedDoc;
-
-            this.hasNext = function hasNext() {
-                return cursor.hasNext();
-            };
-
-            this.peekNext = function peekNext() {
-                if (_stashedDoc === undefined) {
-                    _stashedDoc = cursor.next();
-                }
-                return _stashedDoc;
-            };
-
-            this.next = function next() {
-                const result = (_stashedDoc === undefined) ? cursor.next() : _stashedDoc;
-                _stashedDoc = undefined;
-                return result;
-            };
-        }
-
-        const docsWithDifferentContents = [];
-        const docsMissingOnPrimary = [];
-        const docsMissingOnSecondary = [];
-
         const primaryDB = primarySession.getDatabase(dbName);
         const secondaryDB = secondarySession.getDatabase(dbName);
 
         const commandObj = {find: collNameOrUUID, sort: {_id: 1}};
-        const primaryCursor =
-            new PeekableCursor(new DBCommandCursor(primaryDB, primaryDB.runCommand(commandObj)));
+        const primaryCursor = new DBCommandCursor(primaryDB, primaryDB.runCommand(commandObj));
+        const secondaryCursor =
+            new DBCommandCursor(secondaryDB, secondaryDB.runCommand(commandObj));
+        const diff = DataConsistencyChecker.getDiff(primaryCursor, secondaryCursor);
 
-        const secondaryCursor = new PeekableCursor(
-            new DBCommandCursor(secondaryDB, secondaryDB.runCommand(commandObj)));
-
-        while (primaryCursor.hasNext() && secondaryCursor.hasNext()) {
-            const primaryDoc = primaryCursor.peekNext();
-            const secondaryDoc = secondaryCursor.peekNext();
-
-            if (bsonBinaryEqual(primaryDoc, secondaryDoc)) {
-                // The same document was found on the primary and secondary so we just move on to
-                // the next document for both cursors.
-                primaryCursor.next();
-                secondaryCursor.next();
-                continue;
-            }
-
-            const ordering = bsonWoCompare({_: primaryDoc._id}, {_: secondaryDoc._id});
-            if (ordering === 0) {
-                // The documents have the same _id but have different contents.
-                docsWithDifferentContents.push({primary: primaryDoc, secondary: secondaryDoc});
-                primaryCursor.next();
-                secondaryCursor.next();
-            } else if (ordering < 0) {
-                // The primary's next document has a smaller _id than the secondary's next document.
-                // Since we are iterating the documents in ascending order by their _id, we'll never
-                // see a document with 'primaryDoc._id' on the secondary.
-                docsMissingOnSecondary.push(primaryDoc);
-                primaryCursor.next();
-            } else if (ordering > 0) {
-                // The primary's next document has a larger _id than the secondary's next document.
-                // Since we are iterating the documents in ascending order by their _id, we'll never
-                // see a document with 'secondaryDoc._id' on the primary.
-                docsMissingOnPrimary.push(secondaryDoc);
-                secondaryCursor.next();
-            }
-        }
-
-        while (primaryCursor.hasNext()) {
-            // We've exhausted the secondary's cursor already, so everything remaining from the
-            // primary's cursor must be missing from secondary.
-            docsMissingOnSecondary.push(primaryCursor.next());
-        }
-
-        while (secondaryCursor.hasNext()) {
-            // We've exhausted the primary's cursor already, so everything remaining from the
-            // secondary's cursor must be missing from primary.
-            docsMissingOnPrimary.push(secondaryCursor.next());
-        }
-
-        return {docsWithDifferentContents, docsMissingOnPrimary, docsMissingOnSecondary};
+        return {
+            docsWithDifferentContents: diff.docsWithDifferentContents.map(
+                ({first, second}) => ({primary: first, secondary: second})),
+            docsMissingOnPrimary: diff.docsMissingOnFirst,
+            docsMissingOnSecondary: diff.docsMissingOnSecond
+        };
     };
 
     // Gets the dbhash for the current primary and for all secondaries (or the members of
