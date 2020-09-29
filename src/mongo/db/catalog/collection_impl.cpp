@@ -993,6 +993,19 @@ uint64_t CollectionImpl::getIndexSize(OperationContext* opCtx,
     return totalSize;
 }
 
+uint64_t CollectionImpl::getIndexFreeStorageBytes(OperationContext* const opCtx) const {
+    const auto idxCatalog = getIndexCatalog();
+    const bool includeUnfinished = true;
+    auto indexIt = idxCatalog->getIndexIterator(opCtx, includeUnfinished);
+
+    uint64_t totalSize = 0;
+    while (indexIt->more()) {
+        auto entry = indexIt->next();
+        totalSize += entry->accessMethod()->getFreeStorageBytes(opCtx);
+    }
+    return totalSize;
+}
+
 /**
  * order will be:
  * 1) store index specs

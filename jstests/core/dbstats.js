@@ -2,6 +2,7 @@
 //
 // @tags: [
 //   requires_dbstats,
+//   requires_fcv_47,
 // ]
 
 (function() {
@@ -53,6 +54,11 @@ assert(dbStats.hasOwnProperty("totalSize"), tojson(dbStats));
 assert(dbStats.hasOwnProperty("indexSize"), tojson(dbStats));
 
 if (isUsingPersistentStorage) {
+    assert(dbStats.hasOwnProperty("freeStorageSize"), tojson(dbStats));
+    assert(dbStats.hasOwnProperty("indexFreeStorageSize"), tojson(dbStats));
+    assert(dbStats.hasOwnProperty("totalFreeStorageSize"), tojson(dbStats));
+    assert.eq(dbStats.freeStorageSize + dbStats.indexFreeStorageSize, dbStats.totalFreeStorageSize);
+
     assert(dbStats.hasOwnProperty("fsUsedSize"), tojson(dbStats));
     assert(dbStats.hasOwnProperty("fsTotalSize"), tojson(dbStats));
 }

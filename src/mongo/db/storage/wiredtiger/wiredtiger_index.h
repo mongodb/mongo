@@ -118,6 +118,8 @@ public:
 
     virtual long long getSpaceUsedBytes(OperationContext* opCtx) const;
 
+    virtual long long getFreeStorageBytes(OperationContext* opCtx) const;
+
     virtual Status initAsEmpty(OperationContext* opCtx);
 
     Status compact(OperationContext* opCtx) override;

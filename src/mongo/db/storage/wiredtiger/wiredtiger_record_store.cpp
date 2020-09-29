@@ -1000,12 +1000,7 @@ int64_t WiredTigerRecordStore::freeStorageSize(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isReadLocked());
 
     WiredTigerSession* session = WiredTigerRecoveryUnit::get(opCtx)->getSessionNoTxn();
-    auto result = WiredTigerUtil::getStatisticsValue(session->getSession(),
-                                                     "statistics:" + getURI(),
-                                                     "statistics=(fast)",
-                                                     WT_STAT_DSRC_BLOCK_REUSE_BYTES);
-    uassertStatusOK(result.getStatus());
-    return result.getValue();
+    return WiredTigerUtil::getIdentReuseSize(session->getSession(), getURI());
 }
 
 // Retrieve the value from a positioned cursor.

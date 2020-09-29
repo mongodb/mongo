@@ -203,6 +203,11 @@ public:
      */
     virtual long long getSpaceUsedBytes(OperationContext* opCtx) const = 0;
 
+    /**
+     * The number of unused free bytes consumed by this index on disk.
+     */
+    virtual long long getFreeStorageBytes(OperationContext* opCtx) const = 0;
+
     virtual RecordId findSingle(OperationContext* opCtx, const BSONObj& key) const = 0;
 
     /**
@@ -514,6 +519,8 @@ public:
                            double scale) const final;
 
     long long getSpaceUsedBytes(OperationContext* opCtx) const final;
+
+    long long getFreeStorageBytes(OperationContext* opCtx) const final;
 
     RecordId findSingle(OperationContext* opCtx, const BSONObj& key) const final;
 

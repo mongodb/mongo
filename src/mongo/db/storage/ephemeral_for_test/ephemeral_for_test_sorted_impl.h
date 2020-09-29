@@ -82,6 +82,9 @@ public:
                            BSONObjBuilder* output,
                            double scale) const override;
     long long getSpaceUsedBytes(OperationContext* opCtx) const override;
+    long long getFreeStorageBytes(OperationContext* opCtx) const override {
+        return 0;
+    }
     bool isEmpty(OperationContext* opCtx) override;
     Status initAsEmpty(OperationContext* opCtx) override;
 

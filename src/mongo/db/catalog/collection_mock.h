@@ -254,6 +254,10 @@ public:
         std::abort();
     }
 
+    uint64_t getIndexFreeStorageBytes(OperationContext* const opCtx) const {
+        std::abort();
+    }
+
     boost::optional<Timestamp> getMinimumVisibleSnapshot() const {
         std::abort();
     }

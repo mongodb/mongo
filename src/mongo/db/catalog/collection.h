@@ -524,6 +524,11 @@ public:
                                   const int scale = 1) const = 0;
 
     /**
+     * Returns the number of unused, free bytes used by all indexes on disk.
+     */
+    virtual uint64_t getIndexFreeStorageBytes(OperationContext* const opCtx) const = 0;
+
+    /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must error.
      */

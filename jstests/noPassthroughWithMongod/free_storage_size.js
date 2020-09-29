@@ -1,6 +1,6 @@
 /**
- * Tests that db.collection.stats().freeStorageSize is a non-zero value after records are
- * inserted and then some deleted.
+ * Tests that dbStats and collStats report a non-zero freeStorageSize after records are inserted and
+ * then some deleted.
  *
  * @tags: [
  *   # freeStorageSize is currently only supported by WT.
@@ -42,4 +42,9 @@ forceCheckpoint();
 let collStats = assert.commandWorked(testDB.runCommand({collStats: collName}));
 assert(collStats.hasOwnProperty("freeStorageSize"), tojson(collStats));
 assert.gt(collStats.freeStorageSize, 0);
+
+let dbStats = assert.commandWorked(testDB.runCommand({dbStats: 1}));
+assert(dbStats.hasOwnProperty("freeStorageSize"), tojson(dbStats));
+assert.gt(dbStats.freeStorageSize, 0);
+assert.eq(dbStats.freeStorageSize, collStats.freeStorageSize);
 })();

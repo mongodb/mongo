@@ -204,6 +204,10 @@ public:
         return 0;
     }
 
+    virtual long long getFreeStorageBytes(OperationContext* opCtx) const {
+        return 0;
+    }
+
     virtual bool isEmpty(OperationContext* opCtx) {
         return true;
     }

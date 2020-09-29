@@ -254,8 +254,10 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     long long objects = 0;
     long long size = 0;
     long long storageSize = 0;
+    long long freeStorageSize = 0;
     long long indexes = 0;
     long long indexSize = 0;
+    long long indexFreeStorageSize = 0;
 
     invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
 
@@ -267,9 +269,11 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
 
             BSONObjBuilder temp;
             storageSize += collection->getRecordStore()->storageSize(opCtx, &temp);
+            freeStorageSize += collection->getRecordStore()->freeStorageSize(opCtx);
 
             indexes += collection->getIndexCatalog()->numIndexesTotal(opCtx);
             indexSize += collection->getIndexSize(opCtx);
+            indexFreeStorageSize += collection->getIndexFreeStorageBytes(opCtx);
 
             return true;
         });
@@ -282,9 +286,12 @@ void DatabaseImpl::getStats(OperationContext* opCtx, BSONObjBuilder* output, dou
     output->append("avgObjSize", objects == 0 ? 0 : double(size) / double(objects));
     output->appendNumber("dataSize", size / scale);
     output->appendNumber("storageSize", storageSize / scale);
+    output->appendNumber("freeStorageSize", freeStorageSize / scale);
     output->appendNumber("indexes", indexes);
     output->appendNumber("indexSize", indexSize / scale);
+    output->appendNumber("indexFreeStorageSize", indexFreeStorageSize / scale);
     output->appendNumber("totalSize", (storageSize + indexSize) / scale);
+    output->appendNumber("totalFreeStorageSize", (freeStorageSize + indexFreeStorageSize) / scale);
     output->appendNumber("scaleFactor", scale);
 
     if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {

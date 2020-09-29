@@ -470,6 +470,14 @@ long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     return static_cast<long long>(WiredTigerUtil::getIdentSize(session->getSession(), _uri));
 }
 
+long long WiredTigerIndex::getFreeStorageBytes(OperationContext* opCtx) const {
+    dassert(opCtx->lockState()->isReadLocked());
+    auto ru = WiredTigerRecoveryUnit::get(opCtx);
+    WiredTigerSession* session = ru->getSession();
+
+    return static_cast<long long>(WiredTigerUtil::getIdentReuseSize(session->getSession(), _uri));
+}
+
 bool WiredTigerIndex::isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyString::Value& key) {
     dassert(opCtx->lockState()->isReadLocked());
     invariant(unique());

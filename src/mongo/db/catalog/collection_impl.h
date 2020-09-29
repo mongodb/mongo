@@ -320,6 +320,8 @@ public:
                           BSONObjBuilder* details = nullptr,
                           int scale = 1) const final;
 
+    uint64_t getIndexFreeStorageBytes(OperationContext* const opCtx) const final;
+
     /**
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must error.

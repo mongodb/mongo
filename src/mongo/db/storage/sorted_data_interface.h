@@ -150,6 +150,11 @@ public:
     virtual long long getSpaceUsedBytes(OperationContext* opCtx) const = 0;
 
     /**
+     * The number of unused free bytes consumed by this index on disk.
+     */
+    virtual long long getFreeStorageBytes(OperationContext* opCtx) const = 0;
+
+    /**
      * Return true if 'this' index is empty, and false otherwise.
      */
     virtual bool isEmpty(OperationContext* opCtx) = 0;

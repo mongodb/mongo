@@ -332,6 +332,10 @@ long long AbstractIndexAccessMethod::getSpaceUsedBytes(OperationContext* opCtx) 
     return _newInterface->getSpaceUsedBytes(opCtx);
 }
 
+long long AbstractIndexAccessMethod::getFreeStorageBytes(OperationContext* opCtx) const {
+    return _newInterface->getFreeStorageBytes(opCtx);
+}
+
 pair<KeyStringSet, KeyStringSet> AbstractIndexAccessMethod::setDifference(
     const KeyStringSet& left, const KeyStringSet& right) {
     // Two iterators to traverse the two sets in sorted order.
