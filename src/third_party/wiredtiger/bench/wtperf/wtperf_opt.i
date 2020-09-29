@@ -80,7 +80,6 @@
  * The difference between CONFIG_STRING and STRING is that CONFIG_STRING
  * options are appended to existing content, whereas STRING options overwrite.
  */
-DEF_OPT_AS_UINT32(async_threads, 0, "number of async worker threads")
 DEF_OPT_AS_UINT32(
   checkpoint_interval, 120, "checkpoint every interval seconds during the workload phase.")
 DEF_OPT_AS_UINT32(checkpoint_stress_rate, 0,

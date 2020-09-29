@@ -1,0 +1,2 @@
+This folder contains a list of test/format configurations that generated failures in the past.
+The ticket number is included as the filename postfix to indicate the source of each failure.

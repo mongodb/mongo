@@ -1570,8 +1570,6 @@ INCLUDE_FILE_PATTERNS  =
 # instead of the = operator.
 
 PREDEFINED             = DOXYGEN \
-                         __wt_async_callback:=WT_ASYNC_CALLBACK \
-                         __wt_async_op:=WT_ASYNC_OP \
                          __wt_collator:=WT_COLLATOR \
                          __wt_compressor:=WT_COMPRESSOR \
                          __wt_config_arg:=WT_CONFIG_ARG \

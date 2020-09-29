@@ -139,6 +139,7 @@ thread_run(void *arg)
     char kname[64], tscfg[64];
 
     conn = (WT_CONNECTION *)arg;
+    memset(kname, 0, sizeof(kname));
 
     testutil_check(conn->open_session(conn, NULL, "isolation=snapshot", &session));
     testutil_check(session->open_cursor(session, uri, NULL, NULL, &cursor));
@@ -263,7 +264,7 @@ main(int argc, char *argv[])
 
     (void)testutil_set_progname(argv);
 
-    rand_time = false;
+    rand_time = true;
     timeout = MIN_TIME;
     working_dir = "WT_TEST.wt6616-checkpoint-oldest-ts";
 
@@ -285,6 +286,8 @@ main(int argc, char *argv[])
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
     testutil_make_work_dir(home);
+
+    __wt_random_init_seed(NULL, &rnd);
     if (rand_time) {
         timeout = __wt_random(&rnd) % MAX_TIME;
         if (timeout < MIN_TIME)

@@ -36,7 +36,6 @@ each of which is ordered by one or more columns.
 @m_endif
 
 <h2>Advanced topics</h2>
-- @subpage async
 - @subpage backup
 - @subpage compact
 - @subpage checkpoint

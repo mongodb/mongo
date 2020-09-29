@@ -74,11 +74,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
     session = conn->default_session;
 
     /*
-     * The LSM and async services are not shut down in this path (which is called when
-     * wiredtiger_open hits an error (as well as during normal shutdown). Assert they're not
-     * running.
+     * The LSM services are not shut down in this path (which is called when wiredtiger_open hits an
+     * error (as well as during normal shutdown). Assert they're not running.
      */
-    WT_ASSERT(session, !F_ISSET(conn, WT_CONN_SERVER_ASYNC | WT_CONN_SERVER_LSM));
+    WT_ASSERT(session, !F_ISSET(conn, WT_CONN_SERVER_LSM));
 
     /* Shut down the subsystems, ensuring workers see the state change. */
     F_SET(conn, WT_CONN_CLOSING);

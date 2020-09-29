@@ -490,25 +490,6 @@ class Translator:
             s += 'print("populate:")\n'
         s += 'pop_workload.run(conn)\n'
 
-        # If configured, compact to allow LSM merging to complete.  We
-        # set an unlimited timeout because if we close the connection
-        # then any in-progress compact/merge is aborted.
-        if opts.compact:
-            if opts.async_threads == 0:
-                self.fatal_error('unexpected value for async_threads')
-            s += '\n'
-            if self.verbose > 0:
-                s += 'print("compact after populate:")\n'
-            s += 'import time\n'
-            s += 'start_time = time.time()\n'
-            s += 'async_callback = WtperfAsyncCallback()\n'
-            s += 'for i in range(0, table_count):\n'
-            s += '    op = conn.async_new_op(tables[i]._uri, "timeout=0", async_callback)\n'
-            s += '    op.compact()\n'
-            s += 'conn.async_flush()\n'
-            s += 'print("compact completed in {} seconds".format(' + \
-                'time.time() - start_time))\n'
-
         return s
 
     def translate_inner(self):
@@ -553,7 +534,6 @@ class Translator:
         self.get_boolean_opt('random_value', False)
         self.get_string_opt('transaction_config', '')
         self.get_boolean_opt('compact', False)
-        self.get_int_opt('async_threads', 0)
         self.get_int_opt('pareto', 0)
         opts = self.options
         if opts.range_partition and opts.random_range == 0:
@@ -579,33 +559,10 @@ class Translator:
         if not input_as_string.endswith('\n'):
             s += '\n'
         s += '\'\'\'\n\n'
-        async_config = ''
-        if opts.compact and opts.async_threads == 0:
-            opts.async_threads = 2;
-        if opts.async_threads > 0:
-            # Assume the default of 1024 for the max ops, although we
-            # could bump that up to 4096 if needed.
-            async_config = ',async=(enabled=true,threads=' + \
-                str(opts.async_threads) + ')'
-            s += '# this can be further customized\n'
-            s += 'class WtperfAsyncCallback(AsyncCallback):\n'
-            s += '    def __init__(self):\n'
-            s += '        pass\n'
-            s += '    def notify_error(self, key, value, optype, desc):\n'
-            s += '        print("ERROR: async notify(" + str(key) + "," + \\\n'
-            s += '             str(value) + "," + str(optype) + "): " + desc)\n'
-            s += '    def notify(self, op, op_ret, flags):\n'
-            s += '        if op_ret != 0:\n'
-            s += '            self.notify_error(op._key, op._value,\\\n'
-            s += '                op._optype, wiredtiger_strerror(op_ret))\n'
-            s += '        return op_ret\n'
-            s += '\n'
         s += 'context = Context()\n'
         extra_config = ''
         s += 'conn_config = ""\n'
 
-        if async_config != '':
-            s += 'conn_config += ",' + async_config + '"  # async config\n'
         if conn_config != '':
             s += 'conn_config += ",' + conn_config + '"   # explicitly added\n'
         if compression != '':
