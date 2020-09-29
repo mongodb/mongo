@@ -37,7 +37,6 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/config.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
@@ -275,7 +274,7 @@ public:
     }
 };
 
-class SortedFileWriterAndFileIteratorTests : public ScopedGlobalServiceContextForTest {
+class SortedFileWriterAndFileIteratorTests {
 public:
     void run() {
         unittest::TempDir tempDir("sortedFileWriterTests");
@@ -362,7 +361,7 @@ public:
 };
 
 namespace SorterTests {
-class Basic : public ScopedGlobalServiceContextForTest {
+class Basic {
 public:
     virtual ~Basic() {}
 

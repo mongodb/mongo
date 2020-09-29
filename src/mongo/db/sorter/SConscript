@@ -12,7 +12,6 @@ sorterEnv.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/s/is_mongos',

@@ -87,6 +87,24 @@ void checkNoExternalSortOnMongos(const SortOptions& opts) {
             !(isMongos() && opts.extSortAllowed));
 }
 
+/**
+ * Returns the current EncryptionHooks registered with the global service context.
+ * Returns nullptr if the service context is not available; or if the EncyptionHooks
+ * registered is not enabled.
+ */
+EncryptionHooks* getEncryptionHooksIfEnabled() {
+    // Some tests may not run with a global service context.
+    if (!hasGlobalServiceContext()) {
+        return nullptr;
+    }
+    auto service = getGlobalServiceContext();
+    auto encryptionHooks = EncryptionHooks::get(service);
+    if (!encryptionHooks->enabled()) {
+        return nullptr;
+    }
+    return encryptionHooks;
+}
+
 }  // namespace
 
 namespace sorter {
@@ -287,8 +305,7 @@ private:
         read(_buffer.get(), blockSize);
         uassert(16816, "file too short?", !_done);
 
-        auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
-        if (encryptionHooks->enabled()) {
+        if (auto encryptionHooks = getEncryptionHooksIfEnabled()) {
             std::unique_ptr<char[]> out(new char[blockSize]);
             size_t outLen;
             Status status =
@@ -1078,8 +1095,7 @@ void SortedFileWriter<Key, Value>::spill() {
     }
 
     std::unique_ptr<char[]> out;
-    auto encryptionHooks = EncryptionHooks::get(getGlobalServiceContext());
-    if (encryptionHooks->enabled()) {
+    if (auto encryptionHooks = getEncryptionHooksIfEnabled()) {
         size_t protectedSizeMax = size + encryptionHooks->additionalBytesForProtectedBuffer();
         out.reset(new char[protectedSizeMax]);
         size_t resultLen;
