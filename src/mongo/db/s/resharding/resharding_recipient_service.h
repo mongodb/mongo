@@ -42,6 +42,8 @@ public:
         : PrimaryOnlyService(serviceContext) {}
     ~ReshardingRecipientService() = default;
 
+    class RecipientStateMachine;
+
     StringData getServiceName() const override {
         return kReshardingRecipientServiceName;
     }
@@ -63,7 +65,7 @@ public:
  * Represents the current state of a resharding recipient operation on this shard. This class
  * drives state transitions and updates to underlying on-disk metadata.
  */
-class RecipientStateMachine final
+class ReshardingRecipientService::RecipientStateMachine final
     : public repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine> {
 public:
     explicit RecipientStateMachine(const BSONObj& recipientDoc);

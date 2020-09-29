@@ -42,6 +42,8 @@ public:
         : PrimaryOnlyService(serviceContext) {}
     ~ReshardingDonorService() = default;
 
+    class DonorStateMachine;
+
     StringData getServiceName() const override {
         return kReshardingDonorServiceName;
     }
@@ -63,7 +65,8 @@ public:
  * Represents the current state of a resharding donor operation on this shard. This class drives
  * state transitions and updates to underlying on-disk metadata.
  */
-class DonorStateMachine final : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
+class ReshardingDonorService::DonorStateMachine final
+    : public repl::PrimaryOnlyService::TypedInstance<DonorStateMachine> {
 public:
     explicit DonorStateMachine(const BSONObj& donorDoc);
 

@@ -42,13 +42,14 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::
     return std::make_shared<RecipientStateMachine>(std::move(initialState));
 }
 
-RecipientStateMachine::RecipientStateMachine(const BSONObj& recipientDoc)
+ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
+    const BSONObj& recipientDoc)
     : repl::PrimaryOnlyService::TypedInstance<RecipientStateMachine>(),
       _recipientDoc(ReshardingRecipientDocument::parse(
           IDLParserErrorContext("ReshardingRecipientDocument"), recipientDoc)),
       _id(_recipientDoc.getCommonReshardingMetadata().get_id()) {}
 
-RecipientStateMachine::~RecipientStateMachine() {
+ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(_allDonorsPreparedToDonate.getFuture().isReady());
     invariant(_allDonorsMirroring.getFuture().isReady());
@@ -56,7 +57,8 @@ RecipientStateMachine::~RecipientStateMachine() {
     invariant(_completionPromise.getFuture().isReady());
 }
 
-void RecipientStateMachine::run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
+void ReshardingRecipientService::RecipientStateMachine::run(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToInitialized(); })
         .then([this, executor] {
@@ -98,7 +100,7 @@ void RecipientStateMachine::run(std::shared_ptr<executor::ScopedTaskExecutor> ex
         });
 }
 
-void RecipientStateMachine::interrupt(Status status) {
+void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lg(_mutex);
     if (!_allDonorsPreparedToDonate.getFuture().isReady()) {
@@ -118,11 +120,11 @@ void RecipientStateMachine::interrupt(Status status) {
     }
 }
 
-void onReshardingFieldsChanges(boost::optional<TypeCollectionReshardingFields> reshardingFields) {}
+void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
+    boost::optional<TypeCollectionReshardingFields> reshardingFields) {}
 
-void onDonorReportsMirroring(const ShardId& donor) {}
-
-void RecipientStateMachine::_createTemporaryReshardingCollectionThenTransitionToInitialized() {
+void ReshardingRecipientService::RecipientStateMachine::
+    _createTemporaryReshardingCollectionThenTransitionToInitialized() {
     if (_recipientDoc.getState() > RecipientStateEnum::kInitializing) {
         return;
     }
@@ -130,8 +132,9 @@ void RecipientStateMachine::_createTemporaryReshardingCollectionThenTransitionTo
     _transitionState(RecipientStateEnum::kInitialized);
 }
 
-ExecutorFuture<void> RecipientStateMachine::_awaitAllDonorsPreparedToDonateThenTransitionToCloning(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
+    _awaitAllDonorsPreparedToDonateThenTransitionToCloning(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientDoc.getState() > RecipientStateEnum::kInitialized) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -143,7 +146,7 @@ ExecutorFuture<void> RecipientStateMachine::_awaitAllDonorsPreparedToDonateThenT
         });
 }
 
-void RecipientStateMachine::_cloneThenTransitionToApplying() {
+void ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying() {
     if (_recipientDoc.getState() > RecipientStateEnum::kCloning) {
         return;
     }
@@ -151,7 +154,7 @@ void RecipientStateMachine::_cloneThenTransitionToApplying() {
     _transitionState(RecipientStateEnum::kApplying);
 }
 
-void RecipientStateMachine::_applyThenTransitionToSteadyState() {
+void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyState() {
     if (_recipientDoc.getState() > RecipientStateEnum::kApplying) {
         return;
     }
@@ -159,9 +162,9 @@ void RecipientStateMachine::_applyThenTransitionToSteadyState() {
     _transitionState(RecipientStateEnum::kSteadyState);
 }
 
-ExecutorFuture<void>
-RecipientStateMachine::_awaitAllDonorsMirroringThenTransitionToStrictConsistency(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
+    _awaitAllDonorsMirroringThenTransitionToStrictConsistency(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientDoc.getState() > RecipientStateEnum::kSteadyState) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -171,8 +174,9 @@ RecipientStateMachine::_awaitAllDonorsMirroringThenTransitionToStrictConsistency
     });
 }
 
-ExecutorFuture<void> RecipientStateMachine::_awaitCoordinatorHasCommittedThenTransitionToRenaming(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
+    _awaitCoordinatorHasCommittedThenTransitionToRenaming(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientDoc.getState() > RecipientStateEnum::kStrictConsistency) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
@@ -182,7 +186,8 @@ ExecutorFuture<void> RecipientStateMachine::_awaitCoordinatorHasCommittedThenTra
     });
 }
 
-void RecipientStateMachine::_renameTemporaryReshardingCollectionThenDeleteLocalState() {
+void ReshardingRecipientService::RecipientStateMachine::
+    _renameTemporaryReshardingCollectionThenDeleteLocalState() {
     if (_recipientDoc.getState() > RecipientStateEnum::kRenaming) {
         return;
     }
@@ -190,12 +195,13 @@ void RecipientStateMachine::_renameTemporaryReshardingCollectionThenDeleteLocalS
     _transitionState(RecipientStateEnum::kDone);
 }
 
-void RecipientStateMachine::_fulfillAllDonorsPreparedToDonate(Timestamp fetchTimestamp) {
+void ReshardingRecipientService::RecipientStateMachine::_fulfillAllDonorsPreparedToDonate(
+    Timestamp fetchTimestamp) {
     _allDonorsPreparedToDonate.emplaceValue(fetchTimestamp);
 }
 
-void RecipientStateMachine::_transitionState(RecipientStateEnum endState,
-                                             boost::optional<Timestamp> fetchTimestamp) {
+void ReshardingRecipientService::RecipientStateMachine::_transitionState(
+    RecipientStateEnum endState, boost::optional<Timestamp> fetchTimestamp) {
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(endState);
     if (fetchTimestamp) {
@@ -211,13 +217,15 @@ void RecipientStateMachine::_transitionState(RecipientStateEnum endState,
     _updateRecipientDocument(std::move(replacementDoc));
 }
 
-void RecipientStateMachine::_transitionStateToError(const Status& status) {
+void ReshardingRecipientService::RecipientStateMachine::_transitionStateToError(
+    const Status& status) {
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(RecipientStateEnum::kError);
     _updateRecipientDocument(std::move(replacementDoc));
 }
 
-void RecipientStateMachine::_updateRecipientDocument(ReshardingRecipientDocument&& replacementDoc) {
+void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument(
+    ReshardingRecipientDocument&& replacementDoc) {
     auto opCtx = cc().makeOperationContext();
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
