@@ -104,6 +104,11 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
      * reconstruct the configuration metadata from the file.
      */
     if (import) {
+        /* First verify that the data to import exists on disk. */
+        WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
+        if (!exists)
+            WT_ERR_MSG(session, ENOENT, "%s", uri);
+
         import_repair =
           __wt_config_getones(session, config, "import.repair", &cval) == 0 && cval.val != 0;
         if (!import_repair) {
@@ -131,16 +136,9 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
                   uri);
             }
         }
-    }
-
-    if (import) {
-        WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
-        if (!exists)
-            WT_ERR_MSG(session, ENOENT, "%s: attempted to import file that does not exist", uri);
-    } else {
+    } else
         /* Create the file. */
         WT_ERR(__wt_block_manager_create(session, filename, allocsize));
-    }
 
     if (WT_META_TRACKING(session))
         WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
@@ -591,14 +589,15 @@ static int
 __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
 {
     WT_CONFIG conf;
-    WT_CONFIG_ITEM cgkey, cgval, cval;
+    WT_CONFIG_ITEM cgkey, cgval, ckey, cval;
     WT_DECL_RET;
     WT_TABLE *table;
     size_t cgsize;
-    int ncolgroups;
+    int ncolgroups, nkeys;
     char *tableconf, *cgname;
     const char *cfg[4] = {WT_CONFIG_BASE(session, table_meta), config, NULL, NULL};
     const char *tablename;
+    bool import, import_repair;
 
     cgname = NULL;
     table = NULL;
@@ -608,12 +607,37 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
 
     tablename = uri;
     WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
+    import = __wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0;
 
     /* Check if the table already exists. */
     if ((ret = __wt_metadata_search(session, uri, &tableconf)) != WT_NOTFOUND) {
-        if (exclusive)
+        /*
+         * Regardless of the 'exclusive' flag, we should raise an error if we try to import an
+         * existing URI rather than just silently returning.
+         */
+        if (exclusive || import)
             WT_TRET(EEXIST);
         goto err;
+    }
+
+    if (import) {
+        import_repair =
+          __wt_config_getones(session, config, "import.repair", &cval) == 0 && cval.val != 0;
+        /*
+         * If this is an import but not a repair, check that the exported table metadata is provided
+         * in the config.
+         */
+        if (!import_repair) {
+            __wt_config_init(session, &conf, config);
+            for (nkeys = 0; (ret = __wt_config_next(&conf, &ckey, &cval)) == 0; nkeys++)
+                ;
+            if (nkeys == 1)
+                WT_ERR_MSG(session, EINVAL,
+                  "%s: import requires that the table configuration is specified or the "
+                  "'repair' option is provided",
+                  uri);
+            WT_ERR_NOTFOUND_OK(ret, false);
+        }
     }
 
     WT_ERR(__wt_config_gets(session, cfg, "colgroups", &cval));

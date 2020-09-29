@@ -27,33 +27,46 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # test_import01.py
-# Import a file into a running database.
+# Import a file into a running database for the following scenarios:
+# - The source database and destination database are different.
+# - The source database and destination database are the same.
 
-import os, re, shutil
+import os, random, re, shutil, string
 import wiredtiger, wttest
 
-def timestamp_str(t):
-    return '%x' % t
+# Shared base class used by import tests.
+class test_import_base(wttest.WiredTigerTestCase):
 
-class test_import01(wttest.WiredTigerTestCase):
-    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
-    session_config = 'isolation=snapshot'
-
-    def update(self, uri, key, value, commit_ts):
+    # Insert or update a key/value at the supplied timestamp.
+    def update(self, uri, key, value, ts):
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        cursor[key] = value
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
+        if type(value) in [list, tuple]:
+            cursor.set_key(key)
+            cursor.set_value(*value)
+            cursor.insert()
+        else:
+            cursor[key] = value
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(ts))
         cursor.close()
 
-    def check(self, uri, key, value, read_ts):
+    # Verify the specified key/value is visible at the supplied timestamp.
+    def check_record(self, uri, key, value, ts):
         cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction('read_timestamp=' + timestamp_str(read_ts))
+        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(ts))
         cursor.set_key(key)
         self.assertEqual(0, cursor.search())
         self.assertEqual(value, cursor.get_value())
         self.session.rollback_transaction()
         cursor.close()
+
+    # Verify a range of records/timestamps.
+    def check(self, uri, keys, values, ts):
+        for i in range(len(keys)):
+            if type(values[i]) in [tuple]:
+                self.check_record(uri, keys[i], list(values[i]), ts[i])
+            else:
+                self.check_record(uri, keys[i], values[i], ts[i])
 
     # We know the ID can be different between configs, so just remove it from comparison.
     # Everything else should be the same.
@@ -66,60 +79,68 @@ class test_import01(wttest.WiredTigerTestCase):
              re.findall('\w+=\(.*?\)+', b))
         self.assertTrue(a.sort() == b.sort())
 
-    # Helper for populating a database to simulate importing files into an existing database.
-    def populate(self):
-        # Create file:test_import01_[1-100].
-        for fileno in range(1, 100):
-            uri = 'file:test_import01_{}'.format(fileno)
+    # Populate a database with N tables, each having M rows.
+    def populate(self, ntables, nrows):
+        for table in range(0, ntables):
+            uri = 'table:test_import_{}'.format(
+                ''.join(random.choice(string.ascii_letters) for i in range(10)))
             self.session.create(uri, 'key_format=i,value_format=S')
             cursor = self.session.open_cursor(uri)
-            # Insert keys [1-100] with value 'foo'.
-            for key in range(1, 100):
-                cursor[key] = 'foo'
+            for key in range(0, nrows):
+                cursor[key] = 'value_{}_{}'.format(table, key)
             cursor.close()
 
-    def copy_file(self, file_name, old_dir, new_dir):
-        old_path = os.path.join(old_dir, file_name)
-        if os.path.isfile(old_path) and "WiredTiger.lock" not in file_name and \
+    # Copy a file from a source directory to a destination directory.
+    def copy_file(self, file_name, src_dir, dest_dir):
+        src_path = os.path.join(src_dir, file_name)
+        if os.path.isfile(src_path) and "WiredTiger.lock" not in file_name and \
             "Tmplog" not in file_name and "Preplog" not in file_name:
-            shutil.copy(old_path, new_dir)
+            shutil.copy(src_path, dest_dir)
+
+    # Convert a WiredTiger timestamp to a string.
+    def timestamp_str(self, t):
+        return '%x' % t
+
+# test_import01
+class test_import01(test_import_base):
+
+    conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
+    session_config = 'isolation=snapshot'
+
+    original_db_file = 'original_db_file'
+    uri = 'file:' + original_db_file
+
+    nrows = 100
+    ntables = 10
+    keys = [b'1', b'2', b'3', b'4', b'5', b'6']
+    values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
+              b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
+    ts = [10*k for k in range(1, len(keys)+1)]
+    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
 
     def test_file_import(self):
-        original_db_file = 'original_db_file'
-        uri = 'file:' + original_db_file
+        self.session.create(self.uri, self.create_config)
 
-        create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
-        self.session.create(uri, create_config)
-
-        key1 = b'1'
-        key2 = b'2'
-        key3 = b'3'
-        key4 = b'4'
-        value1 = b'\x01\x02aaa\x03\x04'
-        value2 = b'\x01\x02bbb\x03\x04'
-        value3 = b'\x01\x02ccc\x03\x04'
-        value4 = b'\x01\x02ddd\x03\x04'
-
-        # Add some data.
-        self.update(uri, key1, value1, 10)
-        self.update(uri, key2, value2, 20)
-
-        # Perform a checkpoint.
+        # Add data and perform a checkpoint.
+        min_idx = 0
+        max_idx = len(self.keys) // 3
+        for i in range(min_idx, max_idx):
+            self.update(self.uri, self.keys[i], self.values[i], self.ts[i])
         self.session.checkpoint()
 
-        # Add more data.
-        self.update(uri, key3, value3, 30)
-        self.update(uri, key4, value4, 40)
-
-        # Perform a checkpoint.
+        # Add more data and checkpoint again.
+        min_idx = max_idx
+        max_idx = 2*len(self.keys) // 3
+        for i in range(min_idx, max_idx):
+            self.update(self.uri, self.keys[i], self.values[i], self.ts[i])
         self.session.checkpoint()
 
         # Export the metadata for the table.
         c = self.session.open_cursor('metadata:', None, None)
-        original_db_file_config = c[uri]
+        original_db_file_config = c[self.uri]
         c.close()
 
-        self.printVerbose(3, '\nFILE CONFIG\n' + original_db_file_config)
+        self.printVerbose(3, '\nFile configuration:\n' + original_db_file_config)
 
         # Close the connection.
         self.close_conn()
@@ -132,107 +153,88 @@ class test_import01(wttest.WiredTigerTestCase):
         self.session = self.setUpSessionOpen(self.conn)
 
         # Make a bunch of files and fill them with data.
-        self.populate()
+        self.populate(self.ntables, self.nrows)
+        self.session.checkpoint()
 
         # Copy over the datafiles for the object we want to import.
-        self.copy_file(original_db_file, '.', newdir)
+        self.copy_file(self.original_db_file, '.', newdir)
 
         # Contruct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             original_db_file_config + '))'
 
         # Import the file.
-        self.session.create(uri, import_config)
+        self.session.create(self.uri, import_config)
 
         # Verify object.
-        self.session.verify(uri)
+        self.session.verify(self.uri)
 
         # Check that the previously inserted values survived the import.
-        self.check(uri, key1, value1, 10)
-        self.check(uri, key2, value2, 20)
-        self.check(uri, key3, value3, 30)
-        self.check(uri, key4, value4, 40)
+        self.check(self.uri, self.keys[:max_idx], self.values[:max_idx], self.ts[:max_idx])
 
         # Compare configuration metadata.
         c = self.session.open_cursor('metadata:', None, None)
-        current_db_file_config = c[uri]
+        current_db_file_config = c[self.uri]
         c.close()
         self.config_compare(original_db_file_config, current_db_file_config)
 
-        key5 = b'5'
-        key6 = b'6'
-        value5 = b'\x01\x02eee\x03\x04'
-        value6 = b'\x01\x02fff\x03\x04'
-
-        # Add some data and check that the file operates as usual after importing.
-        self.update(uri, key5, value5, 50)
-        self.update(uri, key6, value6, 60)
-
-        self.check(uri, key5, value5, 50)
-        self.check(uri, key6, value6, 60)
+        # Add some data and check that the table operates as usual after importing.
+        min_idx = max_idx
+        max_idx = len(self.keys)
+        for i in range(min_idx, max_idx):
+            self.update(self.uri, self.keys[i], self.values[i], self.ts[i])
+        self.check(self.uri, self.keys, self.values, self.ts)
 
         # Perform a checkpoint.
         self.session.checkpoint()
 
     def test_file_import_dropped_file(self):
-        original_db_file = 'original_db_file'
-        uri = 'file:' + original_db_file
+        self.session.create(self.uri, self.create_config)
 
-        create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
-        self.session.create(uri, create_config)
-
-        key1 = b'1'
-        key2 = b'2'
-        value1 = b'\x01\x02aaa\x03\x04'
-        value2 = b'\x01\x02bbb\x03\x04'
-
-        # Add some data.
-        self.update(uri, key1, value1, 10)
-        self.update(uri, key2, value2, 20)
-
-        # Perform a checkpoint.
+        # Add data and perform a checkpoint.
+        for i in range(0, len(self.keys)):
+            self.update(self.uri, self.keys[i], self.values[i], self.ts[i])
         self.session.checkpoint()
 
         # Export the metadata for the table.
         c = self.session.open_cursor('metadata:', None, None)
-        original_db_file_config = c[uri]
+        original_db_file_config = c[self.uri]
         c.close()
 
-        self.printVerbose(3, '\nFILE CONFIG\n' + original_db_file_config)
+        self.printVerbose(3, '\nFile configuration:\n' + original_db_file_config)
 
         # Make a bunch of files and fill them with data.
-        self.populate()
+        self.populate(self.ntables, self.nrows)
 
         # Make a copy of the data file that we're about to drop.
         backup_dir = 'BACKUP'
         shutil.rmtree(backup_dir, ignore_errors=True)
         os.mkdir(backup_dir)
-        self.copy_file(original_db_file, '.', backup_dir)
+        self.copy_file(self.original_db_file, '.', backup_dir)
 
         # Drop the table.
         # We'll be importing it back into our database shortly.
-        self.session.drop(uri)
+        self.session.drop(self.uri)
 
         # Now copy it back to our database directory.
-        self.copy_file(original_db_file, backup_dir, '.')
+        self.copy_file(self.original_db_file, backup_dir, '.')
 
         # Contruct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
             original_db_file_config + '))'
 
         # Import the file.
-        self.session.create(uri, import_config)
+        self.session.create(self.uri, import_config)
 
         # Verify object.
-        self.session.verify(uri)
+        self.session.verify(self.uri)
 
         # Check that the previously inserted values survived the import.
-        self.check(uri, key1, value1, 10)
-        self.check(uri, key2, value2, 20)
+        self.check(self.uri, self.keys, self.values, self.ts)
 
         # Compare configuration metadata.
         c = self.session.open_cursor('metadata:', None, None)
-        current_db_file_config = c[uri]
+        current_db_file_config = c[self.uri]
         c.close()
         self.config_compare(original_db_file_config, current_db_file_config)
 

@@ -31,58 +31,31 @@
 
 import os, shutil
 import wiredtiger, wttest
+from test_import01 import test_import_base
 
-def timestamp_str(t):
-    return '%x' % t
-
-class test_import02(wttest.WiredTigerTestCase):
+class test_import02(test_import_base):
     conn_config = 'cache_size=50MB,log=(enabled),statistics=(all)'
     session_config = 'isolation=snapshot'
 
-    def update(self, uri, key, value, commit_ts):
-        cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        cursor[key] = value
-        self.session.commit_transaction('commit_timestamp=' + timestamp_str(commit_ts))
-        cursor.close()
+    original_db_file = 'original_db_file'
+    uri = 'file:' + original_db_file
 
-    # Helper for populating a database to simulate importing files into an existing database.
-    def populate(self):
-        # Create file:test_import02_[1-100].
-        for fileno in range(1, 100):
-            uri = 'file:test_import02_{}'.format(fileno)
-            self.session.create(uri, 'key_format=i,value_format=S')
-            cursor = self.session.open_cursor(uri)
-            # Insert keys [1-100] with value 'foo'.
-            for key in range(1, 100):
-                cursor[key] = 'foo'
-            cursor.close()
-
-    def copy_file(self, file_name, old_dir, new_dir):
-        old_path = os.path.join(old_dir, file_name)
-        if os.path.isfile(old_path) and "WiredTiger.lock" not in file_name and \
-            "Tmplog" not in file_name and "Preplog" not in file_name:
-            shutil.copy(old_path, new_dir)
+    nrows = 100
+    ntables = 10
+    keys = [b'1', b'2', b'3', b'4', b'5', b'6']
+    values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
+              b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
+    ts = [10*k for k in range(1, len(keys)+1)]
+    create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
 
     # The cases where 'file_metadata' is empty or the config option itself is missing entirely are
     # almost identical. Let's capture this in a helper and call them from each test.
     def no_metadata_helper(self, import_config):
-        original_db_file = 'original_db_file'
-        uri = 'file:' + original_db_file
+        self.session.create(self.uri, self.create_config)
 
-        create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
-        self.session.create(uri, create_config)
-
-        key1 = b'1'
-        key2 = b'2'
-        value1 = b'\x01\x02aaa\x03\x04'
-        value2 = b'\x01\x02bbb\x03\x04'
-
-        # Add some data.
-        self.update(uri, key1, value1, 10)
-        self.update(uri, key2, value2, 20)
-
-        # Perform a checkpoint.
+        # Add data and perform a checkpoint.
+        for i in range(0, len(self.keys)):
+            self.update(self.uri, self.keys[i], self.values[i], self.ts[i])
         self.session.checkpoint()
 
         # Close the connection.
@@ -96,14 +69,14 @@ class test_import02(wttest.WiredTigerTestCase):
         self.session = self.setUpSessionOpen(self.conn)
 
         # Copy over the datafiles for the object we want to import.
-        self.copy_file(original_db_file, '.', newdir)
+        self.copy_file(self.original_db_file, '.', newdir)
 
         # Import the file.
         # Since we need "file_metadata" without the "repair" option, we should expect an error here.
         with self.expectedStderrPattern(
             'file:original_db_file: import requires that \'file_metadata\' is specified'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: self.session.create(uri, import_config))
+                lambda: self.session.create(self.uri, import_config))
 
     def test_file_import_empty_metadata(self):
         self.no_metadata_helper('import=(enabled,repair=false,file_metadata="")')
@@ -112,34 +85,22 @@ class test_import02(wttest.WiredTigerTestCase):
         self.no_metadata_helper('import=(enabled,repair=false)')
 
     def test_file_import_existing_uri(self):
-        original_db_file = 'original_db_file'
-        uri = 'file:' + original_db_file
+        self.session.create(self.uri, self.create_config)
 
-        create_config = 'allocation_size=512,key_format=u,log=(enabled=true),value_format=u'
-        self.session.create(uri, create_config)
-
-        key1 = b'1'
-        key2 = b'2'
-
-        value1 = b'\x01\x02aaa\x03\x04'
-        value2 = b'\x01\x02bbb\x03\x04'
-
-        # Add some data.
-        self.update(uri, key1, value1, 10)
-        self.update(uri, key2, value2, 20)
-
-        # Perform a checkpoint.
+        # Add data and perform a checkpoint.
+        for i in range(0, len(self.keys)):
+            self.update(self.uri, self.keys[i], self.values[i], self.ts[i])
         self.session.checkpoint()
 
         # Export the metadata for the table.
         c = self.session.open_cursor('metadata:', None, None)
-        original_db_file_config = c[uri]
+        original_db_file_config = c[self.uri]
         c.close()
 
-        self.printVerbose(3, '\nFILE CONFIG\n' + original_db_file_config)
+        self.printVerbose(3, '\nFile configuration:\n' + original_db_file_config)
 
         # Make a bunch of files and fill them with data.
-        self.populate()
+        self.populate(self.ntables, self.nrows)
 
         # Contruct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
@@ -148,24 +109,23 @@ class test_import02(wttest.WiredTigerTestCase):
         # Try to import the file even though it already exists in our database.
         # We should get an error back.
         self.assertRaisesException(wiredtiger.WiredTigerError,
-            lambda: self.session.create(uri, import_config))
+            lambda: self.session.create(self.uri, import_config))
 
     def test_import_file_missing_file(self):
-        original_db_file = 'original_db_file'
-        uri = 'file:' + original_db_file
-
         # Make a bunch of files and fill them with data.
-        self.populate()
-
+        self.populate(self.ntables, self.nrows)
         self.session.checkpoint()
 
         # Export the metadata for one of the files we made.
         # We just need an example of what a file configuration would typically look like.
-        c = self.session.open_cursor('metadata:', None, None)
-        example_db_file_config = c['file:test_import02_1']
-        c.close()
+        cursor = self.session.open_cursor('metadata:', None, None)
+        for k, v in cursor:
+            if k.startswith('table:'):
+                example_db_file_config = cursor[k]
+                break
+        cursor.close()
 
-        self.printVerbose(3, '\nFILE CONFIG\n' + example_db_file_config)
+        self.printVerbose(3, '\nFile configuration:\n' + example_db_file_config)
 
         # Contruct the config string.
         import_config = 'import=(enabled,repair=false,file_metadata=(' + \
@@ -173,7 +133,5 @@ class test_import02(wttest.WiredTigerTestCase):
 
         # Try to import a file that doesn't exist on disk.
         # We should get an error back.
-        with self.expectedStderrPattern(
-            'file:original_db_file: attempted to import file that does not exist'):
-            self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: self.session.create(uri, import_config))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.create(self.uri, import_config), '/No such file or directory/')
