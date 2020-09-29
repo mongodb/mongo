@@ -76,27 +76,41 @@ void CatalogCacheLoaderMock::waitForDatabaseFlush(OperationContext* opCtx, Strin
     MONGO_UNREACHABLE;
 }
 
+CollectionAndChangedChunks getCollectionRefresh(
+    const StatusWith<CollectionType>& swCollectionReturnValue,
+    StatusWith<std::vector<ChunkType>> swChunksReturnValue,
+    const boost::optional<TypeCollectionReshardingFields>& reshardingFields) {
+    uassertStatusOK(swCollectionReturnValue);
+    uassertStatusOK(swChunksReturnValue);
+
+    // We swap the chunks out of _swChunksReturnValue to ensure if this task is
+    // scheduled multiple times that we don't inform the ChunkManager about a chunk it
+    // has already updated.
+    std::vector<ChunkType> chunks;
+    swChunksReturnValue.getValue().swap(chunks);
+
+    return CollectionAndChangedChunks(swCollectionReturnValue.getValue().getUUID(),
+                                      swCollectionReturnValue.getValue().getEpoch(),
+                                      swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
+                                      swCollectionReturnValue.getValue().getDefaultCollation(),
+                                      swCollectionReturnValue.getValue().getUnique(),
+                                      reshardingFields,
+                                      std::move(chunks));
+}
+
 SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(
     const NamespaceString& nss, ChunkVersion version) {
 
-    return makeReadyFutureWith([this] {
-               uassertStatusOK(_swCollectionReturnValue);
-               uassertStatusOK(_swChunksReturnValue);
+    return makeReadyFutureWith([&nss, this] {
+               auto it = _refreshValues.find(nss);
 
-               // We swap the chunks out of _swChunksReturnValue to ensure if this task is
-               // scheduled multiple times that we don't inform the ChunkManager about a chunk it
-               // has already updated.
-               std::vector<ChunkType> chunks;
-               _swChunksReturnValue.getValue().swap(chunks);
+               if (it != _refreshValues.end())
+                   return getCollectionRefresh(it->second.swCollectionReturnValue,
+                                               std::move(it->second.swChunksReturnValue),
+                                               it->second.reshardingFields);
 
-               return CollectionAndChangedChunks(
-                   _swCollectionReturnValue.getValue().getUUID(),
-                   _swCollectionReturnValue.getValue().getEpoch(),
-                   _swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
-                   _swCollectionReturnValue.getValue().getDefaultCollation(),
-                   _swCollectionReturnValue.getValue().getUnique(),
-                   boost::none,
-                   std::move(chunks));
+               return getCollectionRefresh(
+                   _swCollectionReturnValue, std::move(_swChunksReturnValue), _reshardingFields);
            })
         .semi();
 }

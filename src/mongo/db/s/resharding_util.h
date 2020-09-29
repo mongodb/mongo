@@ -179,7 +179,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
  */
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
-                                              BSONObj fullDocument);
+                                              const BSONObj& fullDocument);
 /**
  * Creates pipeline for filtering collection data matching the recipient shard.
  */

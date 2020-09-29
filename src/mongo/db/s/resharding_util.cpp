@@ -55,6 +55,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
+#include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
@@ -82,7 +83,9 @@ NamespaceString getTempReshardingNss(StringData db, const UUID& sourceUuid) {
 
 // Ensure that this shard owns the document. This must be called after verifying that we
 // are in a resharding operation so that we are guaranteed that migrations are suspended.
-bool documentBelongsToMe(OperationContext* opCtx, CollectionShardingState* css, BSONObj doc) {
+bool documentBelongsToMe(OperationContext* opCtx,
+                         CollectionShardingState* css,
+                         const BSONObj& doc) {
     auto currentKeyPattern = ShardKeyPattern(css->getCollectionDescription(opCtx).getKeyPattern());
     auto ownershipFilter = css->getOwnershipFilter(
         opCtx, CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
@@ -92,7 +95,7 @@ bool documentBelongsToMe(OperationContext* opCtx, CollectionShardingState* css, 
 
 boost::optional<TypeCollectionDonorFields> getDonorFields(OperationContext* opCtx,
                                                           const NamespaceString& sourceNss,
-                                                          BSONObj fullDocument) {
+                                                          const BSONObj& fullDocument) {
     auto css = CollectionShardingState::get(opCtx, sourceNss);
     auto collDesc = css->getCollectionDescription(opCtx);
 
@@ -680,7 +683,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
 
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
-                                              BSONObj fullDocument) {
+                                              const BSONObj& fullDocument) {
     auto donorFields = getDonorFields(opCtx, sourceNss, fullDocument);
     if (!donorFields)
         return boost::none;
@@ -691,7 +694,7 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
         getTempReshardingNss(sourceNss.db(), getCollectionUuid(opCtx, sourceNss)),
         allowLocks);
 
-    uassert(ErrorCodes::ShardInvalidatedForTargeting,
+    uassert(ShardInvalidatedForTargetingInfo(sourceNss),
             "Routing information is not available for the temporary resharding collection.",
             tempNssRoutingInfo.getStatus() != ErrorCodes::StaleShardVersion);
 

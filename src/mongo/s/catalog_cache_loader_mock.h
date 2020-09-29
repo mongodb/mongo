@@ -83,6 +83,18 @@ public:
     void setDatabaseRefreshReturnValue(StatusWith<DatabaseType> swDatabase);
     void clearDatabaseReturnValue();
 
+    void setReshardingFields(boost::optional<TypeCollectionReshardingFields> reshardingFields) {
+        _reshardingFields = std::move(reshardingFields);
+    }
+
+    void setCollectionRefreshValues(
+        const NamespaceString& nss,
+        StatusWith<CollectionType> statusWithCollection,
+        StatusWith<std::vector<ChunkType>> statusWithChunks,
+        boost::optional<TypeCollectionReshardingFields> reshardingFields) {
+        _refreshValues[nss] = {statusWithCollection, statusWithChunks, reshardingFields};
+    }
+
     static const Status kCollectionInternalErrorStatus;
     static const Status kChunksInternalErrorStatus;
     static const Status kDatabaseInternalErrorStatus;
@@ -92,6 +104,15 @@ private:
 
     StatusWith<std::vector<ChunkType>> _swChunksReturnValue{kChunksInternalErrorStatus};
 
+    boost::optional<TypeCollectionReshardingFields> _reshardingFields;
+
+    struct RefreshInfo {
+        StatusWith<CollectionType> swCollectionReturnValue{kCollectionInternalErrorStatus};
+        StatusWith<std::vector<ChunkType>> swChunksReturnValue{kChunksInternalErrorStatus};
+        boost::optional<TypeCollectionReshardingFields> reshardingFields;
+    };
+
+    stdx::unordered_map<NamespaceString, RefreshInfo> _refreshValues;
     StatusWith<DatabaseType> _swDatabaseReturnValue{kDatabaseInternalErrorStatus};
 };
 

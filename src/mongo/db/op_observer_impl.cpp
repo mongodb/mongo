@@ -454,6 +454,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
         for (auto iter = first; iter != last; iter++) {
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid.get(), iter->doc);
+            shardAnnotateOplogEntry(opCtx, nss, iter->doc, operation);
             txnParticipant.addTransactionOperation(opCtx, operation);
         }
     } else {

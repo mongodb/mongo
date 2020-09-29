@@ -393,6 +393,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         }
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setOpTime(insertStatementOplogSlot);
+        oplogEntry.setDestinedRecipient(getDestinedRecipient(opCtx, nss, begin[i].doc));
 
         OplogLink oplogLink;
         if (i > 0)
