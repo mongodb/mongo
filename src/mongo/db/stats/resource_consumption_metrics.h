@@ -63,13 +63,13 @@ public:
         }
 
         // Number of document bytes read
-        uint64_t docBytesRead;
+        long long docBytesRead;
         // Number of document units read
-        uint64_t docUnitsRead;
+        long long docUnitsRead;
         // Number of index entries read
-        uint64_t idxEntriesRead;
+        long long idxEntriesRead;
         // Number of keys sorted for query operations
-        uint64_t keysSorted;
+        long long keysSorted;
     };
 
     /**
@@ -99,13 +99,13 @@ public:
         // Read metrics recorded for queries processed while this node was secondary
         ReadMetrics secondaryMetrics;
         // Amount of CPU time consumed by an operation in milliseconds
-        uint64_t cpuMillis;
+        long long cpuMillis;
         // Number of document bytes written
-        uint64_t docBytesWritten;
+        long long docBytesWritten;
         // Number of document units written
-        uint64_t docUnitsWritten;
+        long long docUnitsWritten;
         // Number of document units returned by a query.
-        uint64_t docUnitsReturned;
+        long long docUnitsReturned;
 
         void toBson(BSONObjBuilder* builder) const;
     };
