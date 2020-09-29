@@ -37,10 +37,11 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo::sbe {
-plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
+CandidatePlans CachedSolutionPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
     invariant(solutions.size() == 1);
@@ -51,12 +52,11 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
         invariant(candidates.size() == 1);
         return std::move(candidates[0]);
     }();
+    auto explainer = plan_explainer_factory::make(candidate.root.get(), candidate.solution.get());
 
     if (candidate.failed) {
         // On failure, fall back to replanning the whole query. We neither evict the existing cache
         // entry, nor cache the result of replanning.
-        auto explainer = plan_explainer_factory::makePlanExplainer(candidate.root.get(),
-                                                                   candidate.solution.get());
         LOGV2_DEBUG(2057901,
                     1,
                     "Execution of cached plan failed, falling back to replan",
@@ -70,13 +70,13 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::plan(
     // If the cached plan hit EOF quickly enough, or still as efficient as before, then no need to
     // replan. Finalize the cached plan and return it.
     if (stats->common.isEOF || numReads <= _decisionReads) {
-        return finalizeExecutionPlan(std::move(stats), std::move(candidate));
+        return {makeVector<plan_ranker::CandidatePlan>(
+                    finalizeExecutionPlan(std::move(stats), std::move(candidate))),
+                0};
     }
 
     // If we're here, the trial period took more than 'maxReadsBeforeReplan' physical reads. This
     // plan may not be efficient any longer, so we replan from scratch.
-    auto explainer =
-        plan_explainer_factory::makePlanExplainer(candidate.root.get(), candidate.solution.get());
     LOGV2_DEBUG(
         2058001,
         1,
@@ -104,7 +104,7 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::finalizeExecutionPlan(
     return candidate;
 }
 
-plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const {
+CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
     // The plan drawn from the cache is being discarded, and should no longer be registered with the
     // yield policy.
     _yieldPolicy->clearRegisteredPlans();
@@ -123,7 +123,7 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const
             _opCtx, _collection, _cq, *solutions[0], _yieldPolicy, true);
         prepareExecutionPlan(root.get(), &data);
 
-        auto explainer = plan_explainer_factory::makePlanExplainer(root.get(), solutions[0].get());
+        auto explainer = plan_explainer_factory::make(root.get(), solutions[0].get());
         LOGV2_DEBUG(
             2058101,
             1,
@@ -131,7 +131,9 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const
             "query"_attr = redact(_cq.toStringShort()),
             "planSummary"_attr = explainer->getPlanSummary(),
             "shouldCache"_attr = (shouldCache ? "yes" : "no"));
-        return {std::move(solutions[0]), std::move(root), std::move(data)};
+        return {makeVector<plan_ranker::CandidatePlan>(plan_ranker::CandidatePlan{
+                    std::move(solutions[0]), std::move(root), std::move(data)}),
+                0};
     }
 
     // Many solutions. Build a plan stage tree for each solution and create a multi planner to pick
@@ -149,15 +151,15 @@ plan_ranker::CandidatePlan CachedSolutionPlanner::replan(bool shouldCache) const
     const auto cachingMode =
         shouldCache ? PlanCachingMode::AlwaysCache : PlanCachingMode::NeverCache;
     MultiPlanner multiPlanner{_opCtx, _collection, _cq, cachingMode, _yieldPolicy};
-    auto plan = multiPlanner.plan(std::move(solutions), std::move(roots));
-    auto explainer =
-        plan_explainer_factory::makePlanExplainer(plan.root.get(), plan.solution.get());
+    auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
+    auto explainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
+                                                  candidates[winnerIdx].solution.get());
     LOGV2_DEBUG(2058201,
                 1,
                 "Query plan after replanning and its cache status",
                 "query"_attr = redact(_cq.toStringShort()),
                 "planSummary"_attr = explainer->getPlanSummary(),
                 "shouldCache"_attr = (shouldCache ? "yes" : "no"));
-    return plan;
+    return {std::move(candidates), winnerIdx};
 }
 }  // namespace mongo::sbe

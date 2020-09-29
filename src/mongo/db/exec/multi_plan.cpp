@@ -49,6 +49,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
@@ -200,7 +201,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     LOGV2_DEBUG(
         20590, 5, "Winning solution", "bestSolution"_attr = redact(bestSolution->toString()));
 
-    auto explainer = plan_explainer_factory::makePlanExplainer(bestCandidate.root, nullptr);
+    auto explainer = plan_explainer_factory::make(bestCandidate.root);
     LOGV2_DEBUG(20591, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
 
     _backupPlanIdx = kNoSuchPlan;

@@ -56,6 +56,7 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/plan_explainer_factory.h"
+#include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/plan_yield_policy_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -121,7 +122,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(plan_explainer_factory::makePlanExplainer(_root.get(), nullptr)),
+      _planExplainer(plan_explainer_factory::make(_root.get())),
       _nss(std::move(nss)),
       // There's no point in yielding if the collection doesn't exist.
       _yieldPolicy(

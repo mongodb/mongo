@@ -266,10 +266,7 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
                 },
                 command: "find",
                 useSbe: true,
-                // TODO SERVER-50743: The slot-based execution engine does not yet generate real
-                // 'planSummary' strings.  Once it is improved to do so, this test should be
-                // adjusted accordingly.
-                planSummary: "unsupported",
+                planSummary: "COLLSCAN",
                 currentOpFilter: {"command.comment": "currentop_query_sbe", numYields: {$gt: 0}}
             },
             {

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
@@ -36,6 +37,20 @@
 #include "mongo/db/query/sbe_plan_ranker.h"
 
 namespace mongo::sbe {
+/**
+ * This struct holds a vector with all candidate plans evaluated by this RuntimePlanner, and an
+ * index pointing to the winning plan within this vector.
+ */
+struct CandidatePlans {
+    std::vector<plan_ranker::CandidatePlan> plans;
+    size_t winnerIdx;
+
+    auto& winner() {
+        invariant(winnerIdx < plans.size());
+        return plans[winnerIdx];
+    }
+};
+
 /**
  * An interface to be implemented by all classes which can evaluate the cost of a PlanStage tree in
  * order to pick the the best plan amongst those specified in 'roots' vector. Evaluation is done in
@@ -46,7 +61,7 @@ class RuntimePlanner {
 public:
     virtual ~RuntimePlanner() = default;
 
-    virtual plan_ranker::CandidatePlan plan(
+    virtual CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) = 0;
 };
@@ -65,7 +80,6 @@ public:
                        PlanYieldPolicySBE* yieldPolicy)
         : _opCtx(opCtx), _collection(collection), _cq(cq), _yieldPolicy(yieldPolicy) {
         invariant(_opCtx);
-        invariant(_collection);
     }
 
 protected:

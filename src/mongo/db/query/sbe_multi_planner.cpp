@@ -37,12 +37,13 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo::sbe {
-plan_ranker::CandidatePlan MultiPlanner::plan(
+CandidatePlans MultiPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
     auto candidates = collectExecutionStats(std::move(solutions), std::move(roots));
@@ -50,7 +51,7 @@ plan_ranker::CandidatePlan MultiPlanner::plan(
     return finalizeExecutionPlans(std::move(decision), std::move(candidates));
 }
 
-plan_ranker::CandidatePlan MultiPlanner::finalizeExecutionPlans(
+CandidatePlans MultiPlanner::finalizeExecutionPlans(
     std::unique_ptr<mongo::plan_ranker::PlanRankingDecision> decision,
     std::vector<plan_ranker::CandidatePlan> candidates) const {
     invariant(decision);
@@ -64,8 +65,7 @@ plan_ranker::CandidatePlan MultiPlanner::finalizeExecutionPlans(
     LOGV2_DEBUG(
         4822875, 5, "Winning solution", "bestSolution"_attr = redact(winner.solution->toString()));
 
-    auto explainer =
-        plan_explainer_factory::makePlanExplainer(winner.root.get(), winner.solution.get());
+    auto explainer = plan_explainer_factory::make(winner.root.get(), winner.solution.get());
     LOGV2_DEBUG(4822876, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
 
     // Close all candidate plans but the winner.
@@ -90,6 +90,6 @@ plan_ranker::CandidatePlan MultiPlanner::finalizeExecutionPlans(
     plan_cache_util::updatePlanCache(
         _opCtx, _collection, _cachingMode, _cq, std::move(decision), candidates);
 
-    return std::move(winner);
+    return {std::move(candidates), winnerIdx};
 }
 }  // namespace mongo::sbe

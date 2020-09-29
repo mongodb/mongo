@@ -32,6 +32,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
 
 namespace mongo {
@@ -107,13 +108,22 @@ void updatePlanCache(
             invariant(ranking->scores.size() > 1U);
             invariant(ranking->candidateOrder.size() > 1U);
 
-            size_t winnerIdx = ranking->candidateOrder[0];
-            size_t runnerUpIdx = ranking->candidateOrder[1];
+            auto runnerUpIdx = ranking->candidateOrder[1];
 
-            auto winnerExplainer = plan_explainer_factory::makePlanExplainer(
-                &*candidates[winnerIdx].root, candidates[winnerIdx].solution.get());
-            auto runnerUpExplainer = plan_explainer_factory::makePlanExplainer(
-                &*candidates[runnerUpIdx].root, candidates[runnerUpIdx].solution.get());
+            auto&& [winnerExplainer, runnerUpExplainer] = [&]() {
+                if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
+                    return std::make_pair(
+                        plan_explainer_factory::make(candidates[winnerIdx].root.get(),
+                                                     candidates[winnerIdx].solution.get()),
+                        plan_explainer_factory::make(candidates[runnerUpIdx].root.get(),
+                                                     candidates[runnerUpIdx].solution.get()));
+                } else {
+                    static_assert(std::is_same_v<PlanStageType, PlanStage*>);
+                    return std::make_pair(
+                        plan_explainer_factory::make(candidates[winnerIdx].root),
+                        plan_explainer_factory::make(candidates[runnerUpIdx].root));
+                }
+            }();
 
             log_detail::logTieForBest(query.toStringShort(),
                                       ranking->scores[0],
@@ -126,8 +136,16 @@ void updatePlanCache(
             // We're using the "sometimes cache" mode, and the winning plan produced no results
             // during the plan ranking trial period. We will not write a plan cache entry.
             canCache = false;
-            auto winnerExplainer = plan_explainer_factory::makePlanExplainer(
-                &*candidates[winnerIdx].root, candidates[winnerIdx].solution.get());
+            auto winnerExplainer = [&]() {
+                if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
+                    return plan_explainer_factory::make(candidates[winnerIdx].root.get(),
+                                                        candidates[winnerIdx].solution.get());
+                } else {
+                    static_assert(std::is_same_v<PlanStageType, PlanStage*>);
+                    return plan_explainer_factory::make(candidates[winnerIdx].root);
+                }
+            }();
+
             log_detail::logNotCachingZeroResults(
                 query.toStringShort(), ranking->scores[0], winnerExplainer->getPlanSummary());
         }

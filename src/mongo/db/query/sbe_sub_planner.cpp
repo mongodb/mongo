@@ -34,9 +34,10 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
+#include "mongo/db/query/util/make_data_structure.h"
 
 namespace mongo::sbe {
-plan_ranker::CandidatePlan SubPlanner::plan(
+CandidatePlans SubPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
     // Plan each branch of the $or.
@@ -69,8 +70,9 @@ plan_ranker::CandidatePlan SubPlanner::plan(
         // conservative about putting a potentially bad plan into the cache in the subplan path.
         MultiPlanner multiPlanner{
             _opCtx, _collection, *cq, PlanCachingMode::SometimesCache, _yieldPolicy};
-        auto plan = multiPlanner.plan(std::move(solutions), std::move(roots));
-        return std::move(plan.solution);
+        auto&& [candidates, winnerIdx] = multiPlanner.plan(std::move(solutions), std::move(roots));
+        invariant(winnerIdx < candidates.size());
+        return std::move(candidates[winnerIdx].solution);
     };
 
     auto subplanSelectStat = QueryPlanner::choosePlanForSubqueries(
@@ -90,10 +92,12 @@ plan_ranker::CandidatePlan SubPlanner::plan(
     auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
         _opCtx, _collection, _cq, *compositeSolution, _yieldPolicy, false);
     prepareExecutionPlan(root.get(), &data);
-    return {std::move(compositeSolution), std::move(root), std::move(data)};
+    return {makeVector<plan_ranker::CandidatePlan>(plan_ranker::CandidatePlan{
+                std::move(compositeSolution), std::move(root), std::move(data)}),
+            0};
 }
 
-plan_ranker::CandidatePlan SubPlanner::planWholeQuery() const {
+CandidatePlans SubPlanner::planWholeQuery() const {
     // Use the query planning module to plan the whole query.
     auto solutions = uassertStatusOK(QueryPlanner::plan(_cq, _queryParams));
 
@@ -102,7 +106,9 @@ plan_ranker::CandidatePlan SubPlanner::planWholeQuery() const {
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
             _opCtx, _collection, _cq, *solutions[0], _yieldPolicy, false);
         prepareExecutionPlan(root.get(), &data);
-        return {std::move(solutions[0]), std::move(root), std::move(data)};
+        return {makeVector<plan_ranker::CandidatePlan>(plan_ranker::CandidatePlan{
+                    std::move(solutions[0]), std::move(root), std::move(data)}),
+                0};
     }
 
     // Many solutions. Build a plan stage tree for each solution and create a multi planner to pick

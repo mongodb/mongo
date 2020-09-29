@@ -33,21 +33,22 @@
 
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/sbe_runtime_planner.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo {
 class PlanExecutorSBE final : public PlanExecutor {
 public:
-    PlanExecutorSBE(
-        OperationContext* opCtx,
-        std::unique_ptr<CanonicalQuery> cq,
-        std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-        const CollectionPtr& collection,
-        NamespaceString nss,
-        bool isOpen,
-        boost::optional<std::queue<std::pair<BSONObj, boost::optional<RecordId>>>> stash,
-        std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
+    PlanExecutorSBE(OperationContext* opCtx,
+                    std::unique_ptr<CanonicalQuery> cq,
+                    sbe::CandidatePlans candidates,
+                    const CollectionPtr& collection,
+                    NamespaceString nss,
+                    bool isOpen,
+                    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
     CanonicalQuery* getCanonicalQuery() const override {
         return _cq.get();
@@ -137,6 +138,7 @@ private:
     sbe::RuntimeEnvironment* _env{nullptr};
     sbe::CompileCtx _ctx;
     std::unique_ptr<sbe::PlanStage> _root;
+    std::unique_ptr<QuerySolution> _solution;
 
     sbe::value::SlotAccessor* _result{nullptr};
     sbe::value::SlotAccessor* _resultRecordId{nullptr};

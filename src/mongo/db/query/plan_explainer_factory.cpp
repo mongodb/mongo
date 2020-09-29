@@ -27,37 +27,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/db/query/sbe_plan_ranker.h"
-#include "mongo/db/query/sbe_runtime_planner.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 
-namespace mongo::sbe {
-/**
- * This runtime planner is used for rooted $or queries. It plans each clause of the $or
- * individually, and then creates an overall query plan based on the winning plan from each
- * clause.
- *
- * Uses the 'MultiPlanner' in order to pick best plans for the individual clauses.
- */
-class SubPlanner final : public BaseRuntimePlanner {
-public:
-    SubPlanner(OperationContext* opCtx,
-               const CollectionPtr& collection,
-               const CanonicalQuery& cq,
-               const QueryPlannerParams& queryParams,
-               PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy}, _queryParams{queryParams} {}
+#include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_explainer_sbe.h"
 
-    CandidatePlans plan(
-        std::vector<std::unique_ptr<QuerySolution>> solutions,
-        std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots)
-        final;
+namespace mongo::plan_explainer_factory {
+std::unique_ptr<PlanExplainer> make(PlanStage* root) {
+    return std::make_unique<PlanExplainerImpl>(root);
+}
 
-private:
-    CandidatePlans planWholeQuery() const;
+std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root, const QuerySolution* solution) {
+    return make(root, solution, {}, false);
+}
 
-    // Query parameters used to create a query solution for each $or branch.
-    const QueryPlannerParams _queryParams;
-};
-}  // namespace mongo::sbe
+std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
+                                    const QuerySolution* solution,
+                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
+                                    bool isMultiPlan) {
+    return std::make_unique<PlanExplainerSBE>(
+        root, solution, std::move(rejectedCandidates), isMultiPlan);
+}
+}  // namespace mongo::plan_explainer_factory

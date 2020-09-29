@@ -49,7 +49,7 @@ public:
                  PlanYieldPolicySBE* yieldPolicy)
         : BaseRuntimePlanner{opCtx, collection, cq, yieldPolicy}, _cachingMode{cachingMode} {}
 
-    plan_ranker::CandidatePlan plan(
+    CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots)
         final;
@@ -61,7 +61,7 @@ private:
      * Calls 'close' method on all other candidate plans and updates the plan cache entry,
      * if possible.
      */
-    plan_ranker::CandidatePlan finalizeExecutionPlans(
+    CandidatePlans finalizeExecutionPlans(
         std::unique_ptr<mongo::plan_ranker::PlanRankingDecision> decision,
         std::vector<plan_ranker::CandidatePlan> candidates) const;
 

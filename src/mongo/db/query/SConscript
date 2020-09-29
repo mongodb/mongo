@@ -53,6 +53,7 @@ env.Library(
         "query_settings.cpp",
         "query_solution.cpp",
         "expression_index_knobs.idl",
+        "stage_types.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

@@ -429,7 +429,7 @@ public:
 
     std::string getPlanSummary() const final {
         invariant(_root);
-        auto explainer = plan_explainer_factory::makePlanExplainer(_root.get(), nullptr);
+        auto explainer = plan_explainer_factory::make(_root.get());
         return explainer->getPlanSummary();
     }
 
@@ -483,8 +483,7 @@ public:
         invariant(_roots.size() == 1);
         invariant(_solutions.size() == 1);
         invariant(_roots[0].first);
-        auto explainer =
-            plan_explainer_factory::makePlanExplainer(_roots[0].first.get(), _solutions[0].get());
+        auto explainer = plan_explainer_factory::make(_roots[0].first.get(), _solutions[0].get());
         return explainer->getPlanSummary();
     }
 
@@ -1096,19 +1095,19 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                                   yieldPolicy.get(),
                                                   plannerOptions)) {
         // Do the runtime planning and pick the best candidate plan.
-        auto plan = planner->plan(std::move(solutions), std::move(roots));
+        auto candidates = planner->plan(std::move(solutions), std::move(roots));
         return plan_executor_factory::make(opCtx,
                                            std::move(cq),
-                                           {std::move(plan.root), std::move(plan.data)},
+                                           std::move(candidates),
                                            collection,
                                            std::move(nss),
-                                           std::move(plan.results),
                                            std::move(yieldPolicy));
     }
     // No need for runtime planning, just use the constructed plan stage tree.
     invariant(roots.size() == 1);
     return plan_executor_factory::make(opCtx,
                                        std::move(cq),
+                                       std::move(solutions[0]),
                                        std::move(roots[0]),
                                        collection,
                                        std::move(nss),
@@ -2090,20 +2089,22 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
     auto&& root = stage_builder::buildClassicExecutableTree(
         opCtx, collection, *parsedDistinct->getQuery(), *soln, ws.get());
 
-    auto explainer = plan_explainer_factory::makePlanExplainer(root.get(), soln.get());
-    LOGV2_DEBUG(20931,
-                2,
-                "Using fast distinct",
-                "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
-                "planSummary"_attr = explainer->getPlanSummary());
+    auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
+                                            std::move(ws),
+                                            std::move(root),
+                                            coll,
+                                            yieldPolicy,
+                                            NamespaceString(),
+                                            std::move(soln));
+    if (exec.isOK()) {
+        LOGV2_DEBUG(20931,
+                    2,
+                    "Using fast distinct",
+                    "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
+                    "planSummary"_attr = exec.getValue()->getPlanExplainer().getPlanSummary());
+    }
 
-    return plan_executor_factory::make(parsedDistinct->releaseQuery(),
-                                       std::move(ws),
-                                       std::move(root),
-                                       coll,
-                                       yieldPolicy,
-                                       NamespaceString(),
-                                       std::move(soln));
+    return exec;
 }
 
 // Checks each solution in the 'solutions' std::vector to see if one includes an IXSCAN that can be
@@ -2137,21 +2138,23 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
             auto&& root = stage_builder::buildClassicExecutableTree(
                 opCtx, collection, *parsedDistinct->getQuery(), *currentSolution, ws.get());
 
-            auto explainer =
-                plan_explainer_factory::makePlanExplainer(root.get(), currentSolution.get());
-            LOGV2_DEBUG(20932,
-                        2,
-                        "Using fast distinct",
-                        "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
-                        "planSummary"_attr = explainer->getPlanSummary());
+            auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
+                                                    std::move(ws),
+                                                    std::move(root),
+                                                    coll,
+                                                    yieldPolicy,
+                                                    NamespaceString(),
+                                                    std::move(currentSolution));
+            if (exec.isOK()) {
+                LOGV2_DEBUG(20932,
+                            2,
+                            "Using fast distinct",
+                            "query"_attr = redact(parsedDistinct->getQuery()->toStringShort()),
+                            "planSummary"_attr =
+                                exec.getValue()->getPlanExplainer().getPlanSummary());
+            }
 
-            return plan_executor_factory::make(parsedDistinct->releaseQuery(),
-                                               std::move(ws),
-                                               std::move(root),
-                                               coll,
-                                               yieldPolicy,
-                                               NamespaceString(),
-                                               std::move(currentSolution));
+            return exec;
         }
     }
 

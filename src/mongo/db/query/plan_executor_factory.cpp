@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_executor_sbe.h"
+#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo::plan_executor_factory {
@@ -112,6 +113,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
     const CollectionPtr* collection,
     NamespaceString nss,
@@ -127,43 +129,42 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 
     rootStage->prepare(data.ctx);
 
-    auto exec = new PlanExecutorSBE(opCtx,
-                                    std::move(cq),
-                                    std::move(root),
-                                    *collection,
-                                    std::move(nss),
-                                    false,
-                                    boost::none,
-                                    std::move(yieldPolicy));
-    return {{exec, PlanExecutor::Deleter{opCtx}}};
+    return {{new PlanExecutorSBE(
+                 opCtx,
+                 std::move(cq),
+                 {makeVector<sbe::plan_ranker::CandidatePlan>(sbe::plan_ranker::CandidatePlan{
+                      std::move(solution), std::move(rootStage), std::move(data)}),
+                  0},
+                 *collection,
+                 std::move(nss),
+                 false,
+                 std::move(yieldPolicy)),
+             PlanExecutor::Deleter{opCtx}}};
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    sbe::CandidatePlans candidates,
     const CollectionPtr* collection,
     NamespaceString nss,
-    std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy) {
     dassert(collection);
-    auto&& [rootStage, data] = root;
 
     LOGV2_DEBUG(4822861,
                 5,
                 "SBE plan",
-                "slots"_attr = data.debugString(),
-                "stages"_attr = sbe::DebugPrinter{}.print(rootStage.get()));
+                "slots"_attr = candidates.winner().data.debugString(),
+                "stages"_attr = sbe::DebugPrinter{}.print(candidates.winner().root.get()));
 
-    auto exec = new PlanExecutorSBE(opCtx,
-                                    std::move(cq),
-                                    std::move(root),
-                                    *collection,
-                                    std::move(nss),
-                                    true,
-                                    stash,
-                                    std::move(yieldPolicy));
-    return {{exec, PlanExecutor::Deleter{opCtx}}};
+    return {{new PlanExecutorSBE(opCtx,
+                                 std::move(cq),
+                                 std::move(candidates),
+                                 *collection,
+                                 std::move(nss),
+                                 true,
+                                 std::move(yieldPolicy)),
+             PlanExecutor::Deleter{opCtx}}};
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> make(

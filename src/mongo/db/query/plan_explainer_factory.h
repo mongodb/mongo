@@ -29,17 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/query/plan_explainer_impl.h"
-#include "mongo/db/query/plan_explainer_sbe.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
 
 namespace mongo::plan_explainer_factory {
-template <typename T>
-std::unique_ptr<PlanExplainer> makePlanExplainer(T* root, const QuerySolution* solution) {
-    if constexpr (std::is_same_v<T, sbe::PlanStage>) {
-        return std::make_unique<PlanExplainerSBE>(root, solution);
-    } else {
-        static_assert(std::is_same_v<T, PlanStage>);
-        return std::make_unique<PlanExplainerImpl>(root);
-    }
-}
+std::unique_ptr<PlanExplainer> make(PlanStage* root);
+std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root, const QuerySolution* solution);
+std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
+                                    const QuerySolution* solution,
+                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
+                                    bool isMultiPlan);
 }  // namespace mongo::plan_explainer_factory

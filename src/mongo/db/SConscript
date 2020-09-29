@@ -1190,6 +1190,7 @@ env.Library(
         'query/plan_executor_impl.cpp',
         'query/plan_executor_factory.cpp',
         'query/plan_executor_sbe.cpp',
+        'query/plan_explainer_factory.cpp',
         'query/plan_explainer_impl.cpp',
         'query/plan_explainer_sbe.cpp',
         'query/plan_insert_listener.cpp',

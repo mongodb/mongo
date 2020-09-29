@@ -31,10 +31,77 @@
 
 #include "mongo/db/query/plan_explainer_sbe.h"
 
+#include <queue>
+
+#include "mongo/db/keypattern.h"
+
 namespace mongo {
 std::string PlanExplainerSBE::getPlanSummary() const {
-    // TODO: SERVER-50743
-    return "unsupported";
+    if (!_solution) {
+        return {};
+    }
+
+    StringBuilder sb;
+    std::queue<const QuerySolutionNode*> queue;
+    queue.push(_solution->root());
+
+    while (!queue.empty()) {
+        auto node = queue.front();
+        queue.pop();
+
+        sb << stageTypeToString(node->getType());
+
+        switch (node->getType()) {
+            case STAGE_COUNT_SCAN: {
+                auto csn = static_cast<const CountScanNode*>(node);
+                const KeyPattern keyPattern{csn->index.keyPattern};
+                sb << " " << keyPattern;
+                break;
+            }
+            case STAGE_DISTINCT_SCAN: {
+                auto dn = static_cast<const DistinctNode*>(node);
+                const KeyPattern keyPattern{dn->index.keyPattern};
+                sb << " " << keyPattern;
+                break;
+            }
+            case STAGE_GEO_NEAR_2D: {
+                auto geo2d = static_cast<const GeoNear2DNode*>(node);
+                const KeyPattern keyPattern{geo2d->index.keyPattern};
+                sb << " " << keyPattern;
+                break;
+            }
+            case STAGE_GEO_NEAR_2DSPHERE: {
+                auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
+                const KeyPattern keyPattern{geo2dsphere->index.keyPattern};
+                sb << " " << keyPattern;
+                break;
+            }
+            case STAGE_IXSCAN: {
+                auto ixn = static_cast<const IndexScanNode*>(node);
+                const KeyPattern keyPattern{ixn->index.keyPattern};
+                sb << " " << keyPattern;
+                break;
+            }
+            case STAGE_TEXT: {
+                auto tn = static_cast<const TextNode*>(node);
+                const KeyPattern keyPattern{tn->indexPrefix};
+                sb << " " << keyPattern;
+                break;
+            }
+            default:
+                break;
+        }
+
+        for (auto&& child : node->children) {
+            queue.push(child);
+        }
+
+        if (!queue.empty()) {
+            sb << ", ";
+        }
+    }
+
+    return sb.str();
 }
 
 void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
@@ -44,7 +111,7 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     // TODO: SERVER-50728
-    return {{}, {}};
+    return {{}, PlanSummaryStats{}};
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(

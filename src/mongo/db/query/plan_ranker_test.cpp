@@ -32,7 +32,7 @@
  */
 
 #include "mongo/db/query/plan_ranker.h"
-
+#include "mongo/db/query/plan_ranker_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

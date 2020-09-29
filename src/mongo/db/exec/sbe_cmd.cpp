@@ -84,11 +84,11 @@ public:
 
         exec = uassertStatusOK(plan_executor_factory::make(opCtx,
                                                            nullptr,
+                                                           nullptr,
                                                            {std::move(root), std::move(data)},
                                                            &CollectionPtr::null,
                                                            nss,
                                                            nullptr));
-
         for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;
             PlanExecutor::ExecState state = exec->getNext(&next, nullptr);

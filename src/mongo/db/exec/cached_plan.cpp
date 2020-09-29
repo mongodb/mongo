@@ -111,7 +111,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // that a different plan is less resource-intensive, so we fall back to replanning the
             // whole query. We neither evict the existing cache entry nor cache the result of
             // replanning.
-            auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
+            auto explainer = plan_explainer_factory::make(child().get());
             LOGV2_DEBUG(20579,
                         1,
                         "Execution of cached plan failed, falling back to replan",
@@ -160,7 +160,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // If we're here, the trial period took more than 'maxWorksBeforeReplan' work cycles. This
     // plan is taking too long, so we replan from scratch.
-    auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
+    auto explainer = plan_explainer_factory::make(child().get());
     LOGV2_DEBUG(20580,
                 1,
                 "Evicting cache entry and replanning query",
@@ -227,7 +227,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         _replannedQs = std::move(solutions.back());
         solutions.pop_back();
 
-        auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
+        auto explainer = plan_explainer_factory::make(child().get());
         LOGV2_DEBUG(
             20581,
             1,
@@ -262,7 +262,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
         return pickBestPlanStatus;
     }
 
-    auto explainer = plan_explainer_factory::makePlanExplainer(child().get(), nullptr);
+    auto explainer = plan_explainer_factory::make(child().get());
     LOGV2_DEBUG(20582,
                 1,
                 "Query plan after replanning and its cache status",

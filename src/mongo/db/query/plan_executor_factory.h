@@ -37,6 +37,8 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/sbe_runtime_planner.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo::plan_executor_factory {
@@ -104,23 +106,23 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
+    std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
     const CollectionPtr* collection,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
 /**
- * Similar to the factory function above in that it also constructs an executor for the SBE plan
- * 'root'. This overload allows callers to pass a pre-existing queue ('stash') of BSON objects or
- * record ids to return to the caller.
+ * Similar to the factory function above in that it also constructs an executor for the winning SBE
+ * plan passed in 'candidates' vector. This overload allows callers to pass a pre-existing queue
+ * ('stash') of BSON objects or record ids to return to the caller.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     OperationContext* opCtx,
     std::unique_ptr<CanonicalQuery> cq,
-    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
+    sbe::CandidatePlans candidates,
     const CollectionPtr* collection,
     NamespaceString nss,
-    std::queue<std::pair<BSONObj, boost::optional<RecordId>>> stash,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
 /**

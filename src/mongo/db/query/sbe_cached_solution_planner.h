@@ -52,7 +52,7 @@ public:
           _queryParams{queryParams},
           _decisionReads{decisionReads} {}
 
-    plan_ranker::CandidatePlan plan(
+    CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots)
         final;
@@ -73,7 +73,7 @@ private:
      *
      * The plan cache is modified only if 'shouldCache' is true.
      */
-    plan_ranker::CandidatePlan replan(bool shouldCache) const;
+    CandidatePlans replan(bool shouldCache) const;
 
     // Query parameters used to create a query solution when the plan was first created. Used during
     // replanning.

@@ -39,58 +39,57 @@
 #include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo {
-PlanExecutorSBE::PlanExecutorSBE(
-    OperationContext* opCtx,
-    std::unique_ptr<CanonicalQuery> cq,
-    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
-    const CollectionPtr& collection,
-    NamespaceString nss,
-    bool isOpen,
-    boost::optional<std::queue<std::pair<BSONObj, boost::optional<RecordId>>>> stash,
-    std::unique_ptr<PlanYieldPolicySBE> yieldPolicy)
+PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
+                                 std::unique_ptr<CanonicalQuery> cq,
+                                 sbe::CandidatePlans candidates,
+                                 const CollectionPtr& collection,
+                                 NamespaceString nss,
+                                 bool isOpen,
+                                 std::unique_ptr<PlanYieldPolicySBE> yieldPolicy)
     : _state{isOpen ? State::kOpened : State::kClosed},
       _opCtx(opCtx),
       _nss(std::move(nss)),
-      _env{root.second.env},
-      _ctx(std::move(root.second.ctx)),
-      _root(std::move(root.first)),
+      _env{candidates.winner().data.env},
+      _ctx{std::move(candidates.winner().data.ctx)},
       _cq{std::move(cq)},
-      _yieldPolicy(std::move(yieldPolicy)),
-      // TODO SERVER-50743: plumb through QuerySolution to init the PlanExplainer.
-      _planExplainer{plan_explainer_factory::makePlanExplainer(_root.get(), nullptr)} {
-    invariant(_root);
+      _yieldPolicy(std::move(yieldPolicy)) {
+
     invariant(!_nss.isEmpty());
 
-    auto&& data = root.second;
+    auto winner = std::move(candidates.plans[candidates.winnerIdx]);
 
-    if (data.resultSlot) {
-        _result = _root->getAccessor(data.ctx, *data.resultSlot);
+    _root = std::move(winner.root);
+    invariant(_root);
+    _solution = std::move(winner.solution);
+
+    if (winner.data.resultSlot) {
+        _result = _root->getAccessor(winner.data.ctx, *winner.data.resultSlot);
         uassert(4822865, "Query does not have result slot.", _result);
     }
 
-    if (data.recordIdSlot) {
-        _resultRecordId = _root->getAccessor(data.ctx, *data.recordIdSlot);
+    if (winner.data.recordIdSlot) {
+        _resultRecordId = _root->getAccessor(winner.data.ctx, *winner.data.recordIdSlot);
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    if (data.oplogTsSlot) {
-        _oplogTs = _root->getAccessor(data.ctx, *data.oplogTsSlot);
+    if (winner.data.oplogTsSlot) {
+        _oplogTs = _root->getAccessor(winner.data.ctx, *winner.data.oplogTsSlot);
         uassert(4822867, "Query does not have oplogTs slot.", _oplogTs);
     }
 
-    if (data.shouldUseTailableScan) {
+    if (winner.data.shouldUseTailableScan) {
         _resumeRecordIdSlot = _env->getSlot("resumeRecordId"_sd);
     }
 
-    _shouldTrackLatestOplogTimestamp = data.shouldTrackLatestOplogTimestamp;
-    _shouldTrackResumeToken = data.shouldTrackResumeToken;
+    _shouldTrackLatestOplogTimestamp = winner.data.shouldTrackLatestOplogTimestamp;
+    _shouldTrackResumeToken = winner.data.shouldTrackResumeToken;
 
     if (!isOpen) {
         _root->attachFromOperationContext(_opCtx);
     }
 
-    if (stash) {
-        _stash = std::move(*stash);
+    if (!winner.results.empty()) {
+        _stash = std::move(winner.results);
     }
 
     // Callers are allowed to disable yielding for this plan by passing a null yield policy.
@@ -101,6 +100,17 @@ PlanExecutorSBE::PlanExecutorSBE(
         _yieldPolicy->clearRegisteredPlans();
         _yieldPolicy->registerPlan(_root.get());
     }
+
+    const auto isMultiPlan = candidates.plans.size() > 0;
+    if (!_cq->getExpCtx()->explain) {
+        // If we're not in explain mode, there is no need to keep rejected candidate plans around.
+        candidates.plans.clear();
+    } else {
+        // Keep only rejected candidate plans.
+        candidates.plans.erase(candidates.plans.begin() + candidates.winnerIdx);
+    }
+    _planExplainer = plan_explainer_factory::make(
+        _root.get(), _solution.get(), std::move(candidates.plans), isMultiPlan);
 }
 
 void PlanExecutorSBE::saveState() {

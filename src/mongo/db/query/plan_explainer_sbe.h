@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_plan_ranker.h"
 
 namespace mongo {
 /**
@@ -39,10 +40,17 @@ namespace mongo {
  */
 class PlanExplainerSBE final : public PlanExplainer {
 public:
-    PlanExplainerSBE(const sbe::PlanStage* root, const QuerySolution* solution) {}
+    PlanExplainerSBE(const sbe::PlanStage* root,
+                     const QuerySolution* solution,
+                     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
+                     bool isMultiPlan)
+        : _root{root},
+          _solution{solution},
+          _rejectedCandidates{std::move(rejectedCandidates)},
+          _isMultiPlan{isMultiPlan} {}
 
     bool isMultiPlan() const final {
-        return false;
+        return _isMultiPlan;
     }
 
     std::string getPlanSummary() const final;
@@ -52,5 +60,11 @@ public:
         ExplainOptions::Verbosity verbosity) const final;
     std::vector<PlanStatsDetails> getCachedPlanStats(const PlanCacheEntry::DebugInfo&,
                                                      ExplainOptions::Verbosity) const final;
+
+private:
+    const sbe::PlanStage* _root{nullptr};
+    const QuerySolution* _solution{nullptr};
+    const std::vector<sbe::plan_ranker::CandidatePlan> _rejectedCandidates;
+    const bool _isMultiPlan{false};
 };
 }  // namespace mongo

@@ -31,6 +31,8 @@
 
 #include <cstdint>
 
+#include "mongo/base/string_data.h"
+
 namespace mongo {
 /**
  * This type acts as an identifier for a node in a query plan tree, such as a 'QuerySolution' tree
@@ -140,4 +142,5 @@ inline bool isSortStageType(StageType stageType) {
     }
 }
 
+StringData stageTypeToString(StageType stageType);
 }  // namespace mongo

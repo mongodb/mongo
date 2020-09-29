@@ -62,6 +62,7 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
 #include "mongo/util/version.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo {
 namespace {
@@ -362,7 +363,15 @@ void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* 
             }
         }
 
-        auto explainer = plan_explainer_factory::makePlanExplainer<PlanStage>(nullptr, nullptr);
+        auto explainer = stdx::visit(
+            visit_helper::Overloaded{
+                [](const std::vector<std::unique_ptr<PlanStageStats>>& stats) {
+                    return plan_explainer_factory::make(nullptr);
+                },
+                [](const std::vector<std::unique_ptr<sbe::PlanStageStats>>& stats) {
+                    return plan_explainer_factory::make(nullptr, nullptr);
+                }},
+            debugInfo.decision->stats);
         auto plannerStats =
             explainer->getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);
         auto execStats =
