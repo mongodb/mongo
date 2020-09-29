@@ -231,8 +231,13 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         }
     }
 
-    // Extract and assign the 'requestResumeToken' field.
-    csn->requestResumeToken = query.getQueryRequest().getRequestResumeToken();
+    // If the client requested a resume token and we are scanning the oplog, prepare
+    // the collection scan to return timestamp-based tokens. Otherwise, we should
+    // return generic RecordId-based tokens.
+    if (query.getQueryRequest().getRequestResumeToken()) {
+        csn->shouldTrackLatestOplogTimestamp = query.nss().isOplog();
+        csn->requestResumeToken = !query.nss().isOplog();
+    }
 
     // Extract and assign the RecordId from the 'resumeAfter' token, if present.
     const BSONObj& resumeAfterObj = query.getQueryRequest().getResumeAfter();

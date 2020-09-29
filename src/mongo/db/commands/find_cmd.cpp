@@ -455,6 +455,7 @@ public:
             BSONObj obj;
             PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
             std::uint64_t numResults = 0;
+            bool stashedResult = false;
 
             try {
                 while (!FindCommon::enoughForFirstBatch(originalQR, numResults) &&
@@ -463,6 +464,7 @@ public:
                     // later.
                     if (!FindCommon::haveSpaceForNext(obj, numResults, firstBatch.bytesUsed())) {
                         exec->enqueue(obj);
+                        stashedResult = true;
                         break;
                     }
 
@@ -488,6 +490,13 @@ public:
 
                 exception.addContext("Executor error during find command");
                 throw;
+            }
+
+            // For empty batches, or in the case where the final result was added to the batch
+            // rather than being stashed, we update the PBRT to ensure that it is the most recent
+            // available.
+            if (!stashedResult) {
+                firstBatch.setPostBatchResumeToken(exec->getPostBatchResumeToken());
             }
 
             // Set up the cursor for getMore.

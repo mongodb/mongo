@@ -352,6 +352,8 @@ public:
             if (state == PlanExecutor::IS_EOF) {
                 // The latest oplog timestamp may advance even when there are no results. Ensure
                 // that we have the latest postBatchResumeToken produced by the plan executor.
+                // The getMore command does not accept a batchSize of 0, so empty batches are
+                // always caused by hitting EOF and do not need to be handled separately.
                 nextBatch->setPostBatchResumeToken(exec->getPostBatchResumeToken());
             }
 
