@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/doc_validation_error_test.h"
+#include "mongo/db/matcher/doc_validation_util.h"
 
 namespace mongo::doc_validation_error {
 namespace {
@@ -1655,6 +1656,54 @@ TEST(ArrayMatchingMatchExpression, AllOverElemMatch) {
         "'reason': 'array did not contain all specified values',"
         "'consideredValue': [{'b': 0, 'c': 0}, {'b': 1, 'c': 1}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+/**
+ * Generates a query of nested $ors that is 'desiredDepth' levels deep.
+ */
+BSONObj generateDeeplyNestedOr(std::uint32_t desiredDepth) {
+    BSONObj query = BSON("a" << 0);
+    for (auto i = 1u; i < desiredDepth; ++i) {
+        // 'i' is cast to an int so that it can be used in constructing the deep query.
+        BSONObj clause = BSON("a" << static_cast<int>(i));
+        query = BSON("$or" << BSON_ARRAY(query << clause));
+    }
+    ASSERT_OK(validateBSON(query.objdata(), query.objsize()));
+    return query;
+}
+
+TEST(ValidationErrorTruncation, BasicDeeplyNestedError) {
+    // The number of levels of nesting that a single failed $or will contribute to the generated
+    // error.
+    static constexpr int depthFactor = 3;
+
+    // Verify that a query that is too deep will not return any error detail.
+    auto verifyFailingQuery = [](const BSONObj& query, BSONObj& failingDoc) -> void {
+        // 'failingQuery' will generate a truncated error with no detail.
+        BSONObj error = generateValidationError(query, failingDoc);
+        auto reason = error.getField("reason");
+        auto truncated = error.getField("truncated");
+        ASSERT(reason);
+        ASSERT_TRUE(truncated.Bool());
+        ASSERT_EQ(reason.type(), BSONType::String);
+        ASSERT_EQ(reason.valueStringData(), "generated error was too deeply nested");
+    };
+
+    BSONObj doc = BSON("b" << 1);
+    // Build a query which will generate an error that is deeper than the maximum allowed
+    // BSONDepth.
+    auto depth = doc_validation_error::computeMaxAllowedValidationErrorDepth() + (2 * depthFactor);
+    depth /= depthFactor;
+    verifyFailingQuery(generateDeeplyNestedOr(depth), doc);
+    // Should still fail when just above the maximum allowed depth.
+    --depth;
+    verifyFailingQuery(generateDeeplyNestedOr(depth), doc);
+    // Should no longer fail when below the maximum allowed depth.
+    --depth;
+    BSONObj error = generateValidationError(generateDeeplyNestedOr(depth), doc);
+    ASSERT_FALSE(error.hasField("reason"));
+    ASSERT_FALSE(error.hasField("truncated"));
+    ASSERT_EQ(error.getField("details").type(), BSONType::Object);
 }
 }  // namespace
 }  // namespace mongo::doc_validation_error

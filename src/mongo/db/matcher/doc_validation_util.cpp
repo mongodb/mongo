@@ -59,4 +59,16 @@ void annotateTreeToIgnoreForErrorDetails(const boost::intrusive_ptr<ExpressionCo
         annotateTreeToIgnoreForErrorDetails(expCtx, childExpr);
     }
 }
+
+unsigned int computeMaxAllowedValidationErrorDepth() {
+    // The default number of levels a generated error must be below the configured depth to be
+    // considered valid.
+    static constexpr auto kDefaultOffset = 10u;
+    // Only use 'kDefaultOffset' if the configured depth is greater than it. The validation error
+    // response will always allow at least 'BSONDepth::kBSONDepthParameterFloor' levels of nesting.
+    return BSONDepth::getMaxAllowableDepth() > kDefaultOffset
+        ? std::max(BSONDepth::getMaxAllowableDepth() - kDefaultOffset,
+                   static_cast<uint32_t>(BSONDepth::kBSONDepthParameterFloor))
+        : BSONDepth::kBSONDepthParameterFloor;
+}
 }  // namespace mongo::doc_validation_error

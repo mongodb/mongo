@@ -35,6 +35,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -1605,6 +1606,28 @@ BSONObj generateDocumentValidationError(const MatchExpression& validatorExpr, co
     invariant(!error.isEmpty());
     return error;
 }
+/**
+ * Returns true if 'generatedError' is of valid depth; false otherwise.
+ */
+bool checkValidationErrorDepth(const BSONObj& generatedError) {
+    const auto maxDepth = computeMaxAllowedValidationErrorDepth();
+    // Implemented iteratively to avoid creating too many stack frames.
+    std::stack<BSONObjIterator> stack;
+    stack.emplace(generatedError);
+    while (!stack.empty()) {
+        if (stack.size() > maxDepth) {
+            return false;
+        }
+        auto next = stack.top().next();
+        if (next.type() == BSONType::Object || next.type() == BSONType::Array) {
+            stack.emplace(next.embeddedObject());
+        }
+        if (!stack.top().more()) {
+            stack.pop();
+        }
+    }
+    return true;
+}
 }  // namespace
 
 std::shared_ptr<const ErrorExtraInfo> DocumentValidationFailureInfo::parse(const BSONObj& obj) {
@@ -1637,6 +1660,16 @@ BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) 
 
     // Add errors from match expressions.
     objBuilder.append("details"_sd, std::move(error));
-    return objBuilder.obj();
+    auto finalError = objBuilder.obj();
+
+    // Verify that the generated error is of valid depth.
+    if (!checkValidationErrorDepth(finalError)) {
+        BSONObjBuilder errorDetails;
+        static constexpr auto kDeeplyNestedError = "generated error was too deeply nested";
+        errorDetails.append("reason", kDeeplyNestedError);
+        errorDetails.append("truncated", true);
+        return errorDetails.obj();
+    }
+    return finalError;
 }
 }  // namespace mongo::doc_validation_error

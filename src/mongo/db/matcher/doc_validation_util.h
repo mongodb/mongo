@@ -52,4 +52,11 @@ std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
  */
 void annotateTreeToIgnoreForErrorDetails(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          MatchExpression* expr);
+
+/**
+ * Compute the maximum allowed depth for a validation error. Since the generated error will be
+ * included in a command response BSONObj, the maximum depth for validation errors has to be
+ * slightly less deep than the maximum allowed depth for BSONObjs.
+ */
+unsigned int computeMaxAllowedValidationErrorDepth();
 }  // namespace mongo::doc_validation_error
