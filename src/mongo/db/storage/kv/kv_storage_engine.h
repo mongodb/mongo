@@ -124,6 +124,8 @@ public:
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
+    virtual Timestamp getInitialDataTimestamp() const override;
+
     virtual void setOldestTimestamp(Timestamp oldestTimestamp) override;
 
     virtual bool supportsRecoverToStableTimestamp() const override;
@@ -224,7 +226,6 @@ private:
     const bool _supportsDocLocking;
     const bool _supportsDBLocking;
     const bool _supportsCappedCollections;
-    Timestamp _initialDataTimestamp = Timestamp::kAllowUnstableCheckpointsSentinel;
 
     std::unique_ptr<RecordStore> _catalogRecordStore;
     std::unique_ptr<KVCatalog> _catalog;

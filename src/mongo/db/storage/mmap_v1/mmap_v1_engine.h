@@ -106,6 +106,10 @@ public:
 
     void setJournalListener(JournalListener* jl) final;
 
+    Timestamp getInitialDataTimestamp() const override {
+        return Timestamp();
+    }
+
     Timestamp getAllCommittedTimestamp() const override {
         MONGO_UNREACHABLE;
     }
