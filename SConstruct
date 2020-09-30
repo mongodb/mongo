@@ -1261,7 +1261,7 @@ def CheckForProcessor(context, which_arch):
         ret = run_compile_check(which_arch)
         context.Message('Checking if target processor is %s ' % which_arch)
         context.Result(ret)
-        return ret;
+        return ret
 
     for k in list(processor_macros.keys()):
         ret = run_compile_check(k)
@@ -1325,40 +1325,25 @@ def CheckForCXXLink(context):
     context.Result(ret)
     return ret
 
-detectConf = Configure(detectEnv, help=False, custom_tests = {
+detectSystem = Configure(detectEnv, help=False, custom_tests = {
     'CheckForToolchain' : CheckForToolchain,
     'CheckForProcessor': CheckForProcessor,
     'CheckForOS': CheckForOS,
-    'CheckForCXXLink': CheckForCXXLink,
 })
 
-if not detectConf.CheckCC():
-    env.ConfError(
-        "C compiler {0} doesn't work",
-        detectEnv['CC'])
-
-if not detectConf.CheckCXX():
-    env.ConfError(
-        "C++ compiler {0} doesn't work",
-        detectEnv['CXX'])
-
-if not detectConf.CheckForCXXLink():
-    env.ConfError(
-        "C++ compiler {0} can't link C++ programs",
-        detectEnv['CXX'])
 
 toolchain_search_sequence = [ "GCC", "clang" ]
 if mongo_platform.is_running_os('windows'):
     toolchain_search_sequence = [ 'MSVC', 'clang', 'GCC' ]
 for candidate_toolchain in toolchain_search_sequence:
-    if detectConf.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
+    if detectSystem.CheckForToolchain(candidate_toolchain, "C++", "CXX", ".cpp"):
         detected_toolchain = candidate_toolchain
         break
 
 if not detected_toolchain:
     env.ConfError("Couldn't identify the C++ compiler")
 
-if not detectConf.CheckForToolchain(detected_toolchain, "C", "CC", ".c"):
+if not detectSystem.CheckForToolchain(detected_toolchain, "C", "CC", ".c"):
     env.ConfError("C compiler does not match identified C++ compiler")
 
 # Now that we've detected the toolchain, we add methods to the env
@@ -1377,20 +1362,23 @@ env.AddMethod(get_toolchain_name, 'ToolchainName')
 env.AddMethod(is_toolchain, 'ToolchainIs')
 
 if env['TARGET_ARCH']:
-    if not detectConf.CheckForProcessor(env['TARGET_ARCH']):
+    if not detectSystem.CheckForProcessor(env['TARGET_ARCH']):
         env.ConfError("Could not detect processor specified in TARGET_ARCH variable")
 else:
-    detected_processor = detectConf.CheckForProcessor(None)
+    detected_processor = detectSystem.CheckForProcessor(None)
     if not detected_processor:
         env.ConfError("Failed to detect a supported target architecture")
     env['TARGET_ARCH'] = detected_processor
 
 if env['TARGET_OS'] not in os_macros:
     print("No special config for [{0}] which probably means it won't work".format(env['TARGET_OS']))
-elif not detectConf.CheckForOS(env['TARGET_OS']):
+elif not detectSystem.CheckForOS(env['TARGET_OS']):
     env.ConfError("TARGET_OS ({0}) is not supported by compiler", env['TARGET_OS'])
 
-detectConf.Finish()
+detectSystem.Finish()
+
+
+
 
 env['CC_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CC')
 env['CXX_VERSION'] = mongo_toolchain.get_toolchain_ver(env, 'CXX')
@@ -2502,6 +2490,61 @@ def doConfigure(myenv):
     def AddToSHLINKFLAGSIfSupported(env, flag):
         return AddFlagIfSupported(env, 'C', '.c', flag, True, SHLINKFLAGS=[flag])
 
+    if myenv.ToolchainIs('gcc', 'clang'):
+        # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker
+        # because it is much faster. Don't use it if the user has already configured another linker
+        # selection manually.
+        if any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
+            myenv.FatalError(f"Use the '--linker' option instead of modifying the LINKFLAGS directly.")
+
+        linker_ld = get_option('linker')
+        if linker_ld == 'auto':
+            # lld has problems with separate debug info on some platforms. See:
+            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
+            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
+            #
+            # lld also apparently has problems with symbol resolution
+            # in some esoteric configurations that apply for us when
+            # using --link-model=dynamic mode, so disable lld there
+            # too. See:
+            # - https://bugs.llvm.org/show_bug.cgi?id=46676
+            #
+            # We should revisit all of these issues the next time we upgrade our clang minimum.
+            if get_option('separate-debug') == 'off' and get_option('link-model') != 'dynamic':
+                if not AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=lld'):
+                    AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+            else:
+                AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+        elif link_model.startswith("dynamic") and linker_ld == 'bfd':
+            # BFD is not supported due to issues with it causing warnings from some of
+            # the third party libraries that mongodb is linked with:
+            # https://jira.mongodb.org/browse/SERVER-49465
+            myenv.FatalError(f"Linker {linker_ld} is not supported with dynamic link model builds.")
+        else:
+            if not AddToLINKFLAGSIfSupported(myenv, f'-fuse-ld={linker_ld}'):
+                myenv.FatalError(f"Linker {linker_ld} could not be configured.")
+
+    detectCompiler = Configure(myenv, help=False, custom_tests = {
+        'CheckForCXXLink': CheckForCXXLink,
+    })
+
+    if not detectCompiler.CheckCC():
+        env.ConfError(
+            "C compiler {0} doesn't work",
+            detectEnv['CC'])
+
+    if not detectCompiler.CheckCXX():
+        env.ConfError(
+            "C++ compiler {0} doesn't work",
+            detectEnv['CXX'])
+
+    if not detectCompiler.CheckForCXXLink():
+        env.ConfError(
+            "C++ compiler {0} can't link C++ programs",
+            detectEnv['CXX'])
+
+    detectCompiler.Finish()
+
 
     if myenv.ToolchainIs('clang', 'gcc'):
         # This warning was added in g++-4.8.
@@ -3160,41 +3203,9 @@ def doConfigure(myenv):
         #
         myenv.Append( CCFLAGS=["/Zc:inline"])
 
+
+
     if myenv.ToolchainIs('gcc', 'clang'):
-        # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker
-        # because it is much faster. Don't use it if the user has already configured another linker
-        # selection manually.
-        if any(flag.startswith('-fuse-ld=') for flag in env['LINKFLAGS']):
-            myenv.FatalError(f"Use the '--linker' option instead of modifying the LINKFLAGS directly.")
-
-        linker_ld = get_option('linker')
-        if linker_ld == 'auto':
-            # lld has problems with separate debug info on some platforms. See:
-            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
-            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
-            #
-            # lld also apparently has problems with symbol resolution
-            # in some esoteric configurations that apply for us when
-            # using --link-model=dynamic mode, so disable lld there
-            # too. See:
-            # - https://bugs.llvm.org/show_bug.cgi?id=46676
-            #
-            # We should revisit all of these issues the next time we upgrade our clang minimum.
-            if get_option('separate-debug') == 'off' and get_option('link-model') != 'dynamic':
-                if not AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=lld'):
-                    AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
-            else:
-                AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
-        elif link_model.startswith("dynamic") and linker_ld == 'bfd':
-            # BFD is not supported due to issues with it causing warnings from some of
-            # the third party libraries that mongodb is linked with:
-            # https://jira.mongodb.org/browse/SERVER-49465
-            myenv.FatalError(f"Linker {linker_ld} is not supported with dynamic link model builds.")
-        else:
-            if not AddToLINKFLAGSIfSupported(myenv, f'-fuse-ld={linker_ld}'):
-                myenv.FatalError(f"Linker {linker_ld} could not be configured.")
-
-
         # Usually, --gdb-index is too expensive in big static binaries, but for dynamic
         # builds it works well.
         if link_model.startswith("dynamic"):
