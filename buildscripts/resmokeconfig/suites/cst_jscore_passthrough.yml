@@ -83,6 +83,7 @@ selector:
   - jstests/core/collection_truncate.js
   - jstests/core/command_json_schema_field.js
   - jstests/core/command_let_variables.js
+  - jstests/core/computed_projections.js
   - jstests/core/connection_string_validation.js
   - jstests/core/count11.js
   - jstests/core/count4.js
@@ -157,6 +158,7 @@ selector:
   - jstests/core/find_and_modify_server6226.js
   - jstests/core/find_and_modify_server6865.js
   - jstests/core/find_dedup.js
+  - jstests/core/find_project_sort.js
   - jstests/core/finda.js
   - jstests/core/fts_mix.js
   - jstests/core/geo2.js
