@@ -159,10 +159,13 @@ public:
                      const KeyStringSet& multikeyMetadataKeys,
                      const MultikeyPaths& multikeyPaths) final;
 
-    // if this ready is ready for queries
     bool isReady(OperationContext* opCtx) const final;
 
     bool isFrozen() const final;
+
+    bool isPresentInMySnapshot(OperationContext* opCtx) const final;
+
+    bool isReadyInMySnapshot(OperationContext* opCtx) const final;
 
     KVPrefix getPrefix() const final {
         return _prefix;
@@ -190,9 +193,6 @@ private:
     Status _setMultikeyInMultiDocumentTransaction(OperationContext* opCtx,
                                                   const CollectionPtr& collection,
                                                   const MultikeyPaths& multikeyPaths);
-
-    bool _catalogIsReady(OperationContext* opCtx) const;
-    bool _catalogIsPresent(OperationContext* opCtx) const;
 
     /**
      * Retrieves the multikey information associated with this index from '_collection',

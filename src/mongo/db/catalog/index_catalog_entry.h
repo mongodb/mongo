@@ -137,8 +137,24 @@ public:
                              const KeyStringSet& multikeyMetadataKeys,
                              const MultikeyPaths& multikeyPaths) = 0;
 
-    // if this ready is ready for queries
+    /**
+     * Returns whether this index is ready for queries. This is potentially unsafe in that it does
+     * not consider whether the index is visible or ready in the currently storage snapshot. For
+     * that, use isReadyInMySnapshot() or isPresentInMySnapshot().
+     */
     virtual bool isReady(OperationContext* const opCtx) const = 0;
+
+    /**
+     * Safely check whether this index is visible in the durable catalog in the current storage
+     * engine snapshot.
+     */
+    virtual bool isPresentInMySnapshot(OperationContext* opCtx) const = 0;
+
+    /**
+     * Safely check whether this index is visible and ready in the durable catalog in the current
+     * storage engine snapshot.
+     */
+    virtual bool isReadyInMySnapshot(OperationContext* opCtx) const = 0;
 
     /**
      * Returns true if this index is not ready, and it is not currently in the process of being
