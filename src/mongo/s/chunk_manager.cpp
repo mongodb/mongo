@@ -763,10 +763,18 @@ ComparableChunkVersion ComparableChunkVersion::makeComparableChunkVersionForForc
                                   _epochDisambiguatingSequenceNumSource.fetchAndAdd(1));
 }
 
-std::string ComparableChunkVersion::toString() const {
-    return str::stream() << _forcedRefreshSequenceNum << "|"
-                         << (_chunkVersion ? _chunkVersion->toString() : "NONE") << "|"
-                         << _epochDisambiguatingSequenceNum;
+BSONObj ComparableChunkVersion::toBSONForLogging() const {
+    BSONObjBuilder builder;
+    if (_chunkVersion)
+        builder.append("chunkVersion"_sd, _chunkVersion->toBSON());
+    else
+        builder.append("chunkVersion"_sd, "None");
+
+    builder.append("forcedRefreshSequenceNum"_sd, static_cast<int64_t>(_forcedRefreshSequenceNum));
+    builder.append("epochDisambiguatingSequenceNum"_sd,
+                   static_cast<int64_t>(_epochDisambiguatingSequenceNum));
+
+    return builder.obj();
 }
 
 bool ComparableChunkVersion::operator==(const ComparableChunkVersion& other) const {

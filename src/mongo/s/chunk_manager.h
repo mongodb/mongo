@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/s/chunk.h"
@@ -366,7 +367,7 @@ public:
         return *_chunkVersion;
     }
 
-    std::string toString() const;
+    BSONObj toBSONForLogging() const;
 
     bool sameEpoch(const ComparableChunkVersion& other) const {
         return _chunkVersion->epoch() == other._chunkVersion->epoch();

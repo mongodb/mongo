@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache_loader.h"
@@ -77,7 +78,7 @@ public:
         return *_dbVersion;
     }
 
-    std::string toString() const;
+    BSONObj toBSONForLogging() const;
 
     bool sameUuid(const ComparableDatabaseVersion& other) const {
         return _dbVersion->getUuid() == other._dbVersion->getUuid();
