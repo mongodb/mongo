@@ -21,7 +21,7 @@ def main():
     options = parser.parse_args()
 
     # Remember the prologue between lines,
-    # Prologue defines the library ids referred to by each threadRecord line.
+    # Prologue defines the library ids referred to by each record line.
     prologue = None
 
     for line in sys.stdin:
@@ -34,8 +34,12 @@ def main():
             if "prologue" in attr:
                 prologue = attr["prologue"]
 
-            if "threadRecord" in attr:
-                thread_record = attr["threadRecord"]
+            # "threadRecord" is an older name for "record".
+            # Accept either name.
+            for record_field_name in ("record", "threadRecord"):
+                if record_field_name not in attr:
+                    continue
+                thread_record = attr[record_field_name]
                 merged = {**thread_record, **prologue}
 
                 output_fn = None
