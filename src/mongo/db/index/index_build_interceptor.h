@@ -214,7 +214,13 @@ private:
     // additional fields that have to be referenced in commit/rollback handlers, this counter should
     // be moved to a new IndexBuildsInterceptor::InternalState structure that will be managed as a
     // shared resource.
-    std::shared_ptr<AtomicWord<long long>> _sideWritesCounter;
+    std::shared_ptr<AtomicWord<long long>> _sideWritesCounter =
+        std::make_shared<AtomicWord<long long>>(0);
+
+    // Whether to skip the check the the number of writes applied is equal to the number of writes
+    // recorded. Resumable index builds to not preserve these counts, so we skip this check for
+    // index builds that were resumed.
+    const bool _skipNumAppliedCheck = false;
 
     mutable Mutex _multikeyPathMutex =
         MONGO_MAKE_LATCH("IndexBuildInterceptor::_multikeyPathMutex");

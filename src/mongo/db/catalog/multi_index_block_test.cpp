@@ -148,7 +148,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(operationContext(), {}, {}));
     auto isResumable = false;
-    indexer->abortWithoutCleanupForRollback(operationContext(), coll.get(), isResumable);
+    indexer->abortWithoutCleanup(operationContext(), coll.get(), isResumable);
 }
 
 TEST_F(MultiIndexBlockTest, InitWriteConflictException) {

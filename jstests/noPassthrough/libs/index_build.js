@@ -474,6 +474,43 @@ const ResumableIndexBuildTest = class {
         }
     }
 
+    static checkResume(conn, buildUUIDs, expectedResumePhases, resumeChecks) {
+        for (let i = 0; i < buildUUIDs.length; i++) {
+            // Ensure that the resume info contains the correct phase to resume from.
+            checkLog.containsJson(conn, 4841700, {
+                buildUUID: function(uuid) {
+                    return uuid["uuid"]["$uuid"] === buildUUIDs[i];
+                },
+                phase: expectedResumePhases[expectedResumePhases.length === 1 ? 0 : i]
+            });
+
+            const resumeCheck = resumeChecks[resumeChecks.length === 1 ? 0 : i];
+
+            if (resumeCheck.numScannedAferResume) {
+                // Ensure that the resumed index build resumed the collection scan from the correct
+                // location.
+                checkLog.containsJson(conn, 20391, {
+                    buildUUID: function(uuid) {
+                        return uuid["uuid"]["$uuid"] === buildUUIDs[i];
+                    },
+                    totalRecords: resumeCheck.numScannedAferResume
+                });
+            } else if (resumeCheck.skippedPhaseLogID) {
+                // Ensure that the resumed index build does not perform a phase that it already
+                // completed before being interrupted for shutdown.
+                assert(!checkLog.checkContainsOnceJson(conn, resumeCheck.skippedPhaseLogID, {
+                    buildUUID: function(uuid) {
+                        return uuid["uuid"]["$uuid"] === buildUUIDs[i];
+                    }
+                }),
+                       "Found log " + resumeCheck.skippedPhaseLogID + " for index build " +
+                           buildUUIDs[i] + " when this phase should not have run after resuming");
+            } else {
+                assert(false, "Must specify one of numScannedAferResume and skippedPhaseLogID");
+            }
+        }
+    }
+
     /**
      * Runs a resumable index build test on the provided replica set and namespace.
      *
@@ -500,7 +537,8 @@ const ResumableIndexBuildTest = class {
      *   'skippedPhaseLogID'. The former is used to verify that the index build scanned the
      *   expected number of documents in the collection scan after resuming. The latter is used for
      *   phases which do not perform a collection scan after resuming, to verify that the index
-     *   index build did not resume from an earlier phase than expected.
+     *   index build did not resume from an earlier phase than expected. The log message must
+     *   contain the buildUUID attribute.
      *
      * 'sideWries' is an array of documents inserted during the initialization phase so that they
      *   are inserted into the side writes table and processed during the drain writes phase.
@@ -554,40 +592,8 @@ const ResumableIndexBuildTest = class {
             awaitCreateIndex();
         }
 
-        for (let i = 0; i < buildUUIDs.length; i++) {
-            // Ensure that the resume info contains the correct phase to resume from.
-            checkLog.containsJson(primary, 4841700, {
-                buildUUID: function(uuid) {
-                    return uuid["uuid"]["$uuid"] === buildUUIDs[i];
-                },
-                phase: expectedResumePhases[expectedResumePhases.length === 1 ? 0 : i]
-            });
-
-            const resumeCheck = resumeChecks[resumeChecks.length === 1 ? 0 : i];
-
-            if (resumeCheck.numScannedAferResume) {
-                // Ensure that the resumed index build resumed the collection scan from the correct
-                // location.
-                checkLog.containsJson(primary, 20391, {
-                    buildUUID: function(uuid) {
-                        return uuid["uuid"]["$uuid"] === buildUUIDs[i];
-                    },
-                    totalRecords: resumeCheck.numScannedAferResume
-                });
-            } else if (resumeCheck.skippedPhaseLogID) {
-                // Ensure that the resumed index build does not perform a phase that it already
-                // completed before being interrupted for shutdown.
-                assert(!checkLog.checkContainsOnceJson(primary, resumeCheck.skippedPhaseLogID, {
-                    buildUUID: function(uuid) {
-                        return uuid["uuid"]["$uuid"] === buildUUIDs[i];
-                    }
-                }),
-                       "Found log " + resumeCheck.skippedPhaseLogID + " for index build " +
-                           buildUUIDs[i] + " when this phase should not have run after resuming");
-            } else {
-                assert(false, "Must specify one of numScannedAferResume and skippedPhaseLogID");
-            }
-        }
+        ResumableIndexBuildTest.checkResume(
+            primary, buildUUIDs, expectedResumePhases, resumeChecks);
 
         ResumableIndexBuildTest.checkIndexes(
             rst, dbName, collName, indexNames, postIndexBuildInserts);

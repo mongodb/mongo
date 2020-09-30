@@ -648,6 +648,8 @@ Status MultiIndexBlock::drainBackgroundWrites(
               IndexBuildPhase_serializer(_phase).toString());
     _phase = IndexBuildPhaseEnum::kDrainWrites;
 
+    ReadSourceScope readSourceScope(opCtx, readSource);
+
     const CollectionPtr& coll =
         CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, _collectionUUID.get());
 
@@ -706,17 +708,6 @@ Status MultiIndexBlock::checkConstraints(OperationContext* opCtx, const Collecti
         }
     }
     return Status::OK();
-}
-
-boost::optional<ResumeIndexInfo> MultiIndexBlock::abortWithoutCleanupForRollback(
-    OperationContext* opCtx, const CollectionPtr& collection, bool isResumable) {
-    return _abortWithoutCleanup(opCtx, collection, false /* shutdown */, isResumable);
-}
-
-void MultiIndexBlock::abortWithoutCleanupForShutdown(OperationContext* opCtx,
-                                                     const CollectionPtr& collection,
-                                                     bool isResumable) {
-    _abortWithoutCleanup(opCtx, collection, true /* shutdown */, isResumable);
 }
 
 MultiIndexBlock::OnCreateEachFn MultiIndexBlock::kNoopOnCreateEachFn = [](const BSONObj& spec) {};
@@ -796,8 +787,9 @@ void MultiIndexBlock::setIndexBuildMethod(IndexBuildMethod indexBuildMethod) {
     _method = indexBuildMethod;
 }
 
-boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(
-    OperationContext* opCtx, const CollectionPtr& collection, bool shutdown, bool isResumable) {
+void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
+                                          const CollectionPtr& collection,
+                                          bool isResumable) {
     invariant(!_buildIsCleanedUp);
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
     // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
@@ -808,15 +800,14 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(
     }
 
     auto action = TemporaryRecordStore::FinalizationAction::kDelete;
-    boost::optional<ResumeIndexInfo> resumeInfo;
 
-    if (isResumable && (shutdown || IndexBuildPhaseEnum::kDrainWrites != _phase)) {
+    if (isResumable) {
         invariant(_buildUUID);
         invariant(_method == IndexBuildMethod::kHybrid);
 
         // Index builds do not yield locks during the bulk load phase so it is not possible for
         // rollback to interrupt an index build during this phase.
-        if (!shutdown) {
+        if (!ErrorCodes::isShutdownError(opCtx->checkForInterruptNoAssert())) {
             invariant(IndexBuildPhaseEnum::kBulkLoad != _phase, str::stream() << *_buildUUID);
         }
 
@@ -829,8 +820,6 @@ boost::optional<ResumeIndexInfo> MultiIndexBlock::_abortWithoutCleanup(
     }
 
     _buildIsCleanedUp = true;
-
-    return resumeInfo;
 }
 
 void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,

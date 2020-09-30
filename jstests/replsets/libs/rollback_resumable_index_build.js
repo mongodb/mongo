@@ -3,14 +3,33 @@ load('jstests/replsets/libs/rollback_test.js');
 
 const RollbackResumableIndexBuildTest = class {
     /**
-     * Runs a resumable index build rollback test. The phase that the index build will be in when
-     * rollback starts is specified by rollbackStartFailPointName. The phase that the index build
-     * will resume from after rollback completes is specified by rollbackEndFailPointName. If
-     * either of these points is in the drain writes phase, documents to insert into the side
-     * writes table must be specified by sideWrites. locksYieldedFailPointName specifies a point
-     * during the index build between rollbackEndFailPointName and rollbackStartFailPointName at
-     * which its locks are yielded. Documents specified by insertsToBeRolledBack are inserted after
-     * transitioning to rollback operations and will be rolled back.
+     * Runs a resumable index build rollback test.
+     *
+     * 'rollbackStartFailPointName' specifies the phase that the index build will be in when
+     *   rollback starts.
+     *
+     * 'rollbackEndFailPointName' specifies the phase that the index build resume from after
+     *   rollback completes.
+     *
+     * 'locksYieldedFailPointName' specifies a point during the index build between
+     *   'rollbackEndFailPointName' and 'rollbackStartFailPointName' at which its locks are yielded.
+     *
+     * 'expectedResumePhase' is a string which specifies the name of the phase that the index build
+     *   is expected to resume in.
+     *
+     * 'resumeCheck' is an object which contains exactly one of 'numScannedAferResume' and
+     *   'skippedPhaseLogID'. The former is used to verify that the index build scanned the
+     *   expected number of documents in the collection scan after resuming. The latter is used for
+     *   phases which do not perform a collection scan after resuming, to verify that the index
+     *   index build did not resume from an earlier phase than expected. The log message must
+     *   contain the buildUUID attribute.
+     *
+     * 'insertsToBeRolledBack' is documents which are inserted after transitioning to rollback
+     *   operations and will be rolled back.
+     *
+     * 'sideWrites' is documents to insert into the side writes table. If either
+     *   'rollbackStartFailPointName' or 'rollbackEndFailPointName' the above two are in the drain
+     *   writes phase, this is required.
      */
     static run(rollbackTest,
                dbName,
@@ -21,6 +40,8 @@ const RollbackResumableIndexBuildTest = class {
                rollbackEndFailPointName,
                rollbackEndFailPointIteration,
                locksYieldedFailPointName,
+               expectedResumePhase,
+               resumeCheck,
                insertsToBeRolledBack,
                sideWrites = []) {
         const originalPrimary = rollbackTest.getPrimary();
@@ -31,6 +52,9 @@ const RollbackResumableIndexBuildTest = class {
         }
 
         rollbackTest.awaitLastOpCommitted();
+
+        assert.commandWorked(
+            originalPrimary.adminCommand({setParameter: 1, logComponentVerbosity: {index: 1}}));
 
         // Set internalQueryExecYieldIterations to 0 and maxIndexBuildDrainBatchSize to 1 so that
         // the index build is guaranteed to yield its locks between the rollback end and start
@@ -101,6 +125,10 @@ const RollbackResumableIndexBuildTest = class {
         rollbackStartFp.off();
         locksYieldedFp.wait();
 
+        // Clear the log so that we can verify that the index build resumes from the correct phase
+        // after rollback.
+        assert.commandWorked(originalPrimary.adminCommand({clearLog: "global"}));
+
         const awaitDisableFailPoint = startParallelShell(
             // Wait for the index build to be aborted for rollback.
             funWithArgs(
@@ -135,7 +163,10 @@ const RollbackResumableIndexBuildTest = class {
         // Ensure that the index build completed after rollback.
         ResumableIndexBuildTest.assertCompleted(originalPrimary, coll, [buildUUID], [indexName]);
 
-        assert.commandWorked(
-            rollbackTest.getPrimary().getDB(dbName).getCollection(collName).dropIndex(indexName));
+        ResumableIndexBuildTest.checkResume(
+            originalPrimary, [buildUUID], [expectedResumePhase], [resumeCheck]);
+
+        ResumableIndexBuildTest.checkIndexes(
+            rollbackTest.getTestFixture(), dbName, collName, [indexName], []);
     }
 };

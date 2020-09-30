@@ -30,6 +30,8 @@ const runTest = function(rollbackEndFailPointName, rollbackEndFailPointIteration
                                         rollbackEndFailPointName,
                                         rollbackEndFailPointIteration,
                                         "setYieldAllLocksHang",
+                                        "collection scan",
+                                        {numScannedAferResume: 1},
                                         [{a: 6}, {a: 7}]);
 };
 

@@ -1580,7 +1580,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     WT_SESSION* session = wtSession.getSession();
     LOGV2_DEBUG(22337,
                 2,
-                "WiredTigerKVEngine::createTemporaryRecordStore uri: {uri} config: {config}",
+                "WiredTigerKVEngine::makeTemporaryRecordStore",
                 "uri"_attr = uri,
                 "config"_attr = config);
     uassertStatusOK(wtRCToStatus(session->create(session, uri.c_str(), config.c_str())));
@@ -1592,8 +1592,10 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.isCapped = false;
     params.isEphemeral = _ephemeral;
     params.cappedCallback = nullptr;
-    params.sizeStorer = _sizeStorer.get();
-    params.tracksSizeAdjustments = true;
+    // Temporary collections do not need to persist size information to the size storer.
+    params.sizeStorer = nullptr;
+    // Temporary collections do not need to reconcile collection size/counts.
+    params.tracksSizeAdjustments = false;
     params.isReadOnly = false;
 
     params.cappedMaxSize = -1;

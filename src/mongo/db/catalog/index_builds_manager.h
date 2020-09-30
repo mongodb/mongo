@@ -168,23 +168,16 @@ public:
      * Signals the index build to be aborted without being cleaned up and returns without waiting
      * for it to stop. Does nothing if the index build has already been cleared away.
      *
+     * Writes the current state of the index build to disk if the specified index build is a
+     * two-phase hybrid index build and resumable index builds are supported.
+     *
      * Returns true if a build existed to be signaled, as opposed to having already finished and
-     * been cleared away, or not having yet started..
+     * been cleared away, or not having yet started.
      */
-    bool abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
-                                                  const CollectionPtr& collection,
-                                                  const UUID& buildUUID,
-                                                  bool isResumable);
-
-    /**
-     * The same as abortIndexBuildWithoutCleanupForRollback above, but additionally writes the
-     * current state of the index build to disk if the specified index build is a two-phase hybrid
-     * index build and resumable index builds are supported.
-     */
-    bool abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
-                                                  const CollectionPtr& collection,
-                                                  const UUID& buildUUID,
-                                                  bool isResumable);
+    bool abortIndexBuildWithoutCleanup(OperationContext* opCtx,
+                                       const CollectionPtr& collection,
+                                       const UUID& buildUUID,
+                                       bool isResumable);
 
     /**
      * Returns true if the index build supports background writes while building an index. This is
@@ -196,17 +189,6 @@ public:
      * Checks via invariant that the manager has no index builds presently.
      */
     void verifyNoIndexBuilds_forTestOnly();
-
-    /**
-     * Returns the information to resume each resumable index build that was aborted for rollback.
-     */
-    std::vector<ResumeIndexInfo> getResumeInfos() const;
-
-    /**
-     * Clears the vector that was used to store the information to resume each resumable index
-     * build after rollback.
-     */
-    void clearResumeInfos();
 
 private:
     /**
@@ -225,9 +207,6 @@ private:
     // Map of index builders by build UUID. Allows access to the builders so that actions can be
     // taken on and information passed to and from index builds.
     std::map<UUID, std::unique_ptr<MultiIndexBlock>> _builders;
-
-    // The information to resume each resumable index build that was aborted for rollback.
-    std::vector<ResumeIndexInfo> _resumeInfos;
 
     /**
      * Deletes record containing duplicate keys and insert it into a local lost and found collection

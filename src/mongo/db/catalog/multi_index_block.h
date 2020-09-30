@@ -271,31 +271,15 @@ public:
 
     /**
      * May be called at any time after construction but before a successful commit(). Suppresses
-     * the default behavior on destruction of removing all traces of uncommitted index builds. Does
-     * not perform any storage engine writes. May delete internal tables, but this is not
-     * transactional.
+     * the default behavior on destruction of removing all traces of uncommitted index builds. May
+     * delete internal tables, but this is not transactional. Writes the resumable index build
+     * state to disk if resumable index builds are supported.
      *
-     * If the indexes being built were resumable, returns the information to resume them.
-     * Otherwise, returns boost::none.
-     *
-     * This should only be used during rollback.
+     * This should only be used during shutdown or rollback.
      */
-    boost::optional<ResumeIndexInfo> abortWithoutCleanupForRollback(OperationContext* opCtx,
-                                                                    const CollectionPtr& collection,
-                                                                    bool isResumable);
-
-    /**
-     * May be called at any time after construction but before a successful commit(). Suppresses
-     * the default behavior on destruction of removing all traces of uncommitted index builds. If
-     * this is a two-phase hybrid index build and resumable index builds are supported, writes the
-     * current state of the index build to disk using the storage engine. May delete internal
-     * tables, but this is not transactional.
-     *
-     * This should only be used during shutdown.
-     */
-    void abortWithoutCleanupForShutdown(OperationContext* opCtx,
-                                        const CollectionPtr& collection,
-                                        bool isResumable);
+    void abortWithoutCleanup(OperationContext* opCtx,
+                             const CollectionPtr& collection,
+                             bool isResumable);
 
     /**
      * Returns true if this build block supports background writes while building an index. This is
@@ -315,17 +299,6 @@ private:
 
         InsertDeleteOptions options;
     };
-
-    /**
-     * This function should be used for shutdown and rollback. When called for shutdown, writes the
-     * resumable index build state to disk if resumable index builds are supported. When called for
-     * rollback, returns the information to resume the index build if resumable index builds are
-     * supported.
-     */
-    boost::optional<ResumeIndexInfo> _abortWithoutCleanup(OperationContext* opCtx,
-                                                          const CollectionPtr& collection,
-                                                          bool shutdown,
-                                                          bool isResumable);
 
     void _writeStateToDisk(OperationContext* opCtx, const CollectionPtr& collection) const;
 

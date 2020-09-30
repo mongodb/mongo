@@ -33,6 +33,8 @@ const runTest = function(rollbackStartFailPointIteration,
                                         rollbackEndFailPointName,
                                         rollbackEndFailPointIteration,
                                         "hangDuringIndexBuildDrainYield",
+                                        "drain writes",
+                                        {skippedPhaseLogID: 20392},
                                         [{a: 18}, {a: 19}],
                                         sideWrites);
 };
@@ -44,7 +46,7 @@ runTest(1, "hangAfterSettingUpIndexBuild", {}, [{a: 4}, {a: 5}, {a: 6}]);
 runTest(1, "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", 1, [{a: 7}, {a: 8}, {a: 9}]);
 
 // Rollback to the bulk load phase.
-runTest(1, "hangIndexBuildDuringBulkLoadPhase", 1, [{a: 7}, {a: 8}, {a: 9}]);
+runTest(1, "hangIndexBuildDuringBulkLoadPhase", 1, [{a: 10}, {a: 11}, {a: 12}]);
 
 // Rollback to earlier in the drain writes phase.
 runTest(3,

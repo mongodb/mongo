@@ -463,6 +463,17 @@ bool isIndexBuildResumable(OperationContext* opCtx,
     return true;
 }
 
+/**
+ * Returns the ReadSource to be used for a drain occurring before the commit quorum has been
+ * satisfied.
+ */
+RecoveryUnit::ReadSource getReadSourceForDrainBeforeCommitQuorum(
+    const ReplIndexBuildState& replState) {
+    return replState.lastOpTimeBeforeInterceptors.isNull()
+        ? RecoveryUnit::ReadSource::kNoTimestamp
+        : RecoveryUnit::ReadSource::kMajorityCommitted;
+}
+
 }  // namespace
 
 const auto getIndexBuildsCoord =
@@ -1404,7 +1415,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
             invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
             invariant(replCoord->getMemberState().rollback());
             auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
-            _indexBuildsManager.abortIndexBuildWithoutCleanupForRollback(
+            _indexBuildsManager.abortIndexBuildWithoutCleanup(
                 opCtx, coll.get(), replState->buildUUID, isResumable);
             break;
         }
@@ -1439,7 +1450,7 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
     const CollectionPtr& collection) {
     // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
     auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
-    _indexBuildsManager.abortIndexBuildWithoutCleanupForShutdown(
+    _indexBuildsManager.abortIndexBuildWithoutCleanup(
         opCtx, collection, replState->buildUUID, isResumable);
 
     {
@@ -2677,7 +2688,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
             replState->buildUUID,
-            RecoveryUnit::ReadSource::kNoTimestamp,
+            getReadSourceForDrainBeforeCommitQuorum(*replState),
             IndexBuildInterceptor::DrainYieldPolicy::kYield));
     }
 
@@ -2705,7 +2716,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
             replState->buildUUID,
-            RecoveryUnit::ReadSource::kNoTimestamp,
+            getReadSourceForDrainBeforeCommitQuorum(*replState),
             IndexBuildInterceptor::DrainYieldPolicy::kNoYield));
     }
 

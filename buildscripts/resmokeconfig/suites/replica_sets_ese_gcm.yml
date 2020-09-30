@@ -8,6 +8,9 @@ selector:
   roots:
   - jstests/replsets/*.js
   exclude_files:
+  # TODO (SERVER-50479): Enable resumable index build rollback tests once resumable index builds
+  # support ESE.
+  - jstests/replsets/rollback_resumable_index_build_*.js
 
 executor:
   config:

@@ -84,8 +84,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatal
     : _indexCatalogEntry(entry),
       _sideWritesTable(
           opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(opCtx)),
-      _skippedRecordTracker(opCtx, entry, boost::none),
-      _sideWritesCounter(std::make_shared<AtomicWord<long long>>()) {
+      _skippedRecordTracker(opCtx, entry, boost::none) {
 
     if (entry->descriptor()->unique()) {
         _duplicateKeyTracker = std::make_unique<DuplicateKeyTracker>(opCtx, entry);
@@ -104,8 +103,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
           opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
               opCtx, sideWritesIdent)),
       _skippedRecordTracker(opCtx, entry, skippedRecordTrackerIdent),
-      _sideWritesCounter(
-          std::make_shared<AtomicWord<long long>>(_sideWritesTable->rs()->numRecords(opCtx))) {
+      _skipNumAppliedCheck(true) {
 
     auto finalizeTableOnFailure = makeGuard([&] {
         _sideWritesTable->finalizeTemporaryTable(opCtx,
@@ -398,28 +396,30 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx) {
 
 bool IndexBuildInterceptor::areAllWritesApplied(OperationContext* opCtx) const {
     invariant(_sideWritesTable);
-    auto cursor = _sideWritesTable->rs()->getCursor(opCtx);
-    auto record = cursor->next();
 
     // The table is empty only when all writes are applied.
-    if (!record) {
-        auto writesRecorded = _sideWritesCounter->load();
-        if (writesRecorded != _numApplied) {
-            dassert(writesRecorded == _numApplied,
-                    (str::stream()
-                     << "The number of side writes recorded does not match the number "
-                        "applied, despite the table appearing empty. Writes recorded: "
-                     << writesRecorded << ", applied: " << _numApplied));
-            LOGV2_WARNING(20692,
-                          "The number of side writes recorded does not match the number applied, "
-                          "despite the table appearing empty",
-                          "writesRecorded"_attr = writesRecorded,
-                          "applied"_attr = _numApplied);
-        }
+    if (_sideWritesTable->rs()->getCursor(opCtx)->next()) {
+        return false;
+    }
+
+    if (_skipNumAppliedCheck) {
         return true;
     }
 
-    return false;
+    auto writesRecorded = _sideWritesCounter->load();
+    if (writesRecorded != _numApplied) {
+        dassert(writesRecorded == _numApplied,
+                (str::stream() << "The number of side writes recorded does not match the number "
+                                  "applied, despite the table appearing empty. Writes recorded: "
+                               << writesRecorded << ", applied: " << _numApplied));
+        LOGV2_WARNING(20692,
+                      "The number of side writes recorded does not match the number applied, "
+                      "despite the table appearing empty",
+                      "writesRecorded"_attr = writesRecorded,
+                      "applied"_attr = _numApplied);
+    }
+
+    return true;
 }
 
 boost::optional<MultikeyPaths> IndexBuildInterceptor::getMultikeyPaths() const {

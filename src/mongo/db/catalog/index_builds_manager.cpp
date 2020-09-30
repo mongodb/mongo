@@ -333,41 +333,19 @@ bool IndexBuildsManager::abortIndexBuild(OperationContext* opCtx,
     return true;
 }
 
-bool IndexBuildsManager::abortIndexBuildWithoutCleanupForRollback(OperationContext* opCtx,
-                                                                  const CollectionPtr& collection,
-                                                                  const UUID& buildUUID,
-                                                                  bool isResumable) {
+bool IndexBuildsManager::abortIndexBuildWithoutCleanup(OperationContext* opCtx,
+                                                       const CollectionPtr& collection,
+                                                       const UUID& buildUUID,
+                                                       bool isResumable) {
     auto builder = _getBuilder(buildUUID);
     if (!builder.isOK()) {
         return false;
     }
 
-    LOGV2(20347,
-          "Index build aborted without cleanup for rollback: {uuid}",
-          "Index build aborted without cleanup for rollback",
-          "buildUUID"_attr = buildUUID);
+    LOGV2(20347, "Index build aborted without cleanup", "buildUUID"_attr = buildUUID);
 
-    if (auto resumeInfo =
-            builder.getValue()->abortWithoutCleanupForRollback(opCtx, collection, isResumable)) {
-        _resumeInfos.push_back(std::move(*resumeInfo));
-    }
+    builder.getValue()->abortWithoutCleanup(opCtx, collection, isResumable);
 
-    return true;
-}
-
-bool IndexBuildsManager::abortIndexBuildWithoutCleanupForShutdown(OperationContext* opCtx,
-                                                                  const CollectionPtr& collection,
-                                                                  const UUID& buildUUID,
-                                                                  bool isResumable) {
-    auto builder = _getBuilder(buildUUID);
-    if (!builder.isOK()) {
-        return false;
-    }
-
-    LOGV2(
-        4841500, "Index build aborted without cleanup for shutdown", "buildUUID"_attr = buildUUID);
-
-    builder.getValue()->abortWithoutCleanupForShutdown(opCtx, collection, isResumable);
     return true;
 }
 
@@ -470,14 +448,6 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
             wuow.commit();
             return docSize;
         });
-}
-
-std::vector<ResumeIndexInfo> IndexBuildsManager::getResumeInfos() const {
-    return std::move(_resumeInfos);
-}
-
-void IndexBuildsManager::clearResumeInfos() {
-    _resumeInfos.clear();
 }
 
 }  // namespace mongo
