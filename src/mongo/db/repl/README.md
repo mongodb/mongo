@@ -1976,3 +1976,27 @@ special case during rollback it is possible for the `stableTimestamp` to move ba
 The calculation of this value in the replication layer occurs [here](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4824-L4881).
 The replication layer will [skip setting the stable timestamp](https://github.com/mongodb/mongo/blob/00fbc981646d9e6ebc391f45a31f4070d4466753/src/mongo/db/repl/replication_coordinator_impl.cpp#L4907-L4921) if it is earlier than the
 `initialDataTimestamp`, since data earlier than that timestamp may be inconsistent.
+
+# Non-replication subsystems dependent on replication state transitions.
+
+The replication machinery provides two different APIs for mongod subsystems to receive notifications
+about replication state transitions. The first, simpler API is the ReplicaSetAwareService interface.
+The second, more sophisticated but also more prescriptive API is the PrimaryOnlyService interface.
+
+## ReplicaSetAwareService interface
+
+The ReplicaSetAwareService interface provides simple hooks to receive notifications on transitions
+into and out of the Primary state. By extending ReplicaSetAwareService and overriding its virtual
+methods, it is possible to get notified every time the current mongod node steps up or steps down.
+Because the onStepUp and onStepDown methods of ReplicaSetAwareServices are called inline as part of
+the stepUp and stepDown processes, while the RSTL is held, ReplicaSetAwareService subclasses should
+strive to do as little work as possible in the bodies of these methods, and should avoid performing
+blocking i/o, as all work performed in these methods delays the replica set state transition for the
+entire node which can result in longer periods of write unavailability for the replica set.
+
+## PrimaryOnlyService interface
+
+The PrimaryOnlyService interface is more sophisticated than the ReplicaSetAwareService interface and
+is designed specifically for services built on persistent state machines that must be driven to
+conclusion by the Primary node of the replica set, even across failovers.  Check out [this
+document](../../../../docs/primary_only_service.md) for more information about PrimaryOnlyServices.
