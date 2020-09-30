@@ -251,7 +251,7 @@ public:
 
         auto pf = makePromiseFuture<FreeMonRegistrationResponse>();
         if (_options.doSync) {
-            pf.promise.setFromStatusWith(doRegister(req));
+            pf.promise.setFrom(doRegister(req));
         } else {
             auto swSchedule = _threadPool->scheduleWork(
                 [sharedPromise = std::move(pf.promise), req, this](
@@ -297,7 +297,7 @@ public:
 
         auto pf = makePromiseFuture<FreeMonMetricsResponse>();
         if (_options.doSync) {
-            pf.promise.setFromStatusWith(doMetrics(req));
+            pf.promise.setFrom(doMetrics(req));
         } else {
             auto swSchedule = _threadPool->scheduleWork(
                 [sharedPromise = std::move(pf.promise), req, this](
