@@ -1295,18 +1295,12 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
                 ret = session->truncate(session, nullptr, truncateStart, truncateEnd, nullptr);
             }
 
-            if (ret == ENOENT || ret == WT_NOTFOUND) {
-                // TODO we should remove this case once SERVER-17141 is resolved
-                LOGV2(22397, "Soft failure truncating capped collection. Will try again later.");
-                docsRemoved = 0;
-            } else {
-                invariantWTOK(ret);
-                _changeNumRecords(opCtx, -docsRemoved);
-                _increaseDataSize(opCtx, -sizeSaved);
-                wuow.commit();
-                // Save the key for the next round
-                _cappedFirstRecord = firstRemainingId;
-            }
+            invariantWTOK(ret);
+            _changeNumRecords(opCtx, -docsRemoved);
+            _increaseDataSize(opCtx, -sizeSaved);
+            wuow.commit();
+            // Save the key for the next round
+            _cappedFirstRecord = firstRemainingId;
         }
     } catch (const WriteConflictException&) {
         opCtx->releaseRecoveryUnit();
