@@ -48,9 +48,10 @@ primaryConn = replTest.getPrimary();
 var res = primaryConn.getDB('admin').runCommand({shardingState: 1});
 
 assert(res.enabled);
-assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
+                primaryConn.adminCommand({shardingState: 1}).configServer);
 
 replTest.stopSet();
 

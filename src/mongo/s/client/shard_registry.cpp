@@ -107,6 +107,10 @@ void ShardRegistry::init(ServiceContext* service) {
     _cache =
         std::make_unique<Cache>(_cacheMutex, _service, _threadPool, lookupFn, 1 /* cacheSize */);
 
+    LOGV2_DEBUG(5123000,
+                1,
+                "Initializing ShardRegistry",
+                "configServers"_attr = _initConfigServerCS.toString());
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _configShardData = ShardRegistryData::createWithConfigShardOnly(
@@ -381,6 +385,13 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
          _latestConnStrings.find(givenConnString.getSetName()) != _latestConnStrings.end())
         ? _latestConnStrings[givenConnString.getSetName()].makeUnionWith(givenConnString)
         : givenConnString;
+    LOGV2_DEBUG(5123001,
+                1,
+                "Updating ShardRegistry connection string",
+                "updateType"_attr =
+                    updateType == ConnectionStringUpdateType::kPossible ? "possible" : "confirmed",
+                "givenConnString"_attr = givenConnString.toString(),
+                "newConnString"_attr = newConnString.toString());
     if (auto shard = _configShardData.findByRSName(newConnString.getSetName())) {
         auto newData = ShardRegistryData::createFromExisting(
             _configShardData, newConnString, _shardFactory.get());

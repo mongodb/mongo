@@ -46,9 +46,10 @@ assert.commandWorked(priConn.getDB('admin').system.version.update(
 // Ensure sharding state on the primary was initialized
 var res = priConn.getDB('admin').runCommand({shardingState: 1});
 assert(res.enabled, tojson(res));
-assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
+                priConn.adminCommand({shardingState: 1}).configServer);
 
 // Ensure sharding state on the secondaries was *not* initialized
 secondaries.forEach(function(secondary) {

@@ -46,9 +46,10 @@ secConn.setSecondaryOk();
 var res = secConn.getDB('admin').runCommand({shardingState: 1});
 
 assert(res.enabled, tojson(res));
-assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
+                secConn.adminCommand({shardingState: 1}).configServer);
 
 replTest.restart(replTest.getNodeId(secConn));
 replTest.waitForPrimary();
@@ -60,9 +61,10 @@ secConn.setSecondaryOk();
 res = secConn.getDB('admin').runCommand({shardingState: 1});
 
 assert(res.enabled, tojson(res));
-assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
 assert.eq(shardIdentityDoc.shardName, res.shardName);
 assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
+                secConn.adminCommand({shardingState: 1}).configServer);
 
 replTest.stopSet();
 

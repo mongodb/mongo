@@ -17,10 +17,10 @@ var checkShardingStateInitialized = function(conn, configConnStr, shardName, clu
     var res = conn.getDB('admin').runCommand({shardingState: 1});
     assert.commandWorked(res);
     assert(res.enabled);
-    assert.eq(configConnStr, res.configServer);
     assert.eq(shardName, res.shardName);
     assert(clusterId.equals(res.clusterId),
            'cluster id: ' + tojson(clusterId) + ' != ' + tojson(res.clusterId));
+    assert.soon(() => configConnStr == conn.adminCommand({shardingState: 1}).configServer);
 };
 
 var checkShardMarkedAsShardAware = function(mongosConn, shardName) {

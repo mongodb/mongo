@@ -71,9 +71,10 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
         res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
         assert(res.enabled);
-        assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
         assert.eq(shardIdentityDoc.shardName, res.shardName);
         assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+        assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
+                        mongodConn.adminCommand({shardingState: 1}).configServer);
 
         return mongodConn;
     };
@@ -93,9 +94,10 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     var res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
     assert(res.enabled);
-    assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
     assert.eq(shardIdentityDoc.shardName, res.shardName);
     assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+    assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
+                    mongodConn.adminCommand({shardingState: 1}).configServer);
     // Should not be allowed to remove the shardIdentity document
     assert.writeErrorWithCode(
         mongodConn.getDB('admin').system.version.remove({_id: 'shardIdentity'}), 40070);
@@ -118,9 +120,10 @@ var runTest = function(mongodConn, configConnStr, awaitVersionUpdate) {
     res = mongodConn.getDB('admin').runCommand({shardingState: 1});
 
     assert(res.enabled);
-    assert.eq(shardIdentityDoc.configsvrConnectionString, res.configServer);
     assert.eq(shardIdentityDoc.shardName, res.shardName);
     assert.eq(shardIdentityDoc.clusterId, res.clusterId);
+    assert.soon(() => shardIdentityDoc.configsvrConnectionString ==
+                    mongodConn.adminCommand({shardingState: 1}).configServer);
 
     //
     // Test shardIdentity doc without configsvrConnectionString, resulting into parse error
