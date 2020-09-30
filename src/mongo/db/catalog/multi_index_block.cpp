@@ -476,11 +476,15 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
               "buildUUID"_attr = _buildUUID,
               "totalRecords"_attr = n,
               "duration"_attr = duration_cast<Milliseconds>(Seconds(t.seconds())),
+              "phase"_attr = IndexBuildPhase_serializer(_phase),
+              "collectionScanPosition"_attr = _lastRecordIdInserted,
               "readSource"_attr = RecoveryUnit::toString(readSource),
               "error"_attr = ex);
         ex.addContext(str::stream()
                       << "collection scan stopped. totalRecords: " << n
                       << "; durationMillis: " << duration_cast<Milliseconds>(Seconds(t.seconds()))
+                      << "; phase: " << IndexBuildPhase_serializer(_phase)
+                      << "; collectionScanPosition: " << _lastRecordIdInserted
                       << "; readSource: " << RecoveryUnit::toString(readSource));
         return ex.toStatus();
     }
@@ -836,6 +840,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
         LOGV2_ERROR(4841501,
                     "Failed to write resumable index build state to disk",
                     "buildUUID"_attr = *_buildUUID,
+                    "details"_attr = obj,
                     "error"_attr = status.getStatus());
         dassert(status,
                 str::stream() << "Failed to write resumable index build state to disk. UUID: "
@@ -847,7 +852,10 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
 
     wuow.commit();
 
-    LOGV2(4841502, "Wrote resumable index build state to disk", "buildUUID"_attr = *_buildUUID);
+    LOGV2(4841502,
+          "Wrote resumable index build state to disk",
+          "buildUUID"_attr = *_buildUUID,
+          "details"_attr = obj);
 
     rs->finalizeTemporaryTable(opCtx, TemporaryRecordStore::FinalizationAction::kKeep);
 }
