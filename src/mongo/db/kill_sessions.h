@@ -31,6 +31,7 @@
 
 #include <tuple>
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/kill_sessions_gen.h"
@@ -41,8 +42,14 @@ namespace mongo {
 class OperationContext;
 class ServiceContext;
 
-struct KillAllSessionsByPatternHash {
-    std::size_t operator()(const KillAllSessionsByPattern& pattern) const {
+struct KillAllSessionsByPatternItem {
+    KillAllSessionsByPattern pattern;
+    APIParameters apiParameters;
+};
+
+struct KillAllSessionsByPatternItemHash {
+    std::size_t operator()(const KillAllSessionsByPatternItem& item) const {
+        auto& pattern = item.pattern;
         if (pattern.getLsid()) {
             return lsidHasher(*pattern.getLsid());
         } else if (pattern.getUid()) {
@@ -60,20 +67,22 @@ struct KillAllSessionsByPatternHash {
 /**
  * Patterns are specifically equal if they differ only by impersonate data.
  */
-inline bool operator==(const KillAllSessionsByPattern& lhs, const KillAllSessionsByPattern& rhs) {
-    auto makeEqualityLens = [](const auto& pattern) {
-        return std::tie(pattern.getLsid(), pattern.getUid());
+inline bool operator==(const KillAllSessionsByPatternItem& lhs,
+                       const KillAllSessionsByPatternItem& rhs) {
+    auto makeEqualityLens = [](const auto& item) {
+        return std::tie(item.pattern.getLsid(), item.pattern.getUid(), item.apiParameters);
     };
 
     return makeEqualityLens(lhs) == makeEqualityLens(rhs);
 }
 
-inline bool operator!=(const KillAllSessionsByPattern& lhs, const KillAllSessionsByPattern& rhs) {
+inline bool operator!=(const KillAllSessionsByPatternItem& lhs,
+                       const KillAllSessionsByPatternItem& rhs) {
     return !(lhs == rhs);
 }
 
 using KillAllSessionsByPatternSet =
-    stdx::unordered_set<KillAllSessionsByPattern, KillAllSessionsByPatternHash>;
+    stdx::unordered_set<KillAllSessionsByPatternItem, KillAllSessionsByPatternItemHash>;
 
 std::tuple<std::vector<UserName>, std::vector<RoleName>> getKillAllSessionsByPatternImpersonateData(
     const KillAllSessionsByPattern& pattern);
@@ -86,13 +95,13 @@ std::tuple<std::vector<UserName>, std::vector<RoleName>> getKillAllSessionsByPat
 /**
  * Constructs a kill sessions pattern which kills all sessions
  */
-KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx);
+KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCtx);
 
 /**
  * Constructs a kill sessions pattern for a particular user
  */
-KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
-                                                      const KillAllSessionsUser& user);
+KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCtx,
+                                                          const KillAllSessionsUser& user);
 
 /**
  * Constructs a KillAllSessionsByPatternSet, each element of which matches the UID of a user that is
@@ -103,7 +112,7 @@ KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(OperationCont
 /**
  * Constructs a kill sessions pattern for a particular logical session
  */
-KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
-                                                      const LogicalSessionId& lsid);
+KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCtx,
+                                                          const LogicalSessionId& lsid);
 
 }  // namespace mongo

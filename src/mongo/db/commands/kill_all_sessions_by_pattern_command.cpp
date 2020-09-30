@@ -96,7 +96,10 @@ public:
 
         // The empty command kills all
         if (ksc.getKillAllSessionsByPattern().empty()) {
-            ksc.setKillAllSessionsByPattern({makeKillAllSessionsByPattern(opCtx)});
+            auto item = makeKillAllSessionsByPattern(opCtx);
+            std::vector<mongo::KillAllSessionsByPattern> patterns;
+            patterns.push_back({std::move(item.pattern)});
+            ksc.setKillAllSessionsByPattern(std::move(patterns));
         } else {
             // If a pattern is passed, you may only pass impersonate data if you have the
             // impersonate privilege.
@@ -114,8 +117,10 @@ public:
             }
         }
 
-        KillAllSessionsByPatternSet patterns{ksc.getKillAllSessionsByPattern().begin(),
-                                             ksc.getKillAllSessionsByPattern().end()};
+        KillAllSessionsByPatternSet patterns;
+        for (auto& pattern : ksc.getKillAllSessionsByPattern()) {
+            patterns.insert({std::move(pattern), APIParameters::get(opCtx)});
+        }
 
         uassertStatusOK(killSessionsCmdHelper(opCtx, result, patterns));
         return true;

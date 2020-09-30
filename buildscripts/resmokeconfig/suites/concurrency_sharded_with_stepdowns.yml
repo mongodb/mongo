@@ -169,6 +169,9 @@ selector:
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_op_only.js
   - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
 
+  # Expects same CSRS primary and shard primary throughout the test
+  - jstests/sharding/mongos_forwards_api_parameters_to_shards.js
+
   exclude_with_any_tags:
   - requires_replication
   - requires_non_retryable_writes

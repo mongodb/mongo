@@ -31,6 +31,7 @@
 
 #include "mongo/db/kill_sessions.h"
 
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
@@ -96,27 +97,25 @@ std::tuple<std::vector<UserName>, std::vector<RoleName>> getKillAllSessionsByPat
     return out;
 }
 
-KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx) {
+KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCtx) {
     KillAllSessionsByPattern kasbp;
 
     kasbp.setUsers(getKillAllSessionsImpersonateUsers(opCtx));
     kasbp.setRoles(getKillAllSessionsImpersonateRoles(opCtx));
-
-    return kasbp;
+    return {kasbp, APIParameters::get(opCtx)};
 }
 
-KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
-                                                      const KillAllSessionsUser& kasu) {
-    KillAllSessionsByPattern kasbp = makeKillAllSessionsByPattern(opCtx);
+KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCtx,
+                                                          const KillAllSessionsUser& kasu) {
+    KillAllSessionsByPatternItem item = makeKillAllSessionsByPattern(opCtx);
 
     auto authMgr = AuthorizationManager::get(opCtx->getServiceContext());
 
     UserName un(kasu.getUser(), kasu.getDb());
 
     auto user = uassertStatusOK(authMgr->acquireUser(opCtx, un));
-    kasbp.setUid(user->getDigest());
-
-    return kasbp;
+    item.pattern.setUid(user->getDigest());
+    return item;
 }
 
 KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(OperationContext* opCtx) {
@@ -127,18 +126,18 @@ KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(OperationCont
         if (auto user = authSession->lookupUser(*it)) {
             KillAllSessionsByPattern pattern;
             pattern.setUid(user->getDigest());
-            patterns.emplace(std::move(pattern));
+            KillAllSessionsByPatternItem item{std::move(pattern), APIParameters::get(opCtx)};
+            patterns.emplace(std::move(item));
         }
     }
     return patterns;
 }
 
-KillAllSessionsByPattern makeKillAllSessionsByPattern(OperationContext* opCtx,
-                                                      const LogicalSessionId& lsid) {
-    KillAllSessionsByPattern kasbp = makeKillAllSessionsByPattern(opCtx);
-    kasbp.setLsid(lsid);
-
-    return kasbp;
+KillAllSessionsByPatternItem makeKillAllSessionsByPattern(OperationContext* opCtx,
+                                                          const LogicalSessionId& lsid) {
+    auto item = makeKillAllSessionsByPattern(opCtx);
+    item.pattern.setLsid(lsid);
+    return item;
 }
 
 }  // namespace mongo
