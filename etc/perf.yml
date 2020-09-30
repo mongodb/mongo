@@ -1137,6 +1137,7 @@ buildvariants:
     platform: linux
     infrastructure_provisioning: microbenchmarks
     mongodb_setup: microbenchmarks_standalone
+    canaries: none
     storageEngine: inMemory
     project_dir: &project_dir perf
   run_on:
@@ -1204,6 +1205,7 @@ buildvariants:
     platform: linux
     infrastructure_provisioning: microbenchmarks
     mongodb_setup: microbenchmarks_replica
+    canaries: none
     storageEngine: inMemory
     project_dir: *project_dir
   run_on:
