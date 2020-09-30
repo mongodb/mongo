@@ -48,10 +48,9 @@ namespace {
 /**
  * Manages Local KMS Information
  */
-class LocalKMSService : public KMSService {
+class LocalKMSService final : public KMSService {
 public:
     LocalKMSService(SymmetricKey key) : _key(std::move(key)) {}
-    ~LocalKMSService() final = default;
 
     static std::unique_ptr<KMSService> create(const LocalKMS& config);
 

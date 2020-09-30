@@ -95,10 +95,9 @@ struct AWSConfig {
 /**
  * Manages SSL information and config for how to talk to AWS KMS.
  */
-class AWSKMSService : public KMSService {
+class AWSKMSService final : public KMSService {
 public:
     AWSKMSService() = default;
-    ~AWSKMSService() final = default;
 
     static std::unique_ptr<KMSService> create(const AwsKMS& config);
 

@@ -200,7 +200,7 @@ struct CurlSlistFreeAll {
 };
 using CurlSlist = std::unique_ptr<curl_slist, CurlSlistFreeAll>;
 
-class CurlHttpClient : public HttpClient {
+class CurlHttpClient final : public HttpClient {
 public:
     CurlHttpClient() {
         // Initialize a base handle with common settings.
@@ -231,8 +231,6 @@ public:
         // curl_easy_setopt(_handle.get(), CURLOPT_VERBOSE, 1);
         // curl_easy_setopt(_handle.get(), CURLOPT_DEBUGFUNCTION , ???);
     }
-
-    ~CurlHttpClient() final = default;
 
     void allowInsecureHTTP(bool allow) final {
         if (allow) {

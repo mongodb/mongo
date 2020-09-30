@@ -84,7 +84,7 @@ auto makeTaskExecutor(ServiceContext* /*serviceContext*/) {
         std::make_unique<ThreadPool>(tpOptions), executor::makeNetworkInterface("FreeMonNet"));
 }
 
-class FreeMonNetworkHttp : public FreeMonNetworkInterface {
+class FreeMonNetworkHttp final : public FreeMonNetworkInterface {
 public:
     explicit FreeMonNetworkHttp(ServiceContext* serviceContext) {
         _executor = makeTaskExecutor(serviceContext);
@@ -95,7 +95,6 @@ public:
                              "Accept: application/octet-stream",
                              "Expect:"});
     }
-    ~FreeMonNetworkHttp() final = default;
 
     Future<FreeMonRegistrationResponse> sendRegistrationAsync(
         const FreeMonRegistrationRequest& req) override {

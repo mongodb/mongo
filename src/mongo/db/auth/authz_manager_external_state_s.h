@@ -43,7 +43,7 @@ namespace mongo {
 /**
  * The implementation of AuthzManagerExternalState functionality for mongos.
  */
-class AuthzManagerExternalStateMongos : public AuthzManagerExternalState {
+class AuthzManagerExternalStateMongos final : public AuthzManagerExternalState {
     AuthzManagerExternalStateMongos(const AuthzManagerExternalStateMongos&) = delete;
     AuthzManagerExternalStateMongos& operator=(const AuthzManagerExternalStateMongos&) = delete;
 

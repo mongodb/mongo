@@ -40,14 +40,12 @@ namespace mongo {
  *  Server side authentication session for SASL SCRAM-SHA-1/256.
  */
 template <typename Policy>
-class SaslSCRAMServerMechanism : public MakeServerMechanism<Policy> {
+class SaslSCRAMServerMechanism final : public MakeServerMechanism<Policy> {
 public:
     using HashBlock = typename Policy::HashBlock;
 
     explicit SaslSCRAMServerMechanism(std::string authenticationDatabase)
         : MakeServerMechanism<Policy>(std::move(authenticationDatabase)) {}
-
-    ~SaslSCRAMServerMechanism() final = default;
 
     /**
      * Take one step in a SCRAM-SHA-1 conversation.

@@ -217,7 +217,7 @@ private:
     T _payload;
 };
 
-class FreeMonNetworkInterfaceMock : public FreeMonNetworkInterface {
+class FreeMonNetworkInterfaceMock final : public FreeMonNetworkInterface {
 public:
     struct Options {
         // If sync = true, then execute the callback immediately and the subsequent future chain
@@ -241,7 +241,6 @@ public:
     explicit FreeMonNetworkInterfaceMock(executor::ThreadPoolTaskExecutor* threadPool,
                                          Options options)
         : _threadPool(threadPool), _options(options), _countdownMetrics(0) {}
-    ~FreeMonNetworkInterfaceMock() final = default;
 
     Future<FreeMonRegistrationResponse> sendRegistrationAsync(
         const FreeMonRegistrationRequest& req) final {
