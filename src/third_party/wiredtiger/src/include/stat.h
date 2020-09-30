@@ -359,6 +359,7 @@ struct __wt_connection_stats {
     int64_t cache_eviction_walks_gave_up_no_targets;
     int64_t cache_eviction_walks_gave_up_ratio;
     int64_t cache_eviction_walks_ended;
+    int64_t cache_eviction_walk_restart;
     int64_t cache_eviction_walk_from_root;
     int64_t cache_eviction_walk_saved_pos;
     int64_t cache_eviction_active_workers;
@@ -835,6 +836,7 @@ struct __wt_dsrc_stats {
     int64_t cache_eviction_walks_gave_up_no_targets;
     int64_t cache_eviction_walks_gave_up_ratio;
     int64_t cache_eviction_walks_ended;
+    int64_t cache_eviction_walk_restart;
     int64_t cache_eviction_walk_from_root;
     int64_t cache_eviction_walk_saved_pos;
     int64_t cache_eviction_hazard;
