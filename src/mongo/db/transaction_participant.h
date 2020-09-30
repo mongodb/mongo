@@ -319,6 +319,10 @@ public:
             return o().txnState.isInProgress();
         }
 
+        bool transactionIsInRetryableWriteMode() const {
+            return o().txnState.isInRetryableWriteMode();
+        }
+
         /**
          * If this session is holding stashed locks in txnResourceStash, reports the current state
          * of the session using the provided builder.
@@ -425,13 +429,14 @@ public:
                                                        TxnNumber txnNumber);
 
         /**
-         * If the participant is in prepare, returns a future whose promise is fulfilled when the
-         * participant transitions out of prepare.
+         * If the participant is in prepare, returns a future whose promise is fulfilled when
+         * the participant transitions out of prepare.
          *
          * If the participant is not in prepare, returns an immediately ready future.
          *
-         * The caller should not wait on the future with the session checked out, since that will
-         * prevent the promise from being able to be fulfilled, i.e., will cause a deadlock.
+         * The caller should not wait on the future with the session checked out, since that
+         * will prevent the promise from being able to be fulfilled, i.e., will cause a
+         * deadlock.
          */
         SharedSemiFuture<void> onExitPrepare() const;
 
@@ -554,9 +559,13 @@ public:
          * Throws if the session has been invalidated or the active transaction number is newer than
          * the one specified.
          */
-        void onMigrateCompletedOnPrimary(OperationContext* opCtx,
-                                         std::vector<StmtId> stmtIdsWritten,
-                                         const SessionTxnRecord& sessionTxnRecord);
+        void onRetryableWriteCloningCompleted(OperationContext* opCtx,
+                                              std::vector<StmtId> stmtIdsWritten,
+                                              const SessionTxnRecord& sessionTxnRecord);
+
+        void onTxnMigrateCompletedOnPrimary(OperationContext* opCtx,
+                                            std::vector<StmtId> stmtIdsWritten,
+                                            const SessionTxnRecord& sessionTxnRecord);
 
         /**
          * Checks whether the given statementId for the specified transaction has already executed

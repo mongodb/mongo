@@ -288,7 +288,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
                 sessionTxnRecord.setLastWriteOpTime(oplogOpTime);
                 sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
                 // We do not migrate transaction oplog entries so don't set the txn state.
-                txnParticipant.onMigrateCompletedOnPrimary(opCtx, {stmtId}, sessionTxnRecord);
+                txnParticipant.onRetryableWriteCloningCompleted(opCtx, {stmtId}, sessionTxnRecord);
             }
 
             wunit.commit();

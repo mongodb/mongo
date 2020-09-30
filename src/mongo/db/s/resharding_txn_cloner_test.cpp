@@ -34,11 +34,16 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/pipeline/document_source_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/resharding_txn_cloner.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/unittest.h"
@@ -57,6 +62,12 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
         }
 
         WaitForMajorityService::get(getServiceContext()).setUp(getServiceContext());
+
+        // onStepUp() relies on the storage interface to create the config.transactions table.
+        repl::StorageInterface::set(getServiceContext(),
+                                    std::make_unique<repl::StorageInterfaceImpl>());
+        MongoDSessionCatalog::onStepUp(operationContext());
+        LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
     }
 
     void tearDown() {
@@ -109,6 +120,87 @@ protected:
         ;
     }
 
+    void onCommandReturnTxns(std::vector<BSONObj> firstBatch, std::vector<BSONObj> secondBatch) {
+        CursorId cursorId(0);
+        if (secondBatch.size() > 0) {
+            cursorId = 123;
+        }
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            return CursorResponse(
+                       NamespaceString::kSessionTransactionsTableNamespace, cursorId, firstBatch)
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+
+        if (secondBatch.size() == 0) {
+            return;
+        }
+
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            return CursorResponse(NamespaceString::kSessionTransactionsTableNamespace,
+                                  CursorId{0},
+                                  secondBatch)
+                .toBSON(CursorResponse::ResponseType::SubsequentResponse);
+        });
+    }
+
+    void seedTransactionOnRecipient(LogicalSessionId sessionId,
+                                    TxnNumber txnNum,
+                                    bool multiDocTxn) {
+        auto opCtx = operationContext();
+        opCtx->setLogicalSessionId(sessionId);
+        opCtx->setTxnNumber(txnNum);
+
+        if (multiDocTxn) {
+            opCtx->setInMultiDocumentTransaction();
+        }
+
+        MongoDOperationContextSession ocs(opCtx);
+
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+        ASSERT(txnParticipant);
+        if (multiDocTxn) {
+            txnParticipant.beginOrContinue(opCtx, txnNum, false, true);
+        } else {
+            txnParticipant.beginOrContinue(opCtx, txnNum, boost::none, boost::none);
+        }
+    }
+
+    void checkTxnHasBeenUpdated(LogicalSessionId sessionId, TxnNumber txnNum) {
+        DBDirectClient client(operationContext());
+        auto bsonOplog =
+            client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                           BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()));
+        ASSERT(!bsonOplog.isEmpty());
+        auto oplogEntry = repl::MutableOplogEntry::parse(bsonOplog).getValue();
+        ASSERT_EQ(oplogEntry.getTxnNumber().get(), txnNum);
+        ASSERT_BSONOBJ_EQ(oplogEntry.getObject(), BSON("$sessionMigrateInfo" << 1));
+        ASSERT_BSONOBJ_EQ(oplogEntry.getObject2().get(), BSON("$incompleteOplogHistory" << 1));
+        ASSERT(oplogEntry.getOpType() == repl::OpTypeEnum::kNoop);
+
+        auto bsonTxn =
+            client.findOne(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                           {BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON())});
+        ASSERT(!bsonTxn.isEmpty());
+        auto txn = SessionTxnRecord::parse(
+            IDLParserErrorContext("resharding config transactions cloning test"), bsonTxn);
+        ASSERT_EQ(txn.getTxnNum(), txnNum);
+        ASSERT_EQ(txn.getLastWriteOpTime(), oplogEntry.getOpTime());
+    }
+    void checkTxnHasNotBeenUpdated(LogicalSessionId sessionId, TxnNumber txnNum) {
+        auto opCtx = operationContext();
+        opCtx->setLogicalSessionId(sessionId);
+        MongoDOperationContextSession ocs(opCtx);
+        auto txnParticipant = TransactionParticipant::get(opCtx);
+
+        DBDirectClient client(operationContext());
+        auto bsonOplog =
+            client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                           BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()));
+
+        ASSERT_BSONOBJ_EQ(bsonOplog, {});
+        ASSERT_EQ(txnParticipant.getActiveTxnNumber(), txnNum);
+    }
+
 private:
     static HostAndPort makeHostAndPort(const ShardId& shardId) {
         return HostAndPort(str::stream() << shardId << ":123");
@@ -126,30 +218,18 @@ TEST_F(ReshardingTxnClonerTest, TxnAggregation) {
                                          kTwoShardIdList[1],
                                          Timestamp::max(),
                                          boost::none,
-                                         [&](StatusWith<BSONObj> statusWithTransaction) {
-                                             auto transaction =
-                                                 unittest::assertGet(statusWithTransaction);
+                                         [&](OperationContext* opCtx, BSONObj transaction) {
                                              retrievedTransactions.push_back(transaction);
-                                         });
+                                         },
+                                         nullptr);
 
         fetcher->join();
     });
 
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        return CursorResponse(NamespaceString::kSessionTransactionsTableNamespace,
-                              CursorId{123},
-                              std::vector<BSONObj>(expectedTransactions.begin(),
-                                                   expectedTransactions.begin() + 4))
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
-    });
+    onCommandReturnTxns(
+        std::vector<BSONObj>(expectedTransactions.begin(), expectedTransactions.begin() + 4),
+        std::vector<BSONObj>(expectedTransactions.begin() + 4, expectedTransactions.end()));
 
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        return CursorResponse(NamespaceString::kSessionTransactionsTableNamespace,
-                              CursorId{0},
-                              std::vector<BSONObj>(expectedTransactions.begin() + 4,
-                                                   expectedTransactions.end()))
-            .toBSON(CursorResponse::ResponseType::SubsequentResponse);
-    });
 
     future.default_timed_get();
 
@@ -163,7 +243,6 @@ TEST_F(ReshardingTxnClonerTest, CursorNotFoundError) {
     std::vector<BSONObj> expectedTransactions{
         makeTxn(), makeTxn(), makeTxn(), makeTxn(), makeTxn(), makeTxn(), makeTxn()};
     std::vector<BSONObj> retrievedTransactions;
-    int errorsReturned = 0;
     Status error = Status::OK();
 
     auto future = launchAsync([&, this] {
@@ -172,20 +251,14 @@ TEST_F(ReshardingTxnClonerTest, CursorNotFoundError) {
             kTwoShardIdList[1],
             Timestamp::max(),
             boost::none,
-            [&](StatusWith<BSONObj> statusWithTransaction) {
-                if (statusWithTransaction.isOK()) {
-                    retrievedTransactions.push_back(statusWithTransaction.getValue());
-                } else {
-                    errorsReturned++;
-                    error = statusWithTransaction.getStatus();
-                }
-            });
+            [&](auto opCtx, BSONObj transaction) { retrievedTransactions.push_back(transaction); },
+            &error);
         fetcher->join();
     });
 
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return CursorResponse(NamespaceString::kSessionTransactionsTableNamespace,
-                              CursorId{124},
+                              CursorId{123},
                               expectedTransactions)
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
@@ -200,8 +273,189 @@ TEST_F(ReshardingTxnClonerTest, CursorNotFoundError) {
                       expectedTransactions.end(),
                       retrievedTransactions.begin(),
                       [](BSONObj a, BSONObj b) { return a.binaryEqual(b); }));
-    ASSERT_EQ(errorsReturned, 1);
     ASSERT_EQ(error, ErrorCodes::CursorNotFound);
+}
+
+TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
+    Status status = Status::OK();
+
+    auto future = launchAsync([&, this] {
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoShardIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    &status);
+        fetcher->join();
+    });
+    const auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber txnNum = 3;
+
+    onCommandReturnTxns(
+        {SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now()).toBSON()}, {});
+
+    future.default_timed_get();
+
+    ASSERT(status.isOK());
+    checkTxnHasBeenUpdated(sessionId, txnNum);
+}
+
+TEST_F(ReshardingTxnClonerTest, MergeUnParsableTxn) {
+    Status status = Status::OK();
+
+    auto future = launchAsync([&, this] {
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoShardIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    &status);
+        fetcher->join();
+    });
+    const auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber txnNum = 3;
+    onCommandReturnTxns({SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now())
+                             .toBSON()
+                             .removeField(SessionTxnRecord::kSessionIdFieldName)},
+                        {});
+
+    future.default_timed_get();
+
+    ASSERT_EQ(status.code(), 40414);
+}
+
+TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {
+    Status status = Status::OK();
+    const auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber donorTxnNum = 3;
+    TxnNumber recipientTxnNum = donorTxnNum - 1;
+
+    seedTransactionOnRecipient(sessionId, recipientTxnNum, true);
+
+    auto future = launchAsync([&, this] {
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoShardIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    &status);
+        fetcher->join();
+    });
+
+    onCommandReturnTxns(
+        {SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now()).toBSON()}, {});
+
+    future.default_timed_get();
+
+    ASSERT(status.isOK());
+    checkTxnHasBeenUpdated(sessionId, donorTxnNum);
+}
+
+TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverRetryableWriteTxn) {
+    Status status = Status::OK();
+    const auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber donorTxnNum = 3;
+    TxnNumber recipientTxnNum = donorTxnNum - 1;
+
+    seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
+
+    auto future = launchAsync([&, this] {
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoShardIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    &status);
+        fetcher->join();
+    });
+
+    onCommandReturnTxns(
+        {SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now()).toBSON()}, {});
+
+    future.default_timed_get();
+
+    ASSERT(status.isOK());
+    checkTxnHasBeenUpdated(sessionId, donorTxnNum);
+}
+
+TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverRetryableWriteTxn) {
+    Status status = Status::OK();
+    const auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber txnNum = 3;
+
+    seedTransactionOnRecipient(sessionId, txnNum, false);
+
+    auto future = launchAsync([&, this] {
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoShardIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    &status);
+        fetcher->join();
+    });
+
+    onCommandReturnTxns(
+        {SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now()).toBSON()}, {});
+
+    future.default_timed_get();
+
+    ASSERT(status.isOK());
+    checkTxnHasBeenUpdated(sessionId, txnNum);
+}
+
+TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverMultiDocTxn) {
+    Status status = Status::OK();
+    const auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber txnNum = 3;
+
+    seedTransactionOnRecipient(sessionId, txnNum, true);
+
+    auto future = launchAsync([&, this] {
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoShardIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    &status);
+        fetcher->join();
+    });
+
+    onCommandReturnTxns(
+        {SessionTxnRecord(sessionId, txnNum, repl::OpTime(), Date_t::now()).toBSON()}, {});
+
+    future.default_timed_get();
+
+    ASSERT(status.isOK());
+    checkTxnHasNotBeenUpdated(sessionId, txnNum);
+}
+
+
+TEST_F(ReshardingTxnClonerTest, MergeOldTxnOverTxn) {
+    Status status = Status::OK();
+    const auto sessionId = makeLogicalSessionIdForTest();
+    TxnNumber recipientTxnNum = 3;
+    TxnNumber donorTxnNum = recipientTxnNum - 1;
+
+    seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
+
+    auto future = launchAsync([&, this] {
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoShardIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    &status);
+        fetcher->join();
+    });
+
+    onCommandReturnTxns(
+        {SessionTxnRecord(sessionId, donorTxnNum, repl::OpTime(), Date_t::now()).toBSON()}, {});
+
+    future.default_timed_get();
+
+    ASSERT(status.isOK());
+    checkTxnHasNotBeenUpdated(sessionId, recipientTxnNum);
 }
 
 }  // namespace

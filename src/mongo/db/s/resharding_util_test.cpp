@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/s/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -1098,7 +1099,9 @@ class ReshardingTxnCloningPipelineTest : public AggregationContextFixture {
 
 protected:
     std::pair<std::deque<DocumentSource::GetNextResult>, std::deque<SessionTxnRecord>>
-    makeTransactions(size_t numTransactions, std::function<Timestamp(size_t)> getTimestamp) {
+    makeTransactions(size_t numTransactions,
+                     std::function<Timestamp(size_t)> getTimestamp,
+                     bool includeMultiDocTransaction = false) {
         std::deque<DocumentSource::GetNextResult> mockResults;
         std::deque<SessionTxnRecord>
             expectedTransactions;  // this will hold the expected result for this test
@@ -1107,6 +1110,14 @@ protected:
                 makeLogicalSessionIdForTest(), 0, repl::OpTime(getTimestamp(i), 0), Date_t());
             mockResults.emplace_back(Document(transaction.toBSON()));
             expectedTransactions.emplace_back(transaction);
+        }
+        if (includeMultiDocTransaction) {
+            auto transaction = SessionTxnRecord(makeLogicalSessionIdForTest(),
+                                                0,
+                                                repl::OpTime(getTimestamp(numTransactions), 0),
+                                                Date_t());
+            transaction.setState(DurableTxnStateEnum::kInProgress);
+            mockResults.emplace_back(Document(transaction.toBSON()));
         }
         std::sort(expectedTransactions.begin(),
                   expectedTransactions.end(),
@@ -1187,6 +1198,15 @@ TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineAfterID) {
     expectedTransactions.erase(expectedTransactions.begin(), middleTransaction + 1);
 
     auto pipeline = constructPipeline(mockResults, Timestamp::max(), middleTransactionSessionId);
+
+    ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
+}
+
+TEST_F(ReshardingTxnCloningPipelineTest, TxnPipelineOnlyRetryableWrites) {
+    auto [mockResults, expectedTransactions] =
+        makeTransactions(10, [](size_t) { return Timestamp::min(); }, true);
+
+    auto pipeline = constructPipeline(mockResults, Timestamp::max(), boost::none);
 
     ASSERT(pipelineMatchesDeque(pipeline, expectedTransactions));
 }

@@ -37,6 +37,24 @@
 
 namespace mongo {
 
+
+/**
+ * Create pipeline stages for iterating donor config.transactions.  The pipeline has these stages:
+ * pipeline: [
+ *      {$match: {_id: {$gt: <startAfter>}, state: {$exists: false}}},
+ *      {$sort: {_id: 1}},
+ *      {$match: {"lastWriteOpTime.ts": {$lt: <fetchTimestamp>}}},
+ * ],
+ * Note that the caller is responsible for making sure that the transactions ns is set in the
+ * expCtx.
+ *
+ * fetchTimestamp never isNull()
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResharding(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    Timestamp fetchTimestamp,
+    boost::optional<LogicalSessionId> startAfter);
+
 /**
  * Clone config.transactions from source and updates the config.transactions on itself.
  * The parameter merge is a function called on every transaction received and should be used
@@ -49,6 +67,12 @@ std::unique_ptr<Fetcher> cloneConfigTxnsForResharding(
     const ShardId& shardId,
     Timestamp fetchTimestamp,
     boost::optional<LogicalSessionId> startAfter,
-    std::function<void(StatusWith<BSONObj>)> merge);
+    std::function<void(OperationContext*, BSONObj)> merge,
+    Status* status);
+
+/**
+ * Callback function to be used to merge transactions cloned by cloneConfigTxnsForResharding
+ */
+void configTxnsMergerForResharding(OperationContext* opCtx, BSONObj donorBsonTransaction);
 
 }  // namespace mongo

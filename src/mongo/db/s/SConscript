@@ -126,6 +126,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/future_util',
+        'resharding_txn_cloner',
         'resharding_util',
     ],
 )
@@ -133,7 +134,6 @@ env.Library(
 env.Library(
     target='resharding_util',
     source=[
-        'resharding_txn_cloner.cpp',
         'resharding_util.cpp',
         env.Idlc('resharding/coordinator_document.idl')[0],
         env.Idlc('resharding/donor_document.idl')[0],
@@ -149,6 +149,30 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/expression_context',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/mongo/s/async_requests_sender',
+        '$BUILD_DIR/mongo/s/common_s',
+        '$BUILD_DIR/mongo/s/grid',
+        'sharding_api_d',
+
+    ],
+)
+
+env.Library(
+    target='resharding_txn_cloner',
+    source=[
+        'resharding_txn_cloner.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/concurrency/write_conflict_exception',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/pipeline/expression_context',
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/repl/oplog',
+        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/grid',
@@ -356,6 +380,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'balancer',
+        'resharding_txn_cloner',
         'resharding_util',
         'sharding_runtime_d',
     ],
@@ -466,6 +491,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
+        'resharding_txn_cloner',
         'resharding_util',
         'shard_server_test_fixture',
         'sharding_logging',
@@ -559,6 +585,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/version_impl',
         'balancer',
         'config_server_test_fixture',
+        'resharding_txn_cloner',
         'resharding_util',
     ],
 )

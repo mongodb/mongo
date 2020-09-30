@@ -2250,7 +2250,7 @@ void TransactionParticipant::Participant::onWriteOpCompletedOnPrimary(
         opCtx, std::move(stmtIdsWritten), sessionTxnRecord.getLastWriteOpTime());
 }
 
-void TransactionParticipant::Participant::onMigrateCompletedOnPrimary(
+void TransactionParticipant::Participant::onRetryableWriteCloningCompleted(
     OperationContext* opCtx,
     std::vector<StmtId> stmtIdsWritten,
     const SessionTxnRecord& sessionTxnRecord) {
