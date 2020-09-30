@@ -109,7 +109,7 @@ RecordId Helpers::findOne(OperationContext* opCtx,
 
     size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
     auto exec = uassertStatusOK(getExecutor(
-        opCtx, collection, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, options));
+        opCtx, &collection, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, options));
 
     PlanExecutor::ExecState state;
     BSONObj obj;
@@ -188,7 +188,7 @@ bool Helpers::getSingleton(OperationContext* opCtx, const char* ns, BSONObj& res
     const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
 
     auto exec = InternalPlanner::collectionScan(
-        opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        opCtx, ns, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     CurOp::get(opCtx)->done();
@@ -210,7 +210,7 @@ bool Helpers::getLast(OperationContext* opCtx, const char* ns, BSONObj& result) 
     const auto& collection = getCollectionForRead(opCtx, NamespaceString(ns), autoColl, autoOplog);
 
     auto exec = InternalPlanner::collectionScan(
-        opCtx, ns, collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
+        opCtx, ns, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD, InternalPlanner::BACKWARD);
     PlanExecutor::ExecState state = exec->getNext(&result, nullptr);
 
     // Non-yielding collection scans from InternalPlanner will never error.

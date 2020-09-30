@@ -73,7 +73,7 @@ public:
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> collectionScan(
         OperationContext* opCtx,
         StringData ns,
-        const CollectionPtr& collection,
+        const CollectionPtr* collection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         const Direction direction = FORWARD,
         boost::optional<RecordId> resumeAfterRecordId = boost::none);
@@ -83,7 +83,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithCollectionScan(
         OperationContext* opCtx,
-        const CollectionPtr& collection,
+        const CollectionPtr* collection,
         std::unique_ptr<DeleteStageParams> params,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD);
@@ -93,7 +93,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> indexScan(
         OperationContext* opCtx,
-        const CollectionPtr& collection,
+        const CollectionPtr* collection,
         const IndexDescriptor* descriptor,
         const BSONObj& startKey,
         const BSONObj& endKey,
@@ -107,7 +107,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> deleteWithIndexScan(
         OperationContext* opCtx,
-        const CollectionPtr& collection,
+        const CollectionPtr* collection,
         std::unique_ptr<DeleteStageParams> params,
         const IndexDescriptor* descriptor,
         const BSONObj& startKey,
@@ -121,7 +121,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> updateWithIdHack(
         OperationContext* opCtx,
-        const CollectionPtr& collection,
+        const CollectionPtr* collection,
         const UpdateStageParams& params,
         const IndexDescriptor* descriptor,
         const BSONObj& key,
@@ -136,7 +136,7 @@ private:
     static std::unique_ptr<PlanStage> _collectionScan(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
-        const CollectionPtr& collection,
+        const CollectionPtr* collection,
         Direction direction,
         boost::optional<RecordId> resumeAfterRecordId = boost::none);
 
@@ -148,7 +148,7 @@ private:
     static std::unique_ptr<PlanStage> _indexScan(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         WorkingSet* ws,
-        const CollectionPtr& collection,
+        const CollectionPtr* collection,
         const IndexDescriptor* descriptor,
         const BSONObj& startKey,
         const BSONObj& endKey,

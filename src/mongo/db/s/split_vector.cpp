@@ -163,7 +163,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         long long numChunks = 0;
 
         auto exec = InternalPlanner::indexScan(opCtx,
-                                               collection.getCollection(),
+                                               &collection.getCollection(),
                                                idx,
                                                minKey,
                                                maxKey,
@@ -181,7 +181,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         BSONObj maxKeyInChunk;
         {
             auto exec = InternalPlanner::indexScan(opCtx,
-                                                   collection.getCollection(),
+                                                   &collection.getCollection(),
                                                    idx,
                                                    maxKey,
                                                    minKey,
@@ -298,7 +298,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                   "keyCount"_attr = keyCount);
 
             exec = InternalPlanner::indexScan(opCtx,
-                                              collection.getCollection(),
+                                              &collection.getCollection(),
                                               idx,
                                               minKey,
                                               maxKey,

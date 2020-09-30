@@ -304,7 +304,7 @@ public:
             const CollectionPtr& coll = ctx->getCollection();
 
             auto exec = uassertStatusOK(getExecutor(opCtx,
-                                                    coll,
+                                                    &coll,
                                                     std::move(cq),
                                                     PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
                                                     QueryPlannerParams::NO_TABLE_SCAN));
@@ -389,7 +389,7 @@ public:
                     }
 
                     // Now that we have the lock again, we can restore the PlanExecutor.
-                    exec->restoreState(&coll);
+                    exec->restoreState(&ctx->getCollection());
                 }
             } catch (DBException& exception) {
                 exception.addContext("Executor error during filemd5 command");

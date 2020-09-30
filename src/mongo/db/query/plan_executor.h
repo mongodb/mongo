@@ -37,6 +37,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/restore_context.h"
 
 namespace mongo {
 
@@ -180,6 +181,10 @@ public:
      * Restores the state saved by a saveState() call. When this method returns successfully, the
      * execution tree can once again be executed via work().
      *
+     * RestoreContext is a context containing external state needed by plan stages to be able to
+     * restore into a valid state. The RequiresCollectionStage requires a valid CollectionPtr for
+     * example.
+     *
      * Throws a UserException if the state cannot be successfully restored (e.g. a collection was
      * dropped or the position of a capped cursor was lost during a yield). If restore fails, it is
      * only safe to call dispose(), detachFromOperationContext(), or the destructor.
@@ -188,7 +193,7 @@ public:
      * WriteConflictException is encountered. If the time limit is exceeded during this retry
      * process, throws ErrorCodes::MaxTimeMSExpired.
      */
-    virtual void restoreState(const Yieldable* yieldable) = 0;
+    virtual void restoreState(const RestoreContext& context) = 0;
 
     /**
      * Detaches from the OperationContext and releases any storage-engine state.

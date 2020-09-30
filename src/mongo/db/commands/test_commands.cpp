@@ -162,7 +162,7 @@ public:
             // end.
             auto exec = InternalPlanner::collectionScan(opCtx,
                                                         fullNs.ns(),
-                                                        collection.getCollection(),
+                                                        &collection.getCollection(),
                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                         InternalPlanner::BACKWARD);
 

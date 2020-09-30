@@ -219,7 +219,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
     // outside of the WriteUnitOfWork.
     try {
-        child()->restoreState();
+        child()->restoreState(&collection());
     } catch (const WriteConflictException&) {
         // Note we don't need to retry anything in this case since the delete already was committed.
         // However, we still need to return the deleted document (if it was requested).

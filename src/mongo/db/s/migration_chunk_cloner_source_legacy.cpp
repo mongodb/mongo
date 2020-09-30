@@ -824,7 +824,7 @@ MigrationChunkClonerSourceLegacy::_getIndexScanExecutor(OperationContext* opCtx,
     // We can afford to yield here because any change to the base data that we might miss is already
     // being queued and will migrate in the 'transferMods' stage.
     return InternalPlanner::indexScan(opCtx,
-                                      collection,
+                                      &collection,
                                       idx,
                                       min,
                                       max,

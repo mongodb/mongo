@@ -159,7 +159,7 @@ private:
 class DocumentSourceChangeStreamMock : public DocumentSourceMock {
 public:
     DocumentSourceChangeStreamMock(const boost::intrusive_ptr<ExpressionContextForTest>& expCtx)
-        : DocumentSourceMock({}, expCtx) {
+        : DocumentSourceMock({}, expCtx), _collectionPtr(&_collection) {
         _filterExpr = BSON("ns" << kTestNs);
         _filter = MatchExpressionParser::parseAndNormalize(_filterExpr, pExpCtx);
         _params.assertMinTsHasNotFallenOffOplog = true;
@@ -199,7 +199,7 @@ protected:
         // If this is the first call to doGetNext, we must create the COLLSCAN.
         if (!_collScan) {
             _collScan = std::make_unique<CollectionScan>(
-                pExpCtx.get(), &_collection, _params, &_ws, _filter.get());
+                pExpCtx.get(), _collectionPtr, _params, &_ws, _filter.get());
             // The first call to doWork will create the cursor and return NEED_TIME. But it won't
             // actually scan any of the documents that are present in the mock cursor queue.
             ASSERT_EQ(_collScan->doWork(nullptr), PlanStage::NEED_TIME);
@@ -239,6 +239,7 @@ private:
     }
 
     ChangeStreamOplogCollectionMock _collection;
+    CollectionPtr _collectionPtr;
     std::unique_ptr<CollectionScan> _collScan;
     CollectionScanParams _params;
 

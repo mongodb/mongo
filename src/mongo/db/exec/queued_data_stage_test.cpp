@@ -112,7 +112,7 @@ TEST_F(QueuedDataStageTest, ValidateStats) {
     ASSERT_EQUALS(stats->yields, 1U);
 
     // unyields
-    mock->restoreState();
+    mock->restoreState({});
     ASSERT_EQUALS(stats->unyields, 1U);
 
 

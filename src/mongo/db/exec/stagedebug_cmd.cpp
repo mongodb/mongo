@@ -183,7 +183,7 @@ public:
             plan_executor_factory::make(expCtx,
                                         std::move(ws),
                                         std::move(rootFetch),
-                                        collection,
+                                        &collection,
                                         PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         fassert(28536, statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());

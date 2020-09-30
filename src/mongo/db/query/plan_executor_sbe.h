@@ -62,7 +62,7 @@ public:
     }
 
     void saveState();
-    void restoreState(const Yieldable* yieldable);
+    void restoreState(const RestoreContext& context);
 
     void detachFromOperationContext();
     void reattachToOperationContext(OperationContext* opCtx);

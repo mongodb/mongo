@@ -516,7 +516,7 @@ public:
                 opCtx->recoveryUnit()->setReadOnce(true);
             }
             exec->reattachToOperationContext(opCtx);
-            exec->restoreState(nullptr);
+            exec->restoreState(readLock ? &readLock->getCollection() : nullptr);
 
             auto planSummary = exec->getPlanExplainer().getPlanSummary();
             {
@@ -584,10 +584,10 @@ public:
             // of this operation's CurOp to signal that we've hit this point and then spin until the
             // failpoint is released.
             std::function<void()> saveAndRestoreStateWithReadLockReacquisition =
-                [exec, dropAndReacquireReadLock]() {
+                [exec, dropAndReacquireReadLock, &readLock]() {
                     exec->saveState();
                     dropAndReacquireReadLock();
-                    exec->restoreState(nullptr);
+                    exec->restoreState(&readLock->getCollection());
                 };
 
             waitWithPinnedCursorDuringGetMoreBatch.execute([&](const BSONObj& data) {

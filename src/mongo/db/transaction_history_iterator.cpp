@@ -88,7 +88,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
         Date_t::max());
 
     auto exec = uassertStatusOK(
-        getExecutorFind(opCtx, oplogRead.getCollection(), std::move(cq), permitYield));
+        getExecutorFind(opCtx, &oplogRead.getCollection(), std::move(cq), permitYield));
 
     PlanExecutor::ExecState getNextResult;
     try {

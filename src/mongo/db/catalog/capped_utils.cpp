@@ -121,7 +121,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                              const NamespaceString& toNss,
                              long long size,
                              bool temp) {
-    const CollectionPtr& fromCollection =
+    CollectionPtr fromCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss);
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
@@ -160,7 +160,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         uassertStatusOK(createCollection(opCtx, toNss.db().toString(), cmd.done()));
     }
 
-    const CollectionPtr& toCollection =
+    CollectionPtr toCollection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
     invariant(toCollection);  // we created above
 
@@ -176,7 +176,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     auto exec =
         InternalPlanner::collectionScan(opCtx,
                                         fromNss.ns(),
-                                        fromCollection,
+                                        &fromCollection,
                                         PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY,
                                         InternalPlanner::FORWARD);
 

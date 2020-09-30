@@ -90,6 +90,7 @@ protected:
         _source.reset();
 
         dbtests::WriteContextForTests ctx(opCtx(), nss.ns());
+        _coll = ctx.getCollection();
 
         auto qr = std::make_unique<QueryRequest>(nss);
         if (hint) {
@@ -97,15 +98,12 @@ protected:
         }
         auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
 
-        auto exec = uassertStatusOK(getExecutor(opCtx(),
-                                                ctx.getCollection(),
-                                                std::move(cq),
-                                                PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                0));
+        auto exec = uassertStatusOK(
+            getExecutor(opCtx(), &_coll, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, 0));
 
         exec->saveState();
         _source = DocumentSourceCursor::create(
-            ctx.getCollection(), std::move(exec), _ctx, DocumentSourceCursor::CursorType::kRegular);
+            _coll, std::move(exec), _ctx, DocumentSourceCursor::CursorType::kRegular);
     }
 
     intrusive_ptr<ExpressionContextForTest> ctx() {
@@ -134,6 +132,7 @@ private:
     // It is important that these are ordered to ensure correct destruction order.
     intrusive_ptr<ExpressionContextForTest> _ctx;
     intrusive_ptr<DocumentSourceCursor> _source;
+    CollectionPtr _coll;
 };
 
 /** Create a DocumentSourceCursor. */
@@ -318,7 +317,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
         uassertStatusOK(plan_executor_factory::make(std::move(canonicalQuery),
                                                     std::move(workingSet),
                                                     std::move(collectionScan),
-                                                    readLock.getCollection(),
+                                                    &readLock.getCollection(),
                                                     PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
@@ -359,7 +358,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
         uassertStatusOK(plan_executor_factory::make(std::move(canonicalQuery),
                                                     std::move(workingSet),
                                                     std::move(collectionScan),
-                                                    readLock.getCollection(),
+                                                    &readLock.getCollection(),
                                                     PlanYieldPolicy::YieldPolicy::ALWAYS_TIME_OUT));
 
     // Make a DocumentSourceCursor.
@@ -409,7 +408,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
         plan_executor_factory::make(std::move(canonicalQuery),
                                     std::move(workingSet),
                                     std::move(collectionScan),
-                                    readLock.getCollection(),
+                                    &readLock.getCollection(),
                                     PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.
@@ -449,7 +448,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
         plan_executor_factory::make(std::move(canonicalQuery),
                                     std::move(workingSet),
                                     std::move(collectionScan),
-                                    readLock.getCollection(),
+                                    &readLock.getCollection(),
                                     PlanYieldPolicy::YieldPolicy::ALWAYS_MARK_KILLED));
 
     // Make a DocumentSourceCursor.

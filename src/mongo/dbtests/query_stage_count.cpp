@@ -71,14 +71,15 @@ public:
         WriteUnitOfWork wunit(&_opCtx);
 
         _ctx.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
-        _coll = _ctx.db()->createCollection(&_opCtx, nss());
+        auto coll = _ctx.db()->createCollection(&_opCtx, nss());
 
-        _coll->getIndexCatalog()
+        coll->getIndexCatalog()
             ->createIndexOnEmptyCollection(&_opCtx,
                                            BSON("key" << BSON("x" << 1) << "name"
                                                       << "x_1"
                                                       << "v" << 1))
             .status_with_transitional_ignore();
+        _coll = coll;
 
         for (int i = 0; i < kDocuments; i++) {
             insert(BSON(GENOID << "x" << i));
@@ -190,14 +191,14 @@ public:
             }
 
             // Resume from yield.
-            countStage.restoreState();
+            countStage.restoreState(&_coll);
         }
 
         return static_cast<const CountStats*>(countStage.getSpecificStats());
     }
 
     IndexScan* createIndexScan(MatchExpression* expr, WorkingSet* ws) {
-        IndexCatalog* catalog = _coll->getIndexCatalog();
+        const IndexCatalog* catalog = _coll->getIndexCatalog();
         std::vector<const IndexDescriptor*> indexes;
         catalog->findIndexesByKeyPattern(&_opCtx, BSON("x" << 1), false, &indexes);
         ASSERT_EQ(indexes.size(), 1U);
@@ -237,7 +238,7 @@ protected:
     Lock::DBLock _dbLock;
     OldClientContext _ctx;
     boost::intrusive_ptr<ExpressionContext> _expCtx;
-    Collection* _coll;
+    CollectionPtr _coll;
 };
 
 class QueryStageCountNoChangeDuringYield : public CountStageTest {

@@ -461,8 +461,10 @@ private:
             // info is more accurate.
             AutoGetCollection collection(opCtx, _batch.getNamespace(), MODE_IX);
 
-            auto exec = uassertStatusOK(getExecutorUpdate(
-                &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedUpdate, verbosity));
+            auto exec = uassertStatusOK(getExecutorUpdate(&CurOp::get(opCtx)->debug(),
+                                                          &collection.getCollection(),
+                                                          &parsedUpdate,
+                                                          verbosity));
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(
                 exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);
@@ -556,8 +558,10 @@ private:
             AutoGetCollection collection(opCtx, _batch.getNamespace(), MODE_IX);
 
             // Explain the plan tree.
-            auto exec = uassertStatusOK(getExecutorDelete(
-                &CurOp::get(opCtx)->debug(), collection.getCollection(), &parsedDelete, verbosity));
+            auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),
+                                                          &collection.getCollection(),
+                                                          &parsedDelete,
+                                                          verbosity));
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(
                 exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);

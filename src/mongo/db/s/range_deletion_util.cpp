@@ -182,7 +182,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     }
 
     auto exec = InternalPlanner::deleteWithIndexScan(opCtx,
-                                                     collection,
+                                                     &collection,
                                                      std::move(deleteStageParams),
                                                      descriptor,
                                                      min,

@@ -79,7 +79,7 @@ public:
             plan_executor_factory::make(expCtx,
                                         std::move(workingSet),
                                         std::move(queuedDataStage),
-                                        nullptr,
+                                        &CollectionPtr::null,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                         kTestNss));
     }

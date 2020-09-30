@@ -603,7 +603,7 @@ public:
 
     // Creates a Yieldable CollectionPtr that reloads the Collection pointer from the catalog when
     // restoring from yield
-    CollectionPtr(OperationContext* opCtx, const Collection* collection, uint64_t catalogEpoch);
+    CollectionPtr(OperationContext* opCtx, const Collection* collection);
 
     // Creates non-yieldable CollectionPtr, performing yield/restore will be a no-op.
     struct NoYieldTag {};
@@ -648,7 +648,7 @@ public:
     void restore() const override;
 
     static void installCatalogLookupImpl(
-        std::function<CollectionPtr(OperationContext*, CollectionUUID, uint64_t)> impl);
+        std::function<CollectionPtr(OperationContext*, CollectionUUID)> impl);
 
     friend std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll);
 
@@ -659,9 +659,7 @@ private:
     // yield/restore to require a non-const instance when it otherwise could be const.
     mutable const Collection* _collection;
     mutable OptionalCollectionUUID _uuid;
-    mutable NamespaceString _ns;
     OperationContext* _opCtx;
-    uint64_t _catalogEpoch;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {

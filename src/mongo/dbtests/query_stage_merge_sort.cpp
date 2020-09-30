@@ -190,7 +190,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -259,7 +259,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -328,7 +328,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -403,7 +403,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -474,7 +474,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -532,7 +532,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -615,7 +615,7 @@ public:
         // stage, and therefore should still be returned.
         ms->saveState();
         remove(BSON(std::string(1u, 'a' + count) << 1));
-        ms->restoreState();
+        ms->restoreState(&coll);
 
         // Make sure recordIds[11] is returned as expected. We expect the corresponding working set
         // member to remain in RID_AND_IDX state. It should have been marked as "suspicious", since
@@ -740,7 +740,7 @@ public:
         // Update doc {a: 5} such that the postimage will no longer match the query.
         ms->saveState();
         update(BSON("a" << 5), BSON("$set" << BSON("a" << 15)));
-        ms->restoreState();
+        ms->restoreState(&coll);
 
         // Invalidated doc {a: 5} should still get returned. We expect an RID_AND_OBJ working set
         // member with an owned BSONObj.
@@ -825,7 +825,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -900,7 +900,7 @@ public:
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
         auto statusWithPlanExecutor = plan_executor_factory::make(
-            _expCtx, std::move(ws), std::move(ms), coll, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+            _expCtx, std::move(ws), std::move(ms), &coll, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

@@ -260,7 +260,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
         plan_executor_factory::make(std::move(cq),
                                     std::move(sharedWs),
                                     std::move(mps),
-                                    coll,
+                                    &coll,
                                     PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -500,7 +500,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
         uassertStatusOK(plan_executor_factory::make(_expCtx,
                                                     std::move(ws),
                                                     std::move(mps),
-                                                    ctx.getCollection(),
+                                                    &ctx.getCollection(),
                                                     PlanYieldPolicy::YieldPolicy::NO_YIELD));
 
     auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
@@ -553,7 +553,7 @@ TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
     qr->setFilter(BSON("foo" << BSON("$gte" << 0)));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(qr)));
     auto exec = uassertStatusOK(
-        getExecutor(opCtx(), coll, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, 0));
+        getExecutor(opCtx(), &coll, std::move(cq), PlanYieldPolicy::YieldPolicy::NO_YIELD, 0));
 
     auto execImpl = dynamic_cast<PlanExecutorImpl*>(exec.get());
     ASSERT(execImpl);

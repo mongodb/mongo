@@ -82,8 +82,12 @@ public:
         data.resultSlot = resultSlot;
         data.recordIdSlot = recordIdSlot;
 
-        exec = uassertStatusOK(plan_executor_factory::make(
-            opCtx, nullptr, {std::move(root), std::move(data)}, nullptr, nss, nullptr));
+        exec = uassertStatusOK(plan_executor_factory::make(opCtx,
+                                                           nullptr,
+                                                           {std::move(root), std::move(data)},
+                                                           &CollectionPtr::null,
+                                                           nss,
+                                                           nullptr));
 
         for (long long objCount = 0; objCount < batchSize; objCount++) {
             BSONObj next;

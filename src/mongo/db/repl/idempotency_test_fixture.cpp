@@ -328,7 +328,7 @@ std::string IdempotencyTest::computeDataHash(const CollectionPtr& collection) {
     auto desc = collection->getIndexCatalog()->findIdIndex(_opCtx.get());
     ASSERT_TRUE(desc);
     auto exec = InternalPlanner::indexScan(_opCtx.get(),
-                                           collection,
+                                           &collection,
                                            desc,
                                            BSONObj(),
                                            BSONObj(),

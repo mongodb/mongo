@@ -1033,7 +1033,7 @@ void dropCollection(OperationContext* opCtx,
         // Performs a collection scan and writes all documents in the collection to disk
         // in order to keep an archive of items that were rolled back.
         auto exec = InternalPlanner::collectionScan(
-            opCtx, nss.toString(), collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+            opCtx, nss.toString(), &collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         PlanExecutor::ExecState execState;
         try {
             BSONObj curObj;

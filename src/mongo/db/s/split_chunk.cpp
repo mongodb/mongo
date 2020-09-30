@@ -66,7 +66,7 @@ bool checkIfSingleDoc(OperationContext* opCtx,
     BSONObj newmax = Helpers::toKeyFormat(kp.extendRangeBound(chunk->getMax(), true));
 
     auto exec = InternalPlanner::indexScan(opCtx,
-                                           collection,
+                                           &collection,
                                            idx,
                                            newmin,
                                            newmax,

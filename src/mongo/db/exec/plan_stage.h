@@ -36,6 +36,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/restore_context.h"
 
 namespace mongo {
 
@@ -255,11 +256,15 @@ public:
      *
      * Propagates to all children, then calls doRestoreState().
      *
+     * RestoreContext is a context containing external state needed by plan stages to be able to
+     * restore into a valid state. The RequiresCollectionStage requires a valid CollectionPtr for
+     * example.
+     *
      * Throws a UserException on failure to restore due to a conflicting event such as a
      * collection drop. May throw a WriteConflictException, in which case the caller may choose to
      * retry.
      */
-    void restoreState();
+    void restoreState(const RestoreContext& context);
 
     /**
      * Detaches from the OperationContext and releases any storage-engine state.
@@ -366,7 +371,7 @@ protected:
     /**
      * Restores any stage-specific saved state and prepares to handle calls to work().
      */
-    virtual void doRestoreState() {}
+    virtual void doRestoreState(const RestoreContext& context) {}
 
     /**
      * Does stage-specific detaching.

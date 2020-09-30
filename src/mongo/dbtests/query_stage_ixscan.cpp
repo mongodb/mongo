@@ -59,6 +59,7 @@ public:
 
         _ctx.db()->dropCollection(&_opCtx, nss()).transitional_ignore();
         _coll = _ctx.db()->createCollection(&_opCtx, nss());
+        _collPtr = _coll;
 
         ASSERT_OK(_coll->getIndexCatalog()->createIndexOnEmptyCollection(
             &_opCtx,
@@ -108,7 +109,7 @@ public:
 
         // This child stage gets owned and freed by the caller.
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), _coll, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), _collPtr, params, &_ws, filter);
     }
 
     IndexScan* createIndexScan(BSONObj startKey,
@@ -149,6 +150,7 @@ protected:
     Lock::DBLock _dbLock;
     OldClientContext _ctx;
     Collection* _coll;
+    CollectionPtr _collPtr;
 
     WorkingSet _ws;
 
@@ -201,7 +203,7 @@ public:
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
         insert(fromjson("{_id: 5, x: 11}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
@@ -234,7 +236,7 @@ public:
         // Save state and insert an indexed doc.
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 7}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         member = getNext(ixscan.get());
         ASSERT_EQ(WorkingSetMember::RID_AND_IDX, member->getState());
@@ -267,7 +269,7 @@ public:
         // Save state and insert an indexed doc.
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 10}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         // Ensure that we're EOF and we don't erroneously return {'': 12}.
         WorkingSetID id;
@@ -301,7 +303,7 @@ public:
         static_cast<PlanStage*>(ixscan.get())->saveState();
         insert(fromjson("{_id: 4, x: 6}"));
         insert(fromjson("{_id: 5, x: 9}"));
-        static_cast<PlanStage*>(ixscan.get())->restoreState();
+        static_cast<PlanStage*>(ixscan.get())->restoreState(&_collPtr);
 
         // Ensure that we don't erroneously return {'': 9} or {'':3}.
         member = getNext(ixscan.get());

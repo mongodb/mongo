@@ -68,7 +68,7 @@ public:
     const NamespaceString& nss() const final;
     OperationContext* getOpCtx() const final;
     void saveState() final;
-    void restoreState(const Yieldable* yieldable) final;
+    void restoreState(const RestoreContext& context) final;
     void detachFromOperationContext() final;
     void reattachToOperationContext(OperationContext* opCtx) final;
     ExecState getNextDocument(Document* objOut, RecordId* dlOut) final;
@@ -94,7 +94,7 @@ public:
      *
      * This is only public for PlanYieldPolicy. DO NOT CALL ANYWHERE ELSE.
      */
-    void restoreStateWithoutRetrying(const Yieldable* yieldable);
+    void restoreStateWithoutRetrying(const RestoreContext& context, const Yieldable* yieldable);
 
     /**
      * Return a pointer to this executor's MultiPlanStage, or nullptr if it does not have one.

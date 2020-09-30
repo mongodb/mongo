@@ -69,25 +69,23 @@ bool CappedInsertNotifier::isDead() {
 
 // We can't reference the catalog from this library as it would create a cyclic library dependency.
 // Setup a weak dependency using a std::function that is installed by the catalog lib
-std::function<CollectionPtr(OperationContext*, CollectionUUID, uint64_t)>& _catalogLookup() {
-    static std::function<CollectionPtr(OperationContext*, CollectionUUID, uint64_t)> func;
+std::function<CollectionPtr(OperationContext*, CollectionUUID)>& _catalogLookup() {
+    static std::function<CollectionPtr(OperationContext*, CollectionUUID)> func;
     return func;
 }
 
 void CollectionPtr::installCatalogLookupImpl(
-    std::function<CollectionPtr(OperationContext*, CollectionUUID, uint64_t)> impl) {
+    std::function<CollectionPtr(OperationContext*, CollectionUUID)> impl) {
     _catalogLookup() = std::move(impl);
 }
 
 CollectionPtr CollectionPtr::null;
 
 CollectionPtr::CollectionPtr() : _collection(nullptr), _opCtx(nullptr) {}
-CollectionPtr::CollectionPtr(OperationContext* opCtx,
-                             const Collection* collection,
-                             uint64_t catalogEpoch)
-    : _collection(collection), _opCtx(opCtx), _catalogEpoch(catalogEpoch) {}
+CollectionPtr::CollectionPtr(OperationContext* opCtx, const Collection* collection)
+    : _collection(collection), _opCtx(opCtx) {}
 CollectionPtr::CollectionPtr(const Collection* collection, NoYieldTag)
-    : CollectionPtr(nullptr, collection, 0) {}
+    : CollectionPtr(nullptr, collection) {}
 CollectionPtr::CollectionPtr(Collection* collection) : CollectionPtr(collection, NoYieldTag{}) {}
 CollectionPtr::CollectionPtr(const std::shared_ptr<const Collection>& collection)
     : CollectionPtr(collection.get(), NoYieldTag{}) {}
@@ -96,7 +94,7 @@ CollectionPtr::~CollectionPtr() {}
 CollectionPtr& CollectionPtr::operator=(CollectionPtr&&) = default;
 
 CollectionPtr CollectionPtr::detached() const {
-    return CollectionPtr(_opCtx, _collection, _catalogEpoch);
+    return CollectionPtr(_opCtx, _collection);
 }
 
 bool CollectionPtr::_canYield() const {
@@ -110,7 +108,6 @@ void CollectionPtr::yield() const {
     // Yield if we are yieldable and have a valid collection
     if (_canYield() && _collection) {
         _uuid = _collection->uuid();
-        _ns = _collection->ns();
         _collection = nullptr;
     }
 }
@@ -119,8 +116,8 @@ void CollectionPtr::restore() const {
     if (_canYield() && _uuid) {
         // We may only do yield restore when we were holding locks that was yielded so we need to
         // refresh from the catalog to make sure we have a valid collection pointer.
-        auto coll = _catalogLookup()(_opCtx, *_uuid, _catalogEpoch);
-        if (coll && coll->ns() == _ns) {
+        auto coll = _catalogLookup()(_opCtx, *_uuid);
+        if (coll) {
             _collection = coll.get();
         }
         _uuid.reset();

@@ -172,7 +172,7 @@ public:
         BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
         ASSERT(!targetDoc.isEmpty());
         remove(targetDoc);
-        static_cast<PlanStage*>(&deleteStage)->restoreState();
+        static_cast<PlanStage*>(&deleteStage)->restoreState(&coll);
 
         // Remove the rest.
         while (!deleteStage.isEOF()) {

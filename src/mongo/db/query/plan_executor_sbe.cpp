@@ -108,7 +108,7 @@ void PlanExecutorSBE::saveState() {
     _root->saveState();
 }
 
-void PlanExecutorSBE::restoreState(const Yieldable* yieldable) {
+void PlanExecutorSBE::restoreState(const RestoreContext& context) {
     invariant(_root);
     _root->restoreState();
 }

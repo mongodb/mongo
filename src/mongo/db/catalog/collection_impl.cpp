@@ -1280,7 +1280,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
     return InternalPlanner::collectionScan(opCtx,
                                            yieldableCollection->ns().ns(),
-                                           yieldableCollection,
+                                           &yieldableCollection,
                                            yieldPolicy,
                                            direction,
                                            resumeAfterRecordId);

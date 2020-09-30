@@ -157,7 +157,7 @@ public:
 
 
                 auto exec = InternalPlanner::indexScan(opCtx,
-                                                       collection,
+                                                       &collection,
                                                        ham->_descriptor,
                                                        key,
                                                        key,

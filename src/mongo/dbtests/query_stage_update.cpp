@@ -275,7 +275,7 @@ public:
             CurOp& curOp = *CurOp::get(_opCtx);
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
-            const CollectionPtr& coll =
+            CollectionPtr coll =
                 CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
             ASSERT(coll);
 
@@ -335,7 +335,7 @@ public:
             BSONObj targetDoc = coll->docFor(&_opCtx, recordIds[targetDocIndex]).value();
             ASSERT(!targetDoc.isEmpty());
             remove(targetDoc);
-            static_cast<PlanStage*>(updateStage.get())->restoreState();
+            static_cast<PlanStage*>(updateStage.get())->restoreState(&coll);
 
             // Do the remaining updates.
             while (!updateStage->isEOF()) {

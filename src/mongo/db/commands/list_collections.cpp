@@ -373,7 +373,7 @@ public:
                 uassertStatusOK(plan_executor_factory::make(expCtx,
                                                             std::move(ws),
                                                             std::move(root),
-                                                            nullptr,
+                                                            &CollectionPtr::null,
                                                             PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                             cursorNss));
 

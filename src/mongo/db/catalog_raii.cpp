@@ -157,27 +157,21 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
         class WritableCollectionReset : public RecoveryUnit::Change {
         public:
             WritableCollectionReset(AutoGetCollection& autoColl,
-                                    const CollectionPtr& rollbackCollection,
-                                    uint64_t catalogEpoch)
-                : _autoColl(autoColl),
-                  _rollbackCollection(rollbackCollection.get()),
-                  _catalogEpoch(catalogEpoch) {}
+                                    const CollectionPtr& rollbackCollection)
+                : _autoColl(autoColl), _rollbackCollection(rollbackCollection.get()) {}
             void commit(boost::optional<Timestamp> commitTime) final {
                 // Restore coll to a yieldable collection
-                _autoColl._coll = {
-                    _autoColl.getOperationContext(), _autoColl._coll.get(), _catalogEpoch};
+                _autoColl._coll = {_autoColl.getOperationContext(), _autoColl._coll.get()};
                 _autoColl._writableColl = nullptr;
             }
             void rollback() final {
-                _autoColl._coll = {
-                    _autoColl.getOperationContext(), _rollbackCollection, _catalogEpoch};
+                _autoColl._coll = {_autoColl.getOperationContext(), _rollbackCollection};
                 _autoColl._writableColl = nullptr;
             }
 
         private:
             AutoGetCollection& _autoColl;
             const Collection* _rollbackCollection;
-            uint64_t _catalogEpoch;
         };
 
         auto& catalog = CollectionCatalog::get(_opCtx);
@@ -185,7 +179,7 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
             catalog.lookupCollectionByNamespaceForMetadataWrite(_opCtx, mode, _resolvedNss);
         if (mode == CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork) {
             _opCtx->recoveryUnit()->registerChange(
-                std::make_unique<WritableCollectionReset>(*this, _coll, catalog.getEpoch()));
+                std::make_unique<WritableCollectionReset>(*this, _coll));
         }
 
         // Set to writable collection. We are no longer yieldable.

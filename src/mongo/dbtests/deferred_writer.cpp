@@ -119,7 +119,7 @@ public:
 
         auto plan = InternalPlanner::collectionScan(_opCtx.get(),
                                                     kTestNamespace.ns(),
-                                                    agc.getCollection(),
+                                                    &agc.getCollection(),
                                                     PlanYieldPolicy::YieldPolicy::NO_YIELD);
 
         std::vector<BSONObj> result;

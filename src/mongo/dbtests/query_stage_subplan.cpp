@@ -538,8 +538,8 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlanning)
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(
-        _expCtx.get(), ctx.getCollection(), &workingSet, params, canonicalQuery.get());
+    auto coll = ctx.getCollection();
+    SubplanStage subplanStage(_expCtx.get(), coll, &workingSet, params, canonicalQuery.get());
 
     AlwaysTimeOutYieldPolicy alwaysTimeOutPolicy(serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, subplanStage.pickBestPlan(&alwaysTimeOutPolicy));
@@ -563,8 +563,8 @@ TEST_F(QueryStageSubplanTest, ShouldReportErrorIfKilledDuringPlanning) {
 
     // Create the SubplanStage.
     WorkingSet workingSet;
-    SubplanStage subplanStage(
-        _expCtx.get(), ctx.getCollection(), &workingSet, params, canonicalQuery.get());
+    auto coll = ctx.getCollection();
+    SubplanStage subplanStage(_expCtx.get(), coll, &workingSet, params, canonicalQuery.get());
 
     AlwaysPlanKilledYieldPolicy alwaysPlanKilledYieldPolicy(serviceContext()->getFastClockSource());
     ASSERT_EQ(ErrorCodes::QueryPlanKilled, subplanStage.pickBestPlan(&alwaysPlanKilledYieldPolicy));
@@ -611,11 +611,13 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     // Attempt to restore state. This should throw due the index drop. As a future improvement, we
     // may wish to make the subplan stage tolerate drops of indices it is not using.
     collLock.emplace(opCtx(), nss);
-    ASSERT_THROWS_CODE(subplanStage.restoreState(), DBException, ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(subplanStage.restoreState(&collLock->getCollection()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSelection) {
-    CollectionPtr collection = nullptr;
+    CollectionPtr collection;
     {
         dbtests::WriteContextForTests ctx{opCtx(), nss.ns()};
         addIndex(BSON("p1" << 1 << "opt1" << 1));
@@ -658,7 +660,7 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     // Restoring state should succeed, since the plan selected by pickBestPlan() does not use the
     // index {irrelevant: 1}.
     collLock.emplace(opCtx(), nss);
-    subplanStage.restoreState();
+    subplanStage.restoreState(&collLock->getCollection());
 }
 
 }  // namespace

@@ -133,7 +133,7 @@ public:
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
         auto statusWithPlanExecutor = plan_executor_factory::make(
-            _expCtx, std::move(ws), std::move(ss), coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+            _expCtx, std::move(ws), std::move(ss), &coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         invariant(statusWithPlanExecutor.isOK());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -179,7 +179,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -610,7 +610,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(fetchStage),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

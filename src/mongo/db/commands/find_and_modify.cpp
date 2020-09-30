@@ -292,7 +292,7 @@ public:
             CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
 
             const auto exec = uassertStatusOK(
-                getExecutorDelete(opDebug, collection.getCollection(), &parsedDelete, verbosity));
+                getExecutorDelete(opDebug, &collection.getCollection(), &parsedDelete, verbosity));
 
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(
@@ -316,7 +316,7 @@ public:
             CollectionShardingState::get(opCtx, nsString)->checkShardVersionOrThrow(opCtx);
 
             const auto exec = uassertStatusOK(
-                getExecutorUpdate(opDebug, collection.getCollection(), &parsedUpdate, verbosity));
+                getExecutorUpdate(opDebug, &collection.getCollection(), &parsedUpdate, verbosity));
 
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(
@@ -476,7 +476,7 @@ public:
         checkIfTransactionOnCappedColl(collection.getCollection(), inTransaction);
 
         const auto exec = uassertStatusOK(getExecutorDelete(
-            opDebug, collection.getCollection(), &parsedDelete, boost::none /* verbosity */));
+            opDebug, &collection.getCollection(), &parsedDelete, boost::none /* verbosity */));
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -563,7 +563,7 @@ public:
         checkIfTransactionOnCappedColl(collection, inTransaction);
 
         const auto exec = uassertStatusOK(
-            getExecutorUpdate(opDebug, collection, parsedUpdate, boost::none /* verbosity */));
+            getExecutorUpdate(opDebug, &collection, parsedUpdate, boost::none /* verbosity */));
 
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());

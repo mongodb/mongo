@@ -232,9 +232,9 @@ void PlanExecutorImpl::saveState() {
     _currentState = kSaved;
 }
 
-void PlanExecutorImpl::restoreState(const Yieldable* yieldable) {
+void PlanExecutorImpl::restoreState(const RestoreContext& context) {
     try {
-        restoreStateWithoutRetrying(yieldable);
+        restoreStateWithoutRetrying(context, context.collection());
     } catch (const WriteConflictException&) {
         if (!_yieldPolicy->canAutoYield())
             throw;
@@ -244,12 +244,13 @@ void PlanExecutorImpl::restoreState(const Yieldable* yieldable) {
     }
 }
 
-void PlanExecutorImpl::restoreStateWithoutRetrying(const Yieldable* yieldable) {
+void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context,
+                                                   const Yieldable* yieldable) {
     invariant(_currentState == kSaved);
 
     _yieldPolicy->setYieldable(yieldable);
     if (!isMarkedAsKilled()) {
-        _root->restoreState();
+        _root->restoreState(context);
     }
 
     _currentState = kUsable;

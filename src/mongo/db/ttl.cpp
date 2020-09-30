@@ -372,7 +372,7 @@ private:
 
         auto exec =
             InternalPlanner::deleteWithIndexScan(opCtx,
-                                                 collection.getCollection(),
+                                                 &collection.getCollection(),
                                                  std::move(params),
                                                  desc,
                                                  startKey,

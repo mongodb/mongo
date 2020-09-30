@@ -77,7 +77,8 @@ Status PlanYieldPolicyImpl::yield(OperationContext* opCtx, std::function<void()>
                 _yieldAllLocks(opCtx, yieldable, whileYieldingFn, _planYielding->nss());
             }
 
-            _planYielding->restoreStateWithoutRetrying(yieldable);
+            _planYielding->restoreStateWithoutRetrying(
+                {RestoreContext::RestoreType::kYield, nullptr}, yieldable);
             return Status::OK();
         } catch (const WriteConflictException&) {
             CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
@@ -118,6 +119,11 @@ void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
         opCtx->checkForInterrupt();  // throws
     }
 
+    ON_BLOCK_EXIT([yieldable]() {
+        if (yieldable)
+            yieldable->restore();
+    });
+
     if (!unlocked) {
         // Nothing was unlocked, just return, yielding is pointless.
         return;
@@ -137,10 +143,6 @@ void PlanYieldPolicyImpl::_yieldAllLocks(OperationContext* opCtx,
     }
 
     locker->restoreLockState(opCtx, snapshot);
-
-    if (yieldable) {
-        yieldable->restore();
-    }
 
     // After yielding and reacquiring locks, the preconditions that were used to select our
     // ReadSource initially need to be checked again. Queries hold an AutoGetCollectionForRead RAII

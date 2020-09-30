@@ -633,7 +633,7 @@ bool runQuery(OperationContext* opCtx,
     constexpr auto verbosity = ExplainOptions::Verbosity::kExecAllPlans;
     expCtx->explain = qr.isExplain() ? boost::make_optional(verbosity) : boost::none;
     auto exec =
-        uassertStatusOK(getExecutorLegacyFind(opCtx, collection.getCollection(), std::move(cq)));
+        uassertStatusOK(getExecutorLegacyFind(opCtx, &collection.getCollection(), std::move(cq)));
 
     // If it's actually an explain, do the explain and return rather than falling through
     // to the normal query execution loop.

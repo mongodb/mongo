@@ -323,7 +323,7 @@ CollectionReader::CollectionReader(OperationContext* opCtx, const NamespaceStrin
     : _collToScan(opCtx, nss),
       _exec(InternalPlanner::collectionScan(opCtx,
                                             nss.ns(),
-                                            _collToScan.getCollection(),
+                                            &_collToScan.getCollection(),
                                             PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                             InternalPlanner::FORWARD)) {}
 

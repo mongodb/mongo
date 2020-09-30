@@ -53,19 +53,17 @@ public:
                             ExpressionContext* expCtx,
                             const CollectionPtr& coll)
         : PlanStage(stageType, expCtx),
-          _collection(coll.detached()),
-          _collectionUUID(_collection->uuid()),
+          _collection(&coll),
+          _collectionUUID(coll->uuid()),
           _catalogEpoch(getCatalogEpoch()),
-          _nss(_collection->ns()) {
-        invariant(_collection);
-    }
+          _nss(coll->ns()) {}
 
     virtual ~RequiresCollectionStage() = default;
 
 protected:
     void doSaveState() final;
 
-    void doRestoreState() final;
+    void doRestoreState(const RestoreContext& context) final;
 
     /**
      * Performs yield preparation specific to a stage which subclasses from RequiresCollectionStage.
@@ -78,7 +76,7 @@ protected:
     virtual void doRestoreStateRequiresCollection() = 0;
 
     const CollectionPtr& collection() const {
-        return _collection;
+        return *_collection;
     }
 
     UUID uuid() const {
@@ -91,7 +89,11 @@ private:
         return CollectionCatalog::get(opCtx()).getEpoch();
     }
 
-    CollectionPtr _collection;
+    // Pointer to a CollectionPtr that is stored at a high level in a AutoGetCollection or other
+    // helper. It needs to stay valid until the PlanExecutor saves its state. To avoid this pointer
+    // from dangling it needs to be reset when doRestoreState() is called and it is reset to a
+    // different CollectionPtr.
+    const CollectionPtr* _collection;
     const UUID _collectionUUID;
     const uint64_t _catalogEpoch;
 

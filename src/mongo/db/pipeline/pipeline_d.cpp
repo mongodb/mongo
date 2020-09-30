@@ -170,7 +170,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
     }
 
     auto exec = plan_executor_factory::make(
-        expCtx, std::move(ws), std::move(root), coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        expCtx, std::move(ws), std::move(root), &coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
     // For sharded collections, the root of the plan tree is a TrialStage that may have chosen
     // either a random-sampling cursor trial plan or a COLLSCAN backup plan. We can only optimize
@@ -252,7 +252,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // example, if we have a document {a: [1,2]} and group by "a" a DISTINCT_SCAN on an "a"
         // index would produce one result for '1' and another for '2', which would be incorrect.
         auto distinctExecutor = getExecutorDistinct(
-            collection, plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY, &parsedDistinct);
+            &collection, plannerOpts | QueryPlannerParams::STRICT_DISTINCT_ONLY, &parsedDistinct);
         if (!distinctExecutor.isOK()) {
             return distinctExecutor.getStatus().withContext(
                 "Unable to use distinct scan to optimize $group stage");
@@ -266,7 +266,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
 
     bool permitYield = true;
     return getExecutorFind(
-        expCtx->opCtx, collection, std::move(cq.getValue()), permitYield, plannerOpts);
+        expCtx->opCtx, &collection, std::move(cq.getValue()), permitYield, plannerOpts);
 }
 
 /**

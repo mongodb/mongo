@@ -190,7 +190,7 @@ public:
             opCtx, request.getCollation().value_or(BSONObj()), nss);
 
         auto statusWithPlanExecutor =
-            getExecutorCount(expCtx, collection, request, true /*explain*/, nss);
+            getExecutorCount(expCtx, &collection, request, true /*explain*/, nss);
         if (!statusWithPlanExecutor.isOK()) {
             return statusWithPlanExecutor.getStatus();
         }
@@ -252,7 +252,7 @@ public:
         auto statusWithPlanExecutor =
             getExecutorCount(makeExpressionContextForGetExecutor(
                                  opCtx, request.getCollation().value_or(BSONObj()), nss),
-                             collection,
+                             &collection,
                              request,
                              false /*explain*/,
                              nss);

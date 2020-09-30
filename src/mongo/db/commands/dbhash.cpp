@@ -350,7 +350,7 @@ private:
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         if (desc) {
             exec = InternalPlanner::indexScan(opCtx,
-                                              collection,
+                                              &collection,
                                               desc,
                                               BSONObj(),
                                               BSONObj(),
@@ -360,7 +360,7 @@ private:
                                               InternalPlanner::IXSCAN_FETCH);
         } else if (collection->isCapped()) {
             exec = InternalPlanner::collectionScan(
-                opCtx, nss.ns(), collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                opCtx, nss.ns(), &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else {
             LOGV2(20455,
                   "Can't find _id index for namespace: {namespace}",

@@ -120,7 +120,7 @@ bool shouldWaitForOplogVisibility(OperationContext* opCtx,
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions = 0);
@@ -137,7 +137,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     bool permitYield = false,
     size_t plannerOptions = QueryPlannerParams::DEFAULT);
@@ -147,7 +147,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorLegacyFind(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const CollectionPtr* collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery);
 
 /**
@@ -204,7 +204,7 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * distinct.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
-    const CollectionPtr& collection, size_t plannerOptions, ParsedDistinct* parsedDistinct);
+    const CollectionPtr* collection, size_t plannerOptions, ParsedDistinct* parsedDistinct);
 
 /*
  * Get a PlanExecutor for a query executing as part of a count command.
@@ -215,7 +215,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCount(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const CollectionPtr& collection,
+    const CollectionPtr* collection,
     const CountCommand& request,
     bool explain,
     const NamespaceString& nss);
@@ -241,7 +241,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    const CollectionPtr& collection,
+    const CollectionPtr* collection,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 
@@ -267,7 +267,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    const CollectionPtr& collection,
+    const CollectionPtr* collection,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity);
 }  // namespace mongo

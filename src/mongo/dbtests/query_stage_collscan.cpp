@@ -107,7 +107,7 @@ public:
             plan_executor_factory::make(_expCtx,
                                         std::move(ws),
                                         std::move(ps),
-                                        collection.getCollection(),
+                                        &collection.getCollection(),
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -200,7 +200,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
         plan_executor_factory::make(_expCtx,
                                     std::move(ws),
                                     std::move(ps),
-                                    collection.getCollection(),
+                                    &collection.getCollection(),
                                     PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -232,7 +232,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
         plan_executor_factory::make(_expCtx,
                                     std::move(ws),
                                     std::move(ps),
-                                    collection.getCollection(),
+                                    &collection.getCollection(),
                                     PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());
@@ -281,7 +281,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
     // Remove recordIds[count].
     scan->saveState();
     remove(coll->docFor(&_opCtx, recordIds[count]).value());
-    scan->restoreState();
+    scan->restoreState(&coll);
 
     // Skip over recordIds[count].
     ++count;
@@ -334,7 +334,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
     // Remove recordIds[count].
     scan->saveState();
     remove(coll->docFor(&_opCtx, recordIds[count]).value());
-    scan->restoreState();
+    scan->restoreState(&coll);
 
     // Skip over recordIds[count].
     ++count;
@@ -388,7 +388,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
         plan_executor_factory::make(_expCtx,
                                     std::move(ws),
                                     std::move(ps),
-                                    collection.getCollection(),
+                                    &collection.getCollection(),
                                     PlanYieldPolicy::YieldPolicy::NO_YIELD);
     ASSERT_OK(statusWithPlanExecutor.getStatus());
     auto exec = std::move(statusWithPlanExecutor.getValue());

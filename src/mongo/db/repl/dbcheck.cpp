@@ -189,7 +189,7 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
 
     // Set up a simple index scan on that.
     _exec = InternalPlanner::indexScan(opCtx,
-                                       collection,
+                                       &collection,
                                        desc,
                                        start.obj(),
                                        end.obj(),

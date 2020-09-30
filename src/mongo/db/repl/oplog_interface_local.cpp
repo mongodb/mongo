@@ -58,13 +58,11 @@ private:
 OplogIteratorLocal::OplogIteratorLocal(OperationContext* opCtx)
     : _oplogRead(opCtx, OplogAccessMode::kRead),
       _ctx(opCtx, NamespaceString::kRsOplogNamespace.ns()),
-      _exec(
-          InternalPlanner::collectionScan(opCtx,
-                                          NamespaceString::kRsOplogNamespace.ns(),
-                                          CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-                                              opCtx, NamespaceString::kRsOplogNamespace),
-                                          PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                          InternalPlanner::BACKWARD)) {}
+      _exec(InternalPlanner::collectionScan(opCtx,
+                                            NamespaceString::kRsOplogNamespace.ns(),
+                                            &_oplogRead.getCollection(),
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            InternalPlanner::BACKWARD)) {}
 
 StatusWith<OplogInterface::Iterator::Value> OplogIteratorLocal::next() {
     BSONObj obj;

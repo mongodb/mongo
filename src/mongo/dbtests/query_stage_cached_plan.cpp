@@ -476,7 +476,9 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
     readLock.reset();
     dropIndex(keyPattern);
     readLock.emplace(&_opCtx, nss);
-    ASSERT_THROWS_CODE(cachedPlanStage.restoreState(), DBException, ErrorCodes::QueryPlanKilled);
+    ASSERT_THROWS_CODE(cachedPlanStage.restoreState(&readLock->getCollection()),
+                       DBException,
+                       ErrorCodes::QueryPlanKilled);
 }
 
 TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPlanSelection) {
@@ -521,7 +523,7 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
     readLock.reset();
     dropIndex(keyPattern);
     readLock.emplace(&_opCtx, nss);
-    cachedPlanStage.restoreState();
+    cachedPlanStage.restoreState(&readLock->getCollection());
 }
 
 }  // namespace QueryStageCachedPlan

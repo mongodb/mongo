@@ -120,7 +120,7 @@ public:
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor = plan_executor_factory::make(
-            std::move(cq), std::move(ws), std::move(root), coll, yieldPolicy);
+            std::move(cq), std::move(ws), std::move(root), &coll, yieldPolicy);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -136,10 +136,8 @@ public:
      * Returns a PlanExecutor capable of executing an index scan
      * over the specified index with the specified bounds.
      */
-    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIndexScanExec(Database* db,
-                                                                      BSONObj& indexSpec,
-                                                                      int start,
-                                                                      int end) {
+    unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeIndexScanExec(
+        Database* db, const CollectionPtr& coll, BSONObj& indexSpec, int start, int end) {
         // Build the index scan stage.
         auto descriptor = getIndex(db, indexSpec);
         IndexScanParams ixparams(&_opCtx, descriptor);
@@ -147,10 +145,6 @@ public:
         ixparams.bounds.startKey = BSON("" << start);
         ixparams.bounds.endKey = BSON("" << end);
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
-
-        const CollectionPtr& coll =
-            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
-
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
         auto ixscan = std::make_unique<IndexScan>(_expCtx.get(), coll, ixparams, ws.get(), nullptr);
@@ -168,7 +162,7 @@ public:
             plan_executor_factory::make(std::move(cq),
                                         std::move(ws),
                                         std::move(root),
-                                        coll,
+                                        &coll,
                                         PlanYieldPolicy::YieldPolicy::YIELD_MANUAL);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());
@@ -214,7 +208,7 @@ TEST_F(PlanExecutorTest, DropIndexScanAgg) {
     // Create an "inner" plan executor and register it with the cursor manager so that it can
     // get notified when the collection is dropped.
     unique_ptr<PlanExecutor, PlanExecutor::Deleter> innerExec(
-        makeIndexScanExec(ctx.db(), indexSpec, 7, 10));
+        makeIndexScanExec(ctx.db(), collection, indexSpec, 7, 10));
 
     // Wrap the "inner" plan executor in a DocumentSourceCursor and add it as the first source
     // in the pipeline.
@@ -311,12 +305,14 @@ TEST_F(PlanExecutorTest, ShouldReportErrorIfKilledDuringYield) {
 
 class PlanExecutorSnapshotTest : public PlanExecutorTest {
 protected:
-    void setupCollection() {
+    CollectionPtr setupCollection() {
         insert(BSON("_id" << 1 << "a" << 1));
         insert(BSON("_id" << 2 << "a" << 2 << "payload"
                           << "x"));
         insert(BSON("_id" << 3 << "a" << 3));
         insert(BSON("_id" << 4 << "a" << 4));
+
+        return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
     }
 
     /**
@@ -384,12 +380,12 @@ TEST_F(PlanExecutorSnapshotTest, SnapshotControl) {
  */
 TEST_F(PlanExecutorSnapshotTest, SnapshotTest) {
     dbtests::WriteContextForTests ctx(&_opCtx, nss.ns());
-    setupCollection();
+    auto coll = setupCollection();
     BSONObj indexSpec = BSON("_id" << 1);
     addIndex(indexSpec);
 
     BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-    auto exec = makeIndexScanExec(ctx.db(), indexSpec, 2, 5);
+    auto exec = makeIndexScanExec(ctx.db(), coll, indexSpec, 2, 5);
 
     BSONObj objOut;
     ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, nullptr));

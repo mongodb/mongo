@@ -687,12 +687,12 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 planExecutor = isFind
                     ? InternalPlanner::collectionScan(opCtx,
                                                       nsOrUUID.toString(),
-                                                      collection,
+                                                      &collection,
                                                       PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                                       direction)
                     : InternalPlanner::deleteWithCollectionScan(
                           opCtx,
-                          collection,
+                          &collection,
                           makeDeleteStageParamsForDeleteDocuments(),
                           PlanYieldPolicy::YieldPolicy::NO_YIELD,
                           direction);
@@ -728,7 +728,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                 }
                 planExecutor = isFind
                     ? InternalPlanner::indexScan(opCtx,
-                                                 collection,
+                                                 &collection,
                                                  indexDescriptor,
                                                  bounds.first,
                                                  bounds.second,
@@ -738,7 +738,7 @@ StatusWith<std::vector<BSONObj>> _findOrDeleteDocuments(
                                                  InternalPlanner::IXSCAN_FETCH)
                     : InternalPlanner::deleteWithIndexScan(
                           opCtx,
-                          collection,
+                          &collection,
                           makeDeleteStageParamsForDeleteDocuments(),
                           indexDescriptor,
                           bounds.first,
@@ -929,7 +929,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         }
 
         auto planExecutorResult = mongo::getExecutorUpdate(
-            nullptr, collection, &parsedUpdate, boost::none /* verbosity */);
+            nullptr, &collection, &parsedUpdate, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1003,7 +1003,7 @@ Status StorageInterfaceImpl::upsertById(OperationContext* opCtx,
         UpdateStageParams updateStageParams(
             parsedUpdate.getRequest(), parsedUpdate.getDriver(), nullptr);
         auto planExecutor = InternalPlanner::updateWithIdHack(opCtx,
-                                                              collection,
+                                                              &collection,
                                                               updateStageParams,
                                                               descriptor,
                                                               idKey.wrap(""),
@@ -1082,7 +1082,7 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
         const auto& collection = *collectionResult.getValue();
 
         auto planExecutorResult = mongo::getExecutorDelete(
-            nullptr, collection, &parsedDelete, boost::none /* verbosity */);
+            nullptr, &collection, &parsedDelete, boost::none /* verbosity */);
         if (!planExecutorResult.isOK()) {
             return planExecutorResult.getStatus();
         }
@@ -1109,7 +1109,7 @@ boost::optional<BSONObj> StorageInterfaceImpl::findOplogEntryLessThanOrEqualToTi
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec =
         InternalPlanner::collectionScan(opCtx,
                                         NamespaceString::kRsOplogNamespace.ns(),
-                                        oplog,
+                                        &oplog,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                         InternalPlanner::BACKWARD);
 

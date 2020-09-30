@@ -479,7 +479,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // As restoreState may restore (recreate) cursors, make sure to restore the
         // state outside of the WritUnitOfWork.
         try {
-            child()->restoreState();
+            child()->restoreState(&collection());
         } catch (const WriteConflictException&) {
             // Note we don't need to retry updating anything in this case since the update
             // already was committed. However, we still need to return the updated document

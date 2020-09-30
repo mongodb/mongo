@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,58 +27,38 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/plan_stage.h"
-
-#include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
+#pragma once
 
 namespace mongo {
-void PlanStage::saveState() {
-    ++_commonStats.yields;
-    for (auto&& child : _children) {
-        child->saveState();
+class CollectionPtr;
+
+/**
+ * Context about outside environment when restoring a PlanExecutor.
+ *
+ * Contains reference to a CollectionPtr owned by an AutoGetCollection lock helper to be used by the
+ * RequiresCollectionStage plan stage.
+ */
+class RestoreContext {
+public:
+    enum class RestoreType {
+        kExternal,  // Restore on the PlanExecutor by an external call
+        kYield      // Internal restore after yield
+    };
+
+    RestoreContext() = default;
+    /* implicit */ RestoreContext(const CollectionPtr* coll) : _collection(coll) {}
+    /* implicit */ RestoreContext(RestoreType type, const CollectionPtr* coll)
+        : _type(type), _collection(coll) {}
+
+    RestoreType type() const {
+        return _type;
+    }
+    const CollectionPtr* collection() const {
+        return _collection;
     }
 
-    doSaveState();
-}
-
-void PlanStage::restoreState(const RestoreContext& context) {
-    ++_commonStats.unyields;
-    for (auto&& child : _children) {
-        child->restoreState(context);
-    }
-
-    doRestoreState(context);
-}
-
-void PlanStage::detachFromOperationContext() {
-    invariant(_opCtx);
-    _opCtx = nullptr;
-
-    for (auto&& child : _children) {
-        child->detachFromOperationContext();
-    }
-
-    doDetachFromOperationContext();
-}
-
-void PlanStage::reattachToOperationContext(OperationContext* opCtx) {
-    invariant(_opCtx == nullptr);
-    _opCtx = opCtx;
-
-    for (auto&& child : _children) {
-        child->reattachToOperationContext(opCtx);
-    }
-
-    doReattachToOperationContext();
-}
-
-ClockSource* PlanStage::getClock() const {
-    return _opCtx->getServiceContext()->getFastClockSource();
-}
-
+private:
+    RestoreType _type = RestoreType::kExternal;
+    const CollectionPtr* _collection;
+};
 }  // namespace mongo
