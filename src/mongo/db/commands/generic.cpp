@@ -180,14 +180,14 @@ public:
             BSONObjBuilder temp(b.subobjStart(command->getName()));
             temp.append("help", command->help());
             temp.append("requiresAuth", command->requiresAuth());
-            temp.append("slaveOk",
+            temp.append("secondaryOk",
                         command->secondaryAllowed(opCtx->getServiceContext()) ==
                             Command::AllowedOnSecondary::kAlways);
             temp.append("adminOnly", command->adminOnly());
             // Optionally indicates that the command can be forced to run on a secondary.
             if (command->secondaryAllowed(opCtx->getServiceContext()) ==
                 Command::AllowedOnSecondary::kOptIn)
-                temp.append("slaveOverrideOk", true);
+                temp.append("secondaryOverrideOk", true);
             temp.append("apiVersions", command->apiVersions());
             temp.append("deprecatedApiVersions", command->deprecatedApiVersions());
             temp.done();

@@ -385,8 +385,8 @@ public:
 
     /**
      * Note that secondaryAllowed should move to CommandInvocation but cannot because there is
-     * one place (i.e. 'listCommands') that inappropriately produces the "slaveOk" and
-     * "slaveOverrideOk" fields for each Command without regard to payload. This is
+     * one place (i.e. 'listCommands') that inappropriately produces the "secondaryOk" and
+     * "secondaryOverrideOk" fields for each Command without regard to payload. This is
      * inappropriate because for some Commands (e.g. 'aggregate'), these properties depend
      * on request payload. See SERVER-34578 for fixing listCommands.
      */

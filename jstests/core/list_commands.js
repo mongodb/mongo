@@ -30,14 +30,14 @@ assert(commands["commands"].hasOwnProperty("ping"));
 // Test that commands listed have required properties
 const hello = commands["commands"]["hello"];
 assert(hello.hasOwnProperty("help"));
-assert(hello.hasOwnProperty("slaveOk"));
+assert(hello.hasOwnProperty("secondaryOk"));
 assert(hello.hasOwnProperty("adminOnly"));
 assert(hello.hasOwnProperty("requiresAuth"));
 
 // Test that commands listed have required properties
 const isMaster = commands["commands"]["isMaster"];
 assert(isMaster.hasOwnProperty("help"));
-assert(isMaster.hasOwnProperty("slaveOk"));
+assert(isMaster.hasOwnProperty("secondaryOk"));
 assert(isMaster.hasOwnProperty("adminOnly"));
 assert(isMaster.hasOwnProperty("requiresAuth"));
 
