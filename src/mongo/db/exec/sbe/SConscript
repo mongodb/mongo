@@ -30,11 +30,13 @@ sbeEnv.Library(
         'stages/makeobj.cpp',
         'stages/project.cpp',
         'stages/sort.cpp',
+        'stages/sorted_merge.cpp',
         'stages/spool.cpp',
         'stages/stages.cpp',
         'stages/text_match.cpp',
         'stages/traverse.cpp',
         'stages/union.cpp',
+        'stages/unique.cpp',
         'stages/unwind.cpp',
         'util/debug_print.cpp',
         'values/bson.cpp',
@@ -106,7 +108,9 @@ env.CppUnitTest(
         'sbe_numeric_convert_test.cpp',
         'sbe_plan_stage_test.cpp',
         'sbe_sort_test.cpp',
+        'sbe_sorted_merge_test.cpp',
         'sbe_test.cpp',
+        'sbe_unique_test.cpp',
         'values/write_value_to_stream_test.cpp'
     ],
     LIBDEPS=[

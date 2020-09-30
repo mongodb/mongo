@@ -169,6 +169,7 @@ std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
 
+    ret.emplace_back(DebugPrinter::Block("[`"));
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
     for (size_t childNum = 0; childNum < _children.size(); childNum++) {
         ret.emplace_back(DebugPrinter::Block("[`"));
@@ -183,10 +184,12 @@ std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
         DebugPrinter::addBlocks(ret, _children[childNum]->debugPrint());
 
         if (childNum + 1 < _children.size()) {
+            ret.emplace_back(DebugPrinter::Block(","));
             DebugPrinter::addNewLine(ret);
         }
     }
     ret.emplace_back(DebugPrinter::Block::cmdDecIndent);
+    ret.emplace_back(DebugPrinter::Block("`]"));
 
     return ret;
 }
