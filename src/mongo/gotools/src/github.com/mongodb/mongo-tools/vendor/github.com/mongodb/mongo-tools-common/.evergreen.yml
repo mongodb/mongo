@@ -15,7 +15,7 @@ mongo_tools_variables:
       mongod_args: ""
       mongod_port: 33333
     ssl: &mongod_ssl_startup_args
-      mongod_args: "--sslMode requireSSL --sslCAFile db/testdata/ca.pem --sslPEMKeyFile db/testdata/server.pem"
+      mongod_args: "--sslMode requireSSL --sslCAFile ./db/testdata/ca-ia.pem --sslPEMKeyFile ./db/testdata/test-server.pem"
       mongod_port: 33333
 
   mongo_arguments:
@@ -23,7 +23,7 @@ mongo_tools_variables:
       mongo_args: &mongo_default_startup_args_string "--port 33333"
       mongod_port: 33333
     ssl: &mongo_ssl_startup_args
-      mongo_args: "--port 33333 --ssl --sslCAFile ./db/testdata/ca.pem --sslPEMKeyFile ./db/testdata/server.pem --sslAllowInvalidCertificates"
+      mongo_args: "--port 33333 --ssl --sslCAFile ./db/testdata/ca-ia.pem --sslPEMKeyFile ./db/testdata/test-client.pem --host localhost"
       mongod_port: 33333
 
 functions:

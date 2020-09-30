@@ -38,8 +38,19 @@ func formatForMan(wr io.Writer, s string) {
 
 func writeManPageOptions(wr io.Writer, grp *Group) {
 	grp.eachGroup(func(group *Group) {
-		if group.Hidden {
+		if group.Hidden || len(group.options) == 0 {
 			return
+		}
+
+		// If the parent (grp) has any subgroups, display their descriptions as
+		// subsection headers similar to the output of --help.
+		if group.ShortDescription != "" && len(grp.groups) > 0 {
+			fmt.Fprintf(wr, ".SS %s\n", group.ShortDescription)
+
+			if group.LongDescription != "" {
+				formatForMan(wr, group.LongDescription)
+				fmt.Fprintln(wr, "")
+			}
 		}
 
 		for _, opt := range group.options {

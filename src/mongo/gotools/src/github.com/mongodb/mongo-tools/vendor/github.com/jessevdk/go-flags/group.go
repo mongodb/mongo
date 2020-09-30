@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strings"
 	"unicode/utf8"
-	"unsafe"
 )
 
 // ErrNotPointerToStruct indicates that a provided data container is not
@@ -110,16 +109,16 @@ func (g *Group) findOption(matcher func(*Option) bool) (option *Option) {
 	return option
 }
 
-// Find an option that is part of the group, or any of its subgroups,
-// by matching its long name (including the option namespace).
+// FindOptionByLongName finds an option that is part of the group, or any of its
+// subgroups, by matching its long name (including the option namespace).
 func (g *Group) FindOptionByLongName(longName string) *Option {
 	return g.findOption(func(option *Option) bool {
 		return option.LongNameWithNamespace() == longName
 	})
 }
 
-// Find an option that is part of the group, or any of its subgroups,
-// by matching its short name.
+// FindOptionByShortName finds an option that is part of the group, or any of
+// its subgroups, by matching its short name.
 func (g *Group) FindOptionByShortName(shortName rune) *Option {
 	return g.findOption(func(option *Option) bool {
 		return option.ShortName == shortName
@@ -174,6 +173,10 @@ func (g *Group) eachGroup(f func(*Group)) {
 	}
 }
 
+func isStringFalsy(s string) bool {
+	return s == "" || s == "false" || s == "no" || s == "0"
+}
+
 func (g *Group) scanStruct(realval reflect.Value, sfield *reflect.StructField, handler scanHandler) error {
 	stype := realval.Type()
 
@@ -213,12 +216,18 @@ func (g *Group) scanStruct(realval reflect.Value, sfield *reflect.StructField, h
 				return err
 			}
 		} else if kind == reflect.Ptr && field.Type.Elem().Kind() == reflect.Struct {
+			flagCountBefore := len(g.options) + len(g.groups)
+
 			if fld.IsNil() {
-				fld.Set(reflect.New(fld.Type().Elem()))
+				fld = reflect.New(fld.Type().Elem())
 			}
 
 			if err := g.scanStruct(reflect.Indirect(fld), &field, handler); err != nil {
 				return err
+			}
+
+			if len(g.options)+len(g.groups) != flagCountBefore {
+				realval.Field(i).Set(fld)
 			}
 		}
 
@@ -249,10 +258,10 @@ func (g *Group) scanStruct(realval reflect.Value, sfield *reflect.StructField, h
 		valueName := mtag.Get("value-name")
 		defaultMask := mtag.Get("default-mask")
 
-		optional := (mtag.Get("optional") != "")
-		required := (mtag.Get("required") != "")
+		optional := !isStringFalsy(mtag.Get("optional"))
+		required := !isStringFalsy(mtag.Get("required"))
 		choices := mtag.GetMany("choice")
-		hidden := (mtag.Get("hidden") != "")
+		hidden := !isStringFalsy(mtag.Get("hidden"))
 
 		option := &Option{
 			Description:      description,
@@ -274,6 +283,12 @@ func (g *Group) scanStruct(realval reflect.Value, sfield *reflect.StructField, h
 			field: field,
 			value: realval.Field(i),
 			tag:   mtag,
+		}
+
+		if option.isBool() && option.Default != nil {
+			return newErrorf(ErrInvalidTag,
+				"boolean flag `%s' may not have default values, they always default to `false' and can only be turned on",
+				option.shortAndLongName())
 		}
 
 		g.options = append(g.options, option)
@@ -322,10 +337,22 @@ func (g *Group) scanSubGroupHandler(realval reflect.Value, sfield *reflect.Struc
 	subgroup := mtag.Get("group")
 
 	if len(subgroup) != 0 {
-		ptrval := reflect.NewAt(realval.Type(), unsafe.Pointer(realval.UnsafeAddr()))
+		var ptrval reflect.Value
+
+		if realval.Kind() == reflect.Ptr {
+			ptrval = realval
+
+			if ptrval.IsNil() {
+				ptrval.Set(reflect.New(ptrval.Type()))
+			}
+		} else {
+			ptrval = realval.Addr()
+		}
+
 		description := mtag.Get("description")
 
 		group, err := g.AddGroup(subgroup, description, ptrval.Interface())
+
 		if err != nil {
 			return true, err
 		}

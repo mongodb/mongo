@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// IniError contains location information on where an error occured.
+// IniError contains location information on where an error occurred.
 type IniError struct {
 	// The error message.
 	Message string
@@ -58,6 +58,8 @@ const (
 // IniParser is a utility to read and write flags options from and to ini
 // formatted strings.
 type IniParser struct {
+	ParseAsDefaults bool // override default flags
+
 	parser *Parser
 }
 
@@ -96,8 +98,6 @@ func IniParse(filename string, data interface{}) error {
 // information on the ini file format. The returned errors can be of the type
 // flags.Error or flags.IniError.
 func (i *IniParser) ParseFile(filename string) error {
-	i.parser.clearIsSet()
-
 	ini, err := readIniFromFile(filename)
 
 	if err != nil {
@@ -132,8 +132,6 @@ func (i *IniParser) ParseFile(filename string) error {
 //
 // The returned errors can be of the type flags.Error or flags.IniError.
 func (i *IniParser) Parse(reader io.Reader) error {
-	i.parser.clearIsSet()
-
 	ini, err := readIni(reader, "")
 
 	if err != nil {
@@ -143,7 +141,7 @@ func (i *IniParser) Parse(reader io.Reader) error {
 	return i.parse(ini)
 }
 
-// WriteFile writes the flags as ini format into a file. See WriteIni
+// WriteFile writes the flags as ini format into a file. See Write
 // for more information. The returned error occurs when the specified file
 // could not be opened for writing.
 func (i *IniParser) WriteFile(filename string, options IniOptions) error {
@@ -536,6 +534,12 @@ func (i *IniParser) parse(ini *ini) error {
 					}
 				}
 
+				continue
+			}
+
+			// ini value is ignored if override is set and
+			// value was previously set from non default
+			if i.ParseAsDefaults && !opt.isSetDefault {
 				continue
 			}
 

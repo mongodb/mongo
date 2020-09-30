@@ -30,8 +30,8 @@ func GetSSLOptions() commonOpts.SSL {
 	_, filename, _, _ := runtime.Caller(0)
 	// Get the path to containing folder
 	foldername := filename[0:strings.LastIndex(filename, "/")]
-	caFile := foldername + "/../db/testdata/ca.pem"
-	serverFile := foldername + "/../db/testdata/server.pem"
+	caFile := foldername + "/../db/testdata/ca-ia.pem"
+	serverFile := foldername + "/../db/testdata/test-server.pem"
 	if testtype.HasTestType(testtype.SSLTestType) {
 		return commonOpts.SSL{
 			UseSSL:        true,

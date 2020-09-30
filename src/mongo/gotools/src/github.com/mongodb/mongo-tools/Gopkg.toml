@@ -29,7 +29,7 @@ required = ["github.com/3rf/mongo-lint"]
 
 [[constraint]]
   name = "github.com/mongodb/mongo-tools-common"
-  version = "^2.0.1"
+  version = "v2.1.0"
 
 [[constraint]]
   name = "go.mongodb.org/mongo-driver"
@@ -55,10 +55,6 @@ required = ["github.com/3rf/mongo-lint"]
 [[constraint]]
   name = "github.com/howeyc/gopass"
   revision = "44476384cd4721b68705e72f19e95d1a3a504370"
-
-[[constraint]]
-  name = "github.com/jessevdk/go-flags"
-  revision = "97448c91aac742cbca3d020b3e769013a420a06f"
 
 [[constraint]]
   name = "github.com/nsf/termbox-go"

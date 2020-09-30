@@ -35,6 +35,8 @@ Additional features specific to Windows:
     Options with long names (/verbose)
     Windows-style options with arguments use a colon as the delimiter
     Modify generated help message with Windows-style / options
+    Windows style options can be disabled at build time using the "forceposix"
+    build tag
 
 
 Basic usage
@@ -76,15 +78,15 @@ The following is a list of tags for struct fields supported by go-flags:
 
     short:            the short name of the option (single character)
     long:             the long name of the option
-    required:         whether an option is required to appear on the command
+    required:         if non empty, makes the option required to appear on the command
                       line. If a required option is not present, the parser will
                       return ErrRequired (optional)
     description:      the description of the option (optional)
     long-description: the long description of the option. Currently only
                       displayed in generated man pages (optional)
-    no-flag:          if non-empty this field is ignored as an option (optional)
+    no-flag:          if non-empty, this field is ignored as an option (optional)
 
-    optional:       whether an argument of the option is optional. When an
+    optional:       if non-empty, makes the argument of the option optional. When an
                     argument is optional it can only be specified using
                     --option=argument (optional)
     optional-value: the value of an optional option when the option occurs
@@ -107,8 +109,8 @@ The following is a list of tags for struct fields supported by go-flags:
     value-name:     the name of the argument value (to be shown in the help)
                     (optional)
     choice:         limits the values for an option to a set of values.
-                    This tag can be specified mltiple times (optional)
-    hidden:         the option is not visible in the help or man page.
+                    This tag can be specified multiple times (optional)
+    hidden:         if non-empty, the option is not visible in the help or man page.
 
     base: a base (radix) used to convert strings to integer values, the
           default base is 10 (i.e. decimal) (optional)

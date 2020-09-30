@@ -33,7 +33,7 @@ type OutputFormatOptions struct {
 	Type string `long:"type" value-name:"<type>" default:"json" default-mask:"-" description:"the output format, either json or csv (defaults to 'json')"`
 
 	// Deprecated: allow legacy --csv option in place of --type=csv
-	CSVOutputType bool `long:"csv" default:"false" hidden:"true"`
+	CSVOutputType bool `long:"csv" hidden:"true"`
 
 	// OutputFile specifies an output file path.
 	OutputFile string `long:"out" value-name:"<filename>" short:"o" description:"output file; if not specified, stdout is used"`
@@ -60,13 +60,13 @@ func (*OutputFormatOptions) Name() string {
 type InputOptions struct {
 	Query          string `long:"query" value-name:"<json>" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
 	QueryFile      string `long:"queryFile" value-name:"<filename>" description:"path to a file containing a query filter (JSON)"`
-	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default:"false" default-mask:"-"`
+	SlaveOk        bool   `long:"slaveOk" short:"k" description:"allow secondary reads if available (default true)" default-mask:"-"`
 	ReadPreference string `long:"readPreference" value-name:"<string>|<json>" description:"specify either a preference mode (e.g. 'nearest') or a preference json object (e.g. '{mode: \"nearest\", tagSets: [{a: \"b\"}], maxStalenessSeconds: 123}')"`
 	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot or hint _id). Deprecated since this is default behavior on WiredTiger"`
 	Skip           int64  `long:"skip" value-name:"<count>" description:"number of documents to skip"`
 	Limit          int64  `long:"limit" value-name:"<count>" description:"limit the number of documents to export"`
 	Sort           string `long:"sort" value-name:"<json>" description:"sort order, as a JSON string, e.g. '{x:1}'"`
-	AssertExists   bool   `long:"assertExists" default:"false" description:"if specified, export fails if the collection does not exist"`
+	AssertExists   bool   `long:"assertExists" description:"if specified, export fails if the collection does not exist"`
 }
 
 // Name returns a human-readable group name for input options.

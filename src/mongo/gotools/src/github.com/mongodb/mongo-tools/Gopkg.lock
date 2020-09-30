@@ -102,11 +102,12 @@
   revision = "44476384cd4721b68705e72f19e95d1a3a504370"
 
 [[projects]]
-  digest = "1:267d807c74d5b9f38d0b606bdcc119543274b693e82da0be3f86226abe612e8e"
+  digest = "1:3f222a291d2810bdeccb8ba10af58fd087269863c8196f7754cfa0de098a2b56"
   name = "github.com/jessevdk/go-flags"
   packages = ["."]
   pruneopts = "T"
-  revision = "97448c91aac742cbca3d020b3e769013a420a06f"
+  revision = "c6ca198ec95c841fdb89fc0de7496fed11ab854e"
+  version = "v1.4.0"
 
 [[projects]]
   digest = "1:4b63210654b1f2b664f74ec434a1bb1cb442b3d75742cc064a10808d1cca6361"
@@ -125,7 +126,7 @@
   version = "v0.0.4"
 
 [[projects]]
-  digest = "1:8dfffe923e9a4fe7a78d192bf4484467c9245f8f7d653c9dbe180e6fcb0ba341"
+  digest = "1:47beaa815557863bbce416b482547a9cea9590081edf9731b2ef67efc151c068"
   name = "github.com/mongodb/mongo-tools-common"
   packages = [
     "archive",
@@ -147,8 +148,8 @@
     "util",
   ]
   pruneopts = "T"
-  revision = "0b00b4fe7c54276f166f795c7d66b30a523f08dc"
-  version = "v2.0.3"
+  revision = "218ac9da085f3a330e16c1acc69f933a83a8f2cb"
+  version = "v2.1.0"
 
 [[projects]]
   digest = "1:f363c75e8cac5653bc5c0c2b90cbd8a522fdc48c13a5f8d85078750f82d1a009"
@@ -355,6 +356,7 @@
     "go.mongodb.org/mongo-driver/mongo/readpref",
     "go.mongodb.org/mongo-driver/mongo/writeconcern",
     "go.mongodb.org/mongo-driver/x/bsonx",
+    "go.mongodb.org/mongo-driver/x/bsonx/bsoncore",
     "golang.org/x/crypto/ssh/terminal",
     "gopkg.in/mgo.v2/bson",
     "gopkg.in/tomb.v2",

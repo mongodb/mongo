@@ -5,7 +5,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"unsafe"
 )
 
 // Command represents an application command. Commands can be added to the
@@ -112,9 +111,9 @@ func (c *Command) Find(name string) *Command {
 	return nil
 }
 
-// Find an option that is part of the command, or any of its
-// parent commands, by matching its long name
-// (including the option namespace).
+// FindOptionByLongName finds an option that is part of the command, or any of
+// its parent commands, by matching its long name (including the option
+// namespace).
 func (c *Command) FindOptionByLongName(longName string) (option *Option) {
 	for option == nil && c != nil {
 		option = c.Group.FindOptionByLongName(longName)
@@ -125,9 +124,9 @@ func (c *Command) FindOptionByLongName(longName string) (option *Option) {
 	return option
 }
 
-// Find an option that is part of the command, or any of its
-// parent commands, by matching its long name
-// (including the option namespace).
+// FindOptionByShortName finds an option that is part of the command, or any of
+// its parent commands, by matching its long name (including the option
+// namespace).
 func (c *Command) FindOptionByShortName(shortName rune) (option *Option) {
 	for option == nil && c != nil {
 		option = c.Group.FindOptionByShortName(shortName)
@@ -181,22 +180,36 @@ func (c *Command) scanSubcommandHandler(parentg *Group) scanHandler {
 					name = field.Name
 				}
 
-				var required int
+				required := -1
+				requiredMaximum := -1
 
 				sreq := m.Get("required")
 
 				if sreq != "" {
 					required = 1
 
-					if preq, err := strconv.ParseInt(sreq, 10, 32); err == nil {
-						required = int(preq)
+					rng := strings.SplitN(sreq, "-", 2)
+
+					if len(rng) > 1 {
+						if preq, err := strconv.ParseInt(rng[0], 10, 32); err == nil {
+							required = int(preq)
+						}
+
+						if preq, err := strconv.ParseInt(rng[1], 10, 32); err == nil {
+							requiredMaximum = int(preq)
+						}
+					} else {
+						if preq, err := strconv.ParseInt(sreq, 10, 32); err == nil {
+							required = int(preq)
+						}
 					}
 				}
 
 				arg := &Arg{
-					Name:        name,
-					Description: m.Get("description"),
-					Required:    required,
+					Name:            name,
+					Description:     m.Get("description"),
+					Required:        required,
+					RequiredMaximum: requiredMaximum,
 
 					value: realval.Field(i),
 					tag:   m,
@@ -215,7 +228,17 @@ func (c *Command) scanSubcommandHandler(parentg *Group) scanHandler {
 		subcommand := mtag.Get("command")
 
 		if len(subcommand) != 0 {
-			ptrval := reflect.NewAt(realval.Type(), unsafe.Pointer(realval.UnsafeAddr()))
+			var ptrval reflect.Value
+
+			if realval.Kind() == reflect.Ptr {
+				ptrval = realval
+
+				if ptrval.IsNil() {
+					ptrval.Set(reflect.New(ptrval.Type().Elem()))
+				}
+			} else {
+				ptrval = realval.Addr()
+			}
 
 			shortDescription := mtag.Get("description")
 			longDescription := mtag.Get("long-description")
@@ -223,6 +246,7 @@ func (c *Command) scanSubcommandHandler(parentg *Group) scanHandler {
 			aliases := mtag.GetMany("alias")
 
 			subc, err := c.AddCommand(subcommand, shortDescription, longDescription, ptrval.Interface())
+
 			if err != nil {
 				return true, err
 			}

@@ -1,10 +1,11 @@
 package flags
 
 import (
+	"bytes"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
-	"syscall"
 	"unicode/utf8"
 )
 
@@ -81,6 +82,7 @@ type Option struct {
 
 	tag            multiTag
 	isSet          bool
+	isSetDefault   bool
 	preventDefault bool
 
 	defaultLiteral string
@@ -167,9 +169,19 @@ func (option *Option) Value() interface{} {
 	return option.value.Interface()
 }
 
+// Field returns the reflect struct field of the option.
+func (option *Option) Field() reflect.StructField {
+	return option.field
+}
+
 // IsSet returns true if option has been set
 func (option *Option) IsSet() bool {
 	return option.isSet
+}
+
+// IsSetDefault returns true if option has been set via the default option tag
+func (option *Option) IsSetDefault() bool {
+	return option.isSetDefault
 }
 
 // Set the value of an option to the specified value. An error will be returned
@@ -249,9 +261,7 @@ func (option *Option) clearDefault() {
 	usedDefault := option.Default
 
 	if envKey := option.EnvDefaultKey; envKey != "" {
-		// os.Getenv() makes no distinction between undefined and
-		// empty values, so we use syscall.Getenv()
-		if value, ok := syscall.Getenv(envKey); ok {
+		if value, ok := os.LookupEnv(envKey); ok {
 			if option.EnvDefaultDelim != "" {
 				usedDefault = strings.Split(value,
 					option.EnvDefaultDelim)
@@ -261,11 +271,14 @@ func (option *Option) clearDefault() {
 		}
 	}
 
+	option.isSetDefault = true
+
 	if len(usedDefault) > 0 {
 		option.empty()
 
 		for _, d := range usedDefault {
 			option.set(&d)
+			option.isSetDefault = true
 		}
 	} else {
 		tp := option.value.Type()
@@ -331,14 +344,27 @@ func (option *Option) isBool() bool {
 
 	for {
 		switch tp.Kind() {
+		case reflect.Slice, reflect.Ptr:
+			tp = tp.Elem()
 		case reflect.Bool:
 			return true
-		case reflect.Slice:
-			return (tp.Elem().Kind() == reflect.Bool)
 		case reflect.Func:
 			return tp.NumIn() == 0
-		case reflect.Ptr:
+		default:
+			return false
+		}
+	}
+}
+
+func (option *Option) isSignedNumber() bool {
+	tp := option.value.Type()
+
+	for {
+		switch tp.Kind() {
+		case reflect.Slice, reflect.Ptr:
 			tp = tp.Elem()
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Float32, reflect.Float64:
+			return true
 		default:
 			return false
 		}
@@ -411,4 +437,23 @@ func (option *Option) updateDefaultLiteral() {
 	}
 
 	option.defaultLiteral = def
+}
+
+func (option *Option) shortAndLongName() string {
+	ret := &bytes.Buffer{}
+
+	if option.ShortName != 0 {
+		ret.WriteRune(defaultShortOptDelimiter)
+		ret.WriteRune(option.ShortName)
+	}
+
+	if len(option.LongName) != 0 {
+		if option.ShortName != 0 {
+			ret.WriteRune('/')
+		}
+
+		ret.WriteString(option.LongName)
+	}
+
+	return ret.String()
 }
