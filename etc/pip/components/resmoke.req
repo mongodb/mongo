@@ -10,3 +10,4 @@ ocspbuilder == 0.10.2
 #grpcio == 1.28.1; platform_machine != "x86_64"
 #grpcio-tools == 1.28.1; platform_machine != "x86_64"
 #googleapis-common-protos == 1.51.0; platform_machine != "x86_64"
+blackduck == 0.0.51

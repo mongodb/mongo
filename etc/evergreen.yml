@@ -7462,6 +7462,37 @@ tasks:
   - func: "do setup"
   - func: "run idl tests"
 
+- name: blackduck_scanner
+  commands:
+  - func: "do non-compile setup"
+  - command: shell.exec
+    type: test
+    params:
+      working_dir: src
+      silent: true
+      script: |
+        # Create the Evergreen API credentials
+        cat > .restconfig.json <<END_OF_CREDS
+        {
+        "baseurl": "${blackduck_url}",
+        "username": "${blackduck_username}",
+        "password": "${blackduck_password}",
+        "debug": false
+        }
+        END_OF_CREDS
+  - command: shell.exec
+    type: setup
+    params:
+      working_dir: src/
+      script: |
+        set -o errexit
+        set -o verbose
+
+        # activate the virtualenv if it has been set up
+        ${activate_virtualenv}
+
+        python buildscripts/blackduck_hub.py -v scan
+
 - name: tla_plus
   commands:
   - func: "do non-compile setup"
@@ -9546,6 +9577,16 @@ buildvariants:
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
+
+- name: security-daily-cron
+  modules:
+  - enterprise
+  display_name: "~ Security Daily Cron"
+  run_on:
+  - rhel80-small
+  stepback: false
+  tasks:
+  - name: blackduck_scanner
 
 ###########################################
 #         Windows buildvariants           #
