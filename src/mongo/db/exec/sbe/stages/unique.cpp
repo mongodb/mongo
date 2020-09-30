@@ -1,0 +1,120 @@
+/**
+ *    Copyright (C) 2020-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/exec/sbe/stages/unique.h"
+
+namespace mongo {
+namespace sbe {
+UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
+                         value::SlotVector keys,
+                         PlanNodeId planNodeId)
+    : PlanStage("unique"_sd, planNodeId), _keySlots(keys) {
+    _children.emplace_back(std::move(input));
+}
+
+std::unique_ptr<PlanStage> UniqueStage::clone() const {
+    return std::make_unique<UniqueStage>(_children[0]->clone(), _keySlots, _commonStats.nodeId);
+}
+
+void UniqueStage::prepare(CompileCtx& ctx) {
+    _children[0]->prepare(ctx);
+    for (auto&& keySlot : _keySlots) {
+        _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, keySlot));
+    }
+}
+
+value::SlotAccessor* UniqueStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+    return _children[0]->getAccessor(ctx, slot);
+}
+
+void UniqueStage::open(bool reOpen) {
+    ++_commonStats.opens;
+    _children[0]->open(reOpen);
+}
+
+PlanState UniqueStage::getNext() {
+    while (_children[0]->getNext() == PlanState::ADVANCED) {
+        value::MaterializedRow key{_inKeyAccessors.size()};
+        size_t idx = 0;
+        for (auto& accessor : _inKeyAccessors) {
+            auto [tag, val] = accessor->getViewOfValue();
+            key.reset(idx++, false, tag, val);
+        }
+
+        ++_specificStats.dupsTested;
+        auto [it, inserted] = _seen.emplace(std::move(key));
+        if (inserted) {
+            const_cast<value::MaterializedRow&>(*it).makeOwned();
+            return PlanState::ADVANCED;
+        } else {
+            // This row has been seen already, so we skip it.
+            ++_specificStats.dupsDropped;
+        }
+    }
+
+    return PlanState::IS_EOF;
+}
+
+void UniqueStage::close() {
+    _children[0]->close();
+}
+
+std::unique_ptr<PlanStageStats> UniqueStage::getStats() const {
+    auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    for (auto&& child : _children) {
+        ret->children.emplace_back(child->getStats());
+    }
+    return ret;
+}
+
+const SpecificStats* UniqueStage::getSpecificStats() const {
+    return &_specificStats;
+}
+
+std::vector<DebugPrinter::Block> UniqueStage::debugPrint() const {
+    auto ret = PlanStage::debugPrint();
+
+    ret.emplace_back(DebugPrinter::Block("[`"));
+    for (size_t idx = 0; idx < _keySlots.size(); idx++) {
+        if (idx) {
+            ret.emplace_back(DebugPrinter::Block("`,"));
+        }
+        DebugPrinter::addIdentifier(ret, _keySlots[idx]);
+    }
+    ret.emplace_back(DebugPrinter::Block("`]"));
+
+    DebugPrinter::addNewLine(ret);
+    DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
+
+    return ret;
+}
+}  // namespace sbe
+}  // namespace mongo

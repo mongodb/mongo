@@ -190,6 +190,8 @@ private:
     void walkFrameProjectList(AstQuery& ast);
     void walkFunCall(AstQuery& ast);
     void walkUnionBranch(AstQuery& ast);
+    void walkSortedMergeBranch(AstQuery& ast);
+    void walkSortDirList(AstQuery& ast);
 
     void walkScan(AstQuery& ast);
     void walkParallelScan(AstQuery& ast);
@@ -219,6 +221,8 @@ private:
     void walkConsumerSpool(AstQuery& ast);
     void walkStackConsumerSpool(AstQuery& ast);
     void walkPlanNodeId(AstQuery& ast);
+    void walkUnique(AstQuery& ast);
+    void walkSortedMerge(AstQuery& ast);
 
     void walk(AstQuery& ast);
 
