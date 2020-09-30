@@ -46,6 +46,8 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(tenantMigrationBlockRead);
 MONGO_FAIL_POINT_DEFINE(tenantMigrationBlockWrite);
 
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+
 }  // namespace
 
 void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
@@ -290,6 +292,7 @@ ExecutorFuture<void> TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommi
             }
             return shouldStop;
         })
+        .withBackoffBetweenIterations(kExponentialBackoff)
         .on(_executor);
 }
 

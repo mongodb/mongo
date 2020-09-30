@@ -126,7 +126,7 @@ private:
                         return ExecutorFuture<ReturnType>(executor, std::move(s));
 
                     // Retry after a delay.
-                    return sleepFor(executor, Milliseconds(delay)).then([this, self]() mutable {
+                    return sleepFor(executor, delay.getNext()).then([this, self]() mutable {
                         return run();
                     });
                 });
@@ -159,9 +159,20 @@ public:
      * Creates a delay which takes place after evaluating the condition and before executing the
      * loop body.
      */
-    template <typename Delay>
-    auto withDelayBetweenIterations(Delay delay)&& {
-        return AsyncTryUntilWithDelay(std::move(_body), std::move(_condition), std::move(delay));
+    template <typename DurationType>
+    auto withDelayBetweenIterations(DurationType delay)&& {
+        return AsyncTryUntilWithDelay(
+            std::move(_body), std::move(_condition), ConstDelay<DurationType>(std::move(delay)));
+    }
+
+    /**
+     * Creates an exponential delay which takes place after evaluating the condition and before
+     * executing the loop body.
+     */
+    template <typename BackoffType>
+    auto withBackoffBetweenIterations(BackoffType backoff)&& {
+        return AsyncTryUntilWithDelay(
+            std::move(_body), std::move(_condition), BackoffDelay<BackoffType>(std::move(backoff)));
     }
 
     /**
@@ -180,6 +191,32 @@ public:
     }
 
 private:
+    template <typename DurationType>
+    class ConstDelay {
+    public:
+        explicit ConstDelay(DurationType delay) : _delay(delay) {}
+
+        Milliseconds getNext() {
+            return Milliseconds(_delay);
+        }
+
+    private:
+        DurationType _delay;
+    };
+
+    template <typename BackoffType>
+    class BackoffDelay {
+    public:
+        explicit BackoffDelay(BackoffType backoff) : _backoff(backoff) {}
+
+        Milliseconds getNext() {
+            return _backoff.nextSleep();
+        }
+
+    private:
+        BackoffType _backoff;
+    };
+
     /**
      * Helper class to perform the actual looping logic with a recursive member function run().
      * Mostly needed to clean up lambda captures and make the looping logic more readable.

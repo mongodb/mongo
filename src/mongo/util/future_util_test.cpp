@@ -69,6 +69,20 @@ private:
     executor::NetworkInterfaceMock* _network;
 };
 
+class TestBackoff {
+public:
+    TestBackoff(Milliseconds initialSleep) : _initialSleep(initialSleep), _lastSleep(0) {}
+
+    Milliseconds nextSleep() {
+        _lastSleep = _lastSleep == Milliseconds{0} ? _initialSleep : _lastSleep * 2;
+        return _lastSleep;
+    }
+
+private:
+    Milliseconds _initialSleep;
+    Milliseconds _lastSleep;
+};
+
 using AsyncTryUntilTest = FutureUtilTest;
 
 TEST_F(AsyncTryUntilTest, LoopExecutesOnceWithAlwaysTrueCondition) {
@@ -93,7 +107,7 @@ TEST_F(AsyncTryUntilTest, LoopExecutesUntilConditionIsTrue) {
     ASSERT_EQ(i, numLoops);
 }
 
-TEST_F(AsyncTryUntilTest, LoopDoesNotRespectDelayIfConditionIsAlreadyTrue) {
+TEST_F(AsyncTryUntilTest, LoopDoesNotRespectConstDelayIfConditionIsAlreadyTrue) {
     auto i = 0;
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
@@ -105,7 +119,19 @@ TEST_F(AsyncTryUntilTest, LoopDoesNotRespectDelayIfConditionIsAlreadyTrue) {
     ASSERT_EQ(i, 1);
 }
 
-TEST_F(AsyncTryUntilTest, LoopRespectsDelayAfterEvaluatingCondition) {
+TEST_F(AsyncTryUntilTest, LoopDoesNotRespectBackoffDelayIfConditionIsAlreadyTrue) {
+    auto i = 0;
+    auto resultFut = AsyncTry([&] { ++i; })
+                         .until([](Status s) { return true; })
+                         .withBackoffBetweenIterations(TestBackoff{Seconds(10000000)})
+                         .on(executor());
+    // This would hang for a very long time if the behavior were incorrect.
+    resultFut.wait();
+
+    ASSERT_EQ(i, 1);
+}
+
+TEST_F(AsyncTryUntilTest, LoopRespectsConstDelayAfterEvaluatingCondition) {
     const int numLoops = 2;
     auto i = 0;
     auto resultFut = AsyncTry([&] {
@@ -128,11 +154,61 @@ TEST_F(AsyncTryUntilTest, LoopRespectsDelayAfterEvaluatingCondition) {
     // Advance the time past the delay.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(network());
-        network()->advanceTime(network()->now() + Seconds{2000});
+        network()->advanceTime(network()->now() + Seconds{1000});
     }
 
     resultFut.wait();
 
+    ASSERT_EQ(i, numLoops);
+}
+
+TEST_F(AsyncTryUntilTest, LoopRespectsBackoffDelayAfterEvaluatingCondition) {
+    const int numLoops = 3;
+    auto i = 0;
+    auto resultFut = AsyncTry([&] {
+                         ++i;
+                         return i;
+                     })
+                         .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
+                         .withBackoffBetweenIterations(TestBackoff{Seconds(1000)})
+                         .on(executor());
+    ASSERT_FALSE(resultFut.isReady());
+
+    // Due to the backoff, the delays are going to be 1000 seconds and 2000 seconds.
+    // Advance the time some, but not enough to be past the first delay.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Seconds{100});
+    }
+
+    ASSERT_EQ(i, 1);
+    ASSERT_FALSE(resultFut.isReady());
+
+    // Advance the time past the first delay.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Seconds{1000});
+    }
+
+    ASSERT_EQ(i, 2);
+    ASSERT_FALSE(resultFut.isReady());
+
+    // Advance the time some more, but not enough to be past the second delay.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Seconds{1000});
+    }
+
+    ASSERT_EQ(i, 2);
+    ASSERT_FALSE(resultFut.isReady());
+
+    // Advance the time past the second delay.
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(network());
+        network()->advanceTime(network()->now() + Seconds{1000});
+    }
+
+    resultFut.wait();
     ASSERT_EQ(i, numLoops);
 }
 

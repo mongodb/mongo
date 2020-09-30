@@ -58,6 +58,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterDataSync);
 MONGO_FAIL_POINT_DEFINE(skipSendingRecipientSyncDataCommand);
 
 const Seconds kRecipientSyncDataTimeout(30);
+const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
     ServiceContext* serviceContext, StringData dbPrefix) {
@@ -189,6 +190,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
         .until([](StatusWith<repl::OpTime> swOpTime) {
             return shouldStopInsertingDonorStateDoc(swOpTime.getStatus());
         })
+        .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor);
 }
 
@@ -266,6 +268,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
         .until([](StatusWith<repl::OpTime> swOpTime) {
             return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus());
         })
+        .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor);
 }
 
@@ -303,6 +306,7 @@ TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
         .until([](StatusWith<repl::OpTime> swOpTime) {
             return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus());
         })
+        .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor);
 }
 
@@ -380,6 +384,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                    });
            })
         .until([](Status status) { return shouldStopSendingRecipientCommand(status); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor);
 }
 
