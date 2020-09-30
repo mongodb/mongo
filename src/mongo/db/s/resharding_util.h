@@ -36,6 +36,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -47,6 +48,21 @@
 namespace mongo {
 
 constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
+
+/**
+ * Helper method to construct a DonorShardEntry with the fields specified.
+ */
+DonorShardEntry makeDonorShard(ShardId shardId,
+                               DonorStateEnum donorState,
+                               boost::optional<Timestamp> minFetchTimestamp = boost::none);
+
+/**
+ * Helper method to construct a RecipientShardEntry with the fields specified.
+ */
+RecipientShardEntry makeRecipientShard(
+    ShardId shardId,
+    RecipientStateEnum recipientState,
+    boost::optional<Timestamp> strictConsistencyTimestamp = boost::none);
 
 /**
  * Gets the UUID for 'nss' from the 'cm'
@@ -110,6 +126,13 @@ void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,
 void validateReshardedChunks(const std::vector<mongo::BSONObj>& chunks,
                              OperationContext* opCtx,
                              const KeyPattern& keyPattern);
+
+/**
+ * Selects the highest minFetchTimestamp from the list of donors.
+ *
+ * Throws if not every donor has a minFetchTimestamp.
+ */
+Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorShards);
 
 /**
  * Asserts that there is not an overlap in the zone ranges.

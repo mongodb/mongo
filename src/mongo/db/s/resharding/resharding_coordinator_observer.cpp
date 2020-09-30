@@ -192,37 +192,31 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
     }
 }
 
-// TODO	SERVER-49572
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsCreatedCollection() {
     return _allRecipientsCreatedCollection.getFuture();
 }
 
-// TODO SERVER-49573
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllDonorsReadyToDonate() {
     return _allDonorsReportedMinFetchTimestamp.getFuture();
 }
 
-// TODO SERVER-49574
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsFinishedCloning() {
     return _allRecipientsFinishedCloning.getFuture();
 }
 
-// TODO SERVER-49575
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsInStrictConsistency() {
     return _allRecipientsReportedStrictConsistencyTimestamp.getFuture();
 }
 
-// TODO SERVER-49577
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllDonorsDroppedOriginalCollection() {
     return _allDonorsDroppedOriginalCollection.getFuture();
 }
 
-// TODO SERVER-49576
 SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsRenamedCollection() {
     return _allRecipientsRenamedCollection.getFuture();

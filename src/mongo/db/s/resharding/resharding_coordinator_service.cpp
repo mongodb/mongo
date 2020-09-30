@@ -665,9 +665,10 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
     return _reshardingCoordinatorObserver->awaitAllDonorsReadyToDonate()
         .thenRunOn(**executor)
         .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
-            // TODO SERVER-49573 Calculate the fetchTimestamp from the updatedStateDoc then pass it
-            // into _runUpdates.
-            this->_runUpdates(CoordinatorStateEnum::kCloning, updatedStateDoc);
+            auto highestMinFetchTimestamp =
+                getHighestMinFetchTimestamp(updatedStateDoc.getDonorShards());
+            this->_runUpdates(
+                CoordinatorStateEnum::kCloning, updatedStateDoc, highestMinFetchTimestamp);
         });
 }
 
@@ -776,6 +777,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_runUpdates(
         auto& fetchTimestampStruct = updatedCoordinatorDoc.getFetchTimestampStruct();
         if (fetchTimestampStruct.getFetchTimestamp())
             invariant(fetchTimestampStruct.getFetchTimestamp().get() == fetchTimestamp.get());
+
+        invariant(!fetchTimestamp->isNull());
 
         fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
     }

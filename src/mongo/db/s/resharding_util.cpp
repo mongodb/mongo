@@ -118,6 +118,32 @@ boost::optional<TypeCollectionDonorFields> getDonorFields(OperationContext* opCt
 
 }  // namespace
 
+DonorShardEntry makeDonorShard(ShardId shardId,
+                               DonorStateEnum donorState,
+                               boost::optional<Timestamp> minFetchTimestamp) {
+    DonorShardEntry entry(shardId);
+    entry.setState(donorState);
+    if (minFetchTimestamp) {
+        auto minFetchTimestampStruct = MinFetchTimestamp();
+        minFetchTimestampStruct.setMinFetchTimestamp(minFetchTimestamp);
+        entry.setMinFetchTimestampStruct(minFetchTimestampStruct);
+    }
+    return entry;
+}
+
+RecipientShardEntry makeRecipientShard(ShardId shardId,
+                                       RecipientStateEnum recipientState,
+                                       boost::optional<Timestamp> strictConsistencyTimestamp) {
+    RecipientShardEntry entry(shardId);
+    entry.setState(recipientState);
+    if (strictConsistencyTimestamp) {
+        auto strictConsistencyTimestampStruct = StrictConsistencyTimestamp();
+        strictConsistencyTimestampStruct.setStrictConsistencyTimestamp(strictConsistencyTimestamp);
+        entry.setStrictConsistencyTimestampStruct(strictConsistencyTimestampStruct);
+    }
+    return entry;
+}
+
 UUID getCollectionUUIDFromChunkManger(const NamespaceString& originalNss, const ChunkManager& cm) {
     auto collectionUUID = cm.getUUID();
     uassert(ErrorCodes::InvalidUUID,
@@ -267,6 +293,23 @@ void validateReshardedChunks(const std::vector<mongo::BSONObj>& chunks,
     }
 
     checkForHolesAndOverlapsInChunks(validChunks, keyPattern);
+}
+
+Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorShards) {
+    invariant(!donorShards.empty());
+
+    auto maxMinFetchTimestamp = Timestamp::min();
+    for (auto& donor : donorShards) {
+        auto donorFetchTimestamp = donor.getMinFetchTimestamp();
+        uassert(4957300,
+                "All donors must have a minFetchTimestamp, but donor {} does not."_format(
+                    donor.getId()),
+                donorFetchTimestamp.is_initialized());
+        if (maxMinFetchTimestamp < donorFetchTimestamp.value()) {
+            maxMinFetchTimestamp = donorFetchTimestamp.value();
+        }
+    }
+    return maxMinFetchTimestamp;
 }
 
 void checkForOverlappingZones(std::vector<TagsType>& zones) {

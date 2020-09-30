@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/unittest/unittest.h"
@@ -43,34 +44,6 @@ namespace {
 
 class ReshardingCoordinatorObserverTest : public unittest::Test {
 protected:
-    DonorShardEntry makeDonorShard(ShardId shardId,
-                                   DonorStateEnum donorState,
-                                   boost::optional<Timestamp> minFetchTimestamp = boost::none) {
-        DonorShardEntry entry(shardId);
-        entry.setState(donorState);
-        if (minFetchTimestamp) {
-            auto minFetchTimestampStruct = MinFetchTimestamp();
-            minFetchTimestampStruct.setMinFetchTimestamp(minFetchTimestamp);
-            entry.setMinFetchTimestampStruct(minFetchTimestampStruct);
-        }
-        return entry;
-    }
-
-    RecipientShardEntry makeRecipientShard(
-        ShardId shardId,
-        RecipientStateEnum recipientState,
-        boost::optional<Timestamp> strictConsistencyTimestamp = boost::none) {
-        RecipientShardEntry entry(shardId);
-        entry.setState(recipientState);
-        if (strictConsistencyTimestamp) {
-            auto strictConsistencyTimestampStruct = StrictConsistencyTimestamp();
-            strictConsistencyTimestampStruct.setStrictConsistencyTimestamp(
-                strictConsistencyTimestamp);
-            entry.setStrictConsistencyTimestampStruct(strictConsistencyTimestampStruct);
-        }
-        return entry;
-    }
-
     ReshardingCoordinatorDocument makeCoordinatorDocWithRecipientsAndDonors(
         std::vector<RecipientShardEntry>& recipients, std::vector<DonorShardEntry>& donors) {
         auto coordinatorDoc = ReshardingCoordinatorDocument();

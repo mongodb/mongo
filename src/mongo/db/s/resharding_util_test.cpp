@@ -174,6 +174,33 @@ private:
                                                                   << "hashed"));
 };
 
+// Confirm the highest minFetchTimestamp is properly computed.
+TEST(ReshardingUtilTest, HighestMinFetchTimestampSucceeds) {
+    std::vector<DonorShardEntry> donorShards{
+        makeDonorShard(ShardId("s0"), DonorStateEnum::kDonating, Timestamp(10, 2)),
+        makeDonorShard(ShardId("s1"), DonorStateEnum::kDonating, Timestamp(10, 3)),
+        makeDonorShard(ShardId("s2"), DonorStateEnum::kDonating, Timestamp(10, 1))};
+    auto highestMinFetchTimestamp = getHighestMinFetchTimestamp(donorShards);
+    ASSERT_EQ(Timestamp(10, 3), highestMinFetchTimestamp);
+}
+
+TEST(ReshardingUtilTest, HighestMinFetchTimestampThrowsWhenDonorMissingTimestamp) {
+    std::vector<DonorShardEntry> donorShards{
+        makeDonorShard(ShardId("s0"), DonorStateEnum::kDonating, Timestamp(10, 3)),
+        makeDonorShard(ShardId("s1"), DonorStateEnum::kDonating),
+        makeDonorShard(ShardId("s2"), DonorStateEnum::kDonating, Timestamp(10, 2))};
+    ASSERT_THROWS_CODE(getHighestMinFetchTimestamp(donorShards), DBException, 4957300);
+}
+
+TEST(ReshardingUtilTest, HighestMinFetchTimestampSucceedsWithDonorStateGTkDonating) {
+    std::vector<DonorShardEntry> donorShards{
+        makeDonorShard(ShardId("s0"), DonorStateEnum::kMirroring, Timestamp(10, 2)),
+        makeDonorShard(ShardId("s1"), DonorStateEnum::kDonating, Timestamp(10, 3)),
+        makeDonorShard(ShardId("s2"), DonorStateEnum::kDonating, Timestamp(10, 1))};
+    auto highestMinFetchTimestamp = getHighestMinFetchTimestamp(donorShards);
+    ASSERT_EQ(Timestamp(10, 3), highestMinFetchTimestamp);
+}
+
 // Validate resharded chunks tests.
 
 TEST_F(ReshardingUtilTest, SuccessfulValidateReshardedChunkCase) {
