@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem.hpp>
+#include <fstream>
 #include <memory>
 
 #include "mongo/base/data_type_endian.h"
@@ -41,6 +42,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -649,6 +651,170 @@ public:
 };
 
 mongo::unittest::OldStyleSuiteInitializer<SorterSuite> extSortTests;
+
+/**
+ * This suite includes test cases for resumable index builds where the Sorter is reconstructed from
+ * state persisted to disk during a previous clean shutdown.
+ */
+class SorterMakeFromExistingRangesTest : public unittest::Test {
+public:
+    static std::vector<SorterRange> makeSampleRanges();
+};
+
+// static
+std::vector<SorterRange> SorterMakeFromExistingRangesTest::makeSampleRanges() {
+    std::vector<SorterRange> ranges;
+    // Sample data extracted from resumable_index_build_bulk_load_phase.js test run.
+    ranges.push_back({0, 24, 18294710});
+    return ranges;
+}
+
+DEATH_TEST_F(
+    SorterMakeFromExistingRangesTest,
+    NonZeroLimit,
+    "Creating a Sorter from existing ranges is only available with the NoLimitSorter (limit 0)") {
+    auto opts = SortOptions().Limit(1ULL);
+    IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
+}
+
+DEATH_TEST_F(SorterMakeFromExistingRangesTest, ExtSortNotAllowed, "opts.extSortAllowed") {
+    auto opts = SortOptions();
+    ASSERT_FALSE(opts.extSortAllowed);
+    IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
+}
+
+DEATH_TEST_F(SorterMakeFromExistingRangesTest, EmptyTempDir, "!opts.tempDir.empty()") {
+    auto opts = SortOptions().ExtSortAllowed();
+    ASSERT_EQUALS("", opts.tempDir);
+    IWSorter::makeFromExistingRanges("", {}, opts, IWComparator(ASC));
+}
+
+DEATH_TEST_F(SorterMakeFromExistingRangesTest, EmptyFileName, "!fileName.empty()") {
+    std::string fileName;
+    auto opts = SortOptions().ExtSortAllowed().TempDir("unused_temp_dir");
+    IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC));
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
+    auto fileName = "unused_sorter_file";
+    auto opts = SortOptions().ExtSortAllowed().TempDir("unused_temp_dir");
+    auto sorter = std::unique_ptr<IWSorter>(
+        IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC)));
+
+    // Sorter::_usedDisk is set when NoLimitSorter is constructed from existing ranges.
+    ASSERT_TRUE(sorter->usedDisk());
+
+    auto iter = std::unique_ptr<IWIterator>(sorter->done());
+    iter->openSource();
+    ASSERT_FALSE(iter->more());
+    iter->closeSource();
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, MissingFile) {
+    auto fileName = "unused_sorter_file";
+    auto tempDir = "unused_temp_dir";
+    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir);
+    ASSERT_THROWS_WITH_CHECK(
+        IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)),
+        std::exception,
+        [&](const auto& ex) {
+            ASSERT_STRING_CONTAINS(ex.what(), tempDir);
+            ASSERT_STRING_CONTAINS(ex.what(), fileName);
+        });
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, EmptyFile) {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto tempFilePath = boost::filesystem::path(tempDir.path()) / "empty_sorter_file";
+    ASSERT(std::ofstream(tempFilePath.string()))
+        << "failed to create empty temporary file: " << tempFilePath.string();
+    auto fileName = tempFilePath.filename().string();
+    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+    // 16815 - unexpected empty file.
+    ASSERT_THROWS_CODE(
+        IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)),
+        DBException,
+        16815);
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+    auto tempFilePath = boost::filesystem::path(tempDir.path()) / "corrupted_sorter_file";
+    {
+        std::ofstream ofs(tempFilePath.string());
+        ASSERT(ofs) << "failed to create temporary file: " << tempFilePath.string();
+        ofs << "invalid sorter data";
+    }
+    auto fileName = tempFilePath.filename().string();
+    auto opts = SortOptions().ExtSortAllowed().TempDir(tempDir.path());
+    auto sorter = std::unique_ptr<IWSorter>(
+        IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)));
+
+    // Sorter::_usedDisk is set when NoLimitSorter is constructed from existing ranges.
+    ASSERT_TRUE(sorter->usedDisk());
+
+    // 16817 - error reading file.
+    ASSERT_THROWS_CODE(sorter->done(), DBException, 16817);
+}
+
+TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
+    unittest::TempDir tempDir(_agent.getSuiteName() + "_" + _agent.getTestName());
+
+    auto opts = SortOptions()
+                    .ExtSortAllowed()
+                    .TempDir(tempDir.path())
+                    .MaxMemoryUsageBytes(sizeof(IWSorter::Data));
+
+    IWPair pairInsertedBeforeShutdown(1, 100);
+
+    // This test uses two sorters. The first sorter is used to persist data to disk in a shutdown
+    // scenario. On startup, we will restore the original state of the sorter using the persisted
+    // data.
+    IWSorter::PersistedState state;
+    {
+        auto sorterBeforeShutdown =
+            std::unique_ptr<IWSorter>(IWSorter::make(opts, IWComparator(ASC)));
+        sorterBeforeShutdown->add(pairInsertedBeforeShutdown.first,
+                                  pairInsertedBeforeShutdown.second);
+        state = sorterBeforeShutdown->persistDataForShutdown();
+        ASSERT_FALSE(state.fileName.empty());
+        ASSERT_EQUALS(1U, state.ranges.size()) << state.ranges.size();
+    }
+
+    // On restart, reconstruct sorter from persisted state.
+    auto sorter = std::unique_ptr<IWSorter>(
+        IWSorter::makeFromExistingRanges(state.fileName, state.ranges, opts, IWComparator(ASC)));
+
+    // Sorter::_usedDisk is set when NoLimitSorter is constructed from existing ranges.
+    ASSERT_TRUE(sorter->usedDisk());
+
+    // Ensure that the restored sorter can accept additional data.
+    IWPair pairInsertedAfterStartup(2, 200);
+    sorter->add(pairInsertedAfterStartup.first, pairInsertedAfterStartup.second);
+
+    // Read data from sorter.
+    {
+        auto iter = std::unique_ptr<IWIterator>(sorter->done());
+        iter->openSource();
+
+        ASSERT(iter->more());
+        auto pair1 = iter->next();
+        ASSERT_EQUALS(pairInsertedBeforeShutdown.first, pair1.first)
+            << pair1.first << "/" << pair1.second;
+        ASSERT_EQUALS(pairInsertedBeforeShutdown.second, pair1.second)
+            << pair1.first << "/" << pair1.second;
+
+        ASSERT(iter->more());
+        auto pair2 = iter->next();
+        ASSERT_EQUALS(pairInsertedAfterStartup.first, pair2.first)
+            << pair2.first << "/" << pair2.second;
+        ASSERT_EQUALS(pairInsertedAfterStartup.second, pair2.second)
+            << pair2.first << "/" << pair2.second;
+
+        ASSERT_FALSE(iter->more());
+        iter->closeSource();
+    }
+}
 
 }  // namespace
 }  // namespace sorter
