@@ -36,7 +36,7 @@ function CommonOps(node) {
     const testColl = testDB.getCollection(collName);
     assert.commandWorked(testColl.insert({a: 1}));
 
-    // Puase all index builds.
+    // Pause all index builds.
     IndexBuildTest.pauseIndexBuilds(node);
 
     jsTestLog("Starting background index build in parallel shell.");
