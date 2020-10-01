@@ -104,8 +104,8 @@ namespace mongo {
 
 using std::string;
 using std::stringstream;
-using std::vector;
 using std::unique_ptr;
+using std::vector;
 
 PlanCacheCommand::PlanCacheCommand(const string& name,
                                    const string& helpText,
@@ -259,11 +259,18 @@ Status PlanCacheListQueryShapes::list(const PlanCache& planCache, BSONObjBuilder
         invariant(entry);
 
         BSONObjBuilder shapeBuilder(arrayBuilder.subobjStart());
-        shapeBuilder.append("query", entry->query);
-        shapeBuilder.append("sort", entry->sort);
-        shapeBuilder.append("projection", entry->projection);
-        if (!entry->collation.isEmpty()) {
-            shapeBuilder.append("collation", entry->collation);
+
+        // Most details demonstrating the shape of the query must be omitted if the plan cache entry
+        // has had its debug info stripped. Debug info may be omitted from the plan cache entry in
+        // order to reduce the plan cache's memory footprint.
+        if (entry->debugInfo) {
+            const auto& createdFromQuery = entry->debugInfo->createdFromQuery;
+            shapeBuilder.append("query", createdFromQuery.filter);
+            shapeBuilder.append("sort", createdFromQuery.sort);
+            shapeBuilder.append("projection", createdFromQuery.projection);
+            if (!createdFromQuery.collation.isEmpty()) {
+                shapeBuilder.append("collation", createdFromQuery.collation);
+            }
         }
         shapeBuilder.doneFast();
 
@@ -403,8 +410,11 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
 
     BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
     size_t numPlans = entry->plannerData.size();
-    invariant(numPlans == entry->decision->stats.size());
-    invariant(numPlans == entry->decision->scores.size());
+    if (entry->debugInfo) {
+        invariant(numPlans == entry->debugInfo->decision->stats.size());
+        invariant(numPlans == entry->debugInfo->decision->scores.size());
+    }
+
     for (size_t i = 0; i < numPlans; ++i) {
         BSONObjBuilder planBob(plansBuilder.subobjStart());
 
@@ -414,30 +424,34 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
         detailsBob.append("solution", entry->plannerData[i]->toString());
         detailsBob.doneFast();
 
-        // reason is comprised of score and initial stats provided by
-        // multi plan runner.
-        BSONObjBuilder reasonBob(planBob.subobjStart("reason"));
-        reasonBob.append("score", entry->decision->scores[i]);
-        BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
-        PlanStageStats* stats = entry->decision->stats[i].get();
-        if (stats) {
-            Explain::statsToBSON(*stats, &statsBob);
-        }
-        statsBob.doneFast();
-        reasonBob.doneFast();
-
-        // BSON object for 'feedback' field shows scores from historical executions of the plan.
-        BSONObjBuilder feedbackBob(planBob.subobjStart("feedback"));
-        if (i == 0U) {
-            feedbackBob.append("nfeedback", int(entry->feedback.size()));
-            BSONArrayBuilder scoresBob(feedbackBob.subarrayStart("scores"));
-            for (size_t i = 0; i < entry->feedback.size(); ++i) {
-                BSONObjBuilder scoreBob(scoresBob.subobjStart());
-                scoreBob.append("score", entry->feedback[i]->score);
+        // Some information for each candidate plan can only be provided if the plan cache entry
+        // contains debug info.
+        if (entry->debugInfo) {
+            const auto& debugInfo = *entry->debugInfo;
+            {
+                // 'reason' is comprised of score and initial stats provided by the multi-planner.
+                BSONObjBuilder reasonBob(planBob.subobjStart("reason"));
+                reasonBob.append("score", debugInfo.decision->scores[i]);
+                {
+                    BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
+                    PlanStageStats* stats = debugInfo.decision->stats[i].get();
+                    if (stats) {
+                        Explain::statsToBSON(*stats, &statsBob);
+                    }
+                }
             }
-            scoresBob.doneFast();
+
+            // BSON object for 'feedback' field shows scores from historical executions of the plan.
+            BSONObjBuilder feedbackBob(planBob.subobjStart("feedback"));
+            if (i == 0U) {
+                feedbackBob.append("nfeedback", int(debugInfo.feedback.size()));
+                BSONArrayBuilder scoresBob(feedbackBob.subarrayStart("scores"));
+                for (auto&& feedback : debugInfo.feedback) {
+                    BSONObjBuilder scoreBob(scoresBob.subobjStart());
+                    scoreBob.append("score", feedback->score);
+                }
+            }
         }
-        feedbackBob.doneFast();
 
         planBob.append("filterSet", entry->plannerData[i]->indexFilterApplied);
     }
@@ -447,6 +461,8 @@ Status PlanCacheListPlans::list(OperationContext* opCtx,
     // Append the time the entry was inserted into the plan cache.
     bob->append("timeOfCreation", entry->timeOfCreation);
 
+    bob->append("works", static_cast<long long>(entry->decisionWorks));
+    bob->append("estimatedSizeBytes", static_cast<long long>(entry->estimatedEntrySizeBytes));
     return Status::OK();
 }
 
