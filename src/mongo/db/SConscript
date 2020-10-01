@@ -1524,7 +1524,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        'api_parameters',
     ],
 )
 

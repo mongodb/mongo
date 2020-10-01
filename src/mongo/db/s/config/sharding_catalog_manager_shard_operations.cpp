@@ -43,7 +43,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/api_parameters.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
@@ -146,7 +145,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     auto host = std::move(swHost.getValue());
 
     executor::RemoteCommandRequest request(
-        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), opCtx, Seconds(30));
+        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), nullptr, Seconds(30));
 
     executor::RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");

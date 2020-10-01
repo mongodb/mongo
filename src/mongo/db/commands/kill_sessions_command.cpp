@@ -63,9 +63,9 @@ KillAllSessionsByPatternSet patternsForLoggedInUser(OperationContext* opCtx) {
             User* user = authzSession->lookupUser(*iter);
             invariant(user);
 
-            auto item = makeKillAllSessionsByPattern(opCtx);
-            item.pattern.setUid(user->getDigest());
-            patterns.emplace(std::move(item));
+            auto pattern = makeKillAllSessionsByPattern(opCtx);
+            pattern.setUid(user->getDigest());
+            patterns.emplace(std::move(pattern));
         }
     } else {
         patterns.emplace(makeKillAllSessionsByPattern(opCtx));
