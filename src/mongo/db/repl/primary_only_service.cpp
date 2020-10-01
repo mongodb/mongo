@@ -185,6 +185,12 @@ void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyServ
                             << ") with state document namespace \"" << ns
                             << "\" that is already in use by service "
                             << existingService->getServiceName());
+    LOGV2_INFO(
+        5123008,
+        "Successfully registered PrimaryOnlyService {service} with state documents stored in {ns}",
+        "Successfully registered PrimaryOnlyService",
+        "service"_attr = name,
+        "ns"_attr = ns);
 }
 
 PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByName(StringData serviceName) {
@@ -391,6 +397,14 @@ void PrimaryOnlyService::onStepDown() {
         return;
     }
 
+    LOGV2_INFO(5123007,
+               "Interrupting (due to stepDown) PrimaryOnlyService {service} with {numInstances} "
+               "currently running instances and {numOperationContexts} associated operations",
+               "Interrupting PrimaryOnlyService due to stepDown",
+               "service"_attr = getServiceName(),
+               "numInstances"_attr = _instances.size(),
+               "numOperationContexts"_attr = _opCtxs.size());
+
     if (_scopedExecutor) {
         (*_scopedExecutor)->shutdown();
     }
@@ -417,6 +431,15 @@ void PrimaryOnlyService::shutdown() {
 
     {
         stdx::lock_guard lk(_mutex);
+
+        LOGV2_INFO(
+            5123006,
+            "Shutting down PrimaryOnlyService {service} with {numInstances} currently running "
+            "instances and {numOperationContexts} associated operations",
+            "Shutting down PrimaryOnlyService",
+            "service"_attr = getServiceName(),
+            "numInstances"_attr = _instances.size(),
+            "numOperationContexts"_attr = _opCtxs.size());
 
         // Save the executor to join() with it outside of _mutex.
         using std::swap;
@@ -457,7 +480,7 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
             str::stream() << "Missing _id element when adding new instance of PrimaryOnlyService \""
                           << getServiceName() << "\"",
             !idElem.eoo());
-    InstanceID instanceID = idElem.wrap();
+    InstanceID instanceID = idElem.wrap().getOwned();
 
     stdx::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(
@@ -475,12 +498,12 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::getOrCreateIns
     if (it != _instances.end()) {
         return it->second;
     }
-    auto [it2, inserted] = _instances.emplace(std::move(instanceID).getOwned(),
-                                              constructInstance(std::move(initialState)));
+    auto [it2, inserted] =
+        _instances.emplace(instanceID, constructInstance(std::move(initialState)));
     invariant(inserted);
 
     // Kick off async work to run the instance
-    _scheduleRun(lk, it2->second);
+    _scheduleRun(lk, it2->second, instanceID);
 
     return it2->second;
 }
@@ -525,7 +548,23 @@ void PrimaryOnlyService::releaseAllInstances() {
 
 void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
     std::vector<BSONObj> stateDocuments;
+
+    auto serviceName = getServiceName();
+    LOGV2_INFO(5123005,
+               "Rebuilding PrimaryOnlyService {service} due to stepUp",
+               "Rebuilding PrimaryOnlyService due to stepUp",
+               "service"_attr = serviceName);
+
     if (!MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
+        auto ns = getStateDocumentsNS();
+        LOGV2_DEBUG(5123004,
+                    2,
+                    "Querying {ns} to look for state documents while rebuilding PrimaryOnlyService "
+                    "{service}",
+                    "Querying to look for state documents while rebuiding PrimaryOnlyService",
+                    "ns"_attr = ns,
+                    "service"_attr = serviceName);
+
         // The PrimaryOnlyServiceClientObserver will make any OpCtx created as part of a
         // PrimaryOnlyService immediately get interrupted if the service is not in state kRunning.
         // Since we are in State::kRebuilding here, we need to install a
@@ -540,23 +579,25 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
                     Status(ErrorCodes::InternalError, "Querying state documents failed"));
             }
 
-            auto cursor = client.query(getStateDocumentsNS(), Query());
+            auto cursor = client.query(ns, Query());
             while (cursor->more()) {
                 stateDocuments.push_back(cursor->nextSafe().getOwned());
             }
         } catch (const DBException& e) {
-            LOGV2_ERROR(4923601,
-                        "Failed to start PrimaryOnlyService {service} because the query on {ns} "
-                        "for state documents failed due to {error}",
-                        "ns"_attr = getStateDocumentsNS(),
-                        "service"_attr = getServiceName(),
-                        "error"_attr = e);
+            LOGV2_ERROR(
+                4923601,
+                "Failed to start PrimaryOnlyService {service} because the query on {ns} "
+                "for state documents failed due to {error}",
+                "Failed to start PrimaryOnlyService because the query for state documents failed",
+                "service"_attr = serviceName,
+                "ns"_attr = ns,
+                "error"_attr = e);
 
             Status status = e.toStatus();
             status.addContext(str::stream()
-                              << "Failed to start PrimaryOnlyService \"" << getServiceName()
-                              << "\" because the query for state documents on ns \""
-                              << getStateDocumentsNS() << "\" failed");
+                              << "Failed to start PrimaryOnlyService \"" << serviceName
+                              << "\" because the query for state documents on ns \"" << ns
+                              << "\" failed");
 
             stdx::lock_guard lk(_mutex);
             if (_state != State::kRebuilding || _term != term) {
@@ -590,6 +631,15 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
     invariant(_instances.empty());
     invariant(_term == term);
 
+    LOGV2_DEBUG(5123003,
+                2,
+                "While rebuilding PrimaryOnlyService {service}, found {numDocuments} state "
+                "documents corresponding to instances of that service",
+                "Found state documents while rebuilding PrimaryOnlyService that correspond to "
+                "instances of that service",
+                "service"_attr = serviceName,
+                "numDocuments"_attr = stateDocuments.size());
+
     for (auto&& doc : stateDocuments) {
         auto idElem = doc["_id"];
         fassert(4923602, !idElem.eoo());
@@ -598,18 +648,21 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
 
         auto [_, inserted] = _instances.emplace(instanceID, instance);
         invariant(inserted);
-        _scheduleRun(lk, std::move(instance));
+        _scheduleRun(lk, std::move(instance), instanceID);
     }
     _state = State::kRunning;
     _rebuildCV.notify_all();
 }
 
-void PrimaryOnlyService::_scheduleRun(WithLock wl, std::shared_ptr<Instance> instance) {
+void PrimaryOnlyService::_scheduleRun(WithLock wl,
+                                      std::shared_ptr<Instance> instance,
+                                      InstanceID instanceID) {
     (*_scopedExecutor)
         ->schedule([this,
                     instance = std::move(instance),
                     scopedExecutor = _scopedExecutor,
-                    executor = _executor](auto status) {
+                    executor = _executor,
+                    instanceID](auto status) {
             if (ErrorCodes::isCancelationError(status) ||
                 ErrorCodes::InterruptedDueToReplStateChange ==  // from kExecutorShutdownStatus
                     status) {
@@ -620,6 +673,13 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl, std::shared_ptr<Instance> ins
             invariant(!instance->_running);
             instance->_running = true;
 
+            LOGV2_DEBUG(
+                5123002,
+                3,
+                "Starting instance of PrimaryOnlyService {service} with InstanceID {instanceID}",
+                "Starting instance of PrimaryOnlyService",
+                "service"_attr = getServiceName(),
+                "instanceID"_attr = instanceID);
             instance->run(std::move(scopedExecutor));
         });
 }

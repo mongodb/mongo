@@ -304,7 +304,7 @@ private:
      * Schedules work to call the provided instance's 'run' method. Must be called while holding
      * _mutex.
      */
-    void _scheduleRun(WithLock, std::shared_ptr<Instance> instance);
+    void _scheduleRun(WithLock, std::shared_ptr<Instance> instance, InstanceID instanceID);
 
     ServiceContext* const _serviceContext;
 
