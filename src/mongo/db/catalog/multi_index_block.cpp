@@ -461,7 +461,8 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
             n++;
         }
     } catch (DBException& ex) {
-        if (ex.isA<ErrorCategory::Interruption>() || ex.isA<ErrorCategory::ShutdownError>()) {
+        if (ex.isA<ErrorCategory::Interruption>() || ex.isA<ErrorCategory::ShutdownError>() ||
+            ErrorCodes::IndexBuildAborted == ex.code()) {
             // If the collection scan is stopped because due to an interrupt or shutdown event, we
             // leave the internal state intact to ensure we have the correct information for
             // resuming this index build during startup and rollback.
