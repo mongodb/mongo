@@ -173,12 +173,10 @@ public:
         bool appendReplicationProcess = configElement.numberInt() > 0;
 
         BSONObjBuilder result;
-        // TODO SERVER-50219: Change useLegacyResponseFields to false once the serverStatus changes
-        // to remove master-slave terminology are merged.
         appendReplicationInfo(opCtx,
                               &result,
                               appendReplicationProcess,
-                              true /* useLegacyResponseFields */,
+                              false /* useLegacyResponseFields */,
                               boost::none /* clientTopologyVersion */,
                               boost::none /* maxAwaitTimeMS */);
 

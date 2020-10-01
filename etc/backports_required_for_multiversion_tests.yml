@@ -80,6 +80,8 @@ all:
     test_file: jstests/replsets/change_sync_source_in_initial_sync.js
   - ticket: SERVER-50415
     test_file: jstests/sharding/awaitable_isMaster_primary_failures.js
+  - ticket: SERVER-50420
+    test_file: jstests/replsets/server_status_repl_is_writable_primary.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
