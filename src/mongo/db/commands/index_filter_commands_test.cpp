@@ -173,17 +173,17 @@ bool planCacheContains(OperationContext* opCtx,
 
     // Search keys.
     bool found = false;
-    for (vector<PlanCacheEntry*>::const_iterator i = entries.begin(); i != entries.end(); i++) {
-        PlanCacheEntry* entry = *i;
+    for (auto&& entry : entries) {
+        ASSERT(entry->debugInfo);
+        const auto& createdFromQuery = entry->debugInfo->createdFromQuery;
 
-        // Canonicalizing query shape in cache entry to get cache key.
-        // Alternatively, we could add key to PlanCacheEntry but that would be used in one place
-        // only.
-        auto qr = stdx::make_unique<QueryRequest>(nss);
-        qr->setFilter(entry->query);
-        qr->setSort(entry->sort);
-        qr->setProj(entry->projection);
-        qr->setCollation(entry->collation);
+        // Canonicalize the query shape stored in the cache entry in order to get the plan cache
+        // key.
+        auto qr = std::make_unique<QueryRequest>(nss);
+        qr->setFilter(createdFromQuery.filter);
+        qr->setSort(createdFromQuery.sort);
+        qr->setProj(createdFromQuery.projection);
+        qr->setCollation(createdFromQuery.collation);
         auto statusWithCurrentQuery = CanonicalQuery::canonicalize(opCtx, std::move(qr));
         ASSERT_OK(statusWithCurrentQuery.getStatus());
         unique_ptr<CanonicalQuery> currentQuery = std::move(statusWithCurrentQuery.getValue());

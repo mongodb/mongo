@@ -409,34 +409,8 @@ bool PlanCache::shouldCacheQuery(const CanonicalQuery& query) {
     return true;
 }
 
-//
-// CachedSolution
-//
-
-CachedSolution::CachedSolution(const PlanCacheKey& key, const PlanCacheEntry& entry)
-    : plannerData(entry.plannerData.size()),
-      key(key),
-      query(entry.query.getOwned()),
-      sort(entry.sort.getOwned()),
-      projection(entry.projection.getOwned()),
-      collation(entry.collation.getOwned()),
-      decisionWorks(entry.decision->stats[0]->common.works) {
-    // CachedSolution should not having any references into
-    // cache entry. All relevant data should be cloned/copied.
-    for (size_t i = 0; i < entry.plannerData.size(); ++i) {
-        verify(entry.plannerData[i]);
-        plannerData[i] = entry.plannerData[i]->clone();
-    }
-}
-
-CachedSolution::~CachedSolution() {
-    for (std::vector<SolutionCacheData*>::const_iterator i = plannerData.begin();
-         i != plannerData.end();
-         ++i) {
-        SolutionCacheData* scd = *i;
-        delete scd;
-    }
-}
+CachedSolution::CachedSolution(const PlanCacheEntry& entry)
+    : plannerData(entry.plannerData[0]->clone()), decisionWorks(entry.decisionWorks) {}
 
 //
 // PlanCacheEntry
@@ -449,10 +423,11 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
     Date_t timeOfCreation) {
     invariant(decision);
 
-    // The caller of this constructor is responsible for ensuring
-    // that the QuerySolution 's' has valid cacheData. If there's no
-    // data to cache you shouldn't be trying to construct a PlanCacheEntry.
+    const size_t decisionWorks = decision->stats[0]->common.works;
 
+    // The caller of this constructor is responsible for ensuring that the QuerySolution has valid
+    // cacheData. If there's no data to cache you shouldn't be trying to construct a PlanCacheEntry.
+    //
     // Copy the solution's cache data into the plan cache entry.
     std::vector<std::unique_ptr<const SolutionCacheData>> solutionCacheData(solutions.size());
     for (size_t i = 0; i < solutions.size(); ++i) {
@@ -461,53 +436,57 @@ std::unique_ptr<PlanCacheEntry> PlanCacheEntry::create(
             std::unique_ptr<const SolutionCacheData>(solutions[i]->cacheData->clone());
     }
 
-    const QueryRequest& qr = query.getQueryRequest();
-    BSONObjBuilder projBuilder;
-    for (auto elem : qr.getProj()) {
-        if (elem.fieldName()[0] == '$') {
-            continue;
+    // If the cumulative size of the plan caches is estimated to remain within a predefined
+    // threshold, then include additional debug info which is not strictly necessary for the plan
+    // cache to be functional. Once the cumulative plan cache size exceeds this threshold, omit this
+    // debug info as a heuristic to prevent plan cache memory consumption from growing too large.
+    const bool includeDebugInfo = planCacheTotalSizeEstimateBytes.get() <
+        internalQueryCacheMaxSizeBytesBeforeStripDebugInfo.load();
+
+    std::unique_ptr<DebugInfo> debugInfo;
+    if (includeDebugInfo) {
+        // Strip projections on $-prefixed fields, as these are added by internal callers of the
+        // system and are not considered part of the user projection.
+        const QueryRequest& qr = query.getQueryRequest();
+        BSONObjBuilder projBuilder;
+        for (auto elem : qr.getProj()) {
+            if (elem.fieldName()[0] == '$') {
+                continue;
+            }
+            projBuilder.append(elem);
         }
-        projBuilder.append(elem);
+
+        CreatedFromQuery createdFromQuery{
+            qr.getFilter(),
+            qr.getSort(),
+            projBuilder.obj(),
+            query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj()};
+        debugInfo =
+            stdx::make_unique<DebugInfo>(std::move(createdFromQuery),
+                                         std::move(decision),
+                                         std::vector<std::unique_ptr<PlanCacheEntryFeedback>>{});
     }
 
     return std::unique_ptr<PlanCacheEntry>(new PlanCacheEntry(
-        std::move(solutionCacheData),
-        qr.getFilter(),
-        qr.getSort(),
-        projBuilder.obj(),
-        query.getCollator() ? query.getCollator()->getSpec().toBSON() : BSONObj(),
-        timeOfCreation,
-        std::move(decision),
-        {}));
+        std::move(solutionCacheData), timeOfCreation, decisionWorks, std::move(debugInfo)));
 }
 
 PlanCacheEntry::PlanCacheEntry(std::vector<std::unique_ptr<const SolutionCacheData>> plannerData,
-                               const BSONObj& query,
-                               const BSONObj& sort,
-                               const BSONObj& projection,
-                               const BSONObj& collation,
-                               const Date_t timeOfCreation,
-                               std::unique_ptr<const PlanRankingDecision> decision,
-                               std::vector<PlanCacheEntryFeedback*> feedback)
+                               Date_t timeOfCreation,
+                               size_t decisionWorks,
+                               std::unique_ptr<DebugInfo> debugInfo)
     : plannerData(std::move(plannerData)),
-      query(query),
-      sort(sort),
-      projection(projection),
-      collation(collation),
       timeOfCreation(timeOfCreation),
-      decision(std::move(decision)),
-      feedback(std::move(feedback)),
-      _entireObjectSize(_estimateObjectSizeInBytes()) {
+      decisionWorks(decisionWorks),
+      debugInfo(std::move(debugInfo)),
+      estimatedEntrySizeBytes(_estimateObjectSizeInBytes()) {
     // Account for the object in the global metric for estimating the server's total plan cache
     // memory consumption.
-    planCacheTotalSizeEstimateBytes.increment(_entireObjectSize);
+    planCacheTotalSizeEstimateBytes.increment(estimatedEntrySizeBytes);
 }
 
 PlanCacheEntry::~PlanCacheEntry() {
-    for (size_t i = 0; i < feedback.size(); ++i) {
-        delete feedback[i];
-    }
-    planCacheTotalSizeEstimateBytes.decrement(_entireObjectSize);
+    planCacheTotalSizeEstimateBytes.decrement(estimatedEntrySizeBytes);
 }
 
 PlanCacheEntry* PlanCacheEntry::clone() const {
@@ -516,55 +495,80 @@ PlanCacheEntry* PlanCacheEntry::clone() const {
         invariant(plannerData[i]);
         solutionCacheData[i] = std::unique_ptr<const SolutionCacheData>(plannerData[i]->clone());
     }
-    auto decisionPtr = std::unique_ptr<PlanRankingDecision>(decision->clone());
-    PlanCacheEntry* entry = new PlanCacheEntry(std::move(solutionCacheData),
-                                               query,
-                                               sort,
-                                               projection,
-                                               collation,
-                                               timeOfCreation,
-                                               std::move(decisionPtr),
-                                               {});
 
-    // Copy performance stats.
-    for (size_t i = 0; i < feedback.size(); ++i) {
-        PlanCacheEntryFeedback* fb = new PlanCacheEntryFeedback();
-        fb->stats.reset(feedback[i]->stats->clone());
-        fb->score = feedback[i]->score;
-        entry->feedback.push_back(fb);
+    return new PlanCacheEntry(std::move(solutionCacheData),
+                              timeOfCreation,
+                              decisionWorks,
+                              debugInfo ? debugInfo->clone() : nullptr);
+}
+
+uint64_t PlanCacheEntry::CreatedFromQuery::estimateObjectSizeInBytes() const {
+    uint64_t size = 0;
+    size += filter.objsize();
+    size += sort.objsize();
+    size += projection.objsize();
+    size += collation.objsize();
+    return size;
+}
+
+PlanCacheEntry::DebugInfo::DebugInfo(CreatedFromQuery createdFromQuery,
+                                     std::unique_ptr<const PlanRankingDecision> decision,
+                                     std::vector<std::unique_ptr<PlanCacheEntryFeedback>> feedback)
+    : createdFromQuery(std::move(createdFromQuery)),
+      decision(std::move(decision)),
+      feedback(std::move(feedback)) {
+    invariant(this->decision);
+}
+
+uint64_t PlanCacheEntry::DebugInfo::estimateObjectSizeInBytes() const {
+    uint64_t size = sizeof(DebugInfo);
+    size += createdFromQuery.estimateObjectSizeInBytes();
+    size += decision->estimateObjectSizeInBytes();
+    size += container_size_helper::estimateObjectSizeInBytes(
+        feedback,
+        [](const auto& feedbackEntry) { return feedbackEntry->estimateObjectSizeInBytes(); },
+        true);
+    return size;
+}
+
+std::unique_ptr<PlanCacheEntry::DebugInfo> PlanCacheEntry::DebugInfo::clone() const {
+    std::vector<std::unique_ptr<PlanCacheEntryFeedback>> clonedFeedback;
+    for (auto&& feedbackEntry : feedback) {
+        clonedFeedback.push_back(feedbackEntry->clone());
     }
-    return entry;
+    return stdx::make_unique<DebugInfo>(
+        createdFromQuery, decision->clone(), std::move(clonedFeedback));
 }
 
 uint64_t PlanCacheEntry::_estimateObjectSizeInBytes() const {
-    return  // Add the size of each entry in 'plannerData' vector.
-        container_size_helper::estimateObjectSizeInBytes(
-            plannerData,
-            [](const auto& cacheData) { return cacheData->estimateObjectSizeInBytes(); },
-            true) +
-        // Add the size of each entry in 'feedback' vector.
-        container_size_helper::estimateObjectSizeInBytes(
-            feedback,
-            [](const auto& feedbackEntry) { return feedbackEntry->estimateObjectSizeInBytes(); },
-            true) +
-        // Add the entire size of 'decision' object.
-        (decision ? decision->estimateObjectSizeInBytes() : 0) +
-        // Add the size of all the owned BSON objects.
-        query.objsize() + sort.objsize() + projection.objsize() + collation.objsize() +
-        // Add size of the object.
-        sizeof(*this);
+    uint64_t size = sizeof(PlanCacheEntry);
+    size += container_size_helper::estimateObjectSizeInBytes(
+        plannerData,
+        [](const auto& cacheData) { return cacheData->estimateObjectSizeInBytes(); },
+        true);
+
+    if (debugInfo) {
+        size += debugInfo->estimateObjectSizeInBytes();
+    }
+
+    return size;
 }
 
-std::string PlanCacheEntry::toString() const {
-    return str::stream() << "(query: " << query.toString() << ";sort: " << sort.toString()
-                         << ";projection: " << projection.toString()
-                         << ";collation: " << collation.toString()
-                         << ";solutions: " << plannerData.size()
-                         << ";timeOfCreation: " << timeOfCreation.toString() << ")";
+std::string PlanCacheEntry::CreatedFromQuery::debugString() const {
+    return str::stream() << "query: " << filter.toString() << "; sort: " << sort.toString()
+                         << "; projection: " << projection.toString()
+                         << "; collation: " << collation.toString();
 }
 
-std::string CachedSolution::toString() const {
-    return str::stream() << "key: " << key << '\n';
+std::string PlanCacheEntry::debugString() const {
+    StringBuilder builder;
+    builder << "(";
+    if (debugInfo) {
+        builder << debugInfo->createdFromQuery.debugString();
+    }
+    builder << "; works: " << decisionWorks;
+    builder << "; timeOfCreation: " << timeOfCreation.toString() << ")";
+    return builder.str();
 }
 
 //
@@ -632,9 +636,9 @@ std::string PlanCacheIndexTree::toString(int indents) const {
 // SolutionCacheData
 //
 
-SolutionCacheData* SolutionCacheData::clone() const {
-    SolutionCacheData* other = new SolutionCacheData();
-    if (NULL != this->tree.get()) {
+std::unique_ptr<SolutionCacheData> SolutionCacheData::clone() const {
+    auto other = std::make_unique<SolutionCacheData>();
+    if (nullptr != this->tree.get()) {
         // 'tree' could be NULL if the cached solution
         // is a collection scan.
         other->tree.reset(this->tree->clone());
@@ -855,7 +859,7 @@ Status PlanCache::add(const CanonicalQuery& query,
 
     if (NULL != evictedEntry.get()) {
         LOG(1) << _ns << ": plan cache maximum size exceeded - "
-               << "removed least recently used entry " << redact(evictedEntry->toString());
+               << "removed least recently used entry " << redact(evictedEntry->debugString());
     }
 
     return Status::OK();
@@ -873,7 +877,7 @@ Status PlanCache::get(const CanonicalQuery& query, CachedSolution** crOut) const
     }
     invariant(entry);
 
-    *crOut = new CachedSolution(key, *entry);
+    *crOut = new CachedSolution(*entry);
 
     return Status::OK();
 }
@@ -893,9 +897,15 @@ Status PlanCache::feedback(const CanonicalQuery& cq, PlanCacheEntryFeedback* fee
     }
     invariant(entry);
 
+    // If no debug info is present in the cache entry, then this is a no-op.
+    if (!entry->debugInfo) {
+        return Status::OK();
+    }
+
     // We store up to a constant number of feedback entries.
-    if (entry->feedback.size() < static_cast<size_t>(internalQueryCacheFeedbacksStored.load())) {
-        entry->feedback.push_back(autoFeedback.release());
+    auto& feedbackArr = entry->debugInfo->feedback;
+    if (feedbackArr.size() < static_cast<size_t>(internalQueryCacheFeedbacksStored.load())) {
+        feedbackArr.push_back(std::move(autoFeedback));
     }
 
     return Status::OK();

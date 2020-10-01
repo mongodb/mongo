@@ -230,8 +230,11 @@ Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
 
         if (branchResult->cachedSolution.get()) {
             // We can get the index tags we need out of the cache.
-            Status tagStatus = tagOrChildAccordingToCache(
-                cacheData.get(), branchResult->cachedSolution->plannerData[0], orChild, _indexMap);
+            Status tagStatus =
+                tagOrChildAccordingToCache(cacheData.get(),
+                                           branchResult->cachedSolution->plannerData.get(),
+                                           orChild,
+                                           _indexMap);
             if (!tagStatus.isOK()) {
                 return tagStatus;
             }

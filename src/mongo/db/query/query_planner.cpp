@@ -447,13 +447,13 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     const CachedSolution& cachedSoln) {
-    invariant(!cachedSoln.plannerData.empty());
+    invariant(cachedSoln.plannerData);
 
     // A query not suitable for caching should not have made its way into the cache.
     invariant(PlanCache::shouldCacheQuery(query));
 
     // Look up winning solution in cached solution's array.
-    const SolutionCacheData& winnerCacheData = *cachedSoln.plannerData[0];
+    const auto& winnerCacheData = *cachedSoln.plannerData;
 
     if (SolutionCacheData::WHOLE_IXSCAN_SOLN == winnerCacheData.solnType) {
         // The solution can be constructed by a scan over the entire index.

@@ -46,6 +46,18 @@ MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheSize, int, 5000);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
 
+MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheMaxSizeBytesBeforeStripDebugInfo,
+                              long long,
+                              512 * 1024 * 1024)
+    ->withValidator([](const long long& newVal) {
+        if (newVal < 0) {
+            return Status(
+                ErrorCodes::Error(4036100),
+                "internalQueryCacheMaxSizeBytesBeforeStripDebugInfo must be non-negative");
+        }
+        return Status::OK();
+    });
+
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheEvictionRatio, double, 10.0);
 
 MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);

@@ -63,12 +63,19 @@ extern AtomicBool internalQueryPlannerEnableHashIntersection;
 // plan cache
 //
 
-// How many entries in the cache?
+// The maximum number of entries allowed in a given collection's plan cache.
 extern AtomicInt32 internalQueryCacheSize;
 
 // How many feedback entries do we collect before possibly evicting from the cache based on bad
 // performance?
 extern AtomicInt32 internalQueryCacheFeedbacksStored;
+
+// Limits the amount of debug info stored across all plan caches in the system. Once the estimate of
+// the number of bytes used across all plan caches exceeds this threshold, then debug info is not
+// stored alongside new cache entries, in order to limit plan cache memory consumption. If plan
+// cache entries are freed and the estimate once again dips below this threshold, then new cache
+// entries will once again have debug info associated with them.
+extern AtomicInt64 internalQueryCacheMaxSizeBytesBeforeStripDebugInfo;
 
 // How many times more works must we perform in order to justify plan cache eviction
 // and replanning?

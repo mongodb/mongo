@@ -699,12 +699,12 @@ protected:
         // Create a CachedSolution the long way..
         // QuerySolution -> PlanCacheEntry -> CachedSolution
         QuerySolution qs;
-        qs.cacheData.reset(soln.cacheData->clone());
+        qs.cacheData = soln.cacheData->clone();
         std::vector<QuerySolution*> solutions;
         solutions.push_back(&qs);
 
         auto entry = PlanCacheEntry::create(solutions, createDecision(1U), *scopedCq, Date_t());
-        CachedSolution cachedSoln(ck, *entry);
+        CachedSolution cachedSoln(*entry);
 
         auto statusWithQs = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln);
         ASSERT_OK(statusWithQs.getStatus());
