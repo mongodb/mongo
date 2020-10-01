@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -870,6 +871,23 @@ void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,
     preRenameCollection(
         opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
     postRenameCollection(opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
+}
+
+void OpObserverImpl::onImportCollection(OperationContext* opCtx,
+                                        const UUID& importUUID,
+                                        const NamespaceString& nss,
+                                        long long numRecords,
+                                        long long dataSize,
+                                        const BSONObj& catalogEntry,
+                                        bool isDryRun) {
+    ImportCollectionOplogEntry importCollection(
+        nss, importUUID, numRecords, dataSize, catalogEntry, isDryRun);
+
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setNss(nss.getCommandNS());
+    oplogEntry.setObject(importCollection.toBSON());
+    logOperation(opCtx, &oplogEntry);
 }
 
 void OpObserverImpl::onApplyOps(OperationContext* opCtx,

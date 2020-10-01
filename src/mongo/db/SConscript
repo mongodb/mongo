@@ -818,6 +818,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
+        '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         'transaction',
     ],
 )
@@ -2264,6 +2265,7 @@ envWithAsio.CppUnitTest(
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',

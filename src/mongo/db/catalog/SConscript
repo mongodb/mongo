@@ -456,6 +456,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='import_collection_oplog_entry',
+    source=[
+        env.Idlc('import_collection_oplog_entry.idl')[0],
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
 env.CppUnitTest(
     target='db_catalog_test',
     source=[

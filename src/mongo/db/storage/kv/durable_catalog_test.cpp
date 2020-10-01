@@ -135,7 +135,11 @@ public:
         Lock::CollectionLock collLock(operationContext(), nss, MODE_X);
 
         WriteUnitOfWork wuow(operationContext());
-        auto res = getCatalog()->importCollection(operationContext(), nss, metadata);
+        auto res = getCatalog()->importCollection(
+            operationContext(),
+            nss,
+            metadata,
+            DurableCatalog::ImportCollectionUUIDOption::kGenerateNew);
         if (res.isOK()) {
             wuow.commit();
         }

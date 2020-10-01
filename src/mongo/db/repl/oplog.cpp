@@ -54,6 +54,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
+#include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/client.h"
@@ -142,7 +143,31 @@ void abortIndexBuilds(OperationContext* opCtx,
     }
 }
 
+void applyImportCollectionDefault(OperationContext* opCtx,
+                                  const UUID& importUUID,
+                                  const NamespaceString& nss,
+                                  long long numRecords,
+                                  long long dataSize,
+                                  const BSONObj& catalogEntry,
+                                  bool isDryRun) {
+    LOGV2_FATAL_NOTRACE(5114200,
+                        "Applying importCollection is not supported with MongoDB Community "
+                        "Edition, please use MongoDB Enterprise Edition",
+                        "importUUID"_attr = importUUID,
+                        "nss"_attr = nss,
+                        "numRecords"_attr = numRecords,
+                        "dataSize"_attr = dataSize,
+                        "catalogEntry"_attr = redact(catalogEntry),
+                        "isDryRun"_attr = isDryRun);
+}
+
 }  // namespace
+
+ApplyImportCollectionFn applyImportCollection = applyImportCollectionDefault;
+
+void registerApplyImportCollectionFn(ApplyImportCollectionFn func) {
+    applyImportCollection = func;
+}
 
 void setOplogCollectionName(ServiceContext* service) {
     LocalOplogInfo::get(service)->setOplogCollectionName(service);
@@ -887,6 +912,19 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
               opCtx, entry.getNss().db().toString(), entry.getUuid(), entry.getObject(), opTime);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
+    {"importCollection",
+     {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
+         auto importEntry = mongo::ImportCollectionOplogEntry::parse(
+             IDLParserErrorContext("importCollectionOplogEntry"), entry.getObject());
+         applyImportCollection(opCtx,
+                               importEntry.getImportUUID(),
+                               importEntry.getImportCollection(),
+                               importEntry.getNumRecords(),
+                               importEntry.getDataSize(),
+                               importEntry.getCatalogEntry(),
+                               importEntry.getDryRun());
+         return Status::OK();
+     }}},
     {"applyOps",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
          return entry.shouldPrepare() ? applyPrepareTransaction(opCtx, entry, mode)

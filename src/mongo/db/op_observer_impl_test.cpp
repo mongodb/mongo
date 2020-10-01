@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/db_raii.h"
@@ -457,6 +458,38 @@ TEST_F(OpObserverTest, MustBePrimaryToWriteOplogEntries) {
     // No-op writes should be prohibited.
     ASSERT_THROWS_CODE(
         opObserver.onOpMessage(opCtx.get(), {}), DBException, ErrorCodes::NotWritablePrimary);
+}
+
+TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    auto importUUID = UUID::gen();
+    NamespaceString nss("test.coll");
+    long long numRecords = 1;
+    long long dataSize = 2;
+    // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
+    auto catalogEntry = BSON("ns" << nss.ns() << "ident"
+                                  << "collection-7-1792004489479993697");
+    bool isDryRun = false;
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onImportCollection(
+            opCtx.get(), importUUID, nss, numRecords, dataSize, catalogEntry, isDryRun);
+        wunit.commit();
+    }
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    ASSERT_TRUE(repl::OpTypeEnum::kCommand == oplogEntry.getOpType());
+    ASSERT_TRUE(OplogEntry::CommandType::kImportCollection == oplogEntry.getCommandType());
+
+    ImportCollectionOplogEntry importCollection(
+        nss, importUUID, numRecords, dataSize, catalogEntry, isDryRun);
+    ASSERT_BSONOBJ_EQ(importCollection.toBSON(), oplogEntry.getObject());
 }
 
 /**

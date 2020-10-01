@@ -279,6 +279,7 @@ public:
         kDropIndexes,
         kCommitTransaction,
         kAbortTransaction,
+        kImportCollection,
     };
 
     // Get the in-memory size in bytes of a ReplOperation.

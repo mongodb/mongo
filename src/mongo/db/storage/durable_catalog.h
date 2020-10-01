@@ -166,9 +166,11 @@ public:
         std::unique_ptr<RecordStore> rs;
         UUID uuid;
     };
+    enum class ImportCollectionUUIDOption { kKeepOld, kGenerateNew };
     virtual StatusWith<ImportResult> importCollection(OperationContext* opCtx,
                                                       const NamespaceString& nss,
-                                                      const BSONObj& metadata) = 0;
+                                                      const BSONObj& metadata,
+                                                      ImportCollectionUUIDOption uuidOption) = 0;
 
     virtual Status renameCollection(OperationContext* opCtx,
                                     RecordId catalogId,

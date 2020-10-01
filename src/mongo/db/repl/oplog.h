@@ -257,5 +257,15 @@ inline OplogSlot getNextOpTime(OperationContext* opCtx) {
     return slots.back();
 }
 
+using ApplyImportCollectionFn = std::function<void(OperationContext*,
+                                                   const UUID&,
+                                                   const NamespaceString&,
+                                                   long long,
+                                                   long long,
+                                                   const BSONObj&,
+                                                   bool)>;
+
+void registerApplyImportCollectionFn(ApplyImportCollectionFn func);
+
 }  // namespace repl
 }  // namespace mongo

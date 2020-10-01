@@ -294,6 +294,14 @@ public:
                                     std::uint64_t numRecords,
                                     bool stayTemp) = 0;
 
+    virtual void onImportCollection(OperationContext* opCtx,
+                                    const UUID& importUUID,
+                                    const NamespaceString& nss,
+                                    long long numRecords,
+                                    long long dataSize,
+                                    const BSONObj& catalogEntry,
+                                    bool isDryRun) = 0;
+
     virtual void onApplyOps(OperationContext* opCtx,
                             const std::string& dbName,
                             const BSONObj& applyOpCmd) = 0;

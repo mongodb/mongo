@@ -237,6 +237,19 @@ public:
                 opCtx, fromCollection, toCollection, uuid, dropTargetUUID, numRecords, stayTemp);
     }
 
+    void onImportCollection(OperationContext* opCtx,
+                            const UUID& importUUID,
+                            const NamespaceString& nss,
+                            long long numRecords,
+                            long long dataSize,
+                            const BSONObj& catalogEntry,
+                            bool isDryRun) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers)
+            o->onImportCollection(
+                opCtx, importUUID, nss, numRecords, dataSize, catalogEntry, isDryRun);
+    }
+
     repl::OpTime preRenameCollection(OperationContext* const opCtx,
                                      const NamespaceString& fromCollection,
                                      const NamespaceString& toCollection,

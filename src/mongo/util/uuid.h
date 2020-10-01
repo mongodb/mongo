@@ -100,6 +100,7 @@ class UUID {
     friend class TenantMigrationRecipientDocument;
     friend class TypeCollectionReshardingFields;
     friend class VoteCommitIndexBuild;
+    friend class ImportCollectionOplogEntry;
 
 
 public:

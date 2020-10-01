@@ -901,7 +901,10 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
 }
 
 StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
-    OperationContext* opCtx, const NamespaceString& nss, const BSONObj& metadata) {
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const BSONObj& metadata,
+    DurableCatalogImpl::ImportCollectionUUIDOption uuidOption) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     invariant(nss.coll().size() > 0);
 
@@ -918,15 +921,21 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
             "Attemped to import collection without idxIdent",
             metadata.hasField("idxIdent"));
 
-    // Generate a new UUID for the collection.
-    md.options.uuid = CollectionUUID::gen();
-    BSONObjBuilder catalogEntry;
-    // Generate a new "md" field after setting the new UUID.
-    catalogEntry.append("md", md.toBSON());
-    // Append the rest of the metadata.
-    catalogEntry.appendElementsUnique(metadata);
+    const auto& catalogEntry = [&] {
+        if (uuidOption == ImportCollectionUUIDOption::kGenerateNew) {
+            // Generate a new UUID for the collection.
+            md.options.uuid = CollectionUUID::gen();
+            BSONObjBuilder catalogEntryBuilder;
+            // Generate a new "md" field after setting the new UUID.
+            catalogEntryBuilder.append("md", md.toBSON());
+            // Append the rest of the metadata.
+            catalogEntryBuilder.appendElementsUnique(metadata);
+            return catalogEntryBuilder.obj();
+        }
+        return metadata;
+    }();
 
-    StatusWith<Entry> swEntry = _importEntry(opCtx, nss, catalogEntry.obj());
+    StatusWith<Entry> swEntry = _importEntry(opCtx, nss, catalogEntry);
     if (!swEntry.isOK())
         return swEntry.getStatus();
     Entry& entry = swEntry.getValue();
