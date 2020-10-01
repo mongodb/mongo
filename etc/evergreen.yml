@@ -2336,7 +2336,8 @@ functions:
         local_file: jstests.tgz
         remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
         bucket: mciuploads
-        permissions: public-read
+        permissions: private
+        visibility: signed
         content_type: ${content_type|application/gzip}
         display_name: Generated Tests - Execution ${execution}
 
@@ -3527,7 +3528,8 @@ tasks:
         local_file: artifacts.tgz
         remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}.tgz
         bucket: mciuploads
-        permissions: public-read
+        permissions: private
+        visibility: signed
         content_type: application/tar
         display_name: Artifacts
 
@@ -3638,7 +3640,8 @@ tasks:
         local_file: "src/fuzzertests-runtime.tgz"
         remote_file: "${project}/libfuzzer-tests/${build_variant}/${revision}/libfuzzer-tests.tgz"
         bucket: mciuploads
-        permissions: public-read
+        permissions: private
+        visibility: signed
         content_type: application/tar
         display_name: "LibFuzzer Tests"
 
