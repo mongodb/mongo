@@ -115,6 +115,7 @@ void ShardRegistry::init(ServiceContext* service) {
         stdx::lock_guard<Latch> lk(_mutex);
         _configShardData = ShardRegistryData::createWithConfigShardOnly(
             _shardFactory->createShard(kConfigServerShardId, _initConfigServerCS));
+        _latestConnStrings[_initConfigServerCS.getSetName()] = _initConfigServerCS;
     }
 
     _isInitialized.store(true);
@@ -379,31 +380,36 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
     invariant(givenConnString.type() == ConnectionString::SET ||
               givenConnString.type() == ConnectionString::CUSTOM);  // For dbtests
 
+    auto setName = givenConnString.getSetName();
+
     stdx::lock_guard<Latch> lk(_mutex);
-    ConnectionString newConnString =
-        (updateType == ConnectionStringUpdateType::kPossible &&
-         _latestConnStrings.find(givenConnString.getSetName()) != _latestConnStrings.end())
-        ? _latestConnStrings[givenConnString.getSetName()].makeUnionWith(givenConnString)
+
+    ConnectionString newConnString = (updateType == ConnectionStringUpdateType::kPossible &&
+                                      _latestConnStrings.find(setName) != _latestConnStrings.end())
+        ? _latestConnStrings[setName].makeUnionWith(givenConnString)
         : givenConnString;
+
     LOGV2_DEBUG(5123001,
                 1,
                 "Updating ShardRegistry connection string",
                 "updateType"_attr =
                     updateType == ConnectionStringUpdateType::kPossible ? "possible" : "confirmed",
+                "currentConnString"_attr = _latestConnStrings[setName].toString(),
                 "givenConnString"_attr = givenConnString.toString(),
                 "newConnString"_attr = newConnString.toString());
-    if (auto shard = _configShardData.findByRSName(newConnString.getSetName())) {
+
+    _latestConnStrings[setName] = newConnString;
+
+    if (auto shard = _configShardData.findByRSName(setName)) {
         auto newData = ShardRegistryData::createFromExisting(
             _configShardData, newConnString, _shardFactory.get());
         _configShardData = newData;
 
     } else {
-        // Stash the new connection string and bump the RSM increment.
-        _latestConnStrings[newConnString.getSetName()] = newConnString;
         auto value = _rsmIncrement.addAndFetch(1);
         LOGV2_DEBUG(4620252,
                     2,
-                    "ShardRegistry stashed new connection string",
+                    "Incrementing the RSM timestamp after receiving updated connection string",
                     "newConnString"_attr = newConnString,
                     "newRSMIncrement"_attr = value);
     }
