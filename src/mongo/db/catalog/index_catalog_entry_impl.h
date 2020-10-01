@@ -172,7 +172,7 @@ public:
      * If return value is not boost::none, reads with majority read concern using an older snapshot
      * must treat this index as unfinished.
      */
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() final {
+    boost::optional<Timestamp> getMinimumVisibleSnapshot() const final {
         return _minVisibleSnapshot;
     }
 

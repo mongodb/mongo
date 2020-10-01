@@ -94,10 +94,18 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
     WriteUnitOfWork wuow(opCtx);
 
-    Status status = collection.getWritableCollection()->truncate(opCtx);
+    auto writableCollection = collection.getWritableCollection();
+    Status status = writableCollection->truncate(opCtx);
     if (!status.isOK()) {
         return status;
     }
+
+    opCtx->recoveryUnit()->onCommit([writableCollection](auto commitTime) {
+        // Ban reading from this collection on snapshots before now.
+        if (commitTime) {
+            writableCollection->setMinimumVisibleSnapshot(commitTime.get());
+        }
+    });
 
     const auto service = opCtx->getServiceContext();
     service->getOpObserver()->onEmptyCapped(opCtx, collection->ns(), collection->uuid());
