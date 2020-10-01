@@ -78,10 +78,10 @@ env.CppLibfuzzerTest(
         'protocol_fuzzer.cpp',
     ],
     LIBDEPS=[
-        'protocol',
-        'rpc',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        'protocol',
+        'rpc',
     ],
 )
 
