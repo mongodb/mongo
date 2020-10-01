@@ -89,8 +89,9 @@ server_parameters:
   #
   # Plan cache
   #
+
   internalQueryCacheSize:
-    description: "How many entries in the cache?"
+    description: "The maximum number of entries allowed in a given collection's plan cache."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryCacheSize"
     cpp_vartype: AtomicWord<int>
@@ -105,6 +106,20 @@ server_parameters:
     cpp_vartype: AtomicWord<int>
     default: 20
     validator: 
+      gte: 0
+
+  internalQueryCacheMaxSizeBytesBeforeStripDebugInfo:
+    description: "Limits the amount of debug info stored across all plan caches in the system. Once
+    the estimate of the number of bytes used across all plan caches exceeds this threshold, then
+    debug info is not stored alongside new cache entries, in order to limit plan cache memory
+    consumption. If plan cache entries are freed and the estimate once again dips below this
+    threshold, then new cache entries will once again have debug info associated with them."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryCacheMaxSizeBytesBeforeStripDebugInfo"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 512 * 1024 * 1024
+    validator:
       gte: 0
 
   internalQueryCacheEvictionRatio:

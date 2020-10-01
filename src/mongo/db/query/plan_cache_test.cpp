@@ -676,7 +676,11 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT_EQ(planCache.get(*cq).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(*cq));
     ASSERT_TRUE(entry->isActive);
-    ASSERT_EQ(entry->decision->stats[0]->common.works, 25U);
+
+    ASSERT(entry->debugInfo);
+    ASSERT(entry->debugInfo->decision);
+    auto&& decision = entry->debugInfo->decision;
+    ASSERT_EQ(decision->stats[0]->common.works, 25U);
     ASSERT_EQ(entry->works, 25U);
 
     ASSERT_EQUALS(planCache.size(), 1U);
@@ -1126,7 +1130,7 @@ protected:
         // Create a CachedSolution the long way..
         // QuerySolution -> PlanCacheEntry -> CachedSolution
         QuerySolution qs;
-        qs.cacheData.reset(soln.cacheData->clone());
+        qs.cacheData = soln.cacheData->clone();
         std::vector<QuerySolution*> solutions;
         solutions.push_back(&qs);
 
@@ -1134,7 +1138,7 @@ protected:
         uint32_t planCacheKey = queryHash;
         auto entry = PlanCacheEntry::create(
             solutions, createDecision(1U), *scopedCq, queryHash, planCacheKey, Date_t(), false, 0);
-        CachedSolution cachedSoln(ck, *entry);
+        CachedSolution cachedSoln(*entry);
 
         auto statusWithQs = QueryPlanner::planFromCache(*scopedCq, params, cachedSoln);
         ASSERT_OK(statusWithQs.getStatus());

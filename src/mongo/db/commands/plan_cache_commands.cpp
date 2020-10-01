@@ -261,12 +261,20 @@ Status PlanCacheListQueryShapesDeprecated::list(const PlanCache& planCache, BSON
         invariant(entry);
 
         BSONObjBuilder shapeBuilder(arrayBuilder.subobjStart());
-        shapeBuilder.append("query", entry->query);
-        shapeBuilder.append("sort", entry->sort);
-        shapeBuilder.append("projection", entry->projection);
-        if (!entry->collation.isEmpty()) {
-            shapeBuilder.append("collation", entry->collation);
+
+        // Most details demonstrating the shape of the query must be omitted if the plan cache entry
+        // has had its debug info stripped. Debug info may be omitted from the plan cache entry in
+        // order to reduce the plan cache's memory footprint.
+        if (entry->debugInfo) {
+            const auto& createdFromQuery = entry->debugInfo->createdFromQuery;
+            shapeBuilder.append("query", createdFromQuery.filter);
+            shapeBuilder.append("sort", createdFromQuery.sort);
+            shapeBuilder.append("projection", createdFromQuery.projection);
+            if (!createdFromQuery.collation.isEmpty()) {
+                shapeBuilder.append("collation", createdFromQuery.collation);
+            }
         }
+
         shapeBuilder.append("queryHash", unsignedIntToFixedLengthHex(entry->queryHash));
         shapeBuilder.doneFast();
     }
@@ -389,8 +397,11 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
     BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));
 
     size_t numPlans = entry->plannerData.size();
-    invariant(numPlans == entry->decision->stats.size());
-    invariant(numPlans == entry->decision->scores.size());
+    if (const auto debugInfo = entry->debugInfo; debugInfo) {
+        invariant(numPlans == debugInfo->decision->stats.size());
+        invariant(numPlans == debugInfo->decision->scores.size());
+    }
+
     for (size_t i = 0; i < numPlans; ++i) {
         BSONObjBuilder planBob(plansBuilder.subobjStart());
 
@@ -400,30 +411,32 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
         detailsBob.append("solution", entry->plannerData[i]->toString());
         detailsBob.doneFast();
 
-        // reason is comprised of score and initial stats provided by
-        // multi plan runner.
-        BSONObjBuilder reasonBob(planBob.subobjStart("reason"));
-        reasonBob.append("score", entry->decision->scores[i]);
-        BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
-        PlanStageStats* stats = entry->decision->stats[i].get();
-        if (stats) {
-            Explain::statsToBSON(*stats, &statsBob);
-        }
-        statsBob.doneFast();
-        reasonBob.doneFast();
-
-        // BSON object for 'feedback' field shows scores from historical executions of the plan.
-        BSONObjBuilder feedbackBob(planBob.subobjStart("feedback"));
-        if (i == 0U) {
-            feedbackBob.append("nfeedback", int(entry->feedback.size()));
-            BSONArrayBuilder scoresBob(feedbackBob.subarrayStart("scores"));
-            for (size_t i = 0; i < entry->feedback.size(); ++i) {
-                BSONObjBuilder scoreBob(scoresBob.subobjStart());
-                scoreBob.append("score", entry->feedback[i]);
+        // Some information for each candidate plan can only be provided if the plan cache entry
+        // contains debug info.
+        if (const auto debugInfo = entry->debugInfo; debugInfo) {
+            {
+                // 'reason' is comprised of score and initial stats provided by the multi-planner.
+                BSONObjBuilder reasonBob(planBob.subobjStart("reason"));
+                reasonBob.append("score", debugInfo->decision->scores[i]);
+                {
+                    BSONObjBuilder statsBob(reasonBob.subobjStart("stats"));
+                    if (auto* stats = debugInfo->decision->stats[i].get(); stats) {
+                        Explain::statsToBSON(*stats, &statsBob);
+                    }
+                }
             }
-            scoresBob.doneFast();
+
+            // BSON object for 'feedback' field shows scores from historical executions of the plan.
+            BSONObjBuilder feedbackBob(planBob.subobjStart("feedback"));
+            if (i == 0U) {
+                feedbackBob.append("nfeedback", int(debugInfo->feedback.size()));
+                BSONArrayBuilder scoresBob(feedbackBob.subarrayStart("scores"));
+                for (auto score : debugInfo->feedback) {
+                    BSONObjBuilder scoreBob(scoresBob.subobjStart());
+                    scoreBob.append("score", score);
+                }
+            }
         }
-        feedbackBob.doneFast();
 
         planBob.append("filterSet", entry->plannerData[i]->indexFilterApplied);
     }
@@ -437,6 +450,7 @@ Status listPlansOriginalFormat(std::unique_ptr<CanonicalQuery> cq,
     // Append whether or not the entry is active.
     bob->append("isActive", entry->isActive);
     bob->append("works", static_cast<long long>(entry->works));
+    bob->append("estimatedSizeBytes", static_cast<long long>(entry->estimatedEntrySizeBytes));
     return Status::OK();
 }
 }  // namespace
