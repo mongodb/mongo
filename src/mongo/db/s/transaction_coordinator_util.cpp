@@ -337,6 +337,7 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                             << buildParticipantListMatchesConditions(participantList) << "$or"
                             << BSON_ARRAY(noDecision << sameDecision)));
 
+            entry.setUpsert(true);
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate([&] {
                 TransactionCoordinatorDocument doc;
                 doc.setId(sessionInfo);

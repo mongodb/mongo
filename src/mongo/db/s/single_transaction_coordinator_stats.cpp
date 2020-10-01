@@ -72,8 +72,8 @@ void SingleTransactionCoordinatorStats::setWaitingForVotesStartTime(TickSource::
 
 void SingleTransactionCoordinatorStats::setWritingDecisionStartTime(TickSource::Tick curTick,
                                                                     Date_t curWallClockTime) {
-    invariant(_waitingForVotesStartTime);
     invariant(!_writingDecisionStartTime);
+    // _waitingForVotesStartTime can remain not set if the previous operation timed out.
 
     _writingDecisionStartTime = curTick;
     _writingDecisionStartWallClockTime = curWallClockTime;
@@ -138,7 +138,10 @@ Microseconds SingleTransactionCoordinatorStats::getWritingParticipantListDuratio
 
 Microseconds SingleTransactionCoordinatorStats::getWaitingForVotesDuration(
     TickSource* tickSource, TickSource::Tick curTick) const {
-    invariant(_waitingForVotesStartTime);
+    if (!_waitingForVotesStartTime) {
+        return Microseconds(
+            0);  // _waitingForVotesStartTime can remain not set in a case of timeout.
+    }
 
     if (_writingDecisionStartTime) {
         return tickSource->ticksTo<Microseconds>(_writingDecisionStartTime -

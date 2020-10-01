@@ -261,6 +261,7 @@ public:
 
             if (coordinatorDecisionFuture) {
                 auto swCommitDecision = coordinatorDecisionFuture->getNoThrow(opCtx);
+
                 // The coordinator can throw TransactionCoordinatorCanceled if
                 // cancelIfCommitNotYetStarted was called, which can happen in one of 3 cases:
                 //

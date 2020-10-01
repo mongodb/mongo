@@ -108,6 +108,11 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
         _scheduler
             ->scheduleWorkAt(deadline,
                              [this](OperationContext*) {
+                                 LOGV2_DEBUG(5047000,
+                                             1,
+                                             "TransactionCoordinator deadline reached",
+                                             "sessionId"_attr = _lsid.getId(),
+                                             "txnNumber"_attr = _txnNumber);
                                  cancelIfCommitNotYetStarted();
 
                                  // See the comments for sendPrepare about the purpose of this
@@ -218,6 +223,19 @@ TransactionCoordinator::TransactionCoordinator(OperationContext* operationContex
                     }
                 });
         })
+        .onError<ErrorCodes::TransactionCoordinatorReachedAbortDecision>(
+            [this, lsid, txnNumber](const Status& status) {
+                // Timeout happened, propagate the decision to abort the transaction to replicas
+                // and convert the internal error code to the public one.
+                LOGV2(5047001,
+                      "Transaction coordinator made abort decision",
+                      "sessionId"_attr = lsid.getId(),
+                      "txnNumber"_attr = txnNumber,
+                      "status"_attr = redact(status));
+                stdx::lock_guard<Latch> lg(_mutex);
+                _decision = txn::PrepareVote::kAbort;
+                _decision->setAbortStatus(Status(ErrorCodes::NoSuchTransaction, status.reason()));
+            })
         .then([this] {
             // Persist the commit decision, unless this has already been done (which would only be
             // the case if this coordinator was created as part of step-up recovery and the recovery
