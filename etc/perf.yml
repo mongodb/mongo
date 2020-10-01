@@ -31,7 +31,6 @@ variables:
   _modules: &modules
     - enterprise
     - mongo-tools
-    - wtdevelop
 
     - dsi
     - signal-processing
@@ -74,10 +73,6 @@ modules:
   repo: git@github.com:10gen/workloads.git
   prefix: workloads
   branch: master
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
 - name: linkbench
   repo: git@github.com:10gen/linkbench.git
   prefix: linkbench
@@ -672,7 +667,6 @@ tasks:
         directory: src
         revisions:
           enterprise: ${enterprise_rev}
-          wtdevelop: ${wtdevelop_rev}
           mongo-tools: ${mongo-tools_rev}
     - command: shell.exec
       params:
