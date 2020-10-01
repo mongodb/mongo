@@ -44,7 +44,9 @@ class DocumentValidationFailureInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::DocumentValidationFailure;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
-    explicit DocumentValidationFailureInfo(const BSONObj& err) : _details(err.getOwned()) {}
+    explicit DocumentValidationFailureInfo(const BSONObj& err) : _details(err.getOwned()) {
+        invariant(!err.isEmpty());
+    }
     const BSONObj& getDetails() const;
     void serialize(BSONObjBuilder* bob) const override;
 

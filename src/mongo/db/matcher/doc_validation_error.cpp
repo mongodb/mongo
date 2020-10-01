@@ -899,7 +899,8 @@ public:
                           kNormalReason,
                           kInvertedReason,
                           &kExpectedTypes,
-                          LeafArrayBehavior::kNoTraversal);
+                          LeafArrayBehavior::kNoTraversal,
+                          true /* isJsonSchemaKeyword */);
     }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
         _context->pushNewFrame(*expr);
@@ -950,9 +951,11 @@ public:
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         // This node should never be responsible for generating an error directly.
         invariant(expr->getErrorAnnotation()->mode != AnnotationMode::kGenerateError);
+
         // As part of pushing a new frame onto the stack, the runtime state may be set to
         // 'kNoError' if 'expr' matches the current document.
         _context->pushNewFrame(*expr);
+
         // Only attempt to find a subdocument if this node failed to match.
         if (_context->getCurrentRuntimeState() != RuntimeState::kNoError) {
             ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
@@ -984,12 +987,13 @@ public:
     }
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {}
     void visit(const InternalSchemaTypeExpression* expr) final {
-        generateTypeError(expr, LeafArrayBehavior::kNoTraversal);
+        generateTypeError(*expr, LeafArrayBehavior::kNoTraversal, true /* isJsonSchemaKeyword */);
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
         static constexpr auto normalReason = "found a duplicate item";
         _context->pushNewFrame(*expr);
-        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+        if (auto attributeValue =
+                getValueForKeywordExpressionIfShouldGenerateError(*expr, {BSONType::Array})) {
             appendErrorDetails(*expr);
             appendErrorReason(normalReason, "");
             auto attributeValueAsArray = BSONArray(attributeValue.embeddedObject());
@@ -1070,7 +1074,8 @@ public:
         if (expr->getErrorAnnotation()->tag == "enum") {
             static constexpr auto kNormalReason = "value was not found in enum";
             static constexpr auto kInvertedReason = "value was found in enum";
-            generateLogicalLeafError(*expr, kNormalReason, kInvertedReason);
+            generateLogicalLeafError(
+                *expr, kNormalReason, kInvertedReason, true /* isJsonSchemaKeyword */);
         } else {
             preVisitTreeOperator(expr);
             // An OR needs its children to call 'matches' in an inverted context to discern which
@@ -1085,7 +1090,13 @@ public:
         static constexpr auto kInvertedReason = "regular expression did match";
         static const std::set<BSONType> kExpectedTypes{
             BSONType::String, BSONType::Symbol, BSONType::RegEx};
-        generatePathError(*expr, kNormalReason, kInvertedReason, &kExpectedTypes);
+        bool isJsonSchemaKeyword = expr->getErrorAnnotation()->tag == "pattern";
+        generatePathError(*expr,
+                          kNormalReason,
+                          kInvertedReason,
+                          &kExpectedTypes,
+                          LeafArrayBehavior::kTraverseOmitArray,
+                          isJsonSchemaKeyword);
     }
     void visit(const SizeMatchExpression* expr) final {
         static constexpr auto kNormalReason = "array length was not equal to given size";
@@ -1104,7 +1115,7 @@ public:
         // traversed array elements as considered values since, when we have predicate "{$type:
         // 'array'}" and a field is an array, that is a match. Therefore we use
         // LeafArrayBehavior::kTraverseOmitArray as the traversal behavior.
-        generateTypeError(expr, LeafArrayBehavior::kTraverseOmitArray);
+        generateTypeError(*expr, LeafArrayBehavior::kTraverseOmitArray);
     }
     void visit(const WhereMatchExpression* expr) final {
         MONGO_UNREACHABLE;
@@ -1339,9 +1350,19 @@ private:
         const std::string& normalReason,
         const std::string& invertedReason,
         const std::set<BSONType>* expectedTypes = nullptr,
-        LeafArrayBehavior leafArrayBehavior = LeafArrayBehavior::kTraverseOmitArray) {
+        LeafArrayBehavior leafArrayBehavior = LeafArrayBehavior::kTraverseOmitArray,
+        bool isJsonSchemaKeyword = false) {
         _context->pushNewFrame(expr);
         if (_context->shouldGenerateError(expr)) {
+            // If this is a jsonSchema keyword, we must verify that expr's path exists and the
+            // value of the path matches the expected type. Otherwise, this node will not be
+            // responsible for an error; either the parent of expr will not match, or another
+            // node in the tree will generate an appropriate error.
+            if (isJsonSchemaKeyword &&
+                !getValueForKeywordExpressionIfShouldGenerateError(expr, *expectedTypes)) {
+                _context->setCurrentRuntimeState(RuntimeState::kNoError);
+                return;
+            }
             appendErrorDetails(expr);
             auto arr = createValuesArray(expr.path(), leafArrayBehavior);
             appendMissingField(arr);
@@ -1354,7 +1375,23 @@ private:
     void generateComparisonError(const ComparisonMatchExpression* expr) {
         static constexpr auto kNormalReason = "comparison failed";
         static constexpr auto kInvertedReason = "comparison succeeded";
-        generatePathError(*expr, kNormalReason, kInvertedReason);
+        // Determine whether 'expr' represents a jsonSchema minimum/maximum keyword.
+        static const std::set<std::string> kJsonSchemaKeywords = {"minimum", "maximum"};
+        if (kJsonSchemaKeywords.find(expr->getErrorAnnotation()->tag) !=
+            kJsonSchemaKeywords.end()) {
+            static const std::set<BSONType> kExpectedTypes{BSONType::NumberLong,
+                                                           BSONType::NumberDouble,
+                                                           BSONType::NumberDecimal,
+                                                           BSONType::NumberInt};
+            generatePathError(*expr,
+                              kNormalReason,
+                              kInvertedReason,
+                              &kExpectedTypes,
+                              LeafArrayBehavior::kNoTraversal,
+                              true /* isJsonSchemaKeyword */);
+        } else {
+            generatePathError(*expr, kNormalReason, kInvertedReason);
+        }
     }
 
     void generateElemMatchError(const ArrayMatchingMatchExpression* expr) {
@@ -1372,13 +1409,21 @@ private:
     }
 
     template <class T>
-    void generateTypeError(const TypeMatchExpressionBase<T>* expr, LeafArrayBehavior behavior) {
-        _context->pushNewFrame(*expr);
+    void generateTypeError(const TypeMatchExpressionBase<T>& expr,
+                           LeafArrayBehavior behavior,
+                           bool isJsonSchemaKeyword = false) {
+        _context->pushNewFrame(expr);
         static constexpr auto kNormalReason = "type did not match";
         static constexpr auto kInvertedReason = "type did match";
-        if (_context->shouldGenerateError(*expr)) {
-            appendErrorDetails(*expr);
-            auto arr = createValuesArray(expr->path(), behavior);
+        if (_context->shouldGenerateError(expr)) {
+            auto arr = createValuesArray(expr.path(), behavior);
+            // If the path of 'expr' is missing and this is a jsonSchema keyword, then this node
+            // should not generate an error.
+            if (isJsonSchemaKeyword && !arr) {
+                _context->setCurrentRuntimeState(RuntimeState::kNoError);
+                return;
+            }
+            appendErrorDetails(expr);
             appendMissingField(arr);
             appendErrorReason(kNormalReason, kInvertedReason);
             appendConsideredValues(arr);
@@ -1408,11 +1453,18 @@ private:
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             auto annotation = expr->getErrorAnnotation();
+            auto tag = annotation->tag;
             // Only append the operator name if it will produce an object error corresponding to
             // a user-facing operator.
-            if (!_context->producesArray(*expr))
+            if (tag[0] != '_')
                 appendOperatorName(*expr);
-            _context->getCurrentObjBuilder().appendElements(annotation->annotation);
+            auto& builder = _context->getCurrentObjBuilder();
+            // Append the keyword specification when 'expr' corresponds to the 'required' keyword.
+            if (tag == "required") {
+                appendSpecifiedAs(*annotation, &builder);
+            } else {
+                _context->getCurrentObjBuilder().appendElements(annotation->annotation);
+            }
         }
     }
     /**
@@ -1421,7 +1473,8 @@ private:
      */
     void generateLogicalLeafError(const ListOfMatchExpression& expr,
                                   const std::string& normalReason,
-                                  const std::string& invertedReason) {
+                                  const std::string& invertedReason,
+                                  bool isJsonSchemaKeyword = false) {
         _context->pushNewFrame(expr);
         if (_context->shouldGenerateError(expr)) {
             // $all with no children should not translate to an 'AndMatchExpression' and 'enum'
@@ -1430,6 +1483,13 @@ private:
             appendErrorDetails(expr);
             auto childExpr = expr.getChild(0);
             auto arr = createValuesArray(childExpr->path(), LeafArrayBehavior::kNoTraversal);
+
+            // If this is a jsonSchema keyword and the value doesn't exist, then this node will
+            // not generate an error.
+            if (isJsonSchemaKeyword && !arr) {
+                _context->setCurrentRuntimeState(RuntimeState::kNoError);
+                return;
+            }
             appendMissingField(arr);
             appendErrorReason(normalReason, invertedReason);
             appendConsideredValues(arr);
@@ -1463,19 +1523,23 @@ private:
         static constexpr auto kNormalReason = "specified string length was not satisfied";
         static constexpr auto kInvertedReason = "specified string length was satisfied";
         static const std::set<BSONType> expectedTypes{BSONType::String};
-        generatePathError(
-            expr, kNormalReason, kInvertedReason, &expectedTypes, LeafArrayBehavior::kNoTraversal);
+        generatePathError(expr,
+                          kNormalReason,
+                          kInvertedReason,
+                          &expectedTypes,
+                          LeafArrayBehavior::kNoTraversal,
+                          true /* isJsonSchemaKeyword */);
     }
 
     /**
-     * Determines if a validation error should be generated for a JSON Schema array keyword match
-     * expression 'expr' given the current document validation context and returns the array 'expr'
-     * expression applies over. If a validation error should not be generated, then the
-     * End-Of-Object (EOO) value is returned. If a validation error should be generated, then the
-     * type of the value of the returned BSONElement is always an array.
+     * Determines if a validation error should be generated for a JsonSchema keyword MatchExpression
+     * 'expr' given the current document validation context. Returns the element 'expr' applies
+     * over if the found element matches one of the 'expectedTypes'. By returning a non-empty
+     * element, this indicates that 'expr' should generate an error. Returns End-Of-Object (EOO)
+     * value otherwise, which indicates that 'expr' should not generate an error.
      */
-    BSONElement getValueForArrayKeywordExpressionIfShouldGenerateError(
-        const MatchExpression& expr) {
+    BSONElement getValueForKeywordExpressionIfShouldGenerateError(
+        const MatchExpression& expr, const std::set<BSONType>& expectedTypes) {
         if (!_context->shouldGenerateError(expr)) {
             return {};
         }
@@ -1489,39 +1553,40 @@ private:
             expr.path(), LeafArrayBehavior::kNoTraversal, NonLeafArrayBehavior::kNoTraversal);
         auto attributeValue = getValueAt(path);
 
-        // If attribute value is either not present or is not an array, do not generate an error,
-        // since related match expressions do that instead. There are 4 cases of how an array
-        // keyword can be defined in combination with 'required' and 'type' keywords (in the
-        // explanation below parameter 'expr' corresponds to '(array keyword match expression)'):
+        // If attribute value is either not present or does not match the types in 'expectedTypes',
+        // do not generate an error, since related match expressions do that instead. There are 4
+        // cases of how a keyword can be defined in combination with 'required' and 'type' keywords
+        // (in the explanation below parameter 'expr' corresponds to '(keyword match expression)'):
         //
-        // 1) 'required' is not present, {type: 'array'} is not present. In this case the expression
-        // tree corresponds to ((array keyword match expression) OR NOT (is array)) OR (NOT
-        // (attribute exists)). This tree can fail to match only if the attribute is present and is
-        // an array.
+        // 1) 'required' is not present, {type: <expectedTypes>} is not present. In this case the
+        // expression tree corresponds to ((keyword match expression) OR NOT (matches type)) OR
+        // (NOT (attribute exists)). This tree can fail to match only if the attribute is present
+        // and matches a type in 'expectedTypes'.
         //
-        // 2) 'required' is not present, {type: 'array'} is present. In this case the expression
-        // tree corresponds to ((array keyword match expression) AND (is array)) OR (NOT (attribute
-        // exists)). If the input is an attribute of a non-array type, then both (array keyword
-        // match expression) and (is array) expressions fail to match and are asked to contribute to
-        // the validation error. We expect only (is array) expression, not an (array keyword match
-        // expression), to report a type mismatch, since otherwise the error would contain redundant
-        // elements.
+        // 2) 'required' is not present, {type: <expectedTypes>} is present. In this case the
+        // expression tree corresponds to ((keyword match expression) AND (matches type)) OR (NOT
+        // (attribute exists)). If the input is an element of a non-matching type, then both
+        // (keyword match expression) and (matches type) expressions fail to match and are asked
+        // to contribute to the validation error. We expect only (matches type) expression, not a
+        // (keyword match expression), to report a type mismatch, since otherwise the error would
+        // contain redundant elements.
         //
-        // 3) 'required' is present, {type: 'array'} is not present. In this case the expression
-        // tree corresponds to ((array keyword match expression) OR NOT (is array)) AND (attribute
-        // exists). This tree can fail to match if the attribute is present and is an array, and
-        // fails to match when the attribute is not present. In the latter case expression part
-        // ((array keyword match expression) OR NOT (is array)) matches and (array keyword match
-        // expression) is not asked to contribute to the error.
+        // 3) 'required' is present, {type: <expectedTypes>} is not present. In this case the
+        // expression tree corresponds to ((keyword match expression) OR NOT (matches type)) AND
+        // (attribute exists). This tree can fail to match if the attribute is present and
+        // matches a type, and fails to match when the attribute is not present. In the latter
+        // case, the expression part ((keyword match expression) OR NOT (matches type)) matches and
+        // (keyword match expression) is not asked to contribute to the error.
         //
-        // 4) 'required' is present, {type: 'array'} is present. In this case the expression tree
-        // corresponds to ((array keyword match expression) AND (is array)) AND (attribute exists).
-        // This tree can fail to match if the attribute is present and is an array, and fails to
-        // match when the attribute is not present or is not an array. In the case when the
+        // 4) 'required' is present, {type: <expectedTypes>} is present. In this case the expression
+        // tree corresponds to ((keyword match expression) AND (matches type)) AND (attribute
+        // exists). This tree can fail to match if the attribute is present and matches a type,
+        // or if the attribute is not present or does not match a type. In the case when the
         // attribute is not present all parts of the expression fail to match and are asked to
         // contribute to the error, but we expect only (attribute exists) expression to contribute,
-        // since otherwise the error would contain redundant elements.
-        return (attributeValue.type() == BSONType::Array) ? attributeValue : BSONElement{};
+        // since otherwise  the error would contain redundant elements.
+        return expectedTypes.find(attributeValue.type()) != expectedTypes.end() ? attributeValue
+                                                                                : BSONElement{};
     }
 
     /**
@@ -1531,7 +1596,8 @@ private:
         const InternalSchemaNumArrayItemsMatchExpression* expr) {
         static constexpr auto normalReason = "array did not match specified length";
         _context->pushNewFrame(*expr);
-        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+        if (auto attributeValue =
+                getValueForKeywordExpressionIfShouldGenerateError(*expr, {BSONType::Array})) {
             appendErrorDetails(*expr);
             appendErrorReason(normalReason, "");
             auto attributeValueAsArray = BSONArray(attributeValue.embeddedObject());
@@ -1548,7 +1614,8 @@ private:
         const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) {
         static constexpr auto normalReason = "found additional items";
         _context->pushNewFrame(*expr);
-        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+        if (auto attributeValue =
+                getValueForKeywordExpressionIfShouldGenerateError(*expr, {BSONType::Array})) {
             appendErrorDetails(*expr);
             appendErrorReason(normalReason, "");
             appendAdditionalItems(BSONArray(attributeValue.embeddedObject()), expr->startIndex());
@@ -1575,7 +1642,8 @@ private:
         }
         invariant(expr.getChild(0)->matchType() ==
                   MatchExpression::MatchType::INTERNAL_SCHEMA_MATCH_ARRAY_INDEX);
-        if (getValueForArrayKeywordExpressionIfShouldGenerateError(*expr.getChild(0))) {
+        if (getValueForKeywordExpressionIfShouldGenerateError(*expr.getChild(0),
+                                                              {BSONType::Array})) {
             appendOperatorName(expr);
 
             // Since the "items" keyword set to an array of subschemas logically behaves as "$and",
@@ -1615,7 +1683,8 @@ private:
         const std::string& normalReason,
         const std::string& invertedReason) {
         _context->pushNewFrame(*expr);
-        if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
+        if (auto attributeValue =
+                getValueForKeywordExpressionIfShouldGenerateError(*expr, {BSONType::Array})) {
             appendOperatorName(*expr);
             appendErrorReason(normalReason, invertedReason);
             auto failingElement =
@@ -1819,6 +1888,8 @@ public:
             {"_propertiesExistList", {"", ""}},
             {"items", {"details", ""}},
             {"dependencies", {"failingDependencies", ""}},
+            {"required", {"missingProperties", ""}},
+            {"_property", {"details", ""}},
             {"", {"details", ""}}};
         auto detailsStringPair = detailsStringMap.find(tag);
         invariant(detailsStringPair != detailsStringMap.end());
@@ -2055,6 +2126,19 @@ private:
     void postVisitTreeOperator(const ListOfMatchExpression* expr,
                                const std::string& detailsString) {
         finishLogicalOperatorChildError(expr, _context);
+        // If this node represents a 'properties' keyword or an individual property schema (denoted
+        // by '_property') and the current array builder has no elements, then this node will not
+        // contribute to the error output. As an example, consider the document {} against the
+        // following schema: {required: ['a'], properties: {'a': {minimum: 2, type: 'int'}}}.
+        // Though the AND representing 'properties' will fail and as such, is expected to construct
+        // an error, its children will not contribute to the generated error. As such, we
+        // retroactively mark an AND representing a 'properties' keyword or an individual
+        // 'property' as 'RuntimeState::kNoError' if no error details were produced.
+        auto tag = expr->getErrorAnnotation()->tag;
+        if (_context->shouldGenerateError(*expr) && (tag == "properties" || tag == "_property") &&
+            _context->getCurrentArrayBuilder().arrSize() == 0) {
+            _context->setCurrentRuntimeState(RuntimeState::kNoError);
+        }
         // Append the result of the current array builder to the current object builder under the
         // field name 'detailsString' unless this node produces an array (i.e. in the case of a
         // subschema).
@@ -2069,18 +2153,18 @@ private:
 };
 
 /**
- * Returns true if each node in the tree rooted at 'validatorExpr' has an error annotation, false
- * otherwise.
+ * Verifies that each node in the tree rooted at 'validatorExpr' has an error annotation.
  */
-bool hasErrorAnnotations(const MatchExpression& validatorExpr) {
-    if (!validatorExpr.getErrorAnnotation())
-        return false;
+void assertHasErrorAnnotations(const MatchExpression& validatorExpr) {
+    uassert(4994600,
+            str::stream() << "Cannot generate validation error details: no annotation found for "
+                             "expression "
+                          << validatorExpr.toString(),
+            validatorExpr.getErrorAnnotation());
     for (const auto childExpr : validatorExpr) {
-        if (!childExpr || !hasErrorAnnotations(*childExpr)) {
-            return false;
-        }
+        if (childExpr)
+            assertHasErrorAnnotations(*childExpr);
     }
-    return true;
 }
 
 /**
@@ -2134,13 +2218,9 @@ BSONObj generateErrorHelper(const MatchExpression& validatorExpr,
     ValidationErrorInVisitor inVisitor{&context};
     ValidationErrorPostVisitor postVisitor{&context};
 
-    // TODO SERVER-49446: Once all nodes have ErrorAnnotations, this check should be converted to an
-    // invariant check that all nodes have an annotation. Also add an invariant to the
-    // DocumentValidationFailureInfo constructor to check that it is initialized with a non-empty
-    // object.
-    if (!hasErrorAnnotations(validatorExpr)) {
-        return BSONObj();
-    }
+    // Verify that all nodes have error annotations.
+    assertHasErrorAnnotations(validatorExpr);
+
     MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
     tree_walker::walk<true, MatchExpression>(&validatorExpr, &walker);
 
