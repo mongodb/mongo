@@ -369,7 +369,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResh
 
 void createSlimOplogView(OperationContext* opCtx, Database* db) {
     writeConflictRetry(
-        opCtx, "createReshardingOplog", "local.system.resharding.slimOplogForGraphLookup", [&] {
+        opCtx, "createReshardingSlimOplog", "local.system.resharding.slimOplogForGraphLookup", [&] {
             {
                 // Create 'system.views' in a separate WUOW if it does not exist.
                 WriteUnitOfWork wuow(opCtx);

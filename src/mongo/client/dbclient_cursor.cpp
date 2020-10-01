@@ -591,6 +591,34 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     }
 }
 
+/* static */
+StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationRequest(
+    DBClientBase* client, AggregationRequest aggRequest, bool secondaryOk, bool useExhaust) {
+    BSONObj ret;
+    try {
+        if (!client->runCommand(aggRequest.getNamespaceString().db().toString(),
+                                aggRequest.serializeToCommandObj().toBson(),
+                                ret,
+                                secondaryOk ? QueryOption_SlaveOk : 0)) {
+            return {ErrorCodes::CommandFailed, ret.toString()};
+        }
+    } catch (...) {
+        return exceptionToStatus();
+    }
+    long long cursorId = ret["cursor"].Obj()["id"].Long();
+    std::vector<BSONObj> firstBatch;
+    for (BSONElement elem : ret["cursor"].Obj()["firstBatch"].Array()) {
+        firstBatch.emplace_back(elem.Obj().getOwned());
+    }
+
+    return {std::make_unique<DBClientCursor>(client,
+                                             aggRequest.getNamespaceString(),
+                                             cursorId,
+                                             0,
+                                             useExhaust ? QueryOption_Exhaust : 0,
+                                             firstBatch)};
+}
+
 DBClientCursor::~DBClientCursor() {
     kill();
 }

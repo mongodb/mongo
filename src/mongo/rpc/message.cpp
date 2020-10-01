@@ -31,7 +31,10 @@
 
 #include "mongo/rpc/message.h"
 
+#include <fmt/format.h>
+
 #include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
 
 namespace mongo {
 
@@ -41,6 +44,31 @@ AtomicWord<int32_t> NextMsgId;
 
 int32_t nextMessageId() {
     return NextMsgId.fetchAndAdd(1);
+}
+
+std::string Message::opMsgDebugString() const {
+    MsgData::ConstView headerView = header();
+    auto opMsgRequest = OpMsgRequest::parse(*this);
+    std::stringstream docSequences;
+    int idx = 0;
+    for (const auto& seq : opMsgRequest.sequences) {
+        docSequences << fmt::format("Sequence Idx: {} Sequence Name: {}", idx++, seq.name)
+                     << std::endl;
+        for (const auto& obj : seq.objs) {
+            docSequences << fmt::format("\t{}", obj.toString()) << std::endl;
+        }
+    }
+
+    return fmt::format(
+        "Length: {} RequestId: {} ResponseTo: {} OpCode: {} Flags: {} Body: {}\n"
+        "Sections: {}",
+        headerView.getLen(),
+        headerView.getId(),
+        headerView.getResponseToMsgId(),
+        headerView.getNetworkOp(),
+        OpMsg::flags(*this),
+        opMsgRequest.body.toString(),
+        docSequences.str());
 }
 
 }  // namespace mongo

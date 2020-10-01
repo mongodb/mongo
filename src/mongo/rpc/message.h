@@ -471,6 +471,8 @@ public:
         return _buf;
     }
 
+    std::string opMsgDebugString() const;
+
 private:
     SharedBuffer _buf;
 };

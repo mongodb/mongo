@@ -80,7 +80,7 @@ public:
 
     ReadConcernArgs(boost::optional<OpTime> opTime, boost::optional<ReadConcernLevel> level);
 
-    ReadConcernArgs(boost::optional<LogicalTime> clusterTime,
+    ReadConcernArgs(boost::optional<LogicalTime> afterClusterTime,
                     boost::optional<ReadConcernLevel> level);
     /**
      * Format:
@@ -167,7 +167,21 @@ public:
     boost::optional<LogicalTime> getArgsAfterClusterTime() const;
 
     boost::optional<LogicalTime> getArgsAtClusterTime() const;
+
+    /**
+     * Returns a BSON object of the form:
+     *
+     * { readConcern: { level: "...",
+     *                  afterClusterTime: Timestamp(...) } }
+     */
     BSONObj toBSON() const;
+
+    /**
+     * Returns a BSON object of the form:
+     *
+     * { level: "...",
+     *   afterClusterTime: Timestamp(...) }
+     */
     BSONObj toBSONInner() const;
     std::string toString() const;
 

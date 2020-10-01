@@ -650,7 +650,12 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMaste
     response->setReplSetVersion(config.getConfigVersion());
     response->setIsMaster(true);
     response->setIsSecondary(false);
-    response->setMe(config.getMemberAt(0).getHostAndPort());
+    if (config.getNumMembers() > 0) {
+        response->setMe(config.getMemberAt(0).getHostAndPort());
+    } else {
+        response->setMe(HostAndPort::parseThrowing("localhost:27017"));
+    }
+
     response->setElectionId(OID::gen());
     response->setTopologyVersion(TopologyVersion(repl::instanceId, 0));
     return response;

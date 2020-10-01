@@ -72,6 +72,7 @@ env.Library(
         'resharding/resharding_coordinator_service.cpp',
         'resharding/resharding_donor_oplog_iterator.cpp',
         'resharding/resharding_donor_service.cpp',
+        'resharding/resharding_oplog_fetcher.cpp',
         'resharding/resharding_recipient_service.cpp',
         'scoped_operation_completion_sharding_actions.cpp',
         'session_catalog_migration_destination.cpp',
@@ -122,6 +123,7 @@ env.Library(
         'transaction_coordinator',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/rs_local_client',
         '$BUILD_DIR/mongo/db/session_catalog',

@@ -38,6 +38,7 @@ structs:
     ReshardingDonorOplogId:
         description: >-
             Represents the set of timestamps that belong to an operation from the donor shard.
+        generate_comparison_operators: true
         fields:
             clusterTime:
                 type: timestamp

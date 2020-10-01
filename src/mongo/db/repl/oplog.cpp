@@ -117,6 +117,7 @@ namespace {
 
 using namespace fmt::literals;
 
+MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 
 // Failpoint to block after a write and its oplog entry have been written to the storage engine and
@@ -285,6 +286,10 @@ void _logOpsInner(OperationContext* opCtx,
 }
 
 OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
+    addDestinedRecipient.execute([&](const BSONObj& data) {
+        auto recipient = data["destinedRecipient"].String();
+        oplogEntry->setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
+    });
     // All collections should have UUIDs now, so all insert, update, and delete oplog entries should
     // also have uuids. Some no-op (n) and command (c) entries may still elide the uuid field.
     invariant(oplogEntry->getUuid() || oplogEntry->getOpType() == OpTypeEnum::kNoop ||
@@ -394,6 +399,10 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(getDestinedRecipient(opCtx, nss, begin[i].doc));
+        addDestinedRecipient.execute([&](const BSONObj& data) {
+            auto recipient = data["destinedRecipient"].String();
+            oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
+        });
 
         OplogLink oplogLink;
         if (i > 0)
