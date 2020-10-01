@@ -2,6 +2,13 @@
 // Utility functions for multi-version replica sets
 //
 
+ReplSetTest.prototype._stablePrimaryOnRestarts = function() {
+    // In a 2-node replica set the secondary can step up after a restart. In fact while the
+    // secondary is being restarted, the primary may end up stepping down (due to heartbeats not
+    // being received) and for the restarted node to run for and win the election.
+    return this.nodes.length > 2;
+};
+
 /**
  * Upgrade or downgrade replica sets.
  *
@@ -10,28 +17,38 @@
  * @param pwd {string} optional, password for authentication. Must be set if user is set.
  */
 ReplSetTest.prototype.upgradeSet = function(options, user, pwd) {
+    this.awaitNodesAgreeOnPrimary();
     let primary = this.getPrimary();
 
-    this.upgradeSecondaries(primary, Object.assign({}, options), user, pwd);
-    this.upgradeArbiters(primary, Object.assign({}, options), user, pwd);
+    this.upgradeSecondaries(Object.assign({}, options), user, pwd);
+    this.upgradeArbiters(Object.assign({}, options), user, pwd);
 
-    // Upgrade the primary after stepping down.
+    if (!this._stablePrimaryOnRestarts()) {
+        this.awaitNodesAgreeOnPrimary();
+        if (this.getPrimary() != primary) {
+            this.upgradeMembers([primary], Object.assign({}, options), user, pwd);
+            return;
+        }
+    }
+
+    assert.eq(
+        this.getPrimary(), primary, "Primary changed unexpectedly after upgrading secondaries");
     this.upgradePrimary(primary, Object.assign({}, options), user, pwd);
 };
 
-ReplSetTest.prototype.upgradeMembers = function(primary, members, options, user, pwd) {
-    const noDowntimePossible = this.nodes.length > 2;
-
-    // Merge new options into node settings.
-    for (let nodeName in this.nodeOptions) {
-        this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
+function mergeNodeOptions(nodeOptions, options) {
+    for (let nodeName in nodeOptions) {
+        nodeOptions[nodeName] = Object.merge(nodeOptions[nodeName], options);
     }
+    return nodeOptions;
+}
+
+ReplSetTest.prototype.upgradeMembers = function(members, options, user, pwd) {
+    // Merge new options into node settings.
+    this.nodeOptions = mergeNodeOptions(this.nodeOptions, options);
 
     for (let member of members) {
         this.upgradeNode(member, options, user, pwd);
-
-        if (noDowntimePossible)
-            assert.eq(this.getPrimary(), primary);
     }
 };
 
@@ -42,21 +59,22 @@ ReplSetTest.prototype.getNonArbiterSecondaries = function() {
     return nonArbiters;
 };
 
-ReplSetTest.prototype.upgradeSecondaries = function(primary, options, user, pwd) {
-    this.upgradeMembers(primary, this.getNonArbiterSecondaries(), options, user, pwd);
+ReplSetTest.prototype.upgradeSecondaries = function(options, user, pwd) {
+    this.upgradeMembers(this.getNonArbiterSecondaries(), options, user, pwd);
 };
 
-ReplSetTest.prototype.upgradeArbiters = function(primary, options, user, pwd) {
+ReplSetTest.prototype.upgradeArbiters = function(options, user, pwd) {
     // We don't support downgrading data files for arbiters. We need to instead delete the dbpath.
+    const oldStartClean = {startClean: (options && !!options["startClean"])};
     if (options && options.binVersion == "last-stable") {
         options["startClean"] = true;
     }
-    this.upgradeMembers(primary, this.getArbiters(), options, user, pwd);
+    this.upgradeMembers(this.getArbiters(), options, user, pwd);
+    // Make sure we don't set {startClean:true} on other nodes unless the user explicitly requested.
+    this.nodeOptions = mergeNodeOptions(this.nodeOptions, oldStartClean);
 };
 
 ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
-    const noDowntimePossible = this.nodes.length > 2;
-
     // Merge new options into node settings.
     for (let nodeName in this.nodeOptions) {
         this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
@@ -79,9 +97,10 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
 
     let newPrimary = this.getPrimary();
 
-    if (noDowntimePossible)
-        assert.eq(newPrimary, primary);
-
+    if (this._stablePrimaryOnRestarts()) {
+        assert.eq(
+            newPrimary, primary, "Primary changed unexpectedly after upgrading old primary node");
+    }
     return newPrimary;
 };
 
@@ -118,7 +137,7 @@ ReplSetTest.prototype.upgradeNode = function(node, opts = {}, user, pwd) {
 
 ReplSetTest.prototype.stepdown = function(nodeId) {
     nodeId = this.getNodeId(nodeId);
-    assert.eq(this.getNodeId(this.getPrimary()), nodeId);
+    assert.eq(this.getNodeId(this.getPrimary()), nodeId, "Trying to stepdown a non primary node");
     var node = this.nodes[nodeId];
 
     assert.soonNoExcept(function() {

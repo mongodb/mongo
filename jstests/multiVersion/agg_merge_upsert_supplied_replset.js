@@ -31,7 +31,7 @@ let targetColl = testDB.target_coll;
 function refreshReplSet(version, secondariesOnly) {
     // Upgrade the set and wait for it to become available again.
     if (secondariesOnly) {
-        rst.upgradeSecondaries(rst.getPrimary(), {binVersion: version});
+        rst.upgradeSecondaries({binVersion: version});
     } else {
         rst.upgradeSet({binVersion: version});
     }

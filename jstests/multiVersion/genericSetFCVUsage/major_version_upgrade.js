@@ -227,8 +227,10 @@ for (let i = 0; i < versions.length; i++) {
     let primary = rst.getPrimary();
 
     // Upgrade the secondary nodes first.
-    rst.upgradeSecondaries(primary, {binVersion: version.binVersion});
+    rst.upgradeSecondaries({binVersion: version.binVersion});
 
+    assert.eq(
+        primary, rst.getPrimary(), "Primary changed unexpectedly after upgrading secondaries");
     assert.neq(null,
                primary,
                `replica set was unable to start up after upgrading secondaries to version: ${

@@ -86,7 +86,7 @@ let testRepl = function() {
     replTest.startSet();
     replTest.initiate();
     // Upgrade secondary to latest version.
-    replTest.upgradeSecondaries(replTest.getPrimary(), {binVersion: "latest"});
+    replTest.upgradeSecondaries({binVersion: "latest"});
 
     let [primary, primaryDb, secondaryDb, inputCollPrimary, inputCollSecondary] =
         awaitReplSet(replTest);
