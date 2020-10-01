@@ -226,23 +226,24 @@ public:
         /**
          * Constructs an annotation for a MatchExpression which does not contribute to error output.
          */
-        ErrorAnnotation(Mode mode) : operatorName(""), annotation(BSONObj()), mode(mode) {
+        ErrorAnnotation(Mode mode) : tag(""), annotation(BSONObj()), mode(mode) {
             invariant(mode != Mode::kGenerateError);
         }
 
         /**
          * Constructs a complete annotation for a MatchExpression which contributes to error output.
          */
-        ErrorAnnotation(std::string operatorName, BSONObj annotation)
-            : operatorName(std::move(operatorName)),
-              annotation(annotation.getOwned()),
-              mode(Mode::kGenerateError) {}
+        ErrorAnnotation(std::string tag, BSONObj annotation)
+            : tag(std::move(tag)), annotation(annotation.getOwned()), mode(Mode::kGenerateError) {}
 
         std::unique_ptr<ErrorAnnotation> clone() const {
             return std::make_unique<ErrorAnnotation>(*this);
         }
 
-        const std::string operatorName;
+        // Tracks either the name of a user facing MQL operator or an internal name for some logical
+        // entity to be used for dispatching to the correct handling logic during error generation.
+        // All internal names are denoted by an underscore prefix.
+        const std::string tag;
         // Tracks the original expression as specified by the user.
         const BSONObj annotation;
         const Mode mode;

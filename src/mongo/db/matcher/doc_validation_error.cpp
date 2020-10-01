@@ -47,6 +47,7 @@
 #include "mongo/db/matcher/match_expression_util.h"
 #include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
@@ -167,8 +168,8 @@ struct ValidationErrorContext {
             return;
         }
 
-        // If our parent needs more information, call 'matches()' to determine whether we are
-        // contributing to error output.
+        // If our parent needs more information, call 'matches()' to determine whether the 'expr'
+        // will contribute to error output.
         if (parentRuntimeState == RuntimeState::kErrorNeedChildrenInfo) {
             bool generateErrorValue = expr.matchesBSON(subDoc) ? inversion == InvertError::kInverted
                                                                : inversion == InvertError::kNormal;
@@ -285,10 +286,24 @@ struct ValidationErrorContext {
     void appendLatestCompleteError(BSONObjBuilder* builder) {
         const static std::string kDetailsString = "details";
         stdx::visit(
-            visit_helper::Overloaded{[&](const auto& details) -> void {
-                                         verifySizeAndAppend(details, kDetailsString, builder);
-                                     },
-                                     [&](const std::monostate& arr) -> void { MONGO_UNREACHABLE }},
+            visit_helper::Overloaded{
+                [&](const auto& details) -> void {
+                    verifySizeAndAppend(details, kDetailsString, builder);
+                },
+                [&](const std::monostate& state) -> void { MONGO_UNREACHABLE; },
+                [&](const std::string& str) -> void { MONGO_UNREACHABLE; }},
+            latestCompleteError);
+    }
+    /**
+     * Appends the latest complete error to 'builder'. This should only be called by nodes which
+     * construct an array as part of their error.
+     */
+    void appendLatestCompleteError(BSONArrayBuilder* builder) {
+        stdx::visit(
+            visit_helper::Overloaded{[&](const BSONObj& obj) -> void { builder->append(obj); },
+                                     [&](const std::string& str) -> void { builder->append(str); },
+                                     [&](const BSONArray& arr) -> void { MONGO_UNREACHABLE; },
+                                     [&](const std::monostate& arr) -> void { MONGO_UNREACHABLE; }},
             latestCompleteError);
     }
 
@@ -300,11 +315,16 @@ struct ValidationErrorContext {
         return stdx::get<BSONObj>(latestCompleteError);
     }
 
+    BSONArray getLatestCompleteErrorArray() const {
+        return stdx::get<BSONArray>(latestCompleteError);
+    }
+
     /**
      * Returns whether 'expr' will produce an array as an error.
      */
-    bool producesArray(const MatchExpression& expr) const {
-        return expr.getErrorAnnotation()->operatorName == "_internalSubschema";
+    bool producesArray(const MatchExpression& expr) {
+        auto& tag = expr.getErrorAnnotation()->tag;
+        return tag == "_subschema" || tag == "_propertiesExistList";
     }
     bool isConsideredValuesTruncated() const {
         invariant(!frames.empty());
@@ -350,8 +370,12 @@ struct ValidationErrorContext {
     // to generate an error for one node. As such, each node must call 'pushNewFrame' as part of
     // its pre-visit and 'popFrame' as part of its post-visit.
     std::stack<ValidationErrorFrame> frames;
-    // Tracks the most recently completed error. The error can be one of three types:
+    // Tracks the most recently completed error. The error can be one of several types:
     // - std::monostate indicates that no error was produced.
+    // - Nodes can return their error as a std::string if they do not need to generate error
+    // details as a structured BSONObj. For example, consider the schema {required: [a,b,c]}. Each
+    // property in the 'required' array is represented as its own ExistsMatchExpression and will
+    // simply report its path if it is missing from the document which failed to match.
     // - BSONArray indicates multiple errors produced by an expression which does not correspond
     // to a user-facing operator. For example, consider the subschema {minimum: 2, multipleOf: 2}.
     // Both schema operators can fail and produce errors, but the schema that they belong to
@@ -359,7 +383,8 @@ struct ValidationErrorContext {
     // in an array and passed to the parent expression.
     // - Finally, BSONObj indicates the most common case of an error: a detailed object which
     // describes the reasons for failure. The final error will be of this type.
-    stdx::variant<std::monostate, BSONObj, BSONArray> latestCompleteError = std::monostate();
+    stdx::variant<std::monostate, std::string, BSONObj, BSONArray> latestCompleteError =
+        std::monostate();
     // Document which failed to match against the collection's validator.
     const BSONObj& rootDoc;
     // Tracks whether the generated error should omit appending 'specifiedAs' and
@@ -380,21 +405,19 @@ void finishLogicalOperatorChildError(const ListOfMatchExpression* expr,
                                      ValidationErrorContext* ctx) {
     if (ctx->shouldGenerateError(*expr) &&
         ctx->getCurrentRuntimeState() != RuntimeState::kErrorIgnoreChildren) {
-        auto operatorName = expr->getErrorAnnotation()->operatorName;
+        auto tag = expr->getErrorAnnotation()->tag;
         // Only provide the indexes of non-matching clauses for certain named operators in the
         // user's query.
         static const stdx::unordered_set<std::string> operatorsWithOrderedClauses = {
             "$and", "$or", "$nor", "allOf", "anyOf", "oneOf"};
         if (ctx->haveLatestCompleteError()) {
-            if (operatorsWithOrderedClauses.find(operatorName) !=
-                operatorsWithOrderedClauses.end()) {
+            if (operatorsWithOrderedClauses.find(tag) != operatorsWithOrderedClauses.end()) {
                 BSONObjBuilder subBuilder = ctx->getCurrentArrayBuilder().subobjStart();
                 subBuilder.appendNumber("index", ctx->getCurrentChildIndex());
                 ctx->appendLatestCompleteError(&subBuilder);
                 subBuilder.done();
             } else {
-                ctx->verifySizeAndAppend(ctx->getLatestCompleteErrorObject(),
-                                         &ctx->getCurrentArrayBuilder());
+                ctx->appendLatestCompleteError(&ctx->getCurrentArrayBuilder());
             }
         }
     }
@@ -418,10 +441,10 @@ enum class ItemsKeywordType {
 ItemsKeywordType toItemsKeywordType(
     const InternalSchemaAllElemMatchFromIndexMatchExpression& expr) {
     auto* errorAnnotation = expr.getErrorAnnotation();
-    if ("items" == errorAnnotation->operatorName) {
+    if ("items" == errorAnnotation->tag) {
         return ItemsKeywordType::kItems;
     }
-    if ("additionalItems" == errorAnnotation->operatorName) {
+    if ("additionalItems" == errorAnnotation->tag) {
         switch (errorAnnotation->annotation.firstElementType()) {
             case BSONType::Bool:
                 return ItemsKeywordType::kAdditionalItemsFalse;
@@ -447,13 +470,13 @@ public:
         generateAlwaysBooleanError(*expr);
     }
     void visit(const AndMatchExpression* expr) final {
-        auto&& operatorName = expr->getErrorAnnotation()->operatorName;
+        auto&& tag = expr->getErrorAnnotation()->tag;
         // $all is treated as a leaf operator.
-        if (operatorName == "$all") {
+        if (tag == "$all") {
             static constexpr auto kNormalReason = "array did not contain all specified values";
             static constexpr auto kInvertedReason = "array did contain all specified values";
             generateLogicalLeafError(*expr, kNormalReason, kInvertedReason);
-        } else if (operatorName == "items") {
+        } else if (tag == "items") {
             // $and only gets annotated as an "items" only for JSON Schema keyword "items" set to an
             // array of subschemas.
             generateJSONSchemaItemsSchemaArrayError(*expr);
@@ -466,8 +489,7 @@ public:
             }
             // If this is the root of a $jsonSchema and we're in an inverted context, do not attempt
             // to provide a detailed error.
-            if (operatorName == "$jsonSchema" &&
-                _context->getCurrentInversion() == InvertError::kInverted) {
+            if (tag == "$jsonSchema" && _context->getCurrentInversion() == InvertError::kInverted) {
                 _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
                 static constexpr auto kInvertedReason = "schema matched";
                 appendErrorReason("", kInvertedReason);
@@ -499,7 +521,10 @@ public:
         static constexpr auto kNormalReason = "path does not exist";
         static constexpr auto kInvertedReason = "path does exist";
         _context->pushNewFrame(*expr, _context->getCurrentDocument());
-        if (_context->shouldGenerateError(*expr)) {
+        // Only generate an error if this node is tagged with an MQL operator name. The
+        // '_propertyExists' tag indicates that this node is implementing a JSONSchema feature.
+        if (_context->shouldGenerateError(*expr) &&
+            expr->getErrorAnnotation()->tag != "_propertyExists") {
             appendErrorDetails(*expr);
             appendErrorReason(kNormalReason, kInvertedReason);
         }
@@ -607,7 +632,19 @@ public:
             appendErrorReason(kNormalReason, kInvertedReason);
         }
     }
-    void visit(const InternalSchemaCondMatchExpression* expr) final {}
+    void visit(const InternalSchemaCondMatchExpression* expr) final {
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        if (_context->shouldGenerateError(*expr)) {
+            // Since 'expr' represents a conditional expression corresponding to a single
+            // $jsonSchema dependency whose else branch always evaluates to 'true', 'expr' can only
+            // fail if its 'condition' expression evaluates to true and its then branch evaluates to
+            // false. Therefore, if 'condition' evaluates to false, we conclude that this node will
+            // not contribute to error generation.
+            if (!expr->condition()->matchesBSON(_context->getCurrentDocument())) {
+                _context->setCurrentRuntimeState(RuntimeState::kNoError);
+            }
+        }
+    }
     void visit(const InternalSchemaEqMatchExpression* expr) final {}
     void visit(const InternalSchemaFmodMatchExpression* expr) final {
         static constexpr auto kNormalReason =
@@ -672,32 +709,36 @@ public:
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         // This node should never be responsible for generating an error directly.
         invariant(expr->getErrorAnnotation()->mode != AnnotationMode::kGenerateError);
-        BSONObj subDocument = _context->getCurrentDocument();
-        ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
-        BSONMatchableDocument doc(_context->getCurrentDocument());
-        MatchableDocument::IteratorHolder cursor(&doc, &path);
-        invariant(cursor->more());
-        auto elem = cursor->next().element();
+        // As part of pushing a new frame onto the stack, the runtime state may be set to
+        // 'kNoError' if 'expr' matches the current document.
+        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        // Only attempt to find a subdocument if this node failed to match.
+        if (_context->getCurrentRuntimeState() != RuntimeState::kNoError) {
+            ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
+            BSONMatchableDocument doc(_context->getCurrentDocument());
+            MatchableDocument::IteratorHolder cursor(&doc, &path);
+            invariant(cursor->more());
+            auto elem = cursor->next().element();
 
-        // If we do not find an object at expr's path, then the subtree rooted at this node will
-        // not contribute to error generation as there will either be an explicit
-        // ExistsMatchExpression which will explain a missing path error or an explicit
-        // InternalSchemaTypeExpression that will explain a type did not match error.
-        bool ignoreSubTree = false;
-        if (elem.type() == BSONType::Object) {
-            subDocument = elem.embeddedObject();
-        } else {
-            ignoreSubTree = true;
-        }
+            // If we do not find an object at expr's path, then the subtree rooted at this node will
+            // not contribute to error generation as there will either be an explicit
+            // ExistsMatchExpression which will explain a missing path error or an explicit
+            // InternalSchemaTypeExpression that will explain a type did not match error.
+            bool ignoreSubTree = false;
+            if (elem.type() == BSONType::Object) {
+                _context->setCurrentDocument(elem.embeddedObject());
+            } else {
+                ignoreSubTree = true;
+            }
 
-        // This expression should match exactly one object; if there are any more elements, then
-        // ignore the subtree.
-        if (cursor->more()) {
-            ignoreSubTree = true;
-        }
-        _context->pushNewFrame(*expr, subDocument);
-        if (ignoreSubTree) {
-            _context->setCurrentRuntimeState(RuntimeState::kNoError);
+            // This expression should match exactly one object; if there are any more elements, then
+            // ignore the subtree.
+            if (cursor->more()) {
+                ignoreSubTree = true;
+            }
+            if (ignoreSubTree) {
+                _context->setCurrentRuntimeState(RuntimeState::kNoError);
+            }
         }
     }
     void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {}
@@ -777,8 +818,7 @@ public:
         _context->flipInversion();
         // If this is a $jsonSchema not, then expr's children will not contribute to the error
         // output.
-        if (_context->shouldGenerateError(*expr) &&
-            expr->getErrorAnnotation()->operatorName == "not") {
+        if (_context->shouldGenerateError(*expr) && expr->getErrorAnnotation()->tag == "not") {
             static constexpr auto kInvertedReason = "child expression matched";
             appendErrorReason("", kInvertedReason);
             _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
@@ -786,7 +826,7 @@ public:
     }
     void visit(const OrMatchExpression* expr) final {
         // The jsonSchema keyword 'enum' is treated as a leaf operator.
-        if (expr->getErrorAnnotation()->operatorName == "enum") {
+        if (expr->getErrorAnnotation()->tag == "enum") {
             static constexpr auto kNormalReason = "value was not found in enum";
             static constexpr auto kInvertedReason = "value was found in enum";
             generateLogicalLeafError(*expr, kNormalReason, kInvertedReason);
@@ -835,10 +875,12 @@ public:
 private:
     // Set of utilities responsible for appending various fields to build a descriptive error.
     void appendOperatorName(const MatchExpression& expr) {
-        auto operatorName = expr.getErrorAnnotation()->operatorName;
+        auto tag = expr.getErrorAnnotation()->tag;
         // Only append the operator name if 'annotation' has one.
-        if (!operatorName.empty()) {
-            _context->getCurrentObjBuilder().append("operatorName", operatorName);
+        if (!tag.empty()) {
+            // An underscore-prefixed tag describes an internal entity, not an MQL operator.
+            invariant(tag[0] != '_');
+            _context->getCurrentObjBuilder().append("operatorName", tag);
         }
     }
     void appendSpecifiedAs(const ErrorAnnotation& annotation, BSONObjBuilder* bob) {
@@ -1402,7 +1444,12 @@ public:
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
-    void visit(const InternalSchemaCondMatchExpression* expr) final {}
+    void visit(const InternalSchemaCondMatchExpression* expr) final {
+        if (_context->shouldGenerateError(*expr)) {
+            generateSingleDependencyError(*expr);
+        }
+        _context->incrementCurrentChildIndex();
+    }
     void visit(const InternalSchemaEqMatchExpression* expr) final {}
     void visit(const InternalSchemaFmodMatchExpression* expr) final {}
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {}
@@ -1452,6 +1499,36 @@ public:
     }
 
 private:
+    /**
+     * Generates an error for a single $jsonSchema dependency represented by 'expr'.
+     */
+    void generateSingleDependencyError(const InternalSchemaCondMatchExpression& expr) {
+        auto childIndex = _context->getCurrentChildIndex();
+        auto& builder = _context->getCurrentObjBuilder();
+        auto&& tag = expr.getErrorAnnotation()->tag;
+        // When generating an error for 'InternalSchemaCondMatchExpression', that is, a single
+        // jsonSchema dependency, we can only generate an error for the 'then' branch (expr's child
+        // at index 1). This is because the only way that a jsonSchema dependency can fail is if
+        // expr's condition (expr's child at index 0) evaluates to true and the 'then' branch
+        // evaluates to false. Additionally, the else branch (expr's child at index 2) is never
+        // considered because it always evaluates to true and detailed inverted errors in the
+        // context of $jsonSchema are not supported.
+        if (_context->haveLatestCompleteError() && childIndex == 1) {
+            builder.append(
+                "conditionalProperty",
+                expr.getErrorAnnotation()->annotation.firstElement().fieldNameStringData());
+            if (tag == "_schemaDependency") {
+                // In the case of a schema dependency (i.e. {dependencies: {a: {<subschema>}}}),
+                // we simply append the subschema's generated failure.
+                _context->appendLatestCompleteError(&builder);
+            } else if (tag == "_propertyDependency") {
+                // In the case of a property dependency (i.e. {dependencies: {a:
+                // [<set of dependant properties>]}}), we append an array of missing properties.
+                builder.append("missingProperties", _context->getLatestCompleteErrorArray());
+            }
+        }
+    }
+
     void inVisitTreeOperator(const ListOfMatchExpression* expr) {
         finishLogicalOperatorChildError(expr, _context);
     }
@@ -1471,17 +1548,15 @@ public:
         _context->finishCurrentError(expr);
     }
     void visit(const AndMatchExpression* expr) final {
-        auto operatorName = expr->getErrorAnnotation()->operatorName;
+        auto tag = expr->getErrorAnnotation()->tag;
         auto inversion = _context->getCurrentInversion();
         // Clean up the frame for this node if we're finishing the error for an $all, an inverted
         // $jsonSchema, or this node shouldn't generate an error.
-        if (operatorName == "$all" ||
-            (operatorName == "$jsonSchema" && inversion == InvertError::kInverted) ||
-            !_context->shouldGenerateError(*expr)) {
+        if (tag == "$all" || (tag == "$jsonSchema" && inversion == InvertError::kInverted)) {
             _context->finishCurrentError(expr);
             return;
         }
-        // Specify a different details string based on the operatorName in expr's annotation where
+        // Specify a different details string based on the tag in expr's annotation where
         // the first entry is the details string in the normal case and the second is the string
         // for the inverted case.
         static const StringMap<std::pair<std::string, std::string>> detailsStringMap = {
@@ -1489,10 +1564,12 @@ public:
             {"allOf", {"schemasNotSatisfied", ""}},
             {"properties", {"propertiesNotSatisfied", ""}},
             {"$jsonSchema", {"schemaRulesNotSatisfied", ""}},
-            {"_internalSubschema", {"", ""}},
+            {"_subschema", {"", ""}},
+            {"_propertiesExistList", {"", ""}},
             {"items", {"details", ""}},
+            {"dependencies", {"failingDependencies", ""}},
             {"", {"details", ""}}};
-        auto detailsStringPair = detailsStringMap.find(operatorName);
+        auto detailsStringPair = detailsStringMap.find(tag);
         invariant(detailsStringPair != detailsStringMap.end());
         auto&& stringPair = detailsStringPair->second;
         if (inversion == InvertError::kNormal) {
@@ -1523,7 +1600,14 @@ public:
         _context->finishCurrentError(expr);
     }
     void visit(const ExistsMatchExpression* expr) final {
-        _context->finishCurrentError(expr);
+        // If this node reports a path as its error, set 'latestCompleteError' appropriately.
+        if (_context->shouldGenerateError(*expr) &&
+            expr->getErrorAnnotation()->tag == "_propertyExists") {
+            _context->latestCompleteError = expr->path().toString();
+            _context->popFrame();
+        } else {
+            _context->finishCurrentError(expr);
+        }
     }
     void visit(const ExprMatchExpression* expr) final {
         _context->finishCurrentError(expr);
@@ -1566,7 +1650,9 @@ public:
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const InternalSchemaCondMatchExpression* expr) final {}
+    void visit(const InternalSchemaCondMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaEqMatchExpression* expr) final {}
     void visit(const InternalSchemaFmodMatchExpression* expr) final {
         _context->finishCurrentError(expr);
@@ -1636,27 +1722,26 @@ public:
     void visit(const NotMatchExpression* expr) final {
         // In the case of a $jsonSchema "not", we do not report any error details
         // explaining why the subschema did match.
-        if (_context->shouldGenerateError(*expr) &&
-            expr->getErrorAnnotation()->operatorName != "not") {
+        if (_context->shouldGenerateError(*expr) && expr->getErrorAnnotation()->tag != "not") {
             _context->appendLatestCompleteError(&_context->getCurrentObjBuilder());
         }
         _context->finishCurrentError(expr);
     }
     void visit(const OrMatchExpression* expr) final {
-        auto operatorName = expr->getErrorAnnotation()->operatorName;
+        auto tag = expr->getErrorAnnotation()->tag;
         // Clean up the frame for this node if we're finishing the error for an 'enum' or this node
         // shouldn't generate an error.
-        if (operatorName == "enum" || !_context->shouldGenerateError(*expr)) {
+        if (tag == "enum" || !_context->shouldGenerateError(*expr)) {
             _context->finishCurrentError(expr);
             return;
         }
-        // Specify a different details string based on the operatorName in expr's annotation where
-        // the first entry is the details string in the normal case and the second is the string
-        // for the inverted case.
+        // Specify a different details string based on the tag in expr's annotation where the first
+        // entry is the details string in the normal case and the second is the string for the
+        // inverted case.
         static const StringMap<std::pair<std::string, std::string>> detailsStringMap = {
             {"$or", {"clausesNotSatisfied", "clausesSatisfied"}},
             {"anyOf", {"schemasNotSatisfied", ""}}};
-        auto detailsStringPair = detailsStringMap.find(operatorName);
+        auto detailsStringPair = detailsStringMap.find(tag);
         invariant(detailsStringPair != detailsStringMap.end());
         auto stringPair = detailsStringPair->second;
         if (_context->getCurrentInversion() == InvertError::kNormal) {

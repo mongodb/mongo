@@ -767,15 +767,23 @@ StatusWithMatchExpression parseNumProperties(const boost::intrusive_ptr<Expressi
     return makeRestriction(expCtx, BSONType::Object, path, std::move(objectMatch), typeExpr);
 }
 
-StatusWithMatchExpression makeDependencyExistsClause(StringData path, StringData dependencyName) {
-    auto existsExpr = std::make_unique<ExistsMatchExpression>(dependencyName);
-
+StatusWithMatchExpression makeDependencyExistsClause(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    StringData path,
+    StringData dependencyName) {
+    // This node is tagged as '_propertyExists' to indicate that it will produce a path instead
+    // of a detail BSONObj error during error generation.
+    auto existsExpr = std::make_unique<ExistsMatchExpression>(
+        dependencyName,
+        doc_validation_error::createAnnotation(expCtx, "_propertyExists", BSONObj()));
     if (path.empty()) {
         return {std::move(existsExpr)};
     }
 
-    auto objectMatch =
-        std::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(existsExpr));
+    auto objectMatch = std::make_unique<InternalSchemaObjectMatchExpression>(
+        path,
+        std::move(existsExpr),
+        doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
 
     return {std::move(objectMatch)};
 }
@@ -794,21 +802,30 @@ StatusWithMatchExpression translateSchemaDependency(
         return nestedSchemaMatch.getStatus();
     }
 
-    auto ifClause = makeDependencyExistsClause(path, dependency.fieldNameStringData());
+    auto ifClause = makeDependencyExistsClause(expCtx, path, dependency.fieldNameStringData());
     if (!ifClause.isOK()) {
         return ifClause.getStatus();
     }
 
+    // The 'if' should never directly contribute to the error being generated.
+    doc_validation_error::annotateTreeToIgnoreForErrorDetails(expCtx, ifClause.getValue().get());
+
     std::array<std::unique_ptr<MatchExpression>, 3> expressions = {
         std::move(ifClause.getValue()),
         std::move(nestedSchemaMatch.getValue()),
-        std::make_unique<AlwaysTrueMatchExpression>()};
+        std::make_unique<AlwaysTrueMatchExpression>(
+            doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore))};
 
-    auto condExpr = std::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
+    auto condExpr = std::make_unique<InternalSchemaCondMatchExpression>(
+        std::move(expressions),
+        doc_validation_error::createAnnotation(expCtx, "_schemaDependency", dependency.wrap()));
     return {std::move(condExpr)};
 }
 
-StatusWithMatchExpression translatePropertyDependency(StringData path, BSONElement dependency) {
+StatusWithMatchExpression translatePropertyDependency(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    StringData path,
+    BSONElement dependency) {
     invariant(dependency.type() == BSONType::Array);
 
     if (dependency.embeddedObject().isEmpty()) {
@@ -819,7 +836,10 @@ StatusWithMatchExpression translatePropertyDependency(StringData path, BSONEleme
                               << "' cannot be an empty array"};
     }
 
-    auto propertyDependencyExpr = std::make_unique<AndMatchExpression>();
+    // This node is tagged as '_internalPropertyList' to denote that this node will produce an
+    // array of properties during error generation.
+    auto propertyDependencyExpr = std::make_unique<AndMatchExpression>(
+        doc_validation_error::createAnnotation(expCtx, "_propertiesExistList", dependency.wrap()));
     std::set<StringData> propertyDependencyNames;
     for (auto&& propertyDependency : dependency.embeddedObject()) {
         if (propertyDependency.type() != BSONType::String) {
@@ -842,7 +862,7 @@ StatusWithMatchExpression translatePropertyDependency(StringData path, BSONEleme
         }
 
         auto propertyExistsExpr =
-            makeDependencyExistsClause(path, propertyDependency.valueStringData());
+            makeDependencyExistsClause(expCtx, path, propertyDependency.valueStringData());
         if (!propertyExistsExpr.isOK()) {
             return propertyExistsExpr.getStatus();
         }
@@ -850,17 +870,22 @@ StatusWithMatchExpression translatePropertyDependency(StringData path, BSONEleme
         propertyDependencyExpr->add(propertyExistsExpr.getValue().release());
     }
 
-    auto ifClause = makeDependencyExistsClause(path, dependency.fieldNameStringData());
+    auto ifClause = makeDependencyExistsClause(expCtx, path, dependency.fieldNameStringData());
     if (!ifClause.isOK()) {
         return ifClause.getStatus();
     }
+    // The 'if' should never directly contribute to the error being generated.
+    doc_validation_error::annotateTreeToIgnoreForErrorDetails(expCtx, ifClause.getValue().get());
 
     std::array<std::unique_ptr<MatchExpression>, 3> expressions = {
         {std::move(ifClause.getValue()),
          std::move(propertyDependencyExpr),
-         std::make_unique<AlwaysTrueMatchExpression>()}};
+         std::make_unique<AlwaysTrueMatchExpression>(
+             doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore))}};
 
-    auto condExpr = std::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
+    auto condExpr = std::make_unique<InternalSchemaCondMatchExpression>(
+        std::move(expressions),
+        doc_validation_error::createAnnotation(expCtx, "_propertyDependency", dependency.wrap()));
     return {std::move(condExpr)};
 }
 
@@ -876,7 +901,8 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
                               << "' must be an object"};
     }
 
-    auto andExpr = std::make_unique<AndMatchExpression>();
+    auto andExpr = std::make_unique<AndMatchExpression>(doc_validation_error::createAnnotation(
+        expCtx, dependencies.fieldNameStringData().toString(), BSONObj()));
     for (auto&& dependency : dependencies.embeddedObject()) {
         if (dependency.type() != BSONType::Object && dependency.type() != BSONType::Array) {
             return {ErrorCodes::TypeMismatch,
@@ -889,7 +915,7 @@ StatusWithMatchExpression parseDependencies(const boost::intrusive_ptr<Expressio
         auto dependencyExpr = (dependency.type() == BSONType::Object)
             ? translateSchemaDependency(
                   expCtx, path, dependency, allowedFeatures, ignoreUnknownKeywords)
-            : translatePropertyDependency(path, dependency);
+            : translatePropertyDependency(expCtx, path, dependency);
         if (!dependencyExpr.isOK()) {
             return dependencyExpr.getStatus();
         }
@@ -1696,12 +1722,12 @@ StatusWithMatchExpression _parse(const boost::intrusive_ptr<ExpressionContext>& 
             doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore));
     }
 
-    // All schemas are tagged with an operator name of '_internalSubschema' to indicate during
-    // error generation that 'andExpr' logically corresponds to a subschema. If this is a top
-    // level schema corresponding to '$jsonSchema', the caller is responsible for providing this
-    // information by overwriting this annotation.
+    // All schemas are given a tag of '_subschema' to indicate during error generation that
+    // 'andExpr' logically corresponds to a subschema. If this is a top level schema corresponding
+    // to '$jsonSchema', the caller is responsible for providing this information by overwriting
+    // this annotation.
     auto andExpr = std::make_unique<AndMatchExpression>(
-        doc_validation_error::createAnnotation(expCtx, "_internalSubschema", BSONObj()));
+        doc_validation_error::createAnnotation(expCtx, "_subschema", BSONObj()));
 
     auto translationStatus =
         translateScalarKeywords(expCtx, keywordMap, path, typeExpr.get(), andExpr.get());

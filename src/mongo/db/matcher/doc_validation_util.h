@@ -40,8 +40,8 @@ namespace mongo::doc_validation_error {
  */
 std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::string& operatorName,
-    const BSONObj& annotation);
+    const std::string& tag,
+    BSONObj annotation);
 
 std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,

@@ -32,15 +32,14 @@
 namespace mongo::doc_validation_error {
 std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const std::string& operatorName,
-    const BSONObj& annotation) {
+    const std::string& tag,
+    BSONObj annotation) {
     if (expCtx->isParsingCollectionValidator) {
-        return std::make_unique<MatchExpression::ErrorAnnotation>(operatorName, annotation);
+        return std::make_unique<MatchExpression::ErrorAnnotation>(tag, std::move(annotation));
     } else {
         return nullptr;
     }
 }
-
 std::unique_ptr<MatchExpression::ErrorAnnotation> createAnnotation(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     MatchExpression::ErrorAnnotation::Mode mode) {

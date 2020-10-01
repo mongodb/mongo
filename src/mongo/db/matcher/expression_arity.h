@@ -124,7 +124,8 @@ public:
                            return orig ? orig->shallowClone()
                                        : std::unique_ptr<MatchExpression>(nullptr);
                        });
-        std::unique_ptr<T> clone = std::make_unique<T>(std::move(clonedExpressions));
+        std::unique_ptr<T> clone =
+            std::make_unique<T>(std::move(clonedExpressions), _errorAnnotation);
 
         if (getTag()) {
             clone->setTag(getTag()->clone());
@@ -138,8 +139,10 @@ protected:
      * Takes ownership of the MatchExpressions in 'expressions'.
      */
     explicit FixedArityMatchExpression(
-        MatchType type, std::array<std::unique_ptr<MatchExpression>, nargs> expressions)
-        : MatchExpression(type), _expressions(std::move(expressions)) {}
+        MatchType type,
+        std::array<std::unique_ptr<MatchExpression>, nargs> expressions,
+        clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(type, std::move(annotation)), _expressions(std::move(expressions)) {}
 
     const auto& expressions() const {
         return _expressions;

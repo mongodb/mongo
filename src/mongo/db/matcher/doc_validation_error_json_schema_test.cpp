@@ -2174,5 +2174,217 @@ TEST(JSONSchemaValidation, NestedMaxPropertiesTypeMismatch) {
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
+// property dependencies
+TEST(JSONSchemaValidation, BasicPropertyDependency) {
+    BSONObj query = fromjson("{'$jsonSchema': {'dependencies': {'a': ['b', 'c']}}}");
+    BSONObj document = fromjson("{'a': 1, 'b': 2}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'a', "
+        "        missingProperties: [ 'c' ]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, NestedPropertyDependency) {
+    BSONObj query =
+        fromjson("{'$jsonSchema': {'properties': {'obj': {'dependencies': {'a': ['b', 'c']}}}}}");
+    BSONObj document = fromjson("{'obj': {'a': 1, 'b': 2}}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'properties', propertiesNotSatisfied: ["
+        "       {propertyName: 'obj', details: ["
+        "           {operatorName: 'dependencies', failingDependencies: ["
+        "               {conditionalProperty: 'a', "
+        "               missingProperties: ['c']}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PropertyDependencyOneFailingDependency) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'dependencies': {'a': ['b', 'c'], 'b': ['c','d'], 'c': ['a', 'b']}}}");
+    BSONObj document = fromjson("{'a': 1, 'b': 2, 'c': 5}");
+    // Should only report an error for 'b's dependency of missing 'd'.
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'b', "
+        "       missingProperties: ['d']}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PropertyDependencyManyFailingDependencies) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "{'dependencies': {'a': ['b', 'c', 'd'], 'b': ['c','d'], 'e': ['c', 'd']}}}");
+    BSONObj document = fromjson("{'a': 1, 'b': 2, 'e': 3}");
+    // Should only report an error for 'b's dependency of missing 'd'.
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'a', missingProperties: ['c','d']}, "
+        "       {conditionalProperty: 'b', missingProperties: ['c','d']},"
+        "       {conditionalProperty: 'e', missingProperties: ['c','d']}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PropertyFailingBiconditionalDependency) {
+    BSONObj query = fromjson("{'$jsonSchema': {'dependencies': {'a': ['b'], 'b': ['a']}}}");
+    BSONObj document = fromjson("{'a': 1}");
+    BSONObj expectedError = fromjson(
+        "{ operatorName: '$jsonSchema', schemaRulesNotSatisfied: [ { operatorName: 'dependencies', "
+        "failingDependencies: [ { conditionalProperty: 'a', missingProperties: [ 'b' ] } ] } ] }");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// schema dependencies
+TEST(JSONSchemaValidation, BasicSchemaDependency) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'dependencies': {'a': {'properties': {'b': {'type': 'number'}}}}}}");
+    BSONObj document = fromjson("{'a': 1, 'b': 'foo'}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'a', details: ["
+        "       {operatorName: 'properties',propertiesNotSatisfied: ["
+        "           {propertyName: 'b', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'number'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue:'foo',"
+        "               consideredType: 'string'}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, NestedSchemaDependency) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'properties': {'topLevelField': "
+        "       {'dependencies': {'a': {'properties': {'b': {'type': 'number'}}}}}}}}");
+    BSONObj document = fromjson("{'topLevelField': {'a': 1, 'b': 'foo'}}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        " {operatorName: 'properties', propertiesNotSatisfied: ["
+        "   {propertyName: 'topLevelField', 'details': ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'a', details: ["
+        "       {operatorName: 'properties',propertiesNotSatisfied: ["
+        "           {propertyName: 'b', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'number'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue:'foo',"
+        "               consideredType: 'string'}]}]}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, BiconditionalSchemaDependency) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'dependencies': "
+        "   {'a': {'properties': {'b': {'type': 'array'}}}, "
+        "   'b': {'properties': {'a': {'type': 'number'}}}}}}");
+    BSONObj document = fromjson("{'a': 'foo', 'b': 'bar'}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'a', details: ["
+        "       {operatorName: 'properties', propertiesNotSatisfied: ["
+        "           {propertyName: 'b', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'array'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue: 'bar',"
+        "               consideredType: 'string'}]}]}]},"
+        "       {conditionalProperty: 'b', details: ["
+        "       {operatorName: 'properties',propertiesNotSatisfied: ["
+        "           {propertyName: 'a', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'number'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue:'foo',"
+        "               consideredType: 'string'}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, SchemaDependencySomeDependenciesSatisfied) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'dependencies': "
+        "   {'a': {'properties': {'b': {'type': 'number'}}},"
+        "   'b': {'properties': {'c': {'type': 'string'}}},"
+        "   'c': {'properties': {'a': {'type': 'array'}}}}}}");
+    BSONObj document = fromjson("{'a': [0,1,2,3], 'b': 1, 'c': 12}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'b', details: ["
+        "       {operatorName: 'properties',propertiesNotSatisfied: ["
+        "           {propertyName: 'c', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'string'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue: 12,"
+        "               consideredType: 'int'}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, SchemaDependencyAllDependenciesFailed) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'dependencies': "
+        "   {'a': {'properties': {'b': {'type': 'number'}}},"
+        "   'b': {'properties': {'c': {'type': 'string'}}},"
+        "   'c': {'properties': {'a': {'type': 'array'}}}}}}");
+    BSONObj document = fromjson("{'a': 'foo', 'b': [], 'c': 12}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'a', details: ["
+        "       {operatorName: 'properties', propertiesNotSatisfied: ["
+        "           {propertyName: 'b', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'number'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue: [],"
+        "               consideredType: 'array'}]}]}]},"
+        "       {conditionalProperty: 'b', details: ["
+        "       {operatorName: 'properties', propertiesNotSatisfied: ["
+        "           {propertyName: 'c', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'string'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue: 12,"
+        "               consideredType: 'int'}]}]}]},"
+        "       {conditionalProperty: 'c', details: ["
+        "       {operatorName: 'properties',propertiesNotSatisfied: ["
+        "           {propertyName: 'a', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'array'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue:'foo',"
+        "               consideredType: 'string'}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, SchemaDependencyAndPropertyDependency) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'dependencies': "
+        "   {'a': {'properties': {'b': {'type': 'number'}}},"
+        "   'b': ['a', 'c']}}}");
+    BSONObj document = fromjson("{'a': [0,1,2,3], 'b': 'foo'}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'dependencies', failingDependencies: ["
+        "       {conditionalProperty: 'a', details: ["
+        "       {operatorName: 'properties', propertiesNotSatisfied: ["
+        "           {propertyName: 'b', details: ["
+        "               {operatorName: 'type', "
+        "               specifiedAs: {type: 'number'}, "
+        "               reason: 'type did not match', "
+        "               consideredValue: 'foo',"
+        "               consideredType: 'string'}]}]}]},"
+        "       {conditionalProperty: 'b', "
+        "       missingProperties: ['c']}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
 }  // namespace
 }  // namespace mongo
