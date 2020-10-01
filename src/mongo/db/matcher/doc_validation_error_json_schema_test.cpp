@@ -1478,6 +1478,7 @@ TEST(JSONSchemaLogicalKeywordValidation, CombineLogicalKeywords) {
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
+// Array keywords.
 TEST(JSONSchemaValidation, ArrayType) {
     BSONObj query = fromjson(
         "  {'$jsonSchema':"
@@ -2386,5 +2387,416 @@ TEST(JSONSchemaValidation, SchemaDependencyAndPropertyDependency) {
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
+// additionalProperties (boolean argument)
+TEST(JSONSchemaValidation, BasicAdditionalPropertiesFalse) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'properties': {'b': {'type': 'number'}}, 'additionalProperties': "
+        "false}}}");
+    BSONObj document = fromjson("{'_id': 0, 'a': 1, 'b': 2}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'additionalProperties', "
+        "   'specifiedAs': {additionalProperties: false},"
+        "   'additionalProperties': ['_id', 'a']}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, AdditionalPropertiesTrueProducesNoError) {
+    BSONObj query =
+        fromjson("{'$jsonSchema': {'minProperties': 100, 'additionalProperties': true}}");
+    BSONObj document = fromjson("{'_id': 0, 'a': 1, 'b': 2}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "           {'operatorName': 'minProperties',"
+        "            'specifiedAs': {minProperties: 100},"
+        "            'reason': 'specified number of properties was not satisfied',"
+        "            'numberOfProperties': 3}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, BasicAdditionalPropertiesFalseNested) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'properties': {'b': {'type': 'object', 'additionalProperties':false}}}}");
+    BSONObj document = fromjson("{'b': {'a': 1}}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'b', 'details': ["
+        "           {'operatorName': 'additionalProperties', "
+        "           'specifiedAs': {additionalProperties: false},"
+        "           'additionalProperties': ['a']}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, BasicAdditionalPropertiesFalseNestedMultiLevel) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'additionalProperties': false, 'properties':"
+        "       {'_id': {},'a': {'type': 'object', 'additionalProperties':false}}}}}");
+    BSONObj document = fromjson("{_id: 1, 'a': {'b': 1}, 'c': 1}");
+    // Report _id and c at the top level and b in the nested error.
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'properties', propertiesNotSatisfied: ["
+        "       {propertyName: 'a', details: ["
+        "               {operatorName: 'additionalProperties', "
+        "               specifiedAs: {additionalProperties: false}, "
+        "               additionalProperties: ['b']}]}]}, "
+        "   {operatorName: 'additionalProperties',"
+        "   specifiedAs: {additionalProperties: false}, "
+        "   additionalProperties: ['c']}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// additionalProperties (object argument)
+TEST(JSONSchemaValidation, BasicAdditionalPropertiesSchema) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'properties': {'a': {'type': 'number'}}, "
+        "   'additionalProperties': {'type': 'string'}}}}");
+    BSONObj document = fromjson(
+        "{'a': 1, 'b': 'not this one', 'c': 'not this one either, but the next one', 'd': 1 }");
+    // Should only produce an error for 'd'.
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "       {'operatorName': 'additionalProperties',"
+        "        'reason':'at least one additional property did not match the subschema',"
+        "        'failingProperty': 'd', 'details': [ "
+        "           {'operatorName': 'type', "
+        "           'specifiedAs': {type: 'string'},"
+        "           'reason': 'type did not match',"
+        "           'consideredValue': 1,"
+        "           'consideredType': 'int'}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, BasicAdditionalPropertiesSchemaNested) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'properties': {'b': {'type': 'object', 'additionalProperties': {'type':'string'}}}}}");
+    BSONObj document = fromjson("{'b': {'a': 1}}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "       {'propertyName': 'b', 'details': ["
+        "           {'operatorName': 'additionalProperties',"
+        "           'reason': 'at least one additional property did not match the subschema',"
+        "           'failingProperty': 'a', 'details': [ "
+        "               {'operatorName': 'type',"
+        "               'specifiedAs': {type: 'string'},"
+        "               'reason': 'type did not match',"
+        "               'consideredValue': 1,"
+        "               'consideredType': 'int'}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, AdditionalPropertiesSchemaNoErrorWhenAdditionalPropertiesAreValid) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'properties': {'_id': {}, 'a': {'type': 'number'}}, "
+        "   'minProperties': 10,"
+        "   'additionalProperties': {'type': 'string'}}}}");
+    BSONObj document = fromjson(
+        "{'_id': 'foo', 'a': 1, "
+        "'b': 'all', 'c': 'additional', 'd': 'properties', 'e': 'are', 'f': 'strings!'}");
+    // Should only produce an error for 'd'.
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "       {'operatorName': 'minProperties',"
+        "       'specifiedAs': {minProperties: 10},"
+        "       'reason': 'specified number of properties was not satisfied',"
+        "       'numberOfProperties': 7}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// patternProperties
+TEST(JSONSchemaValidation, BasicPatternProperties) {
+    BSONObj query = fromjson("{'$jsonSchema': {'patternProperties': {'^S': {'type': 'number'}}}}");
+    BSONObj document = fromjson("{'Super': 1, 'Slow': '67'}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'Slow',"
+        "       regexMatched: '^S', "
+        "       details: [{ "
+        "           operatorName: 'type',"
+        "           specifiedAs: {type: 'number'}, "
+        "           reason: 'type did not match',"
+        "           consideredValue: '67',"
+        "           consideredType: 'string'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, NestedPatternProperties) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'properties': {'a': {'patternProperties': {'^S': {'type': "
+        "'number'}}}}}}");
+    BSONObj document = fromjson("{'a': {'String': 1, 'StringNoNumber': '67'}}");
+    BSONObj expectedError = fromjson(
+        "{ operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'properties', propertiesNotSatisfied: ["
+        "       {propertyName: 'a', details: ["
+        "           {operatorName: 'patternProperties', details: ["
+        "               {propertyName: 'StringNoNumber',"
+        "               regexMatched: '^S',"
+        "               details: ["
+        "                   {operatorName: 'type',"
+        "                   specifiedAs: {type: 'number'}, "
+        "                   reason: 'type did not match', "
+        "                   consideredValue: '67', "
+        "                   consideredType: 'string'}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PatternPropertiesSomePatternsSatifised) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'patternProperties': {'^a': {'type': 'string'},'^S': {'type': "
+        "'number'}}}}");
+    BSONObj document = fromjson(
+        "{'a': 'foo', 'Super': 1, 'aa': 'also a string', 'aaa': 'never a number!', "
+        "'Slow': '67'}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'Slow', "
+        "       regexMatched: '^S', "
+        "       details: ["
+        "           {operatorName: 'type', "
+        "           specifiedAs: {type: 'number'}, "
+        "           reason: 'type did not match', "
+        "           consideredValue: '67', "
+        "           consideredType: 'string'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PatternPropertiesRecursive) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'patternProperties': {'^a': {'patternProperties': {'b+': {type: 'string'}}}}}}");
+    BSONObj document = fromjson("{'a': {'bbbbb': 1}}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'a', regexMatched: '^a', details: ["
+        "           { operatorName: 'patternProperties', details: ["
+        "               {propertyName: 'bbbbb', regexMatched: 'b+', details: ["
+        "                   {operatorName: 'type', "
+        "                   specifiedAs: { type: 'string' }, "
+        "                   reason: 'type did not match',"
+        "                   consideredValue: 1, "
+        "                   consideredType: 'int'}]}]}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PatternPropertiesOneElementFailsMultiplePatternSchemas) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'patternProperties': {'^a': {'minimum': 3}, 'b$': {'maximum': 1}}}}");
+    BSONObj document = fromjson("{'a': 45, 'b': 0, 'ab': 2}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema', 'schemaRulesNotSatisfied': ["
+        "   {'operatorName': 'patternProperties', details: ["
+        "       {propertyName: 'ab', regexMatched: '^a', details: ["
+        "           {operatorName: 'minimum', "
+        "           specifiedAs: {minimum: 3}, "
+        "           reason: 'comparison failed', "
+        "           consideredValue: 2}]}, "
+        "       {propertyName: 'ab', regexMatched: 'b$', details: ["
+        "           {operatorName: 'maximum', "
+        "           specifiedAs: { maximum: 1 },"
+        "           reason: 'comparison failed',"
+        "           consideredValue: 2}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// patternProperties and additionalProperties (false) combined
+TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesFalse) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'patternProperties': {'^S': {'type': 'number'}}, "
+        "'additionalProperties': false}}");
+    BSONObj document = fromjson("{'Super': 1, 'Slow': 'oh no a string', b: 1}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'additionalProperties',"
+        "   specifiedAs: {additionalProperties: false},"
+        "   additionalProperties: ['b', '_id']}, "
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'Slow', "
+        "       regexMatched: '^S',"
+        "       details: ["
+        "           {operatorName: 'type', "
+        "           specifiedAs: {type: 'number'},"
+        "           reason: 'type did not match',"
+        "           consideredValue: 'oh no a string',"
+        "           consideredType: 'string'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation,
+     PatternPropertiesAndAdditionalPropertiesFalseOnlyPatternPropertiesFails) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'properties': {_id: {}},"
+        "   'patternProperties': {'^S': {'type': 'number'}}, "
+        "   'additionalProperties': false}}");
+    BSONObj document = fromjson("{'_id': 1, 'Super': 1, 'Slow': 'oh no a string'}");
+    // There should be no 'additionalProperties' error.
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'Slow', "
+        "       regexMatched: '^S', details: ["
+        "           {operatorName: 'type', "
+        "           specifiedAs: {type: 'number'}, "
+        "           reason: 'type did not match',"
+        "           consideredValue: 'oh no a string', "
+        "           consideredType: 'string'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesTrueOnlyPatternPropertiesFails) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'properties': {_id: {}},"
+        "   'patternProperties': {'^S': {'type': 'number'}}, "
+        "   'additionalProperties': true}}");
+    BSONObj document = fromjson("{'_id': 1, 'Super': 1, 'Slow': 'oh no a string', a: 'foo'}");
+    // There should be no 'additionalProperties' error.
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'Slow', "
+        "       regexMatched: '^S', details: ["
+        "           {operatorName: 'type', "
+        "           specifiedAs: {type: 'number'}, "
+        "           reason: 'type did not match',"
+        "           consideredValue: 'oh no a string', "
+        "           consideredType: 'string'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation,
+     PatternPropertiesAndAdditionalPropertiesFalseOnlyAdditionalPropertiesFails) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'patternProperties': {'^S': {'type': 'number'}}, 'additionalProperties': false}}}");
+    BSONObj document = fromjson("{'Super': 1, 'Slow': 2, 'b': 'clearly an extra property'}");
+    // There should be no 'patternProperties' error.
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'additionalProperties', "
+        "   specifiedAs: {additionalProperties: false}, "
+        "   additionalProperties: ['b', '_id']}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesFalseNeitherFail) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema':"
+        "   {'minProperties': 10,"
+        "   'patternProperties': {'^_id': {}, '^S': {'type': 'number'}}, "
+        "   'additionalProperties': false}}}");
+    BSONObj document = fromjson("{'_id': 1, 'Super': 1, 'Slow': 2}");
+    // The error should reference neither 'patternProperties' nor 'additionalProperties'.
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "           {'operatorName': 'minProperties',"
+        "            'specifiedAs': {minProperties: 10},"
+        "            'reason': 'specified number of properties was not satisfied',"
+        "            'numberOfProperties': 3}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// patternProperties and additionalProperties (object) combined
+TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesSchema) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'patternProperties': {'^S': {'type': 'number'}}, "
+        "   'additionalProperties': {'type': 'string'}}}}");
+    BSONObj document = fromjson("{'Super': 1, 'Slow': 'oh no a string', b: 1}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'additionalProperties', "
+        "   reason: 'at least one additional property did not match the subschema',"
+        "   failingProperty: 'b', details: ["
+        "       {operatorName: 'type', "
+        "       specifiedAs: {type: 'string'}, "
+        "       reason: 'type did not match', "
+        "       consideredValue: 1, "
+        "       consideredType: 'int'}]}, "
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'Slow',"
+        "       regexMatched: '^S',"
+        "       details: ["
+        "           {operatorName: 'type',"
+        "           specifiedAs: {type:'number'},"
+        "           reason: 'type did not match',"
+        "           consideredValue: 'oh no a string',"
+        "           consideredType: 'string'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation,
+     PatternPropertiesAndAdditionalPropertiesSchemaOnlyPatternPropertiesFails) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': "
+        "   {'properties': {_id: {}}, "
+        "   'patternProperties': {'^S': {'type': 'number'}},"
+        "   'additionalProperties': {'type': 'string'}}}}");
+    BSONObj document =
+        fromjson("{_id: 1, 'Super': 1, 'Slow': 'oh no a string', b: 'actually a string!'}");
+    // There should only be a 'patternProperties' error
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'patternProperties', details: ["
+        "       {propertyName: 'Slow', "
+        "       regexMatched: '^S', "
+        "       details: ["
+        "           {operatorName: 'type',"
+        "           specifiedAs: {type: 'number'}, "
+        "           reason: 'type did not match', "
+        "           consideredValue: 'oh no a string',"
+        "           consideredType: 'string'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation,
+     PatternPropertiesAndAdditionalPropertiesSchemaOnlyAdditionalPropertiesFails) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema':"
+        "   {'patternProperties': {'^S': {'type': 'number'}}, "
+        "   'additionalProperties': {'type': 'string'}}}}");
+    BSONObj document = fromjson("{'Super': 1, 'Slow': 2, 'b': 1}");
+    // There should be no 'patternProperties' error.
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$jsonSchema', schemaRulesNotSatisfied: ["
+        "   {operatorName: 'additionalProperties', "
+        "   reason: 'at least one additional property did not match the subschema',"
+        "   failingProperty: 'b', details: ["
+        "       {operatorName: 'type', "
+        "       specifiedAs: {type: 'string'}, "
+        "       reason: 'type did not match', "
+        "       consideredValue: 1, consideredType: 'int'}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, PatternPropertiesAndAdditionalPropertiesSchemaNeitherFail) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema':"
+        "   {'minProperties': 10,"
+        "   'patternProperties': {'^S': {'type': 'number'}}, "
+        "   'additionalProperties': {'type': 'number'}}}}");
+    BSONObj document = fromjson("{'_id': 1, 'Super': 1, 'Slow': 2, 'b': 1}");
+    // The error should reference neither 'patternProperties' nor 'additionalProperties'.
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "           {'operatorName': 'minProperties',"
+        "            'specifiedAs': {minProperties: 10},"
+        "            'reason': 'specified number of properties was not satisfied',"
+        "            'numberOfProperties': 4}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
 }  // namespace
 }  // namespace mongo

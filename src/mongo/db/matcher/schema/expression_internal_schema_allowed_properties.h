@@ -113,7 +113,8 @@ public:
         StringDataSet properties,
         StringData namePlaceholder,
         std::vector<PatternSchema> patternProperties,
-        std::unique_ptr<ExpressionWithPlaceholder> otherwise);
+        std::unique_ptr<ExpressionWithPlaceholder> otherwise,
+        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
 
@@ -163,6 +164,14 @@ public:
 
     void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
         visitor->visit(this);
+    }
+
+    const StringDataSet& getProperties() const {
+        return _properties;
+    }
+
+    const std::vector<PatternSchema>& getPatternProperties() const {
+        return _patternProperties;
     }
 
 private:

@@ -648,7 +648,8 @@ StatusWithMatchExpression parseAdditionalProperties(
     if (!additionalPropertiesElt) {
         // The absence of the 'additionalProperties' keyword is identical in meaning to the presence
         // of 'additionalProperties' with a value of true.
-        return {std::make_unique<AlwaysTrueMatchExpression>()};
+        return {std::make_unique<AlwaysTrueMatchExpression>(
+            doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore))};
     }
 
     if (additionalPropertiesElt.type() != BSONType::Bool &&
@@ -659,11 +660,12 @@ StatusWithMatchExpression parseAdditionalProperties(
                                      << "' must be an object or a boolean")};
     }
 
+    auto annotation = doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnore);
     if (additionalPropertiesElt.type() == BSONType::Bool) {
         if (additionalPropertiesElt.boolean()) {
-            return {std::make_unique<AlwaysTrueMatchExpression>()};
+            return {std::make_unique<AlwaysTrueMatchExpression>(std::move(annotation))};
         } else {
-            return {std::make_unique<AlwaysFalseMatchExpression>()};
+            return {std::make_unique<AlwaysFalseMatchExpression>(std::move(annotation))};
         }
     }
 
@@ -718,11 +720,22 @@ StatusWithMatchExpression parseAllowedProperties(
     auto otherwiseWithPlaceholder = std::make_unique<ExpressionWithPlaceholder>(
         kNamePlaceholder.toString(), std::move(otherwiseExpr.getValue()));
 
+    clonable_ptr<ErrorAnnotation> annotation;
+    // In the case of no 'additionalProperties' keyword, but a 'patternProperties' keyword is
+    // present, we still want '$_internalSchemaAllowedProperties' to generate an error, so we
+    // provide an annotation with empty information.
+    if (additionalPropertiesElt.eoo()) {
+        annotation = doc_validation_error::createAnnotation(expCtx, "", BSONObj());
+    } else {
+        annotation =
+            doc_validation_error::createAnnotation(expCtx, "", additionalPropertiesElt.wrap());
+    }
     auto allowedPropertiesExpr = std::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
         std::move(propertyNames),
         kNamePlaceholder,
         std::move(patternProperties.getValue()),
-        std::move(otherwiseWithPlaceholder));
+        std::move(otherwiseWithPlaceholder),
+        std::move(annotation));
 
     // If this is a top-level schema, then we have no path and there is no need for an explicit
     // object match node.
@@ -731,7 +744,9 @@ StatusWithMatchExpression parseAllowedProperties(
     }
 
     auto objectMatch = std::make_unique<InternalSchemaObjectMatchExpression>(
-        path, std::move(allowedPropertiesExpr));
+        path,
+        std::move(allowedPropertiesExpr),
+        doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
 
     return makeRestriction(expCtx, BSONType::Object, path, std::move(objectMatch), typeExpr);
 }

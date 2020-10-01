@@ -47,6 +47,7 @@
 #include "mongo/db/matcher/match_expression_util.h"
 #include "mongo/db/matcher/match_expression_walker.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
@@ -70,6 +71,8 @@ using ErrorAnnotation = MatchExpression::ErrorAnnotation;
 using AnnotationMode = ErrorAnnotation::Mode;
 using LeafArrayBehavior = ElementPath::LeafArrayBehavior;
 using NonLeafArrayBehavior = ElementPath::NonLeafArrayBehavior;
+using PatternSchema = InternalSchemaAllowedPropertiesMatchExpression::PatternSchema;
+using Pattern = InternalSchemaAllowedPropertiesMatchExpression::Pattern;
 
 // Fail point which simulates an internal error for testing.
 MONGO_FAIL_POINT_DEFINE(docValidationInternalErrorFailPoint);
@@ -82,6 +85,19 @@ MONGO_FAIL_POINT_DEFINE(docValidationInternalErrorFailPoint);
  * error will refer to success.
  */
 enum class InvertError { kNormal, kInverted };
+
+/**
+ * A set of parameters specific to a given frame. Used to allow a parent node to pass parameters to
+ * control how its child node should behave when it gets visited.
+ */
+struct FrameParams {
+    FrameParams(BSONObj currentDoc, InvertError inversion)
+        : currentDoc(std::move(currentDoc)), inversion(inversion) {}
+    // Tracks the current subdocument that an error should be generated over.
+    BSONObj currentDoc;
+    // Tracks whether the generated error should be described normally or in an inverted context.
+    InvertError inversion;
+};
 
 /**
  * A struct which tracks error generation information for some node within the tree.
@@ -100,13 +116,14 @@ struct ValidationErrorFrame {
         // nodes when generating an error. For instance, when generating an error for an AND in a
         // normal context, we need to discern which of its clauses failed.
         kErrorNeedChildrenInfo,
-        // This node contributes to error generation, but none of its children will contribute to
-        // the error output.
+        // This node contributes to error generation, but its next child will not contribute to
+        // error output. If a node maintains this state across all visits to its children, then none
+        // of its children will contribute to the error output.
         kErrorIgnoreChildren,
     };
 
-    ValidationErrorFrame(RuntimeState runtimeState, BSONObj currentDoc, InvertError inversion)
-        : runtimeState(runtimeState), currentDoc(std::move(currentDoc)), inversion(inversion) {}
+    ValidationErrorFrame(RuntimeState runtimeState, FrameParams currentParams)
+        : runtimeState(runtimeState), currentParams(std::move(currentParams)) {}
 
     // BSONBuilders which construct the generated error.
     BSONObjBuilder objBuilder;
@@ -115,12 +132,10 @@ struct ValidationErrorFrame {
     size_t childIndex = 0;
     // Tracks runtime information about how the current node should generate an error.
     RuntimeState runtimeState;
-    // Tracks the current subdocument that an error should be generated over.
-    BSONObj currentDoc;
-    // Tracks whether the generated error should be described normally or in an inverted context.
-    InvertError inversion;
     // Tracks whether the array of 'consideredValues' was truncated for this frame.
     bool consideredValuesTruncated = false;
+    // Tracks the current frame's parameters.
+    FrameParams currentParams;
 };
 
 using RuntimeState = ValidationErrorFrame::RuntimeState;
@@ -144,19 +159,25 @@ struct ValidationErrorContext {
     /**
      * Utilities which add/remove ValidationErrorFrames from 'frames'.
      */
-    void pushNewFrame(const MatchExpression& expr, const BSONObj& subDoc) {
+    void pushNewFrame(const MatchExpression& expr) {
         // Clear the last error that was generated.
         latestCompleteError = std::monostate();
 
         // If this is the first frame, then we know that we've failed validation, so we must be
         // generating an error.
         if (frames.empty()) {
-            frames.emplace(RuntimeState::kError, subDoc, InvertError::kNormal);
+            frames.emplace(RuntimeState::kError, FrameParams(rootDoc, InvertError::kNormal));
             return;
         }
 
         auto parentRuntimeState = getCurrentRuntimeState();
-        auto inversion = getCurrentInversion();
+        auto frameParams = frames.top().currentParams;
+
+        // Record and clear any input given by the parent frame.
+        if (childInput) {
+            frameParams = *childInput;
+            childInput = boost::none;
+        }
 
         // If we've determined at runtime or at parse time that this node shouldn't contribute to
         // error generation, then push a frame indicating that this node should not produce an
@@ -164,21 +185,22 @@ struct ValidationErrorContext {
         if (parentRuntimeState == RuntimeState::kNoError ||
             parentRuntimeState == RuntimeState::kErrorIgnoreChildren ||
             expr.getErrorAnnotation()->mode == AnnotationMode::kIgnore) {
-            frames.emplace(RuntimeState::kNoError, subDoc, inversion);
+            frames.emplace(RuntimeState::kNoError, frameParams);
             return;
         }
 
         // If our parent needs more information, call 'matches()' to determine whether the 'expr'
         // will contribute to error output.
         if (parentRuntimeState == RuntimeState::kErrorNeedChildrenInfo) {
-            bool generateErrorValue = expr.matchesBSON(subDoc) ? inversion == InvertError::kInverted
-                                                               : inversion == InvertError::kNormal;
+            auto inversion = frameParams.inversion;
+            bool generateErrorValue = expr.matchesBSON(frameParams.currentDoc)
+                ? inversion == InvertError::kInverted
+                : inversion == InvertError::kNormal;
             frames.emplace(generateErrorValue ? RuntimeState::kError : RuntimeState::kNoError,
-                           subDoc,
-                           inversion);
+                           frameParams);
             return;
         }
-        frames.emplace(RuntimeState::kError, subDoc, inversion);
+        frames.emplace(RuntimeState::kError, frameParams);
     }
     void popFrame() {
         invariant(!frames.empty());
@@ -217,23 +239,26 @@ struct ValidationErrorContext {
             frames.top().runtimeState = runtimeState;
         }
     }
+    /**
+     * Configures the current frame to have a 'childInput', that is, the set of parameters that any
+     * child expression will accept as input.
+     */
+    void setChildInput(const BSONObj& doc, InvertError inversion) {
+        childInput = FrameParams(doc, inversion);
+    }
     const BSONObj& getCurrentDocument() {
         if (!frames.empty()) {
-            return frames.top().currentDoc;
+            return frames.top().currentParams.currentDoc;
         }
         return rootDoc;
     }
-    void setCurrentDocument(const BSONObj& document) {
+    void setCurrentInversion(InvertError inversion) {
         invariant(!frames.empty());
-        frames.top().currentDoc = document;
+        frames.top().currentParams.inversion = inversion;
     }
     InvertError getCurrentInversion() const {
         invariant(!frames.empty());
-        return frames.top().inversion;
-    }
-    void setCurrentInversion(InvertError inversion) {
-        invariant(!frames.empty());
-        frames.top().inversion = inversion;
+        return frames.top().currentParams.inversion;
     }
 
     /**
@@ -286,12 +311,11 @@ struct ValidationErrorContext {
     void appendLatestCompleteError(BSONObjBuilder* builder) {
         const static std::string kDetailsString = "details";
         stdx::visit(
-            visit_helper::Overloaded{
-                [&](const auto& details) -> void {
-                    verifySizeAndAppend(details, kDetailsString, builder);
-                },
-                [&](const std::monostate& state) -> void { MONGO_UNREACHABLE; },
-                [&](const std::string& str) -> void { MONGO_UNREACHABLE; }},
+            visit_helper::Overloaded{[&](const auto& details) -> void {
+                                         verifySizeAndAppend(details, kDetailsString, builder);
+                                     },
+                                     [&](const std::monostate& state) -> void { MONGO_UNREACHABLE },
+                                     [&](const std::string& str) -> void { MONGO_UNREACHABLE }},
             latestCompleteError);
     }
     /**
@@ -300,10 +324,20 @@ struct ValidationErrorContext {
      */
     void appendLatestCompleteError(BSONArrayBuilder* builder) {
         stdx::visit(
-            visit_helper::Overloaded{[&](const BSONObj& obj) -> void { builder->append(obj); },
-                                     [&](const std::string& str) -> void { builder->append(str); },
-                                     [&](const BSONArray& arr) -> void { MONGO_UNREACHABLE; },
-                                     [&](const std::monostate& arr) -> void { MONGO_UNREACHABLE; }},
+            visit_helper::Overloaded{
+                [&](const BSONObj& obj) -> void { verifySizeAndAppend(obj, builder); },
+                [&](const std::string& str) -> void { builder->append(str); },
+                [&](const BSONArray& arr) -> void {
+                    // The '$_internalSchemaAllowedProperties' match expression represents two
+                    // JSONSchema keywords: 'additionalProperties' and 'patternProperties'. As
+                    // such, if both keywords produce an error, their errors will be packaged
+                    // into an array which the parent expression must absorb when constructing
+                    // its array of error details.
+                    for (auto&& elem : arr) {
+                        verifySizeAndAppend(elem, builder);
+                    }
+                },
+                [&](const std::monostate& state) -> void { MONGO_UNREACHABLE }},
             latestCompleteError);
     }
 
@@ -353,7 +387,7 @@ struct ValidationErrorContext {
     /**
      * Sets 'inversion' to the opposite of its current value.
      */
-    void flipInversion() {
+    void flipCurrentInversion() {
         getCurrentInversion() == InvertError::kNormal ? setCurrentInversion(InvertError::kInverted)
                                                       : setCurrentInversion(InvertError::kNormal);
     }
@@ -390,12 +424,23 @@ struct ValidationErrorContext {
     // Tracks whether the generated error should omit appending 'specifiedAs' and
     // 'consideredValues' to avoid generating an error larger than the maximum BSONObj size.
     const bool truncate = false;
+    // Tracks an optional input to child frames which require custom parameters from their parent
+    // frame.
+    boost::optional<FrameParams> childInput;
     // The maximum allowed size for a doc validation error.
     const int kMaxDocValidationErrorSize;
     // Tracks the maximum number of values that will be reported in the 'consideredValues' array
     // for leaf operators.
     const int kMaxConsideredValuesElements;
 };
+
+/**
+ * Builds a BSON object from a BSON element 'element' using the same name placeholder as the
+ * JSON Schema match expressions.
+ */
+BSONObj toObjectWithPlaceholder(BSONElement element) {
+    return BSON(JSONSchemaParser::kNamePlaceholder << element);
+}
 
 /**
  * Append the error generated by one of 'expr's children to the current array builder of 'expr'
@@ -455,6 +500,163 @@ ItemsKeywordType toItemsKeywordType(
         }
     }
     MONGO_UNREACHABLE;
+}
+
+/**
+ * Returns the set of additional properties from 'doc'. A property is said to be additional if
+ * it is not contained in any of the properties of 'expr', nor does it match any of the regular
+ * expressions in expr's patternProperties.
+ */
+BSONArray findAdditionalProperties(const BSONObj& doc,
+                                   const InternalSchemaAllowedPropertiesMatchExpression& expr) {
+    BSONArrayBuilder additionalProperties;
+    const auto& properties = expr.getProperties();
+    const auto& patternProperties = expr.getPatternProperties();
+    for (auto&& field : doc) {
+        auto fieldName = field.fieldNameStringData();
+        if (!properties.contains(fieldName)) {
+            bool additional = true;
+            for (auto&& pattern : patternProperties) {
+                if (pattern.first.regex->PartialMatch(fieldName.toString())) {
+                    additional = false;
+                    break;
+                }
+            }
+            if (additional) {
+                additionalProperties.append(fieldName);
+            }
+        }
+    }
+    return additionalProperties.arr();
+}
+
+/**
+ * Sets the necessary state to generate an error for a child expression of an
+ * 'InternalSchemaAllowedPropertiesMatchExpression'.
+ */
+void setAllowedPropertiesChildInput(BSONElement failingElement, ValidationErrorContext* ctx) {
+    ctx->setCurrentRuntimeState(RuntimeState::kError);
+    ctx->setChildInput(toObjectWithPlaceholder(failingElement), ctx->getCurrentInversion());
+}
+
+/**
+ * Returns the element corresponding to the first property from 'additionalProperties' whose
+ * value in 'doc' fails to match against 'filter', if such an element exists. Returns EOO otherwise.
+ */
+BSONElement findFirstFailingAdditionalProperty(const MatchExpression& filter,
+                                               const BSONArray& additionalProperties,
+                                               const BSONObj& doc) {
+    for (auto&& property : additionalProperties) {
+        auto&& elem = doc.getField(property.valueStringData());
+        if (!filter.matchesBSONElement(elem)) {
+            return elem;
+        }
+    }
+    return {};
+}
+
+/**
+ * Finds a pattern property failure and returns the failing element (if one exists) and EOO
+ * otherwise. A pattern property failure corresponds to the first element in a document whose field
+ * name matches against a pattern, but fails to match against the corresponding filter.
+ */
+BSONElement findFailingProperty(const InternalSchemaAllowedPropertiesMatchExpression& expr,
+                                const PatternSchema& patternSchema,
+                                ValidationErrorContext* ctx) {
+    // Before walking the tree corresponding to the subschema of a single child expression of
+    // 'patternProperties', we must first determine whether there exists a property which matches
+    // the corresponding regular expression which also fails to match against the subschema.
+    auto& pattern = patternSchema.first;
+    auto filter = patternSchema.second->getFilter();
+    for (auto&& elem : ctx->getCurrentDocument()) {
+        auto field = elem.fieldNameStringData();
+        if (pattern.regex->PartialMatch(field.toString()) && !filter->matchesBSONElement(elem)) {
+            return elem;
+        }
+    }
+    return {};
+}
+
+/**
+ * Generates an error for a child expression of the 'patternProperties' keyword, that is, for a
+ * property whose name matched one of the regexes of 'expr', but failed to match against the
+ * corresponding subschema.
+ */
+void generatePatternPropertyError(const InternalSchemaAllowedPropertiesMatchExpression& expr,
+                                  ValidationErrorContext* ctx) {
+    // Generate an error for the previous regular expression. The previous regex is indexed by
+    // the current child index minus one since the child expression is offset by one to account
+    // for the expression which represents the 'additionalProperties' keyword.
+    invariant(ctx->getCurrentChildIndex() >= 1);
+    auto childIndex = ctx->getCurrentChildIndex() - 1;
+    auto& patternSchema = expr.getPatternProperties()[childIndex];
+    auto element = findFailingProperty(expr, patternSchema, ctx);
+
+    // Only generate an error if we found a regex which matches a property that failed to match
+    // against the corresponding sub-schema.
+    if (ctx->shouldGenerateError(expr) && ctx->haveLatestCompleteError() && element) {
+        auto propertyName = element.fieldNameStringData().toString();
+        BSONObjBuilder patternBuilder;
+        patternBuilder.append("propertyName", propertyName);
+        patternBuilder.append("regexMatched", patternSchema.first.rawRegex);
+        ctx->appendLatestCompleteError(&patternBuilder);
+        ctx->verifySizeAndAppend(patternBuilder.obj(), &ctx->getCurrentArrayBuilder());
+    }
+}
+
+void generateAdditionalPropertiesFalseError(const BSONArray& additionalProperties,
+                                            ValidationErrorContext* ctx) {
+    // Only generate an error if 'additionalProperties' is non empty, that is, there exists at
+    // least one additional property within the current subdocument tracked by 'ctx'.
+    if (!additionalProperties.isEmpty()) {
+        auto& builder = ctx->getCurrentObjBuilder();
+        builder.append("operatorName", "additionalProperties");
+        builder.append("specifiedAs", BSON("additionalProperties" << false));
+        builder.append("additionalProperties", additionalProperties);
+    }
+}
+
+/**
+ * Generates an error for the schema {additionalProperties: <subschema>}. This function can only
+ * be called if there is at least one property in the current subdocument tracked by 'ctx' which
+ * failed to match 'subschema'.
+ */
+void generateAdditionalPropertiesSchemaError(
+    const InternalSchemaAllowedPropertiesMatchExpression& expr, ValidationErrorContext* ctx) {
+    auto&& additionalProperties = findAdditionalProperties(ctx->getCurrentDocument(), expr);
+    auto firstFailingElement = findFirstFailingAdditionalProperty(
+        *expr.getChild(0), additionalProperties, ctx->getCurrentDocument());
+    invariant(firstFailingElement);
+    auto& builder = ctx->getCurrentObjBuilder();
+    builder.append("operatorName", "additionalProperties");
+    builder.append("reason", "at least one additional property did not match the subschema");
+    builder.append("failingProperty", firstFailingElement.fieldNameStringData().toString());
+    ctx->appendLatestCompleteError(&builder);
+}
+
+/**
+ * Handle error generation for either an 'additionalProperties: <schema>' keyword or the child of a
+ * 'patternProperties' keyword.
+ */
+void generateAllowedPropertiesSchemaError(
+    const InternalSchemaAllowedPropertiesMatchExpression& expr, ValidationErrorContext* ctx) {
+    auto childIndex = ctx->getCurrentChildIndex();
+    if (ctx->haveLatestCompleteError()) {
+        // Because 'InternalSchemaAllowedPropertiesMatchExpression' represents both the
+        // 'additionalProperties' and the 'patternProperties' keywords, we must determine which
+        // keyword we are generating an error for. In particular, the first child will always be
+        // the expression corresponding to the 'additionalProperties' keyword, while each
+        // subsequent child will be a single component of the 'patternProperties' keyword.
+        if (childIndex == 0) {
+            // We handle the {'additionalProperties': <schema>} case here after we've walked the
+            // tree corresponding to the additionalProperties keyword.
+            if (expr.getErrorAnnotation()->annotation.firstElementType() == BSONType::Object) {
+                generateAdditionalPropertiesSchemaError(expr, ctx);
+            }
+        } else {
+            generatePatternPropertyError(expr, ctx);
+        }
+    }
 }
 
 /**
@@ -520,7 +722,7 @@ public:
     void visit(const ExistsMatchExpression* expr) final {
         static constexpr auto kNormalReason = "path does not exist";
         static constexpr auto kInvertedReason = "path does exist";
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         // Only generate an error if this node is tagged with an MQL operator name. The
         // '_propertyExists' tag indicates that this node is implementing a JSONSchema feature.
         if (_context->shouldGenerateError(*expr) &&
@@ -532,7 +734,7 @@ public:
     void visit(const ExprMatchExpression* expr) final {
         static constexpr auto kNormalReason = "$expr did not match";
         static constexpr auto kInvertedReason = "$expr did match";
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
             appendErrorReason(kNormalReason, kInvertedReason);
@@ -599,12 +801,50 @@ public:
                 MONGO_UNREACHABLE;
         }
     }
-    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
+        _context->pushNewFrame(*expr);
+
+        // It is the responsibility of 'expr' to discern which child expression(s) failed to
+        // match against which elements of the current document since 'expr' has knowledge of the
+        // set of defined properties along with the any regex/filter pairs defined by
+        // 'patternProperties'. We assume that the next child expression will be ignored until
+        // proven otherwise.
+        _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
+        if (_context->shouldGenerateError(*expr)) {
+            auto additionalProperties =
+                findAdditionalProperties(_context->getCurrentDocument(), *expr);
+
+            // The first child expression of 'expr' always corresponds to the 'additionalProperties'
+            // keyword.
+            auto additionalPropertiesExpr = expr->getChild(0);
+
+            // We discern whether we are dealing with 'additionalProperties: false' or
+            // 'additionalProperties: <schema>' by inspecting the annotation on 'expr'.
+            auto additionalPropertiesType =
+                expr->getErrorAnnotation()->annotation.firstElementType();
+
+            // Only generate an error in the boolean case if the 'additionalProperties' expression
+            // evaluates to false.
+            if (additionalPropertiesType == BSONType::Bool &&
+                !additionalPropertiesExpr->matchesBSON(_context->getCurrentDocument())) {
+                generateAdditionalPropertiesFalseError(additionalProperties, _context);
+            } else if (additionalPropertiesType == BSONType::Object) {
+                // In the case of an additionalProperties keyword which takes a schema argument,
+                // identify the first additional property which violates the subschema, if such a
+                // property exists.
+                auto subSchema = expr->getChild(0);
+                if (auto failingElement = findFirstFailingAdditionalProperty(
+                        *subSchema, additionalProperties, _context->getCurrentDocument())) {
+                    setAllowedPropertiesChildInput(failingElement, _context);
+                }
+            }
+        }
+    }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
         static constexpr auto kNormalReason = "encrypted value has wrong type";
         // This node will never generate an error in the inverted case.
         static constexpr auto kInvertedReason = "";
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
             BSONMatchableDocument doc(_context->getCurrentDocument());
@@ -626,14 +866,14 @@ public:
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {
         static constexpr auto kNormalReason = "value was not encrypted";
         static constexpr auto kInvertedReason = "value was encrypted";
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             appendOperatorName(*expr);
             appendErrorReason(kNormalReason, kInvertedReason);
         }
     }
     void visit(const InternalSchemaCondMatchExpression* expr) final {
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             // Since 'expr' represents a conditional expression corresponding to a single
             // $jsonSchema dependency whose else branch always evaluates to 'true', 'expr' can only
@@ -662,7 +902,7 @@ public:
                           LeafArrayBehavior::kNoTraversal);
     }
     void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             // Get an element of an array.
             ElementPath path(
@@ -685,7 +925,8 @@ public:
 
             // Build a document corresponding to the array element for the child expression to
             // operate on.
-            _context->setCurrentDocument(toObjectWithPlaceholder(arrayElement));
+            _context->setChildInput(toObjectWithPlaceholder(arrayElement),
+                                    _context->getCurrentInversion());
         }
     }
     void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {
@@ -711,7 +952,7 @@ public:
         invariant(expr->getErrorAnnotation()->mode != AnnotationMode::kGenerateError);
         // As part of pushing a new frame onto the stack, the runtime state may be set to
         // 'kNoError' if 'expr' matches the current document.
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         // Only attempt to find a subdocument if this node failed to match.
         if (_context->getCurrentRuntimeState() != RuntimeState::kNoError) {
             ElementPath path(expr->path(), LeafArrayBehavior::kNoTraversal);
@@ -726,7 +967,7 @@ public:
             // InternalSchemaTypeExpression that will explain a type did not match error.
             bool ignoreSubTree = false;
             if (elem.type() == BSONType::Object) {
-                _context->setCurrentDocument(elem.embeddedObject());
+                _context->setChildInput(elem.embeddedObject(), _context->getCurrentInversion());
             } else {
                 ignoreSubTree = true;
             }
@@ -747,7 +988,7 @@ public:
     }
     void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {
         static constexpr auto normalReason = "found a duplicate item";
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
             appendErrorReason(normalReason, "");
@@ -777,7 +1018,7 @@ public:
                 }
             }
             if (!matchingClauses.empty()) {
-                _context->flipInversion();
+                _context->flipCurrentInversion();
                 _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
                 auto& builder = _context->getCurrentObjBuilder();
                 // We only report the matching schema reason in an inverted context, so there is
@@ -811,11 +1052,11 @@ public:
         if (_context->getCurrentInversion() == InvertError::kNormal) {
             _context->setCurrentRuntimeState(RuntimeState::kErrorNeedChildrenInfo);
         }
-        _context->flipInversion();
+        _context->flipCurrentInversion();
     }
     void visit(const NotMatchExpression* expr) final {
         preVisitTreeOperator(expr);
-        _context->flipInversion();
+        _context->flipCurrentInversion();
         // If this is a $jsonSchema not, then expr's children will not contribute to the error
         // output.
         if (_context->shouldGenerateError(*expr) && expr->getErrorAnnotation()->tag == "not") {
@@ -1099,7 +1340,7 @@ private:
         const std::string& invertedReason,
         const std::set<BSONType>* expectedTypes = nullptr,
         LeafArrayBehavior leafArrayBehavior = LeafArrayBehavior::kTraverseOmitArray) {
-        _context->pushNewFrame(expr, _context->getCurrentDocument());
+        _context->pushNewFrame(expr);
         if (_context->shouldGenerateError(expr)) {
             appendErrorDetails(expr);
             auto arr = createValuesArray(expr.path(), leafArrayBehavior);
@@ -1132,7 +1373,7 @@ private:
 
     template <class T>
     void generateTypeError(const TypeMatchExpressionBase<T>* expr, LeafArrayBehavior behavior) {
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         static constexpr auto kNormalReason = "type did not match";
         static constexpr auto kInvertedReason = "type did match";
         if (_context->shouldGenerateError(*expr)) {
@@ -1164,7 +1405,7 @@ private:
      */
     void preVisitTreeOperator(const MatchExpression* expr) {
         invariant(expr->getCategory() == MatchExpression::MatchCategory::kLogical);
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             auto annotation = expr->getErrorAnnotation();
             // Only append the operator name if it will produce an object error corresponding to
@@ -1181,7 +1422,7 @@ private:
     void generateLogicalLeafError(const ListOfMatchExpression& expr,
                                   const std::string& normalReason,
                                   const std::string& invertedReason) {
-        _context->pushNewFrame(expr, _context->getCurrentDocument());
+        _context->pushNewFrame(expr);
         if (_context->shouldGenerateError(expr)) {
             // $all with no children should not translate to an 'AndMatchExpression' and 'enum'
             // must have non-zero children.
@@ -1200,7 +1441,7 @@ private:
      * parse time.
      */
     void generateAlwaysBooleanError(const AlwaysBooleanMatchExpression& expr) {
-        _context->pushNewFrame(expr, _context->getCurrentDocument());
+        _context->pushNewFrame(expr);
         if (_context->shouldGenerateError(expr)) {
             // An AlwaysBooleanMatchExpression can only contribute to error generation when the
             // inversion matches the value of the 'expr'. More precisely, it is only possible
@@ -1289,7 +1530,7 @@ private:
     void generateJSONSchemaMinItemsMaxItemsError(
         const InternalSchemaNumArrayItemsMatchExpression* expr) {
         static constexpr auto normalReason = "array did not match specified length";
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
             appendErrorReason(normalReason, "");
@@ -1306,7 +1547,7 @@ private:
     void generateJSONSchemaAdditionalItemsFalseError(
         const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) {
         static constexpr auto normalReason = "found additional items";
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
             appendErrorReason(normalReason, "");
@@ -1321,7 +1562,7 @@ private:
      * to validate elements of the array.
      */
     void generateJSONSchemaItemsSchemaArrayError(const AndMatchExpression& expr) {
-        _context->pushNewFrame(expr, _context->getCurrentDocument());
+        _context->pushNewFrame(expr);
 
         // Determine if we need to generate an error using a child of the "$and" expression, which
         // must be of InternalSchemaMatchArrayIndexMatchExpression type, since "$and" does not have
@@ -1344,14 +1585,6 @@ private:
             // Force children match expressions to not generate any errors.
             _context->setCurrentRuntimeState(RuntimeState::kNoError);
         }
-    }
-
-    /**
-     * Builds a BSON object from a BSON element 'element' using the same name placeholder as the
-     * JSON Schema match expressions.
-     */
-    BSONObj toObjectWithPlaceholder(BSONElement element) {
-        return BSON(JSONSchemaParser::kNamePlaceholder << element);
     }
 
     /**
@@ -1381,7 +1614,7 @@ private:
         const InternalSchemaAllElemMatchFromIndexMatchExpression* expr,
         const std::string& normalReason,
         const std::string& invertedReason) {
-        _context->pushNewFrame(*expr, _context->getCurrentDocument());
+        _context->pushNewFrame(*expr);
         if (auto attributeValue = getValueForArrayKeywordExpressionIfShouldGenerateError(*expr)) {
             appendOperatorName(*expr);
             appendErrorReason(normalReason, invertedReason);
@@ -1390,7 +1623,8 @@ private:
             invariant(failingElement);
             _context->getCurrentObjBuilder().appendNumber(
                 "itemIndex"_sd, std::stoll(failingElement.fieldNameStringData().toString()));
-            _context->setCurrentDocument(toObjectWithPlaceholder(failingElement));
+            _context->setChildInput(toObjectWithPlaceholder(failingElement),
+                                    _context->getCurrentInversion());
         } else {
             // Disable error generation by the child expression of 'expr'.
             _context->setCurrentRuntimeState(RuntimeState::kNoError);
@@ -1399,7 +1633,7 @@ private:
     void generateNumPropertiesError(const MatchExpression& numPropertiesExpr) {
         static constexpr auto kNormalReason = "specified number of properties was not satisfied";
         static constexpr auto kInvertedReason = "";
-        _context->pushNewFrame(numPropertiesExpr, _context->getCurrentDocument());
+        _context->pushNewFrame(numPropertiesExpr);
         if (_context->shouldGenerateError(numPropertiesExpr)) {
             appendErrorDetails(numPropertiesExpr);
             appendErrorReason(kNormalReason, kInvertedReason);
@@ -1407,7 +1641,6 @@ private:
             objBuilder.append("numberOfProperties", _context->getCurrentDocument().nFields());
         }
     }
-
 
     ValidationErrorContext* _context;
 };
@@ -1441,7 +1674,25 @@ public:
     void visit(const InMatchExpression* expr) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
-    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
+        if (_context->shouldGenerateError(*expr)) {
+            generateAllowedPropertiesSchemaError(*expr, _context);
+
+            // Reset the state before determining if the next child should produce an error.
+            _context->setCurrentRuntimeState(RuntimeState::kErrorIgnoreChildren);
+
+            // Examine the next patternSchema to determine whether the next clause of
+            // 'patternProperties' should generate an error. Since the current index corresponds to
+            // one plus the number of patternProperties clauses visited so far, it also represents
+            // the next 'patternProperties' clause.
+            invariant(_context->getCurrentChildIndex() < expr->getPatternProperties().size());
+            auto& patternSchema = expr->getPatternProperties()[_context->getCurrentChildIndex()];
+            if (auto failingElement = findFailingProperty(*expr, patternSchema, _context)) {
+                setAllowedPropertiesChildInput(failingElement, _context);
+            }
+        }
+        _context->incrementCurrentChildIndex();
+    }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
     void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
     void visit(const InternalSchemaCondMatchExpression* expr) final {
@@ -1643,7 +1894,34 @@ public:
         }
         _context->finishCurrentError(expr);
     }
-    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {
+        if (_context->shouldGenerateError(*expr)) {
+            generateAllowedPropertiesSchemaError(*expr, _context);
+            BSONObj additionalPropertiesError = _context->getCurrentObjBuilder().obj();
+            BSONObj patternPropertiesError;
+            // Only build a 'patternProperties' error if any were produced.
+            auto& arrBuilder = _context->getCurrentArrayBuilder();
+            if (arrBuilder.arrSize() > 0) {
+                BSONObjBuilder patternProperties;
+                patternProperties.append("operatorName", "patternProperties");
+                patternProperties.append("details", arrBuilder.arr());
+                patternPropertiesError = patternProperties.obj();
+            }
+            if (additionalPropertiesError.isEmpty()) {
+                invariant(!patternPropertiesError.isEmpty());
+                _context->latestCompleteError = patternPropertiesError;
+            } else if (patternPropertiesError.isEmpty()) {
+                invariant(!additionalPropertiesError.isEmpty());
+                _context->latestCompleteError = additionalPropertiesError;
+            } else {
+                BSONArrayBuilder arr;
+                arr.append(additionalPropertiesError);
+                arr.append(patternPropertiesError);
+                _context->latestCompleteError = arr.arr();
+            }
+        }
+        _context->popFrame();
+    }
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {
         _context->finishCurrentError(expr);
     }

@@ -38,8 +38,9 @@ InternalSchemaAllowedPropertiesMatchExpression::InternalSchemaAllowedPropertiesM
     StringDataSet properties,
     StringData namePlaceholder,
     std::vector<PatternSchema> patternProperties,
-    std::unique_ptr<ExpressionWithPlaceholder> otherwise)
-    : MatchExpression(MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES),
+    std::unique_ptr<ExpressionWithPlaceholder> otherwise,
+    clonable_ptr<ErrorAnnotation> annotation)
+    : MatchExpression(MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES, std::move(annotation)),
       _properties(std::move(properties)),
       _namePlaceholder(namePlaceholder),
       _patternProperties(std::move(patternProperties)),
@@ -167,7 +168,8 @@ std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression:
         _properties,
         _namePlaceholder,
         std::move(clonedPatternProperties),
-        _otherwise->shallowClone());
+        _otherwise->shallowClone(),
+        _errorAnnotation);
     return {std::move(clone)};
 }
 
