@@ -1031,49 +1031,60 @@ void Explain::getSummaryStats(const PlanExecutor& exec, PlanSummaryStats* statsO
 }
 
 void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {
-    BSONObjBuilder shapeBuilder(out->subobjStart("createdFromQuery"));
-    shapeBuilder.append("query", entry.query);
-    shapeBuilder.append("sort", entry.sort);
-    shapeBuilder.append("projection", entry.projection);
-    if (!entry.collation.isEmpty()) {
-        shapeBuilder.append("collation", entry.collation);
-    }
-    shapeBuilder.doneFast();
     out->append("queryHash", unsignedIntToFixedLengthHex(entry.queryHash));
     out->append("planCacheKey", unsignedIntToFixedLengthHex(entry.planCacheKey));
 
     // Append whether or not the entry is active.
     out->append("isActive", entry.isActive);
     out->append("works", static_cast<long long>(entry.works));
-
-    BSONObjBuilder cachedPlanBob(out->subobjStart("cachedPlan"));
-    Explain::statsToBSON(
-        *entry.decision->stats[0], &cachedPlanBob, ExplainOptions::Verbosity::kQueryPlanner);
-    cachedPlanBob.doneFast();
-
     out->append("timeOfCreation", entry.timeOfCreation);
 
-    BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
-    for (auto&& stat : entry.decision->stats) {
-        BSONObjBuilder planBob(creationBuilder.subobjStart());
-        Explain::generateSinglePlanExecutionInfo(
-            stat.get(), ExplainOptions::Verbosity::kExecAllPlans, boost::none, &planBob);
-        planBob.doneFast();
+    if (entry.debugInfo) {
+        const auto& debugInfo = *entry.debugInfo;
+        invariant(debugInfo.decision);
+
+        // Add the 'createdFromQuery' object.
+        {
+            const auto& createdFromQuery = entry.debugInfo->createdFromQuery;
+            BSONObjBuilder shapeBuilder(out->subobjStart("createdFromQuery"));
+            shapeBuilder.append("query", createdFromQuery.filter);
+            shapeBuilder.append("sort", createdFromQuery.sort);
+            shapeBuilder.append("projection", createdFromQuery.projection);
+            if (!createdFromQuery.collation.isEmpty()) {
+                shapeBuilder.append("collation", createdFromQuery.collation);
+            }
+        }
+
+        BSONObjBuilder cachedPlanBob(out->subobjStart("cachedPlan"));
+        Explain::statsToBSON(*debugInfo.decision->stats[0],
+                             &cachedPlanBob,
+                             ExplainOptions::Verbosity::kQueryPlanner);
+        cachedPlanBob.doneFast();
+
+        BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
+        for (auto&& stat : debugInfo.decision->stats) {
+            BSONObjBuilder planBob(creationBuilder.subobjStart());
+            Explain::generateSinglePlanExecutionInfo(
+                stat.get(), ExplainOptions::Verbosity::kExecAllPlans, boost::none, &planBob);
+            planBob.doneFast();
+        }
+        creationBuilder.doneFast();
+
+        BSONArrayBuilder scoresBuilder(out->subarrayStart("candidatePlanScores"));
+        for (double score : debugInfo.decision->scores) {
+            scoresBuilder.append(score);
+        }
+
+        std::for_each(debugInfo.decision->failedCandidates.begin(),
+                      debugInfo.decision->failedCandidates.end(),
+                      [&scoresBuilder](const auto&) { scoresBuilder.append(0.0); });
+
+        scoresBuilder.doneFast();
     }
-    creationBuilder.doneFast();
 
-    BSONArrayBuilder scoresBuilder(out->subarrayStart("candidatePlanScores"));
-    for (double score : entry.decision->scores) {
-        scoresBuilder.append(score);
-    }
+    out->append("indexFilterSet", entry.plannerData->indexFilterApplied);
 
-    std::for_each(entry.decision->failedCandidates.begin(),
-                  entry.decision->failedCandidates.end(),
-                  [&scoresBuilder](const auto&) { scoresBuilder.append(0.0); });
-
-    scoresBuilder.doneFast();
-
-    out->append("indexFilterSet", entry.plannerData[0]->indexFilterApplied);
+    out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
 }
 
 }  // namespace mongo
