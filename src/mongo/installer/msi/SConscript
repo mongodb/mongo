@@ -62,15 +62,15 @@ msi_platform = 'x64'
 # Enterprise
 if 'enterprise' in env['MONGO_MODULES']:
   msi_edition = 'Enterprise'
-  upgrade_code = 'a345b849-e311-4be7-afd8-3f29ee404882'
+  upgrade_code = '90222619-e6df-4d7b-a34a-ebead95e016d'
 # Community
 else:
   if get_option('ssl') == 'on':
     msi_edition = 'SSL'
-    upgrade_code = '06ac54f6-a00b-41b1-a3f2-6327ceba0882'
+    upgrade_code = 'ccf88af5-51a8-430a-81bd-0ad410c1665d'
   else:
     msi_edition = 'Standard'
-    upgrade_code = '38b73dec-0435-470b-9dfd-d52e724f17ec'
+    upgrade_code = 'e8440665-7088-446a-adf1-e6fecd2e2c3e'
 
 sourcesList.append("Installer_64.wxs")
 
@@ -94,7 +94,7 @@ major_version = "%s.%s" % (mv[0], mv[1])
 #    It allows upgrade from 3.2.0 to 3.2.1 in place instead of side-by-side.
 # 3. Update the check for the next major release below so we bump the GUIDs in the future.
 #
-if float(major_version) > 4.8:
+if float(major_version) > 4.9:
     # If you are troubleshooting this error, see the comment above
     env.FatalError("The upgrade codes are out of date for this release. Please \n" +
     "replace the existing GUIDs listed in this file with new GUIDs so " +
