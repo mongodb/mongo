@@ -109,6 +109,33 @@ TenantMigrationDonorService::Instance::~Instance() {
     invariant(_receiveDonorForgetMigrationPromise.getFuture().isReady());
 }
 
+boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrentOp(
+    MongoProcessInterface::CurrentOpConnectionsMode connMode,
+    MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept {
+
+    // Ignore connMode and sessionMode because tenant migrations are not associated with
+    // sessions and they run in a background thread pool.
+    BSONObjBuilder bob;
+    bob.append("desc", "tenant donor migration");
+    bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
+    bob.append("instanceID", _stateDoc.getId().toBSON());
+    bob.append("recipientConnectionString", _stateDoc.getRecipientConnectionString());
+    bob.append("lastDurableState", _stateDoc.getState());
+    if (_stateDoc.getExpireAt()) {
+        bob.append("expireAt", _stateDoc.getExpireAt()->toString());
+    }
+    if (_stateDoc.getBlockTimestamp()) {
+        bob.append("blockTimestamp", _stateDoc.getBlockTimestamp()->toBSON());
+    }
+    if (_stateDoc.getCommitOrAbortOpTime()) {
+        bob.append("commitOrAbortOpTime", _stateDoc.getCommitOrAbortOpTime()->toBSON());
+    }
+    if (_stateDoc.getAbortReason()) {
+        bob.append("abortReason", _stateDoc.getAbortReason()->toString());
+    }
+    return bob.obj();
+}
+
 Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj options) {
     auto stateDoc = TenantMigrationDonorDocument::parse(IDLParserErrorContext("stateDoc"), options);
 
