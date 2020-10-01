@@ -50,8 +50,10 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_match_array_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_str_length.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_unique_items.h"
@@ -580,14 +582,18 @@ public:
     void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
         generateStringLengthError(*expr);
     }
-    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {
+        generateNumPropertiesError(*expr);
+    }
     void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
         generateJSONSchemaMinItemsMaxItemsError(expr);
     }
     void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
         generateStringLengthError(*expr);
     }
-    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {
+        generateNumPropertiesError(*expr);
+    }
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         // This node should never be responsible for generating an error directly.
         invariant(expr->getErrorAnnotation()->mode != AnnotationMode::kGenerateError);
@@ -1206,6 +1212,18 @@ private:
             _context->setCurrentRuntimeState(RuntimeState::kNoError);
         }
     }
+    void generateNumPropertiesError(const MatchExpression& numPropertiesExpr) {
+        static constexpr auto kNormalReason = "specified number of properties was not satisfied";
+        static constexpr auto kInvertedReason = "";
+        _context->pushNewFrame(numPropertiesExpr, _context->getCurrentDocument());
+        if (_context->shouldGenerateError(numPropertiesExpr)) {
+            appendErrorDetails(numPropertiesExpr);
+            appendErrorReason(kNormalReason, kInvertedReason);
+            auto& objBuilder = _context->getCurrentObjBuilder();
+            objBuilder.append("numberOfProperties", _context->getCurrentDocument().nFields());
+        }
+    }
+
 
     ValidationErrorContext* _context;
 };
@@ -1424,14 +1442,18 @@ public:
     void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaMinItemsMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
     void visit(const InternalSchemaMinLengthMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }
-    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {
+        _context->finishCurrentError(expr);
+    }
     void visit(const InternalSchemaObjectMatchExpression* expr) final {
         _context->finishCurrentError(expr);
     }

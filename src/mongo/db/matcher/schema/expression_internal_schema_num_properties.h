@@ -44,8 +44,11 @@ class InternalSchemaNumPropertiesMatchExpression : public MatchExpression {
 public:
     InternalSchemaNumPropertiesMatchExpression(MatchType type,
                                                long long numProperties,
-                                               std::string name)
-        : MatchExpression(type), _numProperties(numProperties), _name(name) {}
+                                               std::string name,
+                                               clonable_ptr<ErrorAnnotation> annotation = nullptr)
+        : MatchExpression(type, std::move(annotation)),
+          _numProperties(numProperties),
+          _name(name) {}
 
     virtual ~InternalSchemaNumPropertiesMatchExpression() {}
 

@@ -40,10 +40,12 @@ namespace mongo {
 class InternalSchemaMinPropertiesMatchExpression final
     : public InternalSchemaNumPropertiesMatchExpression {
 public:
-    explicit InternalSchemaMinPropertiesMatchExpression(long long numProperties)
+    explicit InternalSchemaMinPropertiesMatchExpression(
+        long long numProperties, clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : InternalSchemaNumPropertiesMatchExpression(MatchType::INTERNAL_SCHEMA_MIN_PROPERTIES,
                                                      numProperties,
-                                                     "$_internalSchemaMinProperties") {}
+                                                     "$_internalSchemaMinProperties",
+                                                     std::move(annotation)) {}
 
     bool matches(const MatchableDocument* doc, MatchDetails* details) const final {
         BSONObj obj = doc->toBSON();
@@ -59,8 +61,8 @@ public:
     }
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const final {
-        auto minProperties =
-            std::make_unique<InternalSchemaMinPropertiesMatchExpression>(numProperties());
+        auto minProperties = std::make_unique<InternalSchemaMinPropertiesMatchExpression>(
+            numProperties(), _errorAnnotation);
         if (getTag()) {
             minProperties->setTag(getTag()->clone());
         }

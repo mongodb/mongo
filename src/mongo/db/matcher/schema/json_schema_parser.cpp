@@ -749,14 +749,20 @@ StatusWithMatchExpression parseNumProperties(const boost::intrusive_ptr<Expressi
         return parsedNumProps.getStatus();
     }
 
-    auto expr = std::make_unique<T>(parsedNumProps.getValue());
+    auto expr = std::make_unique<T>(
+        parsedNumProps.getValue(),
+        doc_validation_error::createAnnotation(
+            expCtx, numProperties.fieldNameStringData().toString(), numProperties.wrap()));
 
     if (path.empty()) {
         // This is a top-level schema.
         return {std::move(expr)};
     }
 
-    auto objectMatch = std::make_unique<InternalSchemaObjectMatchExpression>(path, std::move(expr));
+    auto objectMatch = std::make_unique<InternalSchemaObjectMatchExpression>(
+        path,
+        std::move(expr),
+        doc_validation_error::createAnnotation(expCtx, AnnotationMode::kIgnoreButDescend));
 
     return makeRestriction(expCtx, BSONType::Object, path, std::move(objectMatch), typeExpr);
 }

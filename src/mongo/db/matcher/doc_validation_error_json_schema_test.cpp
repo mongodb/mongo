@@ -2040,5 +2040,103 @@ TEST(JSONSchemaValidation, ArrayAdditionalItemsFalseAlwaysTrue) {
         "    {'operatorName': '$jsonSchema', 'reason': 'schema matched'}}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
+// Object keywords
+
+// minProperties
+TEST(JSONSchemaValidation, BasicMinProperties) {
+    BSONObj query = fromjson("{'$jsonSchema': {minProperties: 10}}");
+    BSONObj document = fromjson("{_id: 1, a: 1, b: 2, c: 3}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "           {'operatorName': 'minProperties',"
+        "            'specifiedAs': {minProperties: 10},"
+        "            'reason': 'specified number of properties was not satisfied',"
+        "            'numberOfProperties': 4}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, NestedMinProperties) {
+    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'minProperties': 10}}}}}");
+    BSONObj document = fromjson("{a: {'b': 1, 'c': 2}}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "      {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "           {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'minProperties',"
+        "            'specifiedAs': {minProperties: 10},"
+        "            'reason': 'specified number of properties was not satisfied',"
+        "            'numberOfProperties': 2}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, NestedMinPropertiesTypeMismatch) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'properties': {'a': {'minProperties': 10, "
+        "'type': 'object'}}}}}");
+    BSONObj document = fromjson("{a: ['clearly', 'not', 'an', 'object']}");
+    // No mention of the 'minProperties' keyword.
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "      {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "           {'propertyName': 'a', 'details': ["
+        "               {'operatorName': 'type',"
+        "               'specifiedAs': {'type': 'object'},"
+        "               'reason': 'type did not match',"
+        "               'consideredValue': ['clearly', 'not', 'an', 'object'],"
+        "               'consideredType': 'array'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+// maxProperties
+TEST(JSONSchemaValidation, BasicMaxProperties) {
+    BSONObj query = fromjson("{'$jsonSchema': {maxProperties: 2}}");
+    BSONObj document = fromjson("{_id: 1, a: 1, b: 2, c: 3}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "           {'operatorName': 'maxProperties',"
+        "            'specifiedAs': {maxProperties: 2},"
+        "            'reason': 'specified number of properties was not satisfied',"
+        "            'numberOfProperties': 4}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, NestedMaxProperties) {
+    BSONObj query = fromjson("{'$jsonSchema': {'properties': {'a': {'maxProperties': 1}}}}}");
+    BSONObj document = fromjson("{a: {'b': 1, 'c': 2}}");
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "      {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "           {'propertyName': 'a', 'details': ["
+        "           {'operatorName': 'maxProperties',"
+        "            'specifiedAs': {maxProperties: 1},"
+        "            'reason': 'specified number of properties was not satisfied',"
+        "            'numberOfProperties': 2}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(JSONSchemaValidation, NestedMaxPropertiesTypeMismatch) {
+    BSONObj query = fromjson(
+        "{'$jsonSchema': {'properties': {'a': {'maxProperties': 10, "
+        "'type': 'object'}}}}}");
+    BSONObj document = fromjson("{a: ['clearly', 'not', 'an', 'object']}");
+    // No mention of the 'maxProperties' keyword.
+    BSONObj expectedError = fromjson(
+        "{'operatorName': '$jsonSchema',"
+        "     'schemaRulesNotSatisfied': ["
+        "      {'operatorName': 'properties', 'propertiesNotSatisfied': ["
+        "           {'propertyName': 'a', 'details': ["
+        "               {'operatorName': 'type',"
+        "               'specifiedAs': {'type': 'object'},"
+        "               'reason': 'type did not match',"
+        "               'consideredValue': ['clearly', 'not', 'an', 'object'],"
+        "               'consideredType': 'array'}]}]}]}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
 }  // namespace
 }  // namespace mongo
