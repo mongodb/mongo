@@ -635,7 +635,7 @@ functions:
   "get buildnumber": &get_buildnumber
     command: keyval.inc
     params:
-      key: "${build_variant}_master"
+      key: "${build_variant}_v4.8"
       destination: "builder_num"
 
   "run diskstats": &run_diskstats
@@ -8537,7 +8537,7 @@ modules:
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
-  branch: master
+  branch: v4.8
 
 - name: wtdevelop
   repo: git@github.com:wiredtiger/wiredtiger.git
