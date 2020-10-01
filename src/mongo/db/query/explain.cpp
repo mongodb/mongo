@@ -338,50 +338,60 @@ void Explain::explainStages(PlanExecutor* exec,
 
 
 void Explain::planCacheEntryToBSON(const PlanCacheEntry& entry, BSONObjBuilder* out) {
-    BSONObjBuilder shapeBuilder(out->subobjStart("createdFromQuery"));
-    shapeBuilder.append("query", entry.query);
-    shapeBuilder.append("sort", entry.sort);
-    shapeBuilder.append("projection", entry.projection);
-    if (!entry.collation.isEmpty()) {
-        shapeBuilder.append("collation", entry.collation);
-    }
-    shapeBuilder.doneFast();
     out->append("queryHash", zeroPaddedHex(entry.queryHash));
     out->append("planCacheKey", zeroPaddedHex(entry.planCacheKey));
 
     // Append whether or not the entry is active.
     out->append("isActive", entry.isActive);
     out->append("works", static_cast<long long>(entry.works));
-
-
-    auto explainer = plan_explainer_factory::makePlanExplainer<PlanStage>(nullptr, nullptr);
-    auto plannerStats =
-        explainer->getCachedPlanStats(entry, ExplainOptions::Verbosity::kQueryPlanner);
-    auto execStats = explainer->getCachedPlanStats(entry, ExplainOptions::Verbosity::kExecStats);
-
-    invariant(plannerStats.size() > 0);
-    out->append("cachedPlan", plannerStats[0].first);
     out->append("timeOfCreation", entry.timeOfCreation);
 
-    BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
-    for (auto&& stats : execStats) {
-        BSONObjBuilder planBob(creationBuilder.subobjStart());
-        generateSinglePlanExecutionInfo(stats, boost::none, &planBob);
-        planBob.doneFast();
+    if (entry.debugInfo) {
+        const auto& debugInfo = *entry.debugInfo;
+        invariant(debugInfo.decision);
+
+        // Add the 'createdFromQuery' object.
+        {
+            const auto& createdFromQuery = entry.debugInfo->createdFromQuery;
+            BSONObjBuilder shapeBuilder(out->subobjStart("createdFromQuery"));
+            shapeBuilder.append("query", createdFromQuery.filter);
+            shapeBuilder.append("sort", createdFromQuery.sort);
+            shapeBuilder.append("projection", createdFromQuery.projection);
+            if (!createdFromQuery.collation.isEmpty()) {
+                shapeBuilder.append("collation", createdFromQuery.collation);
+            }
+        }
+
+        auto explainer = plan_explainer_factory::makePlanExplainer<PlanStage>(nullptr, nullptr);
+        auto plannerStats =
+            explainer->getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kQueryPlanner);
+        auto execStats =
+            explainer->getCachedPlanStats(debugInfo, ExplainOptions::Verbosity::kExecStats);
+
+        invariant(plannerStats.size() > 0);
+        out->append("cachedPlan", plannerStats[0].first);
+
+        BSONArrayBuilder creationBuilder(out->subarrayStart("creationExecStats"));
+        for (auto&& stats : execStats) {
+            BSONObjBuilder planBob(creationBuilder.subobjStart());
+            generateSinglePlanExecutionInfo(stats, boost::none, &planBob);
+            planBob.doneFast();
+        }
+        creationBuilder.doneFast();
+
+        BSONArrayBuilder scoresBuilder(out->subarrayStart("candidatePlanScores"));
+        for (double score : debugInfo.decision->scores) {
+            scoresBuilder.append(score);
+        }
+
+        std::for_each(debugInfo.decision->failedCandidates.begin(),
+                      debugInfo.decision->failedCandidates.end(),
+                      [&scoresBuilder](const auto&) { scoresBuilder.append(0.0); });
+        scoresBuilder.doneFast();
     }
-    creationBuilder.doneFast();
 
-    BSONArrayBuilder scoresBuilder(out->subarrayStart("candidatePlanScores"));
-    for (double score : entry.decision->scores) {
-        scoresBuilder.append(score);
-    }
+    out->append("indexFilterSet", entry.plannerData->indexFilterApplied);
 
-    std::for_each(entry.decision->failedCandidates.begin(),
-                  entry.decision->failedCandidates.end(),
-                  [&scoresBuilder](const auto&) { scoresBuilder.append(0.0); });
-
-    scoresBuilder.doneFast();
-
-    out->append("indexFilterSet", entry.plannerData[0]->indexFilterApplied);
+    out->append("estimatedSizeBytes", static_cast<long long>(entry.estimatedEntrySizeBytes));
 }
 }  // namespace mongo

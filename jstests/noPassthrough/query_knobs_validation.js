@@ -18,6 +18,7 @@ const expectedParamDefaults = {
     internalQueryCacheEvictionRatio: 10.0,
     internalQueryCacheWorksGrowthCoefficient: 2.0,
     internalQueryCacheDisableInactiveEntries: false,
+    internalQueryCacheMaxSizeBytesBeforeStripDebugInfo: 512 * 1024 * 1024,
     internalQueryPlannerMaxIndexedSolutions: 64,
     internalQueryEnumerationMaxOrSolutions: 10,
     internalQueryEnumerationMaxIntersectPerAnd: 3,
@@ -89,6 +90,10 @@ assertSetParameterFails("internalQueryPlanEvaluationMaxResults", -1);
 assertSetParameterSucceeds("internalQueryCacheSize", 1);
 assertSetParameterSucceeds("internalQueryCacheSize", 0);
 assertSetParameterFails("internalQueryCacheSize", -1);
+
+assertSetParameterSucceeds("internalQueryCacheMaxSizeBytesBeforeStripDebugInfo", 1);
+assertSetParameterSucceeds("internalQueryCacheMaxSizeBytesBeforeStripDebugInfo", 0);
+assertSetParameterFails("internalQueryCacheMaxSizeBytesBeforeStripDebugInfo", -1);
 
 assertSetParameterSucceeds("internalQueryCacheEvictionRatio", 1.0);
 assertSetParameterSucceeds("internalQueryCacheEvictionRatio", 0.0);

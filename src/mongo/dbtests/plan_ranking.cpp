@@ -251,12 +251,14 @@ public:
                 .getPlanCache()
                 ->getEntry(*(cq.get()));
         ASSERT_OK(planCacheEntryWithStatus.getStatus());
+        auto debugInfo = planCacheEntryWithStatus.getValue()->debugInfo;
+        ASSERT(debugInfo);
 
         // We assert that there was only one plan scored, implying that there was only one
         // non-failing plan.
-        ASSERT(planCacheEntryWithStatus.getValue()->decision->scores.size() == 1);
+        ASSERT(debugInfo->decision->scores.size() == 1);
         // We assert that there was one failing plan.
-        ASSERT(planCacheEntryWithStatus.getValue()->decision->failedCandidates.size() == 1);
+        ASSERT(debugInfo->decision->failedCandidates.size() == 1);
     }
 
 private:

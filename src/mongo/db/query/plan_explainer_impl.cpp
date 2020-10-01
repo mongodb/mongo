@@ -26,6 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
@@ -704,9 +705,10 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getRejectedPlans
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerImpl::getCachedPlanStats(
-    const PlanCacheEntry& entry, ExplainOptions::Verbosity verbosity) const {
+    const PlanCacheEntry::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const {
+    const auto& decision = *debugInfo.decision;
     std::vector<PlanStatsDetails> res;
-    for (auto&& stats : entry.decision->getStats<PlanStageStats>()) {
+    for (auto&& stats : decision.getStats<PlanStageStats>()) {
         BSONObjBuilder bob;
         statsToBSON(*stats, verbosity, &bob, &bob);
         res.push_back({bob.obj(),

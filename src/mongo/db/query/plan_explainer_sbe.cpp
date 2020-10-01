@@ -54,7 +54,7 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getCachedPlanStats(
-    const PlanCacheEntry& entry, ExplainOptions::Verbosity verbosity) const {
+    const PlanCacheEntry::DebugInfo&, ExplainOptions::Verbosity) const {
     // TODO: SERVER-50728
     return {};
 }

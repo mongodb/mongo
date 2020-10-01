@@ -91,11 +91,11 @@ public:
         ExplainOptions::Verbosity verbosity) const = 0;
 
     /**
-     * Serializes a PlanCacheEntry into the provided BSONObjBuilder. The output format is intended
-     * to be human readable, and useful for debugging query performance problems related to the
-     * plan cache.
+     * Serializes plan cache entry debug info into the provided BSONObjBuilder. The output format is
+     * intended to be human readable, and useful for debugging query performance problems related to
+     * the plan cache.
      */
     virtual std::vector<PlanStatsDetails> getCachedPlanStats(
-        const PlanCacheEntry& entry, ExplainOptions::Verbosity verbosity) const = 0;
+        const PlanCacheEntry::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const = 0;
 };
 }  // namespace mongo

@@ -50,8 +50,8 @@ public:
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
     std::vector<PlanStatsDetails> getRejectedPlansStats(
         ExplainOptions::Verbosity verbosity) const final;
-    std::vector<PlanStatsDetails> getCachedPlanStats(
-        const PlanCacheEntry& entry, ExplainOptions::Verbosity verbosity) const final;
+    std::vector<PlanStatsDetails> getCachedPlanStats(const PlanCacheEntry::DebugInfo&,
+                                                     ExplainOptions::Verbosity) const final;
 
 private:
     PlanStage* const _root;
