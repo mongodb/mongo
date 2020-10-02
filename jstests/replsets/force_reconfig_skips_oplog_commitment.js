@@ -30,6 +30,8 @@ rst.awaitReplication();
 
 // Stop replication on the secondary.
 stopServerReplication(secondary);
+// Avoid closing the connection when the secondary node transitions to REMOVED.
+assert.commandWorked(secondary.adminCommand({hello: 1, hangUpOnStepDown: false}));
 
 // Reconfig down to a 1 node replica set.
 const origConfig = rst.getReplSetConfigFromNode();
@@ -38,13 +40,12 @@ C1.members = C1.members.slice(0, 1);  // Remove the second node.
 C1.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: C1}));
 
-// Make sure we can connect to the secondary after it was REMOVED.
+// Wait for the secondary node to realize it is REMOVED.
 assert.soonNoExcept(function() {
     let res = secondary.adminCommand({replSetGetStatus: 1});
     assert.commandFailedWithCode(res, ErrorCodes.InvalidReplicaSetConfig);
     return true;
 }, () => tojson(secondary.adminCommand({replSetGetStatus: 1})));
-reconnect(secondary);
 
 jsTestLog("Test that force reconfig skips oplog commitment.");
 let C2 = Object.assign({}, origConfig);

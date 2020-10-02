@@ -47,6 +47,9 @@ assert.commandWorked(initialSyncNode.adminCommand({
     maxTimeMS: kDefaultWaitForFailPointTimeout
 }));
 jsTestLog("Removing initial sync node");
+// Avoid closing the connection when the node transitions to REMOVED.
+assert.commandWorked(initialSyncNode.adminCommand({hello: 1, hangUpOnStepDown: false}));
+
 let config = rst.getReplSetConfigFromNode();
 const origHost = config.members[1].host;
 // This host will never resolve.

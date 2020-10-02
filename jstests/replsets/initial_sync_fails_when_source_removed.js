@@ -56,6 +56,8 @@ assert.commandWorked(initialSyncNodeDb.adminCommand(
 beforeStageFailPoint.wait();
 
 jsTestLog("Testing removing sync source in cloner " + cloner + " stage " + stage);
+// Avoid closing the connection when the node transitions to REMOVED.
+assert.commandWorked(initialSyncNode.adminCommand({hello: 1, hangUpOnStepDown: false}));
 // We can't use remove/reInitiate here because that does not properly remove a node
 // in the middle of a config.
 let config = rst.getReplSetConfig();
