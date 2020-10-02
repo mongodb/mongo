@@ -20,8 +20,8 @@ var config = {
 };
 var r = replTest.initiate(config);
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
-// Make sure we have a master
-var master = replTest.getPrimary();
+// Make sure we have a primary
+var primary = replTest.getPrimary();
 var a_conn = conns[0];
 var b_conn = conns[1];
 a_conn.setSecondaryOk();
@@ -31,8 +31,8 @@ var B = b_conn.getDB("test");
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
 
-assert(master == conns[0], "conns[0] assumed to be master");
-assert(a_conn.host == master.host);
+assert(primary == conns[0], "conns[0] assumed to be primary");
+assert(a_conn.host == primary.host);
 
 // create an oplog entry with an insert
 assert.commandWorked(
@@ -67,7 +67,7 @@ var loadGen = startParallelShell(work, replTest.ports[0]);
 // wait for document to appear to continue
 assert.soon(function() {
     try {
-        return 1 == master.getDB("test")["timeToStartTrigger"].find().itcount();
+        return 1 == primary.getDB("test")["timeToStartTrigger"].find().itcount();
     } catch (e) {
         print(e);
         return false;

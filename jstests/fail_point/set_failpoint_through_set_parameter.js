@@ -7,7 +7,7 @@
 "use strict";
 
 var assertStartupSucceeds = function(conn) {
-    assert.commandWorked(conn.adminCommand({ismaster: 1}));
+    assert.commandWorked(conn.adminCommand({hello: 1}));
 };
 
 var assertStartupFails = function(conn) {

@@ -28,19 +28,19 @@ const replTest = new ReplSetTest({
 const nodes = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 var second = replTest.getSecondary();
 
-var masterDB = master.getDB(dbname);
+var primaryDB = primary.getDB(dbname);
 var secondDB = second.getDB(dbname);
 
 var dc = {dropIndexes: collection, index: "i_1"};
 
 // Setup collections.
-masterDB.dropDatabase();
+primaryDB.dropDatabase();
 jsTest.log("Creating test data " + size + " documents");
 Random.setRandomSeed();
-var bulk = masterDB.getCollection(collection).initializeUnorderedBulkOp();
+var bulk = primaryDB.getCollection(collection).initializeUnorderedBulkOp();
 for (i = 0; i < size; ++i) {
     bulk.insert({i: Random.rand()});
 }
@@ -52,22 +52,22 @@ assert.commandWorked(
 jsTest.log("Starting background indexing for test of: " + tojson(dc));
 
 // Add another index to be sure the drop command works.
-masterDB.getCollection(collection).ensureIndex({b: 1});
-masterDB.getCollection(collection).ensureIndex({i: 1}, {background: true});
+primaryDB.getCollection(collection).ensureIndex({b: 1});
+primaryDB.getCollection(collection).ensureIndex({i: 1}, {background: true});
 
 // Make sure the index build has started on the secondary.
 IndexBuildTest.waitForIndexBuildToStart(secondDB);
 
 jsTest.log("Dropping indexes");
-masterDB.runCommand({dropIndexes: collection, index: "*"});
+primaryDB.runCommand({dropIndexes: collection, index: "*"});
 
 jsTest.log("Waiting on replication");
 assert.commandWorked(
     secondDB.adminCommand({configureFailPoint: "hangAfterStartingIndexBuild", mode: "off"}));
 replTest.awaitReplication();
 
-print("Index list on master:");
-masterDB.getCollection(collection).getIndexes().forEach(printjson);
+print("Index list on primary:");
+primaryDB.getCollection(collection).getIndexes().forEach(printjson);
 
 // Need to assert.soon because the drop only marks the index for removal
 // the removal itself is asynchronous and may take another moment before it happens.

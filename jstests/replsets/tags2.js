@@ -31,8 +31,8 @@ replTest.initiate(conf);
 
 replTest.awaitReplication();
 
-var master = replTest.getPrimary();
-var db = master.getDB("test");
+var primary = replTest.getPrimary();
+var db = primary.getDB("test");
 var wtimeout = ReplSetTest.kDefaultTimeoutMS;
 
 assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
@@ -40,21 +40,21 @@ assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: 'backedUp', wtimeo
 var nextVersion = replTest.getReplSetConfigFromNode().version + 1;
 conf.version = nextVersion;
 conf.settings.getLastErrorModes.backedUp.backup = 3;
-master.getDB("admin").runCommand({replSetReconfig: conf});
+primary.getDB("admin").runCommand({replSetReconfig: conf});
 replTest.awaitReplication();
 
-master = replTest.getPrimary();
-var db = master.getDB("test");
+primary = replTest.getPrimary();
+var db = primary.getDB("test");
 assert.commandWorked(db.foo.insert({x: 2}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
 
 nextVersion++;
 conf.version = nextVersion;
 conf.members[0].priorty = 3;
 conf.members[2].priorty = 0;
-master.getDB("admin").runCommand({replSetReconfig: conf});
+primary.getDB("admin").runCommand({replSetReconfig: conf});
 
-master = replTest.getPrimary();
-var db = master.getDB("test");
+primary = replTest.getPrimary();
+var db = primary.getDB("test");
 assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: 'backedUp', wtimeout: wtimeout}}));
 
 replTest.stopSet();

@@ -1,4 +1,4 @@
-// Election when master fails and remaining nodes are an arbiter and a slave.
+// Election when primary fails and remaining nodes are an arbiter and a secondary.
 
 (function() {
 "use strict";
@@ -16,8 +16,8 @@ var r = replTest.initiate({
     ]
 });
 
-// Make sure we have a master
-var master = replTest.getPrimary();
+// Make sure we have a primary
+var primary = replTest.getPrimary();
 
 // Make sure we have an arbiter
 assert.soon(function() {
@@ -31,18 +31,18 @@ assert(result.arbiterOnly);
 assert(!result.passive);
 
 // Wait for initial replication
-master.getDB("foo").foo.insert({a: "foo"});
+primary.getDB("foo").foo.insert({a: "foo"});
 replTest.awaitReplication();
 
-// Now kill the original master
-var mId = replTest.getNodeId(master);
-replTest.stop(mId);
+// Now kill the original primary
+var pId = replTest.getNodeId(primary);
+replTest.stop(pId);
 
-// And make sure that the slave is promoted
-var new_master = replTest.getPrimary();
+// And make sure that the secondary is promoted
+var new_primary = replTest.getPrimary();
 
-var newMasterId = replTest.getNodeId(new_master);
-assert.neq(newMasterId, mId, "Secondary wasn't promoted to new primary");
+var newPrimaryId = replTest.getNodeId(new_primary);
+assert.neq(newPrimaryId, pId, "Secondary wasn't promoted to new primary");
 
 replTest.stopSet(15);
 }());

@@ -17,16 +17,16 @@ replTest.initiate({
     "settings": {"chainingAllowed": false}
 });
 
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 replTest.awaitReplication();
 
 var breakNetwork = function() {
     nodes[0].disconnect(nodes[2]);
-    master = replTest.getPrimary();
+    primary = replTest.getPrimary();
 };
 
 var checkNoChaining = function() {
-    master.getDB("test").foo.insert({x: 1});
+    primary.getDB("test").foo.insert({x: 1});
 
     assert.soon(function() {
         return nodes[1].getDB("test").foo.findOne() != null;
@@ -57,7 +57,7 @@ if (!_isWindows()) {
     print("check that forcing sync target still works");
     forceSync();
 
-    var config = master.getDB("local").system.replset.findOne();
+    var config = primary.getDB("local").system.replset.findOne();
     assert.eq(false, config.settings.chainingAllowed, tojson(config));
 }
 

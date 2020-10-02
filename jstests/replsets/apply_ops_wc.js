@@ -24,8 +24,8 @@ replTest.initiate(cfg);
 var testDB = "applyOps-wc-test";
 
 // Get test collection.
-var master = replTest.getPrimary();
-var db = master.getDB(testDB);
+var primary = replTest.getPrimary();
+var db = primary.getDB(testDB);
 var coll = db.apply_ops_wc;
 
 function dropTestCollection() {

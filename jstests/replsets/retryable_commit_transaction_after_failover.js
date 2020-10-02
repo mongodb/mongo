@@ -73,7 +73,7 @@ rst.stepUp(oldSecondary);
 assert.eq(oldSecondary, rst.getPrimary());
 // Reconnect the connection to the new primary.
 sessionDb.getMongo()._markNodeAsFailed(
-    oldPrimary.host, ErrorCodes.NotWritablePrimary, "Notice that primary is not master");
+    oldPrimary.host, ErrorCodes.NotWritablePrimary, "Notice that primary is not writable");
 reconnect(sessionDb);
 
 jsTest.log("commitTransaction command is retryable after failover");

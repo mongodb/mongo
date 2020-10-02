@@ -17,9 +17,9 @@ var replTest = new ReplSetTest({
 replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 var dbName = "wc-test";
-var db = master.getDB(dbName);
+var db = primary.getDB(dbName);
 var collName = 'leaves';
 var coll = db[collName];
 

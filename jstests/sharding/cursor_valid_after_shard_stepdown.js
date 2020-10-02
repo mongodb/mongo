@@ -26,7 +26,7 @@ var coll = db.TestColl;
 assert.commandWorked(coll.insert({x: 1, value: 'Test value 1'}));
 assert.commandWorked(coll.insert({x: 2, value: 'Test value 2'}));
 
-// Establish a cursor on the primary (by not using slaveOk read)
+// Establish a cursor on the primary (by not using secondaryOk read)
 var findCursor = assert.commandWorked(db.runCommand({find: 'TestColl', batchSize: 1})).cursor;
 
 var shardVersionBeforeStepdown =

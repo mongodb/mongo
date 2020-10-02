@@ -52,14 +52,14 @@ if (storageEngine !== "wiredTiger") {
         doNotWaitForReplication: true,
         doNotWaitForNewlyAddedRemovals: true
     });
-    var master = rst.getPrimary();  // Waits for PRIMARY state.
+    var primary = rst.getPrimary();  // Waits for PRIMARY state.
 
     // Reconfigure primary with a small cache size so less data needs to be
     // inserted to make the cache full while trying to trigger a stall.
-    assert.commandWorked(master.adminCommand(
+    assert.commandWorked(primary.adminCommand(
         {setParameter: 1, "wiredTigerEngineRuntimeConfig": "cache_size=100MB"}));
 
-    var coll = master.getCollection("test.coll");
+    var coll = primary.getCollection("test.coll");
     var bigstr = "a".repeat(4000);
 
     // Do not insert with a writeConcern because we want the delayed slave

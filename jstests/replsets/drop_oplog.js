@@ -7,8 +7,8 @@ let rt = new ReplSetTest({name: "drop_oplog", nodes: 1, oplogSize: 30});
 
 let nodes = rt.startSet();
 rt.initiate();
-let master = rt.getPrimary();
-let localDB = master.getDB('local');
+let primary = rt.getPrimary();
+let localDB = primary.getDB('local');
 
 let threw = false;
 
@@ -19,7 +19,7 @@ let dropOutput = localDB.dropDatabase();
 assert.eq(dropOutput.ok, 0);
 assert.eq(dropOutput.errmsg, "Cannot drop 'local' database while replication is active");
 
-let adminDB = master.getDB('admin');
+let adminDB = primary.getDB('admin');
 dropOutput = adminDB.dropDatabase();
 assert.eq(dropOutput.ok, 0);
 assert.eq(dropOutput.errmsg, "Dropping the 'admin' database is prohibited.");

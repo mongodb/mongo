@@ -7,9 +7,9 @@ var rt = new ReplSetTest({name: "replset8", nodes: 1});
 
 var nodes = rt.startSet();
 rt.initiate();
-var master = rt.getPrimary();
+var primary = rt.getPrimary();
 var bigstring = "a";
-var md = master.getDB('d');
+var md = primary.getDB('d');
 var mdc = md['c'];
 
 // prep the data
@@ -56,7 +56,7 @@ assert.eq(doccount, result.nRemoved);
 assert.eq(doccount + 1, mdc.find().itcount());
 
 // add a secondary
-var slave = rt.add();
+var secondary = rt.add();
 rt.reInitiate();
 jsTestLog('reinitiation complete after adding new node to replicaset');
 rt.awaitSecondaryNodes();
@@ -76,10 +76,10 @@ assert.eq(doccount - 1, result.nModified);
 assert.eq(doccount + 1,
           mdc.find().itcount(),
           'incorrect collection size on primary (fast count: ' + mdc.count() + ')');
-assert.eq(
-    doccount + 1,
-    slave.getDB('d')['c'].find().itcount(),
-    'incorrect collection size on secondary  (fast count: ' + slave.getDB('d')['c'].count() + ')');
+assert.eq(doccount + 1,
+          secondary.getDB('d')['c'].find().itcount(),
+          'incorrect collection size on secondary  (fast count: ' +
+              secondary.getDB('d')['c'].count() + ')');
 
 jsTestLog("finished");
 rt.stopSet();

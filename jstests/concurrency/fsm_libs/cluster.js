@@ -554,8 +554,6 @@ var Cluster = function(options) {
         replSets.forEach(rst => {
             var startTime = Date.now();
             var res;
-
-            // Use '_master' instead of getPrimary() to avoid the detection of a new primary.
             var primary = rst.getPrimary();
 
             if (shouldCheckDBHashes) {

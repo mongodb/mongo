@@ -23,7 +23,7 @@ assert.commandFailed(localDB.createCollection('oplog.fake', {capped: false}));
 // collection.
 assert.writeError(localDB.oplog.rs.insert({}));
 
-// Test that inserting into the master-slave oplog fails when implicitly creating a non-capped
+// Test that inserting into the oplog fails when implicitly creating a non-capped
 // collection.
 assert.commandFailed(localDB.runCommand({godinsert: 'oplog.$main', obj: {}}));
 

@@ -34,32 +34,32 @@ replSet.initiate({
 });
 
 // set up common points of access
-var master = replSet.getPrimary();
-var primary = master.getDB("foo");
+var primary = replSet.getPrimary();
+var primaryDB = primary.getDB("foo");
 replSet.nodes[1].setSecondaryOk();
 replSet.nodes[2].setSecondaryOk();
 var member2 = replSet.nodes[1].getDB("admin");
 var member3 = replSet.nodes[2].getDB("admin");
 
 // Do an initial write
-master.getDB("foo").bar.insert({x: 1});
+primary.getDB("foo").bar.insert({x: 1});
 replSet.awaitReplication();
 
 jsTest.log("Make sure 2 & 3 are syncing from the primary");
-assert.eq(master, replSet.nodes[0]);
-syncFrom(replSet.nodes[1], master, replSet);
-syncFrom(replSet.nodes[2], master, replSet);
+assert.eq(primary, replSet.nodes[0]);
+syncFrom(replSet.nodes[1], primary, replSet);
+syncFrom(replSet.nodes[2], primary, replSet);
 
 jsTest.log("Stop 2's replication");
 member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
 jsTest.log("Do a few writes");
 for (var i = 0; i < 25; i++) {
-    primary.bar.insert({x: i});
+    primaryDB.bar.insert({x: i});
 }
 
 jsTest.log("Make sure 3 is at write #25");
-waitForSameOplogPosition(primary, member3, "node 3 failed to catch up to the primary");
+waitForSameOplogPosition(primaryDB, member3, "node 3 failed to catch up to the primary");
 // This means 3's buffer is empty
 
 jsTest.log("Stop 3's replication");
@@ -73,11 +73,11 @@ member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
 
 jsTest.log("Do some writes");
 for (var i = 25; i < 50; i++) {
-    primary.bar.insert({x: i});
+    primaryDB.bar.insert({x: i});
 }
 
 jsTest.log("Make sure 2 is at write #50");
-waitForSameOplogPosition(primary, member2, "node 2 failed to catch up to the primary");
+waitForSameOplogPosition(primaryDB, member2, "node 2 failed to catch up to the primary");
 // This means 2's buffer is empty
 
 jsTest.log("Stop 2's replication");
@@ -85,11 +85,11 @@ member2.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
 jsTest.log("Do some writes - 2 & 3 should have up to write #75 in their buffers, but unapplied");
 for (var i = 50; i < 75; i++) {
-    primary.bar.insert({x: i});
+    primaryDB.bar.insert({x: i});
 }
-var primaryCollectionSize = primary.bar.find().itcount();
+var primaryCollectionSize = primaryDB.bar.find().itcount();
 jsTest.log("primary collection size: " + primaryCollectionSize);
-var last = primary.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
+var last = primaryDB.getSiblingDB("local").oplog.rs.find().sort({$natural: -1}).limit(1).next();
 
 jsTest.log("waiting a bit for the secondaries to get the write");
 sleep(10000);

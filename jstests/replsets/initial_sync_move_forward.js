@@ -21,12 +21,12 @@ var rst = new ReplSetTest({name: "initial_sync_move_forward", nodes: 1});
 rst.startSet();
 rst.initiate();
 
-var masterColl = rst.getPrimary().getDB("test").coll;
+var primaryColl = rst.getPrimary().getDB("test").coll;
 
 // Insert 500000 documents. Make the last two documents larger, so that {_id: 0, x: 0} and {_id:
 // 1, x: 1} will fit into their positions when we grow them.
 var count = 500000;
-var bulk = masterColl.initializeUnorderedBulkOp();
+var bulk = primaryColl.initializeUnorderedBulkOp();
 for (var i = 0; i < count - 2; ++i) {
     bulk.insert({_id: i, x: i});
 }
@@ -36,7 +36,7 @@ bulk.insert({_id: count - 1, x: count - 1, longString: longString});
 assert.commandWorked(bulk.execute());
 
 // Create a unique index on {x: 1}.
-assert.commandWorked(masterColl.ensureIndex({x: 1}, {unique: true}));
+assert.commandWorked(primaryColl.ensureIndex({x: 1}, {unique: true}));
 
 // Add a secondary.
 var secondary =
@@ -54,16 +54,16 @@ failPoint.wait();
 // Delete {_id: count - 2} to make a hole. Grow {_id: 0} so that it moves into that hole. This
 // will cause the secondary to clone {_id: 0} again.
 // Change the value for 'x' so that we are not testing the uniqueness of 'x' in this case.
-assert.commandWorked(masterColl.remove({_id: 0, x: 0}));
-assert.commandWorked(masterColl.remove({_id: count - 2, x: count - 2}));
-assert.commandWorked(masterColl.insert({_id: 0, x: count, longString: longString}));
+assert.commandWorked(primaryColl.remove({_id: 0, x: 0}));
+assert.commandWorked(primaryColl.remove({_id: count - 2, x: count - 2}));
+assert.commandWorked(primaryColl.insert({_id: 0, x: count, longString: longString}));
 
 // Delete {_id: count - 1} to make a hole. Grow {x: 1} so that it moves into that hole. This
 // will cause the secondary to clone {x: 1} again.
 // Change the value for _id so that we are not testing the uniqueness of _id in this case.
-assert.commandWorked(masterColl.remove({_id: 1, x: 1}));
-assert.commandWorked(masterColl.remove({_id: count - 1, x: count - 1}));
-assert.commandWorked(masterColl.insert({_id: count, x: 1, longString: longString}));
+assert.commandWorked(primaryColl.remove({_id: 1, x: 1}));
+assert.commandWorked(primaryColl.remove({_id: count - 1, x: count - 1}));
+assert.commandWorked(primaryColl.insert({_id: count, x: 1, longString: longString}));
 
 // Resume initial sync.
 failPoint.off();

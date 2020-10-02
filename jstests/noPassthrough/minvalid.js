@@ -10,14 +10,14 @@ var host = getHostName();
 var nodes = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getPrimary();
-var mdb = master.getDB("foo");
+var primary = replTest.getPrimary();
+var mdb = primary.getDB("foo");
 
 print("1: initial insert");
 mdb.foo.save({a: 1000});
 
 print("2. get last op");
-var local = master.getDB("local");
+var local = primary.getDB("local");
 var lastOp = local.oplog.rs.find().sort({$natural: -1}).limit(1).next();
 printjson(lastOp);
 

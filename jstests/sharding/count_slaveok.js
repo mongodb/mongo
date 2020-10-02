@@ -41,18 +41,18 @@ rst.awaitReplication();
 var primary = rst.getPrimary();
 var sec = rst.getSecondary();
 
-// Data now inserted... stop the master, since only two in set, other will still be secondary
+// Data now inserted... stop the primary, since only two in set, other will still be secondary
 rst.stop(rst.getPrimary());
 printjson(rst.status());
 
-// Wait for the mongos to recognize the slave
+// Wait for the mongos to recognize the secondary
 awaitRSClientHosts(conn, sec, {ok: true, secondary: true});
 
 // Make sure that mongos realizes that primary is already down
 awaitRSClientHosts(conn, primary, {ok: false});
 
 // Need to check secondaryOk=true first, since secondaryOk=false will destroy conn in pool when
-// master is down
+// primary is down
 conn.setSecondaryOk();
 
 // count using the command path

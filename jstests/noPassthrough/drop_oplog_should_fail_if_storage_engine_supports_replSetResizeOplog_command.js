@@ -20,8 +20,8 @@
 load("jstests/libs/storage_engine_utils.js");
 
 // Start a standalone node.
-let master = MongoRunner.runMongod();
-let localDB = master.getDB('local');
+let primary = MongoRunner.runMongod();
+let localDB = primary.getDB('local');
 
 // Standalone nodes don't start with an oplog; create one. The size of the oplog doesn't
 // matter. We are capping the oplog because some storage engines do not allow the creation
@@ -36,5 +36,5 @@ if (storageEngineIsWiredTiger()) {
     assert.commandWorked(localDB.runCommand({drop: 'oplog.rs'}));
 }
 
-MongoRunner.stopMongod(master);
+MongoRunner.stopMongod(primary);
 }());

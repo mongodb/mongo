@@ -24,11 +24,11 @@ function runTest(setParams, connPoolStatsCheck, extraOptions) {
     assert.commandWorked(test.s0.adminCommand(shardCommand));
 
     var primary;
-    var mId;
+    var pId;
     if (extraOptions !== undefined) {
         const resp = extraOptions(test);
         primary = resp.connString;
-        mId = resp.nodeId;
+        pId = resp.nodeId;
     }
 
     test.restartMongos(0);
@@ -48,7 +48,7 @@ function runTest(setParams, connPoolStatsCheck, extraOptions) {
     });
 
     if (extraOptions !== undefined) {
-        test.rs0.restart(mId);
+        test.rs0.restart(pId);
     }
 
     test.stop();
@@ -109,11 +109,11 @@ var shutdownNodeConnPoolStatsCheck = function(connPoolStats, currentShard, prima
 };
 var shutdownNodeExtraOptions = function(test) {
     const nodeList = test.rs0.nodeList();
-    const master = test.rs0.getPrimary();
-    var mId = test.rs0.getNodeId(master);
+    const primary = test.rs0.getPrimary();
+    var pId = test.rs0.getNodeId(primary);
 
-    test.rs0.stop(mId);
-    return {connString: nodeList[mId], nodeId: mId};
+    test.rs0.stop(pId);
+    return {connString: nodeList[pId], nodeId: pId};
 };
 
 runTest(shutdownNodeParams, shutdownNodeConnPoolStatsCheck, shutdownNodeExtraOptions);

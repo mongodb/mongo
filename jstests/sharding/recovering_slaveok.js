@@ -1,6 +1,6 @@
 /**
- * This tests that secondaryOk'd queries in sharded setups get correctly routed when a slave goes
- * into RECOVERING state, and don't break
+ * This tests that secondaryOk'd queries in sharded setups get correctly routed when a secondary
+ * goes into RECOVERING state, and don't break
  */
 
 // Shard secondaries are restarted, which may cause that shard's primary to stepdown while it does

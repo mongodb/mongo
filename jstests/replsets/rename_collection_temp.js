@@ -33,10 +33,10 @@ var nodes = replTest.startSet();
 
 replTest.initiate();
 
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 
 // Create a temporary collection.
-var dbFoo = master.getDB("foo");
+var dbFoo = primary.getDB("foo");
 
 assert.commandWorked(dbFoo.runCommand(
     {applyOps: [{op: "c", ns: dbFoo.getName() + ".$cmd", o: {create: "tempColl", temp: true}}]}));
@@ -44,7 +44,7 @@ checkCollectionTemp(dbFoo, "tempColl", true);
 
 // Rename the collection.
 assert.commandWorked(
-    master.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl"}));
+    primary.adminCommand({renameCollection: "foo.tempColl", to: "foo.permanentColl"}));
 
 // Confirm that it is no longer temporary.
 checkCollectionTemp(dbFoo, "permanentColl", false);
@@ -70,7 +70,7 @@ checkCollectionTemp(dbFoo, "tempColl", true);
 assert.commandWorked(dbFoo.runCommand({create: "permanentColl"}));
 
 // Rename, dropping "permanentColl" and replacing it.
-assert.commandWorked(master.adminCommand(
+assert.commandWorked(primary.adminCommand(
     {renameCollection: "foo.tempColl", to: "foo.permanentColl", dropTarget: true}));
 
 checkCollectionTemp(dbFoo, "permanentColl", false);

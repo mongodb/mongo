@@ -15,7 +15,7 @@ r.initiate(config);
 // to pre-allocate files on slow systems
 r.awaitReplication();
 
-var master = r.getPrimary();
+var primary = r.getPrimary();
 
 var members = config.members.map(function(elem) {
     return elem.host;
@@ -49,7 +49,7 @@ r.initiate(config);
 // to pre-allocate files on slow systems
 r.awaitReplication();
 
-master = r.getPrimary();
+primary = r.getPrimary();
 
 print("adding shard addshard42");
 

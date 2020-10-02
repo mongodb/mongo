@@ -1,5 +1,5 @@
 // Test that a db does not exist after it is dropped.
-// Disabled in the small oplog suite because the slave may create a master db
+// Disabled in the small oplog suite because the secondary may create a primary db
 // with the same name as the dropped db when requesting a clone.
 
 m = db.getMongo();

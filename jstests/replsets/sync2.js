@@ -12,10 +12,10 @@ var replTest = new ReplSetTest({
 var conns = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 jsTestLog("Replica set test initialized");
 
-master.getDB("foo").bar.insert({x: 1});
+primary.getDB("foo").bar.insert({x: 1});
 replTest.awaitReplication();
 
 conns[0].disconnect(conns[4]);
@@ -28,8 +28,8 @@ conns[4].disconnect(conns[1]);
 conns[4].disconnect(conns[3]);
 
 assert.soon(function() {
-    master = replTest.getPrimary();
-    return master === conns[0];
+    primary = replTest.getPrimary();
+    return primary === conns[0];
 }, "node 0 should become primary before timeout", replTest.kDefaultTimeoutMS);
 
 replTest.awaitReplication();
@@ -39,13 +39,13 @@ var option = {writeConcern: {w: conns.length - 1, wtimeout: replTest.kDefaultTim
 // to bridging, it will not change sync sources and receive the write in time. This was not a
 // problem in 3.0 because the old version of mongobridge caused all the nodes to restart during
 // partitioning, forcing the set to rebuild the spanning tree.
-assert.commandWorked(master.getDB("foo").bar.insert({x: 1}, option));
+assert.commandWorked(primary.getDB("foo").bar.insert({x: 1}, option));
 
 // 4 is connected to 3
 conns[4].disconnect(conns[2]);
 conns[4].reconnect(conns[3]);
 
-assert.commandWorked(master.getDB("foo").bar.insert({x: 1}, option));
+assert.commandWorked(primary.getDB("foo").bar.insert({x: 1}, option));
 
 replTest.stopSet();
 }());

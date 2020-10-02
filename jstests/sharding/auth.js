@@ -39,8 +39,8 @@ function logout(userObj, thingToUse) {
 }
 
 function getShardName(rsTest) {
-    var master = rsTest.getPrimary();
-    var config = master.getDB("local").system.replset.findOne();
+    var primary = rsTest.getPrimary();
+    var config = primary.getDB("local").system.replset.findOne();
     var members = config.members.map(function(elem) {
         return elem.host;
     });
@@ -110,7 +110,7 @@ d1.stopSet();
 d1.startSet({keyFile: "jstests/libs/key1", restart: true});
 d1.initiate();
 
-var master = d1.getPrimary();
+var primary = d1.getPrimary();
 
 print("adding shard w/auth " + shardName);
 

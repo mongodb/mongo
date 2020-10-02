@@ -1,5 +1,5 @@
 // Test for SERVER-9333
-// Previously, we were not clearing the cache of slaves in the primary at reconfig
+// Previously, we were not clearing the cache of secondaries in the primary at reconfig
 // time.  This would cause us to update stale items in the cache when secondaries
 // reported their progress to a primary.
 
@@ -32,8 +32,8 @@ replTest.initiate(conf);
 replTest.awaitReplication();
 
 var wtimeout = ReplSetTest.kDefaultTimeoutMS;
-var master = replTest.getPrimary();
-var db = master.getDB("test");
+var primary = replTest.getPrimary();
+var db = primary.getDB("test");
 
 // Insert a document with write concern : anydc
 assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));
@@ -42,14 +42,14 @@ assert.commandWorked(db.foo.insert({x: 1}, {writeConcern: {w: 'anydc', wtimeout:
 assert.commandWorked(db.foo.insert({x: 2}, {writeConcern: {w: 'alldc', wtimeout: wtimeout}}));
 
 // Add a new tag to the replica set
-var config = master.getDB("local").system.replset.findOne();
+var config = primary.getDB("local").system.replset.findOne();
 printjson(config);
 var modes = config.settings.getLastErrorModes;
 config.version++;
 config.members[0].tags.newtag = "newtag";
 
 try {
-    master.getDB("admin").runCommand({replSetReconfig: config});
+    primary.getDB("admin").runCommand({replSetReconfig: config});
 } catch (e) {
     print(e);
 }
@@ -57,11 +57,11 @@ try {
 replTest.awaitReplication();
 
 // Print the new config for replica set
-var config = master.getDB("local").system.replset.findOne();
+var config = primary.getDB("local").system.replset.findOne();
 printjson(config);
 
-master = replTest.getPrimary();
-var db = master.getDB("test");
+primary = replTest.getPrimary();
+var db = primary.getDB("test");
 
 // Insert a document with write concern : anydc
 assert.commandWorked(db.foo.insert({x: 3}, {writeConcern: {w: 'anydc', wtimeout: wtimeout}}));

@@ -22,31 +22,31 @@ const rt = new ReplSetTest({
 });
 const nodes = rt.startSet();
 rt.initiate();
-let master = rt.getPrimary();
+let primary = rt.getPrimary();
 rt.awaitSecondaryNodes();
-let slave1 = rt.getSecondary();
+let secondary1 = rt.getSecondary();
 
 // shortcuts
-let masterdb = master.getDB('d');
-let slave1db = slave1.getDB('d');
-let mastercol = masterdb['c'];
-let slave1col = slave1db['c'];
+let primarydb = primary.getDB('d');
+let secondary1db = secondary1.getDB('d');
+let primarycol = primarydb['c'];
+let secondary1col = secondary1db['c'];
 
 // create TTL index, wait for TTL monitor to kick in, then check things
-mastercol.ensureIndex({x: 1}, {expireAfterSeconds: 10});
+primarycol.ensureIndex({x: 1}, {expireAfterSeconds: 10});
 
 rt.awaitReplication();
 
 // increase logging
-assert.commandWorked(slave1col.getDB().adminCommand({setParameter: 1, logLevel: 1}));
+assert.commandWorked(secondary1col.getDB().adminCommand({setParameter: 1, logLevel: 1}));
 
 // insert old doc (10 minutes old) directly on secondary using godinsert
-assert.commandWorked(slave1col.runCommand(
+assert.commandWorked(secondary1col.runCommand(
     "godinsert", {obj: {_id: new Date(), x: new Date((new Date()).getTime() - 600000)}}));
-assert.eq(1, slave1col.count(), "missing inserted doc");
+assert.eq(1, secondary1col.count(), "missing inserted doc");
 
 sleep(70 * 1000);  // wait for 70seconds
-assert.eq(1, slave1col.count(), "ttl deleted my doc!");
+assert.eq(1, secondary1col.count(), "ttl deleted my doc!");
 
 // finish up
 rt.stopSet();

@@ -12,7 +12,7 @@
  * 1) Create a replica set.
  * 2) Add some documents to primary.
  * 3) Wait until the secondary nodes are in state "SECONDARY".
- * 4) Set slaveOk on secondary.
+ * 4) Set secondaryOk on secondary.
  * 5) Take the fsync lock on a secondary. This will stop replication.
  * 6) Insert some more documents to primary.
  * 7) Expect to be able to read from the secondary; the count of documents should

@@ -15,8 +15,8 @@ replTest.initiate({
 
 replTest.awaitReplication();
 
-var master = replTest.getPrimary();
-var db = master.getDB("test");
+var primary = replTest.getPrimary();
+var db = primary.getDB("test");
 printjson(rs.status());
 
 var st = new ShardingTest({numShards: 0});

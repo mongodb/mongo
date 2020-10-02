@@ -129,14 +129,14 @@ var doTest = function(useDollarQuerySyntax) {
         return serverInfo.host + ":" + serverInfo.port.toString();
     };
 
-    // Read pref should work without slaveOk
+    // Read pref should work without secondaryOk
     var explain = getExplain("secondary");
     var explainServer = getExplainServer(explain);
     assert.neq(primaryNode.name, explainServer);
 
     conn.setSecondaryOk();
 
-    // It should also work with slaveOk
+    // It should also work with secondaryOk
     explain = getExplain("secondary");
     explainServer = getExplainServer(explain);
     assert.neq(primaryNode.name, explainServer);

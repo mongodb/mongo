@@ -19,10 +19,10 @@ var replTest =
 replTest.startSet();
 replTest.initiate();
 
-var master = replTest.getPrimary();
+var primary = replTest.getPrimary();
 var dbName = "user-management-wc-test";
-var db = master.getDB(dbName);
-var adminDB = master.getDB('admin');
+var db = primary.getDB(dbName);
+var adminDB = primary.getDB('admin');
 
 function dropUsersAndRoles() {
     db.dropUser('username');

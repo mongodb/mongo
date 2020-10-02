@@ -62,7 +62,7 @@ for (var i = numDocs; i < 2 * numDocs; i++) {
 }
 assert.commandWorked(bulk.execute({w: replNodes, wtimeout: 30000}));
 
-// Take down two nodes and make sure slaveOk reads still work
+// Take down two nodes and make sure secondaryOk reads still work
 var primary = replSet1.getPrimary();
 var [secondary1, secondary2] = replSet1.getSecondaries();
 replSet1.stop(secondary1);

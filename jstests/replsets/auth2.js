@@ -43,12 +43,11 @@ replSetTest.initiate({
     ]
 });
 
-var master = replSetTest.getPrimary();
+var primary = replSetTest.getPrimary();
 
 jsTestLog("add an admin user");
-master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
-                                 {w: 3, wtimeout: replSetTest.kDefaultTimeoutMS});
-var m = replSetTest.nodes[0];
+primary.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
+                                  {w: 3, wtimeout: replSetTest.kDefaultTimeoutMS});
 
 jsTestLog("starting 1 and 2 with key file");
 replSetTest.stop(1);
@@ -64,7 +63,7 @@ testInvalidAuthStates(replSetTest);
 jsTestLog("restart mongod with bad keyFile");
 
 replSetTest.stop(0);
-m = replSetTest.restart(0, {"keyFile": key2});
+replSetTest.restart(0, {"keyFile": key2});
 
 jsTestLog("restart nodes 1 and 2");
 replSetTest.restart(1, {"keyFile": key1});

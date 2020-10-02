@@ -68,7 +68,7 @@ var buildinfo = db.runCommand("buildinfo");
 delete buildinfo.ok;             // Delete extra meta info not in startup_log
 delete buildinfo.operationTime;  // Delete extra meta info not in startup_log
 delete buildinfo.$clusterTime;   // Delete extra meta info not in startup_log
-var isMaster = db._adminCommand("ismaster");
+var hello = db._adminCommand("hello");
 
 // Test buildinfo has the expected keys
 var expectedKeys = [
@@ -107,7 +107,7 @@ assert.eq(
     version, versionArrayCleaned.join('.'), "version doesn't match that from the versionArray");
 var jsEngine = latestStartUpLog.buildinfo.javascriptEngine;
 assert((jsEngine == "none") || jsEngine.startsWith("mozjs"));
-assert.eq(isMaster.maxBsonObjectSize,
+assert.eq(hello.maxBsonObjectSize,
           latestStartUpLog.buildinfo.maxBsonObjectSize,
-          "maxBsonObjectSize doesn't match one from ismaster");
+          "maxBsonObjectSize doesn't match one from hello");
 })();

@@ -151,17 +151,17 @@ function checkTotalCounts(conn, coll) {
 
 // First check behavior when everything is consistent.
 function simpleTestConsistent() {
-    let master = replSet.getPrimary();
+    let primary = replSet.getPrimary();
     clearLog();
 
-    assert.neq(master, undefined);
-    let db = master.getDB(dbName);
+    assert.neq(primary, undefined);
+    let db = primary.getDB(dbName);
     assert.commandWorked(db.runCommand({"dbCheck": multiBatchSimpleCollName}));
 
     awaitDbCheckCompletion(db);
 
-    checkLogAllConsistent(master);
-    checkTotalCounts(master, db[multiBatchSimpleCollName]);
+    checkLogAllConsistent(primary);
+    checkTotalCounts(primary, db[multiBatchSimpleCollName]);
 
     forEachSecondary(function(secondary) {
         checkLogAllConsistent(secondary);
@@ -171,9 +171,9 @@ function simpleTestConsistent() {
 
 // Same thing, but now with concurrent updates.
 function concurrentTestConsistent() {
-    let master = replSet.getPrimary();
+    let primary = replSet.getPrimary();
 
-    let db = master.getDB(dbName);
+    let db = primary.getDB(dbName);
 
     // Add enough documents that dbCheck will take a few seconds.
     db[collName].insertMany([...Array(10000).keys()].map(x => ({i: x})));
@@ -190,7 +190,7 @@ function concurrentTestConsistent() {
 
     awaitDbCheckCompletion(db);
 
-    checkLogAllConsistent(master);
+    checkLogAllConsistent(primary);
     // Omit check for total counts, which might have changed with concurrent updates.
 
     forEachSecondary(secondary => checkLogAllConsistent(secondary, true));
@@ -201,8 +201,8 @@ concurrentTestConsistent();
 
 // Test the various other parameters.
 function testDbCheckParameters() {
-    let master = replSet.getPrimary();
-    let db = master.getDB(dbName);
+    let primary = replSet.getPrimary();
+    let db = primary.getDB(dbName);
 
     // Clean up for the test.
     clearLog();
@@ -269,11 +269,11 @@ testDbCheckParameters();
 
 // Now, test some unusual cases where the command should fail.
 function testErrorOnNonexistent() {
-    let master = replSet.getPrimary();
-    let db = master.getDB("this-probably-doesnt-exist");
+    let primary = replSet.getPrimary();
+    let db = primary.getDB("this-probably-doesnt-exist");
     assert.commandFailed(db.runCommand({dbCheck: 1}),
                          "dbCheck spuriously succeeded on nonexistent database");
-    db = master.getDB(dbName);
+    db = primary.getDB(dbName);
     assert.commandFailed(db.runCommand({dbCheck: "this-also-probably-doesnt-exist"}),
                          "dbCheck spuriously succeeded on nonexistent collection");
 }
@@ -285,12 +285,12 @@ function testErrorOnSecondary() {
 }
 
 function testErrorOnUnreplicated() {
-    let master = replSet.getPrimary();
-    let db = master.getDB("local");
+    let primary = replSet.getPrimary();
+    let db = primary.getDB("local");
 
     assert.commandFailed(db.runCommand({dbCheck: "oplog.rs"}),
                          "dbCheck spuriously succeeded on oplog");
-    assert.commandFailed(master.getDB(dbName).runCommand({dbCheck: "system.profile"}),
+    assert.commandFailed(primary.getDB(dbName).runCommand({dbCheck: "system.profile"}),
                          "dbCheck spuriously succeeded on system.profile");
 }
 
@@ -300,21 +300,21 @@ testErrorOnUnreplicated();
 
 // Test stepdown.
 function testSucceedsOnStepdown() {
-    let master = replSet.getPrimary();
-    let db = master.getDB(dbName);
+    let primary = replSet.getPrimary();
+    let db = primary.getDB(dbName);
 
-    let nodeId = replSet.getNodeId(master);
+    let nodeId = replSet.getNodeId(primary);
     assert.commandWorked(db.runCommand({dbCheck: multiBatchSimpleCollName}));
 
-    // Step down the master.
-    assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown: 0, force: true}));
+    // Step down the primary.
+    assert.commandWorked(primary.getDB("admin").runCommand({replSetStepDown: 0, force: true}));
 
     // Wait for the cluster to come up.
     replSet.awaitSecondaryNodes();
 
     // Find the node we ran dbCheck on.
     db = replSet.getSecondaries()
-             .filter(function isPreviousMaster(node) {
+             .filter(function isPreviousPrimary(node) {
                  return replSet.getNodeId(node) === nodeId;
              })[0]
              .getDB(dbName);
@@ -337,16 +337,16 @@ function collectionUuid(db, collName) {
 }
 
 function getDummyOplogEntry() {
-    let master = replSet.getPrimary();
-    let coll = master.getDB(dbName)[collName];
+    let primary = replSet.getPrimary();
+    let coll = primary.getDB(dbName)[collName];
 
     let replSetStatus =
-        assert.commandWorked(master.getDB("admin").runCommand({replSetGetStatus: 1}));
+        assert.commandWorked(primary.getDB("admin").runCommand({replSetGetStatus: 1}));
     let connStatus = replSetStatus.members.filter(m => m.self)[0];
     let lastOpTime = connStatus.optime;
 
-    let entry = master.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
-    entry["ui"] = collectionUuid(master.getDB(dbName), collName);
+    let entry = primary.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
+    entry["ui"] = collectionUuid(primary.getDB(dbName), collName);
     entry["ns"] = coll.stats().ns;
     entry["ts"] = new Timestamp();
 
@@ -355,17 +355,17 @@ function getDummyOplogEntry() {
 
 // Create various inconsistencies, and check that dbCheck spots them.
 function insertOnSecondaries(doc) {
-    let master = replSet.getPrimary();
+    let primary = replSet.getPrimary();
     let entry = getDummyOplogEntry();
     entry["op"] = "i";
     entry["o"] = doc;
 
-    master.getDB("local").oplog.rs.insertOne(entry);
+    primary.getDB("local").oplog.rs.insertOne(entry);
 }
 
 // Run an apply-ops-ish command on a secondary.
 function runCommandOnSecondaries(doc, ns) {
-    let master = replSet.getPrimary();
+    let primary = replSet.getPrimary();
     let entry = getDummyOplogEntry();
     entry["op"] = "c";
     entry["o"] = doc;
@@ -374,23 +374,23 @@ function runCommandOnSecondaries(doc, ns) {
         entry["ns"] = ns;
     }
 
-    master.getDB("local").oplog.rs.insertOne(entry);
+    primary.getDB("local").oplog.rs.insertOne(entry);
 }
 
 // And on a primary.
 function runCommandOnPrimary(doc) {
-    let master = replSet.getPrimary();
+    let primary = replSet.getPrimary();
     let entry = getDummyOplogEntry();
     entry["op"] = "c";
     entry["o"] = doc;
 
-    master.getDB("admin").runCommand({applyOps: [entry]});
+    primary.getDB("admin").runCommand({applyOps: [entry]});
 }
 
 // Just add an extra document, and test that it catches it.
 function simpleTestCatchesExtra() {
-    let master = replSet.getPrimary();
-    let db = master.getDB(dbName);
+    let primary = replSet.getPrimary();
+    let db = primary.getDB(dbName);
 
     clearLog();
 
@@ -410,8 +410,8 @@ function simpleTestCatchesExtra() {
 
 // Test that dbCheck catches changing various pieces of collection metadata.
 function testCollectionMetadataChanges() {
-    let master = replSet.getPrimary();
-    let db = master.getDB(dbName);
+    let primary = replSet.getPrimary();
+    let db = primary.getDB(dbName);
     db[collName].drop();
     clearLog();
 

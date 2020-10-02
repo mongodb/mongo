@@ -45,7 +45,7 @@ doTest = function(signal) {
         var one = secondary.getDB("foo").foo.findOne();
         printjson(one);
 
-        print("Calling inline mr() with slaveOk=true, must succeed");
+        print("Calling inline mr() with secondaryOk=true, must succeed");
         secondary.setSecondaryOk();
         map = function() {
             emit(this.a, 1);
@@ -59,7 +59,7 @@ doTest = function(signal) {
         };
         secondary.getDB("foo").foo.mapReduce(map, reduce, {out: {"inline": 1}});
 
-        print("Calling mr() to collection with slaveOk=true, must fail");
+        print("Calling mr() to collection with secondaryOk=true, must fail");
         try {
             secondary.getDB("foo").foo.mapReduce(map, reduce, "output");
             assert(false, "mapReduce() to collection succeeded on secondary");
@@ -67,18 +67,19 @@ doTest = function(signal) {
             print("Received exception: " + e);
         }
 
-        print("Calling inline mr() with slaveOk=false, must fail");
-        secondary.slaveOk = false;
+        print("Calling inline mr() with secondaryOk=false, must fail");
+        secondary.setSecondaryOk(false);
         try {
             secondary.getDB("foo").foo.mapReduce(map, reduce, {out: {"inline": 1}});
-            assert(false, "mapReduce() succeeded on secondary with slaveOk=false");
+            assert(false, "mapReduce() succeeded on secondary with secondaryOk=false");
         } catch (e) {
             print("Received exception: " + e);
         }
-        print("Calling mr() to collection with slaveOk=false, must fail");
+        print("Calling mr() to collection with secondaryOk=false, must fail");
         try {
             secondary.getDB("foo").foo.mapReduce(map, reduce, "output");
-            assert(false, "mapReduce() to collection succeeded on secondary with slaveOk=false");
+            assert(false,
+                   "mapReduce() to collection succeeded on secondary with secondaryOk=false");
         } catch (e) {
             print("Received exception: " + e);
         }

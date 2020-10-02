@@ -7,14 +7,14 @@ config.members[0].priority = 2;
 replTest.initiate(config);
 replTest.waitForState(replTest.nodes[0], ReplSetTest.State.PRIMARY);
 
-// Make sure we have a master
-var master = replTest.getPrimary();
+// Make sure we have a primary
+var primary = replTest.getPrimary();
 
 for (i = 0; i < 20; i++) {
-    master.getDB("bar").foo.insert({x: 1, y: i, abc: 123, str: "foo bar baz"});
+    primary.getDB("bar").foo.insert({x: 1, y: i, abc: 123, str: "foo bar baz"});
 }
 for (i = 0; i < 20; i++) {
-    master.getDB("bar").foo.update({y: i}, {$push: {foo: "barrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"}});
+    primary.getDB("bar").foo.update({y: i}, {$push: {foo: "barrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr"}});
 }
 
 replTest.awaitReplication();
@@ -43,7 +43,7 @@ var secondarySoon = function() {
 secondarySoon();
 
 print("make sure compact works on a secondary (SERVER-3923)");
-master.getDB("foo").bar.drop();
+primary.getDB("foo").bar.drop();
 replTest.awaitReplication();
 var result = conns[1].getDB("foo").runCommand({compact: "bar"});
 assert.eq(result.ok, 0, tojson(result));
@@ -53,7 +53,7 @@ secondarySoon();
 print("use replSetMaintenance command to go in/out of maintence mode");
 
 print("primary cannot go into maintence mode");
-result = master.getDB("admin").runCommand({replSetMaintenance: 1});
+result = primary.getDB("admin").runCommand({replSetMaintenance: 1});
 assert.eq(result.ok, 0, tojson(result));
 
 print("check getMore works on a secondary, not on a recovering node");

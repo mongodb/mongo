@@ -30,24 +30,24 @@ var replTest =
 
 var nodes = replTest.startSet();
 replTest.initiate();
-var master = replTest.getPrimary();
-var mTest = master.getDB("test");
-var mLocal = master.getDB("local");
-var mMinvalid = mLocal["replset.minvalid"];
+var primary = replTest.getPrimary();
+var pTest = primary.getDB("test");
+var pLocal = primary.getDB("local");
+var mMinvalid = pLocal["replset.minvalid"];
 
-var slave = replTest.getSecondary();
-var sTest = slave.getDB("test");
-var sLocal = slave.getDB("local");
+var secondary = replTest.getSecondary();
+var sTest = secondary.getDB("test");
+var sLocal = secondary.getDB("local");
 var sMinvalid = sLocal["replset.minvalid"];
 var stepDownSecs = 30;
 var stepDownCmd = {replSetStepDown: stepDownSecs, force: true};
 
 // Write op
 assert.commandWorked(
-    mTest.foo.save({}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
-replTest.waitForState(slave, ReplSetTest.State.SECONDARY);
+    pTest.foo.save({}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+replTest.waitForState(secondary, ReplSetTest.State.SECONDARY);
 assert.commandWorked(
-    mTest.foo.save({}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
+    pTest.foo.save({}, {writeConcern: {w: 'majority', wtimeout: ReplSetTest.kDefaultTimeoutMS}}));
 
 // Set minvalid to something far in the future for the current primary, to simulate recovery.
 // Note: This is so far in the future (5 days) that it will never become secondary.
@@ -68,16 +68,16 @@ printjson(assert.commandWorked(mMinvalid.update(
     minValidUpdate,
     {upsert: true, writeConcern: {w: 1, wtimeout: ReplSetTest.kDefaultTimeoutMS}})));
 
-jsTest.log('Restarting primary ' + master.host +
+jsTest.log('Restarting primary ' + primary.host +
            ' with updated minValid. This node will go into RECOVERING upon restart. ' +
-           'Secondary ' + slave.host + ' will become new primary.');
+           'Secondary ' + secondary.host + ' will become new primary.');
 clearRawMongoProgramOutput();
-replTest.restart(master);
+replTest.restart(primary);
 printjson(sLocal.adminCommand("hello"));
-replTest.waitForState(master, ReplSetTest.State.RECOVERING);
+replTest.waitForState(primary, ReplSetTest.State.RECOVERING);
 
 replTest.awaitNodesAgreeOnPrimary();
-// Slave is now master... Do a write to advance the optime on the primary so that it will be
+// Secondary is now primary... Do a write to advance the optime on the primary so that it will be
 // considered as a sync source -  this is more relevant to PV0 because we do not write a new
 // entry to the oplog on becoming primary.
 assert.commandWorked(replTest.getPrimary().getDB("test").foo.save(

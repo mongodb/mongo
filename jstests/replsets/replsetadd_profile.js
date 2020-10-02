@@ -11,9 +11,9 @@ var collectionName = 'jstests_replsetadd_profile';
 var replTest = new ReplSetTest({name: 'ReplSetAddProfileTestSet', nodes: [{profile: 2}]});
 replTest.startSet();
 replTest.initiate();
-var master = replTest.getPrimary();
-var masterCollection = master.getDB('test').getCollection(collectionName);
-masterCollection.save({a: 1});
+var primary = replTest.getPrimary();
+var primaryCollection = primary.getDB('test').getCollection(collectionName);
+primaryCollection.save({a: 1});
 
 // Add a new node with no profiling level.
 var newNode = replTest.add();
@@ -26,7 +26,7 @@ replTest.awaitReplication();
 var newNodeCollection = newNode.getDB('test').getCollection(collectionName);
 assert.eq(1,
           newNodeCollection.find({a: 1}).itcount(),
-          'expect documents to be present in slave after replication');
+          'expect documents to be present in secondary after replication');
 
 var signal = 15;
 replTest.stopSet(signal);
