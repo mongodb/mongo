@@ -283,8 +283,6 @@ void ShardingInitializationMongoD::initializeShardingEnvironmentOnShardServer(
     TransactionCoordinatorService::get(opCtx)->onShardingInitialization(
         opCtx, isReplSet && isStandaloneOrPrimary);
 
-    Grid::get(opCtx)->setShardingInitialized();
-
     LOGV2(22071,
           "Finished initializing sharding components for {memberState} node.",
           "Finished initializing sharding components",
@@ -464,6 +462,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
     } catch (const DBException& ex) {
         shardingState->setInitialized(ex.toStatus());
     }
+    Grid::get(opCtx)->setShardingInitialized();
 }
 
 void ShardingInitializationMongoD::updateShardIdentityConfigString(
