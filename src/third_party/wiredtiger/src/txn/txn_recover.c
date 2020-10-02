@@ -795,7 +795,7 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
         /*
          * Create the history store as we might need it while applying log records in recovery.
          */
-        WT_ERR(__wt_hs_create(session, cfg));
+        WT_ERR(__wt_hs_open(session, cfg));
     }
 
     /*

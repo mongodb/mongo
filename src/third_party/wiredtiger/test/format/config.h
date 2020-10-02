@@ -251,9 +251,6 @@ static CONFIG c[] = {
     NULL},
 
   /* 100% */
-  {"ops.rebalance", "configure rebalance", C_BOOL, 100, 1, 0, &g.c_rebalance, NULL},
-
-  /* 100% */
   {"ops.salvage", "configure salvage", C_BOOL, 100, 1, 0, &g.c_salvage, NULL},
 
   /* 100% */

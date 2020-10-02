@@ -217,15 +217,10 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
     WT_RET(__wt_meta_track_init(session));
 
     /*
-     * Drop the lookaside file if it still exists.
-     */
-    WT_RET(__wt_hs_cleanup_las(session));
-
-    /*
      * Create the history store file. This will only actually create it on a clean upgrade or when
      * creating a new database.
      */
-    WT_RET(__wt_hs_create(session, cfg));
+    WT_RET(__wt_hs_open(session, cfg));
 
     /*
      * Start the optional logging/archive threads. NOTE: The log manager must be started before

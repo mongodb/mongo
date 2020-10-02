@@ -85,7 +85,6 @@ PMU
 PPC
 PRELOAD
 README
-Rebalance
 RedHat
 RepMgr
 Riak
@@ -450,7 +449,6 @@ readonly
 realclean
 realloc
 realloc'd
-rebalance
 recno
 recnoN
 recnum

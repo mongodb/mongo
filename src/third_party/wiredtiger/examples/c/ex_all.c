@@ -692,10 +692,6 @@ session_ops(WT_SESSION *session)
 /*! [Import a file] */
 #endif
 
-        /*! [Rebalance a table] */
-        error_check(session->rebalance(session, "table:mytable", NULL));
-        /*! [Rebalance a table] */
-
         error_check(
           session->create(session, "table:old", "key_format=r,value_format=S,cache_resident=true"));
         /*! [Rename a table] */

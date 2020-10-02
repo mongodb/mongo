@@ -149,8 +149,6 @@ static const char *list[] = {
   "ops.random_cursor",
   "read_pct=",
   "ops.pct.read",
-  "rebalance=",
-  "ops.rebalance",
   "repeat_data_pct=",
   "btree.repeat_data_pct",
   "reverse=",

@@ -1155,7 +1155,7 @@ __txn_commit_timestamps_assert(WT_SESSION_IMPL *session)
             continue;
         }
 
-        /* Search for prepared updates, so that they will be restored, if moved to lookaside. */
+        /* Search for prepared updates. */
         if (F_ISSET(txn, WT_TXN_PREPARE))
             WT_ERR(__txn_search_prepared_op(session, op, &cursor, &upd));
         else

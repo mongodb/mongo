@@ -55,7 +55,7 @@ typedef struct {
     char *home;                    /* Home directory */
     const char *checkpoint_name;   /* Checkpoint name */
     WT_CONNECTION *conn;           /* WiredTiger connection */
-    bool debug_mode;               /* Lookaside stress test */
+    bool debug_mode;               /* History store stress test */
     u_int nkeys;                   /* Keys to load */
     u_int nops;                    /* Operations per thread */
     FILE *logfp;                   /* Message log file. */
@@ -68,6 +68,7 @@ typedef struct {
     u_int ts_oldest;               /* Current oldest timestamp */
     u_int ts_stable;               /* Current stable timestamp */
     bool use_timestamps;           /* Use txn timestamps */
+    bool prepare;                  /* Use prepare transactions */
     COOKIE *cookies;               /* Per-thread info */
     WT_RWLOCK clock_lock;          /* Clock synchronization */
     wt_thread_t checkpoint_thread; /* Checkpoint thread */

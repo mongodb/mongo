@@ -57,7 +57,6 @@ s/^ops.pct.read=/read_pct=/
 s/^ops.pct.write=/write_pct=/
 s/^ops.prepare=/prepare=/
 s/^ops.random_cursor=/random_cursor=/
-s/^ops.rebalance=/rebalance=/
 s/^ops.salvage=/salvage=/
 s/^ops.truncate=/truncate=/
 s/^ops.verify=/verify=/
