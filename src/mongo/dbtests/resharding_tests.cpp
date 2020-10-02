@@ -52,6 +52,7 @@
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -98,7 +99,7 @@ private:
  *   `migration_manager_test` (part of the `db_s_config_server_test` unittest binary) call a
  *   serverStatus triggerring this assertion.
  */
-class ReshardingTest : public unittest::Test {
+class ReshardingTest {
 public:
     ServiceContext::UniqueOperationContext _opCtxRaii = cc().makeOperationContext();
     OperationContext* _opCtx = _opCtxRaii.get();
@@ -229,95 +230,135 @@ public:
     }
 };
 
-TEST_F(ReshardingTest, RunFetchIteration) {
-    const NamespaceString outputCollectionNss("dbtests.outputCollection");
-    reset(outputCollectionNss);
-    const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
-    reset(dataCollectionNss);
+class RunFetchIteration : public ReshardingTest {
+public:
+    void run() {
+        const NamespaceString outputCollectionNss("dbtests.outputCollection");
+        reset(outputCollectionNss);
+        const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+        reset(dataCollectionNss);
 
-    AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
 
-    // Set a failpoint to tack a `destinedRecipient` onto oplog entries.
-    setGlobalFailPoint("addDestinedRecipient",
-                       BSON("mode"
-                            << "alwaysOn"
-                            << "data"
-                            << BSON("destinedRecipient"
-                                    << "shard1")));
+        // Set a failpoint to tack a `destinedRecipient` onto oplog entries.
+        setGlobalFailPoint("addDestinedRecipient",
+                           BSON("mode"
+                                << "alwaysOn"
+                                << "data"
+                                << BSON("destinedRecipient"
+                                        << "shard1")));
 
-    // Insert five documents. Advance the majority point. Insert five more documents.
-    const std::int32_t docsToInsert = 5;
-    {
-        WriteUnitOfWork wuow(_opCtx);
-        for (std::int32_t num = 0; num < docsToInsert; ++num) {
-            insertDocument(dataColl.getCollection(),
-                           InsertStatement(BSON("_id" << num << "a" << num)));
+        // Insert five documents. Advance the majority point. Insert five more documents.
+        const std::int32_t docsToInsert = 5;
+        {
+            for (std::int32_t num = 0; num < docsToInsert; ++num) {
+                WriteUnitOfWork wuow(_opCtx);
+                insertDocument(dataColl.getCollection(),
+                               InsertStatement(BSON("_id" << num << "a" << num)));
+                wuow.commit();
+            }
         }
-        wuow.commit();
+
+        repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
+        const Timestamp firstFiveLastApplied = getLastApplied().getTimestamp();
+        _svcCtx->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+            firstFiveLastApplied);
+        {
+            for (std::int32_t num = docsToInsert; num < 2 * docsToInsert; ++num) {
+                WriteUnitOfWork wuow(_opCtx);
+                insertDocument(dataColl.getCollection(),
+                               InsertStatement(BSON("_id" << num << "a" << num)));
+                wuow.commit();
+            }
+        }
+
+        // Disable the failpoint.
+        setGlobalFailPoint("addDestinedRecipient",
+                           BSON("mode"
+                                << "off"));
+
+        repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
+        const Timestamp latestLastApplied = getLastApplied().getTimestamp();
+
+        BSONObj firstOplog = queryOplog(BSONObj());
+        Timestamp firstTimestamp = firstOplog["ts"].timestamp();
+        std::cout << "First oplog: " << firstOplog.toString()
+                  << " Timestamp: " << firstTimestamp.toString() << std::endl;
+
+        // The first call to `iterate` should return the first five inserts and return a
+        // `ReshardingDonorOplogId` matching the last applied of those five inserts.
+        ReshardingOplogFetcher fetcher;
+        DBDirectClient client(_opCtx);
+        StatusWith<ReshardingDonorOplogId> ret = fetcher.iterate(_opCtx,
+                                                                 &client,
+                                                                 createExpressionContext(),
+                                                                 {firstTimestamp, firstTimestamp},
+                                                                 dataColl->uuid(),
+                                                                 {"shard1"},
+                                                                 true,
+                                                                 outputCollectionNss);
+        ReshardingDonorOplogId donorOplodId = unittest::assertGet(ret);
+        // +1 because of the create collection oplog entry.
+        ASSERT_EQ(docsToInsert + 1, itcount(outputCollectionNss));
+        ASSERT_EQ(firstFiveLastApplied, donorOplodId.getClusterTime());
+        ASSERT_EQ(firstFiveLastApplied, donorOplodId.getTs());
+
+        // Advance the committed snapshot. A second `iterate` should return the second batch of five
+        // inserts.
+        _svcCtx->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+            getLastApplied().getTimestamp());
+
+        ret = fetcher.iterate(_opCtx,
+                              &client,
+                              createExpressionContext(),
+                              {firstFiveLastApplied, firstFiveLastApplied},
+                              dataColl->uuid(),
+                              {"shard1"},
+                              true,
+                              outputCollectionNss);
+
+        donorOplodId = unittest::assertGet(ret);
+        // Two batches of five inserts + 1 entry for the create collection oplog entry.
+        ASSERT_EQ((2 * docsToInsert) + 1, itcount(outputCollectionNss));
+        ASSERT_EQ(latestLastApplied, donorOplodId.getClusterTime());
+        ASSERT_EQ(latestLastApplied, donorOplodId.getTs());
+    }
+};
+
+class AllReshardingTests : public unittest::OldStyleSuiteSpecification {
+public:
+    AllReshardingTests() : unittest::OldStyleSuiteSpecification("ReshardingTests") {}
+
+    // Must be evaluated at test run() time, not static-init time.
+    static bool shouldSkip() {
+        // Only run on storage engines that support snapshot reads.
+        auto storageEngine = cc().getServiceContext()->getStorageEngine();
+        if (!storageEngine->supportsReadConcernSnapshot() ||
+            !mongo::serverGlobalParams.enableMajorityReadConcern) {
+            LOGV2(5123009,
+                  "Skipping this test because the configuration does not support majority reads.",
+                  "storageEngine"_attr = storageGlobalParams.engine,
+                  "enableMajorityReadConcern"_attr =
+                      mongo::serverGlobalParams.enableMajorityReadConcern);
+            return true;
+        }
+        return false;
     }
 
-    repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
-    const Timestamp firstFiveLastApplied = getLastApplied().getTimestamp();
-    _svcCtx->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(firstFiveLastApplied);
-    {
-        WriteUnitOfWork wuow(_opCtx);
-        for (std::int32_t num = docsToInsert; num < 2 * docsToInsert; ++num) {
-            insertDocument(dataColl.getCollection(),
-                           InsertStatement(BSON("_id" << num << "a" << num)));
-        }
-        wuow.commit();
+    template <typename T>
+    void addIf() {
+        addNameCallback(nameForTestClass<T>(), [] {
+            if (!shouldSkip())
+                T().run();
+        });
     }
 
-    // Disable the failpoint.
-    setGlobalFailPoint("addDestinedRecipient",
-                       BSON("mode"
-                            << "off"));
+    void setupTests() {
+        addIf<RunFetchIteration>();
+    }
+};
 
-    repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
-    const Timestamp latestLastApplied = getLastApplied().getTimestamp();
+unittest::OldStyleSuiteInitializer<AllReshardingTests> allReshardingTests;
 
-    BSONObj firstOplog = queryOplog(BSONObj());
-    Timestamp firstTimestamp = firstOplog["ts"].timestamp();
-    std::cout << "First oplog: " << firstOplog.toString()
-              << " Timestamp: " << firstTimestamp.toString() << std::endl;
-
-    // The first call to `iterate` should return the first five inserts and return a
-    // `ReshardingDonorOplogId` matching the last applied of those five inserts.
-    ReshardingOplogFetcher fetcher;
-    DBDirectClient client(_opCtx);
-    StatusWith<ReshardingDonorOplogId> ret = fetcher.iterate(_opCtx,
-                                                             &client,
-                                                             createExpressionContext(),
-                                                             {firstTimestamp, firstTimestamp},
-                                                             dataColl->uuid(),
-                                                             {"shard1"},
-                                                             true,
-                                                             outputCollectionNss);
-    ReshardingDonorOplogId donorOplodId = unittest::assertGet(ret);
-    // +1 because of the create collection oplog entry.
-    ASSERT_EQ(docsToInsert + 1, itcount(outputCollectionNss));
-    ASSERT_EQ(firstFiveLastApplied, donorOplodId.getClusterTime());
-    ASSERT_EQ(firstFiveLastApplied, donorOplodId.getTs());
-
-    // Advance the committed snapshot. A second `iterate` should return the second batch of five
-    // inserts.
-    _svcCtx->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
-        getLastApplied().getTimestamp());
-
-    ret = fetcher.iterate(_opCtx,
-                          &client,
-                          createExpressionContext(),
-                          {firstFiveLastApplied, firstFiveLastApplied},
-                          dataColl->uuid(),
-                          {"shard1"},
-                          true,
-                          outputCollectionNss);
-
-    donorOplodId = unittest::assertGet(ret);
-    // Two batches of five inserts + 1 entry for the create collection oplog entry.
-    ASSERT_EQ((2 * docsToInsert) + 1, itcount(outputCollectionNss));
-    ASSERT_EQ(latestLastApplied, donorOplodId.getClusterTime());
-    ASSERT_EQ(latestLastApplied, donorOplodId.getTs());
-}
 }  // namespace
 }  // namespace mongo
