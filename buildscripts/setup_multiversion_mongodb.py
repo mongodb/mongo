@@ -230,14 +230,15 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
                         continue
                     urls.append((ver, generic_url))
             if not urls:
-                if version != "4.7":
+                if version not in ["4.7", "4.8"]:
                     raise Exception(
                         "No fall-back generic link available or version {}.".format(version))
 
-                print("manually constructing URL for 4.7 releases;"
-                      "please note that only the latest release is available")
+                print(
+                    "manually constructing URL for {} releases; please note that only the latest release is available"
+                    .format(version))
 
-                url_template = "https://downloads.mongodb.com/{bucket}/mongodb-{os_family}-{arch}-enterprise-{platform}-4.7.tgz"
+                url_template = "https://downloads.mongodb.com/{bucket}/mongodb-{os_family}-{arch}-enterprise-{platform}-{version}.tgz"
 
                 if self.platform == "windows":
                     os_family = self.platform
@@ -259,11 +260,12 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
                     platform = self.platform
 
                 url = url_template.format(bucket=bucket, os_family=os_family,
-                                          arch=self.architecture, platform=platform)
+                                          arch=self.architecture, platform=platform,
+                                          version=version)
 
                 # URLs with missing sections lead to double dashes.
                 url = url.replace("--", "-")
-                urls.append(("4.7", url))
+                urls.append((version, url))
             else:
                 print("Falling back to generic architecture.")
 
