@@ -55,6 +55,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/wiredtiger/oplog_stone_parameters_gen.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -1054,7 +1055,7 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
 
     int64_t old_length = old_value.size;
 
-    ret = WT_OP_CHECK(c->remove(c));
+    ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
     invariantWTOK(ret);
 
     _changeNumRecords(opCtx, -1);
@@ -1280,7 +1281,7 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
                     if (--toRemove > 0) {
                         firstRecordId = getKey(truncateEnd);
                     }
-                    invariantWTOK(truncateEnd->remove(truncateEnd));
+                    invariantWTOK(wiredTigerCursorRemove(opCtx, truncateEnd));
                 }
                 ret = 0;
             } else {
@@ -1495,7 +1496,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         setKey(c, record.id);
         WiredTigerItem value(record.data.data(), record.data.size());
         c->set_value(c, value.Get());
-        int ret = WT_OP_CHECK(c->insert(c));
+        int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
         if (ret)
             return wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord");
     }
@@ -1627,8 +1628,9 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
         if ((ret = wiredtiger_calc_modify(
                  c->session, &old_value, value.Get(), kMaxDiffBytes, entries.data(), &nentries)) ==
             0) {
-            invariantWTOK(WT_OP_CHECK(nentries == 0 ? c->reserve(c)
-                                                    : c->modify(c, entries.data(), nentries)));
+            invariantWTOK(WT_OP_CHECK(
+                nentries == 0 ? c->reserve(c)
+                              : wiredTigerCursorModify(opCtx, c, entries.data(), nentries)));
             WT_ITEM new_value;
             dassert(nentries == 0 ||
                     (c->get_value(c, &new_value) == 0 && new_value.size == value.size &&
@@ -1641,7 +1643,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
 
     if (!skip_update) {
         c->set_value(c, value.Get());
-        ret = WT_OP_CHECK(c->insert(c));
+        ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
     }
     invariantWTOK(ret);
 
@@ -1685,7 +1687,7 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
     if (nentries == 0)
         invariantWTOK(WT_OP_CHECK(c->search(c)));
     else
-        invariantWTOK(WT_OP_CHECK(c->modify(c, entries.data(), nentries)));
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorModify(opCtx, c, entries.data(), nentries)));
 
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));

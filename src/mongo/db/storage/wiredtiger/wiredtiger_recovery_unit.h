@@ -34,6 +34,7 @@
 #include <boost/optional.hpp>
 #include <cstdint>
 #include <memory>
+#include <stack>
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
@@ -170,6 +171,10 @@ public:
 
     void refreshSnapshot() override;
 
+    void ignoreAllMultiTimestampConstraints() {
+        _multiTimestampConstraintTracker.ignoreAllMultiTimestampConstraints = true;
+    }
+
     // ---- WT STUFF
 
     WiredTigerSession* getSession();
@@ -201,6 +206,14 @@ public:
         return _isActive();
     }
     void assertInActiveTxn() const;
+
+    /**
+     * This function must be called when a write operation is performed on the active transaction
+     * for the first time.
+     *
+     * Must be reset when the active transaction is either committed or rolled back.
+     */
+    void setTxnModified();
 
     boost::optional<int64_t> getOplogVisibilityTs();
 
@@ -246,10 +259,26 @@ private:
      */
     Timestamp _getTransactionReadTimestamp(WT_SESSION* session);
 
+    /**
+     * Keeps track of constraint violations on multi timestamp transactions. If a transaction sets
+     * multiple timestamps, the first timestamp must be set prior to any writes. Vice-versa, if a
+     * transaction writes a document before setting a timestamp, it must not set multiple
+     * timestamps.
+     */
+    void _updateMultiTimestampConstraint(Timestamp timestamp);
+
     WiredTigerSessionCache* _sessionCache;  // not owned
     WiredTigerOplogManager* _oplogManager;  // not owned
     UniqueWiredTigerSession _session;
     bool _isTimestamped = false;
+
+    // Helpers used to keep track of multi timestamp constraint violations on the transaction.
+    struct MultiTimestampConstraintTracker {
+        bool isTxnModified = false;
+        bool txnHasNonTimestampedWrite = false;
+        bool ignoreAllMultiTimestampConstraints = false;
+        std::stack<Timestamp> timestampOrder = {};
+    } _multiTimestampConstraintTracker;
 
     // Specifies which external source to use when setting read timestamps on transactions.
     ReadSource _timestampReadSource = ReadSource::kNoTimestamp;

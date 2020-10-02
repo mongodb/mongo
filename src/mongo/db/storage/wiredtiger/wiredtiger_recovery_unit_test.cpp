@@ -34,6 +34,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/recovery_unit_test_harness.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
@@ -271,7 +272,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(cursor->insert(cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -294,7 +295,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture,
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(cursor->insert(cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -318,7 +319,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key1");
     cursor->set_value(cursor, "value1");
-    invariantWTOK(cursor->insert(cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -337,7 +338,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteAllowedWhileIgnorePrepareFalse) {
     cursor->set_value(cursor, "value2");
 
     // The write is allowed.
-    invariantWTOK(cursor->insert(cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx2.second.get(), cursor));
 
     ru1->abortUnitOfWork();
     ru2->abortUnitOfWork();
@@ -350,7 +351,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     getCursor(ru1, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value");
-    invariantWTOK(cursor->insert(cursor));
+    invariantWTOK(wiredTigerCursorInsert(clientAndCtx1.second.get(), cursor));
     ru1->setPrepareTimestamp({1, 1});
     ru1->prepareUnitOfWork();
 
@@ -359,7 +360,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, WriteOnADocumentBeingPreparedTriggersW
     getCursor(ru2, &cursor);
     cursor->set_key(cursor, "key");
     cursor->set_value(cursor, "value2");
-    int ret = cursor->insert(cursor);
+    int ret = wiredTigerCursorInsert(clientAndCtx2.second.get(), cursor);
     ASSERT_EQ(WT_ROLLBACK, ret);
 
     ru1->abortUnitOfWork();
@@ -693,6 +694,71 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithoutDurableTimestamp) {
         WriteUnitOfWork wuow(opCtx);
         wuow.commit();
     }
+}
+
+TEST_F(WiredTigerRecoveryUnitTestFixture, MultiTimestampConstraintsInternalState) {
+    Timestamp ts1(1, 1);
+    Timestamp ts2(2, 2);
+
+    OperationContext* opCtx = clientAndCtx1.second.get();
+    ru1->beginUnitOfWork(opCtx);
+
+    // Perform an non timestamped write.
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+    cursor->set_key(cursor, "key");
+    cursor->set_value(cursor, "value");
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+
+    // Perform a write at ts1.
+    cursor->set_key(cursor, "key2");
+    cursor->set_value(cursor, "value");
+    ASSERT_OK(ru1->setTimestamp(ts1));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+
+    // Setting the timestamp again to the same value should not fail.
+    ASSERT_OK(ru1->setTimestamp(ts1));
+
+    // Committing the unit of work should reset the internal state for the multi timestamp
+    // constraint checks.
+    ru1->commitUnitOfWork();
+    ru1->beginUnitOfWork(opCtx);
+
+    // Perform a write at ts2.
+    cursor->set_key(cursor, "key3");
+    cursor->set_value(cursor, "value");
+    ASSERT_OK(ru1->setTimestamp(ts2));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+
+    ru1->commitUnitOfWork();
+}
+
+DEATH_TEST_REGEX_F(WiredTigerRecoveryUnitTestFixture,
+                   MultiTimestampConstraints,
+                   "Fatal assertion.*4877100") {
+    Timestamp ts1(1, 1);
+    Timestamp ts2(2, 2);
+
+    OperationContext* opCtx = clientAndCtx1.second.get();
+    ru1->beginUnitOfWork(opCtx);
+
+    // Perform an non timestamped write.
+    WT_CURSOR* cursor;
+    getCursor(ru1, &cursor);
+    cursor->set_key(cursor, "key");
+    cursor->set_value(cursor, "value");
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+
+    // Perform a write at ts1.
+    cursor->set_key(cursor, "key2");
+    cursor->set_value(cursor, "value");
+    ASSERT_OK(ru1->setTimestamp(ts1));
+    invariantWTOK(wiredTigerCursorInsert(opCtx, cursor));
+
+    // Setting the timestamp again to a different value should detect that we're trying to set
+    // multiple timestamps with the first write being non timestamped.
+    ASSERT_OK(ru1->setTimestamp(ts2));
+    ru1->commitUnitOfWork();
 }
 
 DEATH_TEST_F(WiredTigerRecoveryUnitTestFixture,

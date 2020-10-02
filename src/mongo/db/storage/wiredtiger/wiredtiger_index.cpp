@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -659,7 +660,7 @@ public:
 
         _cursor->set_value(_cursor, valueItem.Get());
 
-        invariantWTOK(_cursor->insert(_cursor));
+        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor));
 
         return Status::OK();
     }
@@ -747,7 +748,7 @@ private:
 
         _cursor->set_value(_cursor, valueItem.Get());
 
-        invariantWTOK(_cursor->insert(_cursor));
+        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor));
 
         // Don't copy the key again if dups are allowed.
         if (!_dupsAllowed)
@@ -811,7 +812,7 @@ private:
         setKey(_cursor, keyItem.Get());
         _cursor->set_value(_cursor, valueItem.Get());
 
-        invariantWTOK(_cursor->insert(_cursor));
+        invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor));
 
         _records.clear();
     }
@@ -1516,7 +1517,7 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     WiredTigerItem valueItem(value.getBuffer(), value.getSize());
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    int ret = WT_OP_CHECK(c->insert(c));
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
 
     if (ret != WT_DUPLICATE_KEY) {
         if (ret == 0) {
@@ -1570,7 +1571,7 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
 
     valueItem = WiredTigerItem(value.getBuffer(), value.getSize());
     c->set_value(c, valueItem.Get());
-    Status status = wtRCToStatus(c->update(c));
+    Status status = wtRCToStatus(wiredTigerCursorUpdate(opCtx, c));
 
     if (!status.isOK())
         return status;
@@ -1598,7 +1599,7 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
         // First phase inserts the prefix key to prohibit concurrent insertions of same key
         setKey(c, prefixKeyItem.Get());
         c->set_value(c, emptyItem.Get());
-        ret = WT_OP_CHECK(c->insert(c));
+        ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
 
         // An entry with prefix key already exists. This can happen only during rolling upgrade when
         // both timestamp unsafe and timestamp safe index format keys could be present.
@@ -1617,7 +1618,7 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
         // transactions, but will not conflict with any transaction that begins after this
         // operation commits.
         setKey(c, prefixKeyItem.Get());
-        ret = WT_OP_CHECK(c->remove(c));
+        ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
         invariantWTOK(ret);
 
         // Second phase looks up for existence of key to avoid insertion of duplicate key
@@ -1643,7 +1644,7 @@ Status WiredTigerIndexUnique::_insertTimestampSafe(OperationContext* opCtx,
         : WiredTigerItem(typeBits.getBuffer(), typeBits.getSize());
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    ret = WT_OP_CHECK(c->insert(c));
+    ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
 
     // It is possible that this key is already present during a concurrent background index build.
     if (ret != WT_DUPLICATE_KEY)
@@ -1674,15 +1675,15 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
-    auto triggerWriteConflictAtPoint = [this, &keyItem](WT_CURSOR* point) {
+    auto triggerWriteConflictAtPoint = [this, opCtx, &keyItem](WT_CURSOR* point) {
         // WT_NOTFOUND may occur during a background index build. Insert a dummy value and
         // delete it again to trigger a write conflict in case this is being concurrently
         // indexed by the background indexer.
         setKey(point, keyItem.Get());
         point->set_value(point, emptyItem.Get());
-        invariantWTOK(WT_OP_CHECK(point->insert(point)));
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorInsert(opCtx, point)));
         setKey(point, keyItem.Get());
-        invariantWTOK(WT_OP_CHECK(point->remove(point)));
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(opCtx, point)));
     };
 
     if (!dupsAllowed) {
@@ -1706,7 +1707,7 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
             KeyString::TypeBits::fromBuffer(getKeyStringVersion(), &br);
             fassert(40417, !br.remaining());
         }
-        int ret = WT_OP_CHECK(c->remove(c));
+        int ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
         if (ret == WT_NOTFOUND) {
             triggerWriteConflictAtPoint(c);
             return;
@@ -1739,7 +1740,7 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
             if (records.empty() && !br.remaining()) {
                 // This is the common case: we are removing the only id for this key.
                 // Remove the whole entry.
-                invariantWTOK(WT_OP_CHECK(c->remove(c)));
+                invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c)));
                 return;
             }
 
@@ -1778,7 +1779,7 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
 
     WiredTigerItem valueItem = WiredTigerItem(newValue.getBuffer(), newValue.getSize());
     c->set_value(c, valueItem.Get());
-    invariantWTOK(c->update(c));
+    invariantWTOK(wiredTigerCursorUpdate(opCtx, c));
 }
 
 void WiredTigerIndexUnique::_unindexTimestampSafe(OperationContext* opCtx,
@@ -1787,7 +1788,7 @@ void WiredTigerIndexUnique::_unindexTimestampSafe(OperationContext* opCtx,
                                                   bool dupsAllowed) {
     WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
     setKey(c, item.Get());
-    int ret = WT_OP_CHECK(c->remove(c));
+    int ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
     if (ret != WT_NOTFOUND) {
         invariantWTOK(ret);
         return;
@@ -1802,7 +1803,7 @@ void WiredTigerIndexUnique::_unindexTimestampSafe(OperationContext* opCtx,
     WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
     setKey(c, keyItem.Get());
 
-    ret = WT_OP_CHECK(c->remove(c));
+    ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
     if (ret != WT_NOTFOUND) {
         invariantWTOK(ret);
         return;
@@ -1812,9 +1813,9 @@ void WiredTigerIndexUnique::_unindexTimestampSafe(OperationContext* opCtx,
     // by the background indexer.
     setKey(c, item.Get());
     c->set_value(c, emptyItem.Get());
-    invariantWTOK(WT_OP_CHECK(c->insert(c)));
+    invariantWTOK(WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c)));
     setKey(c, item.Get());
-    invariantWTOK(WT_OP_CHECK(c->remove(c)));
+    invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c)));
 }
 // ------------------------------
 
@@ -1853,7 +1854,7 @@ Status WiredTigerIndexStandard::_insert(OperationContext* opCtx,
 
     setKey(c, keyItem.Get());
     c->set_value(c, valueItem.Get());
-    int ret = WT_OP_CHECK(c->insert(c));
+    int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
 
     // If the record was already in the index, we just return OK.
     // This can happen, for example, when building a background index while documents are being
@@ -1871,7 +1872,7 @@ void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
     invariant(dupsAllowed);
     WiredTigerItem item(keyString.getBuffer(), keyString.getSize());
     setKey(c, item.Get());
-    int ret = WT_OP_CHECK(c->remove(c));
+    int ret = WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c));
     if (ret != WT_NOTFOUND) {
         invariantWTOK(ret);
     } else {
@@ -1880,9 +1881,9 @@ void WiredTigerIndexStandard::_unindex(OperationContext* opCtx,
         // the background indexer.
         setKey(c, item.Get());
         c->set_value(c, emptyItem.Get());
-        invariantWTOK(WT_OP_CHECK(c->insert(c)));
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c)));
         setKey(c, item.Get());
-        invariantWTOK(WT_OP_CHECK(c->remove(c)));
+        invariantWTOK(WT_OP_CHECK(wiredTigerCursorRemove(opCtx, c)));
     }
 }
 
