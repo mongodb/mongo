@@ -2,8 +2,9 @@
  * Run a query on a sharded cluster where one of the shards hangs. Running killCursors on the mongos
  * should always succeed.
  *
- * Uses getMore to pin an open cursor.
- * @tags: [requires_getmore]
+ * Uses getMore to pin an open cursor. Uses 'enableShardedIndexConsistencyCheck' parameter only
+ * available on 4.2.
+ * @tags: [requires_getmore, requires_fcv_42]
  */
 
 (function() {
@@ -23,6 +24,15 @@ const mongosDB = st.s.getDB(kDBName);
 const shard0DB = st.shard0.getDB(kDBName);
 const shard1DB = st.shard1.getDB(kDBName);
 
+// Disable the background periodic index consistency checker. This background job uses the same
+// code path (getMore) as the test's "dummy" operation and can cause the test to spuriously
+// fail. In versions 4.4 and later, this is solved by running the dummy operation with a 'comment'
+// and filtering $currentOp output based based on the comment. This behavior is unavailable in
+// earlier versions (see SERVER-29794), so we instead disable the background job.
+assert.commandWorked(
+    shard0DB.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
+assert.commandWorked(
+    shard1DB.adminCommand({setParameter: 1, enableShardedIndexConsistencyCheck: false}));
 let coll = mongosDB.jstest_kill_pinned_cursor;
 coll.drop();
 
@@ -109,9 +119,17 @@ function testShardedKillPinned(
             makeParallelShellFunctionString(cursorId, getMoreErrCodes, useSession, sessionId);
         getMoreJoiner = startParallelShell(parallelShellFn, st.s.port);
 
+        function runCurrentOpForGetMore(shardDB) {
+            const findGetMorePipeline = [
+                {$currentOp: {}},
+                {$match: {"msg": kFailPointName, "command.getMore": {$exists: true}}}
+            ];
+            return shardDB.getSiblingDB("admin").aggregate(findGetMorePipeline).toArray();
+        }
+
         // Sleep until we know the mongod cursors are pinned.
-        assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.pinned > 0);
-        assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.pinned > 0);
+        assert.soon(() => runCurrentOpForGetMore(shard0DB).length > 0);
+        assert.soon(() => runCurrentOpForGetMore(shard1DB).length > 0);
 
         // Use the function provided by the caller to kill the sharded query.
         killFunc(cursorId);
@@ -132,10 +150,8 @@ function testShardedKillPinned(
 
         // Eventually the cursors on the mongods should also be cleaned up. They should be
         // killed by mongos when the mongos cursor gets killed.
-        assert.soon(() => shard0DB.serverStatus().metrics.cursor.open.pinned == 0);
-        assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.pinned == 0);
-        assert.eq(shard0DB.serverStatus().metrics.cursor.open.total, 0);
-        assert.eq(shard1DB.serverStatus().metrics.cursor.open.total, 0);
+        assert.soon(() => runCurrentOpForGetMore(shard0DB).length == 0);
+        assert.soon(() => runCurrentOpForGetMore(shard1DB).length == 0);
     } finally {
         assert.commandWorked(
             shard0DB.adminCommand({configureFailPoint: kFailPointName, mode: "off"}));
@@ -174,7 +190,10 @@ for (let useSession of [true, false]) {
         killFunc: function() {
             let currentGetMoresArray =
                 shard0DB.getSiblingDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {"msg": kFailPointName, "command.getMore": {$exists: true}}}
+                    ])
                     .toArray();
             assert.eq(1, currentGetMoresArray.length);
             let currentGetMore = currentGetMoresArray[0];
@@ -193,7 +212,10 @@ for (let useSession of [true, false]) {
         killFunc: function() {
             let currentGetMoresArray =
                 shard0DB.getSiblingDB("admin")
-                    .aggregate([{$currentOp: {}}, {$match: {"command.getMore": {$exists: true}}}])
+                    .aggregate([
+                        {$currentOp: {}},
+                        {$match: {"msg": kFailPointName, "command.getMore": {$exists: true}}}
+                    ])
                     .toArray();
             assert.eq(1, currentGetMoresArray.length);
             let currentGetMore = currentGetMoresArray[0];
