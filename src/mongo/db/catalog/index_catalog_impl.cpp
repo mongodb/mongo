@@ -1112,58 +1112,14 @@ bool IndexCatalogImpl::haveAnyIndexesInProgress() const {
 }
 
 int IndexCatalogImpl::numIndexesTotal(OperationContext* opCtx) const {
-    int count = _readyIndexes.size() + _buildingIndexes.size();
-
-    if (kDebugBuild) {
-        try {
-            // Check if the in-memory index count matches the durable catalogs index count on disk.
-            // This can throw a WriteConflictException when retries on write conflicts are disabled
-            // during testing. The DurableCatalog fetches the metadata off of the disk using a
-            // findRecord() call.
-            dassert(DurableCatalog::get(opCtx)->getTotalIndexCount(
-                        opCtx, _collection->getCatalogId()) == count);
-        } catch (const WriteConflictException& ex) {
-            if (opCtx->lockState()->inAWriteUnitOfWork()) {
-                // Must abort this write transaction now.
-                throw;
-            }
-            // Ignore the write conflict for read transactions; we will eventually roll back this
-            // transaction anyway.
-            LOGV2(20356, "Skipping dassert check", "reason"_attr = ex);
-        }
-    }
-
-    return count;
+    return _readyIndexes.size() + _buildingIndexes.size();
 }
 
 int IndexCatalogImpl::numIndexesReady(OperationContext* opCtx) const {
     std::vector<const IndexDescriptor*> itIndexes;
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, /*includeUnfinished*/ false);
-    auto durableCatalog = DurableCatalog::get(opCtx);
     while (ii->more()) {
         itIndexes.push_back(ii->next()->descriptor());
-    }
-    if (kDebugBuild) {
-        std::vector<std::string> completedIndexes;
-        durableCatalog->getReadyIndexes(opCtx, _collection->getCatalogId(), &completedIndexes);
-
-        // There is a potential inconistency where the index information in the collection catalog
-        // entry and the index catalog differ. Log as much information as possible here.
-        if (itIndexes.size() != completedIndexes.size()) {
-            for (const IndexDescriptor* i : itIndexes) {
-                LOGV2(20358, "index catalog reports", "index"_attr = *i);
-            }
-
-            for (auto const& i : completedIndexes) {
-                LOGV2(20360, "collection catalog reports", "index"_attr = i);
-            }
-
-            LOGV2(20361, "uuid", "uuid"_attr = _collection->uuid());
-
-            invariant(itIndexes.size() == completedIndexes.size(),
-                      "The number of ready indexes reported in the collection metadata catalog did "
-                      "not match the number of ready indexes reported by the index catalog.");
-        }
     }
     return itIndexes.size();
 }
