@@ -13,6 +13,8 @@
 // compatible with implicit sessions.
 TestData.disableImplicitSessions = true;
 
+load("jstests/multiVersion/libs/multi_rs.js");
+
 const keyFile = 'jstests/libs/key1';
 const adminUser = {
     db: "admin",
