@@ -42,6 +42,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_name.h"
@@ -156,12 +157,18 @@ bool haveClient() {
 
 ServiceContext::UniqueClient Client::releaseCurrent() {
     invariant(haveClient());
+    if (auto opCtx = currentClient->_opCtx)
+        if (auto timer = OperationCPUTimer::get(opCtx))
+            timer->onThreadDetach();
     return std::move(currentClient);
 }
 
 void Client::setCurrent(ServiceContext::UniqueClient client) {
     invariantNoCurrentClient();
     currentClient = std::move(client);
+    if (auto opCtx = currentClient->_opCtx)
+        if (auto timer = OperationCPUTimer::get(opCtx))
+            timer->onThreadAttach();
 }
 
 /**
