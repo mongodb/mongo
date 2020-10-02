@@ -1087,14 +1087,6 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
         auto implicitCommit = lastOp && !prepare;
         auto implicitPrepare = lastOp && prepare;
         auto isPartialTxn = !lastOp;
-        if (isPartialTxn) {
-            // Partial transactions create multiple oplog entries in the same WriteUnitOfWork.
-            // Because of this, partial transactions will set multiple timestamps, violating the
-            // multi timestamp constraint. It's safe to ignore the multi timestamp constraints here
-            // as additional rollback logic is in place for this case.
-            opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
-        }
-
         // A 'prepare' oplog entry should never include a 'partialTxn' field.
         invariant(!(isPartialTxn && implicitPrepare));
         if (implicitPrepare) {

@@ -477,15 +477,6 @@ public:
     virtual bool inActiveTxn() const = 0;
 
     /**
-     * When called, the WriteUnitOfWork ignores the multi timestamp constraint for the remainder of
-     * the WriteUnitOfWork, where if within a WriteUnitOfWork multiple timestamps are set, the first
-     * timestamp must be set prior to any writes.
-     *
-     * Must be reset when the WriteUnitOfWork is either committed or rolled back.
-     */
-    virtual void ignoreAllMultiTimestampConstraints(){};
-
-    /**
      * Registers a callback to be called prior to a WriteUnitOfWork committing the storage
      * transaction. This callback may throw a WriteConflictException which will abort the
      * transaction.

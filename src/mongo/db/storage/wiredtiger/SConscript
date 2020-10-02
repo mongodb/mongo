@@ -41,7 +41,6 @@ if wiredtiger:
             'oplog_stones_server_status_section.cpp',
             'wiredtiger_begin_transaction_block.cpp',
             'wiredtiger_cursor.cpp',
-            'wiredtiger_cursor_helpers.cpp',
             'wiredtiger_global_options.cpp',
             'wiredtiger_index.cpp',
             'wiredtiger_kv_engine.cpp',

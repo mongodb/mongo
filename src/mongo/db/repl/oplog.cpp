@@ -339,11 +339,6 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
         oplogEntry->setFromTenantMigration(recipientInfo->uuid);
     }
 
-    // TODO SERVER-51301 to remove this block.
-    if (oplogEntry->getOpType() == repl::OpTypeEnum::kNoop) {
-        opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
-    }
-
     // Use OplogAccessMode::kLogOp to avoid recursive locking.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
     auto oplogInfo = oplogWrite.getOplogInfo();
