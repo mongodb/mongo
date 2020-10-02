@@ -76,4 +76,18 @@ void APIParameters::appendInfo(BSONObjBuilder* builder) const {
     }
 }
 
+std::size_t APIParameters::Hash::operator()(const APIParameters& params) const {
+    size_t seed = 0;
+    if (params.getAPIVersion()) {
+        boost::hash_combine(seed, *params.getAPIVersion());
+    }
+    if (params.getAPIStrict()) {
+        boost::hash_combine(seed, *params.getAPIStrict());
+    }
+    if (params.getAPIDeprecationErrors()) {
+        boost::hash_combine(seed, *params.getAPIDeprecationErrors());
+    }
+    return seed;
+}
+
 }  // namespace mongo

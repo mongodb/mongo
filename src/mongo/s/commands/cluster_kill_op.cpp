@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
@@ -111,8 +112,10 @@ private:
         result.append("shardid", opId);
 
         ScopedDbConnection conn(shard->getConnString());
+        BSONObjBuilder bob(BSON("killOp" << 1 << "op" << opId));
+        APIParameters::get(opCtx).appendInfo(&bob);
         // intentionally ignore return value - that is how legacy killOp worked.
-        conn->runCommand(OpMsgRequest::fromDBAndBody("admin", BSON("killOp" << 1 << "op" << opId)));
+        conn->runCommand(OpMsgRequest::fromDBAndBody("admin", bob.obj()));
         conn.done();
 
         // The original behavior of killOp on mongos is to always return success, regardless of
