@@ -240,6 +240,16 @@ public:
         _sizeStorer = ss;
     }
 
+    /**
+     * Sets the new number of records and flushes the size storer.
+     */
+    void setNumRecords(long long numRecords);
+
+    /**
+     * Sets the new data size and flushes the size storer.
+     */
+    void setDataSize(long long dataSize);
+
     bool isOpHidden_forTest(const RecordId& id) const;
 
     bool inShutdown() const;

@@ -1988,6 +1988,32 @@ void WiredTigerRecordStore::_increaseDataSize(OperationContext* opCtx, int64_t a
         _sizeStorer->store(_uri, _sizeInfo);
 }
 
+void WiredTigerRecordStore::setNumRecords(long long numRecords) {
+    _sizeInfo->numRecords.store(numRecords);
+
+    if (!_sizeStorer) {
+        return;
+    }
+
+    // Flush the updated number of records to disk immediately.
+    _sizeStorer->store(_uri, _sizeInfo);
+    bool syncToDisk = true;
+    _sizeStorer->flush(syncToDisk);
+}
+
+void WiredTigerRecordStore::setDataSize(long long dataSize) {
+    _sizeInfo->dataSize.store(dataSize);
+
+    if (!_sizeStorer) {
+        return;
+    }
+
+    // Flush the updated data size to disk immediately.
+    _sizeStorer->store(_uri, _sizeInfo);
+    bool syncToDisk = true;
+    _sizeStorer->flush(syncToDisk);
+}
+
 void WiredTigerRecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                                 RecordId end,
                                                 bool inclusive) {
