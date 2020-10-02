@@ -119,11 +119,9 @@ SessionKiller::Result killSessionsRemote(OperationContext* opCtx,
 
     // Generate the kill command.
     KillAllSessionsByPatternCmd cmd;
-    std::vector<KillAllSessionsByPattern> patterns;
-    for (auto& item : matcher.getPatterns()) {
-        patterns.push_back(std::move(item.pattern));
-    }
-    cmd.setKillAllSessionsByPattern(std::move(patterns));
+    cmd.setKillAllSessionsByPattern(std::vector<KillAllSessionsByPattern>{
+        matcher.getPatterns().begin(), matcher.getPatterns().end()});
+
     return parallelExec(opCtx, cmd.toBSON(), urbg);
 }
 

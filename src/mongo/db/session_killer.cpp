@@ -85,19 +85,18 @@ SessionKiller::ReapResult::ReapResult() : result(std::make_shared<boost::optiona
 
 SessionKiller::Matcher::Matcher(KillAllSessionsByPatternSet&& patterns)
     : _patterns(std::move(patterns)) {
-    for (const auto& item : _patterns) {
-        auto& pattern = item.pattern;
+    for (const auto& pattern : _patterns) {
         if (pattern.getUid()) {
             _uids.emplace(pattern.getUid().get(), &pattern);
         } else if (pattern.getLsid()) {
             _lsids.emplace(pattern.getLsid().get(), &pattern);
         } else {
             // If we're killing everything, it's the only pattern we care about.
-            decltype(_patterns) onlyKillAll{{item}};
+            decltype(_patterns) onlyKillAll{{pattern}};
             using std::swap;
             swap(_patterns, onlyKillAll);
 
-            _killAll = &(_patterns.begin()->pattern);
+            _killAll = &(*_patterns.begin());
             break;
         }
     }
@@ -178,38 +177,19 @@ void SessionKiller::_periodicKill(OperationContext* opCtx, stdx::unique_lock<Lat
     // Drop the lock and run the killer.
     lk.unlock();
 
-    // Group patterns with equal API parameters into sets.
-    stdx::unordered_map<APIParameters, KillAllSessionsByPatternSet, APIParameters::Hash> sets;
-    for (auto& item : nextToReap) {
-        sets[item.apiParameters].insert(std::move(item));
+    Matcher matcher(std::move(nextToReap));
+    boost::optional<Result> results;
+    try {
+        results.emplace(_killFunc(opCtx, matcher, &_urbg));
+    } catch (...) {
+        results.emplace(exceptionToStatus());
     }
+    lk.lock();
 
-    // Use the API parameters included in each KillAllSessionsByPattern struct.
-    IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
-    Result finalResults{std::vector<HostAndPort>{}};
-    for (auto& [apiParameters, items] : sets) {
-        APIParameters::get(opCtx) = apiParameters;
-        Matcher matcher(std::move(items));
-        boost::optional<Result> results;
-        try {
-            results.emplace(_killFunc(opCtx, matcher, &_urbg));
-        } catch (...) {
-            results.emplace(exceptionToStatus());
-        }
-        invariant(results);
-        if (!results->isOK()) {
-            finalResults = *results;
-            break;
-        }
-
-        finalResults.getValue().insert(finalResults.getValue().end(),
-                                       std::make_move_iterator(results->getValue().begin()),
-                                       std::make_move_iterator(results->getValue().end()));
-    }
+    invariant(results);
 
     // Expose the results and notify callers
-    lk.lock();
-    *(reapResults.result) = std::move(finalResults);
+    *(reapResults.result) = std::move(results);
     _callerCV.notify_all();
 };
 

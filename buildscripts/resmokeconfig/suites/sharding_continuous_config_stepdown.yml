@@ -222,9 +222,6 @@ selector:
   - jstests/sharding/conversion_of_replica_set_to_sharded_cluster.js
   - jstests/sharding/move_primary_with_writes.js
 
-  # Expects same CSRS primary and shard primary throughout the test
-  - jstests/sharding/mongos_forwards_api_parameters_to_shards.js
-
 executor:
   config:
     shell_options:
