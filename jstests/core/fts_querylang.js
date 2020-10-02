@@ -1,7 +1,6 @@
 // Test the $text query operator.
 // @tags: [
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

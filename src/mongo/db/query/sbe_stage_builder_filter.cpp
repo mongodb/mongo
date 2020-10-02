@@ -773,6 +773,56 @@ void generateBitTest(MatchExpressionVisitorContext* context,
     generatePredicate(context, expr->path(), std::move(makePredicate));
 }
 
+// Each logical expression child is evaluated in a separate EvalFrame. Set up a new EvalFrame with a
+// limit-1/coscan tree.
+void pushFrameForLogicalExpressionChild(MatchExpressionVisitorContext* context,
+                                        size_t numChildren) {
+    if (numChildren <= 1) {
+        // For logical expressions with no children, we return constant (handled in the
+        // post-visitor). For expressions with 1 child, we evaluate the child within the current
+        // EvalFrame.
+        return;
+    }
+
+    auto& frame = context->evalStack.back();
+    context->evalStack.emplace_back(EvalStage{}, frame.inputSlot);
+}
+
+// Build specified logical expression with branches stored on stack.
+void buildLogicalExpression(sbe::EPrimBinary::Op op,
+                            size_t numChildren,
+                            MatchExpressionVisitorContext* context) {
+    if (numChildren == 0) {
+        // If logical expression does not have any children, constant is returned.
+        generateAlwaysBoolean(context, op == sbe::EPrimBinary::logicAnd);
+        return;
+    } else if (numChildren == 1) {
+        // For expressions with 1 child, do nothing and return. The post-visitor for the child
+        // expression has already done all the necessary work.
+        return;
+    }
+
+    // Move the children's outputs off of the evalStack into a vector in preparation for
+    // calling generateShortCircuitingLogicalOp().
+    std::vector<EvalExprStagePair> branches;
+    for (size_t i = 0, stackSize = context->evalStack.size(); i < numChildren; ++i) {
+        auto& childFrame = context->evalStack[stackSize - numChildren + i];
+        branches.emplace_back(std::move(childFrame.output), std::move(childFrame.stage));
+    }
+
+    for (size_t i = 0; i < numChildren; ++i) {
+        context->evalStack.pop_back();
+    }
+
+    auto& frame = context->evalStack.back();
+    EvalStage opStage;
+    std::tie(frame.output, opStage) = generateShortCircuitingLogicalOp(
+        op, std::move(branches), context->planNodeId, context->slotIdGenerator);
+
+    // Join frame.stage with opStage.
+    frame.stage = makeLoopJoin(std::move(frame.stage), std::move(opStage), context->planNodeId);
+}
+
 /**
  * A match expression pre-visitor used for maintaining nested logical expressions while traversing
  * the match expression tree.
@@ -784,20 +834,16 @@ public:
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
 
-    void visit(const AndMatchExpression* matchExpr) final {
-        auto& frame = _context->evalStack.back();
-
-        if (matchExpr->numChildren() <= 1 || matchExpr == _context->topLevelAnd) {
-            // For $and's with no children, we output true (handled in the post-visitor). For a
-            // top-level $and with at least one child, and for non-top-level $and's with exactly
-            // one child, we evaluate each child within the current EvalFrame ('frame') so that
-            // each child builds directly on top of frame->stage.
+    void visit(const AndMatchExpression* expr) final {
+        if (expr == _context->topLevelAnd) {
+            // For a top-level $and with at least one child, we evaluate each child within the
+            // current EvalFrame ('frame') so that each child builds directly on top of
+            // frame->stage.
             return;
         }
 
-        // For non-top-level $and's, we evaluate each child in its own EvalFrame. Set up a new
-        // EvalFrame with a null tree for the first child.
-        _context->evalStack.emplace_back(EvalStage{}, frame.inputSlot);
+        // For non-top-level $and's, we evaluate each child in its own EvalFrame.
+        pushFrameForLogicalExpressionChild(_context, expr->numChildren());
     }
 
     void visit(const BitsAllClearMatchExpression* expr) final {}
@@ -902,24 +948,15 @@ public:
     void visit(const LTMatchExpression* expr) final {}
     void visit(const ModMatchExpression* expr) final {}
     void visit(const NorMatchExpression* expr) final {
-        unsupportedExpression(expr);
+        pushFrameForLogicalExpressionChild(_context, expr->numChildren());
     }
 
     void visit(const NotMatchExpression* expr) final {
         invariant(expr->numChildren() == 1);
     }
 
-    void visit(const OrMatchExpression* matchExpr) final {
-        auto& frame = _context->evalStack.back();
-
-        if (matchExpr->numChildren() <= 1) {
-            // For $or's with no children, we output false (handled in the post-visitor). For $or's
-            // with 1 child, we evaluate the child within the current EvalFrame.
-            return;
-        }
-
-        // Set up a new EvalFrame with a null tree for the first child.
-        _context->evalStack.emplace_back(EvalStage{}, frame.inputSlot);
+    void visit(const OrMatchExpression* expr) final {
+        pushFrameForLogicalExpressionChild(_context, expr->numChildren());
     }
 
     void visit(const RegexMatchExpression* expr) final {}
@@ -976,12 +1013,11 @@ public:
         generateAlwaysBoolean(_context, true);
     }
 
-    void visit(const AndMatchExpression* matchExpr) final {
-        auto numChildren = matchExpr->numChildren();
-        if (matchExpr == _context->topLevelAnd) {
+    void visit(const AndMatchExpression* expr) final {
+        if (expr == _context->topLevelAnd) {
             // For a top-level $and with no children, do nothing and return. For top-level $and's
             // with at least one, we evaluate each child within the current EvalFrame.
-            if (numChildren >= 1) {
+            if (expr->numChildren() >= 1) {
                 // Process the output of the last child.
                 auto& frame = _context->evalStack.back();
                 invariant(frame.output);
@@ -990,41 +1026,9 @@ public:
                 frame.output.reset();
             }
             return;
-        } else if (numChildren == 0) {
-            // For non-top-level $and's with no children, output true.
-            generateAlwaysBoolean(_context, true);
-            return;
-        } else if (numChildren == 1) {
-            // For non-top-level $and's with one child, do nothing and return. The post-visitor for
-            // the child expression has already done all the necessary work.
-            return;
         }
 
-        // For non-top-level $and's, we evaluate each child in its own EvalFrame. Now that we're
-        // done evaluating the children, move the children's outputs off of the evalStack into
-        // a vector in preparation for calling generateShortCircuitingLogicalOp().
-        std::vector<EvalExprStagePair> branches;
-        for (size_t i = 0, stackSize = _context->evalStack.size(); i < numChildren; ++i) {
-            auto& childFrame = _context->evalStack[stackSize - numChildren + i];
-            branches.emplace_back(std::move(childFrame.output), std::move(childFrame.stage));
-        }
-
-        for (size_t i = 0; i < numChildren; ++i) {
-            _context->evalStack.pop_back();
-        }
-
-        auto& frame = _context->evalStack.back();
-
-        EvalStage andStage;
-        std::tie(frame.output, andStage) =
-            generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicAnd,
-                                             std::move(branches),
-                                             _context->planNodeId,
-                                             _context->slotIdGenerator);
-
-        // Join frame.stage with andStage.
-        frame.stage =
-            makeLoopJoin(std::move(frame.stage), std::move(andStage), _context->planNodeId);
+        buildLogicalExpression(sbe::EPrimBinary::logicAnd, expr->numChildren(), _context);
     }
 
     void visit(const BitsAllClearMatchExpression* expr) final {
@@ -1437,7 +1441,15 @@ public:
         generatePredicate(_context, expr->path(), std::move(makePredicate));
     }
 
-    void visit(const NorMatchExpression* expr) final {}
+    void visit(const NorMatchExpression* expr) final {
+        // $nor is implemented as a negation of $or. First step is to build $or expression from
+        // stack.
+        buildLogicalExpression(sbe::EPrimBinary::logicOr, expr->numChildren(), _context);
+
+        // Second step is to negate the result of $or expression.
+        auto& frame = _context->evalStack.back();
+        frame.output = makeNot(std::move(frame.output.expr));
+    }
 
     void visit(const NotMatchExpression* expr) final {
         auto& frame = _context->evalStack.back();
@@ -1446,42 +1458,8 @@ public:
         frame.output = makeNot(std::move(frame.output.expr));
     }
 
-    void visit(const OrMatchExpression* matchExpr) final {
-        auto numChildren = matchExpr->numChildren();
-        if (numChildren == 0) {
-            // For $or's with no children, output false.
-            generateAlwaysBoolean(_context, false);
-            return;
-        } else if (numChildren == 1) {
-            // For $or's with 1 child, do nothing and return. The post-visitor for the child
-            // expression has already done all the necessary work.
-            return;
-        }
-
-        // Move the children's outputs off of the evalStack into a vector in preparation for
-        // calling generateShortCircuitingLogicalOp().
-        std::vector<EvalExprStagePair> branches;
-        for (size_t i = 0, stackSize = _context->evalStack.size(); i < numChildren; ++i) {
-            auto& childFrame = _context->evalStack[stackSize - numChildren + i];
-            branches.emplace_back(std::move(childFrame.output), std::move(childFrame.stage));
-        }
-
-        for (size_t i = 0; i < numChildren; ++i) {
-            _context->evalStack.pop_back();
-        }
-
-        auto& frame = _context->evalStack.back();
-
-        EvalStage orStage;
-        std::tie(frame.output, orStage) =
-            generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicOr,
-                                             std::move(branches),
-                                             _context->planNodeId,
-                                             _context->slotIdGenerator);
-
-        // Join frame.stage with orStage.
-        frame.stage =
-            makeLoopJoin(std::move(frame.stage), std::move(orStage), _context->planNodeId);
+    void visit(const OrMatchExpression* expr) final {
+        buildLogicalExpression(sbe::EPrimBinary::logicOr, expr->numChildren(), _context);
     }
 
     void visit(const RegexMatchExpression* expr) final {
@@ -1542,24 +1520,21 @@ public:
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
 
-    void visit(const AndMatchExpression* matchExpr) final {
-        // This method should never be called for $and's with less than 2 children.
-        invariant(matchExpr->numChildren() >= 2);
-        auto& frame = _context->evalStack.back();
-
-        if (matchExpr == _context->topLevelAnd) {
+    void visit(const AndMatchExpression* expr) final {
+        if (expr == _context->topLevelAnd) {
             // For a top-level $and, we evaluate each child within the current EvalFrame.
             // Process the output of the most recently evaluated child.
+            auto& frame = _context->evalStack.back();
             invariant(frame.output);
             frame.stage = makeFilter<false>(
                 std::move(frame.stage), std::move(frame.output.expr), _context->planNodeId);
             frame.output.reset();
-        } else {
-            // For non-top-level $and's, we evaluate each child in its own EvalFrame, and we
-            // leave these EvalFrames on the stack until we're done evaluating all the children.
-            // Set up a new EvalFrame with a null tree for the next child.
-            _context->evalStack.emplace_back(EvalStage{}, frame.inputSlot);
+            return;
         }
+
+        // For non-top-level $and's, we evaluate each child in its own EvalFrame, and we
+        // leave these EvalFrames on the stack until we're done evaluating all the children.
+        pushFrameForLogicalExpressionChild(_context, expr->numChildren());
     }
 
     void visit(const BitsAllClearMatchExpression* expr) final {}
@@ -1613,17 +1588,19 @@ public:
     void visit(const LTEMatchExpression* expr) final {}
     void visit(const LTMatchExpression* expr) final {}
     void visit(const ModMatchExpression* expr) final {}
-    void visit(const NorMatchExpression* expr) final {}
+
+    void visit(const NorMatchExpression* expr) final {
+        // We leave the EvalFrame of each child on the stack until we're done evaluating all the
+        // children.
+        pushFrameForLogicalExpressionChild(_context, expr->numChildren());
+    }
+
     void visit(const NotMatchExpression* expr) final {}
 
-    void visit(const OrMatchExpression* matchExpr) final {
-        // This method should never be called for $or's with less than 2 children.
-        invariant(matchExpr->numChildren() >= 2);
-        auto& frame = _context->evalStack.back();
-
+    void visit(const OrMatchExpression* expr) final {
         // We leave the EvalFrame of each child on the stack until we're done evaluating all the
-        // children. Set up a new EvalFrame with a null tree for the next child.
-        _context->evalStack.emplace_back(EvalStage{}, frame.inputSlot);
+        // children.
+        pushFrameForLogicalExpressionChild(_context, expr->numChildren());
     }
 
     void visit(const RegexMatchExpression* expr) final {}

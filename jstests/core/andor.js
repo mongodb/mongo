@@ -1,7 +1,4 @@
-// SERVER-1089 Test and/or nesting
-// @tags: [
-//   sbe_incompatible,
-// ]
+// SERVER-1089 Test and/or/nor nesting
 
 t = db.jstests_andor;
 t.drop();
