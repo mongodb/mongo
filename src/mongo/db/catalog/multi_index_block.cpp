@@ -212,6 +212,17 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 indexSpecs.size();
         }
 
+        // Initializing individual index build blocks below performs un-timestamped writes to the
+        // durable catalog. It's possible for the onInit function to set multiple timestamps
+        // depending on the index build codepath taken. Once to persist the index build entry in the
+        // 'config.system.indexBuilds' collection and another time to log the operation using
+        // onStartIndexBuild(). It's imperative that the durable catalog writes are timestamped at
+        // the same time as onStartIndexBuild() is to avoid rollback issues.
+        Status status = onInit(indexInfoObjs);
+        if (!status.isOK()) {
+            return status;
+        }
+
         for (size_t i = 0; i < indexSpecs.size(); i++) {
             BSONObj info = indexSpecs[i];
             StatusWith<BSONObj> statusWithInfo =
@@ -307,11 +318,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             indexCleanupGuard.dismiss();
             _indexes.push_back(std::move(index));
-        }
-
-        Status status = onInit(indexInfoObjs);
-        if (!status.isOK()) {
-            return status;
         }
 
         opCtx->recoveryUnit()->onCommit([ns, this](auto commitTs) {

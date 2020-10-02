@@ -254,81 +254,72 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     // create a database, which could result in createCollection failing if the database
     // does not yet exist.
     if (ui) {
-        // Return an optional, indicating whether we need to early return (if the collection already
-        // exists, or in case of an error).
-        using Result = boost::optional<Status>;
-        auto result =
-            writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName.ns(), [&] {
-                WriteUnitOfWork wunit(opCtx);
-                auto uuid = ui.get();
-                uassert(ErrorCodes::InvalidUUID,
-                        "Invalid UUID in applyOps create command: " + uuid.toString(),
-                        uuid.isRFC4122v4());
+        auto uuid = ui.get();
+        uassert(ErrorCodes::InvalidUUID,
+                "Invalid UUID in applyOps create command: " + uuid.toString(),
+                uuid.isRFC4122v4());
 
-                auto& catalog = CollectionCatalog::get(opCtx);
-                const auto currentName = catalog.lookupNSSByUUID(opCtx, uuid);
-                auto serviceContext = opCtx->getServiceContext();
-                auto opObserver = serviceContext->getOpObserver();
-                if (currentName && *currentName == newCollName)
-                    return Result(Status::OK());
+        auto& catalog = CollectionCatalog::get(opCtx);
+        const auto currentName = catalog.lookupNSSByUUID(opCtx, uuid);
+        auto serviceContext = opCtx->getServiceContext();
+        auto opObserver = serviceContext->getOpObserver();
+        if (currentName && *currentName == newCollName)
+            return Status::OK();
 
-                if (currentName && currentName->isDropPendingNamespace()) {
-                    LOGV2(20308,
-                          "CMD: create {newCollection} - existing collection with conflicting UUID "
-                          "{conflictingUUID} is in a drop-pending state: {existingCollection}",
-                          "CMD: create -- existing collection with conflicting UUID "
-                          "is in a drop-pending state",
-                          "newCollection"_attr = newCollName,
-                          "conflictingUUID"_attr = uuid,
-                          "existingCollection"_attr = *currentName);
-                    return Result(Status(ErrorCodes::NamespaceExists,
-                                         str::stream()
-                                             << "existing collection " << currentName->toString()
-                                             << " with conflicting UUID " << uuid.toString()
-                                             << " is in a drop-pending state."));
-                }
+        if (currentName && currentName->isDropPendingNamespace()) {
+            LOGV2(20308,
+                  "CMD: create -- existing collection with conflicting UUID is in a drop-pending "
+                  "state",
+                  "newCollection"_attr = newCollName,
+                  "conflictingUUID"_attr = uuid,
+                  "existingCollection"_attr = *currentName);
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream() << "existing collection " << currentName->toString()
+                                        << " with conflicting UUID " << uuid.toString()
+                                        << " is in a drop-pending state.");
+        }
 
-                // In the case of oplog replay, a future command may have created or renamed a
-                // collection with that same name. In that case, renaming this future collection to
-                // a random temporary name is correct: once all entries are replayed no temporary
-                // names will remain.
-                const bool stayTemp = true;
-                auto futureColl = db
-                    ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, newCollName)
-                    : nullptr;
-                bool needsRenaming = static_cast<bool>(futureColl);
-                invariant(!needsRenaming || allowRenameOutOfTheWay);
+        // In the case of oplog replay, a future command may have created or renamed a
+        // collection with that same name. In that case, renaming this future collection to
+        // a random temporary name is correct: once all entries are replayed no temporary
+        // names will remain.
+        const bool stayTemp = true;
+        auto futureColl = db
+            ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, newCollName)
+            : nullptr;
+        bool needsRenaming = static_cast<bool>(futureColl);
+        invariant(!needsRenaming || allowRenameOutOfTheWay);
 
-                for (int tries = 0; needsRenaming && tries < 10; ++tries) {
-                    auto tmpNameResult =
-                        db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.create");
-                    if (!tmpNameResult.isOK()) {
-                        return Result(tmpNameResult.getStatus().withContext(
-                            str::stream() << "Cannot generate temporary "
-                                             "collection namespace for applyOps "
-                                             "create command: collection: "
-                                          << newCollName));
-                    }
+        for (int tries = 0; needsRenaming && tries < 10; ++tries) {
+            auto tmpNameResult = db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.create");
+            if (!tmpNameResult.isOK()) {
+                return tmpNameResult.getStatus().withContext(str::stream()
+                                                             << "Cannot generate temporary "
+                                                                "collection namespace for applyOps "
+                                                                "create command: collection: "
+                                                             << newCollName);
+            }
 
-                    const auto& tmpName = tmpNameResult.getValue();
-                    AutoGetCollection tmpCollLock(opCtx, tmpName, LockMode::MODE_X);
-                    if (tmpCollLock.getCollection()) {
-                        // Conflicting on generating a unique temp collection name. Try again.
-                        continue;
-                    }
+            const auto& tmpName = tmpNameResult.getValue();
+            AutoGetCollection tmpCollLock(opCtx, tmpName, LockMode::MODE_X);
+            if (tmpCollLock.getCollection()) {
+                // Conflicting on generating a unique temp collection name. Try again.
+                continue;
+            }
 
-                    // It is ok to log this because this doesn't happen very frequently.
-                    LOGV2(20309,
-                          "CMD: create {newCollection} - renaming existing collection with "
-                          "conflicting UUID {conflictingUUID} to temporary collection {tempName}",
-                          "CMD: create -- renaming existing collection with "
-                          "conflicting UUID to temporary collection",
-                          "newCollection"_attr = newCollName,
-                          "conflictingUUID"_attr = uuid,
-                          "tempName"_attr = tmpName);
+            // It is ok to log this because this doesn't happen very frequently.
+            LOGV2(20309,
+                  "CMD: create -- renaming existing collection with conflicting UUID to "
+                  "temporary collection",
+                  "newCollection"_attr = newCollName,
+                  "conflictingUUID"_attr = uuid,
+                  "tempName"_attr = tmpName);
+            Status status =
+                writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName.ns(), [&] {
+                    WriteUnitOfWork wuow(opCtx);
                     Status status = db->renameCollection(opCtx, newCollName, tmpName, stayTemp);
                     if (!status.isOK())
-                        return Result(status);
+                        return status;
                     opObserver->onRenameCollection(opCtx,
                                                    newCollName,
                                                    tmpName,
@@ -337,59 +328,61 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                                    /*numRecords*/ 0U,
                                                    stayTemp);
 
-                    // Abort any remaining index builds on the temporary collection.
-                    IndexBuildsCoordinator::get(opCtx)->abortCollectionIndexBuilds(
-                        opCtx,
-                        tmpName,
-                        futureColl->uuid(),
-                        "Aborting index builds on temporary collection");
+                    wuow.commit();
+                    return Status::OK();
+                });
 
-                    // The existing collection has been successfully moved out of the way.
-                    needsRenaming = false;
-                }
-                if (needsRenaming) {
-                    return Result(Status(ErrorCodes::NamespaceExists,
-                                         str::stream() << "Cannot generate temporary "
-                                                          "collection namespace for applyOps "
-                                                          "create command: collection: "
-                                                       << newCollName));
-                }
+            if (!status.isOK()) {
+                return status;
+            }
 
-                // If the collection with the requested UUID already exists, but with a different
-                // name, just rename it to 'newCollName'.
-                if (catalog.lookupCollectionByUUID(opCtx, uuid)) {
-                    invariant(currentName);
-                    uassert(40655,
-                            str::stream() << "Invalid name " << newCollName << " for UUID " << uuid,
-                            currentName->db() == newCollName.db());
-                    Status status =
-                        db->renameCollection(opCtx, *currentName, newCollName, stayTemp);
-                    if (!status.isOK())
-                        return Result(status);
-                    opObserver->onRenameCollection(opCtx,
-                                                   *currentName,
-                                                   newCollName,
-                                                   uuid,
-                                                   /*dropTargetUUID*/ {},
-                                                   /*numRecords*/ 0U,
-                                                   stayTemp);
+            // Abort any remaining index builds on the temporary collection.
+            IndexBuildsCoordinator::get(opCtx)->abortCollectionIndexBuilds(
+                opCtx,
+                tmpName,
+                futureColl->uuid(),
+                "Aborting index builds on temporary collection");
 
-                    wunit.commit();
-                    return Result(Status::OK());
-                }
-
-                // A new collection with the specific UUID must be created, so add the UUID to the
-                // creation options. Regular user collection creation commands cannot do this.
-                auto uuidObj = uuid.toBSON();
-                newCmd = cmdObj.addField(uuidObj.firstElement());
-                wunit.commit();
-
-                return Result(boost::none);
-            });
-
-        if (result) {
-            return *result;
+            // The existing collection has been successfully moved out of the way.
+            needsRenaming = false;
         }
+        if (needsRenaming) {
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream() << "Cannot generate temporary "
+                                           "collection namespace for applyOps "
+                                           "create command: collection: "
+                                        << newCollName);
+        }
+
+        // If the collection with the requested UUID already exists, but with a different
+        // name, just rename it to 'newCollName'.
+        if (catalog.lookupCollectionByUUID(opCtx, uuid)) {
+            invariant(currentName);
+            uassert(40655,
+                    str::stream() << "Invalid name " << newCollName << " for UUID " << uuid,
+                    currentName->db() == newCollName.db());
+            return writeConflictRetry(opCtx, "createCollectionForApplyOps", newCollName.ns(), [&] {
+                WriteUnitOfWork wuow(opCtx);
+                Status status = db->renameCollection(opCtx, *currentName, newCollName, stayTemp);
+                if (!status.isOK())
+                    return status;
+                opObserver->onRenameCollection(opCtx,
+                                               *currentName,
+                                               newCollName,
+                                               uuid,
+                                               /*dropTargetUUID*/ {},
+                                               /*numRecords*/ 0U,
+                                               stayTemp);
+
+                wuow.commit();
+                return Status::OK();
+            });
+        }
+
+        // A new collection with the specific UUID must be created, so add the UUID to the
+        // creation options. Regular user collection creation commands cannot do this.
+        auto uuidObj = uuid.toBSON();
+        newCmd = cmdObj.addField(uuidObj.firstElement());
     }
 
     return createCollection(
