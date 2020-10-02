@@ -43,6 +43,7 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
@@ -120,6 +121,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a compiled JS function with scope.
     jsFunction,
+
+    // Pointer to a ShardFilterer for shard filtering.
+    shardFilterer,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -786,9 +790,15 @@ inline TimeZoneDatabase* getTimeZoneDBView(Value val) noexcept {
     return reinterpret_cast<TimeZoneDatabase*>(val);
 }
 
+inline ShardFilterer* getShardFiltererView(Value val) noexcept {
+    return reinterpret_cast<ShardFilterer*>(val);
+}
+
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction&);
+
+std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer&);
 
 void releaseValue(TypeTags tag, Value val) noexcept;
 
@@ -853,6 +863,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyPcreRegex(*getPcreRegexView(val));
         case TypeTags::jsFunction:
             return makeCopyJsFunction(*getJsFunctionView(val));
+        case TypeTags::shardFilterer:
+            return makeCopyShardFilterer(*getShardFiltererView(val));
         default:
             break;
     }

@@ -34,6 +34,7 @@
 #include "mongo/db/query/classic_stage_builder.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/shard_filterer_factory_impl.h"
 
 namespace mongo::stage_builder {
 std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
@@ -69,8 +70,15 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
     auto sbeYieldPolicy = dynamic_cast<PlanYieldPolicySBE*>(yieldPolicy);
     invariant(sbeYieldPolicy);
 
-    auto builder = std::make_unique<SlotBasedStageBuilder>(
-        opCtx, collection, cq, solution, sbeYieldPolicy, needsTrialRunProgressTracker);
+    auto shardFilterer = std::make_unique<ShardFiltererFactoryImpl>(collection);
+
+    auto builder = std::make_unique<SlotBasedStageBuilder>(opCtx,
+                                                           collection,
+                                                           cq,
+                                                           solution,
+                                                           sbeYieldPolicy,
+                                                           needsTrialRunProgressTracker,
+                                                           shardFilterer.get());
     auto root = builder->build(solution.root());
     auto data = builder->getPlanStageData();
 

@@ -97,6 +97,11 @@ std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {
     return {TypeTags::jsFunction, ownedJsFunction};
 }
 
+std::pair<TypeTags, Value> makeCopyShardFilterer(const ShardFilterer& filterer) {
+    auto filter = sbe::value::bitcastFrom<ShardFilterer*>(filterer.clone().release());
+    return {TypeTags::shardFilterer, filter};
+}
+
 void releaseValue(TypeTags tag, Value val) noexcept {
     switch (tag) {
         case TypeTags::NumberDecimal:
@@ -131,6 +136,10 @@ void releaseValue(TypeTags tag, Value val) noexcept {
             break;
         case TypeTags::jsFunction:
             delete getJsFunctionView(val);
+            break;
+        case TypeTags::shardFilterer:
+            delete getShardFiltererView(val);
+            break;
         default:
             break;
     }
@@ -213,6 +222,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
             break;
         case TypeTags::jsFunction:
             stream << "jsFunction";
+            break;
+        case TypeTags::shardFilterer:
+            stream << "shardFilterer";
             break;
         default:
             stream << "unknown tag";
@@ -429,6 +441,10 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             // TODO: Also include code.
             stream << "jsFunction";
             break;
+        case value::TypeTags::shardFilterer: {
+            stream << "ShardFilterer";
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }

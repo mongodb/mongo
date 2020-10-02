@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,46 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
 /**
- * Interface for doing shard filtering, to be used by both the find and agg execution trees, and
- * slot-based execution.
+ * An interface that can be used to construct a ShardFilterer.
  */
-class ShardFilterer {
+class ShardFiltererFactoryInterface {
 public:
-    enum class DocumentBelongsResult { kDoesNotBelong, kBelongs, kNoShardKey };
+    virtual ~ShardFiltererFactoryInterface() = default;
 
-    virtual ~ShardFilterer() = default;
-
-    virtual std::unique_ptr<ShardFilterer> clone() const = 0;
-
-    /**
-     * Checks if a shard key is owned by the current node according to the filtering metadata of a
-     * sharded collection. This method assumes that the provided shard key is valid (non-empty).
-     */
-    virtual bool keyBelongsToMe(const BSONObj& key) const = 0;
-
-    /**
-     * A higher-level helper that must extract the shard key and then pass the shard key extracted
-     * to keyBelongsToMe.
-     */
-    virtual DocumentBelongsResult documentBelongsToMe(const BSONObj& doc) const = 0;
-
-    /**
-     * This method determines if the collection sharded.
-     */
-    virtual bool isCollectionSharded() const = 0;
-
-    /**
-     * Returns a KeyPattern representation of the shard key pattern being used to test membership of
-     * the shard key.
-     */
-    virtual const KeyPattern& getKeyPattern() const = 0;
+    virtual std::unique_ptr<ShardFilterer> makeShardFilterer(OperationContext* opCtx) const = 0;
 };
 }  // namespace mongo

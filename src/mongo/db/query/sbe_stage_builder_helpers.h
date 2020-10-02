@@ -165,6 +165,36 @@ inline std::unique_ptr<sbe::EExpression> makeFunction(std::string_view name, Arg
 }
 
 /**
+ * Check if expression returns Nothing and return null if so. Otherwise, return the
+ * expression.
+ */
+std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpression> e);
+
+/**
+ * Check if expression returns an array and return Nothing if so. Otherwise, return the expression.
+ */
+std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
+    std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise);
+
+/**
+ * Creates an expression to extract a shard key part from inputExpr. The generated expression is a
+ * let binding that binds a getField expression to extract the shard key part value from the
+ * inputExpr. The entire let binding evaluates to a constant expression carrying the Nothing value
+ * if the binding is an array. Otherwise, it evaluates to a fillEmpty null expression. Here is an
+ * example expression generated from this function for a shard key pattern {'a.b': 1}:
+ *
+ * let [l1.0 = getField (s1, "a")]
+ *   if (isArray (l1.0), NOTHING,
+ *     let [l2.0 = getField (l1.0, "b")]
+ *       if (isArray (l2.0), NOTHING, fillEmpty (l2.0, null)))
+ */
+std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
+    const FieldRef& keyPatternField,
+    sbe::value::FrameIdGenerator& frameIdGenerator,
+    std::unique_ptr<sbe::EExpression> inputExpr,
+    int level);
+
+/**
  * If given 'EvalExpr' already contains a slot, simply returns it. Otherwise, allocates a new slot
  * and creates project stage to assign expression to this new slot. After that, new slot and project
  * stage are returned.

@@ -46,6 +46,7 @@
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
+#include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
@@ -56,6 +57,7 @@
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/db/s/collection_sharding_state.h"
 
 namespace mongo::stage_builder {
 std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
@@ -119,10 +121,12 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
                                              const CanonicalQuery& cq,
                                              const QuerySolution& solution,
                                              PlanYieldPolicySBE* yieldPolicy,
-                                             bool needsTrialRunProgressTracker)
+                                             bool needsTrialRunProgressTracker,
+                                             ShardFiltererFactoryInterface* shardFiltererFactory)
     : StageBuilder(opCtx, collection, cq, solution),
       _yieldPolicy(yieldPolicy),
-      _data(makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)) {
+      _data(makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)),
+      _shardFiltererFactory(shardFiltererFactory) {
 
     if (needsTrialRunProgressTracker) {
         const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
@@ -140,6 +144,11 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
         _data.shouldTrackResumeToken = csn->requestResumeToken;
         _data.shouldUseTailableScan = csn->tailable;
     }
+
+    if (auto node = getNodeByType(solution.root(), STAGE_VIRTUAL_SCAN)) {
+        auto vsn = static_cast<const VirtualScanNode*>(node);
+        _shouldProduceRecordIdSlot = vsn->hasRecordId;
+    }
 }
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
@@ -147,21 +156,23 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
     invariant(!_buildHasStarted);
     _buildHasStarted = true;
 
-    // We always produce a 'resultSlot' and a 'recordIdSlot'. If the solution contains a
-    // CollectionScanNode with the 'shouldTrackLatestOplogTimestamp' flag set to true, then we
-    // will also produce an 'oplogTsSlot'.
+    // We always produce a 'resultSlot' and conditionally produce a 'recordIdSlot' based on the
+    // 'shouldProduceRecordIdSlot'. If the solution contains a CollectionScanNode with the
+    // 'shouldTrackLatestOplogTimestamp' flag set to true, then we will also produce an
+    // 'oplogTsSlot'.
     PlanStageReqs reqs;
     reqs.set(kResult);
-    reqs.set(kRecordId);
+    reqs.setIf(kRecordId, _shouldProduceRecordIdSlot);
     reqs.setIf(kOplogTs, _data.shouldTrackLatestOplogTimestamp);
 
     // Build the SBE plan stage tree.
     auto [stage, outputs] = build(root, reqs);
 
-    // Assert that we produced a 'resultSlot' and a 'recordIdSlot'. Also assert that we produced
-    // an 'oplogTsSlot' if it's needed.
+    // Assert that we produced a 'resultSlot' and that we prouced a 'recordIdSlot' if the
+    // 'shouldProduceRecordIdSlot' flag was set. Also assert that we produced an 'oplogTsSlot' if
+    // it's needed.
     invariant(outputs.has(kResult));
-    invariant(outputs.has(kRecordId));
+    invariant(!_shouldProduceRecordIdSlot || outputs.has(kRecordId));
     invariant(!_data.shouldTrackLatestOplogTimestamp || outputs.has(kOplogTs));
 
     _data.outputs = std::move(outputs);
@@ -203,6 +214,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto vsn = static_cast<const VirtualScanNode*>(root);
+    invariant(!reqs.getIndexKeyBitset());
+
+    // Virtual scans cannot produce an oplogTsSlot, so assert that the caller doesn't need it.
+    invariant(!reqs.has(kOplogTs));
 
     auto [inputTag, inputVal] = sbe::value::makeNewArray();
     sbe::value::ValueGuard inputGuard{inputTag, inputVal};
@@ -221,11 +236,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     if (vsn->hasRecordId) {
         invariant(scanSlots.size() == 2);
-        outputs.set(PlanStageSlots::kRecordId, scanSlots[0]);
-        outputs.set(PlanStageSlots::kResult, scanSlots[1]);
+        outputs.set(kRecordId, scanSlots[0]);
+        outputs.set(kResult, scanSlots[1]);
     } else {
         invariant(scanSlots.size() == 1);
-        outputs.set(PlanStageSlots::kResult, scanSlots[0]);
+        invariant(!reqs.has(kRecordId));
+        outputs.set(kResult, scanSlots[0]);
     }
 
     return {std::move(scanStage), std::move(outputs)};
@@ -999,6 +1015,98 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     return {std::move(unionStage), std::move(outputs)};
 }
 
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildShardFilter(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    using namespace std::literals;
+
+    const auto filterNode = static_cast<const ShardingFilterNode*>(root);
+
+    uassert(5071201,
+            "STAGE_SHARD_FILTER is curently only supported in SBE for collection scan plans",
+            filterNode->children[0]->getType() == StageType::STAGE_COLLSCAN ||
+                filterNode->children[0]->getType() == StageType::STAGE_VIRTUAL_SCAN);
+
+    auto childReqs = reqs.copy().set(kResult);
+    auto [stage, outputs] = build(filterNode->children[0], childReqs);
+
+    // If we're sharded make sure that we don't return data that isn't owned by the shard. This
+    // situation can occur when pending documents from in-progress migrations are inserted and when
+    // there are orphaned documents from aborted migrations. To check if the document is owned by
+    // the shard, we need to own a 'ShardFilterer', and extract the document's shard key as a
+    // BSONObj.
+    auto shardFilterer = _shardFiltererFactory->makeShardFilterer(_opCtx);
+
+    // Build an expression to extract the shard key from the document based on the shard key
+    // pattern. To do this, we iterate over the shard key pattern parts and build nested 'getField'
+    // expressions. This will handle single-element paths, and dotted paths for each shard key part.
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
+    sbe::value::SlotVector fieldSlots;
+    std::vector<std::string> projectFields;
+    std::unique_ptr<sbe::EExpression> bindShardKeyPart;
+
+    BSONObjIterator keyPatternIter(shardFilterer->getKeyPattern().toBSON());
+    while (auto keyPatternElem = keyPatternIter.next()) {
+        auto fieldRef = FieldRef{keyPatternElem.fieldNameStringData()};
+        fieldSlots.push_back(_slotIdGenerator.generate());
+        projectFields.push_back(fieldRef.dottedField().toString());
+
+        auto currentFieldSlot = sbe::makeE<sbe::EVariable>(outputs.get(kResult));
+        auto shardKeyBinding =
+            generateShardKeyBinding(fieldRef, _frameIdGenerator, std::move(currentFieldSlot), 0);
+
+        projections.emplace(fieldSlots.back(), std::move(shardKeyBinding));
+    }
+
+    auto shardKeySlot{_slotIdGenerator.generate()};
+
+    // Build an object which will hold a flattened shard key from the projections above.
+    auto shardKeyObjStage = sbe::makeS<sbe::MakeObjStage>(
+        sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projections), root->nodeId()),
+        shardKeySlot,
+        boost::none,
+        std::vector<std::string>{},
+        projectFields,
+        fieldSlots,
+        true,
+        false,
+        root->nodeId());
+
+    // Build a project stage that checks if any of the fieldSlots for the shard key parts are an
+    // Array which is represented by Nothing.
+    invariant(fieldSlots.size() > 0);
+    auto arrayChecks = makeNot(sbe::makeE<sbe::EFunction>(
+        "exists", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlots[0]))));
+    for (size_t ind = 1; ind < fieldSlots.size(); ++ind) {
+        arrayChecks = sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::Op::logicOr,
+            std::move(arrayChecks),
+            makeNot(sbe::makeE<sbe::EFunction>(
+                "exists", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlots[ind])))));
+    }
+    arrayChecks = sbe::makeE<sbe::EIf>(std::move(arrayChecks),
+                                       sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
+                                       sbe::makeE<sbe::EVariable>(shardKeySlot));
+
+    auto finalShardKeySlot{_slotIdGenerator.generate()};
+
+    auto finalShardKeyObjStage = makeProjectStage(
+        std::move(shardKeyObjStage), root->nodeId(), finalShardKeySlot, std::move(arrayChecks));
+
+    // Build a 'FilterStage' to skip over documents that don't belong to the shard. Shard membership
+    // of the document is checked by invoking 'shardFilter' with the owned 'ShardFilterer' along
+    // with the shard key that sits in the 'finalShardKeySlot' of 'MakeObjStage'.
+    auto shardFilterFn = sbe::makeE<sbe::EFunction>(
+        "shardFilter"sv,
+        sbe::makeEs(sbe::makeE<sbe::EConstant>(
+                        sbe::value::TypeTags::shardFilterer,
+                        sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release())),
+                    sbe::makeE<sbe::EVariable>(finalShardKeySlot)));
+
+    return {sbe::makeS<sbe::FilterStage<false>>(
+                std::move(finalShardKeyObjStage), std::move(shardFilterFn), root->nodeId()),
+            std::move(outputs)};
+}
+
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::build(
@@ -1024,7 +1132,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             {STAGE_TEXT, &SlotBasedStageBuilder::buildText},
             {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey},
             {STAGE_EOF, &SlotBasedStageBuilder::buildEof},
-            {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge}};
+            {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
+            {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter}};
 
     uassert(4822884,
             str::stream() << "Can't build exec tree for node: " << root->toString(),

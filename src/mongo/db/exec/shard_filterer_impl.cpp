@@ -36,22 +36,25 @@
 
 namespace mongo {
 
+std::unique_ptr<ShardFilterer> ShardFiltererImpl::clone() const {
+    return std::make_unique<ShardFiltererImpl>(_collectionFilter);
+}
+
 ShardFiltererImpl::ShardFiltererImpl(ScopedCollectionFilter cf) : _collectionFilter(std::move(cf)) {
     if (_collectionFilter.isSharded()) {
         _keyPattern = ShardKeyPattern(_collectionFilter.getKeyPattern());
     }
 }
 
-ShardFilterer::DocumentBelongsResult ShardFiltererImpl::_shardKeyBelongsToMe(
-    const BSONObj shardKey) const {
+ShardFilterer::DocumentBelongsResult ShardFiltererImpl::keyBelongsToMeHelper(
+    const BSONObj& shardKey) const {
     if (shardKey.isEmpty()) {
         return DocumentBelongsResult::kNoShardKey;
     }
 
-    return _collectionFilter.keyBelongsToMe(shardKey) ? DocumentBelongsResult::kBelongs
-                                                      : DocumentBelongsResult::kDoesNotBelong;
+    return keyBelongsToMe(shardKey) ? DocumentBelongsResult::kBelongs
+                                    : DocumentBelongsResult::kDoesNotBelong;
 }
-
 
 ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     const WorkingSetMember& wsm) const {
@@ -60,7 +63,7 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     }
 
     if (wsm.hasObj()) {
-        return _shardKeyBelongsToMe(_keyPattern->extractShardKeyFromDoc(wsm.doc.value().toBson()));
+        return keyBelongsToMeHelper(_keyPattern->extractShardKeyFromDoc(wsm.doc.value().toBson()));
     }
     // Transform 'IndexKeyDatum' provided by 'wsm' into 'IndexKeyData' to call
     // extractShardKeyFromIndexKeyData().
@@ -70,14 +73,19 @@ ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
     for (auto&& indexKeyData : wsm.keyData) {
         indexKeyDataVector.push_back({indexKeyData.keyData, indexKeyData.indexKeyPattern});
     }
-    return _shardKeyBelongsToMe(_keyPattern->extractShardKeyFromIndexKeyData(indexKeyDataVector));
+    return keyBelongsToMeHelper(_keyPattern->extractShardKeyFromIndexKeyData(indexKeyDataVector));
 }
 
 ShardFilterer::DocumentBelongsResult ShardFiltererImpl::documentBelongsToMe(
-    const Document& doc) const {
+    const BSONObj& doc) const {
     if (!_collectionFilter.isSharded()) {
         return DocumentBelongsResult::kBelongs;
     }
-    return _shardKeyBelongsToMe(_keyPattern->extractShardKeyFromDoc(doc.toBson()));
+    return keyBelongsToMeHelper(_keyPattern->extractShardKeyFromDoc(doc));
+}
+
+const KeyPattern& ShardFiltererImpl::getKeyPattern() const {
+    invariant(_keyPattern);
+    return _keyPattern->getKeyPattern();
 }
 }  // namespace mongo

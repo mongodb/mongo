@@ -420,6 +420,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"regexCompile", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexCompile, false}},
     {"regexFind", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexFind, false}},
     {"regexFindAll", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::regexFindAll, false}},
+    {"shardFilter", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::shardFilter, false}},
 };
 
 /**

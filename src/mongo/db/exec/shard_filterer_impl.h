@@ -39,20 +39,24 @@ class ShardFiltererImpl : public ShardFilterer {
 public:
     ShardFiltererImpl(ScopedCollectionFilter collectionFilter);
 
-    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const override;
-    DocumentBelongsResult documentBelongsToMe(const Document& doc) const override;
+    std::unique_ptr<ShardFilterer> clone() const override;
+
+    DocumentBelongsResult documentBelongsToMe(const BSONObj& doc) const override;
+    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const;
+
+    bool keyBelongsToMe(const BSONObj& shardKey) const override {
+        return _collectionFilter.keyBelongsToMe(shardKey);
+    };
 
     bool isCollectionSharded() const override {
         return _collectionFilter.isSharded();
     }
 
-    const KeyPattern& getKeyPattern() const override {
-        invariant(_keyPattern);
-        return _keyPattern->getKeyPattern();
-    }
+    const KeyPattern& getKeyPattern() const override;
 
 private:
-    DocumentBelongsResult _shardKeyBelongsToMe(BSONObj shardKey) const;
+    DocumentBelongsResult keyBelongsToMeHelper(const BSONObj& doc) const;
+
     ScopedCollectionFilter _collectionFilter;
     boost::optional<ShardKeyPattern> _keyPattern;
 };

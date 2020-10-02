@@ -339,6 +339,8 @@ env.CppUnitTest(
         "query_solution_test.cpp",
         "sbe_stage_builder_test_fixture.cpp",
         "sbe_stage_builder_test.cpp",
+        "sbe_shard_filter_test.cpp",
+        "shard_filterer_factory_mock.cpp",
         "view_response_formatter_test.cpp",
     ],
     LIBDEPS=[

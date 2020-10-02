@@ -43,10 +43,11 @@ namespace mongo {
 
 class StubShardFilterer : public ShardFilterer {
 public:
-    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const override {
+    std::unique_ptr<ShardFilterer> clone() const {
         MONGO_UNREACHABLE;
     }
-    DocumentBelongsResult documentBelongsToMe(const Document& doc) const override {
+
+    DocumentBelongsResult documentBelongsToMe(const BSONObj& doc) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -55,6 +56,10 @@ public:
     }
 
     const KeyPattern& getKeyPattern() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool keyBelongsToMe(const BSONObj& shardKey) const override {
         MONGO_UNREACHABLE;
     }
 };

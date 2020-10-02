@@ -1205,6 +1205,7 @@ env.Library(
         'query/sbe_stage_builder_index_scan.cpp',
         'query/sbe_stage_builder_projection.cpp',
         'query/sbe_sub_planner.cpp',
+        'query/shard_filterer_factory_impl.cpp',
         'query/stage_builder_util.cpp',
         'query/wildcard_multikey_paths.cpp',
         'run_op_kill_cursors.cpp',

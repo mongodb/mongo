@@ -2247,6 +2247,33 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
     return {true, arrTag, arrVal};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardFilter(uint8_t arity) {
+    invariant(arity == 2);
+
+    auto [ownedFilter, filterTag, filterValue] = getFromStack(0);
+    auto [ownedShardKey, shardKeyTag, shardKeyValue] = getFromStack(1);
+
+    if (filterTag != value::TypeTags::shardFilterer || shardKeyTag != value::TypeTags::Object) {
+        if (filterTag == value::TypeTags::shardFilterer &&
+            shardKeyTag == value::TypeTags::Nothing) {
+            LOGV2_WARNING(5071200,
+                          "No shard key found in document, it may have been inserted manually "
+                          "into shard",
+                          "keyPattern"_attr =
+                              value::getShardFiltererView(filterValue)->getKeyPattern());
+        }
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    BSONObjBuilder bob;
+    bson::convertToBsonObj(bob, value::getObjectView(shardKeyValue));
+
+    return {false,
+            value::TypeTags::Boolean,
+            value::bitcastFrom<bool>(
+                value::getShardFiltererView(filterValue)->keyBelongsToMe(bob.done()))};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           ArityType arity) {
     switch (f) {
@@ -2368,6 +2395,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinRegexFind(arity);
         case Builtin::regexFindAll:
             return builtinRegexFindAll(arity);
+        case Builtin::shardFilter:
+            return builtinShardFilter(arity);
     }
 
     MONGO_UNREACHABLE;

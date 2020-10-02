@@ -34,11 +34,12 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 /**
- * SBEStageBuilderTestFixture is a unittest fixture that can be used to facilitate testing the
+ * SbeStageBuilderTestFixture is a unittest fixture that can be used to facilitate testing the
  * translation of a QuerySolution tree to an sbe PlanStage tree.
  *
  * The main mechanism that enables the whole sbe::PlanStage tree to be exercised under unittests is
@@ -51,9 +52,9 @@ namespace mongo {
  * prepare the sbe::PlanStage tree. The sbe::PlanStageData returned from buildPlanStage() must be
  * kept alive across buildPlanStage(), prepareTree() and execution of the plan.
  */
-class SBEStageBuilderTestFixture : public sbe::PlanStageTestFixture {
+class SbeStageBuilderTestFixture : public sbe::PlanStageTestFixture {
 public:
-    SBEStageBuilderTestFixture() = default;
+    SbeStageBuilderTestFixture() = default;
 
     /**
      * Makes a QuerySolution from a QuerySolutionNode.
@@ -66,11 +67,16 @@ public:
      * SlotVector. If hasRecordId is 'true' then the returned SlotVector will carry a SlotId in the
      * 0th position for the RecordId and a SlotId for the BSONObj representation of the document in
      * the 1st position. Otherwise, if hasRecordId is 'false', the SlotVector will contain a single
-     * SlotId for the BSONObj representation of the document.
+     * SlotId for the BSONObj representation of the document. A real or mock
+     * ShardFiltererFactoryInterface must be provided so the sbe SlotBasedStageBuilder can build and
+     * utilize a ShardFilterer instance during translation of a ShardingFilterNode.
      */
-    std::
-        tuple<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData>
-        buildPlanStage(std::unique_ptr<QuerySolution> querySolution, bool hasRecordId);
+    std::tuple<sbe::value::SlotVector,
+               std::unique_ptr<sbe::PlanStage>,
+               stage_builder::PlanStageData>
+    buildPlanStage(std::unique_ptr<QuerySolution> querySolution,
+                   bool hasRecordId,
+                   std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface);
 
 private:
     const NamespaceString _nss = NamespaceString{"testdb.sbe_stage_builder"};

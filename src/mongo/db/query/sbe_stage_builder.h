@@ -35,6 +35,7 @@
 #include "mongo/db/exec/trial_period_utils.h"
 #include "mongo/db/exec/trial_run_progress_tracker.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
+#include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder.h"
 
 namespace mongo::stage_builder {
@@ -255,7 +256,8 @@ public:
                           const CanonicalQuery& cq,
                           const QuerySolution& solution,
                           PlanYieldPolicySBE* yieldPolicy,
-                          bool needsTrialRunProgressTracker);
+                          bool needsTrialRunProgressTracker,
+                          ShardFiltererFactoryInterface* shardFilterer);
 
     std::unique_ptr<sbe::PlanStage> build(const QuerySolutionNode* root) final;
 
@@ -324,6 +326,9 @@ private:
     std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> makeUnionForTailableCollScan(
         const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildShardFilter(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
@@ -335,5 +340,9 @@ private:
     PlanStageData _data;
 
     bool _buildHasStarted{false};
+    bool _shouldProduceRecordIdSlot{true};
+
+    // A factory to construct shard filters.
+    ShardFiltererFactoryInterface* _shardFiltererFactory;
 };
 }  // namespace mongo::stage_builder

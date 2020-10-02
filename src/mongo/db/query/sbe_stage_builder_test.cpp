@@ -29,15 +29,23 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/shard_filterer_mock.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
+#include "mongo/db/query/shard_filterer_factory_mock.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-using SBEStageBuilderTest = SBEStageBuilderTestFixture;
+class SbeStageBuilderTest : public SbeStageBuilderTestFixture {
+protected:
+    std::unique_ptr<ShardFiltererFactoryInterface> makeAlwaysPassShardFiltererInterface() {
+        return std::make_unique<ShardFiltererFactoryMock>(
+            std::make_unique<ConstantFilterMock>(true, BSONObj{}));
+    }
+};
 
-TEST_F(SBEStageBuilderTest, TestVirtualScan) {
+TEST_F(SbeStageBuilderTest, TestVirtualScan) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(int64_t{0} << BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(int64_t{1} << BSON("a" << 2 << "b" << 2)),
                                        BSON_ARRAY(int64_t{2} << BSON("a" << 3 << "b" << 2))};
@@ -51,7 +59,9 @@ TEST_F(SBEStageBuilderTest, TestVirtualScan) {
     ASSERT_EQ(querySolution->root()->nodeId(), 1);
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
-    auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), true);
+    auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
+    auto [resultSlots, stage, data] =
+        buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
     auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);
 
     int64_t index = 0;
@@ -70,7 +80,7 @@ TEST_F(SBEStageBuilderTest, TestVirtualScan) {
     ASSERT_EQ(index, 3);
 }
 
-TEST_F(SBEStageBuilderTest, TestLimitOneVirtualScan) {
+TEST_F(SbeStageBuilderTest, TestLimitOneVirtualScan) {
     auto docs = std::vector<BSONArray>{BSON_ARRAY(int64_t{0} << BSON("a" << 1 << "b" << 2)),
                                        BSON_ARRAY(int64_t{1} << BSON("a" << 2 << "b" << 2)),
                                        BSON_ARRAY(int64_t{2} << BSON("a" << 3 << "b" << 2))};
@@ -86,7 +96,9 @@ TEST_F(SBEStageBuilderTest, TestLimitOneVirtualScan) {
     auto querySolution = makeQuerySolution(std::move(limitNode));
 
     // Translate the QuerySolution tree to an sbe::PlanStage.
-    auto [resultSlots, stage, data] = buildPlanStage(std::move(querySolution), true);
+    auto shardFiltererInterface = makeAlwaysPassShardFiltererInterface();
+    auto [resultSlots, stage, data] =
+        buildPlanStage(std::move(querySolution), true, std::move(shardFiltererInterface));
 
     // Prepare the sbe::PlanStage for execution.
     auto resultAccessors = prepareTree(&data.ctx, stage.get(), resultSlots);

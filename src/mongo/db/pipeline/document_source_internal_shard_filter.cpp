@@ -52,7 +52,7 @@ DocumentSource::GetNextResult DocumentSourceInternalShardFilter::doGetNext() {
     auto next = pSource->getNext();
     invariant(_shardFilterer);
     for (; next.isAdvanced(); next = pSource->getNext()) {
-        const auto belongsRes = _shardFilterer->documentBelongsToMe(next.getDocument());
+        const auto belongsRes = _shardFilterer->documentBelongsToMe(next.getDocument().toBson());
         if (belongsRes == ShardFilterer::DocumentBelongsResult::kBelongs) {
             return next;
         }

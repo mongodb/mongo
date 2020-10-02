@@ -235,6 +235,7 @@ enum class Builtin : uint8_t {
     regexCompile,  // compile <pattern, options> into value::pcreRegex
     regexFind,
     regexFindAll,
+    shardFilter,
 };
 
 using SmallArityType = uint8_t;
@@ -590,6 +591,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexCompile(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexFind(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexFindAll(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinShardFilter(uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

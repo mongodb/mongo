@@ -50,10 +50,11 @@ using DocumentSourceInternalShardFilterTest = AggregationContextFixture;
  */
 class ShardFiltererBaseForTest : public ShardFilterer {
 public:
-    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const override {
+    std::unique_ptr<ShardFilterer> clone() const {
         MONGO_UNREACHABLE;
     }
-    DocumentBelongsResult documentBelongsToMe(const Document& doc) const override {
+
+    DocumentBelongsResult documentBelongsToMe(const BSONObj& obj) const override {
         MONGO_UNREACHABLE;
     }
 
@@ -62,6 +63,10 @@ public:
     }
 
     const KeyPattern& getKeyPattern() const override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool keyBelongsToMe(const BSONObj& obj) const override {
         MONGO_UNREACHABLE;
     }
 };
@@ -115,10 +120,7 @@ class FirstNShardFilterer : public ShardFiltererBaseForTest {
 public:
     FirstNShardFilterer(unsigned int n) : _numToFilter(n) {}
 
-    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const override {
-        MONGO_UNREACHABLE;
-    }
-    DocumentBelongsResult documentBelongsToMe(const Document& doc) const override {
+    DocumentBelongsResult documentBelongsToMe(const BSONObj& obj) const override {
         return i++ >= _numToFilter ? DocumentBelongsResult::kBelongs
                                    : DocumentBelongsResult::kDoesNotBelong;
     }
@@ -158,10 +160,7 @@ class ShardFiltererNoShardKey : public ShardFiltererBaseForTest {
 public:
     ShardFiltererNoShardKey() : _kp(BSON("b" << 1)) {}
 
-    DocumentBelongsResult documentBelongsToMe(const WorkingSetMember& wsm) const override {
-        MONGO_UNREACHABLE;
-    }
-    DocumentBelongsResult documentBelongsToMe(const Document& doc) const override {
+    DocumentBelongsResult documentBelongsToMe(const BSONObj& obj) const override {
         return DocumentBelongsResult::kNoShardKey;
     }
 
