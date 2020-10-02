@@ -129,7 +129,7 @@ protected:
             wunit.commit();
         }
         abortOnExit.dismiss();
-        _collection = collection.get().detached();
+        _collection = CollectionPtr(collection.get().get(), CollectionPtr::NoYieldTag{});
     }
 
     void insert(const char* s) {

@@ -113,7 +113,7 @@ public:
         Date_t deadline = Date_t::max());
 
     explicit operator bool() const {
-        return static_cast<bool>(_coll);
+        return static_cast<bool>(getCollection());
     }
 
     /**

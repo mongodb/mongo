@@ -155,15 +155,6 @@ const OperationContext::Decoration<UncommittedWritableCollections>
     getUncommittedWritableCollections =
         OperationContext::declareDecoration<UncommittedWritableCollections>();
 
-struct installCatalogLookupFn {
-    installCatalogLookupFn() {
-        CollectionPtr::installCatalogLookupImpl([](OperationContext* opCtx, CollectionUUID uuid) {
-            const auto& catalog = CollectionCatalog::get(opCtx);
-            return catalog.lookupCollectionByUUID(opCtx, uuid);
-        });
-    }
-} inst;
-
 class FinishDropCollectionChange : public RecoveryUnit::Change {
 public:
     FinishDropCollectionChange(CollectionCatalog* catalog,
@@ -221,7 +212,7 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
         return CollectionPtr();
     }
 
-    return {_opCtx, _mapIter->second.get()};
+    return {_opCtx, _mapIter->second.get(), LookupCollectionForYieldRestore()};
 }
 
 Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx,
@@ -469,12 +460,14 @@ CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
     }
 
     if (auto coll = UncommittedCollections::getForTxn(opCtx, uuid)) {
-        return {opCtx, coll.get()};
+        return {opCtx, coll.get(), LookupCollectionForYieldRestore()};
     }
 
     stdx::lock_guard<Latch> lock(_catalogLock);
     auto coll = _lookupCollectionByUUID(lock, uuid);
-    return (coll && coll->isCommitted()) ? CollectionPtr(opCtx, coll.get()) : CollectionPtr();
+    return (coll && coll->isCommitted())
+        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore())
+        : CollectionPtr();
 }
 
 void CollectionCatalog::makeCollectionVisible(CollectionUUID uuid) {
@@ -565,13 +558,15 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
     }
 
     if (auto coll = UncommittedCollections::getForTxn(opCtx, nss)) {
-        return {opCtx, coll.get()};
+        return {opCtx, coll.get(), LookupCollectionForYieldRestore()};
     }
 
     stdx::lock_guard<Latch> lock(_catalogLock);
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
-    return (coll && coll->isCommitted()) ? CollectionPtr(opCtx, coll.get()) : nullptr;
+    return (coll && coll->isCommitted())
+        ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore())
+        : nullptr;
 }
 
 boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationContext* opCtx,
@@ -935,6 +930,11 @@ void CollectionCatalog::commitUnmanagedClone(OperationContext* opCtx, Collection
 void CollectionCatalog::discardUnmanagedClone(OperationContext* opCtx, Collection* collection) {
     auto& uncommittedWritableCollections = getUncommittedWritableCollections(opCtx);
     uncommittedWritableCollections.remove(collection);
+}
+
+const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* opCtx,
+                                                              CollectionUUID uuid) const {
+    return CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid).get();
 }
 
 }  // namespace mongo

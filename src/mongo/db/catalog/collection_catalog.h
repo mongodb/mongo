@@ -436,4 +436,13 @@ private:
      */
     DatabaseProfileSettingsMap _databaseProfileSettings;
 };
+
+/**
+ * Functor for looking up Collection by UUID from the Collection Catalog. This is the default yield
+ * restore implementation for CollectionPtr when acquired from the catalog.
+ */
+struct LookupCollectionForYieldRestore {
+    const Collection* operator()(OperationContext* opCtx, CollectionUUID uuid) const;
+};
+
 }  // namespace mongo

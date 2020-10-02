@@ -591,24 +591,26 @@ public:
 /**
  * Smart-pointer'esque type to handle yielding of Collection lock that may invalidate pointers when
  * resuming. CollectionPtr will re-load the Collection from the Catalog when restoring from a yield
- * that dropped Collection locks. If this is constructed from a Lock-Free Reads context (shared_ptr)
- * or writable pointer, then it is not allowed to reload from the catalog and the yield operations
- * are no-ops.
+ * that dropped locks. The yield and restore behavior can be disabled by constructing this type from
+ * a writable Collection or by specifying NoYieldTag.
  */
 class CollectionPtr : public Yieldable {
 public:
     static CollectionPtr null;
 
+    // Function for the implementation on how we load a new Collection pointer when restoring from
+    // yield
+    using RestoreFn = std::function<const Collection*(OperationContext*, CollectionUUID)>;
+
     CollectionPtr();
 
     // Creates a Yieldable CollectionPtr that reloads the Collection pointer from the catalog when
     // restoring from yield
-    CollectionPtr(OperationContext* opCtx, const Collection* collection);
+    CollectionPtr(OperationContext* opCtx, const Collection* collection, RestoreFn restoreFn);
 
     // Creates non-yieldable CollectionPtr, performing yield/restore will be a no-op.
     struct NoYieldTag {};
     CollectionPtr(const Collection* collection, NoYieldTag);
-    CollectionPtr(const std::shared_ptr<const Collection>& collection);
     CollectionPtr(Collection* collection);
 
     CollectionPtr(const CollectionPtr&) = delete;
@@ -635,20 +637,12 @@ public:
         return _collection;
     }
 
-    // Creates a new CollectionPtr that is detached from the current, if the current instance is
-    // yieldable the new CollectionPtr will also be. Yielding on the new instance may cause the
-    // instance we detached from to dangle.
-    CollectionPtr detached() const;
-
     void reset() {
         *this = CollectionPtr();
     }
 
     void yield() const override;
     void restore() const override;
-
-    static void installCatalogLookupImpl(
-        std::function<CollectionPtr(OperationContext*, CollectionUUID)> impl);
 
     friend std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll);
 
@@ -658,8 +652,10 @@ private:
     // These members needs to be mutable so the yield/restore interface can be const. We don't want
     // yield/restore to require a non-const instance when it otherwise could be const.
     mutable const Collection* _collection;
-    mutable OptionalCollectionUUID _uuid;
+    mutable OptionalCollectionUUID _yieldedUUID;
+
     OperationContext* _opCtx;
+    RestoreFn _restoreFn;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {

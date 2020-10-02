@@ -151,26 +151,31 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
     // Acquire writable instance if not already available
     if (!_writableColl) {
 
-        // Resets the writable Collection when the write unit of work finishes so we re-fetches and
-        // re-clones the Collection if a new write unit of work is opened.
+        // Makes the internal CollectionPtr Yieldable and resets the writable Collection when the
+        // write unit of work finishes so we re-fetches and re-clones the Collection if a new write
+        // unit of work is opened.
         class WritableCollectionReset : public RecoveryUnit::Change {
         public:
             WritableCollectionReset(AutoGetCollection& autoColl,
-                                    const CollectionPtr& rollbackCollection)
-                : _autoColl(autoColl), _rollbackCollection(rollbackCollection.get()) {}
+                                    const Collection* originalCollection)
+                : _autoColl(autoColl), _originalCollection(originalCollection) {}
             void commit(boost::optional<Timestamp> commitTime) final {
-                // Restore coll to a yieldable collection
-                _autoColl._coll = {_autoColl.getOperationContext(), _autoColl._coll.get()};
+                _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
+                                                _autoColl._coll.get(),
+                                                LookupCollectionForYieldRestore());
                 _autoColl._writableColl = nullptr;
             }
             void rollback() final {
-                _autoColl._coll = {_autoColl.getOperationContext(), _rollbackCollection};
+                _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
+                                                _originalCollection,
+                                                LookupCollectionForYieldRestore());
                 _autoColl._writableColl = nullptr;
             }
 
         private:
             AutoGetCollection& _autoColl;
-            const Collection* _rollbackCollection;
+            // Used to be able to restore to the original pointer in case of a rollback
+            const Collection* _originalCollection;
         };
 
         auto& catalog = CollectionCatalog::get(_opCtx);
@@ -178,7 +183,7 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
             catalog.lookupCollectionByNamespaceForMetadataWrite(_opCtx, mode, _resolvedNss);
         if (mode == CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork) {
             _opCtx->recoveryUnit()->registerChange(
-                std::make_unique<WritableCollectionReset>(*this, _coll));
+                std::make_unique<WritableCollectionReset>(*this, _coll.get()));
         }
 
         // Set to writable collection. We are no longer yieldable.
@@ -201,7 +206,14 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     _resolvedNss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _collection =
         CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForRead(opCtx, _resolvedNss);
-    _collectionPtr = CollectionPtr(_collection);
+
+    // When we restore from yield on this CollectionPtr we will update _collection above and use its
+    // new pointer in the CollectionPtr
+    _collectionPtr = CollectionPtr(
+        opCtx, _collection.get(), [this](OperationContext* opCtx, CollectionUUID uuid) {
+            _collection = CollectionCatalog::get(opCtx).lookupCollectionByUUIDForRead(opCtx, uuid);
+            return _collection.get();
+        });
 
     // TODO (SERVER-51319): add DatabaseShardingState::checkDbVersion somewhere.
 

@@ -86,11 +86,11 @@ const CollectionPtr& LocalOplogInfo::getCollection() const {
 }
 
 void LocalOplogInfo::setCollection(const CollectionPtr& oplog) {
-    _oplog = oplog.detached();
+    _oplog = CollectionPtr(oplog.get(), CollectionPtr::NoYieldTag{});
 }
 
 void LocalOplogInfo::resetCollection() {
-    _oplog = CollectionPtr();
+    _oplog.reset();
 }
 
 void LocalOplogInfo::setNewTimestamp(ServiceContext* service, const Timestamp& newTime) {

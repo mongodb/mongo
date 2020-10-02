@@ -67,60 +67,39 @@ bool CappedInsertNotifier::isDead() {
     return _dead;
 }
 
-// We can't reference the catalog from this library as it would create a cyclic library dependency.
-// Setup a weak dependency using a std::function that is installed by the catalog lib
-std::function<CollectionPtr(OperationContext*, CollectionUUID)>& _catalogLookup() {
-    static std::function<CollectionPtr(OperationContext*, CollectionUUID)> func;
-    return func;
-}
-
-void CollectionPtr::installCatalogLookupImpl(
-    std::function<CollectionPtr(OperationContext*, CollectionUUID)> impl) {
-    _catalogLookup() = std::move(impl);
-}
-
 CollectionPtr CollectionPtr::null;
 
 CollectionPtr::CollectionPtr() : _collection(nullptr), _opCtx(nullptr) {}
-CollectionPtr::CollectionPtr(OperationContext* opCtx, const Collection* collection)
-    : _collection(collection), _opCtx(opCtx) {}
+CollectionPtr::CollectionPtr(OperationContext* opCtx,
+                             const Collection* collection,
+                             RestoreFn restoreFn)
+    : _collection(collection), _opCtx(opCtx), _restoreFn(std::move(restoreFn)) {}
 CollectionPtr::CollectionPtr(const Collection* collection, NoYieldTag)
-    : CollectionPtr(nullptr, collection) {}
+    : CollectionPtr(nullptr, collection, nullptr) {}
 CollectionPtr::CollectionPtr(Collection* collection) : CollectionPtr(collection, NoYieldTag{}) {}
-CollectionPtr::CollectionPtr(const std::shared_ptr<const Collection>& collection)
-    : CollectionPtr(collection.get(), NoYieldTag{}) {}
 CollectionPtr::CollectionPtr(CollectionPtr&&) = default;
 CollectionPtr::~CollectionPtr() {}
 CollectionPtr& CollectionPtr::operator=(CollectionPtr&&) = default;
 
-CollectionPtr CollectionPtr::detached() const {
-    return CollectionPtr(_opCtx, _collection);
-}
-
 bool CollectionPtr::_canYield() const {
     // We only set the opCtx when we use a constructor that allows yielding.
-    // When we are doing a lock free read or having a writable pointer in a WUOW it is not allowed
-    // to yield.
     return _opCtx;
 }
 
 void CollectionPtr::yield() const {
     // Yield if we are yieldable and have a valid collection
     if (_canYield() && _collection) {
-        _uuid = _collection->uuid();
+        _yieldedUUID = _collection->uuid();
         _collection = nullptr;
     }
 }
 void CollectionPtr::restore() const {
     // Restore from yield if we are yieldable and if uuid was set in a previous yield.
-    if (_canYield() && _uuid) {
+    if (_canYield() && _yieldedUUID) {
         // We may only do yield restore when we were holding locks that was yielded so we need to
         // refresh from the catalog to make sure we have a valid collection pointer.
-        auto coll = _catalogLookup()(_opCtx, *_uuid);
-        if (coll) {
-            _collection = coll.get();
-        }
-        _uuid.reset();
+        _collection = _restoreFn(_opCtx, *_yieldedUUID);
+        _yieldedUUID.reset();
     }
 }
 

@@ -2453,8 +2453,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // dropped while the index build is still registered for the collection -- until abortIndexBuild
     // is called. The collection can be renamed, but it is OK for the name to be stale just for
     // logging purposes.
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUIDForRead(
+    auto collectionSharedPtr = CollectionCatalog::get(opCtx).lookupCollectionByUUIDForRead(
         opCtx, replState->collectionUUID);
+    CollectionPtr collection(collectionSharedPtr.get(), CollectionPtr::NoYieldTag{});
     invariant(collection,
               str::stream() << "Collection with UUID " << replState->collectionUUID
                             << " should exist because an index build is in progress: "
