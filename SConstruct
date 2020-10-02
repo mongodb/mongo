@@ -1777,8 +1777,8 @@ elif env.TargetOSIs('windows'):
 
 def init_no_global_add_flags(env, start_flag, end_flag):
     """ Helper function for init_no_global_libdeps_tag_expand"""
-    env.AppendUnique(LIBDEPS_PREFIX_FLAGS=[start_flag])
-    env.PrependUnique(LIBDEPS_POSTFIX_FLAGS=[end_flag])
+    env['LIBDEPS_PREFIX_FLAGS']=[start_flag]
+    env['LIBDEPS_POSTFIX_FLAGS']=[end_flag]
     if env.TargetOSIs('linux', 'freebsd', 'openbsd'):
         env.AppendUnique(
             LIBDEPS_SWITCH_FLAGS=[{
@@ -1806,6 +1806,8 @@ def init_no_global_libdeps_tag_expand(source, target, env, for_signature):
                 env.AppendUnique(SHLINKFLAGS=[start_flag])
             else:
                 init_no_global_add_flags(env, start_flag, end_flag)
+        else:
+            init_no_global_add_flags(env, "", "")
 
     else:
         start_flag = env.get('LINK_WHOLE_ARCHIVE_LIB_START', '')
@@ -1817,7 +1819,8 @@ def init_no_global_libdeps_tag_expand(source, target, env, for_signature):
         # at link time.
         if "init-no-global-side-effects" not in env.get(libdeps.Constants.LibdepsTags, []):
             init_no_global_add_flags(env, start_flag, end_flag)
-
+        else:
+            init_no_global_add_flags(env, "", "")
     return []
 
 env['LIBDEPS_TAG_EXPANSIONS'].append(init_no_global_libdeps_tag_expand)
