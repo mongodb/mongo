@@ -219,7 +219,7 @@ void OpObserverShardingImpl::shardObserveTransactionPrepareOrUnpreparedCommit(
 void OpObserverShardingImpl::shardAnnotateOplogEntry(OperationContext* opCtx,
                                                      const NamespaceString nss,
                                                      const BSONObj& doc,
-                                                     repl::ReplOperation& op) {
+                                                     repl::DurableReplOperation& op) {
     op.setDestinedRecipient(getDestinedRecipient(opCtx, nss, doc));
 }
 

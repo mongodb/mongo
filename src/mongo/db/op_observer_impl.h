@@ -230,7 +230,7 @@ private:
     virtual void shardAnnotateOplogEntry(OperationContext* opCtx,
                                          const NamespaceString nss,
                                          const BSONObj& doc,
-                                         repl::ReplOperation& op) {}
+                                         repl::DurableReplOperation& op) {}
 };
 
 extern const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>

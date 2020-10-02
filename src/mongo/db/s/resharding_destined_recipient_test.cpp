@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -53,6 +54,28 @@
 
 namespace mongo {
 namespace {
+
+template <typename Callable>
+void runInTransaction(OperationContext* opCtx, Callable&& func) {
+    auto sessionId = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 0;
+
+    opCtx->setLogicalSessionId(sessionId);
+    opCtx->setTxnNumber(txnNum);
+    opCtx->setInMultiDocumentTransaction();
+
+    MongoDOperationContextSession ocs(opCtx);
+
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    ASSERT(txnParticipant);
+    txnParticipant.beginOrContinue(opCtx, txnNum, false, true);
+    txnParticipant.unstashTransactionResources(opCtx, "SetDestinedRecipient");
+
+    func();
+
+    txnParticipant.commitUnpreparedTransaction(opCtx);
+    txnParticipant.stashTransactionResources(opCtx);
+}
 
 class DestinedRecipientTest : public ShardServerTestFixture {
 public:
@@ -228,6 +251,31 @@ protected:
         wuow.commit();
     }
 
+    void updateDoc(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const BSONObj& filter,
+                   const BSONObj& update,
+                   const ReshardingEnv& env) {
+        AutoGetCollection coll(opCtx, nss, MODE_IX);
+
+        // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter
+        // has been updated to detect frozen migrations.
+        if (!OperationShardingState::isOperationVersioned(opCtx)) {
+            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+                kNss, env.version, env.dbVersion);
+        }
+
+        Helpers::update(opCtx, nss.toString(), filter, update);
+    }
+
+    repl::OplogEntry getLastOplogEntry(OperationContext* opCtx) {
+        repl::OplogInterfaceLocal oplogInterface(opCtx);
+        auto oplogIter = oplogInterface.makeIterator();
+
+        const auto& doc = unittest::assertGet(oplogIter->next()).first;
+        return unittest::assertGet(repl::OplogEntry::parse(doc));
+    }
+
 protected:
     CatalogCacheLoaderMock* _mockCatalogCacheLoader;
 };
@@ -273,12 +321,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
 
     writeDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10), env);
 
-    repl::OplogInterfaceLocal oplogInterface(opCtx);
-    auto oplogIter = oplogInterface.makeIterator();
-
-    auto nextValue = unittest::assertGet(oplogIter->next());
-    const auto& doc = nextValue.first;
-    auto entry = unittest::assertGet(repl::OplogEntry::parse(doc));
+    auto entry = getLastOplogEntry(opCtx);
     auto recipShard = entry.getDestinedRecipient();
 
     ASSERT(recipShard);
@@ -289,35 +332,74 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTran
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
-    auto sessionId = makeLogicalSessionIdForTest();
-    const TxnNumber txnNum = 0;
-
-    {
-        opCtx->setLogicalSessionId(sessionId);
-        opCtx->setTxnNumber(txnNum);
-        opCtx->setInMultiDocumentTransaction();
-
-        MongoDOperationContextSession ocs(opCtx);
-
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        ASSERT(txnParticipant);
-        txnParticipant.beginOrContinue(opCtx, txnNum, false, true);
-        txnParticipant.unstashTransactionResources(opCtx, "SetDestinedRecipient");
-
-        writeDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10), env);
-
-        txnParticipant.commitUnpreparedTransaction(opCtx);
-        txnParticipant.stashTransactionResources(opCtx);
-    }
+    runInTransaction(
+        opCtx, [&]() { writeDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10), env); });
 
     // Look for destined recipient in latest oplog entry. Since this write was done in a
     // transaction, the write operation will be embedded in an applyOps entry and needs to be
     // extracted.
-    repl::OplogInterfaceLocal oplogInterface(opCtx);
-    auto oplogIter = oplogInterface.makeIterator();
+    auto entry = getLastOplogEntry(opCtx);
+    auto info = repl::ApplyOpsCommandInfo::parse(entry.getOperationToApply());
 
-    const auto& doc = unittest::assertGet(oplogIter->next()).first;
-    auto entry = unittest::assertGet(repl::OplogEntry::parse(doc));
+    auto ops = info.getOperations();
+    auto replOp = repl::ReplOperation::parse(IDLParserErrorContext("insertOp"), ops[0]);
+    ASSERT_EQ(replOp.getNss(), kNss);
+
+    auto recipShard = replOp.getDestinedRecipient();
+    ASSERT(recipShard);
+    ASSERT_EQ(*recipShard, env.destShard);
+}
+
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdates) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
+
+    auto entry = getLastOplogEntry(opCtx);
+    auto recipShard = entry.getDestinedRecipient();
+
+    ASSERT(recipShard);
+    ASSERT_EQ(*recipShard, env.destShard);
+}
+
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesOutOfPlace) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
+
+    auto entry = getLastOplogEntry(opCtx);
+    auto recipShard = entry.getDestinedRecipient();
+
+    ASSERT(recipShard);
+    ASSERT_EQ(*recipShard, env.destShard);
+}
+
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTransaction) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    runInTransaction(opCtx, [&]() {
+        updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
+    });
+
+    // Look for destined recipient in latest oplog entry. Since this write was done in a
+    // transaction, the write operation will be embedded in an applyOps entry and needs to be
+    // extracted.
+    auto entry = getLastOplogEntry(opCtx);
     auto info = repl::ApplyOpsCommandInfo::parse(entry.getOperationToApply());
 
     auto ops = info.getOperations();

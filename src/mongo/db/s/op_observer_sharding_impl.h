@@ -73,7 +73,7 @@ protected:
     void shardAnnotateOplogEntry(OperationContext* opCtx,
                                  const NamespaceString nss,
                                  const BSONObj& doc,
-                                 repl::ReplOperation& op) override;
+                                 repl::DurableReplOperation& op) override;
 };
 
 }  // namespace mongo

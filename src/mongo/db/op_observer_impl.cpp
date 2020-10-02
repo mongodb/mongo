@@ -152,8 +152,9 @@ struct OpTimeBundle {
 /**
  * Write oplog entry(ies) for the update operation.
  */
-OpTimeBundle replLogUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-    MutableOplogEntry oplogEntry;
+OpTimeBundle replLogUpdate(OperationContext* opCtx,
+                           const OplogUpdateEntryArgs& args,
+                           MutableOplogEntry oplogEntry) {
     oplogEntry.setNss(args.nss);
     oplogEntry.setUuid(args.uuid);
 
@@ -537,6 +538,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         auto operation = MutableOplogEntry::makeUpdateOperation(
             args.nss, args.uuid, args.updateArgs.update, args.updateArgs.criteria);
 
+        shardAnnotateOplogEntry(opCtx, args.nss, args.updateArgs.updatedDoc, operation);
+
         if (args.updateArgs.preImageRecordingEnabledForCollection) {
             invariant(args.updateArgs.preImageDoc);
             operation.setPreImage(args.updateArgs.preImageDoc->getOwned());
@@ -544,7 +547,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
-        opTime = replLogUpdate(opCtx, args);
+        MutableOplogEntry oplogEntry;
+        shardAnnotateOplogEntry(
+            opCtx, args.nss, args.updateArgs.updatedDoc, oplogEntry.getDurableReplOperation());
+        opTime = replLogUpdate(opCtx, args, std::move(oplogEntry));
+
         SessionTxnRecord sessionTxnRecord;
         sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
         sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
