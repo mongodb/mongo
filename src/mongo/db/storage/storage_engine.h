@@ -391,11 +391,6 @@ public:
     virtual void setInitialDataTimestamp(Timestamp timestamp) {}
 
     /**
-     * Returns the initial data timestamp.
-     */
-    virtual Timestamp getInitialDataTimestamp() const = 0;
-
-    /**
      * Sets the oldest timestamp for which the storage engine must maintain snapshot history
      * through. Additionally, all future writes must be newer or equal to this value.
      */

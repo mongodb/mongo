@@ -189,8 +189,6 @@ public:
 
     virtual void setInitialDataTimestamp(Timestamp initialDataTimestamp) override;
 
-    Timestamp getInitialDataTimestamp() const override;
-
     /**
      * This method will set the oldest timestamp and commit timestamp to the input value. Callers
      * must be serialized along with `setStableTimestamp`. If force=false, this function does not
