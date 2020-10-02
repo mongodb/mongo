@@ -150,11 +150,6 @@ selector:
   # TODO: SERVER-38207 Cannot insert document with MaxKey shard key.
   - jstests/core/type8.js
 
-  # TODO: SERVER-38215 delx.js touches 2 different collections, which makes it susceptible for
-  # migration to happen in between and cause the transaction to abort due to StaleConfigException
-  # because it is not the first op of the transaction.
-  - jstests/core/delx.js
-
   # benchRun bypasses the network_error_and_txn_override.js so it doesn't run under the same
   # transaction and can cause test to timeout because of the 3 hr transactions lifetime setting and
   # moveChunk getting blocked trying to acquire collection X lock while doing chunk refresh.
