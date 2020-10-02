@@ -345,35 +345,10 @@ private:
             invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_S));
         }
 
-        auto indexCatalog = collection->getIndexCatalog();
-
-        // Find the _id index descriptor even if it is not ready.
-        auto desc = [&]() -> const IndexDescriptor* {
-            const bool includeUnfinished = true;
-            auto indexIt = indexCatalog->getIndexIterator(opCtx, includeUnfinished);
-            while (indexIt->more()) {
-                auto indexDesc = indexIt->next()->descriptor();
-                if (indexDesc->isIdIndex()) {
-                    return indexDesc;
-                }
-            }
-            return nullptr;
-        }();
-
+        auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
 
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
         if (desc) {
-            // The collection minimumVisibleSnapshot does not protect us from reading at timestamps
-            // before index catalog changes. Since we need to use the _id index, we must perform a
-            // check here to force the caller to retry with a different read timestamp when the
-            // index is not visible yet.
-            auto entry = indexCatalog->getEntry(desc);
-            if (!entry->isPresentInMySnapshot(opCtx) || !entry->isReadyInMySnapshot(opCtx)) {
-                uasserted(ErrorCodes::SnapshotUnavailable,
-                          str::stream()
-                              << "Unable to read from a snapshot due pending catalog changes on "
-                                 "the _id index; please retry the operation.");
-            }
             exec = InternalPlanner::indexScan(opCtx,
                                               collection,
                                               desc,

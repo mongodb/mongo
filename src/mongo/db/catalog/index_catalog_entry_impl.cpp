@@ -76,7 +76,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
           DurableCatalog::get(opCtx)->getIndexPrefix(opCtx, _catalogId, _descriptor->indexName())) {
 
     _descriptor->_entry = this;
-    _isReady = isReadyInMySnapshot(opCtx);
+    _isReady = _catalogIsReady(opCtx);
 
     {
         stdx::lock_guard<Latch> lk(_indexMultikeyPathsMutex);
@@ -131,7 +131,7 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
     // out-of-sync index catalog entries.  To fix this, we uassert if we detect that the
     // in-memory catalog is out-of-sync with the on-disk catalog.
     if (opCtx->inMultiDocumentTransaction()) {
-        if (!isPresentInMySnapshot(opCtx) || isReadyInMySnapshot(opCtx) != _isReady) {
+        if (!_catalogIsPresent(opCtx) || _catalogIsReady(opCtx) != _isReady) {
             uasserted(ErrorCodes::SnapshotUnavailable,
                       str::stream() << "Unable to read from a snapshot due to pending collection"
                                        " catalog changes; please retry the operation.");
@@ -139,7 +139,7 @@ bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
     }
 
     if (kDebugBuild)
-        invariant(_isReady == isReadyInMySnapshot(opCtx));
+        invariant(_isReady == _catalogIsReady(opCtx));
     return _isReady;
 }
 
@@ -270,7 +270,7 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
     // If the index is not visible within the side transaction, the index may have been created,
     // but not committed, in the parent transaction. Therefore, we abandon the side transaction
     // and set the multikey flag in the parent transaction.
-    if (!isPresentInMySnapshot(opCtx)) {
+    if (!_catalogIsPresent(opCtx)) {
         return {ErrorCodes::SnapshotUnavailable, "index not visible in side transaction"};
     }
 
@@ -325,11 +325,11 @@ NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx
     return DurableCatalog::get(opCtx)->getEntry(_catalogId).nss;
 }
 
-bool IndexCatalogEntryImpl::isReadyInMySnapshot(OperationContext* opCtx) const {
+bool IndexCatalogEntryImpl::_catalogIsReady(OperationContext* opCtx) const {
     return DurableCatalog::get(opCtx)->isIndexReady(opCtx, _catalogId, _descriptor->indexName());
 }
 
-bool IndexCatalogEntryImpl::isPresentInMySnapshot(OperationContext* opCtx) const {
+bool IndexCatalogEntryImpl::_catalogIsPresent(OperationContext* opCtx) const {
     return DurableCatalog::get(opCtx)->isIndexPresent(opCtx, _catalogId, _descriptor->indexName());
 }
 
