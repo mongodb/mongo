@@ -84,14 +84,6 @@ function resumeChangeStreamFromEachToken(mongod, changeStreamDocs, expectedChang
     });
 }
 
-const expectedChanges = [
-    {operationType: "insert", fullDocument: {_id: 2}},
-    {operationType: "delete", documentKey: {_id: 2}},
-    {operationType: "insert", fullDocument: {_id: 1}},
-    {operationType: "update", updateDescription: {updatedFields: {a: 1}, removedFields: []}},
-    {operationType: "delete", documentKey: {_id: 1}},
-];
-
 function runTest(downgradeVersion) {
     const rst = new ReplSetTest({
         nodes: 2,
@@ -109,6 +101,21 @@ function runTest(downgradeVersion) {
     // we can correctly resume from any resume token.
     const changeStreamCursor = rst.getPrimary().getDB(dbName)[watchedCollName].watch();
     performDBOps(rst.getPrimary());
+
+    // Starting with MongoDB 4.8 we expect update descriptions to include truncatedArrays.
+    const updateDescription = {updatedFields: {a: 1}, removedFields: []};
+    if (MongoRunner.compareBinVersions(downgradeVersion, "4.8") >= 0) {
+        updateDescription.truncatedArrays = [];
+    }
+
+    const expectedChanges = [
+        {operationType: "insert", fullDocument: {_id: 2}},
+        {operationType: "delete", documentKey: {_id: 2}},
+        {operationType: "insert", fullDocument: {_id: 1}},
+        {operationType: "update", updateDescription: updateDescription},
+        {operationType: "delete", documentKey: {_id: 1}},
+    ];
+
     const changeStreamDocs = getChangeStreamResults(changeStreamCursor, expectedChanges.length);
     compareChanges(expectedChanges, changeStreamDocs);
     resumeChangeStreamFromEachToken(rst.getPrimary(), changeStreamDocs, expectedChanges);

@@ -47,7 +47,7 @@ function runStandaloneTest(downgradeVersion) {
     if (numVersionsSinceLastLTS > 2) {
         // We do not support upgrading/downgrading to FCV's newer than last-lts but older than
         // last-continuous.
-        const unsupportedFCV = (parseFloat(lastContinuous) - 0.1).toFixed(1);
+        const unsupportedFCV = (parseFloat(lastContinuousFCV) - 0.1).toFixed(1);
         assert.commandFailed(
             adminDB.runCommand({setFeatureCompatibilityVersion: unsupportedFCV.toString()}));
     }

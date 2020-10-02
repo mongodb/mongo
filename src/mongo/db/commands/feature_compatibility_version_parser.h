@@ -50,22 +50,27 @@ public:
     static constexpr StringData kVersionUpgradingFrom44To47 = "upgrading from 4.4 to 4.7"_sd;
     static constexpr StringData kVersionUpgradingFrom47To48 = "upgrading from 4.7 to 4.8"_sd;
     static constexpr StringData kVersionUpgradingFrom44To48 = "upgrading from 4.4 to 4.8"_sd;
+    static constexpr StringData kVersionDowngradingFrom49To44 = "downgrading from 4.9 to 4.4"_sd;
+    static constexpr StringData kVersionUpgradingFrom44To49 = "upgrading from 4.4 to 4.9"_sd;
+    static constexpr StringData kVersionDowngradingFrom49To48 = "downgrading from 4.9 to 4.8"_sd;
+    static constexpr StringData kVersionUpgradingFrom48To49 = "upgrading from 4.8 to 4.9"_sd;
+    static constexpr StringData kVersion49 = "4.9"_sd;
     static constexpr StringData kVersionUnset = "Unset"_sd;
 
     static constexpr StringData kParameterName = "featureCompatibilityVersion"_sd;
 
     static constexpr StringData kLastLTS = kVersion44;
-    static constexpr StringData kLastContinuous = kVersion47;
-    static constexpr StringData kLatest = kVersion48;
-    static constexpr StringData kUpgradingFromLastLTSToLatest = kVersionUpgradingFrom44To48;
-    static constexpr StringData kUpgradingFromLastContinuousToLatest = kVersionUpgradingFrom47To48;
+    static constexpr StringData kLastContinuous = kVersion48;
+    static constexpr StringData kLatest = kVersion49;
+    static constexpr StringData kUpgradingFromLastLTSToLatest = kVersionUpgradingFrom44To49;
+    static constexpr StringData kUpgradingFromLastContinuousToLatest = kVersionUpgradingFrom48To49;
     // kVersionUpgradingFromLastLTSToLastContinuous should assigned kVersionUnset when kLastLTS and
     // kLastContinuous are equal.
     static constexpr StringData kVersionUpgradingFromLastLTSToLastContinuous =
-        kVersionUpgradingFrom44To47;
-    static constexpr StringData kDowngradingFromLatestToLastLTS = kVersionDowngradingFrom48To44;
+        kVersionUpgradingFrom44To48;
+    static constexpr StringData kDowngradingFromLatestToLastLTS = kVersionDowngradingFrom49To44;
     static constexpr StringData kDowngradingFromLatestToLastContinuous =
-        kVersionDowngradingFrom48To47;
+        kVersionDowngradingFrom49To48;
 
     static FeatureCompatibilityParams::Version parseVersion(StringData versionString);
 
