@@ -81,6 +81,8 @@ const newPrimaryColl = newPrimaryDB.getCollection('test');
 // Ensure the old primary doesn't take over again.
 assert.neq(primary.port, newPrimary.port);
 
+rst.awaitReplication();
+
 // The index should not be present on the old primary after processing the abortIndexBuild oplog
 // entry from the new primary.
 jsTestLog("waiting for index build to stop on old primary");
