@@ -1032,6 +1032,7 @@ functions:
         $python buildscripts/evergreen_resmoke_job_count.py \
           --taskName ${task_name}                           \
           --buildVariant ${build_variant}                   \
+          --distro ${distro_id}                             \
           --jobFactor ${resmoke_jobs_factor|1}              \
           --jobsMax ${resmoke_jobs_max|0}                   \
           --outFile resmoke_jobs_expansion.yml

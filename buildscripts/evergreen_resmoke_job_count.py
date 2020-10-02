@@ -6,6 +6,7 @@ import logging
 import platform
 import re
 import sys
+from collections import defaultdict
 
 import psutil
 import structlog
@@ -34,6 +35,8 @@ VARIANT_TASK_FACTOR_OVERRIDES = {
 }
 
 TASKS_FACTORS = [{"task": r"replica_sets.*", "factor": 0.5}, {"task": r"sharding.*", "factor": 0.5}]
+
+DISTRO_MULTIPLIERS = {"rhel62-large": 1.618}
 
 # Apply factor for a task based on the machine type it is running on.
 MACHINE_TASK_FACTOR_OVERRIDES = {"aarch64": TASKS_FACTORS}
@@ -78,7 +81,13 @@ def get_task_factor(task_name, overrides, override_type, factor):
     return factor
 
 
-def determine_factor(task_name, variant, factor):
+def determine_final_multiplier(distro):
+    """Determine the final multiplier."""
+    multipliers = defaultdict(lambda: 1, DISTRO_MULTIPLIERS)
+    return multipliers[distro]
+
+
+def determine_factor(task_name, variant, distro, factor):
     """Determine the job factor."""
     factors = [
         get_task_factor(task_name, MACHINE_TASK_FACTOR_OVERRIDES, PLATFORM_MACHINE, factor),
@@ -86,16 +95,16 @@ def determine_factor(task_name, variant, factor):
         get_task_factor(task_name, VARIANT_TASK_FACTOR_OVERRIDES, variant, factor),
         global_task_factor(task_name, GLOBAL_TASK_FACTOR_OVERRIDES, factor),
     ]
-    return min(factors)
+    return min(factors) * determine_final_multiplier(distro)
 
 
-def determine_jobs(task_name, variant, jobs_max=0, job_factor=1.0):
+def determine_jobs(task_name, variant, distro, jobs_max=0, job_factor=1.0):
     """Determine the resmoke jobs."""
     if jobs_max < 0:
         raise ValueError("The jobs_max must be >= 0.")
     if job_factor <= 0:
         raise ValueError("The job_factor must be > 0.")
-    factor = determine_factor(task_name, variant, job_factor)
+    factor = determine_factor(task_name, variant, distro, job_factor)
     jobs_available = int(round(CPU_COUNT * factor))
     if jobs_max == 0:
         return max(1, jobs_available)
@@ -120,6 +129,8 @@ def main():
     parser.add_argument("--taskName", dest="task", required=True, help="Task being executed.")
     parser.add_argument("--buildVariant", dest="variant", required=True,
                         help="Build variant task is being executed on.")
+    parser.add_argument("--distro", dest="distro", required=True,
+                        help="Distro task is being executed on.")
     parser.add_argument(
         "--jobFactor", dest="jobs_factor", type=float, default=1.0,
         help=("Job factor to use as a mulitplier with the number of CPUs. Defaults"
@@ -141,7 +152,8 @@ def main():
     LOGGER.info("Finding job count", task=options.task, variant=options.variant,
                 platform=PLATFORM_MACHINE, sys=SYS_PLATFORM, cpu_count=CPU_COUNT)
 
-    jobs = determine_jobs(options.task, options.variant, options.jobs_max, options.jobs_factor)
+    jobs = determine_jobs(options.task, options.variant, options.distro, options.jobs_max,
+                          options.jobs_factor)
     if jobs < CPU_COUNT:
         print("Reducing number of jobs to run from {} to {}".format(CPU_COUNT, jobs))
     output_jobs(jobs, options.outfile)
