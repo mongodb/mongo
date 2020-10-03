@@ -410,7 +410,7 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
                 projectEvalExpr(std::move(expr), std::move(stage), planNodeId, slotIdGenerator);
         }
 
-        stages.emplace_back(std::move(stage.stage));
+        stages.emplace_back(std::move(stage.stage));  // NOLINT(bugprone-use-after-move)
         inputs.emplace_back(sbe::makeSV(slot));
     }
 
@@ -530,7 +530,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     auto outputSlot = slotIdGenerator->generate();
     auto outputStage =
         makeTraverse(std::move(fromBranch),
-                     std::move(innerBranch),
+                     std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
                      fieldSlot,
                      outputSlot,
                      innerSlot,
@@ -560,7 +560,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                     "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlot)))),
                 std::move(outputExpr.expr)));
 
-        return {std::move(outputExpr), std::move(outputStage)};
+        return {std::move(outputExpr), std::move(outputStage)};  // NOLINT(bugprone-use-after-move)
     } else {
         return {outputSlot, std::move(outputStage)};
     }
@@ -1147,7 +1147,9 @@ public:
         // We're using 'kDoNotTraverseLeaf' traverse mode, so we're guaranteed that 'makePredcate'
         // will only be called once, so it's safe to capture and pass in the 'filterStage' subtree
         // here.
-        auto makePredicate = [&, filterSlot = filterSlot, &filterStage = filterStage](
+        auto makePredicate = [&,
+                              filterSlot = filterSlot,
+                              &filterStage = filterStage](  // NOLINT(bugprone-use-after-move)
                                  sbe::value::SlotId inputSlot,
                                  EvalStage inputStage) -> EvalExprStagePair {
             invariant(filterStage.stage);
