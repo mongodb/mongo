@@ -114,7 +114,7 @@ public:
      */
     BSONObj processNetworkResponse(const BSONObj& obj,
                                    bool expectReadyRequestsAfterProcessing = false);
-    BSONObj processNetworkResponse(const RemoteCommandResponse rs,
+    BSONObj processNetworkResponse(RemoteCommandResponse rs,
                                    bool expectReadyRequestsAfterProcessing = false);
 
     void runUntil(Date_t when, bool expectReadyRequestsAfterAdvancingClock = false);
@@ -202,7 +202,7 @@ BSONObj ReporterTest::processNetworkResponse(const BSONObj& obj,
     return cmdObj;
 }
 
-BSONObj ReporterTest::processNetworkResponse(const RemoteCommandResponse rs,
+BSONObj ReporterTest::processNetworkResponse(RemoteCommandResponse rs,
                                              bool expectReadyRequestsAfterProcessing) {
     auto net = getNet();
     net->enterNetwork();

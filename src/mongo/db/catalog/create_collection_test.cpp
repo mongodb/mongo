@@ -55,7 +55,7 @@ private:
     void tearDown() override;
 
 protected:
-    void validateValidator(const std::string& validatorStr, const int expectedError);
+    void validateValidator(const std::string& validatorStr, int expectedError);
 
     // Use StorageInterface to access storage features below catalog interface.
     std::unique_ptr<repl::StorageInterface> _storage;
@@ -92,8 +92,7 @@ ServiceContext::UniqueOperationContext makeOpCtx() {
     return opCtx;
 }
 
-void CreateCollectionTest::validateValidator(const std::string& validatorStr,
-                                             const int expectedError) {
+void CreateCollectionTest::validateValidator(const std::string& validatorStr, int expectedError) {
     NamespaceString newNss("test.newCollWithValidation");
 
     auto opCtx = makeOpCtx();

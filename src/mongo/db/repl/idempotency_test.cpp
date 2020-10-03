@@ -58,7 +58,7 @@ protected:
     const BSONObj kDocIdQuery = BSON("_id" << kDocId);
 
     std::vector<OplogEntry> createUpdateSequence(const UpdateSequenceGenerator& generator,
-                                                 const size_t length);
+                                                 size_t length);
 
     BSONObj canonicalizeDocumentForDataHash(const BSONObj& obj) override;
 
@@ -133,7 +133,7 @@ BSONObj RandomizedIdempotencyTest::getDoc() {
 }
 
 std::vector<OplogEntry> RandomizedIdempotencyTest::createUpdateSequence(
-    const UpdateSequenceGenerator& generator, const size_t length) {
+    const UpdateSequenceGenerator& generator, size_t length) {
     // for each document enumerated & inserted generate a sequence of updates to apply to it.
     std::vector<OplogEntry> updateSequence;
     updateSequence.reserve(length);

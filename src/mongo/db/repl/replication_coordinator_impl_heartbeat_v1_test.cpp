@@ -84,8 +84,8 @@ protected:
         const ReplSetConfig& rsConfig,
         int sourceId,
         const HostAndPort& source,
-        const int term = 1,
-        const boost::optional<int> currentPrimaryId = boost::none);
+        int term = 1,
+        boost::optional<int> currentPrimaryId = boost::none);
 };
 
 void ReplCoordHBV1Test::assertMemberState(const MemberState expected, std::string msg) {
@@ -98,8 +98,8 @@ ReplSetHeartbeatResponse ReplCoordHBV1Test::receiveHeartbeatFrom(
     const ReplSetConfig& rsConfig,
     int sourceId,
     const HostAndPort& source,
-    const int term,
-    const boost::optional<int> currentPrimaryId) {
+    int term,
+    boost::optional<int> currentPrimaryId) {
     ReplSetHeartbeatArgsV1 hbArgs;
     hbArgs.setConfigVersion(rsConfig.getConfigVersion());
     hbArgs.setConfigTerm(rsConfig.getConfigTerm());

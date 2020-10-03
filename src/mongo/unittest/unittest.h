@@ -595,7 +595,7 @@ protected:
      * If a BSON Element is undefined, it simply checks for its existence, not its type or value.
      * This allows callers to test for the existence of elements in variable length log lines.
      */
-    int64_t countBSONFormatLogLinesIsSubset(const BSONObj needle);
+    int64_t countBSONFormatLogLinesIsSubset(const BSONObj& needle);
 
     /**
      * Prints the captured log lines.

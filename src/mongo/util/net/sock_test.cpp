@@ -56,7 +56,7 @@ typedef std::pair<SocketPtr, SocketPtr> SocketPair;
 // call. The 'type' parameter should be one of SOCK_STREAM, SOCK_DGRAM, SOCK_SEQPACKET, etc.
 // For Win32, we don't have a native socketpair function, so we hack up a connected PF_INET
 // pair on a random port.
-SocketPair socketPair(const int type, const int protocol = 0);
+SocketPair socketPair(int type, int protocol = 0);
 
 #if defined(_WIN32)
 namespace detail {
@@ -82,7 +82,7 @@ void awaitConnect(SOCKET* connectSock, const struct addrinfo& where, Notificatio
 }
 }  // namespace detail
 
-SocketPair socketPair(const int type, const int protocol) {
+SocketPair socketPair(int type, int protocol) {
     const int domain = PF_INET;
 
     // Create a listen socket and a connect socket.
@@ -186,7 +186,7 @@ SocketPair socketPair(const int type, const int protocol) {
 }
 #else
 // We can just use ::socketpair and wrap up the result in a Socket.
-SocketPair socketPair(const int type, const int protocol) {
+SocketPair socketPair(int type, int protocol) {
     // PF_LOCAL is the POSIX name for Unix domain sockets, while PF_UNIX
     // is the name that BSD used.  We use the BSD name because it is more
     // widely supported (e.g. Solaris 10).

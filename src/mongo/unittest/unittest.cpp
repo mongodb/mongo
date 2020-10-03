@@ -196,7 +196,7 @@ public:
     const std::vector<std::string>& getCapturedTextFormatLogMessages() const;
     std::vector<BSONObj> getCapturedBSONFormatLogMessages() const;
     int64_t countTextFormatLogLinesContaining(const std::string& needle);
-    int64_t countBSONFormatLogLinesIsSubset(const BSONObj needle);
+    int64_t countBSONFormatLogLinesIsSubset(const BSONObj& needle);
     void printCapturedTextFormatLogLines() const;
 
 private:
@@ -346,7 +346,7 @@ bool isSubset(BSONObj haystack, BSONObj needle) {
     return true;
 }
 
-int64_t CaptureLogs::countBSONFormatLogLinesIsSubset(const BSONObj needle) {
+int64_t CaptureLogs::countBSONFormatLogLinesIsSubset(const BSONObj& needle) {
     const auto& msgs = getCapturedBSONFormatLogMessages();
     return std::count_if(
         msgs.begin(), msgs.end(), [&](const BSONObj s) { return isSubset(s, needle); });
@@ -369,7 +369,7 @@ std::vector<BSONObj> Test::getCapturedBSONFormatLogMessages() const {
 int64_t Test::countTextFormatLogLinesContaining(const std::string& needle) {
     return getCaptureLogs()->countTextFormatLogLinesContaining(needle);
 }
-int64_t Test::countBSONFormatLogLinesIsSubset(const BSONObj needle) {
+int64_t Test::countBSONFormatLogLinesIsSubset(const BSONObj& needle) {
     return getCaptureLogs()->countBSONFormatLogLinesIsSubset(needle);
 }
 void Test::printCapturedTextFormatLogLines() const {

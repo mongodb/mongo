@@ -55,7 +55,7 @@ public:
      * number of documents returned equals "expectedNumberOfDocuments".
      */
     void checkMigrationsCollectionForDocument(const MigrateInfo& migrateInfo,
-                                              const unsigned long expectedNumberOfDocuments);
+                                              unsigned long expectedNumberOfDocuments);
 
     /**
      * Makes a ScopedMigrationRequest and checks that the migration was written to
@@ -73,7 +73,7 @@ void ScopedMigrationRequestTest::setUp() {
 }
 
 void ScopedMigrationRequestTest::checkMigrationsCollectionForDocument(
-    const MigrateInfo& migrateInfo, const unsigned long expectedNumberOfDocuments) {
+    const MigrateInfo& migrateInfo, unsigned long expectedNumberOfDocuments) {
     auto response = shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         operationContext(),
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},

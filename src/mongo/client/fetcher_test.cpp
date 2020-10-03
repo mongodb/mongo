@@ -65,7 +65,7 @@ public:
     void processNetworkResponse(const BSONObj& obj,
                                 ReadyQueueState readyQueueStateAfterProcessing,
                                 FetcherState fetcherStateAfterProcessing);
-    void processNetworkResponse(const ResponseStatus,
+    void processNetworkResponse(ResponseStatus,
                                 ReadyQueueState readyQueueStateAfterProcessing,
                                 FetcherState fetcherStateAfterProcessing);
     void processNetworkResponse(const BSONObj& obj,
