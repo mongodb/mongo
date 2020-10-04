@@ -178,12 +178,7 @@ StatusWith<executor::TaskExecutor::EventHandle> BlockingResultsMerger::getNextEv
 }
 
 void BlockingResultsMerger::kill(OperationContext* opCtx) {
-    auto killEvent = _arm.kill(opCtx);
-    if (!killEvent) {
-        // We are shutting down.
-        return;
-    }
-    _executor->waitForEvent(killEvent);
+    _arm.kill(opCtx).wait();
 }
 
 }  // namespace mongo

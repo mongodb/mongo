@@ -685,12 +685,10 @@ void AsyncResultsMerger::_cleanUpKilledBatch(WithLock lk) {
     invariant(_lifecycleState == kKillStarted);
 
     // If this is the last callback to run then we are ready to free the ARM. We signal the
-    // '_killCompleteEvent', which the caller of kill() may be waiting on.
+    // '_killCompleteInfo', which the caller of kill() may be waiting on.
     if (!_haveOutstandingBatchRequests(lk)) {
-        // If the event is invalid then '_executor' is in shutdown, so we cannot signal events.
-        if (_killCompleteEvent.isValid()) {
-            _executor->signalEvent(_killCompleteEvent);
-        }
+        invariant(_killCompleteInfo);
+        _killCompleteInfo->signalFutures();
 
         _lifecycleState = kKillComplete;
     }
@@ -818,7 +816,7 @@ bool AsyncResultsMerger::_haveOutstandingBatchRequests(WithLock) {
 }
 
 void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx) {
-    invariant(_killCompleteEvent.isValid());
+    invariant(_killCompleteInfo);
 
     for (const auto& remote : _remotes) {
         if (remote.status.isOK() && remote.cursorId && !remote.exhausted()) {
@@ -834,40 +832,29 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
     }
 }
 
-executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* opCtx) {
+stdx::shared_future<void> AsyncResultsMerger::kill(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    if (_killCompleteEvent.isValid()) {
+    if (_killCompleteInfo) {
         invariant(_lifecycleState != kAlive);
-        return _killCompleteEvent;
+        return _killCompleteInfo->getFuture();
     }
 
     invariant(_lifecycleState == kAlive);
     _lifecycleState = kKillStarted;
 
-    // Make '_killCompleteEvent', which we will signal as soon as all of our callbacks
-    // have finished running.
-    auto statusWithEvent = _executor->makeEvent();
-    if (ErrorCodes::isShutdownError(statusWithEvent.getStatus().code())) {
-        // The underlying task executor is shutting down.
-        if (!_haveOutstandingBatchRequests(lk)) {
-            _lifecycleState = kKillComplete;
-        }
-        return executor::TaskExecutor::EventHandle();
-    }
-    fassert(28716, statusWithEvent);
-    _killCompleteEvent = statusWithEvent.getValue();
+    // Create "_killCompleteInfo", which we will signal as soon as all of our callbacks have
+    // finished running.
+    _killCompleteInfo.emplace();
 
     _scheduleKillCursors(lk, opCtx);
 
     if (!_haveOutstandingBatchRequests(lk)) {
         _lifecycleState = kKillComplete;
-        // Signal the event right now, as there's nothing to wait for.
-        _executor->signalEvent(_killCompleteEvent);
-        return _killCompleteEvent;
+        // Signal the future right now, as there's nothing to wait for.
+        _killCompleteInfo->signalFutures();
+        return _killCompleteInfo->getFuture();
     }
-
-    _lifecycleState = kKillStarted;
 
     // Cancel all of our callbacks. Once they all complete, the event will be signaled.
     for (const auto& remote : _remotes) {
@@ -875,7 +862,7 @@ executor::TaskExecutor::EventHandle AsyncResultsMerger::kill(OperationContext* o
             _executor->cancel(remote.cbHandle);
         }
     }
-    return _killCompleteEvent;
+    return _killCompleteInfo->getFuture();
 }
 
 //
