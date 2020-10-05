@@ -6493,4 +6493,10 @@ void ExpressionToHashedIndexKey::_doAddDependencies(DepsTracker* deps) const {
     // Nothing to do
 }
 
+MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {
+    // Nothing to do. This initializer exists to tie together all the individual initializers
+    // defined by REGISTER_EXPRESSION / REGISTER_EXPRESSION_WITH_MIN_VERSION.
+    return Status::OK();
+}
+
 }  // namespace mongo

@@ -25,4 +25,14 @@ expectedResult = {
 };
 testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_profiling.json"}, expectedResult);
 
+jsTest.log("Testing \"operationProfiling.filter\" config file option with agg expressions");
+expectedResult = {
+    "parsed": {
+        "config": "jstests/libs/config_files/set_profiling_filter.json",
+        "operationProfiling": {"filter": "{$expr: {$lt: [{$rand: {}}, 0.01]}}"}
+    }
+};
+testGetCmdLineOptsMongod({config: "jstests/libs/config_files/set_profiling_filter.json"},
+                         expectedResult);
+
 print(baseName + " succeeded.");
