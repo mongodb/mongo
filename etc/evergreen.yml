@@ -3883,7 +3883,7 @@ tasks:
         task_install_action:
             default
         task_compile_flags: >-
-          --ninja=next
+          --ninja
         targets:
           build.ninja
     - command: shell.exec
