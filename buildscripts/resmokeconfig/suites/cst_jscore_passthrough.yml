@@ -485,6 +485,7 @@ selector:
   - jstests/core/dbref3.js
   - jstests/core/elemmatch_object.js
   - jstests/core/elemmatch_or_pushdown.js
+  - jstests/core/elemmatch_value.js
   - jstests/core/elemMatchProjection.js
   - jstests/core/elemMatchProjection.js
   - jstests/core/existsa.js
