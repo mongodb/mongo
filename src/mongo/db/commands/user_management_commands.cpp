@@ -60,17 +60,21 @@
 #include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/password_digest.h"
@@ -741,6 +745,166 @@ BSONArray vectorToBSON(const std::vector<T>& vec) {
     }
     return builder.arr();
 }
+
+MONGO_FAIL_POINT_DEFINE(umcTransaction);
+/**
+ * Handler for performing transaction guarded updates to the auth collections.
+ *
+ * UMCTransaction::commit() must be called after setting up operations,
+ * or the transaction will be aborted on scope exit.
+ */
+class UMCTransaction {
+public:
+    static constexpr StringData kAdminDB = "admin"_sd;
+    static constexpr StringData kCommitTransaction = "commitTransaction"_sd;
+    static constexpr StringData kAbortTransaction = "abortTransaction"_sd;
+
+    UMCTransaction(OperationContext* opCtx, StringData forCommand) {
+        // Don't transactionalize on standalone.
+        _isReplSet = repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
+            repl::ReplicationCoordinator::modeReplSet;
+
+        // Subclient used by transaction operations.
+        _client = opCtx->getServiceContext()->makeClient(forCommand.toString());
+        auto as = AuthorizationSession::get(_client.get());
+        if (as) {
+            as->grantInternalAuthorization(_client.get());
+        }
+
+        AlternativeClientRegion clientRegion(_client);
+        _sessionInfo.setStartTransaction(true);
+        _sessionInfo.setTxnNumber(0);
+        _sessionInfo.setSessionId(LogicalSessionFromClient(UUID::gen()));
+        _sessionInfo.setAutocommit(false);
+    }
+    ~UMCTransaction() {
+        if (_state == TransactionState::kStarted) {
+            abort().ignore();
+        }
+    }
+
+    StatusWith<std::uint32_t> insert(const NamespaceString& nss, const std::vector<BSONObj>& docs) {
+        dassert(nss.db() == kAdminDB);
+        write_ops::Insert op(nss);
+        op.setDocuments(docs);
+        return doCrudOp(op.toBSON({}));
+    }
+
+    StatusWith<std::uint32_t> update(const NamespaceString& nss, BSONObj query, BSONObj update) {
+        dassert(nss.db() == kAdminDB);
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(query);
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+        entry.setMulti(true);
+        write_ops::Update op(nss);
+        op.setUpdates({entry});
+        return doCrudOp(op.toBSON({}));
+    }
+
+    StatusWith<std::uint32_t> remove(const NamespaceString& nss, BSONObj query) {
+        dassert(nss.db() == kAdminDB);
+        write_ops::DeleteOpEntry entry;
+        entry.setQ(query);
+        entry.setMulti(true);
+        write_ops::Delete op(nss);
+        op.setDeletes({entry});
+        return doCrudOp(op.toBSON({}));
+    }
+
+    Status commit() {
+        auto fp = umcTransaction.scoped();
+        if (fp.isActive()) {
+            IDLParserErrorContext ctx("umcTransaction");
+            auto delay = UMCTransactionFailPoint::parse(ctx, fp.getData()).getCommitDelayMS();
+            LOGV2(4993100,
+                  "Sleeping prior to committing UMC transaction",
+                  "duration"_attr = Milliseconds(delay));
+            sleepmillis(delay);
+        }
+        return commitOrAbort(kCommitTransaction);
+    }
+
+    Status abort() {
+        return commitOrAbort(kAbortTransaction);
+    }
+
+private:
+    StatusWith<std::uint32_t> doCrudOp(BSONObj op) try {
+        invariant(_state != TransactionState::kDone);
+
+        BSONObjBuilder body(op);
+        auto reply = runCommand(&body);
+        auto status = getStatusFromCommandResult(reply);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (_state == TransactionState::kInit) {
+            _state = TransactionState::kStarted;
+            _sessionInfo.setStartTransaction(boost::none);
+        }
+
+        BatchedCommandResponse response;
+        std::string errmsg;
+        if (!response.parseBSON(reply, &errmsg)) {
+            return {ErrorCodes::FailedToParse, errmsg};
+        }
+
+        return response.getN();
+    } catch (const AssertionException& ex) {
+        return ex.toStatus();
+    }
+
+    Status commitOrAbort(StringData cmd) {
+        invariant((cmd == kCommitTransaction) || (cmd == kAbortTransaction));
+        if (_state != TransactionState::kStarted) {
+            return {ErrorCodes::NoSuchTransaction, "UMC Transaction not running"};
+        }
+
+        if (_isReplSet) {
+            BSONObjBuilder cmdBuilder;
+            cmdBuilder.append(cmd, 1);
+            auto status = getStatusFromCommandResult(runCommand(&cmdBuilder));
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        _state = TransactionState::kDone;
+        return Status::OK();
+    }
+
+    BSONObj runCommand(BSONObjBuilder* cmdBuilder) {
+        if (_isReplSet) {
+            // Append logical session (transaction) metadata.
+            _sessionInfo.serialize(cmdBuilder);
+        }
+
+        auto svcCtx = _client->getServiceContext();
+        auto sep = svcCtx->getServiceEntryPoint();
+        auto opMsgRequest = OpMsgRequest::fromDBAndBody(kAdminDB, cmdBuilder->obj());
+        auto requestMessage = rpc::messageFromOpMsgRequest(
+            rpc::supports::kAll, rpc::supports::kOpQueryOnly, opMsgRequest);
+
+        // Switch to our local client and create a short-lived opCtx for this transaction op.
+        AlternativeClientRegion clientRegion(_client);
+        auto subOpCtx = svcCtx->makeOperationContext(Client::getCurrent());
+        auto responseMessage = sep->handleRequest(subOpCtx.get(), requestMessage).get().response;
+        return rpc::makeReply(&responseMessage)->getCommandReply().getOwned();
+    }
+
+private:
+    enum class TransactionState {
+        kInit,
+        kStarted,
+        kDone,
+    };
+
+    bool _isReplSet;
+    ServiceContext::UniqueClient _client;
+    OperationSessionInfoFromClient _sessionInfo;
+    TransactionState _state = TransactionState::kInit;
+};
 
 template <typename RequestT, typename ReplyT>
 class CmdUMCTyped : public TypedCommand<CmdUMCTyped<RequestT, ReplyT>> {
@@ -1612,70 +1776,42 @@ void CmdUMCTyped<DropRoleCommand, void>::Invocation::typedRun(OperationContext* 
         }
     });
 
+    UMCTransaction txn(opCtx, DropRoleCommand::kCommandName);
+
     // Remove this role from all users
-    std::int64_t numMatched;
-    auto status = updateAuthzDocuments(
-        opCtx,
-        AuthorizationManager::usersCollectionNamespace,
-        BSON("roles" << BSON("$elemMatch" << BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                                  << roleName.getRole()
-                                                  << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                                  << roleName.getDB()))),
-        BSON("$pull" << BSON("roles" << BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                             << roleName.getRole()
-                                             << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                             << roleName.getDB()))),
-        false,
-        true,
-        &numMatched);
-    if (!status.isOK()) {
-        uassertStatusOK(useDefaultCode(status, ErrorCodes::UserModificationFailed)
+    auto swCount = txn.update(AuthorizationManager::usersCollectionNamespace,
+                              BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
+                              BSON("$pull" << BSON("roles" << roleName.toBSON())));
+    if (!swCount.isOK()) {
+        uassertStatusOK(useDefaultCode(swCount.getStatus(), ErrorCodes::UserModificationFailed)
                             .withContext(str::stream()
                                          << "Failed to remove role " << roleName.getFullName()
                                          << " from all users"));
     }
 
     // Remove this role from all other roles
-    status = updateAuthzDocuments(
-        opCtx,
-        AuthorizationManager::rolesCollectionNamespace,
-        BSON("roles" << BSON("$elemMatch" << BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                                  << roleName.getRole()
-                                                  << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                                  << roleName.getDB()))),
-        BSON("$pull" << BSON("roles" << BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                             << roleName.getRole()
-                                             << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                             << roleName.getDB()))),
-        false,
-        true,
-        &numMatched);
-    if (!status.isOK()) {
-        uassertStatusOK(useDefaultCode(status, ErrorCodes::RoleModificationFailed)
+    swCount = txn.update(AuthorizationManager::rolesCollectionNamespace,
+                         BSON("roles" << BSON("$elemMatch" << roleName.toBSON())),
+                         BSON("$pull" << BSON("roles" << roleName.toBSON())));
+    if (!swCount.isOK()) {
+        uassertStatusOK(useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
                             .withContext(str::stream()
-                                         << "Removed role " << roleName.getFullName()
-                                         << " from all users but failed to remove from all roles"));
+                                         << "Failed to remove role " << roleName.getFullName()
+                                         << " from all users"));
+    }
+
+    // Finally, remove the actual role document
+    swCount = txn.remove(AuthorizationManager::rolesCollectionNamespace, roleName.toBSON());
+    if (!swCount.isOK()) {
+        uassertStatusOK(swCount.getStatus().withContext(str::stream() << "Failed to remove role "
+                                                                      << roleName.getFullName()));
     }
 
     audit::logDropRole(client, roleName);
 
-    // Finally, remove the actual role document
-    status = removeRoleDocuments(
-        opCtx,
-        BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-             << roleName.getRole() << AuthorizationManager::ROLE_DB_FIELD_NAME << roleName.getDB()),
-        &numMatched);
+    auto status = txn.commit();
     if (!status.isOK()) {
-        uassertStatusOK(status.withContext(
-            str::stream() << "Removed role " << roleName.getFullName()
-                          << " from all users and roles but failed to actually delete"
-                             " the role itself"));
-    }
-
-    dassert(numMatched == 0 || numMatched == 1);
-    if (numMatched == 0) {
-        uasserted(ErrorCodes::RoleNotFound,
-                  str::stream() << "Role '" << roleName.getFullName() << "' not found");
+        uassertStatusOK(status.withContext("Failed applying dropRole transaction"));
     }
 }
 
@@ -1702,53 +1838,50 @@ CmdUMCTyped<DropAllRolesFromDatabaseCommand, DropAllRolesFromDatabaseReply>::Inv
         }
     });
 
+    UMCTransaction txn(opCtx, DropAllRolesFromDatabaseCommand::kCommandName);
+    auto roleMatch = BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname);
+    auto rolesMatch = BSON("roles" << roleMatch);
+
     // Remove these roles from all users
-    std::int64_t numMatched;
-    auto status = updateAuthzDocuments(
-        opCtx,
-        AuthorizationManager::usersCollectionNamespace,
-        BSON("roles" << BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname)),
-        BSON("$pull" << BSON("roles" << BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname))),
-        false,
-        true,
-        &numMatched);
-    if (!status.isOK()) {
-        uassertStatusOK(useDefaultCode(status, ErrorCodes::UserModificationFailed)
+    auto swCount = txn.update(
+        AuthorizationManager::usersCollectionNamespace, rolesMatch, BSON("$pull" << rolesMatch));
+    if (!swCount.isOK()) {
+        uassertStatusOK(useDefaultCode(swCount.getStatus(), ErrorCodes::UserModificationFailed)
                             .withContext(str::stream() << "Failed to remove roles from \"" << dbname
                                                        << "\" db from all users"));
     }
 
     // Remove these roles from all other roles
-    std::string sourceFieldName = str::stream()
-        << "roles." << AuthorizationManager::ROLE_DB_FIELD_NAME;
-    status = updateAuthzDocuments(
-        opCtx,
-        AuthorizationManager::rolesCollectionNamespace,
-        BSON(sourceFieldName << dbname),
-        BSON("$pull" << BSON("roles" << BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname))),
-        false,
-        true,
-        &numMatched);
-    if (!status.isOK()) {
-        uassertStatusOK(useDefaultCode(status, ErrorCodes::RoleModificationFailed)
+    swCount = txn.update(AuthorizationManager::rolesCollectionNamespace,
+                         BSON("roles.db" << dbname),
+                         BSON("$pull" << rolesMatch));
+    if (!swCount.isOK()) {
+        uassertStatusOK(useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
                             .withContext(str::stream() << "Failed to remove roles from \"" << dbname
                                                        << "\" db from all roles"));
     }
 
-    audit::logDropAllRolesFromDatabase(Client::getCurrent(), dbname);
     // Finally, remove the actual role documents
-    status = removeRoleDocuments(
-        opCtx, BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname), &numMatched);
-    if (!status.isOK()) {
-        uassertStatusOK(status.withContext(
+    swCount = txn.remove(AuthorizationManager::rolesCollectionNamespace, roleMatch);
+    if (!swCount.isOK()) {
+        uassertStatusOK(swCount.getStatus().withContext(
             str::stream() << "Removed roles from \"" << dbname
                           << "\" db "
                              " from all users and roles but failed to actually delete"
                              " those roles themselves"));
     }
 
+    audit::logDropAllRolesFromDatabase(Client::getCurrent(), dbname);
+
+    auto status = txn.commit();
+    if (!status.isOK()) {
+        uassertStatusOK(
+            status.withContext("Failed applying dropAllRolesFromDatabase command transaction"));
+    }
+
+
     DropAllRolesFromDatabaseReply reply;
-    reply.setCount(numMatched);
+    reply.setCount(swCount.getValue());
     return reply;
 }
 

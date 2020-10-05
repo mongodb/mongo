@@ -276,7 +276,7 @@ private:
         uassert(50791,
                 str::stream() << "Cannot write to system collection " << ns().toString()
                               << " within a transaction.",
-                !ns().isSystem());
+                !ns().isSystem() || ns().isPrivilegeCollection());
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         uassert(50790,
                 str::stream() << "Cannot write to unreplicated collection " << ns().toString()

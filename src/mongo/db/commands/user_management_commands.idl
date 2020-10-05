@@ -60,6 +60,14 @@ structs:
                 type: int
                 cpp_name: count
 
+    UMCTransactionFailPoint:
+        description: Data for umcTransaction failpoint
+        fields:
+            commitDelayMS:
+                type: int
+                default: 0
+                validator: { gte: 0 }
+
 commands:
     createUser:
         description: "Create a user"
