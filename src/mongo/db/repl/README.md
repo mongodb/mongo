@@ -1879,6 +1879,14 @@ is updated to reflect the new upgraded or downgraded state. This update is also 
 `writeConcern: majority`. The new in-memory FCV value will be updated to reflect the on-disk
 changes.
 
+# System Collections
+
+Much of mongod's configuration and state is persisted in "system collections" in the "admin"
+database, such as `admin.system.version`, or the "config" database, such as `config.transactions`.
+(These collections are both replicated. Unreplicated configuration and state is stored in the
+"local" database.) The difference between "admin" and "config" for system collections is historical;
+from now on when we invent a new system collection we will place it on "admin".
+
 # Replication Timestamp Glossary
 
 In this section, when we refer to the word "transaction" without any other qualifier, we are talking
