@@ -105,10 +105,10 @@ SetOption('random', 1)
 #
 
 add_option('ninja',
-    choices=['stable', 'next', 'disabled'],
+    choices=['enabled', 'disabled'],
     default='disabled',
     nargs='?',
-    const='stable',
+    const='enabled',
     type='choice',
     help='Enable the build.ninja generator tool stable or canary version',
 )
@@ -1107,7 +1107,7 @@ envDict = dict(BUILD_ROOT=buildDir,
 # user has opted into the next gen tools, add our experimental tool
 # directory into the default toolpath, ahead of whatever is already in
 # there so it overrides it.
-if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
+if get_option('build-tools') == 'next':
     SCons.Tool.DefaultToolpath.insert(0, os.path.abspath('site_scons/site_tools/next'))
 
 env = Environment(variables=env_vars, **envDict)
@@ -4020,22 +4020,18 @@ elif env.ToolchainIs("gcc"):
 
 # Now that we are done with configure checks, enable ccache and
 # icecream if requested.
-if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
-    if 'CCACHE' in env and env['CCACHE']:
-        ccache = Tool('ccache')
-        if not ccache.exists(env):
-            env.FatalError(f"Failed to load ccache tool with CCACHE={env['CCACHE']}")
-        ccache(env)
-    if 'ICECC' in env and env['ICECC']:
-        env['ICECREAM_VERBOSE'] = env.Verbose()
-        env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
-        icecream = Tool('icecream')
-        if not icecream.exists(env):
-            env.FatalError(f"Failed to load icecream tool with ICECC={env['ICECC']}")
-        icecream(env)
-else:
-    env.Tool('ccache')
-    env.Tool('icecream')
+if 'CCACHE' in env and env['CCACHE']:
+    ccache = Tool('ccache')
+    if not ccache.exists(env):
+        env.FatalError(f"Failed to load ccache tool with CCACHE={env['CCACHE']}")
+    ccache(env)
+if 'ICECC' in env and env['ICECC']:
+    env['ICECREAM_VERBOSE'] = env.Verbose()
+    env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
+    icecream = Tool('icecream')
+    if not icecream.exists(env):
+        env.FatalError(f"Failed to load icecream tool with ICECC={env['ICECC']}")
+    icecream(env)
 
 # Defaults for SCons provided flags. SetOption only sets the option to our value
 # if the user did not provide it. So for any flag here if it's explicitly passed
@@ -4090,34 +4086,31 @@ if get_option('ninja') != 'disabled':
             env.FatalError("Use of ccache is mandatory with --ninja and icecream older than 1.2. You are running {}.".format(env['ICECREAM_VERSION']))
 
     ninja_builder = Tool("ninja")
-    if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
-        env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
-        ninja_builder.generate(env)
+    env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
+    ninja_builder.generate(env)
 
-        ninjaConf = Configure(env, help=False, custom_tests = {
-            'CheckNinjaCompdbExpand': env.CheckNinjaCompdbExpand,
-        })
-        env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
-        ninjaConf.Finish()
+    ninjaConf = Configure(env, help=False, custom_tests = {
+        'CheckNinjaCompdbExpand': env.CheckNinjaCompdbExpand,
+    })
+    env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
+    ninjaConf.Finish()
 
-        # TODO: API for getting the sconscripts programmatically
-        # exists upstream: https://github.com/SCons/scons/issues/3625
-        def ninja_generate_deps(env, target, source, for_signature):
-            dependencies = env.Flatten([
-                'SConstruct',
-                glob(os.path.join('src', '**', 'SConscript'), recursive=True),
-                glob(os.path.join(os.path.expanduser('~/.scons/'), '**', '*.py'), recursive=True),
-                glob(os.path.join('site_scons', '**', '*.py'), recursive=True),
-                glob(os.path.join('buildscripts', '**', '*.py'), recursive=True),
-                glob(os.path.join('src/third_party/scons-*', '**', '*.py'), recursive=True),
-                glob(os.path.join('src/mongo/db/modules', '**', '*.py'), recursive=True),
-            ])
+    # TODO: API for getting the sconscripts programmatically
+    # exists upstream: https://github.com/SCons/scons/issues/3625
+    def ninja_generate_deps(env, target, source, for_signature):
+        dependencies = env.Flatten([
+            'SConstruct',
+            glob(os.path.join('src', '**', 'SConscript'), recursive=True),
+            glob(os.path.join(os.path.expanduser('~/.scons/'), '**', '*.py'), recursive=True),
+            glob(os.path.join('site_scons', '**', '*.py'), recursive=True),
+            glob(os.path.join('buildscripts', '**', '*.py'), recursive=True),
+            glob(os.path.join('src/third_party/scons-*', '**', '*.py'), recursive=True),
+            glob(os.path.join('src/mongo/db/modules', '**', '*.py'), recursive=True),
+        ])
 
-            return dependencies
+        return dependencies
 
-        env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
-    else:
-        ninja_builder.generate(env)
+    env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
@@ -4134,15 +4127,9 @@ if get_option('ninja') != 'disabled':
     )
 
     def get_idlc_command(env, node, action, targets, sources, executor=None):
-        if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
-            _, variables, _ = env.NinjaGetGenericShellCommand(node, action, targets, sources, executor=executor)
-        else:
-            _, variables = env.NinjaGetShellCommand(node, action, targets, sources, executor=executor)
+        _, variables, _ = env.NinjaGetGenericShellCommand(node, action, targets, sources, executor=executor)
         variables["msvc_deps_prefix"] = "import file:"
-        if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
-            return "IDLC", variables, env.subst(env['IDLC']).split()
-        else:
-            return "IDLC", variables
+        return "IDLC", variables, env.subst(env['IDLC']).split()
 
     env.NinjaRuleMapping("$IDLCCOM", get_idlc_command)
     env.NinjaRuleMapping(env["IDLCCOM"], get_idlc_command)

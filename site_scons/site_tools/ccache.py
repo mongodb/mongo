@@ -30,23 +30,20 @@ from pkg_resources import parse_version
 
 # This is the oldest version of ccache that offers support for -gsplit-dwarf
 _ccache_version_min = parse_version("3.2.3")
-_ccache_version_found = None
 
 
 def exists(env):
     """Look for a viable ccache implementation that meets our version requirements."""
+    if not env.subst("$CCACHE"):
+        return False
 
-    # If we already generated, we definitely exist
-    if "CCACHE_VERSION" in env:
+    ccache = env.WhereIs("$CCACHE")
+    if not ccache:
+        print(f"Error: ccache not found at {env['CCACHE']}")
+        return False
+
+    if 'CCACHE_VERSION' in env and env['CCACHE_VERSION'] >= _ccache_version_min:
         return True
-
-    ccache = env.get("CCACHE", False)
-    if not ccache:
-        return False
-
-    ccache = env.WhereIs(ccache)
-    if not ccache:
-        return False
 
     pipe = SCons.Action._subproc(
         env,
@@ -57,6 +54,7 @@ def exists(env):
     )
 
     if pipe.wait() != 0:
+        print(f"Error: failed to execute '{env['CCACHE']}'")
         return False
 
     validated = False
@@ -70,10 +68,14 @@ def exists(env):
         ccache_version = re.split("ccache version (.+)", line)
         if len(ccache_version) < 2:
             continue
-        global _ccache_version_found
-        _ccache_version_found = parse_version(ccache_version[1])
-        if _ccache_version_found >= _ccache_version_min:
+        ccache_version = parse_version(ccache_version[1])
+        if ccache_version >= _ccache_version_min:
             validated = True
+
+    if validated:
+        env['CCACHE_VERSION'] = ccache_version
+    else:
+        print(f"Error: failed to verify ccache version >= {_ccache_version_min}, found {ccache_version}")
 
     return validated
 
@@ -81,14 +83,8 @@ def exists(env):
 def generate(env):
     """Add ccache support."""
 
-    # If we have already generated the tool, don't generate it again.
-    if "CCACHE_VERSION" in env:
-        return
-
-    # If we can't find ccache, or it is too old a version, don't
-    # generate.
-    if not exists(env):
-        return
+    # Absoluteify
+    env["CCACHE"] = env.WhereIs("$CCACHE")
 
     # Propagate CCACHE related variables into the command environment
     for var, host_value in os.environ.items():
@@ -104,23 +100,53 @@ def generate(env):
     if env.ToolchainIs("clang"):
         env.AppendUnique(CCFLAGS=["-Qunused-arguments"])
 
-    # Record our found CCACHE_VERSION. Other tools that need to know
-    # about ccache (like iecc) should query this variable to determine
-    # if ccache is active. Looking at the CCACHE variable in the
-    # environment is not sufficient, since the user may have set it,
-    # but it doesn't work or is out of date.
-    env["CCACHE_VERSION"] = _ccache_version_found
+    # Check whether icecream is requested and is a valid tool.
+    if "ICECC" in env:
+        icecream = SCons.Tool.Tool('icecream')
+        icecream_enabled = bool(icecream) and icecream.exists(env)
+    else:
+        icecream_enabled = False
 
     # Set up a performant ccache configuration. Here, we don't use a second preprocessor and
     # pass preprocessor arguments that deterministically expand source files so a stable
     # hash can be calculated on them. This both reduces the amount of work ccache needs to
     # do and increases the likelihood of a cache hit.
-    env["ENV"]["CCACHE_NOCPP2"] = 1
     if env.ToolchainIs("clang"):
+        env["ENV"].pop("CCACHE_CPP2", None)
+        env["ENV"]["CCACHE_NOCPP2"] = "1"
         env.AppendUnique(CCFLAGS=["-frewrite-includes"])
     elif env.ToolchainIs("gcc"):
-        env.AppendUnique(CCFLAGS=["-fdirectives-only"])
+        if icecream_enabled:
+            # Newer versions of Icecream will drop -fdirectives-only from
+            # preprocessor and compiler flags if it does not find a remote
+            # build host to build on. ccache, on the other hand, will not
+            # pass the flag to the compiler if CCACHE_NOCPP2=1, but it will
+            # pass it to the preprocessor. The combination of setting
+            # CCACHE_NOCPP2=1 and passing the flag can lead to build
+            # failures.
 
+            # See: https://jira.mongodb.org/browse/SERVER-48443
+            # We have an open issue with Icecream and ccache to resolve the
+            # cause of these build failures. Once the bug is resolved and
+            # the fix is deployed, we can remove this entire conditional
+            # branch and make it like the one for clang.
+            # TODO: https://github.com/icecc/icecream/issues/550
+            env["ENV"].pop("CCACHE_CPP2", None)
+            env["ENV"]["CCACHE_NOCPP2"] = "1"
+        else:
+            env["ENV"].pop("CCACHE_NOCPP2", None)
+            env["ENV"]["CCACHE_CPP2"] = "1"
+            env.AppendUnique(CCFLAGS=["-fdirectives-only"])
+
+    # Ensure ccache accounts for any extra files in use that affects the generated object
+    # file. This can be used for situations where a file is passed as an argument to a
+    # compiler parameter and differences in the file need to be accounted for in the
+    # hash result to prevent erroneous cache hits.
+    if "CCACHE_EXTRAFILES" in env and env["CCACHE_EXTRAFILES"]:
+        env["ENV"]["CCACHE_EXTRAFILES"] = ":".join([
+            blackfile.path
+            for blackfile in env["CCACHE_EXTRAFILES"]
+        ])
 
     # Make a generator to expand to CCACHE in the case where we are
     # not a conftest. We don't want to use ccache for configure tests
