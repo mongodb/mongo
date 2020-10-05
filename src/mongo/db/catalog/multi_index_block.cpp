@@ -860,7 +860,7 @@ void MultiIndexBlock::_writeStateToDisk(OperationContext* opCtx,
     wuow.commit();
 
     LOGV2(4841502,
-          "Wrote resumable index build state to disk",
+          "Index build: wrote resumable state to disk",
           "buildUUID"_attr = *_buildUUID,
           "details"_attr = obj);
 
