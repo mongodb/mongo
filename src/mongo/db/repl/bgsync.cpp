@@ -38,6 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_pool.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/oplog_interface_remote.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
 #include "mongo/db/repl/replication_process.h"
@@ -438,6 +440,20 @@ void BackgroundSync::_produce() {
     // before the OplogWriter gets a chance to append to the oplog.
     {
         auto opCtx = cc().makeOperationContext();
+
+        // Check if the producer has been stopped so that we can prevent setting the applied point
+        // after step up has already cleared it. We need to acquire the collection lock before the
+        // mutex to preserve proper lock ordering.
+        AutoGetCollection autoColl(
+            opCtx.get(),
+            NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
+            MODE_IX);
+        stdx::lock_guard<Latch> lock(_mutex);
+
+        if (_state != ProducerState::Running) {
+            return;
+        }
+
         if (_replicationProcess->getConsistencyMarkers()->getAppliedThrough(opCtx.get()).isNull()) {
             _replicationProcess->getConsistencyMarkers()->setAppliedThrough(
                 opCtx.get(), _replCoord->getMyLastAppliedOpTime());
