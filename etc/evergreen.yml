@@ -7477,7 +7477,8 @@ tasks:
         "baseurl": "${blackduck_url}",
         "username": "${blackduck_username}",
         "password": "${blackduck_password}",
-        "debug": false
+        "debug": false,
+        "insecure" : false
         }
         END_OF_CREDS
   - command: shell.exec

@@ -1,0 +1,308 @@
+# List of Third Party Components in MongoDB source code
+#
+# This file is consumed by buildscripts/blackduck_hub.py
+
+# Sample
+# component_name: Sample Example Compnent
+# 	homepage_url: https://www.example.com
+# 	local_directory_path: src/third_party/example
+#   open_hub_url: https://www.openhub.net/p/example
+#   release_monitoring_id: 1234
+# 	upgrade_suppression: SERVER-12345
+# 	vulnerability_suppression: SERVER-12345
+# 	team_owner: example
+
+# Description
+# component_name - string - required - Name of component in Black Duck Hub
+# homepage_url - URL - required - website where to find third party component
+# open_hub_url - URL - required - Black Duck Open Hub URL where to find third party component
+#                         not always available, see https://www.openhub.net
+# release_monitoring_id - integer - required - id of Fedora's Anitya project for monitoring releases
+#                         not always available, see https://release-monitoring.org/
+# local_directory_path - path - required - relative path to directory containing code
+# upgrade_suppression - string - optional - SERVER- ticket in JIRA, if present upgrade issues are ignored
+# vulnerability_suppression - string - optional - SERVER- ticket in JIRA, if present vulnerability issues are ignored
+# team_owner - string - required - server team that is responsible for maintaining library
+
+# TODO - can we query JIRA to see if the tickets are closed, check DAG code
+
+components:
+
+  abseil/abseil-cpp:
+    homepage_url: https://abseil.io
+    open_hub_url: N/A
+    release_monitoring_id: 115295
+    local_directory_path: src/third_party/abseil-cpp-master
+    team_owner: "Service Architecture"
+    # Note: abseil exists in Black Duck, but not OpenHub
+
+  Aladdin MD5:
+    homepage_url: N/A
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: [src/mongo/util/md5.h, src/mongo/util/md5.cpp]
+    team_owner: "Security"
+    # Not covered in Black Duck
+
+  "ASIO C++ Library":
+    homepage_url: http://think-async.com/Asio/
+    open_hub_url: N/A
+    release_monitoring_id: 117
+    local_directory_path: src/third_party/asio-master
+    team_owner: "Service Architecture"
+
+  benchmark:
+    homepage_url: https://github.com/google/benchmark
+    open_hub_url: https://www.openhub.net/p/benchmark
+    release_monitoring_id: 18299
+    local_directory_path: src/third_party/benchmark
+    team_owner: "Service Architecture"
+
+  "Boost C++ Libraries - boost":
+    homepage_url: https://www.boost.org/
+    open_hub_url: https://www.openhub.net/p/boost
+    release_monitoring_id: 6845
+    local_directory_path: src/third_party/boost-1.70.0
+    team_owner: "Service Architecture"
+
+  concurrencytest:
+    homepage_url: https://github.com/cgoldberg/concurrencytest
+    open_hub_url: https://www.openhub.net/p/concurrencytest
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/concurrencytest-0.1.2
+    team_owner: "Wiredtiger"
+
+  "dcleblanc/SafeInt":
+    homepage_url: https://github.com/dcleblanc/SafeInt
+    open_hub_url: https://www.openhub.net/p/SafeInt
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/SafeInt
+    team_owner: "Service Architecture"
+
+  discover-python:
+    homepage_url: https://pypi.org/project/discover/
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/discover-0.4.0
+    team_owner: "Wiredtiger"
+
+  fmt:
+    homepage_url: https://fmt.dev
+    open_hub_url: https://www.openhub.net/p/fmtlib_fmt
+    release_monitoring_id: 11526
+    local_directory_path: src/third_party/fmt
+    team_owner: "Security"
+
+  google/s2geometry:
+    homepage_url: https://github.com/google/s2geometry
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/s2
+    team_owner: "Query"
+    # Note: Code in MongoDB is based on early release here - https://code.google.com/archive/p/s2-geometry-library/
+
+  google-snappy:
+    homepage_url: https://google.github.io/snappy/
+    open_hub_url: N/A
+    release_monitoring_id: 4844
+    local_directory_path: src/third_party/snappy-1.1.7
+    team_owner: "Execution"
+
+  gperftools:
+    homepage_url: https://github.com/gperftools/gperftools
+    open_hub_url: https://www.openhub.net/p/google-perftools
+    release_monitoring_id: 1238
+    local_directory_path: src/third_party/gperftools
+    team_owner: "Execution"
+    # TODO - fix the version number in Black Duck
+
+  "ICU for C/C++ (ICU4C)":
+    homepage_url: http://site.icu-project.org/
+    open_hub_url: https://www.openhub.net/p/icu4c
+    release_monitoring_id: 16134
+    local_directory_path: src/third_party/icu4c-57.1
+    team_owner: "Query"
+    vulnerability_suppression: SERVER-49211
+
+  "Intel Decimal Floating-Point Math Library":
+    homepage_url: https://software.intel.com/content/www/us/en/develop/articles/intel-decimal-floating-point-math-library.html
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/IntelRDFPMathLib20U1
+    team_owner: "Execution"
+    # Note: IntelRDFPMathLib exists in Black Duck, but not OpenHub
+
+  JSON-Schema-Test-Suite:
+    homepage_url: https://github.com/json-schema-org/JSON-Schema-Test-Suite
+    open_hub_url: https://www.openhub.net/p/json-schema-test-suite
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/JSON-Schema-Test-Suite
+    team_owner: "Query"
+
+  libmongocrypt:
+    homepage_url: https://github.com/mongodb/libmongocrypt
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/kms-message
+    team_owner: "Security"
+    # Note: libmongocrypt exists in Black Duck, but not OpenHub
+
+  linenoise:
+    homepage_url: https://github.com/antirez/linenoise
+    open_hub_url: https://www.openhub.net/p/linenoise
+    release_monitoring_id: 5691
+    local_directory_path: [src/mongo/shell/linenoise.h, src/mongo/shell/linenoise.cpp]
+    team_owner: "Server Tools and Methodology"
+
+  LibTomCrypt:
+    homepage_url: https://www.libtom.net/
+    open_hub_url: https://www.openhub.net/p/libtomcrypt
+    release_monitoring_id: 15563
+    local_directory_path: src/third_party/tomcrypt-1.18.2
+    team_owner: "Security"
+
+  libunwind:
+    homepage_url: http://www.nongnu.org/libunwind/
+    open_hub_url: https://www.openhub.net/p/p_w_d10376
+    release_monitoring_id: 1748
+    local_directory_path: src/third_party/unwind
+    team_owner: "Service Architecture"
+    # Note: missing from README.third_party.md
+
+  "Mozilla Firefox":
+    homepage_url: https://www.mozilla.org/en-US/firefox/organizations/
+    open_hub_url: https://www.openhub.net/p/firefox
+    release_monitoring_id: 16838
+    local_directory_path: src/third_party/mozjs-60
+    team_owner: "Query"
+    vulnerability_suppression: SERVER-42427
+
+  "mpark-variant-devel":
+    homepage_url: https://github.com/mpark/variant
+    open_hub_url: N/A
+    release_monitoring_id: 18301
+    local_directory_path: src/third_party/variant-1.4.0
+    team_owner: "Service Architecture"
+
+  ocspbuilder:
+    homepage_url: https://github.com/wbond/ocspbuilder
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/mock_ocsp_responder
+    team_owner: "Security"
+    # Note: ocspbuilder exists in Black Duck, but not OpenHub
+
+  ocspresponder:
+    homepage_url: https://github.com/threema-ch/ocspresponder
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/mock_ocsp_responder
+    team_owner: "Security"
+    # Note: ocspresponder exists in Black Duck, but not OpenHub
+
+  PCRE:
+    homepage_url: https://www.pcre.org/
+    open_hub_url: https://www.openhub.net/p/pcre
+    release_monitoring_id: 2610
+    local_directory_path: src/third_party/pcre-8.42
+    team_owner: "Query"
+
+  python-testscenarios:
+    homepage_url: https://launchpad.net/testscenarios
+    open_hub_url: https://www.openhub.net/p/testscenarios
+    release_monitoring_id: 13220
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/testscenarios-0.4
+    team_owner: "Wiredtiger"
+
+  python3-extras:
+    homepage_url: https://github.com/testing-cabal/extras
+    open_hub_url: N/A
+    release_monitoring_id: 13192
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/extras-0.0.3
+    team_owner: "Wiredtiger"
+
+  "SCons - a Software Construction tool":
+    homepage_url: https://www.scons.org/
+    open_hub_url: https://www.openhub.net/p/scons
+    release_monitoring_id: 4770
+    local_directory_path: src/third_party/scons-3.1.2
+    team_owner: "Service Development Platform"
+
+  smhasher:
+    homepage_url: https://github.com/aappleby/smhasher
+    open_hub_url: https://www.openhub.net/p/smhasher
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/murmurhash3
+    team_owner: "Execution"
+
+  "Snowball Stemming Algorithms":
+    homepage_url: https://snowballstem.org/
+    open_hub_url: https://www.openhub.net/p/Snowball_Stemming_Algorithms
+    release_monitoring_id: 7853
+    local_directory_path: src/third_party/libstemmer_c
+    team_owner: "Query"
+
+  subunit:
+    homepage_url: https://launchpad.net/subunit
+    open_hub_url: N/A
+    release_monitoring_id: 85461
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/python-subunit-0.0.16
+    team_owner: "Wiredtiger"
+
+  timelib:
+    homepage_url: https://github.com/derickr/timelib
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/timelib-2018.01
+    team_owner: "Query"
+    # Note: Not in Black Duck
+
+  unicode:
+    homepage_url: http://www.unicode.org
+    open_hub_url: N/A
+    release_monitoring_id: 5045
+    local_directory_path: src/third_party/unicode-8.0.0
+    team_owner: "Query"
+
+  valgrind:
+    homepage_url: https://valgrind.org/
+    open_hub_url: https://www.openhub.net/p/valgrind
+    release_monitoring_id: 13639
+    local_directory_path: src/third_party/valgrind-3.14.0
+    team_owner: "Decision Automation Group"
+
+  testtools:
+    homepage_url: https://launchpad.net/testtools
+    open_hub_url: https://www.openhub.net/p/python-testtools
+    release_monitoring_id: 4047
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/testtools-0.9.34
+    team_owner: "Wiredtiger"
+
+  yaml-cpp:
+    homepage_url: https://github.com/jbeder/yaml-cpp
+    open_hub_url: https://www.openhub.net/p/jbeder_yaml-cpp
+    release_monitoring_id: 5284
+    local_directory_path: src/third_party/yaml-cpp-0.6.2
+    team_owner: "Security"
+
+  yhirose/cpp-peglib:
+    homepage_url: https://github.com/yhirose/cpp-peglib
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/peglib
+    team_owner: "Query"
+    # Note: peglib exists in Black Duck, but not OpenHub
+
+  zlib:
+    homepage_url: https://www.zlib.net/
+    open_hub_url: https://www.openhub.net/p/zlib
+    release_monitoring_id: 5303
+    local_directory_path: src/third_party/zlib-1.2.11
+    team_owner: "Execution"
+
+  zstd:
+    homepage_url: http://www.zstd.net/
+    open_hub_url: https://www.openhub.net/p/zstd
+    release_monitoring_id: 12083
+    local_directory_path: src/third_party/zstandard-1.4.4
+    team_owner: "Execution"
