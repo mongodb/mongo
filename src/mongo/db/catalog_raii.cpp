@@ -194,6 +194,43 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
     return _writableColl;
 }
 
+AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
+                                                     const NamespaceStringOrUUID& nsOrUUID,
+                                                     AutoGetCollectionViewMode viewMode,
+                                                     Date_t deadline)
+    : _globalLock(
+          opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, true /* skipRSTLLock */) {
+
+    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
+    setAutoGetCollectionWait.execute(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
+
+    _resolvedNss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+    _collection =
+        CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForRead(opCtx, _resolvedNss);
+    _collectionPtr = CollectionPtr(_collection);
+
+    // TODO (SERVER-51319): add DatabaseShardingState::checkDbVersion somewhere.
+
+    if (_collection) {
+        // If the collection exists, there is no need to check for views.
+        return;
+    }
+
+    // Returns nullptr for 'viewCatalog' if db does not exist.
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, _resolvedNss.db());
+    if (!viewCatalog) {
+        return;
+    }
+
+    // TODO (SERVER-51320): this code will invariant in ViewCatalog::lookup() because it takes a
+    // CollectionLock that expects a DBLock to be held on the database already.
+    _view = viewCatalog->lookup(opCtx, _resolvedNss.ns());
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
+            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+}
+
 struct CollectionWriter::SharedImpl {
     SharedImpl(CollectionWriter* parent) : _parent(parent) {}
 

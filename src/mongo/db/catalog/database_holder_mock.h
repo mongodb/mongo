@@ -41,6 +41,11 @@ public:
         return nullptr;
     }
 
+    std::shared_ptr<ViewCatalog> getSharedViewCatalog(OperationContext* const opCtx,
+                                                      StringData dbName) const override {
+        return nullptr;
+    }
+
     Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = nullptr) override {
         return nullptr;
     }

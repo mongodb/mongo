@@ -60,7 +60,7 @@
 namespace mongo {
 
 namespace {
-auto getViewCatalog = Database::declareDecoration<std::unique_ptr<ViewCatalog>>();
+auto getViewCatalog = Database::declareDecoration<std::shared_ptr<ViewCatalog>>();
 
 StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
                                                              BSONObj collationSpec) {
@@ -72,6 +72,10 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
     return CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collationSpec);
 }
 }  // namespace
+
+std::shared_ptr<ViewCatalog> ViewCatalog::getShared(const Database* db) {
+    return getViewCatalog(db);
+}
 
 ViewCatalog* ViewCatalog::get(const Database* db) {
     return getViewCatalog(db).get();

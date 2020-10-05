@@ -42,6 +42,7 @@ class CollectionCatalogEntry;
 class Database;
 class OperationContext;
 class RecordStore;
+class ViewCatalog;
 
 /**
  * Registry of opened databases.
@@ -63,6 +64,18 @@ public:
      * locked in at least IS-mode.
      */
     virtual Database* getDb(OperationContext* const opCtx, const StringData ns) const = 0;
+
+    /**
+     * Fetches the ViewCatalog decorating the Database matching 'dbName', or returns nullptr if the
+     * database does not exist. The returned ViewCatalog is safe to access without a lock because it
+     * is held as a shared_ptr.
+     *
+     * The ViewCatalog must be fetched through this interface if the caller holds no database lock
+     * to ensure the Database object is safe to access. This class' internal mutex provides
+     * concurrency protection around looking up and accessing the Database object matching 'dbName.
+     */
+    virtual std::shared_ptr<ViewCatalog> getSharedViewCatalog(OperationContext* const opCtx,
+                                                              StringData dbName) const = 0;
 
     /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been

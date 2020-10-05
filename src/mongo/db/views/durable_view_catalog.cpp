@@ -86,8 +86,7 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
     if (db) {
         // If the 'system.views' collection is dropped, we need to clear the in-memory state of the
         // view catalog.
-        ViewCatalog* viewCatalog = ViewCatalog::get(db);
-        viewCatalog->clear();
+        ViewCatalog::get(db)->clear();
     }
 }
 

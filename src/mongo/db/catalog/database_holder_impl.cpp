@@ -43,6 +43,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -67,7 +68,6 @@ StringData _todb(StringData ns) {
 
 }  // namespace
 
-
 Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, StringData ns) const {
     const StringData db = _todb(ns);
     invariant(opCtx->lockState()->isDbLockedForMode(db, MODE_IS) ||
@@ -77,6 +77,17 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, StringData ns) cons
     DBs::const_iterator it = _dbs.find(db);
     if (it != _dbs.end()) {
         return it->second;
+    }
+
+    return nullptr;
+}
+
+std::shared_ptr<ViewCatalog> DatabaseHolderImpl::getSharedViewCatalog(OperationContext* opCtx,
+                                                                      StringData dbName) const {
+    stdx::lock_guard<SimpleMutex> lk(_m);
+    DBs::const_iterator it = _dbs.find(dbName);
+    if (it != _dbs.end()) {
+        return ViewCatalog::getShared(it->second);
     }
 
     return nullptr;

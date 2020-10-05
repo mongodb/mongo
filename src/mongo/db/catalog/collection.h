@@ -58,19 +58,15 @@
 #include "mongo/util/decorable.h"
 
 namespace mongo {
+
 class CappedCallback;
 class CollectionPtr;
-class ExtentManager;
 class IndexCatalog;
 class IndexCatalogEntry;
-class IndexDescriptor;
-class DatabaseImpl;
 class MatchExpression;
 class OpDebug;
 class OperationContext;
 class RecordCursor;
-class UpdateDriver;
-class UpdateRequest;
 
 /**
  * Holds information update an update operation.

@@ -198,6 +198,71 @@ protected:
 };
 
 /**
+ * RAII-style class that acquires the global MODE_IS lock. This class should only be used for reads.
+ *
+ * NOTE: Throws NamespaceNotFound if the collection UUID cannot be resolved to a nss.
+ *
+ * The collection references returned by this class will no longer be safe to retain after this
+ * object goes out of scope. This object ensures the continued existence of a Collection reference,
+ * if the collection exists when this object is instantiated.
+ */
+class AutoGetCollectionLockFree {
+    AutoGetCollectionLockFree(const AutoGetCollectionLockFree&) = delete;
+    AutoGetCollectionLockFree& operator=(const AutoGetCollectionLockFree&) = delete;
+
+public:
+    AutoGetCollectionLockFree(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max());
+
+    /**
+     * AutoGetCollectionLockFree can be used as a Collection pointer with the -> operator.
+     */
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
+    /**
+     * Returns nullptr if the collection didn't exist.
+     */
+    const CollectionPtr& getCollection() const {
+        return _collectionPtr;
+    }
+
+    /**
+     * Returns nullptr if the view didn't exist.
+     */
+    ViewDefinition* getView() const {
+        return _view.get();
+    }
+
+    /**
+     * Returns the resolved namespace of the collection or view.
+     */
+    const NamespaceString& getNss() const {
+        return _resolvedNss;
+    }
+
+private:
+    Lock::GlobalLock _globalLock;
+
+    // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
+    // the same as the input namespace string
+    NamespaceString _resolvedNss;
+
+    // The Collection shared_ptr will keep the Collection instance alive even if it is removed from
+    // the CollectionCatalog while this lock-free operation runs.
+    std::shared_ptr<const Collection> _collection;
+
+    // The CollectionPtr is the access point to the Collection instance for callers.
+    CollectionPtr _collectionPtr;
+
+    std::shared_ptr<ViewDefinition> _view;
+};
+
+/**
  * RAII-style class to handle the lifetime of writable Collections.
  * It does not take any locks, concurrency needs to be handled separately using explicit locks or
  * AutoGetCollection. This class can serve as an adaptor to unify different methods of acquiring a

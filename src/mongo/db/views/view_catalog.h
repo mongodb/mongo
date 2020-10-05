@@ -67,6 +67,12 @@ public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
     using ViewIteratorCallback = std::function<void(const ViewDefinition& view)>;
 
+    /**
+     * This getter should only be used when not holding a database lock. Otherwise the regular get()
+     * is appropriate and safe.
+     */
+    static std::shared_ptr<ViewCatalog> getShared(const Database* db);
+
     static ViewCatalog* get(const Database* db);
     static void set(Database* db, std::unique_ptr<ViewCatalog> catalog);
 
