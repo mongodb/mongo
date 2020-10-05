@@ -84,3 +84,8 @@ server_parameters:
         cpp_varname: 'storageGlobalParams.disableLockFreeReads'
         default: true
 
+feature_flags:
+    featureFlagTimeSeriesCollection:
+        description: "Support for time-series collections"
+        cpp_varname: feature_flags::gTimeSeriesCollection
+        default: false
