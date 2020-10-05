@@ -238,10 +238,9 @@ txnNumber++;
 
 assert.commandWorked(sessionDb.runCommand({find: collName, filter: {}}));
 
-// TODO(SERVER-47508): Remove ErrorCodes.InvalidOptions from allowable error codes. We must
-// accommodate this error code because certain suites will attach a readConcern to this invocation,
-// which in turn will fail the check that only the first statement in a multi-document transaction
-// can specify a readConcern.
+// We must accommodate both error codes because certain suites will attach a readConcern to this
+// invocation, which in turn will fail the check that only the first statement in a multi-document
+// transaction can specify a readConcern.
 assert.commandFailedWithCode(
     sessionDb.runCommand(
         {find: collName, filter: {}, txnNumber: NumberLong(txnNumber), autocommit: false}),
