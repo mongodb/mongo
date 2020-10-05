@@ -999,10 +999,13 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
     }
 
     auto fut = replState->sharedPromise.getFuture();
+    auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
+    auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
     LOGV2(20654,
           "Index build: joined after commit",
           "buildUUID"_attr = buildUUID,
-          "result"_attr = fut.waitNoThrow(opCtx));
+          "waitResult"_attr = waitStatus,
+          "status"_attr = buildStatus);
 
     // Throws if there was an error building the index.
     fut.get();
@@ -1321,10 +1324,13 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         // Collection lock until this happens, guaranteeing the thread has stopped making progress
         // and has exited.
         auto fut = replState->sharedPromise.getFuture();
+        auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
+        auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
         LOGV2(20655,
-              "Index build thread exited",
+              "Index build: joined after abort",
               "buildUUID"_attr = buildUUID,
-              "status"_attr = fut.waitNoThrow());
+              "waitResult"_attr = waitStatus,
+              "status"_attr = buildStatus);
 
         {
             // Unregister last once we guarantee all other state has been cleaned up.
