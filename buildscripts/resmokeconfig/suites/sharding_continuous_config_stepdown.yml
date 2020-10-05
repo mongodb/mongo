@@ -222,6 +222,12 @@ selector:
   - jstests/sharding/conversion_of_replica_set_to_sharded_cluster.js
   - jstests/sharding/move_primary_with_writes.js
 
+  # Expects same CSRS primary and shard primary throughout the test
+  - jstests/sharding/api_params_nontransaction_sharded.js
+  - jstests/sharding/api_params_nontransaction_unsharded.js
+  - jstests/sharding/api_params_transaction_sharded.js
+  - jstests/sharding/api_params_transaction_unsharded.js
+
 executor:
   config:
     shell_options:

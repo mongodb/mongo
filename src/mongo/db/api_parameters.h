@@ -49,6 +49,11 @@ public:
     static APIParameters fromClient(const APIParametersFromClient& apiParamsFromClient);
     static APIParameters fromBSON(const BSONObj& cmdObj);
 
+    // For use with unordered_map.
+    struct Hash {
+        std::size_t operator()(const APIParameters& params) const;
+    };
+
     void appendInfo(BSONObjBuilder* builder) const;
 
     const boost::optional<std::string>& getAPIVersion() const {
@@ -85,6 +90,14 @@ private:
     boost::optional<bool> _apiDeprecationErrors;
 };
 
+inline bool operator==(const APIParameters& lhs, const APIParameters& rhs) {
+    return lhs.getAPIVersion() == rhs.getAPIVersion() && lhs.getAPIStrict() == rhs.getAPIStrict() &&
+        lhs.getAPIDeprecationErrors() == rhs.getAPIDeprecationErrors();
+}
+
+inline bool operator!=(const APIParameters& lhs, const APIParameters& rhs) {
+    return !(lhs == rhs);
+}
 
 /**
  * Temporarily remove the user's API parameters from an OperationContext.
