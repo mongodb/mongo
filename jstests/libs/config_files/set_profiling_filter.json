@@ -1,0 +1,5 @@
+{
+    "operationProfiling" : {
+        "filter" : "{$expr: {$lt: [{$rand: {}}, 0.01]}}"
+    }
+}

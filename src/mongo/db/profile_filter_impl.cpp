@@ -76,7 +76,7 @@ bool ProfileFilterImpl::matches(OperationContext* opCtx,
 
 // PathlessOperatorMap is required for parsing a MatchExpression.
 MONGO_INITIALIZER_GENERAL(ProfileFilterDefault,
-                          ("PathlessOperatorMap", "MatchExpressionParser"),
+                          ("PathlessOperatorMap", "MatchExpressionParser", "expressionParserMap"),
                           ())
 (InitializerContext*) {
     try {
