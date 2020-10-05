@@ -1099,7 +1099,7 @@ def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinf
     )
 
     env.Prepend(_LIBFLAGS="$_LIBDEPS_TAGS $_LIBDEPS $_SYSLIBDEPS ")
-    env.Prepend(ARFLAGS="$_LIBDEPS_TAGS ")
+    env.Prepend(ARFLAGS="$_LIBDEPS_TAGS")
     for builder_name in ("Program", "SharedLibrary", "LoadableModule", "SharedArchive"):
         try:
             update_scanner(env["BUILDERS"][builder_name])
