@@ -172,12 +172,16 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
 
     auto& catalog = CollectionCatalog::get(opCtx);
     for (const auto& uuid : catalog.getAllCollectionUUIDsFromDb(_name)) {
-        auto collection = catalog.lookupCollectionByUUIDForMetadataWrite(
-            opCtx, CollectionCatalog::LifetimeMode::kInplace, uuid);
+        CollectionWriter collection(
+            opCtx,
+            uuid,
+            opCtx->lockState()->isW() ? CollectionCatalog::LifetimeMode::kInplace
+                                      : CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork);
         invariant(collection);
         // If this is called from the repair path, the collection is already initialized.
-        if (!collection->isInitialized())
-            collection->init(opCtx);
+        if (!collection->isInitialized()) {
+            collection.getWritableCollection()->init(opCtx);
+        }
     }
 
     // When in repair mode, record stores are not loaded. Thus the ViewsCatalog cannot be reloaded.
