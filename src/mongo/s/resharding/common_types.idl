@@ -95,7 +95,7 @@ structs:
                 type: uuid
                 description: "The UUID of the original collection being resharded."
             reshardingKey:
-                type: object
+                type: object_owned
                 description: "The index specification document to use as the new shard key."
 
     MinFetchTimestamp:

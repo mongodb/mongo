@@ -43,9 +43,9 @@ structs:
                 type: shard_id
                 description: "The id of the recipient shard."
             min:
-                type: object
+                type: object_owned
                 description: "The min key of the chunk range."
             max:
-                type: object
+                type: object_owned
                 description: "The max key of the chunk range."
 
