@@ -24,10 +24,11 @@ const kTTLMonitorSleepSecs = 1;
 
 /**
  * Runs the donorStartMigration command to start a migration, and interrupts the migration on the
- * donor using the 'interruptFunc', and asserts that the command either succeeds or fails with an
- * expected error.
+ * donor using the 'interruptFunc', and verifies the command response using the
+ * 'verifyCmdResponseFunc'.
  */
-function testDonorStartMigrationInterrupt(interruptFunc, isExpectedErrorFunc, numDonorRsNodes = 1) {
+function testDonorStartMigrationInterrupt(
+    interruptFunc, verifyCmdResponseFunc, numDonorRsNodes = 1) {
     const donorRst = new ReplSetTest({
         nodes: numDonorRsNodes,
         name: "donorRst",
@@ -60,10 +61,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, isExpectedErrorFunc, nu
     migrationThread.start();
     sleep(Math.random() * kMaxSleepTimeMS);
     interruptFunc(donorRst, migrationId, migrationOpts.dbPrefix);
-    migrationThread.join();
-
-    const res = migrationThread.returnData();
-    assert(res.ok || isExpectedErrorFunc(res.code), tojson(res));
+    verifyCmdResponseFunc(migrationThread);
 
     donorRst.stopSet();
     recipientRst.stopSet();
@@ -71,11 +69,11 @@ function testDonorStartMigrationInterrupt(interruptFunc, isExpectedErrorFunc, nu
 
 /**
  * Starts a migration and waits for it to commit, then runs the donorForgetMigration, and interrupts
- * the donor using the 'interruptFunc', and asserts that the command either succeeds or fails with
- * an expected error.
+ * the donor using the 'interruptFunc', and verifies the command response using the
+ * 'verifyCmdResponseFunc'.
  */
 function testDonorForgetMigrationInterrupt(
-    interruptFunc, isExpectedErrorFunc, numDonorRsNodes = 1) {
+    interruptFunc, verifyCmdResponseFunc, numDonorRsNodes = 1) {
     const donorRst = new ReplSetTest({
         nodes: numDonorRsNodes,
         name: "donorRst",
@@ -123,13 +121,35 @@ function testDonorForgetMigrationInterrupt(
     forgetMigrationThread.start();
     sleep(Math.random() * kMaxSleepTimeMS);
     interruptFunc(donorRst, migrationId, migrationOpts.dbPrefix);
-    forgetMigrationThread.join();
-
-    const res = forgetMigrationThread.returnData();
-    assert(res.ok || isExpectedErrorFunc(res.code), tojson(res));
+    verifyCmdResponseFunc(forgetMigrationThread);
 
     donorRst.stopSet();
     recipientRst.stopSet();
+}
+
+/**
+ * Asserts the command either succeeded or failed with a NotPrimary error.
+ */
+function assertCmdSucceededOrInterruptedDueToStepDown(cmdThread) {
+    const res = cmdThread.returnData();
+    assert(res.ok || ErrorCodes.isNotPrimaryError(res.code));
+}
+
+/**
+ * Asserts the command either succeeded or failed with a NotPrimary or shutdown or network error.
+ */
+function assertCmdSucceededOrInterruptedDueToShutDown(cmdThread) {
+    try {
+        const res = cmdThread.returnData();
+        assert(res.ok || ErrorCodes.isNotPrimaryError(res.code) ||
+               ErrorCodes.isShutdownError(res.code));
+    } catch (e) {
+        if (isNetworkError(e)) {
+            jsTestLog(`Ignoring network error due to node shutting down ${tojson(e)}`);
+        } else {
+            throw e;
+        }
+    }
 }
 
 /**
@@ -150,17 +170,14 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
     testDonorStartMigrationInterrupt((donorRst) => {
         assert.commandWorked(
             donorRst.getPrimary().adminCommand({replSetStepDown: 1000, force: true}));
-    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode));
+    }, assertCmdSucceededOrInterruptedDueToStepDown);
 })();
 
 (() => {
     jsTest.log("Test that the donorStartMigration command is interrupted successfully on shutdown");
-    testDonorStartMigrationInterrupt(
-        (donorRst) => {
-            donorRst.stopSet();
-        },
-        (errorCode) =>
-            ErrorCodes.isNotPrimaryError(errorCode) || ErrorCodes.isShutdownError(errorCode));
+    testDonorStartMigrationInterrupt((donorRst) => {
+        donorRst.stopSet();
+    }, assertCmdSucceededOrInterruptedDueToShutDown);
 })();
 
 (() => {
@@ -168,28 +185,25 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
     testDonorForgetMigrationInterrupt((donorRst) => {
         assert.commandWorked(
             donorRst.getPrimary().adminCommand({replSetStepDown: 1000, force: true}));
-    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode));
+    }, assertCmdSucceededOrInterruptedDueToStepDown);
 })();
 
 (() => {
     jsTest.log("Test that the donorForgetMigration is interrupted successfully on shutdown");
-    testDonorForgetMigrationInterrupt(
-        (donorRst) => {
-            donorRst.stopSet();
-        },
-        (errorCode) =>
-            ErrorCodes.isNotPrimaryError(errorCode) || ErrorCodes.isShutdownError(errorCode));
+    testDonorForgetMigrationInterrupt((donorRst) => {
+        donorRst.stopSet();
+    }, assertCmdSucceededOrInterruptedDueToShutDown);
 })();
 
 (() => {
     jsTest.log("Test that the migration resumes on stepup");
     testDonorStartMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
-        // Use a short replSetStepDown seconds to make it more likely for the old primary to step
-        // back up.
+        // Use a short replSetStepDown seconds to make it more likely for the old primary to
+        // step back up.
         assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
 
         testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix);
-    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
+    }, assertCmdSucceededOrInterruptedDueToStepDown, 3 /* numDonorRsNodes */);
 })();
 
 (() => {
@@ -199,7 +213,7 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
         donorRst.startSet({restart: true, setParameter: {enableTenantMigrations: true}});
 
         testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix);
-    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
+    }, assertCmdSucceededOrInterruptedDueToShutDown, 3 /* numDonorRsNodes */);
 })();
 
 (() => {
@@ -207,8 +221,8 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
     testDonorForgetMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
         let donorPrimary = donorRst.getPrimary();
 
-        // Use a short replSetStepDown seconds to make it more likely for the old primary to step
-        // back up.
+        // Use a short replSetStepDown seconds to make it more likely for the old primary to
+        // step back up.
         assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
 
         donorPrimary = donorRst.getPrimary();
@@ -217,7 +231,7 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
 
         TenantMigrationUtil.waitForMigrationGarbageCollection(
             donorRst.nodes, migrationId, dbPrefix);
-    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
+    }, assertCmdSucceededOrInterruptedDueToStepDown, 3 /* numDonorRsNodes */);
 })();
 
 (() => {
@@ -232,6 +246,6 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
 
         TenantMigrationUtil.waitForMigrationGarbageCollection(
             donorRst.nodes, migrationId, dbPrefix);
-    }, (errorCode) => ErrorCodes.isNotPrimaryError(errorCode), 3 /* numDonorRsNodes */);
+    }, assertCmdSucceededOrInterruptedDueToShutDown, 3 /* numDonorRsNodes */);
 })();
 })();

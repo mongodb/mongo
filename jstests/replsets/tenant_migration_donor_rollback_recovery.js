@@ -111,7 +111,7 @@ function testRollbackInitialState() {
     let rollbackOpsFunc = (donorRstArgs, donorPrimary) => {
         // Start the migration and wait for the primary to insert the state doc.
         migrationThread = new Thread(
-            TenantMigrationUtil.startMigrationRetryOnNotPrimaryErrors, donorRstArgs, migrationOpts);
+            TenantMigrationUtil.startMigrationRetryOnRetryableErrors, donorRstArgs, migrationOpts);
         migrationThread.start();
         assert.soon(() => {
             return 1 === donorPrimary.getCollection(kConfigDonorsNS).count({_id: migrationId});
@@ -148,7 +148,7 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState)
         pauseFp = configureFailPoint(donorPrimary, pauseFailPoint);
 
         migrationThread = new Thread(
-            TenantMigrationUtil.startMigrationRetryOnNotPrimaryErrors, donorRstArgs, migrationOpts);
+            TenantMigrationUtil.startMigrationRetryOnRetryableErrors, donorRstArgs, migrationOpts);
         migrationThread.start();
         pauseFp.wait();
     };
@@ -195,7 +195,7 @@ function testRollBackMarkingStateGarbageCollectable() {
         // Run donorForgetMigration and wait for the primary to do the write to mark the state doc
         // as garbage collectable.
         forgetMigrationThread =
-            new Thread(TenantMigrationUtil.forgetMigrationRetryOnNotPrimaryErrors,
+            new Thread(TenantMigrationUtil.forgetMigrationRetryOnRetryableErrors,
                        donorRstArgs,
                        migrationOpts.migrationIdString);
         forgetMigrationThread.start();
@@ -230,9 +230,9 @@ function testRollBackRandom() {
     let setUpFunc = (donorRstArgs, donorPrimary) => {
         migrationThread = new Thread((donorRstArgs, migrationOpts) => {
             load("jstests/replsets/libs/tenant_migration_util.js");
-            assert.commandWorked(TenantMigrationUtil.startMigrationRetryOnNotPrimaryErrors(
+            assert.commandWorked(TenantMigrationUtil.startMigrationRetryOnRetryableErrors(
                 donorRstArgs, migrationOpts));
-            assert.commandWorked(TenantMigrationUtil.forgetMigrationRetryOnNotPrimaryErrors(
+            assert.commandWorked(TenantMigrationUtil.forgetMigrationRetryOnRetryableErrors(
                 donorRstArgs, migrationOpts.migrationIdString));
         }, donorRstArgs, migrationOpts);
 
