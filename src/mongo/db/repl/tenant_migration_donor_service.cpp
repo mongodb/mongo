@@ -368,45 +368,46 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
     const BSONObj& cmdObj) {
     return AsyncTry([this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj] {
-               auto opCtxHolder = cc().makeOperationContext();
-               auto opCtx = opCtxHolder.get();
-
-               HostAndPort recipientHost =
-                   uassertStatusOK(recipientTargeterRS->findHost(opCtx, ReadPreferenceSetting()));
-
-               executor::RemoteCommandRequest request(recipientHost,
-                                                      NamespaceString::kAdminDb.toString(),
-                                                      std::move(cmdObj),
-                                                      rpc::makeEmptyMetadata(),
-                                                      nullptr,
-                                                      kRecipientSyncDataTimeout);
-
-               auto recipientSyncDataResponsePF =
-                   makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
-               auto promisePtr =
-                   std::make_shared<Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
-                       std::move(recipientSyncDataResponsePF.promise));
-
-               auto scheduleResult =
-                   (**executor)
-                       ->scheduleRemoteCommand(std::move(request), [promisePtr](const auto& args) {
-                           promisePtr->emplaceValue(args);
-                       });
-
-               if (!scheduleResult.isOK()) {
-                   // Since the command failed to be scheduled, the callback above did not and will
-                   // not run. Thus, it is safe to fulfill the promise here without worrying about
-                   // synchronizing access with the executor's thread.
-                   promisePtr->setError(scheduleResult.getStatus());
-               }
-
-               return std::move(recipientSyncDataResponsePF.future)
+               return recipientTargeterRS
+                   ->findHostWithMaxWait(ReadPreferenceSetting(),
+                                         ReplicaSetMonitorInterface::kDefaultFindHostTimeout)
                    .thenRunOn(**executor)
-                   .then([this, self = shared_from_this()](auto args) -> Status {
-                       if (!args.response.status.isOK()) {
-                           return args.response.status;
+                   .then([this, self = shared_from_this(), executor, cmdObj](auto recipientHost) {
+                       executor::RemoteCommandRequest request(std::move(recipientHost),
+                                                              NamespaceString::kAdminDb.toString(),
+                                                              std::move(cmdObj),
+                                                              rpc::makeEmptyMetadata(),
+                                                              nullptr,
+                                                              kRecipientSyncDataTimeout);
+
+                       auto recipientSyncDataResponsePF =
+                           makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
+                       auto promisePtr = std::make_shared<
+                           Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
+                           std::move(recipientSyncDataResponsePF.promise));
+
+                       auto scheduleResult =
+                           (**executor)
+                               ->scheduleRemoteCommand(std::move(request),
+                                                       [promisePtr](const auto& args) {
+                                                           promisePtr->emplaceValue(args);
+                                                       });
+
+                       if (!scheduleResult.isOK()) {
+                           // Since the command failed to be scheduled, the callback above did not
+                           // and will not run. Thus, it is safe to fulfill the promise here without
+                           // worrying about synchronizing access with the executor's thread.
+                           promisePtr->setError(scheduleResult.getStatus());
                        }
-                       return getStatusFromCommandResult(args.response.data);
+
+                       return std::move(recipientSyncDataResponsePF.future)
+                           .thenRunOn(**executor)
+                           .then([this, self = shared_from_this()](auto args) -> Status {
+                               if (!args.response.status.isOK()) {
+                                   return args.response.status;
+                               }
+                               return getStatusFromCommandResult(args.response.data);
+                           });
                    });
            })
         .until([](Status status) { return shouldStopSendingRecipientCommand(status); })
