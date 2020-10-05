@@ -41,40 +41,42 @@ env.Library(
     ],
 )
 
-env.Library(
-    target=[
-        'sasl_aws_common',
-    ],
-    source=[
-        env.Idlc('sasl_aws_protocol_common.idl')[0],
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
 
-kmsEnv = env.Clone()
+if get_option('ssl') == 'on':
+    env.Library(
+        target=[
+            'sasl_aws_common',
+        ],
+        source=[
+            env.Idlc('sasl_aws_protocol_common.idl')[0],
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
+            '$BUILD_DIR/mongo/idl/idl_parser',
+        ],
+    )
 
-kmsEnv.InjectThirdParty(libraries=['kms-message'])
+    kmsEnv = env.Clone()
 
-kmsEnv.Library(
-    target=[
-        'sasl_aws_client',
-    ],
-    source=[
-        'sasl_aws_client_protocol.cpp',
-        env.Idlc('sasl_aws_client_protocol.idl')[0],
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/third_party/shim_kms_message',
-        'sasl_aws_common',
-    ],
-)
+    kmsEnv.InjectThirdParty(libraries=['kms-message'])
+
+    kmsEnv.Library(
+        target=[
+            'sasl_aws_client',
+        ],
+        source=[
+            'sasl_aws_client_protocol.cpp',
+            env.Idlc('sasl_aws_client_protocol.idl')[0],
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/server_options_core', # For object_check.h
+            '$BUILD_DIR/mongo/idl/idl_parser',
+            '$BUILD_DIR/third_party/shim_kms_message',
+            'sasl_aws_common',
+        ],
+    )
 
 saslClientEnv = env.Clone()
 saslLibs = []

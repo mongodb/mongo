@@ -211,6 +211,7 @@ env.Library(
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/util/icu',
         '$BUILD_DIR/mongo/util/md5',
+        'auth',
         'sasl_options',
         'security_file',
         'user',

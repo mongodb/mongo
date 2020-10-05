@@ -32,7 +32,6 @@
 #include "mongo/client/native_sasl_client_session.h"
 
 #include "mongo/base/init.h"
-#include "mongo/client/sasl_aws_client_conversation.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_plain_client_conversation.h"
 #include "mongo/client/sasl_scram_client_conversation.h"
@@ -41,6 +40,10 @@
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/util/str.h"
+
+#ifdef MONGO_CONFIG_SSL
+#include "mongo/client/sasl_aws_client_conversation.h"
+#endif
 
 namespace mongo {
 namespace {

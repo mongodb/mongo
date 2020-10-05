@@ -139,62 +139,63 @@ env.Library(
     ]
 )
 
-kmsEnv = env.Clone()
+if get_option('ssl') == 'on':
+    kmsEnv = env.Clone()
 
-kmsEnv.InjectThirdParty(libraries=['kms-message'])
+    kmsEnv.InjectThirdParty(libraries=['kms-message'])
 
-kmsEnv.Library(
-    target="kms",
-    source=[
-        "kms.cpp",
-        "kms_aws.cpp",
-        "kms_local.cpp",
-        kmsEnv.Idlc("kms.idl")[0],
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base/secure_allocator',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/crypto/aead_encryption',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/net/ssl_manager',
-        '$BUILD_DIR/mongo/util/net/ssl_options',
-        '$BUILD_DIR/third_party/shim_kms_message',
-    ],
-)
+    kmsEnv.Library(
+        target="kms",
+        source=[
+            "kms.cpp",
+            "kms_aws.cpp",
+            "kms_local.cpp",
+            kmsEnv.Idlc("kms.idl")[0],
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base/secure_allocator',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/crypto/aead_encryption',
+            '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/mongo/util/net/network',
+            '$BUILD_DIR/mongo/util/net/ssl_manager',
+            '$BUILD_DIR/mongo/util/net/ssl_options',
+            '$BUILD_DIR/third_party/shim_kms_message',
+        ],
+    )
 
-env.Library(
-    target="kms_shell",
-    source=[
-        "kms_shell.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        'kms',
-        'shell_utils',
-    ],
-)
+    env.Library(
+        target="kms_shell",
+        source=[
+            "kms_shell.cpp",
+        ],
+        LIBDEPS_PRIVATE=[
+            'kms',
+            'shell_utils',
+        ],
+    )
 
-scriptingEnv = env.Clone()
-scriptingEnv.InjectMozJS()
+    scriptingEnv = env.Clone()
+    scriptingEnv.InjectMozJS()
 
-scriptingEnv.Library(
-    target="encrypted_dbclient",
-    source=[
-        "encrypted_dbclient_base.cpp",
-        scriptingEnv.Idlc("fle_shell_options.idl")[0],
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        '$BUILD_DIR/mongo/crypto/aead_encryption',
-        '$BUILD_DIR/mongo/crypto/symmetric_crypto',
-        '$BUILD_DIR/mongo/scripting/scripting',
-        '$BUILD_DIR/mongo/shell/shell_options_register',
-        '$BUILD_DIR/third_party/shim_mozjs',
-        'kms',
-    ],
-)
+    scriptingEnv.Library(
+        target="encrypted_dbclient",
+        source=[
+            "encrypted_dbclient_base.cpp",
+            scriptingEnv.Idlc("fle_shell_options.idl")[0],
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/client/clientdriver_minimal',
+            '$BUILD_DIR/mongo/crypto/aead_encryption',
+            '$BUILD_DIR/mongo/crypto/symmetric_crypto',
+            '$BUILD_DIR/mongo/scripting/scripting',
+            '$BUILD_DIR/mongo/shell/shell_options_register',
+            '$BUILD_DIR/third_party/shim_mozjs',
+            'kms',
+        ],
+    )
 
 env.Library(
     target="linenoise_utf8",
