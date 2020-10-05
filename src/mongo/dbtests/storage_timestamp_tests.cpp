@@ -1354,12 +1354,19 @@ public:
         repl::UnreplicatedWritesBlock uwb(_opCtx);
 
         NamespaceString nss("unittests.SecondarySetWildcardIndexMultikeyOnInsert");
-        reset(nss);
-        UUID uuid = UUID::gen();
-        {
+        // Use a capped collection to prevent the batch applier from grouping insert operations
+        // together in the same WUOW. This test attempts to apply operations out of order, but the
+        // storage engine does not allow an operation to set out-of-order timestamps in the same
+        // WUOW.
+        ASSERT_OK(createCollection(
+            _opCtx,
+            nss.db().toString(),
+            BSON("create" << nss.coll() << "capped" << true << "size" << 1 * 1024 * 1024)));
+        auto uuid = [&]() {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-            uuid = autoColl.getCollection()->uuid();
-        }
+            return autoColl.getCollection()->uuid();
+        }();
+
         auto indexName = "a_1";
         auto indexSpec = BSON("name" << indexName << "key" << BSON("$**" << 1) << "v"
                                      << static_cast<int>(kIndexVersion));
@@ -1387,7 +1394,11 @@ public:
                       << "i"
                       << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc2));
 
-        // Coerce oplog application to apply op2 before op1.
+        // Coerce oplog application to apply op2 before op1. This does not guarantee the actual
+        // order of application however, because the oplog applier applies these operations in
+        // parallel across several threads. The test accepts the possibility of a false negative
+        // (test passes when it should fail) in favor of occasionally finding a true positive (test
+        // fails as intended).
         std::vector<repl::OplogEntry> ops = {op0, op2, op1};
 
         DoNothingOplogApplierObserver observer;
@@ -1485,7 +1496,11 @@ public:
                       << "ns" << nss.ns() << "ui" << uuid << "wall" << Date_t() << "o" << doc2
                       << "o2" << BSON("_id" << 0)));
 
-        // Coerce oplog application to apply op2 before op1.
+        // Coerce oplog application to apply op2 before op1. This does not guarantee the actual
+        // order of application however, because the oplog applier applies these operations in
+        // parallel across several threads. The test accepts the possibility of a false negative
+        // (test passes when it should fail) in favor of occasionally finding a true positive (test
+        // fails as intended).
         std::vector<repl::OplogEntry> ops = {op0, op2, op1};
 
         DoNothingOplogApplierObserver observer;
