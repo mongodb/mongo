@@ -1088,9 +1088,18 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
             implicit.append(provider_dep)
             continue
 
+        # in some case the tool could be in the local directory and be suppled without the ext
+        # such as in windows, so append the executable suffix and check.
+        prog_suffix = sub_env.get('PROGSUFFIX', '')
+        provider_dep_ext = provider_dep if provider_dep.endswith(prog_suffix) else provider_dep + prog_suffix
+        if os.path.exists(provider_dep_ext):
+            implicit.append(provider_dep_ext)
+            continue
+
         # Many commands will assume the binary is in the path, so
         # we accept this as a possible input from a given command.
-        provider_dep_abspath = sub_env.WhereIs(provider_dep)
+
+        provider_dep_abspath = sub_env.WhereIs(provider_dep) or sub_env.WhereIs(provider_dep, path=os.environ["PATH"])
         if provider_dep_abspath:
             implicit.append(provider_dep_abspath)
             continue
