@@ -37,11 +37,12 @@ server_parameters:
         cpp_class:
             name: FeatureCompatibilityVersionParameter
             override_ctor: true
-    internalValidateFeaturesAsMaster:
+    internalValidateFeaturesAsPrimary:
+        deprecated_name: "internalValidateFeaturesAsMaster"
         description: >
             Startup parameter to ignore featureCompatibilityVersion checks. This parameter cannot be set if
             the node is started with --replSet. This should never be set by end users.
         set_at: startup
         cpp_vartype: bool
-        cpp_varname: gInternalValidateFeaturesAsMaster
+        cpp_varname: gInternalValidateFeaturesAsPrimary
         default: true

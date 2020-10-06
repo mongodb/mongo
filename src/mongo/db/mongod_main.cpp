@@ -679,7 +679,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             startTTLMonitor(serviceContext);
         }
 
-        if (replSettings.usingReplSets() || !gInternalValidateFeaturesAsMaster) {
+        if (replSettings.usingReplSets() || !gInternalValidateFeaturesAsPrimary) {
             serverGlobalParams.validateFeaturesAsMaster.store(false);
         }
     }

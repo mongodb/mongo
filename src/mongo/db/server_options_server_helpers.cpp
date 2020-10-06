@@ -174,14 +174,22 @@ Status validateServerOptions(const moe::Environment& params) {
             haveAuthenticationMechanisms = false;
         }
 
-        if (parameters.find("internalValidateFeaturesAsMaster") != parameters.end()) {
-            // Command line options that are disallowed when internalValidateFeaturesAsMaster is
-            // specified.
+        bool internalValidateFeaturesAsPrimaryUsed =
+            parameters.find("internalValidateFeaturesAsPrimary") != parameters.end();
+        bool internalValidateFeaturesAsMasterUsed =
+            parameters.find("internalValidateFeaturesAsMaster") != parameters.end();
+
+        if (internalValidateFeaturesAsPrimaryUsed || internalValidateFeaturesAsMasterUsed) {
+            // Command line options that are disallowed when internalValidateFeaturesAsPrimary or
+            // internalValidateFeaturesAsMaster, the deprecated alias, is specified.
+            std::string parameterName = internalValidateFeaturesAsPrimaryUsed
+                ? "internalValidateFeaturesAsPrimary"
+                : "internalValidateFeaturesAsMaster";
             if (params.count("replication.replSet")) {
                 return Status(ErrorCodes::BadValue,
                               str::stream() <<  //
-                                  "Cannot specify both internalValidateFeaturesAsMaster and "
-                                  "replication.replSet");
+                                  "Cannot specify both " + parameterName +
+                                      " and replication.replSet");
             }
         }
     }
