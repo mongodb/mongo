@@ -630,6 +630,34 @@ public:
     }
 
     /**
+     * Returns if this invocation is safe to run on a borrowed threading model.
+     *
+     * In practice, this is attempting to predict if the operation will do network or storage reads
+     * and writes. It will allow auth commands for the most part, since while they do involve
+     * network or storage operations, they are not targeting the storage engine or remote
+     * mongo-server nodes.
+     */
+    virtual bool isSafeForBorrowedThreads() const {
+        if (definition()->maintenanceMode() || !definition()->maintenanceOk()) {
+            // If the command has maintenance implications, it has storage implications.
+            return false;
+        }
+
+        if (supportsWriteConcern()) {
+            // If the command supports write concern, it has storage and network implications.
+            return false;
+        }
+
+        if (auto result = supportsReadConcern(repl::ReadConcernLevel::kMajorityReadConcern);
+            result.readConcernSupport.isOK()) {
+            // If the command supports read concern, it has storage and newtork implications.
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Return if this invocation can be mirrored to secondaries
      */
     virtual bool supportsReadMirroring() const {

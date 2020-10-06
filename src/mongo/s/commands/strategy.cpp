@@ -85,6 +85,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/transport/ismaster_metrics.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -287,6 +288,18 @@ void execCommandClient(OperationContext* opCtx,
 
     auto body = result->getBodyBuilder();
     appendRequiredFieldsToResponse(opCtx, &body);
+
+    auto seCtx = transport::ServiceExecutorContext::get(opCtx->getClient());
+    if (!seCtx) {
+        // We were run by a background worker.
+        return;
+    }
+
+    if (!invocation->isSafeForBorrowedThreads()) {
+        // If the last command wasn't safe for a borrowed thread, then let's move
+        // off of it.
+        seCtx->setThreadingModel(transport::ServiceExecutor::ThreadingModel::kDedicated);
+    }
 }
 
 MONGO_FAIL_POINT_DEFINE(doNotRefreshShardsOnRetargettingError);

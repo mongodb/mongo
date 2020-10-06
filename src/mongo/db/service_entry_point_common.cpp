@@ -98,6 +98,7 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/transport/ismaster_metrics.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
@@ -2253,6 +2254,22 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(
                 [execContext = hr->executionContext](DbResponse response) -> void {
                     // Set the response upon successful execution
                     execContext->setResponse(std::move(response));
+
+                    auto opCtx = execContext->getOpCtx();
+
+                    auto seCtx = transport::ServiceExecutorContext::get(opCtx->getClient());
+                    if (!seCtx) {
+                        // We were run by a background worker.
+                        return;
+                    }
+
+                    if (auto invocation = CommandInvocation::get(opCtx);
+                        invocation && !invocation->isSafeForBorrowedThreads()) {
+                        // If the last command wasn't safe for a borrowed thread, then let's move
+                        // off of it.
+                        seCtx->setThreadingModel(
+                            transport::ServiceExecutor::ThreadingModel::kDedicated);
+                    }
                 });
         })
         .then([hr] { return hr->completeOperation(); })
