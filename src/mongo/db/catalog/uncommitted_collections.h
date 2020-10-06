@@ -69,8 +69,10 @@ public:
         return std::weak_ptr<UncommittedCollectionsMap>(_resourcesPtr);
     }
 
-    std::shared_ptr<UncommittedCollectionsMap> shareResources() {
-        return _resourcesPtr;
+    std::shared_ptr<UncommittedCollectionsMap> releaseResources() {
+        auto ret = std::move(_resourcesPtr);
+        _resourcesPtr = std::make_shared<UncommittedCollectionsMap>();
+        return ret;
     }
 
     void receiveResources(std::shared_ptr<UncommittedCollectionsMap> resources) {

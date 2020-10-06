@@ -749,7 +749,7 @@ TransactionParticipant::TxnResources::TxnResources(WithLock wl,
 
     _apiParameters = APIParameters::get(opCtx);
     _readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    _uncommittedCollections = UncommittedCollections::get(opCtx).shareResources();
+    _uncommittedCollections = UncommittedCollections::get(opCtx).releaseResources();
 }
 
 TransactionParticipant::TxnResources::~TxnResources() {
