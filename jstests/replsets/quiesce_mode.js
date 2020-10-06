@@ -71,10 +71,10 @@ jsTestLog("Create a hanging hello on the secondary.");
 res = assert.commandWorked(secondary.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 let topologyVersionField = res.topologyVersion;
-let isMasterFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+let helloFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
 let hello =
     startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), secondary.port);
-isMasterFailPoint.wait();
+helloFailPoint.wait();
 assert.eq(1, secondary.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
 
 jsTestLog("Transition the secondary to quiesce mode.");
@@ -163,9 +163,9 @@ jsTestLog("Create a hanging hello on the primary.");
 res = assert.commandWorked(primary.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 topologyVersionField = res.topologyVersion;
-isMasterFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
+helloFailPoint = configureFailPoint(primary, "waitForHelloResponse");
 hello = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), primary.port);
-isMasterFailPoint.wait();
+helloFailPoint.wait();
 assert.eq(1, primary.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
 
 jsTestLog("Transition the primary to quiesce mode.");

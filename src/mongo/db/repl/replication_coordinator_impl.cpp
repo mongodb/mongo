@@ -119,8 +119,8 @@ MONGO_FAIL_POINT_DEFINE(stepdownHangBeforeRSTLEnqueue);
 // Fail setMaintenanceMode with ErrorCodes::NotSecondary to simulate a concurrent election.
 MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
-// Signals that an isMaster request has started waiting.
-MONGO_FAIL_POINT_DEFINE(waitForIsMasterResponse);
+// Signals that a hello request has started waiting.
+MONGO_FAIL_POINT_DEFINE(waitForHelloResponse);
 // Will cause a hello request to hang as it starts waiting.
 MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponse);
 // Will cause a hello request to hang after it times out waiting for a topology change.
@@ -2276,10 +2276,10 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
     HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
     lk.unlock();
 
-    if (MONGO_unlikely(waitForIsMasterResponse.shouldFail())) {
+    if (MONGO_unlikely(waitForHelloResponse.shouldFail())) {
         // Used in tests that wait for this failpoint to be entered before triggering a topology
         // change.
-        LOGV2(31464, "waitForIsMasterResponse failpoint enabled");
+        LOGV2(31464, "waitForHelloResponse failpoint enabled");
     }
     if (MONGO_unlikely(hangWhileWaitingForHelloResponse.shouldFail())) {
         LOGV2(21341, "Hanging due to hangWhileWaitingForHelloResponse failpoint");

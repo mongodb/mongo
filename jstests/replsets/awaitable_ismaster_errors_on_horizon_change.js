@@ -52,8 +52,8 @@ function runTest(cmd) {
 
     // A failpoint signalling that the server has received the hello/isMaster request and is waiting
     // for a topology change.
-    let primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-    let secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+    let primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+    let secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
     // Send an awaitable hello/isMaster request. This will block until there is a topology change.
     const awaitCmdHorizonChangeOnPrimary = startParallelShell(
         funWithArgs(runAwaitableCmdBeforeHorizonChange, cmd, primaryTopologyVersion), primary.port);
@@ -112,8 +112,8 @@ function runTest(cmd) {
     rsConfig.version++;
 
     // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-    primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-    secondaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
+    primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+    secondaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
     // Send an awaitable hello/isMaster request. This will block until maxAwaitTimeMS has elapsed or
     // a topology change happens.
     let primaryAwaitCmdBeforeAddingTags = startParallelShell(

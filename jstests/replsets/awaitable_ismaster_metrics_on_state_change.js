@@ -34,7 +34,7 @@ function runTest(cmd) {
 
     // A failpoint signalling that the server has received the hello/isMaster request and is waiting
     // for a topology change.
-    let failPoint = configureFailPoint(node, "waitForIsMasterResponse");
+    let failPoint = configureFailPoint(node, "waitForHelloResponse");
     // Send an awaitable hello/isMaster request. This will block until maxAwaitTimeMS has elapsed or
     // a topology change happens.
     let firstCmdBeforeStepDown =
@@ -45,7 +45,7 @@ function runTest(cmd) {
     assert.eq(1, numAwaitingTopologyChange);
 
     // Reconfigure failpoint to refresh the number of times entered.
-    failPoint = configureFailPoint(node, "waitForIsMasterResponse");
+    failPoint = configureFailPoint(node, "waitForHelloResponse");
     let secondCmdBeforeStepdown =
         startParallelShell(funWithArgs(runAwaitableCmd, cmd, topologyVersionField), node.port);
     failPoint.wait();

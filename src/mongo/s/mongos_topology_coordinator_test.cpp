@@ -258,16 +258,16 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorInQuiesceMode) {
                        ErrorCodes::ShutdownInProgress);
 }
 
-TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
+TEST_F(MongosTopoCoordTest, HelloReturnsErrorOnEnteringQuiesceMode) {
     auto opCtx = makeOperationContext();
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
     // Use 0 ms for quiesce time so that we can immediately return from enterQuiesceModeAndWait.
     auto quiesceTime = Milliseconds(0);
 
-    // This will cause the isMaster request to hang.
-    auto waitForIsMasterFailPoint = globalFailPointRegistry().find("waitForIsMasterResponse");
-    auto timesEnteredFailPoint = waitForIsMasterFailPoint->setMode(FailPoint::alwaysOn);
-    ON_BLOCK_EXIT([&] { waitForIsMasterFailPoint->setMode(FailPoint::off, 0); });
+    // This will cause the hello request to hang.
+    auto waitForHelloFailPoint = globalFailPointRegistry().find("waitForHelloResponse");
+    auto timesEnteredFailPoint = waitForHelloFailPoint->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT([&] { waitForHelloFailPoint->setMode(FailPoint::off, 0); });
     stdx::thread getIsMasterThread([&] {
         Client::setCurrent(getServiceContext()->makeClient("getIsMasterThread"));
         auto threadOpCtx = cc().makeOperationContext();
@@ -280,11 +280,11 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorOnEnteringQuiesceMode) {
     });
 
     // Ensure that awaitIsMasterResponse() is called before entering quiesce mode.
-    waitForIsMasterFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+    waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
     getTopoCoord().enterQuiesceModeAndWait(opCtx.get(), quiesceTime);
     ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
                   getTopoCoord().getTopologyVersion().getCounter());
-    waitForIsMasterFailPoint->setMode(FailPoint::off);
+    waitForHelloFailPoint->setMode(FailPoint::off);
     getIsMasterThread.join();
 }
 

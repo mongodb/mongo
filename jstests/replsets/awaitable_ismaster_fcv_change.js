@@ -100,8 +100,8 @@ function runTest(downgradeFCV) {
 
     // A failpoint signalling that the servers have received the hello request and are waiting
     // for a topology change.
-    let primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-    let secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+    let primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+    let secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
 
     // Send an awaitable hello request. This will block until maxAwaitTimeMS has elapsed or a
     // topology change happens.
@@ -182,8 +182,8 @@ function runTest(downgradeFCV) {
         // setFeatureCompatibilityVersion command with fromConfigServer: true.
 
         // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-        primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-        secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+        primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+        secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
         let awaitHelloBeforeUpgradeOnPrimary =
             startParallelShell(funWithArgs(runAwaitableHelloBeforeFCVChange,
                                            primaryTopologyVersionAfterDowngrade,
@@ -255,8 +255,8 @@ function runTest(downgradeFCV) {
     }
 
     // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-    primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-    secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+    primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+    secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
     let awaitHelloBeforeUpgradeFCVOnPrimary =
         startParallelShell(funWithArgs(runAwaitableHelloBeforeFCVChange,
                                        primaryTopologyVersionAfterDowngrade,

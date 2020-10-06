@@ -74,9 +74,9 @@ jsTestLog("Create a hanging hello via mongos.");
 res = assert.commandWorked(mongos.adminCommand({hello: 1}));
 assert(res.hasOwnProperty("topologyVersion"), res);
 let topologyVersionField = res.topologyVersion;
-let isMasterFailPoint = configureFailPoint(mongos, "waitForIsMasterResponse");
+let helloFailPoint = configureFailPoint(mongos, "waitForHelloResponse");
 let hello = startParallelShell(funWithArgs(runAwaitableHello, topologyVersionField), mongos.port);
-isMasterFailPoint.wait();
+helloFailPoint.wait();
 assert.eq(1, mongos.getDB("admin").serverStatus().connections.awaitingTopologyChanges);
 
 jsTestLog("Transition mongos to quiesce mode.");

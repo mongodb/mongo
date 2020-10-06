@@ -88,6 +88,20 @@ all:
     test_file: jstests/replsets/transactions_on_secondaries_not_allowed.js
   - ticket: SERVER-43904
     test_file: jstests/replsets/election_handoff_skips_unelectable_nodes.js
+  - ticket: SERVER-51259
+    test_file: jstests/replsets/awaitable_ismaster_errors_on_horizon_change.js
+  - ticket: SERVER-51259
+    test_file: jstests/replsets/awaitable_ismaster_fcv_change.js
+  - ticket: SERVER-51259
+    test_file: jstests/replsets/awaitable_ismaster_metrics_on_state_change.js
+  - ticket: SERVER-51259
+    test_file: jstests/replsets/awaitable_ismaster_on_nodes_with_invalid_configs.js
+  - ticket: SERVER-51259
+    test_file: jstests/replsets/awaitable_ismaster_stepdown_stepup.js
+  - ticket: SERVER-51259
+    test_file: jstests/replsets/quiesce_mode.js
+  - ticket: SERVER-51259
+    test_file: jstests/sharding/mongos_quiesce_mode.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
