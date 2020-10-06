@@ -1332,6 +1332,18 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
               "waitResult"_attr = waitStatus,
               "status"_attr = buildStatus);
 
+        if (IndexBuildAction::kRollbackAbort == signalAction) {
+            // Index builds interrupted for rollback may be resumed during recovery. We wait for the
+            // builder thread to complete before persisting the in-memory state that will be used
+            // to resume the index build.
+            // No locks are required when aborting due to rollback. This performs no storage engine
+            // writes, only cleans up the remaining in-memory state.
+            CollectionWriter coll(opCtx, replState->collectionUUID);
+            auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
+            _indexBuildsManager.abortIndexBuildWithoutCleanup(
+                opCtx, coll.get(), replState->buildUUID, isResumable);
+        }
+
         {
             // Unregister last once we guarantee all other state has been cleaned up.
             stdx::unique_lock<Latch> lk(_mutex);
@@ -1415,14 +1427,10 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
                 opCtx, coll, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
             break;
         }
-        // No locks are required when aborting due to rollback. This performs no storage engine
-        // writes, only cleans up the remaining in-memory state.
         case IndexBuildAction::kRollbackAbort: {
             invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
             invariant(replCoord->getMemberState().rollback());
-            auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
-            _indexBuildsManager.abortIndexBuildWithoutCleanup(
-                opCtx, coll.get(), replState->buildUUID, isResumable);
+            // Defer cleanup until builder thread is joined.
             break;
         }
         case IndexBuildAction::kNoAction:
