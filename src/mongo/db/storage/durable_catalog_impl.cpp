@@ -936,8 +936,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     Entry& entry = swEntry.getValue();
 
     auto kvEngine = _engine->getEngine();
-    Status status =
-        kvEngine->importRecordStore(opCtx, nss.ns(), entry.ident, md.options, storageMetadata);
+    Status status = kvEngine->importRecordStore(opCtx, entry.ident, storageMetadata);
     if (!status.isOK())
         return status;
 
@@ -950,9 +949,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
             auto keyPattern = spec.getObjectField("key");
             auto idxName = spec["name"].String();
             auto ident = idxIdent[idxName].String();
-            IndexDescriptor idxDes(nullptr, IndexNames::findPluginName(keyPattern), spec);
-            status = kvEngine->importSortedDataInterface(
-                opCtx, nss, md.options, ident, &idxDes, storageMetadata);
+            status = kvEngine->importSortedDataInterface(opCtx, ident, storageMetadata);
             if (!status.isOK()) {
                 return status;
             }

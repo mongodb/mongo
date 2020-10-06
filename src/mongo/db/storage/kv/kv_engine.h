@@ -157,9 +157,7 @@ public:
      * instead of creating a new one.
      */
     virtual Status importRecordStore(OperationContext* opCtx,
-                                     StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options,
                                      const BSONObj& storageMetadata) {
         MONGO_UNREACHABLE;
     }
@@ -193,10 +191,7 @@ public:
      * provided ident instead of creating a new one.
      */
     virtual Status importSortedDataInterface(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const CollectionOptions& collOptions,
                                              StringData ident,
-                                             const IndexDescriptor* desc,
                                              const BSONObj& storageMetadata) {
         MONGO_UNREACHABLE;
     }

@@ -60,9 +60,7 @@ public:
                                      const CollectionOptions& options);
 
     virtual Status importRecordStore(OperationContext* opCtx,
-                                     StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options,
                                      const BSONObj& storageMetadata);
 
     virtual std::unique_ptr<mongo::RecordStore> getRecordStore(OperationContext* opCtx,
@@ -79,10 +77,7 @@ public:
                                              const IndexDescriptor* desc);
 
     virtual Status importSortedDataInterface(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const CollectionOptions& collOptions,
                                              StringData ident,
-                                             const IndexDescriptor* desc,
                                              const BSONObj& storageMetadata);
 
     virtual Status dropGroupedSortedDataInterface(OperationContext* opCtx, StringData ident) {

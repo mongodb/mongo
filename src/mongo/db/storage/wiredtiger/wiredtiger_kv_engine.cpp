@@ -1303,28 +1303,19 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
 }
 
 Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
-                                             StringData ns,
                                              StringData ident,
-                                             const CollectionOptions& options,
                                              const BSONObj& storageMetadata) {
     _ensureIdentPath(ident);
     WiredTigerSession session(_conn);
 
-    const bool prefixed = false;
-    // TODO SERVER-51147: WT_SESSION::create with the 'import' option for collection ident.
-    StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
-        _canonicalName, ns, options, _rsOptions, prefixed);
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-    std::string config = result.getValue();
+    std::string config =
+        uassertStatusOK(WiredTigerUtil::generateImportString(ident, storageMetadata));
 
     string uri = _uri(ident);
     WT_SESSION* s = session.getSession();
     LOGV2_DEBUG(5095102,
                 2,
                 "WiredTigerKVEngine::importRecordStore",
-                "ns"_attr = ns,
                 "uri"_attr = uri,
                 "config"_attr = config);
     return wtRCToStatus(s->create(s, uri.c_str(), config.c_str()));
@@ -1513,37 +1504,16 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
 }
 
 Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
-                                                     const NamespaceString& nss,
-                                                     const CollectionOptions& collOptions,
                                                      StringData ident,
-                                                     const IndexDescriptor* desc,
                                                      const BSONObj& storageMetadata) {
     _ensureIdentPath(ident);
 
-    std::string collIndexOptions;
-
-    if (!collOptions.indexOptionDefaults["storageEngine"].eoo()) {
-        BSONObj storageEngineOptions = collOptions.indexOptionDefaults["storageEngine"].Obj();
-        collIndexOptions =
-            dps::extractElementAtPath(storageEngineOptions, _canonicalName + ".configString")
-                .valuestrsafe();
-    }
-
-    const bool prefixed = false;
-    // TODO SERVER-51147: WT_SESSION::create with the 'import' option for index idents.
-    StatusWith<std::string> result = WiredTigerIndex::generateCreateString(
-        _canonicalName, _indexOptions, collIndexOptions, nss, *desc, prefixed);
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    std::string config = result.getValue();
+    std::string config =
+        uassertStatusOK(WiredTigerUtil::generateImportString(ident, storageMetadata));
 
     LOGV2_DEBUG(5095103,
                 2,
                 "WiredTigerKVEngine::importSortedDataInterface",
-                "namespace"_attr = nss,
-                "collection_uuid"_attr = collOptions.uuid,
                 "ident"_attr = ident,
                 "config"_attr = config);
     return wtRCToStatus(WiredTigerIndex::Create(opCtx, _uri(ident), config));

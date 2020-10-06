@@ -169,9 +169,7 @@ public:
                                     KVPrefix prefix) override;
 
     Status importRecordStore(OperationContext* opCtx,
-                             StringData ns,
                              StringData ident,
-                             const CollectionOptions& options,
                              const BSONObj& storageMetadata) override;
 
     std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
@@ -187,10 +185,7 @@ public:
                                             KVPrefix prefix) override;
 
     Status importSortedDataInterface(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const CollectionOptions& collOptions,
                                      StringData ident,
-                                     const IndexDescriptor* desc,
                                      const BSONObj& storageMetadata) override;
 
     /**
