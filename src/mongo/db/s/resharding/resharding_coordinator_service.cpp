@@ -359,7 +359,7 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
  */
 template <class T>
 std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntries) {
-    std::vector<ShardId> shardIds;
+    std::vector<ShardId> shardIds(participantShardEntries.size());
     std::transform(participantShardEntries.begin(),
                    participantShardEntries.end(),
                    shardIds.begin(),
