@@ -382,7 +382,7 @@ error_codes:
     - {code: 319,name: MovePrimaryInProgress}
 
     - {code: 320, name: TenantMigrationConflict,extra: TenantMigrationConflictInfo}
-    - {code: 321, name: TenantMigrationCommitted}
+    - {code: 321, name: TenantMigrationCommitted,extra: TenantMigrationCommittedInfo}
 
     - {code: 322, name: APIVersionError, categories: [VersionedAPIError]}
     - {code: 323, name: APIStrictError, categories: [VersionedAPIError]}

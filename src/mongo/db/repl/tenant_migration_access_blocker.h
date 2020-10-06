@@ -116,10 +116,12 @@ class TenantMigrationAccessBlocker
 public:
     TenantMigrationAccessBlocker(ServiceContext* serviceContext,
                                  std::shared_ptr<executor::TaskExecutor> executor,
-                                 std::string dbPrefix)
+                                 std::string dbPrefix,
+                                 std::string recipientConnString)
         : _serviceContext(serviceContext),
           _executor(std::move(executor)),
-          _dbPrefix(std::move(dbPrefix)) {}
+          _dbPrefix(std::move(dbPrefix)),
+          _recipientConnString(std::move(recipientConnString)) {}
 
     //
     // Called by all writes and reads against the database.
@@ -161,6 +163,7 @@ private:
     ServiceContext* _serviceContext;
     std::shared_ptr<executor::TaskExecutor> _executor;
     std::string _dbPrefix;
+    std::string _recipientConnString;
 
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlocker::_mutex");

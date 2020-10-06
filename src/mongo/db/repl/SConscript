@@ -1244,8 +1244,9 @@ env.Library(
 )
 
 env.Library(
-    target='tenant_migration_conflict_info',
+    target='tenant_migration_errors',
     source= [
+        'tenant_migration_committed_info.cpp',
         'tenant_migration_conflict_info.cpp',
     ],
     LIBDEPS=[
@@ -1329,7 +1330,7 @@ env.Library(
         'local_oplog_info',
         'optime',
         'repl_coordinator_interface',
-        'tenant_migration_conflict_info',
+        'tenant_migration_errors',
         'tenant_migration_state_machine_idl'
     ],
 )

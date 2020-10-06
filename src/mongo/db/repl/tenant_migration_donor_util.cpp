@@ -71,7 +71,8 @@ void onTransitionToDataSync(OperationContext* opCtx,
     auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
         opCtx->getServiceContext(),
         getTenantMigrationDonorExecutor(),
-        donorStateDoc.getDatabasePrefix().toString());
+        donorStateDoc.getDatabasePrefix().toString(),
+        donorStateDoc.getRecipientConnectionString().toString());
     TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
         .add(donorStateDoc.getDatabasePrefix(), mtab);
 }
@@ -246,10 +247,11 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
     Query query;
 
     store.forEach(opCtx, query, [&](const TenantMigrationDonorDocument& doc) {
-        auto mtab =
-            std::make_shared<TenantMigrationAccessBlocker>(opCtx->getServiceContext(),
-                                                           getTenantMigrationDonorExecutor(),
-                                                           doc.getDatabasePrefix().toString());
+        auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
+            opCtx->getServiceContext(),
+            getTenantMigrationDonorExecutor(),
+            doc.getDatabasePrefix().toString(),
+            doc.getRecipientConnectionString().toString());
 
         TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
             .add(doc.getDatabasePrefix(), mtab);

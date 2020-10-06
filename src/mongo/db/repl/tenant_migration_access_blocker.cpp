@@ -34,6 +34,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
+#include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -61,7 +62,7 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
             uasserted(TenantMigrationConflictInfo(_dbPrefix),
                       "Write must block until this tenant migration commits or aborts");
         case Access::kReject:
-            uasserted(ErrorCodes::TenantMigrationCommitted,
+            uasserted(TenantMigrationCommittedInfo(_dbPrefix, _recipientConnString),
                       "Write must be re-routed to the new owner of this tenant");
         default:
             MONGO_UNREACHABLE;
@@ -83,8 +84,8 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCt
     auto status = onCompletion().getNoThrow();
     if (status.isOK()) {
         invariant(_access == Access::kReject);
-        uasserted(ErrorCodes::TenantMigrationCommitted,
-                  "Write must be re-routed to the new owner of this database");
+        uasserted(TenantMigrationCommittedInfo(_dbPrefix, _recipientConnString),
+                  "Write must be re-routed to the new owner of this tenant");
     }
     uassertStatusOK(status);
 }
@@ -105,16 +106,16 @@ void TenantMigrationAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(
     opCtx->waitForConditionOrInterrupt(
         _transitionOutOfBlockingCV, ul, [&]() { return canRead() || _access == Access::kReject; });
 
-    uassert(ErrorCodes::TenantMigrationCommitted,
-            "Read must be re-routed to the new owner of this database",
+    uassert(TenantMigrationCommittedInfo(_dbPrefix, _recipientConnString),
+            "Read must be re-routed to the new owner of this tenant",
             canRead());
 }
 
 void TenantMigrationAccessBlocker::checkIfLinearizableReadWasAllowedOrThrow(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lg(_mutex);
-    uassert(ErrorCodes::TenantMigrationCommitted,
-            "Read must be re-routed to the new owner of this database",
+    uassert(TenantMigrationCommittedInfo(_dbPrefix, _recipientConnString),
+            "Read must be re-routed to the new owner of this tenant",
             _access != Access::kReject);
 }
 

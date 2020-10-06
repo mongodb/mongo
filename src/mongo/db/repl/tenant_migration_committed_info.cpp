@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/tenant_migration_conflict_info.h"
+#include "mongo/db/repl/tenant_migration_committed_info.h"
 
 #include "mongo/base/init.h"
 
@@ -37,24 +37,27 @@ namespace mongo {
 
 namespace {
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TenantMigrationConflictInfo);
+MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TenantMigrationCommittedInfo);
 
 constexpr StringData kDatabasePrefixFieldName = "databasePrefix"_sd;
+constexpr StringData kRecipientConnetionStringFieldName = "recipientConnectionString"_sd;
 
 }  // namespace
 
-BSONObj TenantMigrationConflictInfo::toBSON() const {
+BSONObj TenantMigrationCommittedInfo::toBSON() const {
     BSONObjBuilder bob;
     serialize(&bob);
     return bob.obj();
 }
 
-void TenantMigrationConflictInfo::serialize(BSONObjBuilder* bob) const {
+void TenantMigrationCommittedInfo::serialize(BSONObjBuilder* bob) const {
     bob->append(kDatabasePrefixFieldName, _dbPrefix);
+    bob->append(kRecipientConnetionStringFieldName, _recipientConnString);
 }
 
-std::shared_ptr<const ErrorExtraInfo> TenantMigrationConflictInfo::parse(const BSONObj& obj) {
-    return std::make_shared<TenantMigrationConflictInfo>(obj[kDatabasePrefixFieldName].String());
+std::shared_ptr<const ErrorExtraInfo> TenantMigrationCommittedInfo::parse(const BSONObj& obj) {
+    return std::make_shared<TenantMigrationCommittedInfo>(
+        obj[kDatabasePrefixFieldName].String(), obj[kRecipientConnetionStringFieldName].String());
 }
 
 }  // namespace mongo

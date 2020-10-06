@@ -27,34 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/repl/tenant_migration_conflict_info.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
 
-namespace {
+class TenantMigrationCommittedInfo final : public ErrorExtraInfo {
+public:
+    static constexpr auto code = ErrorCodes::TenantMigrationCommitted;
 
-MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TenantMigrationConflictInfo);
+    TenantMigrationCommittedInfo(const std::string dbPrefix, const std::string recipientConnString)
+        : _dbPrefix(std::move(dbPrefix)), _recipientConnString(std::move(recipientConnString)){};
 
-constexpr StringData kDatabasePrefixFieldName = "databasePrefix"_sd;
+    const auto& getDatabasePrefix() const {
+        return _dbPrefix;
+    }
 
-}  // namespace
+    const auto& getRecipientConnString() const {
+        return _recipientConnString;
+    }
 
-BSONObj TenantMigrationConflictInfo::toBSON() const {
-    BSONObjBuilder bob;
-    serialize(&bob);
-    return bob.obj();
-}
+    BSONObj toBSON() const;
+    void serialize(BSONObjBuilder* bob) const override;
+    static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
-void TenantMigrationConflictInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append(kDatabasePrefixFieldName, _dbPrefix);
-}
-
-std::shared_ptr<const ErrorExtraInfo> TenantMigrationConflictInfo::parse(const BSONObj& obj) {
-    return std::make_shared<TenantMigrationConflictInfo>(obj[kDatabasePrefixFieldName].String());
-}
+private:
+    std::string _dbPrefix;
+    std::string _recipientConnString;
+};
+using TenantMigrationCommittedException = ExceptionFor<ErrorCodes::TenantMigrationCommitted>;
 
 }  // namespace mongo
