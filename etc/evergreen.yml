@@ -12797,7 +12797,7 @@ buildvariants:
 - name: live-record
   display_name: "~ RHEL 6.2 Shared Library (with UndoDB live-record)"
   batchtime: 1440 # 1 day
-  stepback: true
+  stepback: false
   modules:
   - enterprise
   run_on:
@@ -12814,7 +12814,8 @@ buildvariants:
     large_distro_name: rhel62-large
     num_scons_link_jobs_available: 0.99
     record_with: --recordWith /opt/undodb5/bin/live-record
-    exec_timeout_secs: 14400 # 4 hours
+    resmoke_jobs_factor: 0.3
+    exec_timeout_secs: 28800 # 8 hours
     test_flags: --excludeWithAnyTags=requires_fast_memory,live_record_incompatible
   tasks:
   - name: compile_without_package_TG
