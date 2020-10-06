@@ -120,7 +120,7 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
         """Return true if all replica sets are still operating."""
         return all(replica_set.is_running() for replica_set in self.replica_sets)
 
-    def get_num_replica_sets(self):
+    def get_num_replsets(self):
         """Return the number of replica sets."""
         return self.num_replica_sets
 
@@ -129,6 +129,12 @@ class TenantMigrationFixture(interface.Fixture):  # pylint: disable=too-many-ins
         if not self.replica_sets:
             raise ValueError("Must call setup() before calling get_replset")
         return self.replica_sets[index]
+
+    def get_replsets(self):
+        """Return the ReplicaSetFixtures for all the replica sets."""
+        if not self.replica_sets:
+            raise ValueError("Must call setup() before calling get_replsets")
+        return self.replica_sets
 
     def get_internal_connection_string(self):
         """Return the internal connection string to the replica set that currently starts out owning the data."""

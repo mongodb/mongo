@@ -81,9 +81,44 @@ selector:
   - jstests/core/capped_convertToCapped1.js
   # TODO (SERVER-52866): Synchronize getLastError with tenant migrations.
   - jstests/core/bulk_legacy_enforce_gle.js
-  # These tests run getMore commands which are not supported in the tenant migration *passthrough*.
+  # This test contains assertions for the hostname that operations run on.
+  - jstests/core/currentop_cursors.js
+  # Server parameters are stored in-memory only so are not transferred onto the recipient. These
+  # tests set the server parameter "notablescan" to force the node to not execute queries that
+  # require a collection scan and return an error.
+  - jstests/core/notablescan.js
+  - jstests/core/notablescan_capped.js
+  # captrunc command is not blocked during tenant migration.
+  - jstests/core/capped6.js
+  # TODO (SERVER-54449): Enable index related tests in tenant_migration_jscore_passthrough suite.
+  - jstests/core/*explain*.js
+  - jstests/core/*index*.js
+  - jstests/core/*multikey*.js
+  - jstests/core/*stage*.js
+  - jstests/core/agg_hint.js
+  - jstests/core/geo_s2sparse.js
+  - jstests/core/insert_illegal_doc.js
+  - jstests/core/ord.js
+  - jstests/core/splitvector.js
+  # TODO (SERVER-51774): Ensure the donor's TenantMigrationCommitted/TenantMigrationAborted write
+  # errors don't exceed the max BSON size.
+  - jstests/core/batch_write_command_delete.js
+  - jstests/core/batch_write_command_insert.js
+  - jstests/core/batch_write_command_update.js
+
   exclude_with_any_tags:
+  # These tests run getMore commands which are not supported in the tenant migration passthrough.
   - requires_getmore
+  # Due to background tenant migrations, operations in the main test shell are not guaranteed to
+  # be causally consistent with operations in a parallel shell. The reason is that
+  # TenantMigrationCommitted error is only thrown when the client does a write or a atClusterTime/
+  # afterClusterTime or linearlizable read. Therefore, one of shell may not be aware that the
+  # migration has occurred and would not forward the read/write command to the right replica set.
+  - uses_parallel_shell
+  # Profile settings are stored in-memory only so are not transferred to the recipient.
+  - requires_profiling
+  # emptycapped command is blocked during tenant migration.
+  - requires_emptycapped
 
 executor:
   archive:
@@ -119,13 +154,16 @@ executor:
       set_parameters:
         enableTestCommands: 1
         failpoint.abortTenantMigrationBeforeLeavingBlockingState:
+            mode:
+              activationProbability: 0.5
+        failpoint.pauseTenantMigrationBeforeLeavingBlockingState:
             mode: alwaysOn
             data:
               blockTimeMS: 250
-        # Set the delay before migration state machine is garbage collected to be short to avoid
-        # migration conflicts since the ContinuousTenantMigration hook migrates a single tenant
-        # between the replica sets in the fixture.
-        tenantMigrationGarbageCollectionDelayMS: 100
+        # To avoid routing commands in each test incorrectly, the ContinuousTenantMigration hook
+        # only runs donorForgetMigration against the donor of each migration when it is safe to do
+        # so. Therefore, the garbage collection delay doesn't need to be large.
+        tenantMigrationGarbageCollectionDelayMS: 1
         ttlMonitorSleepSecs: 1
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
@@ -134,6 +172,11 @@ executor:
       # Each entry is for a different replica set's extra mongod options.
       - tlsCertificateKeyFile: jstests/libs/rs0.pem
       - tlsCertificateKeyFile: jstests/libs/rs1.pem
-    num_replica_sets: 2
+      - tlsCertificateKeyFile: jstests/libs/rs2.pem
+    # Tenant migration garbage collection is expected to take at least one second since
+    # ttlMonitorSleepSecs is set to 1 (lowest possible value). Using three replica sets allow us
+    # to run more migrations during tests that less than one second to complete since we don't need
+    # to wait for the garbage collection right way in the first round of migrations.
+    num_replica_sets: 3
     num_nodes_per_replica_set: 3
     use_replica_set_connection_string: true
