@@ -808,28 +808,27 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     auto opCtx = opCtxHolder.get();
 
                     pauseTenantMigrationBeforeLeavingBlockingState.executeIf(
-                        [&](const BSONObj&) {
-                            pauseTenantMigrationBeforeLeavingBlockingState.pauseWhileSet(opCtx);
+                        [&](const BSONObj& data) {
+                            if (!data.hasField("blockTimeMS")) {
+                                pauseTenantMigrationBeforeLeavingBlockingState.pauseWhileSet(opCtx);
+                            } else {
+                                const auto blockTime =
+                                    Milliseconds{data.getIntField("blockTimeMS")};
+                                LOGV2(5010400,
+                                      "Keep migration in blocking state",
+                                      "blockTime"_attr = blockTime);
+                                opCtx->sleepFor(blockTime);
+                            }
                         },
                         [&](const BSONObj& data) {
                             return !data.hasField("tenantId") ||
                                 _stateDoc.getTenantId() == data["tenantId"].str();
                         });
 
-                    abortTenantMigrationBeforeLeavingBlockingState.execute(
-                        [&](const BSONObj& data) {
-                            if (data.hasField("blockTimeMS")) {
-                                const auto blockTime =
-                                    Milliseconds{data.getIntField("blockTimeMS")};
-                                LOGV2(5010400,
-                                      "Keep migration in blocking state before aborting",
-                                      "blockTime"_attr = blockTime);
-                                opCtx->sleepFor(blockTime);
-                            }
-
-                            uasserted(ErrorCodes::InternalError,
-                                      "simulate a tenant migration error");
-                        });
+                    if (MONGO_unlikely(
+                            abortTenantMigrationBeforeLeavingBlockingState.shouldFail())) {
+                        uasserted(ErrorCodes::InternalError, "simulate a tenant migration error");
+                    }
                 })
                 .then([this, self = shared_from_this(), executor, serviceToken] {
                     checkIfReceivedDonorAbortMigration(serviceToken, _abortMigrationSource.token());

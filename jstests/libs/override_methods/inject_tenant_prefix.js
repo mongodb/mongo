@@ -11,8 +11,8 @@ load("jstests/libs/transactions_util.js");
 
 // Save references to the original methods in the IIFE's scope.
 // This scoping allows the original methods to be called by the overrides below.
-// Override this method to make the accessed database have the prefix TestData.tenantId.
 let originalRunCommand = Mongo.prototype.runCommand;
+let originalRunCommandWithMetadata = Mongo.prototype.runCommandWithMetadata;
 
 const blacklistedDbNames = ["config", "admin", "local"];
 
@@ -30,7 +30,8 @@ function prependTenantIdToDbNameIfApplicable(dbName) {
         // ignored.
         return dbName;
     }
-    return isBlacklistedDb(dbName) ? dbName : TestData.tenantId + "_" + dbName;
+    const prefix = TestData.tenantId + "_";
+    return isBlacklistedDb(dbName) || dbName.startsWith(prefix) ? dbName : prefix + dbName;
 }
 
 /**
@@ -125,11 +126,26 @@ const kCmdsWithNsAsFirstField =
     new Set(["renameCollection", "checkShardingIndex", "dataSize", "datasize", "splitVector"]);
 
 /**
- * Returns a new cmdObj with TestData.tenantId prepended to all database name and namespace fields.
+ * Returns true if cmdObj has been marked as having TestData.tenantId prepended to all of its
+ * database name and namespace fields, and false otherwise. Assumes that 'createCmdObjWithTenantId'
+ * sets cmdObj.comment.isCmdObjWithTenantId to true.
+ */
+function isCmdObjWithTenantId(cmdObj) {
+    return cmdObj.comment && cmdObj.comment.isCmdObjWithTenantId;
+}
+
+/**
+ * If cmdObj.comment.isCmdObjWithTenantId is false, returns a new cmdObj with TestData.tenantId
+ * prepended to all of its database name and namespace fields, and sets the flag to true after doing
+ * so. Otherwise, returns an exact copy of cmdObj.
  */
 function createCmdObjWithTenantId(cmdObj) {
     const cmdName = Object.keys(cmdObj)[0];
     let cmdObjWithTenantId = TransactionsUtil.deepCopyObject({}, cmdObj);
+
+    if (isCmdObjWithTenantId(cmdObj)) {
+        return cmdObjWithTenantId;
+    }
 
     // Handle commands with special database and namespace field names.
     if (kCmdsWithNsAsFirstField.has(cmdName)) {
@@ -175,28 +191,47 @@ function createCmdObjWithTenantId(cmdObj) {
         prependTenantId(cmdObjWithTenantId);
     }
 
+    cmdObjWithTenantId.comment = Object.assign(
+        cmdObjWithTenantId.comment ? cmdObjWithTenantId.comment : {}, {isCmdObjWithTenantId: true});
     return cmdObjWithTenantId;
 }
 
 /**
- * If the given response object contains a TenantMigrationAborted error, returns the error object.
+ * If the given response object contains the given tenant migration error, returns the error object.
  * Otherwise, returns null.
  */
-function extractTenantMigrationAbortedError(resObj) {
-    if (resObj.code == ErrorCodes.TenantMigrationAborted) {
-        // Commands, like createIndex and dropIndex, have TenantMigrationAborted error in the top
-        // level
+function extractTenantMigrationError(resObj, errorCode) {
+    if (resObj.code == errorCode) {
+        // Commands, like createIndex and dropIndex, have TenantMigrationCommitted or
+        // TenantMigrationAborted error in the top level.
         return resObj;
     }
     if (resObj.writeErrors) {
         for (let writeError of resObj.writeErrors) {
-            if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+            if (writeError.code == errorCode) {
                 return writeError;
             }
         }
     }
     return null;
 }
+
+/**
+ * If the response contains the 'writeErrors' field, replaces it with a field named
+ * 'truncatedWriteErrors' which includes only the first and last error object in 'writeErrors'.
+ * To be used for logging.
+ */
+function reformatResObjForLogging(resObj) {
+    if (resObj.writeErrors) {
+        let truncatedWriteErrors = [resObj.writeErrors[0]];
+        if (resObj.writeErrors.length > 1) {
+            truncatedWriteErrors.push(resObj.writeErrors[resObj.writeErrors.length - 1]);
+        }
+        resObj["truncatedWriteErrors"] = truncatedWriteErrors;
+        delete resObj.writeErrors;
+    }
+}
+
 /**
  * If the command was a batch command where some of the operations failed, modifies the command
  * object so that only failed operations are retried.
@@ -206,7 +241,7 @@ function modifyCmdObjForRetry(cmdObj, resObj) {
         let retryOps = [];
         if (cmdObj.ordered === false) {
             for (let writeError of resObj.writeErrors) {
-                if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+                if (ErrorCodes.isTenantMigrationError(writeError.code)) {
                     retryOps.push(cmdObj.documents[writeError.index]);
                 }
             }
@@ -221,7 +256,7 @@ function modifyCmdObjForRetry(cmdObj, resObj) {
         let retryOps = [];
         if (cmdObj.ordered === false) {
             for (let writeError of resObj.writeErrors) {
-                if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+                if (ErrorCodes.isTenantMigrationError(writeError.code)) {
                     retryOps.push(cmdObj.updates[writeError.index]);
                 }
             }
@@ -235,7 +270,7 @@ function modifyCmdObjForRetry(cmdObj, resObj) {
         let retryOps = [];
         if (cmdObj.ordered === false) {
             for (let writeError of resObj.writeErrors) {
-                if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+                if (ErrorCodes.isTenantMigrationError(writeError.code)) {
                     retryOps.push(cmdObj.deletes[writeError.index]);
                 }
             }
@@ -284,10 +319,51 @@ function removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap) {
     return indexMap;
 }
 
-Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
-    // Create another cmdObj from this command with TestData.tenantId prepended to all the
-    // applicable database names and namespaces.
-    const cmdObjWithTenantId = createCmdObjWithTenantId(cmdObj);
+/**
+ * Returns the state document for the outgoing tenant migration for TestData.tenantId. Asserts
+ * that there is only one such migration.
+ */
+Mongo.prototype.getTenantMigrationStateDoc = function() {
+    const findRes = assert.commandWorked(originalRunCommand.apply(
+        this,
+        ["config", {find: "tenantMigrationDonors", filter: {tenantId: TestData.tenantId}}, 0]));
+    const docs = findRes.cursor.firstBatch;
+    // There should only be one active migration at any given time.
+    assert.eq(docs.length, 1, tojson(docs));
+    return docs[0];
+};
+
+/**
+ * Marks the outgoing migration for TestData.tenantId as having caused the shell to reroute
+ * commands by inserting a document for it into the testTenantMigration.rerouted collection.
+ */
+Mongo.prototype.recordRerouteDueToTenantMigration = function() {
+    assert.neq(null, this.migrationStateDoc);
+    assert.neq(null, this.reroutingMongo);
+
+    assert.commandWorked(originalRunCommand.apply(this, [
+        "testTenantMigration",
+        {
+            insert: "rerouted",
+            documents: [{_id: this.migrationStateDoc._id}],
+            writeConcern: {w: "majority"}
+        },
+        0
+    ]));
+};
+
+/**
+ * Keeps executing 'cmdObjWithTenantId' by running 'originalRunCommandFunc' if 'this.reroutingMongo'
+ * is not none or 'reroutingRunCommandFunc' if it is none until the command succeeds or fails with
+ * errors other than TenantMigrationCommitted or TenantMigrationAborted. When the command fails
+ * with TenantMigrationCommitted, sets 'this.reroutingMongo' to the mongo connection to the
+ * recipient for the migration. 'dbNameWithTenantId' is only used for logging.
+ */
+Mongo.prototype.runCommandRetryOnTenantMigrationErrors = function(
+    dbNameWithTenantId, cmdObjWithTenantId, originalRunCommandFunc, reroutingRunCommandFunc) {
+    if (this.reroutingMongo) {
+        return reroutingRunCommandFunc();
+    }
 
     let numAttempts = 0;
 
@@ -318,17 +394,22 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
 
     while (true) {
         numAttempts++;
-        let resObj = originalRunCommand.apply(
-            this, [prependTenantIdToDbNameIfApplicable(dbName), cmdObjWithTenantId, options]);
+        let resObj;
+        if (this.reroutingMongo) {
+            resObj = reroutingRunCommandFunc();
+            this.recordRerouteDueToTenantMigration();
+        } else {
+            resObj = originalRunCommandFunc();
+        }
 
-        // Remove TestData.tenantId from all database names and namespaces in the resObj since tests
-        // assume the command was run against the original database.
-        removeTenantId(resObj);
+        const migrationCommittedErr =
+            extractTenantMigrationError(resObj, ErrorCodes.TenantMigrationCommitted);
+        const migrationAbortedErr =
+            extractTenantMigrationError(resObj, ErrorCodes.TenantMigrationAborted);
 
-        // If the write didn't encounter a TenantMigrationAborted error at all, return the result
-        // directly.
-        let tenantMigrationAbortedErr = extractTenantMigrationAbortedError(resObj);
-        if (numAttempts == 1 && !tenantMigrationAbortedErr) {
+        // If the write didn't encounter a TenantMigrationCommitted or TenantMigrationAborted error
+        // at all, return the result directly.
+        if (numAttempts == 1 && (!migrationCommittedErr && !migrationAbortedErr)) {
             return resObj;
         }
 
@@ -360,9 +441,9 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
             }
             if (resObj.writeErrors) {
                 for (let writeError of resObj.writeErrors) {
-                    // If we encounter a TenantMigrationAborted error, the rest of the batch must
-                    // have failed with the same code.
-                    if (writeError.code === ErrorCodes.TenantMigrationAborted) {
+                    // If we encounter a TenantMigrationCommitted or TenantMigrationAborted error,
+                    // the rest of the batch must have failed with the same code.
+                    if (ErrorCodes.isTenantMigrationError(writeError.code)) {
                         break;
                     }
 
@@ -380,17 +461,32 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
             }
         }
 
-        if (tenantMigrationAbortedErr) {
-            modifyCmdObjForRetry(cmdObjWithTenantId, resObj);
+        if (migrationCommittedErr || migrationAbortedErr) {
+            // Update the command for reroute/retry.
+            modifyCmdObjForRetry(cmdObjWithTenantId, resObj, true);
+            // It is safe to reformat this resObj since it will not be returned to the caller of
+            // runCommand.
+            reformatResObjForLogging(resObj);
 
             // Build a new indexMap where the keys are the index that each write that needs to be
             // retried will have in the next attempt's cmdObj.
             indexMap = resetIndices(indexMap);
 
-            jsTest.log(
-                `Got TenantMigrationAborted for command against database ` +
-                `"${dbName}" with response ${tojson(resObj)} after trying ${numAttempts} times, ` +
-                `retrying the command`);
+            if (migrationCommittedErr) {
+                // Store the connection to the recipient so the next commands can be rerouted.
+                this.migrationStateDoc = this.getTenantMigrationStateDoc();
+                this.reroutingMongo =
+                    connect(this.migrationStateDoc.recipientConnectionString).getMongo();
+
+                jsTest.log(`Got TenantMigrationCommitted for command against database ` +
+                           `"${dbNameWithTenantId}" after trying ${numAttempts} times, rerouting ` +
+                           `the command: ${tojson(resObj)}`);
+            } else if (migrationAbortedErr) {
+                jsTest.log(
+                    `Got TenantMigrationAborted for command against database ` +
+                    `"${dbNameWithTenantId}" after trying ${numAttempts} times, retrying the ` +
+                    `command: ${tojson(resObj)}`);
+            }
         } else {
             // Modify the resObj before returning the result.
             if (resObj.n) {
@@ -410,130 +506,54 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     }
 };
 
-Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
-    // Create another cmdObj from this command with TestData.tenantId prepended to all the
-    // applicable database names and namespaces.
-    const cmdObjWithTenantId = createCmdObjWithTenantId(cmdObj);
+Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
+    const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName);
 
-    let numAttempts = 0;
+    // Use cmdObj with TestData.tenantId prepended to all the applicable database names and
+    // namespaces.
+    const originalCmdObjContainsTenantId = isCmdObjWithTenantId(cmdObj);
+    let cmdObjWithTenantId =
+        originalCmdObjContainsTenantId ? cmdObj : createCmdObjWithTenantId(cmdObj);
 
-    // Keep track of the write operations that were applied.
-    let n = 0;
-    let nModified = 0;
-    let upserted = [];
-    let nonRetryableWriteErrors = [];
+    let resObj = this.runCommandRetryOnTenantMigrationErrors(
+        dbNameWithTenantId,
+        cmdObjWithTenantId,
+        () => originalRunCommand.apply(this, [dbNameWithTenantId, cmdObjWithTenantId, options]),
+        () => this.reroutingMongo.runCommand(dbNameWithTenantId, cmdObjWithTenantId, options));
 
-    // 'indexMap' is a mapping from a write's index in the current cmdObj to its index in the
-    // original cmdObj.
-    let indexMap = {};
-    if (cmdObjWithTenantId.documents) {
-        for (let i = 0; i < cmdObjWithTenantId.documents.length; i++) {
-            indexMap[i] = i;
-        }
-    }
-    if (cmdObjWithTenantId.updates) {
-        for (let i = 0; i < cmdObjWithTenantId.updates.length; i++) {
-            indexMap[i] = i;
-        }
-    }
-    if (cmdObjWithTenantId.deletes) {
-        for (let i = 0; i < cmdObjWithTenantId.deletes.length; i++) {
-            indexMap[i] = i;
-        }
-    }
-
-    while (true) {
-        numAttempts++;
-        let resObj = originalRunCommand.apply(
-            this, [prependTenantIdToDbNameIfApplicable(dbName), metadata, commandArgsWithTenantId]);
-
+    if (!originalCmdObjContainsTenantId) {
         // Remove TestData.tenantId from all database names and namespaces in the resObj since tests
         // assume the command was run against the original database.
         removeTenantId(resObj);
-
-        // If the write didn't encounter a TenantMigrationAborted error at all, return the result
-        // directly.
-        let tenantMigrationAbortedErr = extractTenantMigrationAbortedError(resObj);
-        if (numAttempts == 1 && !tenantMigrationAbortedErr) {
-            return resObj;
-        }
-
-        // Add/modify the shells's n, nModified, upserted, and writeErrors.
-        if (resObj.n) {
-            n += resObj.n;
-        }
-        if (resObj.nModified) {
-            nModified += resObj.nModified;
-        }
-        if (resObj.upserted || resObj.writeErrors) {
-            // This is an optimization to make later lookups into 'indexMap' faster, since it
-            // removes any key that is not pertinent in the current cmdObj execution.
-            indexMap = removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap);
-
-            if (resObj.upserted) {
-                for (let upsert of resObj.upserted) {
-                    let currentUpsertedIndex = upsert.index;
-
-                    // Set the entry's index to the write's index in the original cmdObj.
-                    upsert.index = indexMap[upsert.index];
-
-                    // Track that this write resulted in an upsert.
-                    upserted.push(upsert);
-
-                    // This write will not need to be retried, so remove it from 'indexMap'.
-                    delete indexMap[currentUpsertedIndex];
-                }
-            }
-            if (resObj.writeErrors) {
-                for (let writeError of resObj.writeErrors) {
-                    // If we encounter a TenantMigrationAborted error, the rest of the batch must
-                    // have failed with the same code.
-                    if (writeError.code === ErrorCodes.TenantMigrationAborted) {
-                        break;
-                    }
-
-                    let currentWriteErrorIndex = writeError.index;
-
-                    // Set the entry's index to the write's index in the original cmdObj.
-                    writeError.index = indexMap[writeError.index];
-
-                    // Track that this write resulted in a non-retryable error.
-                    nonRetryableWriteErrors.push(writeError);
-
-                    // This write will not need to be retried, so remove it from 'indexMap'.
-                    delete indexMap[currentWriteErrorIndex];
-                }
-            }
-        }
-
-        if (tenantMigrationAbortedErr) {
-            modifyCmdObjForRetry(cmdObjWithTenantId, resObj);
-
-            // Build a new indexMap where the keys are the index that each write that needs to be
-            // retried will have in the next attempt's cmdObj.
-            indexMap = resetIndices(indexMap);
-
-            jsTest.log(
-                `Got TenantMigrationAborted for command against database ` +
-                `"${dbName}" with response ${tojson(resObj)} after trying ${numAttempts} times, ` +
-                `retrying the command`);
-        } else {
-            // Modify the resObj before returning the result.
-            if (resObj.n) {
-                resObj.n = n;
-            }
-            if (resObj.nModified) {
-                resObj.nModified = nModified;
-            }
-            if (upserted.length > 0) {
-                resObj.upserted = upserted;
-            }
-            if (nonRetryableWriteErrors.length > 0) {
-                resObj.writeErrors = nonRetryableWriteErrors;
-            }
-            return resObj;
-        }
     }
+
+    return resObj;
+};
+
+Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, cmdObj) {
+    const dbNameWithTenantId = prependTenantIdToDbNameIfApplicable(dbName);
+
+    // Use cmdObj with TestData.tenantId prepended to all the applicable database names and
+    // namespaces.
+    const originalCmdObjContainsTenantId = isCmdObjWithTenantId(cmdObj);
+    let cmdObjWithTenantId =
+        originalCmdObjContainsTenantId ? cmdObj : createCmdObjWithTenantId(cmdObj);
+
+    let resObj = this.runCommandRetryOnTenantMigrationErrors(
+        dbNameWithTenantId,
+        cmdObjWithTenantId,
+        () => originalRunCommandWithMetadata.apply(
+            this, [dbNameWithTenantId, metadata, cmdObjWithTenantId]),
+        () => this.reroutingMongo.runCommandWithMetadata(
+            dbNameWithTenantId, metadata, cmdObjWithTenantId));
+
+    if (!originalCmdObjContainsTenantId) {
+        // Remove TestData.tenantId from all database names and namespaces in the resObj since tests
+        // assume the command was run against the original database.
+        removeTenantId(resObj);
+    }
+
+    return resObj;
 };
 
 OverrideHelpers.prependOverrideInParallelShell(
