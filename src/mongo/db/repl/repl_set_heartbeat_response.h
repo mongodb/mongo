@@ -111,6 +111,10 @@ public:
     }
     OpTime getDurableOpTime() const;
     OpTimeAndWallTime getDurableOpTimeAndWallTime() const;
+    bool hasIsElectable() const {
+        return _electableSet;
+    }
+    bool isElectable() const;
 
     /**
      * Sets _setName to "name".
@@ -174,6 +178,10 @@ public:
     void setTerm(long long term) {
         _term = term;
     }
+    void setElectable(bool electable) {
+        _electableSet = true;
+        _electable = electable;
+    }
 
 private:
     bool _electionTimeSet = false;
@@ -200,6 +208,9 @@ private:
     bool _primaryIdSet = false;
     long long _primaryId = -1;
     long long _term = -1;
+
+    bool _electableSet = false;
+    bool _electable = false;
 };
 
 }  // namespace repl

@@ -142,6 +142,13 @@ public:
         return _hostAndPort;
     }
 
+    /*
+     * Returns true if the last heartbeat data explicilty stated that the node is not electable.
+     */
+    bool isUnelectable() const {
+        return _lastResponse.hasIsElectable() && !_lastResponse.isElectable();
+    }
+
     /**
      * Sets values in this object from the results of a successful heartbeat command.
      * Returns whether or not the optimes advanced as a result of this heartbeat response.

@@ -63,6 +63,7 @@ const std::string kReplSetFieldName = "set";
 const std::string kSyncSourceFieldName = "syncingTo";
 const std::string kTermFieldName = "term";
 const std::string kTimestampFieldName = "ts";
+const std::string kIsElectableFieldName = "electable";
 
 }  // namespace
 
@@ -100,6 +101,9 @@ void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
     if (_appliedOpTimeSet) {
         _appliedOpTime.append(builder, kAppliedOpTimeFieldName);
         builder->appendDate(kAppliedWallTimeFieldName, _appliedWallTime);
+    }
+    if (_electableSet) {
+        *builder << kIsElectableFieldName << _electable;
     }
 }
 
@@ -188,6 +192,13 @@ Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc,
         _appliedWallTime = appliedWallTimeElement.Date();
     }
     _appliedOpTimeSet = true;
+
+    status = bsonExtractBooleanField(doc, kIsElectableFieldName, &_electable);
+    if (!status.isOK()) {
+        _electableSet = false;
+    } else {
+        _electableSet = true;
+    }
 
     const BSONElement memberStateElement = doc[kMemberStateFieldName];
     if (memberStateElement.eoo()) {
@@ -296,6 +307,11 @@ OpTime ReplSetHeartbeatResponse::getDurableOpTime() const {
 OpTimeAndWallTime ReplSetHeartbeatResponse::getDurableOpTimeAndWallTime() const {
     invariant(_durableOpTimeSet);
     return {_durableOpTime, _durableWallTime};
+}
+
+bool ReplSetHeartbeatResponse::isElectable() const {
+    invariant(_electableSet);
+    return _electable;
 }
 
 }  // namespace repl
