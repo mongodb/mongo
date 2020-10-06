@@ -2565,7 +2565,7 @@ TEST_F(UpdateObjectNodeTest, ApplyMultipleArrayUpdates) {
         doc.getObject());
     ASSERT_FALSE(doc.isInPlaceModeEnabled());
 
-    assertOplogEntry(fromjson("{$set: {'a.10': 10, 'a.2': 2}}"),
+    assertOplogEntry(fromjson("{$set: {'a.2': 2, 'a.10': 10}}"),
                      fromjson("{$v: 2, diff: {sa: {a: true, u2: 2, u10: 10}}}"));
 }
 

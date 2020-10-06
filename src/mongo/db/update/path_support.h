@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <string>
 
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref.h"
@@ -49,6 +50,27 @@ static const size_t kMaxPaddingAllowed = 1500000;
 
 // Convenience type to hold equality matches at particular paths from a MatchExpression
 typedef std::map<StringData, const EqualityMatchExpression*> EqualityMatches;
+
+struct cmpPathsAndArrayIndexes {
+    // Assumes paths are valid.
+    bool operator()(const std::string& a, const std::string& b) const {
+        NumberParser parser;
+        long numA;
+        long numB;
+        auto status = parser(a, &numA);
+        if (!status.isOK())
+            return a < b;
+        status = parser(b, &numB);
+        if (!status.isOK())
+            return a < b;
+        // If the numbers are the same, and the strings are the same, 'numA' < 'numB' is equivalent
+        // to 'a' < 'b'. However, the strings could still be different (for example, "1" and "01")
+        // and we need to treat them differently.
+        if (numA == numB)
+            return a < b;
+        return numA < numB;
+    }
+};
 
 /**
  * Finds the longest portion of 'prefix' that exists in document rooted at 'root' and is

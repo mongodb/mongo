@@ -34,12 +34,15 @@
 namespace mongo {
 
 // static
-std::map<std::string, clonable_ptr<UpdateNode>> UpdateInternalNode::createUpdateNodeMapByMerging(
-    const std::map<std::string, clonable_ptr<UpdateNode>>& leftMap,
-    const std::map<std::string, clonable_ptr<UpdateNode>>& rightMap,
+std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes>
+UpdateInternalNode::createUpdateNodeMapByMerging(
+    const std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes>&
+        leftMap,
+    const std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes>&
+        rightMap,
     FieldRef* pathTaken,
     bool wrapFieldNameAsArrayFilterIdentifier) {
-    std::map<std::string, clonable_ptr<UpdateNode>> mergedMap;
+    std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes> mergedMap;
 
     // Get the union of the field names we know about among the leftMap and rightMap.
     stdx::unordered_set<std::string> allFields;

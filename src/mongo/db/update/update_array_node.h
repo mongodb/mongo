@@ -99,7 +99,7 @@ public:
 
 private:
     const std::map<StringData, std::unique_ptr<ExpressionWithPlaceholder>>& _arrayFilters;
-    std::map<std::string, clonable_ptr<UpdateNode>> _children;
+    std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes> _children;
 
     // When calling apply() causes us to merge elements of '_children', we store the result of the
     // merge in case we need it for another array element or document.
