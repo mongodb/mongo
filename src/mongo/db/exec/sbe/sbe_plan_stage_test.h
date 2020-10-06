@@ -152,7 +152,7 @@ public:
      * Note that this method assumes ownership of the SBE Array being passed in.
      */
     std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateMockScanMulti(
-        int64_t numSlots, value::TypeTags arrTag, value::Value arrVal);
+        int32_t numSlots, value::TypeTags arrTag, value::Value arrVal);
 
     /**
      * Make a mock scan from an BSON array. This method does NOT assume ownership of the BSONArray
@@ -165,7 +165,7 @@ public:
      * ownership of the BSONArray passed in.
      */
     std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateMockScanMulti(
-        int64_t numSlots, const BSONArray& array);
+        int32_t numSlots, const BSONArray& array);
 
     /**
      * Prepares the tree of PlanStages given by `root` and returns the SlotAccessor* for `slot`.
@@ -232,7 +232,7 @@ public:
      * slots. `output` should be an array of subarrays with each subarray having M elements, where M
      * is the number of output slots.
      */
-    void runTestMulti(int64_t numInputSlots,
+    void runTestMulti(int32_t numInputSlots,
                       value::TypeTags inputTag,
                       value::Value inputVal,
                       value::TypeTags expectedTag,

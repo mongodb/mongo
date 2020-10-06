@@ -18,20 +18,20 @@ assert.commandWorked(coll.insert([
 ]));
 
 const result =
-    coll.aggregate([{$sort: {_id: 1}}, {$addFields: {f: {$first: "$a"}, l: {$last: "$a"}}}])
+    coll.aggregate([{$sort: {_id: 1}}, {$project: {f: {$first: "$a"}, l: {$last: "$a"}}}])
         .toArray();
 assert.eq(result, [
     // When an array doesn't contain a given index, the result is 'missing', similar to looking up a
     // nonexistent key in a document.
-    {_id: 0, a: []},
+    {_id: 0},
 
-    {_id: 1, a: ['A'], f: 'A', l: 'A'},
-    {_id: 2, a: ['A', 'B'], f: 'A', l: 'B'},
-    {_id: 3, a: ['A', 'B', 'C'], f: 'A', l: 'C'},
+    {_id: 1, f: 'A', l: 'A'},
+    {_id: 2, f: 'A', l: 'B'},
+    {_id: 3, f: 'A', l: 'C'},
 
     // When the input is nullish instead of an array, the result is null.
-    {_id: 4, a: null, f: null, l: null},
-    {_id: 5, a: undefined, f: null, l: null},
+    {_id: 4, f: null, l: null},
+    {_id: 5, f: null, l: null},
     {_id: 6, f: null, l: null},
 ]);
 }());

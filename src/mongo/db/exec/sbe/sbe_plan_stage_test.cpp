@@ -83,7 +83,7 @@ std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::gener
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
-PlanStageTestFixture::generateMockScanMulti(int64_t numSlots,
+PlanStageTestFixture::generateMockScanMulti(int32_t numSlots,
                                             value::TypeTags arrTag,
                                             value::Value arrVal) {
     using namespace std::literals;
@@ -97,14 +97,14 @@ PlanStageTestFixture::generateMockScanMulti(int64_t numSlots,
     // across multiple output slots.
     value::SlotVector projectSlots;
     value::SlotMap<std::unique_ptr<EExpression>> projections;
-    for (int64_t i = 0; i < numSlots; ++i) {
+    for (int32_t i = 0; i < numSlots; ++i) {
         projectSlots.emplace_back(generateSlotId());
         projections.emplace(
             projectSlots.back(),
             makeE<EFunction>("getElement"sv,
                              makeEs(makeE<EVariable>(scanSlot),
-                                    makeE<EConstant>(value::TypeTags::NumberInt64,
-                                                     value::bitcastFrom<int64_t>(i)))));
+                                    makeE<EConstant>(value::TypeTags::NumberInt32,
+                                                     value::bitcastFrom<int32_t>(i)))));
     }
 
     return {std::move(projectSlots),
@@ -118,7 +118,7 @@ std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::gener
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
-PlanStageTestFixture::generateMockScanMulti(int64_t numSlots, const BSONArray& array) {
+PlanStageTestFixture::generateMockScanMulti(int32_t numSlots, const BSONArray& array) {
     auto [arrTag, arrVal] = makeValue(array);
     return generateMockScanMulti(numSlots, arrTag, arrVal);
 }
@@ -214,7 +214,7 @@ void PlanStageTestFixture::runTest(value::TypeTags inputTag,
     ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
 }
 
-void PlanStageTestFixture::runTestMulti(int64_t numInputSlots,
+void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         value::TypeTags inputTag,
                                         value::Value inputVal,
                                         value::TypeTags expectedTag,

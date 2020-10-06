@@ -90,6 +90,75 @@ protected:
         return _vm.runPredicate(compiledExpr);
     }
 
+    std::pair<value::TypeTags, value::Value> makeBsonArray(const BSONArray& ba) {
+        int numBytes = ba.objsize();
+        uint8_t* data = new uint8_t[numBytes];
+        memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
+        return {value::TypeTags::bsonArray, value::bitcastFrom<uint8_t*>(data)};
+    }
+
+    std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {
+        auto [tmpTag, tmpVal] = makeBsonArray(arr);
+        value::ValueGuard tmpGuard{tmpTag, tmpVal};
+
+        value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+
+        auto [arrTag, arrVal] = value::makeNewArraySet();
+        value::ValueGuard guard{arrTag, arrVal};
+
+        auto arrView = value::getArraySetView(arrVal);
+
+        while (!enumerator.atEnd()) {
+            auto [tag, val] = enumerator.getViewOfValue();
+            enumerator.advance();
+
+            auto [copyTag, copyVal] = value::copyValue(tag, val);
+            arrView->push_back(copyTag, copyVal);
+        }
+        guard.reset();
+
+        return {arrTag, arrVal};
+    }
+
+    std::pair<value::TypeTags, value::Value> makeArray(const BSONArray& arr) {
+        auto [tmpTag, tmpVal] = makeBsonArray(arr);
+        value::ValueGuard tmpGuard{tmpTag, tmpVal};
+
+        value::ArrayEnumerator enumerator{tmpTag, tmpVal};
+
+        auto [arrTag, arrVal] = value::makeNewArray();
+        value::ValueGuard guard{arrTag, arrVal};
+
+        auto arrView = value::getArrayView(arrVal);
+
+        while (!enumerator.atEnd()) {
+            auto [tag, val] = enumerator.getViewOfValue();
+            enumerator.advance();
+
+            auto [copyTag, copyVal] = value::copyValue(tag, val);
+            arrView->push_back(copyTag, copyVal);
+        }
+        guard.reset();
+
+        return {arrTag, arrVal};
+    }
+
+    std::pair<value::TypeTags, value::Value> makeNothing() {
+        return {value::TypeTags::Nothing, value::bitcastFrom<int64_t>(0)};
+    }
+
+    std::pair<value::TypeTags, value::Value> makeInt32(int32_t value) {
+        return {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(value)};
+    }
+
+    std::pair<value::TypeTags, value::Value> makeInt64(int64_t value) {
+        return {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(value)};
+    }
+
+    std::pair<value::TypeTags, value::Value> makeDouble(double value) {
+        return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(value)};
+    }
+
 private:
     value::SlotIdGenerator _slotIdGenerator;
     CoScanStage _emptyStage{kEmptyPlanNodeId};

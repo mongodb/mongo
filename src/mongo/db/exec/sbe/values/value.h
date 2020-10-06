@@ -205,6 +205,8 @@ inline std::size_t hashCombine(std::size_t state, std::size_t val) noexcept {
  */
 class ValueGuard {
 public:
+    ValueGuard(const std::pair<TypeTags, Value> typedValue)
+        : ValueGuard(typedValue.first, typedValue.second) {}
     ValueGuard(TypeTags tag, Value val) : _tag(tag), _value(val) {}
     ValueGuard() = delete;
     ValueGuard(const ValueGuard&) = delete;

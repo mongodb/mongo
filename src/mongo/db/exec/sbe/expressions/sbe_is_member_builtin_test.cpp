@@ -45,61 +45,8 @@ protected:
         ASSERT_EQ(actualRes, expectedRes);
     }
 
-    std::pair<value::TypeTags, value::Value> makeValue(const BSONArray& ba) {
-        int numBytes = ba.objsize();
-        uint8_t* data = new uint8_t[numBytes];
-        memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
-        return {value::TypeTags::bsonArray, value::bitcastFrom<uint8_t*>(data)};
-    }
-
     std::pair<value::TypeTags, value::Value> makeViewOfObject(const BSONObj& obj) {
         return {value::TypeTags::bsonObject, value::bitcastFrom<const char*>(obj.objdata())};
-    }
-
-    std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {
-        auto [tmpTag, tmpVal] = makeValue(arr);
-        value::ValueGuard tmpGuard{tmpTag, tmpVal};
-
-        value::ArrayEnumerator enumerator{tmpTag, tmpVal};
-
-        auto [arrTag, arrVal] = value::makeNewArraySet();
-        value::ValueGuard guard{arrTag, arrVal};
-
-        auto arrView = value::getArraySetView(arrVal);
-
-        while (!enumerator.atEnd()) {
-            auto [tag, val] = enumerator.getViewOfValue();
-            enumerator.advance();
-
-            auto [copyTag, copyVal] = value::copyValue(tag, val);
-            arrView->push_back(copyTag, copyVal);
-        }
-        guard.reset();
-
-        return {arrTag, arrVal};
-    }
-
-    std::pair<value::TypeTags, value::Value> makeArray(const BSONArray& arr) {
-        auto [tmpTag, tmpVal] = makeValue(arr);
-        value::ValueGuard tmpGuard{tmpTag, tmpVal};
-
-        value::ArrayEnumerator enumerator{tmpTag, tmpVal};
-
-        auto [arrTag, arrVal] = value::makeNewArray();
-        value::ValueGuard guard{arrTag, arrVal};
-
-        auto arrView = value::getArrayView(arrVal);
-
-        while (!enumerator.atEnd()) {
-            auto [tag, val] = enumerator.getViewOfValue();
-            enumerator.advance();
-
-            auto [copyTag, copyVal] = value::copyValue(tag, val);
-            arrView->push_back(copyTag, copyVal);
-        }
-        guard.reset();
-
-        return {arrTag, arrVal};
     }
 };
 
@@ -238,50 +185,50 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberBSONArray) {
 
     // Test that isMember can find basic values.
     inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), true);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(1 << 2)), true);
 
     inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), false);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(1 << 2)), false);
 
     inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(BSONObj())), false);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(BSONObj())), false);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), true);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(1));
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(1 << 2)), true);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), false);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int32_t>(3));
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(1 << 2)), false);
 
     auto [decimalTag, decimalVal] = value::makeCopyDecimal(Decimal128{9});
     inputSlotAccessor.reset(decimalTag, decimalVal);
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 9.0)), true);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(1 << 9.0)), true);
 
     std::tie(decimalTag, decimalVal) = value::makeCopyDecimal(Decimal128{0.1});
     inputSlotAccessor.reset(decimalTag, decimalVal);
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 9.0)), false);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(1 << 9.0)), false);
 
     auto [smallStrTag, smallStrVal] = value::makeSmallString("foo");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
-                           makeValue(BSON_ARRAY("foo"
-                                                << "bar")),
+                           makeBsonArray(BSON_ARRAY("foo"
+                                                    << "bar")),
                            true);
 
     std::tie(smallStrTag, smallStrVal) = value::makeSmallString("baz");
     inputSlotAccessor.reset(smallStrTag, smallStrVal);
     runAndAssertExpression(inputSlot,
-                           makeValue(BSON_ARRAY("foo"
-                                                << "bar")),
+                           makeBsonArray(BSON_ARRAY("foo"
+                                                    << "bar")),
                            false);
 
     // Test that isMember can find composite values.
     auto [arrTag, arrVal] = makeArray(BSON_ARRAY(2 << 3));
     inputSlotAccessor.reset(arrTag, arrVal);
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(BSON_ARRAY(2 << 3) << 1)), true);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(BSON_ARRAY(2 << 3) << 1)), true);
 
     std::tie(arrTag, arrVal) = makeArray(BSON_ARRAY(1));
     inputSlotAccessor.reset(arrTag, arrVal);
-    runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(BSON_ARRAY(1 << 2) << 3)), false);
+    runAndAssertExpression(inputSlot, makeBsonArray(BSON_ARRAY(BSON_ARRAY(1 << 2) << 3)), false);
 
     value::ViewOfValueAccessor bsonObjAccessor;
     auto bsonObjSlot = bindAccessor(&bsonObjAccessor);
@@ -290,10 +237,10 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberBSONArray) {
     auto [targetTag, targetVal] = makeViewOfObject(targetObj);
 
     bsonObjAccessor.reset(targetTag, targetVal);
-    runAndAssertExpression(bsonObjSlot, makeValue(BSON_ARRAY(1 << BSON("a" << 1))), true);
+    runAndAssertExpression(bsonObjSlot, makeBsonArray(BSON_ARRAY(1 << BSON("a" << 1))), true);
 
     bsonObjAccessor.reset(targetTag, targetVal);
-    runAndAssertExpression(bsonObjSlot, makeValue(BSON_ARRAY(10 << BSON("b" << 1))), false);
+    runAndAssertExpression(bsonObjSlot, makeBsonArray(BSON_ARRAY(10 << BSON("b" << 1))), false);
 }
 
 

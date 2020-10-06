@@ -437,51 +437,92 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::Type
                                                                      value::Value arrValue,
                                                                      value::TypeTags idxTag,
                                                                      value::Value idxValue) {
-    if (arrTag != value::TypeTags::Array && arrTag != value::TypeTags::bsonArray) {
+    // We need to ensure that 'size_t' is wide enough to store 32-bit index.
+    static_assert(sizeof(size_t) >= sizeof(int32_t), "size_t must be at least 32-bits");
+
+    if (!value::isArray(arrTag)) {
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    // Bail out if the `idx` parameter isn't a number, or if it can't be converted to a 64-bit
-    // integer, or if it's outside of the range where the `lhsTag` type can represent consecutive
-    // integers precisely.
-    auto [numTag, numVal] = genericNumConvertToPreciseInt64(idxTag, idxValue);
-    if (numTag != value::TypeTags::NumberInt64) {
+    if (idxTag != value::TypeTags::NumberInt32) {
         return {false, value::TypeTags::Nothing, 0};
     }
-    int64_t numInt64 = value::bitcastTo<int64_t>(numVal);
-    // Cast the `idx` parameter to size_t. Bail out if its negative or if it's too big for size_t.
-    if (numInt64 < 0 ||
-        (sizeof(size_t) < sizeof(int64_t) &&
-         numInt64 > static_cast<int64_t>(std::numeric_limits<size_t>::max()))) {
-        return {false, value::TypeTags::Nothing, 0};
+
+    const auto idxInt32 = value::bitcastTo<int32_t>(idxValue);
+    const bool isNegative = idxInt32 < 0;
+
+    size_t idx = 0;
+    if (isNegative) {
+        // Upcast 'idxInt32' to 'int64_t' prevent overflow during the sign change.
+        idx = static_cast<size_t>(-static_cast<int64_t>(idxInt32));
+    } else {
+        idx = static_cast<size_t>(idxInt32);
     }
-    size_t idx = static_cast<size_t>(numInt64);
 
     if (arrTag == value::TypeTags::Array) {
         // If `arr` is an SBE array, use Array::getAt() to retrieve the element at index `idx`.
-        auto [tag, val] = value::getArrayView(arrValue)->getAt(idx);
-        return {false, tag, val};
-    } else if (arrTag == value::TypeTags::bsonArray) {
-        // If `arr` is a BSON array, loop over the elements until we reach the idx-th element.
-        auto be = value::bitcastTo<const char*>(arrValue);
-        auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
-        // Skip document length.
-        be += 4;
-        // The field names of an array are always be 0 thru N-1 in order. Therefore we don't need to
-        // inspect the field names (aside from determining their length so we can skip over them).
-        for (size_t currentIdx = 0; *be != 0; ++currentIdx) {
-            size_t fieldNameLength = strlen(be + 1);
-            if (currentIdx == idx) {
-                auto [tag, val] = bson::convertFrom(true, be, end, fieldNameLength);
-                return {false, tag, val};
+        auto arrayView = value::getArrayView(arrValue);
+
+        size_t convertedIdx = idx;
+        if (isNegative) {
+            if (idx > arrayView->size()) {
+                return {false, value::TypeTags::Nothing, 0};
             }
-            be = bson::advance(be, fieldNameLength);
+            convertedIdx = arrayView->size() - idx;
         }
-        // If the array didn't have an element at index `idx`, return Nothing.
-        return {false, value::TypeTags::Nothing, 0};
+
+        auto [tag, val] = value::getArrayView(arrValue)->getAt(convertedIdx);
+        return {false, tag, val};
+    } else if (arrTag == value::TypeTags::bsonArray || arrTag == value::TypeTags::ArraySet) {
+        value::ArrayEnumerator enumerator(arrTag, arrValue);
+
+        if (!isNegative) {
+            // Loop through array until we meet element at position 'idx'.
+            size_t i = 0;
+            while (i < idx && !enumerator.atEnd()) {
+                i++;
+                enumerator.advance();
+            }
+            // If the array didn't have an element at index `idx`, return Nothing.
+            if (enumerator.atEnd()) {
+                return {false, value::TypeTags::Nothing, 0};
+            }
+            auto [tag, val] = enumerator.getViewOfValue();
+            return {false, tag, val};
+        }
+
+        // For negative indexes we use two pointers approach. We start two array enumerators at the
+        // distance of 'idx' and move them at the same time. Once one of the enumerators reaches the
+        // end of the array, the second one points to the element at position '-idx'.
+        //
+        // First, move one of the enumerators 'idx' elements forward.
+        size_t i = 0;
+        while (i < idx && !enumerator.atEnd()) {
+            enumerator.advance();
+            i++;
+        }
+
+        if (i != idx) {
+            // Array is too small to have an element at the requested index.
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        // Initiate second enumerator at the start of the array. Now the distance between
+        // 'enumerator' and 'windowEndEnumerator' is exactly 'idx' elements. Move both enumerators
+        // until the first one reaches the end of the array.
+        value::ArrayEnumerator windowEndEnumerator(arrTag, arrValue);
+        while (!enumerator.atEnd() && !windowEndEnumerator.atEnd()) {
+            enumerator.advance();
+            windowEndEnumerator.advance();
+        }
+        invariant(enumerator.atEnd());
+        invariant(!windowEndEnumerator.atEnd());
+
+        auto [tag, val] = windowEndEnumerator.getViewOfValue();
+        return {false, tag, val};
     } else {
-        // Earlier in this function we bailed out if the `arrTag` wasn't Array or bsonArray, so it
-        // should be impossible to reach this point.
+        // Earlier in this function we bailed out if the `arrTag` wasn't Array, ArraySet or
+        // bsonArray, so it should be impossible to reach this point.
         MONGO_UNREACHABLE
     }
 }

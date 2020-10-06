@@ -96,6 +96,7 @@ env.CppUnitTest(
         'expressions/sbe_index_of_test.cpp',
         'expressions/sbe_to_upper_to_lower_test.cpp',
         'expressions/sbe_trigonometric_expressions_test.cpp',
+        'expressions/sbe_get_element_builtin_test.cpp',
         'sbe_filter_test.cpp',
         'sbe_key_string_test.cpp',
         'sbe_limit_skip_test.cpp',
