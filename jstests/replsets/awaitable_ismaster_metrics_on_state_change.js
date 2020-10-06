@@ -35,7 +35,7 @@ function runAwaitableIsMaster(topologyVersionField) {
 
 // A failpoint signalling that the server has received the IsMaster request and is waiting for a
 // topology change.
-let failPoint = configureFailPoint(node, "waitForIsMasterResponse");
+let failPoint = configureFailPoint(node, "waitForHelloResponse");
 // Send an awaitable isMaster request. This will block until maxAwaitTimeMS has elapsed or a
 // topology change happens.
 let firstIsMasterBeforeStepDown =
@@ -46,7 +46,7 @@ let numAwaitingTopologyChange = db.serverStatus().connections.awaitingTopologyCh
 assert.eq(1, numAwaitingTopologyChange);
 
 // Reconfigure failpoint to refresh the number of times entered.
-failPoint = configureFailPoint(node, "waitForIsMasterResponse");
+failPoint = configureFailPoint(node, "waitForHelloResponse");
 let secondIsMasterBeforeStepdown =
     startParallelShell(funWithArgs(runAwaitableIsMaster, topologyVersionField), node.port);
 failPoint.wait();

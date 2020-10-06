@@ -89,8 +89,8 @@ function runAwaitableIsMasterBeforeFCVChange(
 
 // A failpoint signalling that the servers have received the isMaster request and are waiting for a
 // topology change.
-let primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-let secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+let primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+let secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
 
 // Send an awaitable isMaster request. This will block until maxAwaitTimeMS has elapsed or a
 // topology change happens.
@@ -171,8 +171,8 @@ assert(secondaryResponseAfterDowngrade.hasOwnProperty("topologyVersion"),
 const secondaryTopologyVersionAfterDowngrade = secondaryResponseAfterDowngrade.topologyVersion;
 
 // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
 let awaitIsMasterBeforeUpgradeFCVOnPrimary =
     startParallelShell(funWithArgs(runAwaitableIsMasterBeforeFCVChange,
                                    primaryTopologyVersionAfterDowngrade,

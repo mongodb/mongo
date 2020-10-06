@@ -49,8 +49,8 @@ function runAwaitableIsMasterOnRejoiningSet(topologyVersionField) {
 
 // A failpoint signalling that the servers have received the isMaster request and are waiting for a
 // topology change.
-let node0FailPoint = configureFailPoint(node0, "waitForIsMasterResponse");
-let node1FailPoint = configureFailPoint(node1, "waitForIsMasterResponse");
+let node0FailPoint = configureFailPoint(node0, "waitForHelloResponse");
+let node1FailPoint = configureFailPoint(node1, "waitForHelloResponse");
 // Send an awaitable isMaster request. This will block until there is a topology change.
 const firstAwaitInitiateOnNode0 =
     startParallelShell(funWithArgs(runAwaitableIsMaster, topologyVersionNode0), node0.port);
@@ -66,8 +66,8 @@ assert.eq(1, numAwaitingTopologyChangeOnNode0);
 assert.eq(1, numAwaitingTopologyChangeOnNode1);
 
 // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-node0FailPoint = configureFailPoint(node0, "waitForIsMasterResponse");
-node1FailPoint = configureFailPoint(node1, "waitForIsMasterResponse");
+node0FailPoint = configureFailPoint(node0, "waitForHelloResponse");
+node1FailPoint = configureFailPoint(node1, "waitForHelloResponse");
 const secondAwaitInitiateOnNode0 =
     startParallelShell(funWithArgs(runAwaitableIsMaster, topologyVersionNode0), node0.port);
 const secondAwaitInitiateOnNode1 =
@@ -101,7 +101,7 @@ const primaryRespAfterInitiate = assert.commandWorked(primaryDB.runCommand({isMa
 let primaryTopologyVersion = primaryRespAfterInitiate.topologyVersion;
 
 // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-let primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
+let primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
 const awaitPrimaryIsMasterBeforeNodeRemoval =
     startParallelShell(funWithArgs(runAwaitableIsMaster, primaryTopologyVersion), primary.port);
 primaryFailPoint.wait();
@@ -134,8 +134,8 @@ assert.eq("Does not have a valid replica set config",
           secondaryRespAfterRemoval);
 
 // Reconfigure the failpoint to refresh the number of times the failpoint has been entered.
-primaryFailPoint = configureFailPoint(primary, "waitForIsMasterResponse");
-let secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+primaryFailPoint = configureFailPoint(primary, "waitForHelloResponse");
+let secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
 const awaitPrimaryIsMasterBeforeReadding =
     startParallelShell(funWithArgs(runAwaitableIsMaster, primaryTopologyVersion), primary.port);
 const firstAwaitSecondaryIsMasterBeforeRejoining = startParallelShell(
@@ -150,7 +150,7 @@ assert.eq(1, numAwaitingTopologyChangeOnPrimary);
 assert.eq(1, numAwaitingTopologyChangeOnSecondary);
 
 // Send a second isMaster to the removed secondary.
-secondaryFailPoint = configureFailPoint(secondary, "waitForIsMasterResponse");
+secondaryFailPoint = configureFailPoint(secondary, "waitForHelloResponse");
 const secondAwaitSecondaryIsMasterBeforeRejoining = startParallelShell(
     funWithArgs(runAwaitableIsMasterOnRejoiningSet, secondaryTopologyVersion), secondary.port);
 secondaryFailPoint.wait();
