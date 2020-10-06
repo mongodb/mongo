@@ -54,9 +54,9 @@ namespace mongo {
 
 // Hangs in the beginning of each hello command when set.
 MONGO_FAIL_POINT_DEFINE(waitInHello);
-// Awaitable isMaster requests with the proper topologyVersions are expected to sleep for
+// Awaitable hello requests with the proper topologyVersions are expected to sleep for
 // maxAwaitTimeMS on mongos. This failpoint will hang right before doing this sleep when set.
-MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
+MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponse);
 
 TopologyVersion mongosTopologyVersion;
 
@@ -170,9 +170,9 @@ public:
                 IsMasterMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
                 ON_BLOCK_EXIT(
                     [&] { IsMasterMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
-                if (MONGO_unlikely(hangWhileWaitingForIsMasterResponse.shouldFail())) {
-                    LOGV2(31463, "hangWhileWaitingForIsMasterResponse failpoint enabled.");
-                    hangWhileWaitingForIsMasterResponse.pauseWhileSet(opCtx);
+                if (MONGO_unlikely(hangWhileWaitingForHelloResponse.shouldFail())) {
+                    LOGV2(31463, "hangWhileWaitingForHelloResponse failpoint enabled.");
+                    hangWhileWaitingForHelloResponse.pauseWhileSet(opCtx);
                 }
                 opCtx->sleepFor(Milliseconds(maxAwaitTimeMS));
             }

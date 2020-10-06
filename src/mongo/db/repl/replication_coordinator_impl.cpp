@@ -120,8 +120,8 @@ MONGO_FAIL_POINT_DEFINE(setMaintenanceModeFailsWithNotSecondary);
 MONGO_FAIL_POINT_DEFINE(forceSyncSourceRetryWaitForInitialSync);
 // Signals that an isMaster request has started waiting.
 MONGO_FAIL_POINT_DEFINE(waitForIsMasterResponse);
-// Will cause an isMaster request to hang as it starts waiting.
-MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForIsMasterResponse);
+// Will cause a hello request to hang as it starts waiting.
+MONGO_FAIL_POINT_DEFINE(hangWhileWaitingForHelloResponse);
 MONGO_FAIL_POINT_DEFINE(skipDurableTimestampUpdates);
 // Will cause a reconfig to hang after completing the config quorum check.
 MONGO_FAIL_POINT_DEFINE(omitConfigQuorumCheck);
@@ -2196,9 +2196,9 @@ std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorImpl::awaitIsMaste
         // change.
         LOGV2(31464, "waitForIsMasterResponse failpoint enabled");
     }
-    if (MONGO_unlikely(hangWhileWaitingForIsMasterResponse.shouldFail())) {
-        LOGV2(21341, "Hanging due to hangWhileWaitingForIsMasterResponse failpoint");
-        hangWhileWaitingForIsMasterResponse.pauseWhileSet(opCtx);
+    if (MONGO_unlikely(hangWhileWaitingForHelloResponse.shouldFail())) {
+        LOGV2(21341, "Hanging due to hangWhileWaitingForHelloResponse failpoint");
+        hangWhileWaitingForHelloResponse.pauseWhileSet(opCtx);
     }
 
     // Wait for a topology change with timeout set to deadline.
