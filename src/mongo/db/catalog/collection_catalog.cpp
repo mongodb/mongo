@@ -209,8 +209,10 @@ CollectionCatalog::iterator::iterator(OperationContext* opCtx,
 
 CollectionCatalog::iterator::iterator(OperationContext* opCtx,
                                       std::map<std::pair<std::string, CollectionUUID>,
-                                               std::shared_ptr<Collection>>::const_iterator mapIter)
-    : _opCtx(opCtx), _mapIter(mapIter) {}
+                                               std::shared_ptr<Collection>>::const_iterator mapIter,
+                                      uint64_t genNum,
+                                      const CollectionCatalog& catalog)
+    : _opCtx(opCtx), _genNum(genNum), _mapIter(mapIter), _catalog(&catalog) {}
 
 CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
     stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
@@ -846,7 +848,7 @@ CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx, St
 }
 
 CollectionCatalog::iterator CollectionCatalog::end(OperationContext* opCtx) const {
-    return iterator(opCtx, _orderedCollections.end());
+    return iterator(opCtx, _orderedCollections.end(), _generationNumber, *this);
 }
 
 boost::optional<std::string> CollectionCatalog::lookupResourceName(const ResourceId& rid) {

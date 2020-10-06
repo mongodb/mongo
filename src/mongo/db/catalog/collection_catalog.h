@@ -81,7 +81,9 @@ public:
                  const CollectionCatalog& catalog);
         iterator(OperationContext* opCtx,
                  std::map<std::pair<std::string, CollectionUUID>,
-                          std::shared_ptr<Collection>>::const_iterator mapIter);
+                          std::shared_ptr<Collection>>::const_iterator mapIter,
+                 uint64_t genNum,
+                 const CollectionCatalog& catalog);
         value_type operator*();
         iterator operator++();
         iterator operator++(int);
