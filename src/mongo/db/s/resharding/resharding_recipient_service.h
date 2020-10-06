@@ -111,10 +111,9 @@ public:
 
 private:
     // The following functions correspond to the actions to take at a particular recipient state.
-    void _createTemporaryReshardingCollectionThenTransitionToInitialized();
+    void _transitionToCreatingTemporaryReshardingCollection();
 
-    ExecutorFuture<void> _awaitAllDonorsPreparedToDonateThenTransitionToCloning(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+    void _createTemporaryReshardingCollectionThenTransitionToCloning();
 
     void _cloneThenTransitionToApplying();
 
@@ -155,8 +154,6 @@ private:
 
     // Each promise below corresponds to a state on the recipient state machine. They are listed in
     // ascending order, such that the first promise below will be the first promise fulfilled.
-    SharedPromise<Timestamp> _allDonorsPreparedToDonate;
-
     SharedPromise<void> _allDonorsMirroring;
 
     SharedPromise<void> _coordinatorHasCommitted;

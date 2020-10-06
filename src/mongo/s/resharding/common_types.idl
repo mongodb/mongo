@@ -42,7 +42,6 @@ enums:
         values:
             kUnused: "unused"
             kInitializing: "initializing"
-            kInitialized: "initialized"
             kPreparingToDonate: "preparing-to-donate"
             kCloning: "cloning"
             kMirroring: "mirroring"
@@ -69,8 +68,7 @@ enums:
         type: string
         values:
             kUnused: "unused"
-            kInitializing: "initializing"
-            kInitialized: "initialized"
+            kCreatingCollection: "creating-collection"
             kCloning: "cloning"
             kApplying: "applying"
             kSteadyState: "steady-state"

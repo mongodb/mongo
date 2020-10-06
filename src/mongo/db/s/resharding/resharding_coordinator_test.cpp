@@ -541,7 +541,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, PersistInitialInfoSucceeds) {
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
-    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kInitialized);
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
     persistInitialStateAndCatalogUpdatesExpectSuccess(
         operationContext(), expectedCoordinatorDoc, initialChunks, newZones);
@@ -549,11 +549,11 @@ TEST_F(ReshardingCoordinatorPersistenceTest, PersistInitialInfoSucceeds) {
 
 TEST_F(ReshardingCoordinatorPersistenceTest, PersistBasicStateTransitionSucceeds) {
     auto coordinatorDoc =
-        insertStateAndCatalogEntries(CoordinatorStateEnum::kInitialized, _originalEpoch);
+        insertStateAndCatalogEntries(CoordinatorStateEnum::kCloning, _originalEpoch);
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
-    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kMirroring);
 
     persistStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
 }
@@ -667,7 +667,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
     auto newZones = makeZones(_tempNss, _newShardKey);
 
     auto expectedCoordinatorDoc = coordinatorDoc;
-    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kInitialized);
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
     // Do not create the config.collections entry for the original collection
     ASSERT_THROWS_CODE(resharding::persistInitialStateAndCatalogUpdates(

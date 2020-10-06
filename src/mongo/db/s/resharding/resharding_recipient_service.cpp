@@ -134,7 +134,6 @@ ReshardingRecipientService::RecipientStateMachine::RecipientStateMachine(
 
 ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_allDonorsPreparedToDonate.getFuture().isReady());
     invariant(_allDonorsMirroring.getFuture().isReady());
     invariant(_coordinatorHasCommitted.getFuture().isReady());
     invariant(_completionPromise.getFuture().isReady());
@@ -143,10 +142,8 @@ ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
 void ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
-        .then([this] { _createTemporaryReshardingCollectionThenTransitionToInitialized(); })
-        .then([this, executor] {
-            return _awaitAllDonorsPreparedToDonateThenTransitionToCloning(executor);
-        })
+        .then([this] { _transitionToCreatingTemporaryReshardingCollection(); })
+        .then([this] { _createTemporaryReshardingCollectionThenTransitionToCloning(); })
         .then([this] { return _cloneThenTransitionToApplying(); })
         .then([this] { return _applyThenTransitionToSteadyState(); })
         .then([this, executor] {
@@ -186,9 +183,6 @@ void ReshardingRecipientService::RecipientStateMachine::run(
 void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lg(_mutex);
-    if (!_allDonorsPreparedToDonate.getFuture().isReady()) {
-        _allDonorsPreparedToDonate.setError(status);
-    }
 
     if (!_allDonorsMirroring.getFuture().isReady()) {
         _allDonorsMirroring.setError(status);
@@ -207,29 +201,24 @@ void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChange
     boost::optional<TypeCollectionReshardingFields> reshardingFields) {}
 
 void ReshardingRecipientService::RecipientStateMachine::
-    _createTemporaryReshardingCollectionThenTransitionToInitialized() {
-    if (_recipientDoc.getState() > RecipientStateEnum::kInitializing) {
+    _transitionToCreatingTemporaryReshardingCollection() {
+    if (_recipientDoc.getState() > RecipientStateEnum::kCreatingCollection) {
+        return;
+    }
+
+    _transitionState(RecipientStateEnum::kCreatingCollection);
+}
+
+void ReshardingRecipientService::RecipientStateMachine::
+    _createTemporaryReshardingCollectionThenTransitionToCloning() {
+    if (_recipientDoc.getState() > RecipientStateEnum::kCreatingCollection) {
         return;
     }
 
     // TODO SERVER-51217: Call
     // resharding_recipient_service_util::createTemporaryReshardingCollectionLocally()
 
-    _transitionState(RecipientStateEnum::kInitialized);
-}
-
-ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
-    _awaitAllDonorsPreparedToDonateThenTransitionToCloning(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_recipientDoc.getState() > RecipientStateEnum::kInitialized) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
-    return _allDonorsPreparedToDonate.getFuture()
-        .thenRunOn(**executor)
-        .then([this](Timestamp fetchTimestamp) {
-            _transitionState(RecipientStateEnum::kCloning, fetchTimestamp);
-        });
+    _transitionState(RecipientStateEnum::kCloning);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying() {
@@ -281,16 +270,11 @@ void ReshardingRecipientService::RecipientStateMachine::
     _transitionState(RecipientStateEnum::kDone);
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_fulfillAllDonorsPreparedToDonate(
-    Timestamp fetchTimestamp) {
-    _allDonorsPreparedToDonate.emplaceValue(fetchTimestamp);
-}
-
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     RecipientStateEnum endState, boost::optional<Timestamp> fetchTimestamp) {
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(endState);
-    if (endState == RecipientStateEnum::kInitialized) {
+    if (endState == RecipientStateEnum::kCreatingCollection) {
         _insertRecipientDocument(replacementDoc);
         return;
     }

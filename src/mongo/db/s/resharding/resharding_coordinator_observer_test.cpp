@@ -69,20 +69,20 @@ protected:
 
 TEST_F(ReshardingCoordinatorObserverTest, onReshardingParticipantTransitionSucceeds) {
     auto reshardingObserver = std::make_shared<ReshardingCoordinatorObserver>();
-    auto fut = reshardingObserver->awaitAllRecipientsCreatedCollection();
+    auto fut = reshardingObserver->awaitAllRecipientsFinishedCloning();
     ASSERT_FALSE(fut.isReady());
 
-    auto donorShards = makeMockDonorsInState(DonorStateEnum::kUnused);
+    auto donorShards = makeMockDonorsInState(DonorStateEnum::kDonating, Timestamp());
     std::vector<RecipientShardEntry> recipientShards0{
-        makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kInitializing),
-        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kInitialized)};
+        makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kCloning),
+        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)};
     auto coordinatorDoc0 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards0, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);
     ASSERT_FALSE(fut.isReady());
 
     std::vector<RecipientShardEntry> recipientShards1{
-        makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kInitialized),
-        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kInitialized)};
+        makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kSteadyState),
+        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)};
     auto coordinatorDoc1 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards1, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc1);
     ASSERT_TRUE(fut.isReady());
@@ -92,32 +92,32 @@ TEST_F(ReshardingCoordinatorObserverTest, onReshardingParticipantTransitionSucce
 
 TEST_F(ReshardingCoordinatorObserverTest, onReshardingParticipantTransitionTwoOutOfOrder) {
     auto reshardingObserver = std::make_shared<ReshardingCoordinatorObserver>();
-    auto fut = reshardingObserver->awaitAllRecipientsCreatedCollection();
+    auto fut = reshardingObserver->awaitAllRecipientsFinishedCloning();
     ASSERT_FALSE(fut.isReady());
 
-    // By default, all donors should be kUnused at this stage.
-    auto donorShards = makeMockDonorsInState(DonorStateEnum::kUnused);
+    // By default, all donors should be kDonating at this stage.
+    auto donorShards = makeMockDonorsInState(DonorStateEnum::kDonating, Timestamp());
 
     std::vector<RecipientShardEntry> recipientShards0{
-        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kInitializing)},
-        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kInitialized)},
-        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kInitialized)}};
+        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kCloning)},
+        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)},
+        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kSteadyState)}};
     auto coordinatorDoc0 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards0, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);
     ASSERT_FALSE(fut.isReady());
 
     std::vector<RecipientShardEntry> recipientShards1{
-        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kInitializing)},
-        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kInitialized)},
-        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kInitializing)}};
+        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kCloning)},
+        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)},
+        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kCloning)}};
     auto coordinatorDoc1 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards1, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc1);
     ASSERT_FALSE(fut.isReady());
 
     std::vector<RecipientShardEntry> recipientShards2{
-        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kInitialized)},
-        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kInitialized)},
-        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kInitialized)}};
+        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kSteadyState)},
+        {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)},
+        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kSteadyState)}};
     auto coordinatorDoc2 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards2, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc2);
     ASSERT_TRUE(fut.isReady());
@@ -127,16 +127,16 @@ TEST_F(ReshardingCoordinatorObserverTest, onReshardingParticipantTransitionTwoOu
 
 TEST_F(ReshardingCoordinatorObserverTest, participantReportsError) {
     auto reshardingObserver = std::make_shared<ReshardingCoordinatorObserver>();
-    auto fut = reshardingObserver->awaitAllRecipientsCreatedCollection();
+    auto fut = reshardingObserver->awaitAllRecipientsFinishedCloning();
     ASSERT_FALSE(fut.isReady());
 
-    // By default, all donors should be kUnused at this stage.
-    auto donorShards = makeMockDonorsInState(DonorStateEnum::kUnused);
+    // By default, all donors should be kDonating at this stage.
+    auto donorShards = makeMockDonorsInState(DonorStateEnum::kDonating, Timestamp());
 
     std::vector<RecipientShardEntry> recipientShards0{
-        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kInitializing)},
+        {makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kCloning)},
         {makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kError)},
-        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kInitialized)}};
+        {makeRecipientShard(ShardId{"s3"}, RecipientStateEnum::kSteadyState)}};
     auto coordinatorDoc0 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards0, donorShards);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);
     auto resp = fut.getNoThrow();
@@ -153,8 +153,8 @@ TEST_F(ReshardingCoordinatorObserverTest, onDonorsReportedMinFetchTimestamp) {
     auto fut = reshardingObserver->awaitAllDonorsReadyToDonate();
     ASSERT_FALSE(fut.isReady());
 
-    // By default, all recipients should be kInitialized at this stage.
-    auto recipientShards = makeMockRecipientsInState(RecipientStateEnum::kInitialized);
+    // By default, all recipients should be kUnused at this stage.
+    auto recipientShards = makeMockRecipientsInState(RecipientStateEnum::kUnused);
 
     std::vector<DonorShardEntry> donorShards0{
         {makeDonorShard(ShardId{"s1"}, DonorStateEnum::kDonating, Timestamp())},
@@ -162,7 +162,6 @@ TEST_F(ReshardingCoordinatorObserverTest, onDonorsReportedMinFetchTimestamp) {
     auto coordinatorDoc0 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards, donorShards0);
     reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);
     ASSERT_FALSE(fut.isReady());
-    ASSERT_TRUE(reshardingObserver->awaitAllRecipientsCreatedCollection().isReady());
 
     std::vector<DonorShardEntry> donorShards1{
         {makeDonorShard(ShardId{"s1"}, DonorStateEnum::kDonating, Timestamp())},

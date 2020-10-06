@@ -146,13 +146,6 @@ private:
     ExecutorFuture<void> _init(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Waits on _reshardingCoordinatorObserver to notify that all recipients have created the
-     * temporary collection. Transitions to 'kPreparingToDonate'.
-     */
-    ExecutorFuture<void> _awaitAllRecipientsCreatedCollection(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
-    /**
      * Waits on _reshardingCoordinatorObserver to notify that all donors have picked a
      * minFetchTimestamp and are ready to donate. Transitions to 'kCloning'.
      */

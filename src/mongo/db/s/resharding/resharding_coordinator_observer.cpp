@@ -144,7 +144,6 @@ ReshardingCoordinatorObserver::ReshardingCoordinatorObserver() = default;
 
 ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
     stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_allRecipientsCreatedCollection.getFuture().isReady());
     invariant(_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
     invariant(_allRecipientsFinishedCloning.getFuture().isReady());
     invariant(_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
@@ -156,13 +155,6 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
     const ReshardingCoordinatorDocument& updatedStateDoc) {
 
     stdx::lock_guard<Latch> lk(_mutex);
-
-    if (stateTransitionIncomplete(lk,
-                                  _allRecipientsCreatedCollection,
-                                  RecipientStateEnum::kInitialized,
-                                  updatedStateDoc)) {
-        return;
-    }
 
     if (stateTransitionIncomplete(
             lk, _allDonorsReportedMinFetchTimestamp, DonorStateEnum::kDonating, updatedStateDoc)) {
@@ -193,11 +185,6 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
-ReshardingCoordinatorObserver::awaitAllRecipientsCreatedCollection() {
-    return _allRecipientsCreatedCollection.getFuture();
-}
-
-SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllDonorsReadyToDonate() {
     return _allDonorsReportedMinFetchTimestamp.getFuture();
 }
@@ -224,9 +211,6 @@ ReshardingCoordinatorObserver::awaitAllRecipientsRenamedCollection() {
 
 void ReshardingCoordinatorObserver::interrupt(Status status) {
     stdx::lock_guard<Latch> lg(_mutex);
-    if (!_allRecipientsCreatedCollection.getFuture().isReady()) {
-        _allRecipientsCreatedCollection.setError(status);
-    }
 
     if (!_allDonorsReportedMinFetchTimestamp.getFuture().isReady()) {
         _allDonorsReportedMinFetchTimestamp.setError(status);

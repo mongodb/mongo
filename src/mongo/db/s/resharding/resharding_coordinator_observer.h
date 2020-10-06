@@ -65,12 +65,6 @@ public:
     void onReshardingParticipantTransition(const ReshardingCoordinatorDocument& updatedStateDoc);
 
     /**
-     * Fulfills the '_allRecipientsCreatedCollection' promise when the last recipient writes that it
-     * is in 'initializing' state.
-     */
-    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsCreatedCollection();
-
-    /**
      * When the last donor reports its 'minFetchTimestamp', selects the highest 'minFetchTimestamp'
      * of all donors to be the 'fetchTimestamp'. Fulfills the '_allDonorsReportedMinFetchTimestamp'
      * promise with this 'fetchTimestamp'.
@@ -119,14 +113,12 @@ private:
      * Below are the relationships between promise and expected state in
      * format: {promiseToFulfill, expectedState}
      *
-     *  {_allRecipientsCreatedCollection, RecipientStateEnum::kInitialized}
      *  {_allDonorsReportedMinFetchTimestamp, DonorStateEnum::kDonating}
      *  {_allRecipientsFinishedCloning, RecipientStateEnum::kSteadyState}
      *  {_allRecipientsReportedStrictConsistencyTimestamp, RecipientStateEnum::kStrictConsistency}
      *  {_allRecipientsRenamedCollection, RecipientStateEnum::kDone}
      *  {_allDonorsDroppedOriginalCollection, DonorStateEnum::kDone}
      */
-    SharedPromise<ReshardingCoordinatorDocument> _allRecipientsCreatedCollection;
 
     SharedPromise<ReshardingCoordinatorDocument> _allDonorsReportedMinFetchTimestamp;
 

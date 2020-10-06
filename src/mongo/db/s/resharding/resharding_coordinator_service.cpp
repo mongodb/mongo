@@ -92,7 +92,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
     BatchedCommandRequest request([&] {
         auto nextState = coordinatorDoc.getState();
         switch (nextState) {
-            case CoordinatorStateEnum::kInitialized:
+            case CoordinatorStateEnum::kPreparingToDonate:
                 // Insert the new coordinator state document
                 return buildInsertOp(NamespaceString::kConfigReshardingOperationsNamespace,
                                      std::vector<BSONObj>{coordinatorDoc.toBSON()});
@@ -130,7 +130,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
     boost::optional<OID> newCollectionEpoch) {
     auto nextState = coordinatorDoc.getState();
     switch (nextState) {
-        case CoordinatorStateEnum::kInitialized: {
+        case CoordinatorStateEnum::kPreparingToDonate: {
             // Append 'reshardingFields' to the config.collections entry for the original nss
             TypeCollectionReshardingFields originalEntryReshardingFields(coordinatorDoc.get_id());
             originalEntryReshardingFields.setState(coordinatorDoc.getState());
@@ -200,7 +200,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
     BatchedCommandRequest request([&] {
         auto nextState = coordinatorDoc.getState();
         switch (nextState) {
-            case CoordinatorStateEnum::kInitialized: {
+            case CoordinatorStateEnum::kPreparingToDonate: {
                 // Insert new entry for the temporary nss into config.collections
                 auto collType = resharding::createTempReshardingCollectionType(
                     opCtx, coordinatorDoc, chunkVersion.get(), collation.get());
@@ -528,8 +528,6 @@ void ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
         .then([this, executor] { return _init(executor); })
-        .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
-        .then([this, executor] { return _awaitAllRecipientsCreatedCollection(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
         .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
@@ -634,7 +632,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_init(
             // Create state document that will be written to disk and afterward set to the in-memory
             // _coordinatorDoc
             ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
-            updatedCoordinatorDoc.setState(CoordinatorStateEnum::kInitialized);
+            updatedCoordinatorDoc.setState(CoordinatorStateEnum::kPreparingToDonate);
 
             auto opCtx = cc().makeOperationContext();
             resharding::persistInitialStateAndCatalogUpdates(
@@ -646,25 +644,14 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_init(
 }
 
 ExecutorFuture<void>
-ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsCreatedCollection(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kInitialized) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
-    return _reshardingCoordinatorObserver->awaitAllRecipientsCreatedCollection()
-        .thenRunOn(**executor)
-        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
-            this->_runUpdates(CoordinatorStateEnum::kPreparingToDonate, updatedStateDoc);
-        });
-}
-
-ExecutorFuture<void>
 ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kPreparingToDonate) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
+
+    // TODO SERVER-51212 Remove this call.
+    interrupt({ErrorCodes::InternalError, "Early exit to support jsTesting"});
 
     return _reshardingCoordinatorObserver->awaitAllDonorsReadyToDonate()
         .thenRunOn(**executor)
