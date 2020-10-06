@@ -6,7 +6,7 @@ load("jstests/replsets/rslib.js");
  * 2. Perform writes.
  * 3. Migrate only chunk to other shard.
  * 4. Retry writes.
- * 5. Step down primary and wait for new primary.
+ * 5. Step up secondary and wait for new primary.
  * 6. Retry writes.
  * 7. Migrate only chunk back to original shard.
  * 8. Retry writes.
@@ -27,8 +27,8 @@ var testMoveChunkWithSession = function(
     checkRetryResultFunc(result, assert.commandWorked(testDB.runCommand(cmdObj)));
     checkDocumentsFunc(coll);
 
-    assert.commandWorked(
-        st.rs1.getPrimary().adminCommand({replSetStepDown: 60, secondaryCatchUpPeriodSecs: 30}));
+    const secondary = st.rs1.getSecondary();
+    st.rs1.stepUp(secondary);
 
     st.rs1.awaitNodesAgreeOnPrimary();
     st.configRS.nodes.concat([st.s]).forEach(function awaitNode(conn) {

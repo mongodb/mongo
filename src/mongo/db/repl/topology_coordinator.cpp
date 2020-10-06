@@ -846,6 +846,9 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
         return Status::OK();
     }
 
+    response->setElectable(
+        !_getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout));
+
     const long long v = _rsConfig.getConfigVersion();
     const long long t = _rsConfig.getConfigTerm();
     response->setConfigVersion(v);
@@ -2330,6 +2333,9 @@ TopologyCoordinator::UnelectableReasonMask TopologyCoordinator::_getUnelectableR
     }
     if (hbData.getState() != MemberState::RS_SECONDARY) {
         result |= NotSecondary;
+    }
+    if (hbData.up() && hbData.isUnelectable()) {
+        result |= StepDownPeriodActive;
     }
     invariant(result || memberConfig.isElectable());
     return result;
