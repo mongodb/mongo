@@ -16,7 +16,7 @@
  * If we did not wait, the latter would get a write conflict when writing to the txn table because
  * it's reading from time 7 and doesn't see the write from time 9.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, uses_parallel_shell]
  */
 
 (function() {

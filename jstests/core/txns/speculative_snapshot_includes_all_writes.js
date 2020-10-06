@@ -1,7 +1,7 @@
 /**
  * A speculative snapshot must not include any writes ordered after any uncommitted writes.
  *
- * @tags: [uses_transactions, requires_majority_read_concern]
+ * @tags: [uses_transactions, requires_majority_read_concern, uses_parallel_shell]
  */
 (function() {
 "use strict";

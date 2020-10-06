@@ -1,7 +1,7 @@
 /**
  * Auto complete returns quickly if listCollections is blocked by the transaction lock.
  *
- * @tags: [uses_transactions, assumes_unsharded_collection]
+ * @tags: [uses_transactions, assumes_unsharded_collection, uses_parallel_shell]
  */
 (function() {
 'use strict';

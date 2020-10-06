@@ -1,7 +1,7 @@
 /**
  * Tests that currentOp reports debug information for operations that are blocked on transactions.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, uses_parallel_shell]
  */
 (function() {
 "use strict";

@@ -4,6 +4,7 @@
  * @tags: [
  *   uses_prepare_transaction,
  *   uses_transactions,
+ *   uses_parallel_shell
  * ]
  */
 (function() {

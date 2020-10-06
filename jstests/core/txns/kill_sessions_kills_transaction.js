@@ -1,5 +1,5 @@
 // Tests that killSessions kills inactive transactions.
-// @tags: [uses_transactions]
+// @tags: [uses_transactions, uses_parallel_shell]
 (function() {
 "use strict";
 

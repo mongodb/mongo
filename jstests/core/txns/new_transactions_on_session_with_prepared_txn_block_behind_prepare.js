@@ -2,7 +2,7 @@
  * Tests that new transactions on a session block behind an existing prepared transaction on the
  * session.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, uses_parallel_shell]
  */
 
 (function() {
