@@ -101,6 +101,8 @@ all:
     test_file: jstests/replsets/read_operations_during_step_down.js
   - ticket: SERVER-50417
     test_file: jstests/replsets/read_operations_during_step_up.js
+  - ticket: SERVER-43904
+    test_file: jstests/replsets/election_handoff_skips_unelectable_nodes.js
 
 suites:
 
