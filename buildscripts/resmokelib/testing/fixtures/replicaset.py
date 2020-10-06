@@ -33,7 +33,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             auth_options=None, replset_config_options=None, voting_secondaries=True,
             all_nodes_electable=False, use_replica_set_connection_string=None, linear_chain=False,
             mixed_bin_versions=None, default_read_concern=None, default_write_concern=None,
-            shard_logging_prefix=None):
+            shard_logging_prefix=None, replicaset_logging_prefix=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
@@ -53,6 +53,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
                                                         config.MIXED_BIN_VERSIONS)
         self.mixed_bin_versions_config = self.mixed_bin_versions
         self.shard_logging_prefix = shard_logging_prefix
+        self.replicaset_logging_prefix = replicaset_logging_prefix
 
         # Use the values given from the command line if they exist for linear_chain and num_nodes.
         linear_chain_option = utils.default_if_none(config.LINEAR_CHAIN, linear_chain)
@@ -622,6 +623,9 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
             node_name = f"{self.shard_logging_prefix}:{node_name}"
             return logging.loggers.new_fixture_node_logger("ShardedClusterFixture", self.job_num,
                                                            node_name)
+
+        if self.replicaset_logging_prefix is not None:
+            node_name = f"{self.replicaset_logging_prefix}:{node_name}"
 
         return logging.loggers.new_fixture_node_logger(self.__class__.__name__, self.job_num,
                                                        node_name)

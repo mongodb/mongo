@@ -422,6 +422,9 @@ MIXED_BIN_VERSIONS = None
 # Specifies the number of replica set members in a ReplicaSetFixture.
 NUM_REPLSET_NODES = None
 
+# Specifies the number of replica sets in a MultiReplicaSetFixture.
+NUM_REPLSETS = None
+
 # Specifies the number of shards in a ShardedClusterFixture.
 NUM_SHARDS = None
 

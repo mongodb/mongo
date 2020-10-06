@@ -11,7 +11,7 @@ import pymongo.errors
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
-from buildscripts.resmokelib.testing.fixtures import replicaset
+from buildscripts.resmokelib.testing.fixtures import tenant_migration
 from buildscripts.resmokelib.testing.hooks import interface
 
 
@@ -25,17 +25,21 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
 
         Args:
             hook_logger: the logger instance for this hook.
-            fixture: the target replica set fixture.
+            fixture: the target TenantMigrationFixture containing two replica sets.
             shell_options: contains the global_vars which contains TestData.dbPrefix to be used for
                            tenant migrations.
 
         """
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousTenantMigration.DESCRIPTION)
 
-        self._fixture = fixture
         self._db_prefix = shell_options["global_vars"]["TestData"]["dbPrefix"]
+        if not isinstance(fixture, tenant_migration.TenantMigrationFixture) or \
+                fixture.get_num_replica_sets() != 2:
+            raise ValueError(
+                "The ContinuousTenantMigration hook requires a TenantMigrationFixture with two replica sets"
+            )
+        self._tenant_migration_fixture = fixture
 
-        self._rs_fixtures = []
         self._tenant_migration_thread = None
 
     def before_suite(self, test_report):
@@ -43,8 +47,8 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
         # TODO (SERVER-50496): Make the hook start the migration thread once here instead of inside
         # before_test and make it run migrations continuously back and forth between the two replica
         # sets.
-        if not self._rs_fixtures:
-            self._add_fixture(self._fixture)
+        if not self._tenant_migration_fixture:
+            raise ValueError("No replica set pair to run migrations on")
 
     def after_suite(self, test_report):
         """After suite."""
@@ -53,8 +57,8 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
     def before_test(self, test, test_report):
         """Before test."""
         self.logger.info("Starting the migration thread.")
-        self._tenant_migration_thread = _TenantMigrationThread(self.logger, self._rs_fixtures,
-                                                               self._db_prefix)
+        self._tenant_migration_thread = _TenantMigrationThread(
+            self.logger, self._tenant_migration_fixture, self._db_prefix)
         self._tenant_migration_thread.start()
 
     def after_test(self, test, test_report):
@@ -63,38 +67,35 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
         self._tenant_migration_thread.stop()
         self.logger.info("migration thread stopped.")
 
-    def _add_fixture(self, fixture):
-        if isinstance(fixture, replicaset.ReplicaSetFixture):
-            self._rs_fixtures.append(fixture)
-
 
 class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
-    MAX_SLEEP_SECS = 0.1
-    MAX_BLOCK_TIME_MILLISECS = 5 * 1000
+    MIN_START_MIGRATION_DELAY_SECS = 0.1
+    MAX_START_MIGRATION_DELAY_SECS = 0.25
+    MIN_BLOCK_TIME_SECS = 1
+    MAX_BLOCK_TIME_SECS = 2.5
     DONOR_START_MIGRATION_POLL_INTERVAL_SECS = 0.1
-    TENANT_MIGRATION_ABORTED_ERROR_CODE = 325
 
-    def __init__(self, logger, rs_fixtures, db_prefix):
+    def __init__(self, logger, tenant_migration_fixture, db_prefix):
         """Initialize _TenantMigrationThread."""
         threading.Thread.__init__(self, name="TenantMigrationThread")
         self.daemon = True
         self.logger = logger
-        self._rs_fixtures = rs_fixtures
+        self._tenant_migration_fixture = tenant_migration_fixture
         self._db_prefix = db_prefix
 
         self._last_exec = time.time()
 
     def run(self):
         """Execute the thread."""
-        if not self._rs_fixtures:
-            self.logger.warning("No replica set on which to run migrations.")
+        if not self._tenant_migration_fixture:
+            self.logger.warning("No replica set pair to run migrations on.")
             return
 
         try:
             now = time.time()
             self.logger.info("Starting a tenant migration for database prefix '%s'",
                              self._db_prefix)
-            self._run_migration(self._rs_fixtures[0])
+            self._run_migration(self._tenant_migration_fixture)
             self._last_exec = time.time()
             self.logger.info("Completed a tenant migration in %0d ms",
                              (self._last_exec - now) * 1000)
@@ -114,12 +115,14 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         # end of each test so that each test uses its own randomly generated block time.
         try:
             donor_primary_client.admin.command(
-                bson.SON([("configureFailPoint", "abortTenantMigrationAfterBlockingStarts"),
-                          ("mode", "alwaysOn"),
-                          ("data",
-                           bson.SON([("blockTimeMS",
-                                      random.uniform(
-                                          0, _TenantMigrationThread.MAX_BLOCK_TIME_MILLISECS))]))]))
+                bson.SON(
+                    [("configureFailPoint", "abortTenantMigrationAfterBlockingStarts"),
+                     ("mode", "alwaysOn"),
+                     ("data",
+                      bson.SON(
+                          [("blockTimeMS",
+                            1000 * random.uniform(_TenantMigrationThread.MIN_BLOCK_TIME_SECS,
+                                                  _TenantMigrationThread.MAX_BLOCK_TIME_SECS))]))]))
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "Unable to enable the failpoint to make migrations abort on donor primary on port "
@@ -143,24 +146,29 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 + "{} of replica set '{}': {}".format(donor_primary_port, donor_primary_rs_name,
                                                       err.args[0]))
 
-    def _run_migration(self, rs_fixture):
-        donor_primary = rs_fixture.get_primary()
+    def _run_migration(self, tenant_migration_fixture):
+        donor_rs = tenant_migration_fixture.get_replset(0)
+        recipient_rs = tenant_migration_fixture.get_replset(1)
+
+        donor_primary = donor_rs.get_primary()
         donor_primary_client = donor_primary.mongo_client()
 
-        time.sleep(random.uniform(0, _TenantMigrationThread.MAX_SLEEP_SECS))
+        time.sleep(
+            random.uniform(_TenantMigrationThread.MIN_START_MIGRATION_DELAY_SECS,
+                           _TenantMigrationThread.MAX_START_MIGRATION_DELAY_SECS))
 
         self.logger.info(
             "Starting a tenant migration with donor primary on port %d of replica set '%s'.",
-            donor_primary.port, rs_fixture.replset_name)
+            donor_primary.port, donor_rs.replset_name)
 
         cmd_obj = {
             "donorStartMigration": 1, "migrationId": bson.Binary(uuid.uuid4().bytes, 4),
-            "recipientConnectionString": "dummySet/dummyHost:1234",
+            "recipientConnectionString": recipient_rs.get_driver_connection_url(),
             "databasePrefix": self._db_prefix, "readPreference": {"mode": "primary"}
         }
 
         try:
-            self._enable_abort(donor_primary_client, donor_primary.port, rs_fixture.replset_name)
+            self._enable_abort(donor_primary_client, donor_primary.port, donor_rs.replset_name)
 
             while True:
                 # Keep polling the migration state until the migration completes, otherwise we might
@@ -172,17 +180,10 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 if (not res["ok"] or res["state"] == "committed" or res["state"] == "aborted"):
                     break
                 time.sleep(_TenantMigrationThread.DONOR_START_MIGRATION_POLL_INTERVAL_SECS)
-        except pymongo.errors.OperationFailure as err:
-            if err.code == _TenantMigrationThread.TENANT_MIGRATION_ABORTED_ERROR_CODE:
-                self.logger.exception(
-                    "tenant migration with donor primary on port %d of replica set '%s' aborted.",
-                    donor_primary.port, rs_fixture.replset_name)
-                return
-            raise
         except pymongo.errors.PyMongoError:
             self.logger.exception(
                 "Error running tenant migration with donor primary on port %d of replica set '%s'.",
-                donor_primary.port, rs_fixture.replset_name)
+                donor_primary.port, donor_rs.replset_name)
             raise
         finally:
-            self._disable_abort(donor_primary_client, donor_primary.port, rs_fixture.replset_name)
+            self._disable_abort(donor_primary_client, donor_primary.port, donor_rs.replset_name)
