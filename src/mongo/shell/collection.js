@@ -125,13 +125,13 @@ DBCollection.prototype.help = function() {
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
     print(
         "\tdb." + shortName +
-        ".update( query, <update object or pipeline>[, upsert_bool, multi_bool] ) - instead of two flags, you can pass an object with fields: upsert, multi, hint");
+        ".update( query, <update object or pipeline>[, upsert_bool, multi_bool] ) - instead of two flags, you can pass an object with fields: upsert, multi, hint, let");
     print(
         "\tdb." + shortName +
-        ".updateOne( filter, <update object or pipeline>, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j, hint");
+        ".updateOne( filter, <update object or pipeline>, <optional params> ) - update the first matching document, optional parameters are: upsert, w, wtimeout, j, hint, let");
     print(
         "\tdb." + shortName +
-        ".updateMany( filter, <update object or pipeline>, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j, hint");
+        ".updateMany( filter, <update object or pipeline>, <optional params> ) - update all matching documents, optional parameters are: upsert, w, wtimeout, j, hint, let");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName +
@@ -367,11 +367,14 @@ DBCollection.prototype._parseRemove = function(t, justOne) {
 
     var wc = undefined;
     var collation = undefined;
+    let letParams = undefined;
+
     if (typeof (justOne) === "object") {
         var opts = justOne;
         wc = opts.writeConcern;
         justOne = opts.justOne;
         collation = opts.collation;
+        letParams = opts.let;
     }
 
     // Normalize "justOne" to a bool.
@@ -382,7 +385,7 @@ DBCollection.prototype._parseRemove = function(t, justOne) {
         wc = this.getWriteConcern();
     }
 
-    return {"query": query, "justOne": justOne, "wc": wc, "collation": collation};
+    return {"query": query, "justOne": justOne, "wc": wc, "collation": collation, "let": letParams};
 };
 
 // Returns a WriteResult if write command succeeded, but may contain write errors.
@@ -393,6 +396,7 @@ DBCollection.prototype.remove = function(t, justOne) {
     var justOne = parsed.justOne;
     var wc = parsed.wc;
     var collation = parsed.collation;
+    var letParams = parsed.let;
 
     var result = undefined;
     var startTime =
@@ -400,6 +404,10 @@ DBCollection.prototype.remove = function(t, justOne) {
 
     if (this.getMongo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
+
+        if (letParams) {
+            bulk.setLetParams(letParams);
+        }
         var removeOp = bulk.find(query);
 
         if (collation) {
@@ -456,6 +464,7 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
     var collation = undefined;
     var arrayFilters = undefined;
     let hint = undefined;
+    let letParams = undefined;
 
     // can pass options via object for improved readability
     if (typeof (upsert) === "object") {
@@ -471,6 +480,7 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
         collation = opts.collation;
         arrayFilters = opts.arrayFilters;
         hint = opts.hint;
+        letParams = opts.let;
     }
 
     // Normalize 'upsert' and 'multi' to booleans.
@@ -489,7 +499,8 @@ DBCollection.prototype._parseUpdate = function(query, updateSpec, upsert, multi)
         "multi": multi,
         "wc": wc,
         "collation": collation,
-        "arrayFilters": arrayFilters
+        "arrayFilters": arrayFilters,
+        "let": letParams
     };
 };
 
@@ -505,6 +516,7 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
     var wc = parsed.wc;
     var collation = parsed.collation;
     var arrayFilters = parsed.arrayFilters;
+    let letParams = parsed.let;
 
     var result = undefined;
     var startTime =
@@ -512,6 +524,10 @@ DBCollection.prototype.update = function(query, updateSpec, upsert, multi) {
 
     if (this.getMongo().writeMode() != "legacy") {
         var bulk = this.initializeOrderedBulkOp();
+
+        if (letParams) {
+            bulk.setLetParams(letParams);
+        }
         var updateOp = bulk.find(query);
 
         if (hint) {

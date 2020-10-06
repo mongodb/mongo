@@ -1,8 +1,10 @@
 // Tests that commands like find, aggregate and update accepts a 'let' parameter which defines
 // variables for use in expressions within the command.
 // @tags: [
-//   requires_fcv_47,
+//   requires_fcv_48,
 //   sbe_incompatible,
+//   # Does not work with legacy shellWriteMode.
+//   requires_find_command,
 // ]
 //
 (function() {
@@ -271,6 +273,19 @@ result = assert
              .cursor.firstBatch;
 assert.eq(result.length, 0);
 
+// Test that the .remove() shell helper supports let parameters.
+assert.commandWorked(coll.insert({_id: 4, Species: "bird_to_remove"}));
+result = assert.commandWorked(
+    coll.remove({$and: [{_id: 4}, {$expr: {$eq: ["$Species", "$$target_species"]}}]},
+                {justOne: true, let : {target_species: "bird_to_remove"}}));
+assert.eq(result.nRemoved, 1);
+
+result = assert
+             .commandWorked(
+                 testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$_id", "4"]}}}))
+             .cursor.firstBatch;
+assert.eq(result.length, 0);
+
 // Test that reserved names are not allowed as let variable names.
 assert.commandFailedWithCode(
     testDB.runCommand(
@@ -405,6 +420,22 @@ assert.commandFailedWithCode(testDB.runCommand({
     let : {cat: "not_a_bird"}
 }),
                              17276);
+
+// Test that the .update() shell helper supports let parameters.
+result = assert.commandWorked(
+    coll.update({$expr: {$eq: ["$Species", "$$target_species"]}},
+                [{$set: {Species: "$$new_name"}}],
+                {let : {target_species: "Pied Piper", new_name: "Chaffinch"}}));
+assert.eq(result.nMatched, 1);
+assert.eq(result.nModified, 1);
+
+result = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$Species", "Pied Piper"]}}}));
+assert.eq(result.cursor.firstBatch.length, 0, result);
+
+result = assert.commandWorked(
+    testDB.runCommand({find: coll.getName(), filter: {$expr: {$eq: ["$Species", "Chaffinch"]}}}));
+assert.eq(result.cursor.firstBatch.length, 1, result);
 
 // Test that let variables can be initialized with an expression.
 result = assert

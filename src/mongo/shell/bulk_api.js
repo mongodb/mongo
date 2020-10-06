@@ -538,6 +538,7 @@ var _bulk_api_module = (function() {
         var maxBatchSizeBytes = 1024 * 1024 * 16;
         var maxNumberOfDocsInBatch = (TestData && TestData.disableBatchWrites) ? 1 : 1000;
         var writeConcern = null;
+        var letParams = null;
         var currentOp;
 
         // Final results
@@ -808,6 +809,10 @@ var _bulk_api_module = (function() {
             return findOperations;
         };
 
+        this.setLetParams = function(userLet) {
+            letParams = userLet;
+        };
+
         //
         // Merge write command result into aggregated results object
         var mergeBatchResults = function(batch, bulkResult, result) {
@@ -895,6 +900,11 @@ var _bulk_api_module = (function() {
             // If we have a write concern
             if (writeConcern) {
                 cmd.writeConcern = writeConcern;
+            }
+
+            // If we have let parameters, add them to the command.
+            if (letParams) {
+                cmd.let = letParams;
             }
 
             {
