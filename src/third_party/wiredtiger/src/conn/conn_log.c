@@ -406,7 +406,7 @@ __log_archive_once(WT_SESSION_IMPL *session, uint32_t backup_file)
          */
         if ((dbg_val + 1) >= log->fileid)
             return (0);
-        if (log->ckpt_lsn.l.file == 1 && log->ckpt_lsn.l.offset == 0)
+        if (WT_IS_INIT_LSN(&log->ckpt_lsn))
             min_lognum = log->fileid - (dbg_val + 1);
         else
             min_lognum = WT_MIN(log->fileid - (dbg_val + 1), min_lognum);
@@ -584,7 +584,7 @@ __log_file_server(void *arg)
                  * to be set again. Copy the LSN before clearing the file handle. Use a barrier to
                  * make sure the compiler does not reorder the following two statements.
                  */
-                close_end_lsn = log->log_close_lsn;
+                WT_ASSIGN_LSN(&close_end_lsn, &log->log_close_lsn);
                 WT_FULL_BARRIER();
                 log->log_close_fh = NULL;
                 /*
@@ -612,7 +612,7 @@ __log_file_server(void *arg)
                 locked = true;
                 WT_ERR(__wt_close(session, &close_fh));
                 WT_ASSERT(session, __wt_log_cmp(&close_end_lsn, &log->sync_lsn) >= 0);
-                log->sync_lsn = close_end_lsn;
+                WT_ASSIGN_LSN(&log->sync_lsn, &close_end_lsn);
                 __wt_cond_signal(session, log->log_sync_cond);
                 locked = false;
                 __wt_spin_unlock(session, &log->log_sync_lock);
@@ -625,7 +625,7 @@ __log_file_server(void *arg)
             /*
              * Save the latest write LSN which is the minimum we will have written to disk.
              */
-            min_lsn = log->write_lsn;
+            WT_ASSIGN_LSN(&min_lsn, &log->write_lsn);
             /*
              * We have to wait until the LSN we asked for is written. If it isn't signal the wrlsn
              * thread to get it written.
@@ -650,7 +650,7 @@ __log_file_server(void *arg)
                  */
                 if (__wt_log_cmp(&log->sync_lsn, &min_lsn) <= 0) {
                     WT_ASSERT(session, min_lsn.l.file == log->sync_lsn.l.file);
-                    log->sync_lsn = min_lsn;
+                    WT_ASSIGN_LSN(&log->sync_lsn, &min_lsn);
                     __wt_cond_signal(session, log->log_sync_cond);
                 }
                 locked = false;
@@ -733,7 +733,7 @@ restart:
         if (slot->slot_state != WT_LOG_SLOT_WRITTEN)
             continue;
         written[written_i].slot_index = save_i;
-        written[written_i++].lsn = slot->slot_release_lsn;
+        WT_ASSIGN_LSN(&written[written_i++].lsn, &slot->slot_release_lsn);
     }
     /*
      * If we found any written slots process them. We sort them based on the release LSN, and then
@@ -773,7 +773,7 @@ restart:
                  * If we get here we have a slot to coalesce and free.
                  */
                 coalescing->slot_last_offset = slot->slot_last_offset;
-                coalescing->slot_end_lsn = slot->slot_end_lsn;
+                WT_ASSIGN_LSN(&coalescing->slot_end_lsn, &slot->slot_end_lsn);
                 WT_STAT_CONN_INCR(session, log_slot_coalesced);
                 /*
                  * Copy the flag for later closing.
@@ -786,7 +786,7 @@ restart:
                  * slots. A synchronous write may update write_lsn so save the last one we saw to
                  * check when coalescing slots.
                  */
-                save_lsn = log->write_lsn;
+                WT_ASSIGN_LSN(&save_lsn, &log->write_lsn);
                 if (__wt_log_cmp(&log->write_lsn, &written[i].lsn) != 0) {
                     coalescing = slot;
                     continue;
@@ -802,8 +802,8 @@ restart:
                  */
                 if (slot->slot_start_lsn.l.offset != slot->slot_last_offset)
                     slot->slot_start_lsn.l.offset = (uint32_t)slot->slot_last_offset;
-                log->write_start_lsn = slot->slot_start_lsn;
-                log->write_lsn = slot->slot_end_lsn;
+                WT_ASSIGN_LSN(&log->write_start_lsn, &slot->slot_start_lsn);
+                WT_ASSIGN_LSN(&log->write_lsn, &slot->slot_end_lsn);
                 __wt_cond_signal(session, log->log_write_cond);
                 WT_STAT_CONN_INCR(session, log_write_lsn);
                 /*

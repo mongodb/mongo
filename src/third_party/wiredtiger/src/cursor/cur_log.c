@@ -22,8 +22,8 @@ __curlog_logrec(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, WT_LSN 
     WT_UNUSED(firstrecord);
 
     /* Set up the LSNs and take a copy of the log record for the cursor. */
-    *cl->cur_lsn = *lsnp;
-    *cl->next_lsn = *next_lsnp;
+    WT_ASSIGN_LSN(cl->cur_lsn, lsnp);
+    WT_ASSIGN_LSN(cl->next_lsn, next_lsnp);
     WT_RET(__wt_buf_set(session, cl->logrec, logrec->data, logrec->size));
 
     /*
