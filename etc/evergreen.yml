@@ -8808,7 +8808,6 @@ buildvariants:
   display_name: TLA+
   run_on:
   - ubuntu1804-build
-  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     timeout_secs: 345600 # 4 days
@@ -9078,7 +9077,6 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-zseries-test
-  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -9994,7 +9992,6 @@ buildvariants:
   display_name: "Embedded SDK - macOS"
   run_on:
   - macos-1014
-  batchtime: 10080 # 7 days
   expansions:
     test_flags: --excludeWithAnyTags=uses_transactions
     cmake_path: /Applications/cmake-3.11.0-Darwin-x86_64/CMake.app/Contents/bin/cmake
@@ -10044,7 +10041,6 @@ buildvariants:
 
 - name: enterprise-rhel-62-64-bit
   display_name: "Enterprise RHEL 6.2"
-  batchtime: 1440 # 1 day
   modules:
   - enterprise
   run_on:
@@ -10268,7 +10264,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
-  batchtime: 10080 # 7 days
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     compile_flags: >-
@@ -10473,6 +10468,7 @@ buildvariants:
 # currently only run on our daily builders.
 - name: enterprise-rhel-62-64-bit-multiversion
   display_name: "Enterprise RHEL 6.2 (implicit multiversion)"
+  batchtime: 1440 # 1 day
   modules:
   - enterprise
   run_on:
@@ -10507,7 +10503,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel62-small
-  batchtime: 10080 # 7 days
   expansions: &enterprise-rhel-62-64-bit-flow-control-off
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: >-
@@ -10614,7 +10609,6 @@ buildvariants:
     - enterprise
   run_on:
     - rhel62-large
-  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -10675,7 +10669,6 @@ buildvariants:
 # are spending when we split tasks into multiple sub-tasks.
 - name: enterprise-rhel-62-64-bit-single-task-baseline
   display_name: "Enterprise RHEL 6.2 (Single Task Baseline)"
-  batchtime: 10080  # 1 week.
   modules:
     - enterprise
   run_on:
@@ -10904,7 +10897,6 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-kitchen-sink
   display_name: "~ Enterprise RHEL 7.0 (Dagger)"
-  batchtime: 1440 # 1 day
   expansions:
     <<: *enterprise-rhel-70-64-bit-expansions-template
     compile_flags: --ssl MONGO_DISTMOD=rhel70 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -10918,7 +10910,6 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
   display_name: "hot_backups RHEL 7.0"
-  batchtime: 1440  # 1 day
   run_on:
   - rhel70
   expansions:
@@ -10934,7 +10925,6 @@ buildvariants:
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
   display_name: "~ Enterprise RHEL 7.0 (no-libunwind)"
-  batchtime: 10080  # 1 week
   run_on:
   - rhel70
   expansions:
@@ -11336,7 +11326,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel72-zseries-test
-  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11418,7 +11407,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel67-zseries-test
-  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11666,7 +11654,6 @@ buildvariants:
   - enterprise
   run_on:
   - suse12-zseries-test
-  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -12234,7 +12221,6 @@ buildvariants:
   - enterprise
   run_on:
   - rhel71-power8-test
-  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -12547,7 +12533,6 @@ buildvariants:
 
 - name: enterprise-ubuntu-no-latch-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (without Diagnostic Latches)"
-  batchtime: 1440 # 1 day
   modules:
   - enterprise
   expansions:
@@ -12559,7 +12544,6 @@ buildvariants:
 
 - name: enterprise-ubuntu-no-latch-1804-64-bit
   display_name: "~ Enterprise Ubuntu 18.04 DEBUG (Unoptimized)"
-  batchtime: 1440 # 1 day
   modules:
   - enterprise
   expansions:
@@ -12572,7 +12556,6 @@ buildvariants:
 
 - name: enterprise-ubuntu-scanning-replica-set-monitor-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with ScanningReplicaSetMonitor)"
-  batchtime: 1440 # 1 day
   run_on:
     - ubuntu1604-test
   modules:
@@ -12603,7 +12586,6 @@ buildvariants:
 
 - name: enterprise-ubuntu-sdam-replica-set-monitor-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with SdamReplicaSetMonitor)"
-  batchtime: 1440 # 1 day
   run_on:
     - ubuntu1604-test
   modules:
@@ -12634,7 +12616,6 @@ buildvariants:
 
 - name: enterprise-ubuntu-task-executor-pool-size-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with {taskExecutorPoolSize: 4})"
-  batchtime: 1440 # 1 day
   run_on:
     - ubuntu1604-test
   modules:
