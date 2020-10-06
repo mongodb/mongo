@@ -928,6 +928,9 @@ Status TopologyCoordinator::prepareHeartbeatResponseV1(Date_t now,
         return Status::OK();
     }
 
+    response->setElectable(
+        !_getMyUnelectableReason(now, StartElectionReasonEnum::kElectionTimeout));
+
     const long long v = _rsConfig.getConfigVersion();
     response->setConfigVersion(v);
     // Deliver new config if caller's version is older than ours
