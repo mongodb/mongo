@@ -170,6 +170,8 @@ selector:
   # Enable the following two tests once SERVER-49986 and SERVER-49988 are backported to 4.0.
   - jstests/sharding/database_and_shard_versioning_all_commands.js
   - jstests/sharding/ismaster.js
+  # Uses the enableShardedIndexConsistencyCheck parameter which does not exist on 4.0.
+  - jstests/sharding/kill_pinned_cursor.js
 executor:
   config:
     shell_options:

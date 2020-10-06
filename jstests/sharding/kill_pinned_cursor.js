@@ -2,9 +2,8 @@
  * Run a query on a sharded cluster where one of the shards hangs. Running killCursors on the mongos
  * should always succeed.
  *
- * Uses getMore to pin an open cursor. Uses 'enableShardedIndexConsistencyCheck' parameter only
- * available on 4.2.
- * @tags: [requires_getmore, requires_fcv_42]
+ * Uses getMore to pin an open cursor.
+ * @tags: [requires_getmore]
  */
 
 (function() {
