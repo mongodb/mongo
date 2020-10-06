@@ -119,7 +119,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
     bob.append("instanceID", _stateDoc.getId().toBSON());
     bob.append("recipientConnectionString", _stateDoc.getRecipientConnectionString());
-    bob.append("lastDurableState", _stateDoc.getState());
+    bob.append("lastDurableState", _durableState.state);
     if (_stateDoc.getExpireAt()) {
         bob.append("expireAt", _stateDoc.getExpireAt()->toString());
     }
