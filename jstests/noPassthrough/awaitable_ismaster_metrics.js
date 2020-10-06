@@ -80,14 +80,14 @@ replTest.initiate();
 const primary = replTest.getPrimary();
 // A failpoint signalling that the server has received the command request and is waiting for a
 // topology change or maxAwaitTimeMS.
-failPoint = configureFailPoint(primary, "hangWhileWaitingForIsMasterResponse");
+failPoint = configureFailPoint(primary, "hangWhileWaitingForHelloResponse");
 runTest(primary.getDB("admin"), "hello", failPoint);
 runTest(primary.getDB("admin"), "isMaster", failPoint);
 runTest(primary.getDB("admin"), "ismaster", failPoint);
 replTest.stopSet();
 
 const st = new ShardingTest({mongos: 1, shards: [{nodes: 1}], config: 1});
-failPoint = configureFailPoint(st.s, "hangWhileWaitingForIsMasterResponse");
+failPoint = configureFailPoint(st.s, "hangWhileWaitingForHelloResponse");
 runTest(st.s.getDB("admin"), "hello", failPoint);
 runTest(st.s.getDB("admin"), "isMaster", failPoint);
 runTest(st.s.getDB("admin"), "ismaster", failPoint);
