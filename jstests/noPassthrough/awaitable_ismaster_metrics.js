@@ -69,7 +69,7 @@ const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 // A failpoint signalling that the standalone server has received the IsMaster request and is
 // waiting for maxAwaitTimeMS.
-let failPoint = configureFailPoint(conn, "hangWaitingForIsMasterResponseOnStandalone");
+let failPoint = configureFailPoint(conn, "hangWaitingForHelloResponseOnStandalone");
 runTest(conn.getDB("admin"), failPoint);
 MongoRunner.stopMongod(conn);
 
