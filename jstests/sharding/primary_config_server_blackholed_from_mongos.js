@@ -52,7 +52,15 @@ assert.writeError(
         .TestColl.insert({_id: 0, value: 'This value will never be inserted'}, {maxTimeMS: 15000}));
 
 jsTest.log('Doing CRUD operations on the sharded collection');
-assert.eq(1000, testDB.ShardedColl.find().itcount());
+assert.soon(() => {
+    // eventually the mongos will route the traffic to a secondary of the config replica set
+    try {
+        return testDB.ShardedColl.countDocuments({}) === 1000;
+    } catch (err) {
+        jsTest.log("Attempt to count documents failed with error: " + err);
+    }
+    return false;
+});
 assert.commandWorked(testDB.ShardedColl.insert({_id: 1000}));
 assert.eq(1001, testDB.ShardedColl.find().count());
 
