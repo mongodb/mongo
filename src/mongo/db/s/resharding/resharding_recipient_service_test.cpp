@@ -147,6 +147,7 @@ public:
             reshardingFields.setUuid(uuid);
             TypeCollectionRecipientFields recipientFields;
             recipientFields.setOriginalNamespace(origNss);
+            recipientFields.setExistingUUID(uuid);
             reshardingFields.setRecipientFields(recipientFields);
             coll.setReshardingFields(reshardingFields);
 

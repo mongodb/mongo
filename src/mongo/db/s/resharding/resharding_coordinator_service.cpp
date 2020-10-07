@@ -386,7 +386,8 @@ CollectionType createTempReshardingCollectionType(
 
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.get_id());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());
-    TypeCollectionRecipientFields recipient(coordinatorDoc.getNss());
+    TypeCollectionRecipientFields recipient(coordinatorDoc.getExistingUUID(),
+                                            coordinatorDoc.getNss());
     if (coordinatorDoc.getFetchTimestampStruct().getFetchTimestamp()) {
         recipient.setFetchTimestampStruct(coordinatorDoc.getFetchTimestampStruct());
     }

@@ -48,6 +48,8 @@ structs:
         chained_structs:
             FetchTimestamp: FetchTimestampStruct
         fields:
+            existingUUID:
+                type: uuid
             originalNamespace:
                 type: namespacestring
 
