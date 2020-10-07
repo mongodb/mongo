@@ -968,14 +968,11 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
         }
     }
 
-    auto ru = opCtx->recoveryUnit();
     opCtx->recoveryUnit()->onRollback(
-        [ru, catalog = this, nss, ident = entry.ident, indexIdents = indexIdents]() {
-            // TODO SERVER-51146: dropIdent without removing the files.
-            // Intentionally ignoring failure
-            catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
+        [opCtx, catalog = this, ident = entry.ident, indexIdents = indexIdents]() {
+            catalog->_engine->getEngine()->dropIdentForImport(opCtx, ident);
             for (const auto& indexIdent : indexIdents) {
-                catalog->_engine->getEngine()->dropIdent(ru, indexIdent).ignore();
+                catalog->_engine->getEngine()->dropIdentForImport(opCtx, indexIdent);
             }
         });
 
