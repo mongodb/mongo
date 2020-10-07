@@ -48,6 +48,8 @@ structs:
         chained_structs:
             FetchTimestamp: FetchTimestampStruct
         fields:
+            donorShardIds:
+                type: array<shard_id>
             existingUUID:
                 type: uuid
             originalNamespace:

@@ -148,6 +148,10 @@ public:
             TypeCollectionRecipientFields recipientFields;
             recipientFields.setOriginalNamespace(origNss);
             recipientFields.setExistingUUID(uuid);
+            // Populating the set of donor shard ids isn't necessary to test the functionality of
+            // creating the temporary resharding collection.
+            recipientFields.setDonorShardIds({});
+
             reshardingFields.setRecipientFields(recipientFields);
             coll.setReshardingFields(reshardingFields);
 
