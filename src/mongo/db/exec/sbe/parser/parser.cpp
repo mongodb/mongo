@@ -429,12 +429,13 @@ void Parser::walkPrimaryExpr(AstQuery& ast) {
             ast.expr = makeE<EVariable>(lookupSlotStrict(ast.nodes[0]->identifier));
         }
     } else if (ast.nodes[0]->tag == "NUMBER"_) {
-        ast.expr = makeE<EConstant>(value::TypeTags::NumberInt64, std::stoll(ast.nodes[0]->token));
+        ast.expr = makeE<EConstant>(value::TypeTags::NumberInt64,
+                                    value::bitcastFrom<int64_t>(std::stoll(ast.nodes[0]->token)));
     } else if (ast.nodes[0]->tag == "CONST_TOK"_) {
         if (ast.nodes[0]->token == "true") {
-            ast.expr = makeE<EConstant>(value::TypeTags::Boolean, 1);
+            ast.expr = makeE<EConstant>(value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
         } else if (ast.nodes[0]->token == "false") {
-            ast.expr = makeE<EConstant>(value::TypeTags::Boolean, 0);
+            ast.expr = makeE<EConstant>(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
         } else if (ast.nodes[0]->token == "null") {
             ast.expr = makeE<EConstant>(value::TypeTags::Null, 0);
         } else if (ast.nodes[0]->token == "#") {

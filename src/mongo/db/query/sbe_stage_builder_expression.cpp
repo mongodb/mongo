@@ -222,7 +222,7 @@ struct ExpressionVisitorContext {
 
         auto shortCircuitVal = (logicOp == sbe::EPrimBinary::logicOr);
         auto shortCircuitExpr = sbe::makeE<sbe::EConstant>(
-            sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom(shortCircuitVal));
+            sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(shortCircuitVal));
         traverseStage = sbe::makeProjectStage(
             sbe::makeS<sbe::LimitSkipStage>(
                 sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId),
@@ -1220,7 +1220,8 @@ public:
             : sbe::makeE<sbe::EPrimBinary>(
                   comparisonOperator,
                   std::move(cmp3w),
-                  sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0));
+                  sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                             sbe::value::bitcastFrom<int32_t>(0)));
 
         // If either operand evaluates to "Nothing," then the entire operation expressed by 'cmp'
         // will also evaluate to "Nothing." MQL comparisons, however, treat "Nothing" as if it is a
@@ -1358,11 +1359,13 @@ public:
                         sbe::makeE<sbe::EPrimBinary>(
                             sbe::EPrimBinary::greaterEq,
                             var.clone(),
-                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, lower)),
+                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                       sbe::value::bitcastFrom<int32_t>(lower))),
                         sbe::makeE<sbe::EPrimBinary>(
                             sbe::EPrimBinary::lessEq,
                             var.clone(),
-                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, upper))),
+                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                       sbe::value::bitcastFrom<int32_t>(upper)))),
                     sbe::makeE<sbe::EFail>(ErrorCodes::Error{4848972}, errMsg));
             };
 
@@ -1429,7 +1432,8 @@ public:
         std::vector<std::unique_ptr<sbe::EExpression>> operands;
         if (isIsoWeekYear) {
             if (!eIsoWeekYear) {
-                eIsoWeekYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1970);
+                eIsoWeekYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                          sbe::value::bitcastFrom<int32_t>(1970));
                 operands.push_back(std::move(eIsoWeekYear));
             } else {
                 boundChecks.push_back(boundedCheck(yearRef, 1, 9999, "isoWeekYear"));
@@ -1437,7 +1441,8 @@ public:
                     std::move(eIsoWeekYear), _context->frameIdGenerator, "isoWeekYear"));
             }
             if (!eIsoWeek) {
-                eIsoWeek = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                eIsoWeek = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                      sbe::value::bitcastFrom<int32_t>(1));
                 operands.push_back(std::move(eIsoWeek));
             } else {
                 boundChecks.push_back(boundedCheck(monthRef, minInt16, maxInt16, "isoWeek"));
@@ -1445,7 +1450,8 @@ public:
                     std::move(eIsoWeek), _context->frameIdGenerator, "isoWeek"));
             }
             if (!eIsoDayOfWeek) {
-                eIsoDayOfWeek = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                eIsoDayOfWeek = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                           sbe::value::bitcastFrom<int32_t>(1));
                 operands.push_back(std::move(eIsoDayOfWeek));
             } else {
                 boundChecks.push_back(boundedCheck(dayRef, minInt16, maxInt16, "isoDayOfWeek"));
@@ -1455,7 +1461,8 @@ public:
         } else {
             // The regular year/month/day case.
             if (!eYear) {
-                eYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1970);
+                eYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                   sbe::value::bitcastFrom<int32_t>(1970));
                 operands.push_back(std::move(eYear));
             } else {
                 boundChecks.push_back(boundedCheck(yearRef, 1, 9999, "year"));
@@ -1463,7 +1470,8 @@ public:
                     fieldConversionBinding(std::move(eYear), _context->frameIdGenerator, "year"));
             }
             if (!eMonth) {
-                eMonth = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                eMonth = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                    sbe::value::bitcastFrom<int32_t>(1));
                 operands.push_back(std::move(eMonth));
             } else {
                 boundChecks.push_back(boundedCheck(monthRef, minInt16, maxInt16, "month"));
@@ -1471,7 +1479,8 @@ public:
                     fieldConversionBinding(std::move(eMonth), _context->frameIdGenerator, "month"));
             }
             if (!eDay) {
-                eDay = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 1);
+                eDay = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                  sbe::value::bitcastFrom<int32_t>(1));
                 operands.push_back(std::move(eDay));
             } else {
                 boundChecks.push_back(boundedCheck(dayRef, minInt16, maxInt16, "day"));
@@ -1480,7 +1489,8 @@ public:
             }
         }
         if (!eHour) {
-            eHour = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            eHour = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                               sbe::value::bitcastFrom<int32_t>(0));
             operands.push_back(std::move(eHour));
         } else {
             boundChecks.push_back(boundedCheck(hourRef, minInt16, maxInt16, "hour"));
@@ -1488,7 +1498,8 @@ public:
                 fieldConversionBinding(std::move(eHour), _context->frameIdGenerator, "hour"));
         }
         if (!eMinute) {
-            eMinute = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            eMinute = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                 sbe::value::bitcastFrom<int32_t>(0));
             operands.push_back(std::move(eMinute));
         } else {
             boundChecks.push_back(boundedCheck(minRef, minInt16, maxInt16, "minute"));
@@ -1496,7 +1507,8 @@ public:
                 fieldConversionBinding(std::move(eMinute), _context->frameIdGenerator, "minute"));
         }
         if (!eSecond) {
-            eSecond = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            eSecond = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                 sbe::value::bitcastFrom<int32_t>(0));
             operands.push_back(std::move(eSecond));
         } else {
             // MQL doesn't place bound restrictions on the second field, because seconds carry over
@@ -1505,7 +1517,8 @@ public:
                 fieldConversionBinding(std::move(eSecond), _context->frameIdGenerator, "second"));
         }
         if (!eMillisecond) {
-            eMillisecond = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, 0);
+            eMillisecond = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                      sbe::value::bitcastFrom<int32_t>(0));
             operands.push_back(std::move(eMillisecond));
         } else {
             // MQL doesn't enforce bound restrictions on millisecond fields because milliseconds
@@ -1874,7 +1887,8 @@ public:
         auto exprIsNum = sbe::makeE<sbe::EIf>(
             sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(inputRef.clone())),
             sbe::makeE<sbe::EFunction>("isNumber", sbe::makeEs(inputRef.clone())),
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false));
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                       sbe::value::bitcastFrom<bool>(false)));
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprIsNum)));
@@ -2323,9 +2337,9 @@ private:
         if (expr->getChildren().size() == 0) {
             // Empty $and and $or always evaluate to their logical operator's identity value: true
             // and false, respectively.
-            bool logicIdentityVal = (logicOp == sbe::EPrimBinary::logicAnd);
+            auto logicIdentityVal = (logicOp == sbe::EPrimBinary::logicAnd);
             _context->pushExpr(sbe::makeE<sbe::EConstant>(
-                sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom(logicIdentityVal)));
+                sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(logicIdentityVal)));
             return;
         } else if (expr->getChildren().size() == 1) {
             // No need for short circuiting logic in a singleton $and/$or. Just execute the branch
@@ -2436,12 +2450,12 @@ private:
                 lowerCmp,
                 inputRef.clone(),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
-                                           sbe::value::bitcastFrom(lowerBound.bound))),
+                                           sbe::value::bitcastFrom<double>(lowerBound.bound))),
             sbe::makeE<sbe::EPrimBinary>(
                 upperCmp,
                 inputRef.clone(),
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
-                                           sbe::value::bitcastFrom(upperBound.bound))));
+                                           sbe::value::bitcastFrom<double>(upperBound.bound))));
 
         auto genericTrignomentricExpr = sbe::makeE<sbe::EIf>(
             generateNullOrMissing(frameId, 0),
@@ -2624,7 +2638,8 @@ std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable 
             sbe::EPrimBinary::neq,
             sbe::makeE<sbe::EPrimBinary>(
                 sbe::EPrimBinary::cmp3w, branchRef.clone(), std::move(valExpr)),
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                       sbe::value::bitcastFrom<int64_t>(0)));
     };
 
     // If any of these are false, the branch is considered false for the purposes of the
@@ -2633,10 +2648,10 @@ std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable 
     auto checkNotNull = sbe::makeE<sbe::EPrimUnary>(
         sbe::EPrimUnary::logicNot,
         sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(branchRef.clone())));
-    auto checkNotFalse =
-        makeNeqCheck(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false));
-    auto checkNotZero =
-        makeNeqCheck(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0));
+    auto checkNotFalse = makeNeqCheck(sbe::makeE<sbe::EConstant>(
+        sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(false)));
+    auto checkNotZero = makeNeqCheck(sbe::makeE<sbe::EConstant>(
+        sbe::value::TypeTags::NumberInt64, sbe::value::bitcastFrom<int64_t>(0)));
 
     return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::logicAnd,

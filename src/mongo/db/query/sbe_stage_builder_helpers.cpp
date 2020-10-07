@@ -68,7 +68,7 @@ std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable&
             var.clone(),
             sbe::makeE<sbe::EConstant>(
                 sbe::value::TypeTags::NumberInt64,
-                sbe::value::bitcastFrom(std::numeric_limits<int64_t>::min()))));
+                sbe::value::bitcastFrom<int64_t>(std::numeric_limits<int64_t>::min()))));
 }
 
 std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
@@ -79,14 +79,16 @@ std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable&
     return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::EPrimBinary::lessEq,
         var.clone(),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom(0)));
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                   sbe::value::bitcastFrom<int32_t>(0)));
 }
 
 std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& var) {
     return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::EPrimBinary::less,
         var.clone(),
-        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom(0)));
+        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                   sbe::value::bitcastFrom<int32_t>(0)));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var) {
@@ -114,7 +116,9 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpre
     using namespace std::literals;
     return sbe::makeE<sbe::EFunction>(
         "fillEmpty"sv,
-        sbe::makeEs(std::move(e), sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, 0)));
+        sbe::makeEs(std::move(e),
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                               sbe::value::bitcastFrom<bool>(false))));
 }
 
 }  // namespace mongo::stage_builder

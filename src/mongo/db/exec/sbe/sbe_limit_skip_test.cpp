@@ -63,7 +63,7 @@ TEST_F(LimitSkipStageTest, LimitSkipSimpleTest) {
     auto inputView = value::getArrayView(inputVal);
     int i;
     for (i = 0; i < 1000; ++i) {
-        inputView->push_back(value::TypeTags::NumberInt64, i);
+        inputView->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(i));
     }
 
     // Make a "limit 200 skip 300" stage.

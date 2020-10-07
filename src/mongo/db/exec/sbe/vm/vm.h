@@ -50,22 +50,22 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
             case value::TypeTags::NumberInt32: {
                 auto result = op(value::numericCast<int32_t>(lhsTag, lhsValue),
                                  value::numericCast<int32_t>(rhsTag, rhsValue));
-                return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+                return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             case value::TypeTags::NumberInt64: {
                 auto result = op(value::numericCast<int64_t>(lhsTag, lhsValue),
                                  value::numericCast<int64_t>(rhsTag, rhsValue));
-                return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+                return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             case value::TypeTags::NumberDouble: {
                 auto result = op(value::numericCast<double>(lhsTag, lhsValue),
                                  value::numericCast<double>(rhsTag, rhsValue));
-                return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+                return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             case value::TypeTags::NumberDecimal: {
                 auto result = op(value::numericCast<Decimal128>(lhsTag, lhsValue),
                                  value::numericCast<Decimal128>(rhsTag, rhsValue));
-                return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+                return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
             }
             default:
                 MONGO_UNREACHABLE;
@@ -74,27 +74,27 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
         auto lhsStr = getStringView(lhsTag, lhsValue);
         auto rhsStr = getStringView(rhsTag, rhsValue);
         auto result = op(lhsStr.compare(rhsStr), 0);
-        return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if (lhsTag == value::TypeTags::Date && rhsTag == value::TypeTags::Date) {
         auto result = op(value::bitcastTo<int64_t>(lhsValue), value::bitcastTo<int64_t>(rhsValue));
-        return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if (lhsTag == value::TypeTags::Timestamp && rhsTag == value::TypeTags::Timestamp) {
         auto result =
             op(value::bitcastTo<uint64_t>(lhsValue), value::bitcastTo<uint64_t>(rhsValue));
-        return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if (lhsTag == value::TypeTags::Boolean && rhsTag == value::TypeTags::Boolean) {
-        auto result = op(lhsValue != 0, rhsValue != 0);
-        return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+        auto result = op(value::bitcastTo<bool>(lhsValue), value::bitcastTo<bool>(rhsValue));
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if (lhsTag == value::TypeTags::Null && rhsTag == value::TypeTags::Null) {
         // This is where Mongo differs from SQL.
         auto result = op(0, 0);
-        return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if ((value::isArray(lhsTag) && value::isArray(rhsTag)) ||
                (value::isObject(lhsTag) && value::isObject(rhsTag))) {
         auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue);
         if (tag == value::TypeTags::NumberInt32) {
             auto result = op(value::bitcastTo<int32_t>(val), 0);
-            return {value::TypeTags::Boolean, value::bitcastFrom(result)};
+            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
         }
     }
 

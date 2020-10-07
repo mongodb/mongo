@@ -44,11 +44,11 @@ namespace value {
 
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
     auto k = new KeyString::Value(inKey);
-    return {TypeTags::ksValue, reinterpret_cast<Value>(k)};
+    return {TypeTags::ksValue, bitcastFrom<KeyString::Value*>(k)};
 }
 
 std::pair<TypeTags, Value> makeCopyPcreRegex(const pcrecpp::RE& regex) {
-    auto ownedRegexVal = sbe::value::bitcastFrom(new pcrecpp::RE(regex));
+    auto ownedRegexVal = sbe::value::bitcastFrom<pcrecpp::RE*>(new pcrecpp::RE(regex));
     return {TypeTags::pcreRegex, ownedRegexVal};
 }
 
@@ -186,7 +186,7 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << bitcastTo<int64_t>(val);
             break;
         case value::TypeTags::Boolean:
-            stream << ((val) ? "true" : "false");
+            stream << (bitcastTo<bool>(val) ? "true" : "false");
             break;
         case value::TypeTags::Null:
             stream << "null";
@@ -418,7 +418,7 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
         case TypeTags::Timestamp:
             return absl::Hash<uint64_t>{}(bitcastTo<uint64_t>(val));
         case TypeTags::Boolean:
-            return val != 0;
+            return bitcastTo<bool>(val);
         case TypeTags::Null:
             return 0;
         case TypeTags::StringSmall:
@@ -513,22 +513,22 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
             case TypeTags::NumberInt32: {
                 auto result = compareHelper(numericCast<int32_t>(lhsTag, lhsValue),
                                             numericCast<int32_t>(rhsTag, rhsValue));
-                return {TypeTags::NumberInt32, bitcastFrom(result)};
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             case TypeTags::NumberInt64: {
                 auto result = compareHelper(numericCast<int64_t>(lhsTag, lhsValue),
                                             numericCast<int64_t>(rhsTag, rhsValue));
-                return {TypeTags::NumberInt32, bitcastFrom(result)};
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             case TypeTags::NumberDouble: {
                 auto result = compareHelper(numericCast<double>(lhsTag, lhsValue),
                                             numericCast<double>(rhsTag, rhsValue));
-                return {TypeTags::NumberInt32, bitcastFrom(result)};
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             case TypeTags::NumberDecimal: {
                 auto result = compareHelper(numericCast<Decimal128>(lhsTag, lhsValue),
                                             numericCast<Decimal128>(rhsTag, rhsValue));
-                return {TypeTags::NumberInt32, bitcastFrom(result)};
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             default:
                 MONGO_UNREACHABLE;
@@ -537,18 +537,18 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto lhsStr = getStringView(lhsTag, lhsValue);
         auto rhsStr = getStringView(rhsTag, rhsValue);
         auto result = lhsStr.compare(rhsStr);
-        return {TypeTags::NumberInt32, bitcastFrom(compareHelper(result, 0))};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::Date && rhsTag == TypeTags::Date) {
         auto result = compareHelper(bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue));
-        return {TypeTags::NumberInt32, bitcastFrom(result)};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Timestamp && rhsTag == TypeTags::Timestamp) {
         auto result = compareHelper(bitcastTo<uint64_t>(lhsValue), bitcastTo<uint64_t>(rhsValue));
-        return {TypeTags::NumberInt32, bitcastFrom(result)};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Boolean && rhsTag == TypeTags::Boolean) {
-        auto result = compareHelper(lhsValue != 0, rhsValue != 0);
-        return {TypeTags::NumberInt32, bitcastFrom(result)};
+        auto result = compareHelper(bitcastTo<bool>(lhsValue), bitcastTo<bool>(rhsValue));
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Null && rhsTag == TypeTags::Null) {
-        return {TypeTags::NumberInt32, 0};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (isArray(lhsTag) && isArray(rhsTag)) {
         auto lhsArr = ArrayEnumerator{lhsTag, lhsValue};
         auto rhsArr = ArrayEnumerator{rhsTag, rhsValue};
@@ -557,14 +557,14 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
             auto [rhsTag, rhsVal] = rhsArr.getViewOfValue();
 
             auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-            if (tag != TypeTags::NumberInt32 || val != 0) {
+            if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
                 return {tag, val};
             }
             lhsArr.advance();
             rhsArr.advance();
         }
         if (lhsArr.atEnd() && rhsArr.atEnd()) {
-            return {TypeTags::NumberInt32, 0};
+            return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
         } else if (lhsArr.atEnd()) {
             return {TypeTags::NumberInt32, bitcastFrom<int32_t>(-1)};
         } else {
@@ -576,21 +576,21 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         while (!lhsObj.atEnd() && !rhsObj.atEnd()) {
             auto fieldCmp = lhsObj.getFieldName().compare(rhsObj.getFieldName());
             if (fieldCmp != 0) {
-                return {TypeTags::NumberInt32, bitcastFrom(compareHelper(fieldCmp, 0))};
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(fieldCmp, 0))};
             }
 
             auto [lhsTag, lhsVal] = lhsObj.getViewOfValue();
             auto [rhsTag, rhsVal] = rhsObj.getViewOfValue();
 
             auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-            if (tag != TypeTags::NumberInt32 || val != 0) {
+            if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
                 return {tag, val};
             }
             lhsObj.advance();
             rhsObj.advance();
         }
         if (lhsObj.atEnd() && rhsObj.atEnd()) {
-            return {TypeTags::NumberInt32, 0};
+            return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
         } else if (lhsObj.atEnd()) {
             return {TypeTags::NumberInt32, bitcastFrom<int32_t>(-1)};
         } else {
@@ -602,12 +602,12 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto rhsObjId = rhsTag == TypeTags::ObjectId ? getObjectIdView(rhsValue)->data()
                                                      : bitcastTo<uint8_t*>(rhsValue);
         auto result = memcmp(lhsObjId, rhsObjId, sizeof(ObjectIdType));
-        return {TypeTags::NumberInt32, bitcastFrom(compareHelper(result, 0))};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (isBinData(lhsTag) && isBinData(rhsTag)) {
         auto lsz = getBSONBinDataSize(lhsTag, lhsValue);
         auto rsz = getBSONBinDataSize(rhsTag, rhsValue);
         if (lsz != rsz) {
-            return {TypeTags::NumberInt32, bitcastFrom(compareHelper(lsz, rsz))};
+            return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(lsz, rsz))};
         }
 
         // Since we already compared the size above, skip the first 4 bytes of the buffer and
@@ -615,19 +615,19 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto result = memcmp(getRawPointerView(lhsValue) + sizeof(uint32_t),
                              getRawPointerView(rhsValue) + sizeof(uint32_t),
                              lsz + 1);
-        return {TypeTags::NumberInt32, bitcastFrom(compareHelper(result, 0))};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     } else if (lhsTag == TypeTags::ksValue && rhsTag == TypeTags::ksValue) {
         auto result = getKeyStringView(lhsValue)->compare(*getKeyStringView(lhsValue));
-        return {TypeTags::NumberInt32, bitcastFrom(result)};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Nothing && rhsTag == TypeTags::Nothing) {
         // Special case for Nothing in a hash table (group) and sort comparison.
-        return {TypeTags::NumberInt32, 0};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else {
         // Different types.
         auto result =
             canonicalizeBSONType(tagToType(lhsTag)) - canonicalizeBSONType(tagToType(rhsTag));
         invariant(result != 0);
-        return {TypeTags::NumberInt32, bitcastFrom(compareHelper(result, 0))};
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(compareHelper(result, 0))};
     }
 }
 

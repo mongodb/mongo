@@ -138,7 +138,8 @@ TEST_F(SBEKeyStringTest, Basic) {
                          makeEs(makeE<EVariable>(bsonObjSlot), makeE<EVariable>(fieldNameSlot))));
     auto compiledExpr = compileExpression(*comparisonExpr);
 
-    bsonObjAccessor.reset(value::TypeTags::bsonObject, value::bitcastFrom(testValues.objdata()));
+    bsonObjAccessor.reset(value::TypeTags::bsonObject,
+                          value::bitcastFrom<const char*>(testValues.objdata()));
     std::vector<sbe::value::ViewOfValueAccessor> keyStringValues;
     BufBuilder builder;
     for (auto&& element : testValues) {
@@ -189,11 +190,12 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
     readKeyStringValueIntoAccessors(
         keyString, KeyString::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
 
-    ASSERT(std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{12345})) ==
-           accessors[0].getViewOfValue())
-        << "Incorrect value from accessor: " << valueDebugString(accessors[0].getViewOfValue());
+    auto value = accessors[0].getViewOfValue();
+    ASSERT(value::TypeTags::NumberInt64 == value.first &&
+           12345 == value::bitcastTo<int64_t>(value.second))
+        << "Incorrect value from accessor: " << valueDebugString(value);
 
-    auto value = accessors[1].getViewOfValue();
+    value = accessors[1].getViewOfValue();
     ASSERT(value::isString(value.first) &&
            ("I know the kings of England, and I quote the fights historical" ==
             value::getStringView(value.first, value.second)))

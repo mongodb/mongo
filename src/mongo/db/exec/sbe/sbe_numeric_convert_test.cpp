@@ -35,7 +35,8 @@ template <typename T>
 std::unique_ptr<sbe::EExpression> makeEFromNumber(const T in,
                                                   value::TypeTags sourceTag,
                                                   value::TypeTags targetTag) {
-    return makeE<ENumericConvert>(makeE<EConstant>(sourceTag, value::bitcastFrom(in)), targetTag);
+    return makeE<ENumericConvert>(makeE<EConstant>(sourceTag, value::bitcastFrom<T>(in)),
+                                  targetTag);
 }
 
 template <>

@@ -62,7 +62,7 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     // Register an unowned global timezone database for datetime expression evaluation.
     env->registerSlot("timeZoneDB"_sd,
                       sbe::value::TypeTags::timeZoneDB,
-                      sbe::value::bitcastFrom(getTimeZoneDatabase(opCtx)),
+                      sbe::value::bitcastFrom<const TimeZoneDatabase*>(getTimeZoneDatabase(opCtx)),
                       false,
                       slotIdGenerator);
     return env;
@@ -261,7 +261,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolu
                 sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::cmp3w,
                                              sbe::makeE<sbe::EVariable>(innerVar),
                                              sbe::makeE<sbe::EVariable>(resultVar)),
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0)),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                           sbe::value::bitcastFrom<int64_t>(0))),
             sbe::makeE<sbe::EVariable>(innerVar),
             sbe::makeE<sbe::EVariable>(resultVar));
 

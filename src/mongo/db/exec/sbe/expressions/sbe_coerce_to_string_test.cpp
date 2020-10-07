@@ -81,12 +81,12 @@ TEST_F(SBECoerceToStringTest, BasicCoerceToString) {
     // BSONString test.
     auto bsonString = BSON("string"
                            << "hello");
-    auto bsonStringVal = value::bitcastFrom(bsonString["string"].value());
+    auto bsonStringVal = value::bitcastFrom<const char*>(bsonString["string"].value());
     coerceToStringAccessor.reset(value::TypeTags::bsonString, bsonStringVal);
     runAndAssertExpression(compiledExpr.get(), "hello");
 
     // Date test.
-    coerceToStringAccessor.reset(sbe::value::TypeTags::Date, value::bitcastFrom<uint64_t>(4400));
+    coerceToStringAccessor.reset(sbe::value::TypeTags::Date, value::bitcastFrom<int64_t>(4400));
     runAndAssertExpression(compiledExpr.get(), "1970-01-01T00:00:04.400Z");
 
     // TimeStamp test.
@@ -101,7 +101,7 @@ TEST_F(SBECoerceToStringTest, BasicCoerceToString) {
 
     // BSONObj test.
     auto bsonObj = BSON("number" << 42);
-    auto bsonData = value::bitcastFrom(bsonObj.objdata());
+    auto bsonData = value::bitcastFrom<const char*>(bsonObj.objdata());
     auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonData);
     coerceToStringAccessor.reset(bsonTag, bsonVal);
     runAndAssertNothing(compiledExpr.get());

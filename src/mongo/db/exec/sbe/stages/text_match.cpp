@@ -80,7 +80,7 @@ PlanState TextMatchStage::getNext() {
             obj = builder.obj();
         }
         const auto matchResult = _ftsMatcher.matches(obj);
-        _outValueAccessor.reset(value::TypeTags::Boolean, matchResult);
+        _outValueAccessor.reset(value::TypeTags::Boolean, value::bitcastFrom<bool>(matchResult));
     }
 
     return trackPlanState(state);

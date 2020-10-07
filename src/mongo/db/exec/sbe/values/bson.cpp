@@ -98,19 +98,19 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
 
     switch (type) {
         case BSONType::NumberDouble: {
-            auto dbl = ConstDataView(be).read<LittleEndian<double>>();
-            return {value::TypeTags::NumberDouble, value::bitcastFrom(dbl)};
+            double dbl = ConstDataView(be).read<LittleEndian<double>>();
+            return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(dbl)};
         }
         case BSONType::NumberDecimal: {
             if (view) {
-                return {value::TypeTags::NumberDecimal, value::bitcastFrom(be)};
+                return {value::TypeTags::NumberDecimal, value::bitcastFrom<const char*>(be)};
             }
 
             return value::makeCopyDecimal(value::readDecimal128FromMemory(ConstDataView{be}));
         }
         case BSONType::String: {
             if (view) {
-                return {value::TypeTags::bsonString, value::bitcastFrom(be)};
+                return {value::TypeTags::bsonString, value::bitcastFrom<const char*>(be)};
             }
             // len includes trailing zero.
             auto len = ConstDataView(be).read<LittleEndian<uint32_t>>();
@@ -127,12 +127,12 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             } else {
                 auto str = new char[len];
                 memcpy(str, be, len);
-                return {value::TypeTags::StringBig, value::bitcastFrom(str)};
+                return {value::TypeTags::StringBig, value::bitcastFrom<const char*>(str)};
             }
         }
         case BSONType::BinData: {
             if (view) {
-                return {value::TypeTags::bsonBinData, value::bitcastFrom(be)};
+                return {value::TypeTags::bsonBinData, value::bitcastFrom<const char*>(be)};
             }
 
             auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
@@ -142,18 +142,18 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
                 auto metaSize = sizeof(uint32_t) + 1;
                 auto binData = new uint8_t[size + metaSize];
                 memcpy(binData, be, size + metaSize);
-                return {value::TypeTags::bsonBinData, value::bitcastFrom(binData)};
+                return {value::TypeTags::bsonBinData, value::bitcastFrom<uint8_t*>(binData)};
             } else {
                 // The legacy byte array stores an extra int32 in byte[size].
                 auto metaSize = 2 * sizeof(uint32_t) + 1;
                 auto binData = new uint8_t[size + metaSize];
                 memcpy(binData, be, size + metaSize);
-                return {value::TypeTags::bsonBinData, value::bitcastFrom(binData)};
+                return {value::TypeTags::bsonBinData, value::bitcastFrom<uint8_t*>(binData)};
             }
         }
         case BSONType::Object: {
             if (view) {
-                return {value::TypeTags::bsonObject, value::bitcastFrom(be)};
+                return {value::TypeTags::bsonObject, value::bitcastFrom<const char*>(be)};
             }
             // Skip document length.
             be += 4;
@@ -172,7 +172,7 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
         }
         case BSONType::Array: {
             if (view) {
-                return {value::TypeTags::bsonArray, value::bitcastFrom(be)};
+                return {value::TypeTags::bsonArray, value::bitcastFrom<const char*>(be)};
             }
             // Skip array length.
             be += 4;
@@ -191,31 +191,31 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
         }
         case BSONType::jstOID: {
             if (view) {
-                return {value::TypeTags::bsonObjectId, value::bitcastFrom(be)};
+                return {value::TypeTags::bsonObjectId, value::bitcastFrom<const char*>(be)};
             }
             auto [tag, val] = value::makeNewObjectId();
             memcpy(value::getObjectIdView(val), be, sizeof(value::ObjectIdType));
             return {tag, val};
         }
         case BSONType::Bool:
-            return {value::TypeTags::Boolean, *(be)};
+            return {value::TypeTags::Boolean, value::bitcastFrom<bool>(*(be))};
         case BSONType::Date: {
-            auto integer = ConstDataView(be).read<LittleEndian<int64_t>>();
-            return {value::TypeTags::Date, value::bitcastFrom(integer)};
+            int64_t integer = ConstDataView(be).read<LittleEndian<int64_t>>();
+            return {value::TypeTags::Date, value::bitcastFrom<int64_t>(integer)};
         }
         case BSONType::jstNULL:
             return {value::TypeTags::Null, 0};
         case BSONType::NumberInt: {
-            auto integer = ConstDataView(be).read<LittleEndian<int32_t>>();
-            return {value::TypeTags::NumberInt32, value::bitcastFrom(integer)};
+            int32_t integer = ConstDataView(be).read<LittleEndian<int32_t>>();
+            return {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(integer)};
         }
         case BSONType::bsonTimestamp: {
-            auto val = ConstDataView(be).read<LittleEndian<uint64_t>>();
-            return {value::TypeTags::Timestamp, value::bitcastFrom(val)};
+            uint64_t val = ConstDataView(be).read<LittleEndian<uint64_t>>();
+            return {value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(val)};
         }
         case BSONType::NumberLong: {
-            auto val = ConstDataView(be).read<LittleEndian<int64_t>>();
-            return {value::TypeTags::NumberInt64, value::bitcastFrom(val)};
+            int64_t val = ConstDataView(be).read<LittleEndian<int64_t>>();
+            return {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(val)};
         }
         default:
             return {value::TypeTags::Nothing, 0};
@@ -247,7 +247,7 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
                 builder.append(Timestamp(value::bitcastTo<uint64_t>(val)));
                 break;
             case value::TypeTags::Boolean:
-                builder.append(val != 0);
+                builder.append(value::bitcastTo<bool>(val));
                 break;
             case value::TypeTags::Null:
                 builder.appendNull();
@@ -303,7 +303,8 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
 }
 void convertToBsonObj(BSONArrayBuilder& builder, value::Array* arr) {
     return convertToBsonObj(
-        builder, value::ArrayEnumerator{value::TypeTags::Array, value::bitcastFrom(arr)});
+        builder,
+        value::ArrayEnumerator{value::TypeTags::Array, value::bitcastFrom<value::Array*>(arr)});
 }
 void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
     for (size_t idx = 0; idx < obj->size(); ++idx) {
@@ -332,7 +333,7 @@ void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
                 builder.append(name, Timestamp(value::bitcastTo<uint64_t>(val)));
                 break;
             case value::TypeTags::Boolean:
-                builder.append(name, val != 0);
+                builder.append(name, value::bitcastTo<bool>(val));
                 break;
             case value::TypeTags::Null:
                 builder.appendNull(name);

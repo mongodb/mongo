@@ -84,15 +84,15 @@ public:
     }
 
     void append(const bool in) {
-        appendValue(TypeTags::Boolean, value::bitcastFrom(in));
+        appendValue(TypeTags::Boolean, value::bitcastFrom<bool>(in));
     }
 
     void append(const Date_t& in) {
-        appendValue(TypeTags::Date, value::bitcastFrom(in.toMillisSinceEpoch()));
+        appendValue(TypeTags::Date, value::bitcastFrom<int64_t>(in.toMillisSinceEpoch()));
     }
 
     void append(const Timestamp& in) {
-        appendValue(TypeTags::Timestamp, value::bitcastFrom(in.asLL()));
+        appendValue(TypeTags::Timestamp, value::bitcastFrom<uint64_t>(in.asULL()));
     }
 
     void append(const OID& in) {
@@ -144,7 +144,7 @@ public:
     }
 
     void append(double in) {
-        appendValue(TypeTags::NumberDouble, value::bitcastFrom(in));
+        appendValue(TypeTags::NumberDouble, value::bitcastFrom<double>(in));
     }
 
     void append(const Decimal128& in) {
@@ -153,11 +153,11 @@ public:
     }
 
     void append(long long in) {
-        appendValue(TypeTags::NumberInt64, value::bitcastFrom(in));
+        appendValue(TypeTags::NumberInt64, value::bitcastFrom<int64_t>(in));
     }
 
     void append(int32_t in) {
-        appendValue(TypeTags::NumberInt32, value::bitcastFrom(in));
+        appendValue(TypeTags::NumberInt32, value::bitcastFrom<int32_t>(in));
     }
 
     BufBuilder& subobjStart() {
@@ -208,7 +208,7 @@ public:
                 case TypeTags::bsonBinData: {
                     auto offset = bitcastTo<decltype(bufferLen)>(val);
                     invariant(offset < bufferLen);
-                    val = bitcastFrom(_valueBufferBuilder->buf() + offset);
+                    val = bitcastFrom<const char*>(_valueBufferBuilder->buf() + offset);
                     break;
                 }
                 default:
@@ -247,7 +247,7 @@ private:
     // offset to pointer occurs as part of the 'releaseValues()' function.
     void appendValueBufferOffset(TypeTags tag) {
         _tagList[_numValues] = tag;
-        _valList[_numValues] = value::bitcastFrom(_valueBufferBuilder->len());
+        _valList[_numValues] = value::bitcastFrom<int32_t>(_valueBufferBuilder->len());
         ++_numValues;
     }
 

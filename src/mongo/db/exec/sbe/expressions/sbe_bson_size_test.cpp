@@ -45,12 +45,13 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForBsonDocument) {
     objBuilder.append("citizen", true);
     auto bsonObj = objBuilder.done();
 
-    slotAccessor.reset(value::TypeTags::bsonObject, value::bitcastFrom(bsonObj.objdata()));
+    slotAccessor.reset(value::TypeTags::bsonObject,
+                       value::bitcastFrom<const char*>(bsonObj.objdata()));
     auto [tag, val] = runCompiledExpression(compiledExpr.get());
     value::ValueGuard guard(tag, val);
 
     ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
-    ASSERT_EQUALS(value::bitcastTo<uint32_t>(val), bsonObj.objsize());
+    ASSERT_EQUALS(value::bitcastTo<int32_t>(val), bsonObj.objsize());
 }
 
 TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
@@ -64,8 +65,8 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
     auto [tagArg2, valArg2] = value::makeNewObject();
     auto obj = value::getObjectView(valArg2);
     obj->push_back("name", tagArg1, valArg1);
-    obj->push_back("age", value::TypeTags::NumberInt32, value::bitcastFrom(32));
-    obj->push_back("citizen", value::TypeTags::Boolean, value::bitcastFrom(true));
+    obj->push_back("age", value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
+    obj->push_back("citizen", value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
     value::ValueGuard argGuard(tagArg2, valArg2);
 
     slotAccessor.reset(value::TypeTags::Object, valArg2);
@@ -73,7 +74,7 @@ TEST_F(SBEBsonSizeTest, ComputesSizeForSbeObject) {
     value::ValueGuard guard(tag, val);
 
     ASSERT_EQUALS(value::TypeTags::NumberInt32, tag);
-    ASSERT_EQUALS(value::bitcastTo<uint32_t>(val), 54);
+    ASSERT_EQUALS(value::bitcastTo<int32_t>(val), 54);
 }
 
 TEST_F(SBEBsonSizeTest, ReturnsNothingForNonObject) {
@@ -89,12 +90,12 @@ TEST_F(SBEBsonSizeTest, ReturnsNothingForNonObject) {
     auto [tagArg2, valArg2] = value::makeNewArray();
     value::ValueGuard guard2(tagArg2, valArg2);
     auto arr = value::getArrayView(valArg2);
-    arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom(32));
+    arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(32));
     auto [tagArg3, valArg3] = value::copyValue(tagArg1, valArg1);
     arr->push_back(tagArg3, valArg3);
 
     std::vector<std::pair<value::TypeTags, value::Value>> testData = {
-        std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom(12789)),
+        std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(12789)),
         std::make_pair(tagArg1, valArg1),
         std::make_pair(tagArg2, valArg2)};
 

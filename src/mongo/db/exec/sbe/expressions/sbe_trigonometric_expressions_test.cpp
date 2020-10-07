@@ -65,13 +65,13 @@ TEST_F(SBETrigonometricExprTest, ComputesAcos) {
     auto acosExpr = sbe::makeE<sbe::EFunction>("acos", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*acosExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(0));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
     runAndAssertExpression(compiledExpr.get(), std::acos(0));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{1}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::acos(1));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::acos(0.10001));
 
     Decimal128 arg(0.777);
@@ -90,13 +90,13 @@ TEST_F(SBETrigonometricExprTest, ComputesAcosh) {
     auto acoshExpr = sbe::makeE<sbe::EFunction>("acosh", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*acoshExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::acosh(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{7}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(7));
     runAndAssertExpression(compiledExpr.get(), std::acosh(7));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(1.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.10001));
     runAndAssertExpression(compiledExpr.get(), std::acosh(1.10001));
 
     Decimal128 arg(7.777);
@@ -115,13 +115,13 @@ TEST_F(SBETrigonometricExprTest, ComputesAsin) {
     auto asinExpr = sbe::makeE<sbe::EFunction>("asin", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*asinExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(0));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
     runAndAssertExpression(compiledExpr.get(), std::asin(0));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{1}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::asin(1));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::asin(0.10001));
 
     Decimal128 arg(0.9);
@@ -140,13 +140,13 @@ TEST_F(SBETrigonometricExprTest, ComputesAsinh) {
     auto asinhExpr = sbe::makeE<sbe::EFunction>("asinh", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*asinhExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(0));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
     runAndAssertExpression(compiledExpr.get(), std::asinh(0));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{1}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::asinh(1));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::asinh(0.10001));
 
     Decimal128 arg(1.5);
@@ -166,13 +166,13 @@ TEST_F(SBETrigonometricExprTest, ComputesAtan) {
     auto atanExpr = sbe::makeE<sbe::EFunction>("atan", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*atanExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::atan(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{2}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     runAndAssertExpression(compiledExpr.get(), std::atan(2));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::atan(0.10001));
 
     Decimal128 arg(1.0471975512);
@@ -191,13 +191,13 @@ TEST_F(SBETrigonometricExprTest, ComputesAtanh) {
     auto atanhExpr = sbe::makeE<sbe::EFunction>("atanh", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*atanhExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(0));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
     runAndAssertExpression(compiledExpr.get(), std::atanh(0));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{0}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
     runAndAssertExpression(compiledExpr.get(), std::atanh(0));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::atanh(0.10001));
 
     Decimal128 arg(-0.345);
@@ -218,16 +218,16 @@ TEST_F(SBETrigonometricExprTest, ComputesAtan2) {
         "atan2", sbe::makeEs(makeE<EVariable>(argSlot1), makeE<EVariable>(argSlot2)));
     auto compiledExpr = compileExpression(*atan2Expr);
 
-    slotAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
-    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom(0));
+    slotAccessor1.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
     runAndAssertExpression(compiledExpr.get(), std::atan2(1, 0));
 
-    slotAccessor1.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{0}));
-    slotAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{-1}));
+    slotAccessor1.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
+    slotAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(-1));
     runAndAssertExpression(compiledExpr.get(), std::atan2(0, -1));
 
-    slotAccessor1.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
-    slotAccessor2.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.707106781187));
+    slotAccessor1.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
+    slotAccessor2.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.707106781187));
     runAndAssertExpression(compiledExpr.get(), std::atan2(0.10001, 0.707106781187));
 
     Decimal128 arg1(0.5), arg2(0.866025403784);
@@ -239,7 +239,7 @@ TEST_F(SBETrigonometricExprTest, ComputesAtan2) {
 
     auto [tagStrArg, valStrArg] = value::makeNewString("xyz");
     slotAccessor1.reset(tagStrArg, valStrArg);
-    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertNothing(compiledExpr.get());
 }
 
@@ -249,13 +249,13 @@ TEST_F(SBETrigonometricExprTest, ComputesCos) {
     auto cosExpr = sbe::makeE<sbe::EFunction>("cos", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*cosExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::cos(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{2}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     runAndAssertExpression(compiledExpr.get(), std::cos(2));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::cos(0.10001));
 
     Decimal128 arg(1.000001);
@@ -274,13 +274,13 @@ TEST_F(SBETrigonometricExprTest, ComputesCosh) {
     auto coshExpr = sbe::makeE<sbe::EFunction>("cosh", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*coshExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::cosh(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{2}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     runAndAssertExpression(compiledExpr.get(), std::cosh(2));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::cosh(0.10001));
 
     Decimal128 arg(4.18879020479);
@@ -300,13 +300,13 @@ TEST_F(SBETrigonometricExprTest, ComputesDegreesToRadians) {
         sbe::makeE<sbe::EFunction>("degreesToRadians", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*degreesToRadiansExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(45));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(45));
     runAndAssertExpression(compiledExpr.get(), 0.7853981633974483);
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{135}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(135));
     runAndAssertExpression(compiledExpr.get(), 2.356194490192345);
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(240.0));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(240.0));
     runAndAssertExpression(compiledExpr.get(), 4.1887902047863905);
 
     Decimal128 arg(180);
@@ -326,13 +326,14 @@ TEST_F(SBETrigonometricExprTest, ComputesRadiansToDegrees) {
         sbe::makeE<sbe::EFunction>("radiansToDegrees", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*radiansToDegreesExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), 57.29577951308232);
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{3}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
     runAndAssertExpression(compiledExpr.get(), 171.88733853924697);
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(5.235987755982989));
+    slotAccessor.reset(value::TypeTags::NumberDouble,
+                       value::bitcastFrom<double>(5.235987755982989));
     runAndAssertExpression(compiledExpr.get(), 300.0);
 
     Decimal128 arg(3.141592653589793);
@@ -351,13 +352,13 @@ TEST_F(SBETrigonometricExprTest, ComputesSin) {
     auto sinExpr = sbe::makeE<sbe::EFunction>("sin", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*sinExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::sin(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{2}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     runAndAssertExpression(compiledExpr.get(), std::sin(2));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::sin(0.10001));
 
     Decimal128 arg(1.000001);
@@ -376,13 +377,13 @@ TEST_F(SBETrigonometricExprTest, ComputesSinh) {
     auto sinhExpr = sbe::makeE<sbe::EFunction>("sinh", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*sinhExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::sinh(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{2}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     runAndAssertExpression(compiledExpr.get(), std::sinh(2));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.523598775598));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.523598775598));
     runAndAssertExpression(compiledExpr.get(), std::sinh(0.523598775598));
 
     Decimal128 arg(3.66519142919);
@@ -400,13 +401,13 @@ TEST_F(SBETrigonometricExprTest, ComputesTan) {
     auto tanExpr = sbe::makeE<sbe::EFunction>("tan", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*tanExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::tan(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{2}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     runAndAssertExpression(compiledExpr.get(), std::tan(2));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(0.10001));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.10001));
     runAndAssertExpression(compiledExpr.get(), std::tan(0.10001));
 
     Decimal128 arg(1.000001);
@@ -425,13 +426,13 @@ TEST_F(SBETrigonometricExprTest, ComputesTanh) {
     auto tanhExpr = sbe::makeE<sbe::EFunction>("tanh", sbe::makeEs(makeE<EVariable>(argSlot)));
     auto compiledExpr = compileExpression(*tanhExpr);
 
-    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(1));
+    slotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(compiledExpr.get(), std::tanh(1));
 
-    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{2}));
+    slotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(2));
     runAndAssertExpression(compiledExpr.get(), std::tanh(2));
 
-    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(1.0471975512));
+    slotAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(1.0471975512));
     runAndAssertExpression(compiledExpr.get(), std::tanh(1.0471975512));
 
     Decimal128 arg(0.785398163397);

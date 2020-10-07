@@ -115,7 +115,8 @@ PlanState UnwindStage::getNext() {
                     _inArray = false;
                     if (_preserveNullAndEmptyArrays) {
                         _outFieldOutputAccessor->reset(value::TypeTags::Nothing, 0);
-                        _outIndexOutputAccessor->reset(value::TypeTags::NumberInt64, _index);
+                        _outIndexOutputAccessor->reset(value::TypeTags::NumberInt64,
+                                                       value::bitcastFrom<int64_t>(_index));
                         return trackPlanState(PlanState::ADVANCED);
                     }
                 }
@@ -136,7 +137,8 @@ PlanState UnwindStage::getNext() {
     auto [tagElem, valElem] = _inArrayAccessor.getViewOfValue();
 
     _outFieldOutputAccessor->reset(tagElem, valElem);
-    _outIndexOutputAccessor->reset(value::TypeTags::NumberInt64, _index);
+    _outIndexOutputAccessor->reset(value::TypeTags::NumberInt64,
+                                   value::bitcastFrom<int64_t>(_index));
 
     _inArrayAccessor.advance();
     ++_index;

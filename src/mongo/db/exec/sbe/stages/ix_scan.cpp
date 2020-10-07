@@ -270,7 +270,7 @@ PlanState IndexScanStage::getNext() {
 
     if (_recordAccessor) {
         _recordAccessor->reset(value::TypeTags::ksValue,
-                               value::bitcastFrom(&_nextRecord->keyString));
+                               value::bitcastFrom<KeyString::Value*>(&_nextRecord->keyString));
     }
 
     if (_recordIdAccessor) {

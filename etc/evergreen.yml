@@ -9158,7 +9158,7 @@ buildvariants:
   - name: .integration !.audit
     distros:
     - ubuntu1804-zseries-build
-  - name: .jscore .common !.auth !.sbe
+  - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
   - name: replica_sets
@@ -11598,7 +11598,7 @@ buildvariants:
   - name: .integration !.audit
     distros:
     - rhel72-zseries-build
-  - name: .jscore .common !.auth !.sbe
+  - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
   - name: replica_sets
@@ -11670,7 +11670,7 @@ buildvariants:
   - name: .integration !.audit !.sharded
     distros:
     - rhel67-zseries-build
-  - name: .jscore .common !.sbe
+  - name: .jscore .common
   - name: jsCore_minimum_batch_size
   - name: replica_sets_jscore_passthrough
   - name: sasl
@@ -11924,7 +11924,7 @@ buildvariants:
   - name: .integration !.audit
     distros:
     - suse12-zseries-build
-  - name: .jscore .common !.auth !.sbe
+  - name: .jscore .common !.auth
   - name: jsCore_op_query
   - name: .read_write_concern
   - name: replica_sets
@@ -12489,7 +12489,7 @@ buildvariants:
   - name: .integration !.audit
     distros:
     - rhel72-zseries-build
-  - name: .jscore .common !.decimal !.sbe
+  - name: .jscore .common !.decimal
   - name: jsCore_op_query
   - name: .read_write_concern !.durable_history
   - name: replica_sets

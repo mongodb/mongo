@@ -106,8 +106,9 @@ PlanState CheckBoundsStage::getNext() {
                 auto seekKey = std::make_unique<KeyString::Value>(
                     IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
                         seekPoint, _params.version, _params.ord, _params.direction == 1));
-                _outAccessor.reset(
-                    true, value::TypeTags::ksValue, value::bitcastFrom(seekKey.release()));
+                _outAccessor.reset(true,
+                                   value::TypeTags::ksValue,
+                                   value::bitcastFrom<KeyString::Value*>(seekKey.release()));
                 // We should return the seek key provided by the 'IndexBoundsChecker' to restart
                 // the index scan, but we should stop on the next call to 'getNext' since we've just
                 // passed behind the current interval and need to signal the parent stage that we're

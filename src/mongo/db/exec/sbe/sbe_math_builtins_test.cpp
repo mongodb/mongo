@@ -46,7 +46,7 @@ TEST_F(SBEMathBuiltinTest, Abs) {
     auto compiledExpr = compileExpression(*callExpr);
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{-6}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-6));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -56,7 +56,7 @@ TEST_F(SBEMathBuiltinTest, Abs) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt32,
-                            value::bitcastFrom(std::numeric_limits<int32_t>::min()));
+                            value::bitcastFrom<int32_t>(std::numeric_limits<int32_t>::min()));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -66,7 +66,7 @@ TEST_F(SBEMathBuiltinTest, Abs) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{-6000000000}));
+        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(-6000000000));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -76,7 +76,7 @@ TEST_F(SBEMathBuiltinTest, Abs) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64,
-                            value::bitcastFrom(std::numeric_limits<int64_t>::min()));
+                            value::bitcastFrom<int64_t>(std::numeric_limits<int64_t>::min()));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -84,7 +84,7 @@ TEST_F(SBEMathBuiltinTest, Abs) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(-6e300));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-6e300));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -112,7 +112,7 @@ TEST_F(SBEMathBuiltinTest, Ceil) {
     auto compiledExpr = compileExpression(*callExpr);
 
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(double{-10.0001}));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-10.0001));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -132,7 +132,7 @@ TEST_F(SBEMathBuiltinTest, Ceil) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{-10}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -142,7 +142,7 @@ TEST_F(SBEMathBuiltinTest, Ceil) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64,
-                            value::bitcastFrom(int64_t{-10000000000}));
+                            value::bitcastFrom<int64_t>(-10000000000));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -159,7 +159,7 @@ TEST_F(SBEMathBuiltinTest, Floor) {
     auto compiledExpr = compileExpression(*callExpr);
 
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(double{-10.0001}));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-10.0001));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -179,7 +179,7 @@ TEST_F(SBEMathBuiltinTest, Floor) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{-10}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-10));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -189,7 +189,7 @@ TEST_F(SBEMathBuiltinTest, Floor) {
 
     {
         inputAccessor.reset(value::TypeTags::NumberInt64,
-                            value::bitcastFrom(int64_t{-10000000000}));
+                            value::bitcastFrom<int64_t>(-10000000000));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -206,7 +206,7 @@ TEST_F(SBEMathBuiltinTest, Exp) {
     auto compiledExpr = compileExpression(*callExpr);
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{2}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -215,7 +215,7 @@ TEST_F(SBEMathBuiltinTest, Exp) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{3}));
+        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -224,7 +224,7 @@ TEST_F(SBEMathBuiltinTest, Exp) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(double{2.5}));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.5));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -254,7 +254,7 @@ TEST_F(SBEMathBuiltinTest, Ln) {
     auto compiledExpr = compileExpression(*callExpr);
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{2}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(2));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -263,7 +263,7 @@ TEST_F(SBEMathBuiltinTest, Ln) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{20000000000}));
+        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(20000000000));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -272,7 +272,7 @@ TEST_F(SBEMathBuiltinTest, Ln) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(double{2.1e20}));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.1e20));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -295,7 +295,7 @@ TEST_F(SBEMathBuiltinTest, Ln) {
 
     // Non-positive values evaluate to Nothing
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{0}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -311,7 +311,7 @@ TEST_F(SBEMathBuiltinTest, Log10) {
     auto compiledExpr = compileExpression(*callExpr);
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{100}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(100));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -320,7 +320,7 @@ TEST_F(SBEMathBuiltinTest, Log10) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{10000000000}));
+        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10000000000));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -329,7 +329,7 @@ TEST_F(SBEMathBuiltinTest, Log10) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(double{2.1e20}));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.1e20));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -356,7 +356,7 @@ TEST_F(SBEMathBuiltinTest, Sqrt) {
     auto compiledExpr = compileExpression(*callExpr);
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom(int32_t{4}));
+        inputAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(4));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -365,7 +365,7 @@ TEST_F(SBEMathBuiltinTest, Sqrt) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{10000000000}));
+        inputAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10000000000));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -374,7 +374,7 @@ TEST_F(SBEMathBuiltinTest, Sqrt) {
     }
 
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(double{2.5}));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(2.5));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -398,7 +398,7 @@ TEST_F(SBEMathBuiltinTest, Sqrt) {
     // For types with signed zero, we do not distinguish -0 from 0. The domain of sqrt _does_
     // include -0, and -0 evaluates to a value that is equal to zero.
     {
-        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom(double{-0.0}));
+        inputAccessor.reset(value::TypeTags::NumberDouble, value::bitcastFrom<double>(-0.0));
         auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
         value::ValueGuard guard(resultTag, resultVal);
 
@@ -475,7 +475,7 @@ TEST_F(SBEMathBuiltinTest, InvalidInputsToUnaryNumericFunctions) {
     // NaN is a valid input but returns NaN
     {
         inputAccessor.reset(value::TypeTags::NumberDouble,
-                            value::bitcastFrom(std::numeric_limits<double>::quiet_NaN()));
+                            value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN()));
 
         for (auto&& compiledExpr : compiledExpressionList) {
             auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());

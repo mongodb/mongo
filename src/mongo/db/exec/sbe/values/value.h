@@ -226,6 +226,81 @@ private:
     Value _value;
 };
 
+inline char* getRawPointerView(Value val) noexcept {
+    return reinterpret_cast<char*>(val);
+}
+
+inline Decimal128 readDecimal128FromMemory(const ConstDataView& view) {
+    uint64_t low = view.read<LittleEndian<uint64_t>>();
+    uint64_t high = view.read<LittleEndian<uint64_t>>(sizeof(uint64_t));
+    return Decimal128{Decimal128::Value{low, high}};
+}
+
+template <class T>
+struct dont_deduce_t {
+    using type = T;
+};
+
+template <class T>
+using dont_deduce = typename dont_deduce_t<T>::type;
+
+template <typename T>
+Value bitcastFrom(const dont_deduce<T> in) noexcept {
+    static_assert(std::is_pointer_v<T> || std::is_integral_v<T> || std::is_floating_point_v<T>);
+
+    static_assert(sizeof(Value) >= sizeof(T));
+
+    // Callers must not try to store a pointer to a Decimal128 object in an sbe::value::Value. Any
+    // Value with the NumberDecimal TypeTag actually stores a pointer to a NumberDecimal as it would
+    // be represented in a BSONElement: a pair of network-ordered (little-endian) uint64_t values.
+    // These bytes are _not_ guaranteed to be the same as the bytes in a Decimal128_t object.
+    //
+    // To get a NumberDecimal value, either call makeCopyDecimal() or store the value in BSON and
+    // use sbe::bson::convertFrom().
+    static_assert(!std::is_same_v<Decimal128, T>);
+    static_assert(!std::is_same_v<Decimal128*, T>);
+
+    if constexpr (std::is_pointer_v<T>) {
+        // Casting from pointer to integer value is OK.
+        return reinterpret_cast<Value>(in);
+    } else if constexpr (std::is_same_v<bool, T>) {
+        // make_signed_t<bool> is not defined, so we handle the bool type separately here.
+        return static_cast<Value>(in);
+    } else if constexpr (std::is_integral_v<T>) {
+        // Native integer types are converted to Value using static_cast with sign extension.
+        return static_cast<Value>(static_cast<std::make_signed_t<T>>(in));
+    }
+
+    Value val{0};
+    memcpy(&val, &in, sizeof(T));
+    return val;
+}
+
+template <typename T>
+T bitcastTo(const Value in) noexcept {
+    static_assert(std::is_pointer_v<T> || std::is_integral_v<T> || std::is_floating_point_v<T> ||
+                  std::is_same_v<Decimal128, T>);
+
+    if constexpr (std::is_pointer_v<T>) {
+        // Casting from integer value to pointer is OK.
+        static_assert(sizeof(Value) == sizeof(T));
+        return reinterpret_cast<T>(in);
+    } else if constexpr (std::is_integral_v<T>) {
+        // Values are converted to native integer types using static_cast. If sizeof(T) is less
+        // than sizeof(Value), the upper bits of 'in' are discarded.
+        static_assert(sizeof(Value) >= sizeof(T));
+        return static_cast<T>(in);
+    } else if constexpr (std::is_same_v<Decimal128, T>) {
+        static_assert(sizeof(Value) == sizeof(T*));
+        return readDecimal128FromMemory(ConstDataView{getRawPointerView(in)});
+    } else {
+        static_assert(sizeof(Value) >= sizeof(T));
+        T val;
+        memcpy(&val, &in, sizeof(T));
+        return val;
+    }
+}
+
 /**
  * This is the SBE representation of objects/documents. It is a relatively simple structure of
  * vectors of field names, type tags, and values.
@@ -380,7 +455,7 @@ class ArraySet {
                         const std::pair<TypeTags, Value>& rhs) const {
             auto [tag, val] = compareValue(lhs.first, lhs.second, rhs.first, rhs.second);
 
-            if (tag != TypeTags::NumberInt32 || val != 0) {
+            if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
                 return false;
             } else {
                 return true;
@@ -440,10 +515,6 @@ inline char* getBigStringView(Value val) noexcept {
     return reinterpret_cast<char*>(val);
 }
 
-inline char* getRawPointerView(Value val) noexcept {
-    return reinterpret_cast<char*>(val);
-}
-
 inline char* getRawStringView(TypeTags tag, Value& val) noexcept {
     if (tag == TypeTags::StringSmall) {
         return getSmallStringView(val);
@@ -469,57 +540,11 @@ T readFromMemory(const unsigned char* memory) noexcept {
     return val;
 }
 
-inline Decimal128 readDecimal128FromMemory(const ConstDataView& view) {
-    uint64_t low = view.read<LittleEndian<long long>>();
-    uint64_t high = view.read<LittleEndian<long long>>(sizeof(long long));
-    return Decimal128{Decimal128::Value{low, high}};
-}
-
 template <typename T>
 size_t writeToMemory(unsigned char* memory, const T val) noexcept {
     memcpy(memory, &val, sizeof(T));
 
     return sizeof(T);
-}
-
-template <typename T>
-Value bitcastFrom(const T in) noexcept {
-    static_assert(sizeof(Value) >= sizeof(T));
-
-    // Callers must not try to store a pointer to a Decimal128 object in an sbe::value::Value. Any
-    // Value with the NumberDecimal TypeTag actually stores a pointer to a NumberDecimal as it would
-    // be represented in a BSONElement: a pair of network-ordered (little-endian) uint64_t values.
-    // These bytes are _not_ guaranteed to be the same as the bytes in a Decimal128_t object.
-    //
-    // To get a NumberDecimal value, either call makeCopyDecimal() or store the value in BSON and
-    // use sbe::bson::convertFrom().
-    static_assert(!std::is_same_v<Decimal128, T>);
-    static_assert(!std::is_same_v<Decimal128*, T>);
-
-    // Casting from pointer to integer value is OK.
-    if constexpr (std::is_pointer_v<T>) {
-        return reinterpret_cast<Value>(in);
-    }
-    Value val{0};
-    memcpy(&val, &in, sizeof(T));
-    return val;
-}
-
-template <typename T>
-T bitcastTo(const Value in) noexcept {
-    // Casting from integer value to pointer is OK.
-    if constexpr (std::is_pointer_v<T>) {
-        static_assert(sizeof(Value) == sizeof(T));
-        return reinterpret_cast<T>(in);
-    } else if constexpr (std::is_same_v<Decimal128, T>) {
-        static_assert(sizeof(Value) == sizeof(T*));
-        return readDecimal128FromMemory(ConstDataView{getRawPointerView(in)});
-    } else {
-        static_assert(sizeof(Value) >= sizeof(T));
-        T val;
-        memcpy(&val, &in, sizeof(T));
-        return val;
-    }
 }
 
 inline std::string_view getStringView(TypeTags tag, Value& val) noexcept {
@@ -673,7 +698,7 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             auto dst = new char[len + 1];
             memcpy(dst, src, len);
             dst[len] = 0;
-            return {TypeTags::StringBig, bitcastFrom(dst)};
+            return {TypeTags::StringBig, reinterpret_cast<Value>(dst)};
         }
         case TypeTags::bsonString: {
             auto bsonstr = getRawPointerView(val);
@@ -689,28 +714,28 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             auto size = ConstDataView(bson).read<LittleEndian<uint32_t>>();
             auto dst = new uint8_t[size];
             memcpy(dst, bson, size);
-            return {TypeTags::bsonObject, bitcastFrom(dst)};
+            return {TypeTags::bsonObject, reinterpret_cast<Value>(dst)};
         }
         case TypeTags::bsonObjectId: {
             auto bson = getRawPointerView(val);
             auto size = sizeof(ObjectIdType);
             auto dst = new uint8_t[size];
             memcpy(dst, bson, size);
-            return {TypeTags::bsonObjectId, bitcastFrom(dst)};
+            return {TypeTags::bsonObjectId, reinterpret_cast<Value>(dst)};
         }
         case TypeTags::bsonArray: {
             auto bson = getRawPointerView(val);
             auto size = ConstDataView(bson).read<LittleEndian<uint32_t>>();
             auto dst = new uint8_t[size];
             memcpy(dst, bson, size);
-            return {TypeTags::bsonArray, bitcastFrom(dst)};
+            return {TypeTags::bsonArray, reinterpret_cast<Value>(dst)};
         }
         case TypeTags::bsonBinData: {
             auto binData = getRawPointerView(val);
             auto size = getBSONBinDataSize(tag, val);
             auto dst = new uint8_t[size + sizeof(uint32_t) + 1];
             memcpy(dst, binData, size + sizeof(uint32_t) + 1);
-            return {TypeTags::bsonBinData, bitcastFrom(dst)};
+            return {TypeTags::bsonBinData, reinterpret_cast<Value>(dst)};
         }
         case TypeTags::ksValue:
             return makeCopyKeyString(*getKeyStringView(val));
@@ -767,19 +792,19 @@ inline std::tuple<bool, value::TypeTags, value::Value> numericConvLossless(
     switch (targetTag) {
         case value::TypeTags::NumberInt32: {
             if (auto result = representAs<int32_t>(value); result) {
-                return {false, value::TypeTags::NumberInt32, value::bitcastFrom(*result)};
+                return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(*result)};
             }
             return {false, value::TypeTags::Nothing, 0};
         }
         case value::TypeTags::NumberInt64: {
             if (auto result = representAs<int64_t>(value); result) {
-                return {false, value::TypeTags::NumberInt64, value::bitcastFrom(*result)};
+                return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(*result)};
             }
             return {false, value::TypeTags::Nothing, 0};
         }
         case value::TypeTags::NumberDouble: {
             if (auto result = representAs<double>(value); result) {
-                return {false, value::TypeTags::NumberDouble, value::bitcastFrom(*result)};
+                return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(*result)};
             }
             return {false, value::TypeTags::Nothing, 0};
         }

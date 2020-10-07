@@ -70,7 +70,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToUpper) {
     // BSONString test.
     auto bsonStringObj = BSON("string"
                               << "hello");
-    auto bsonStringVal = value::bitcastFrom(bsonStringObj["string"].value());
+    auto bsonStringVal = value::bitcastFrom<const char*>(bsonStringObj["string"].value());
     toUpperAccessor.reset(value::TypeTags::bsonString, bsonStringVal);
     runAndAssertExpression(compiledExpr.get(), "HELLO");
 
@@ -92,7 +92,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToUpper) {
     runAndAssertNothing(compiledExpr.get());
 
     // Date test.
-    toUpperAccessor.reset(sbe::value::TypeTags::Date, value::bitcastFrom<uint64_t>(4400));
+    toUpperAccessor.reset(sbe::value::TypeTags::Date, value::bitcastFrom<int64_t>(4400));
     runAndAssertNothing(compiledExpr.get());
 
     // Timestamp test.
@@ -102,7 +102,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToUpper) {
 
     // BSONObj test.
     auto bsonObj = BSON("number" << 42);
-    auto bsonData = value::bitcastFrom(bsonObj.objdata());
+    auto bsonData = value::bitcastFrom<const char*>(bsonObj.objdata());
     auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonData);
     toUpperAccessor.reset(bsonTag, bsonVal);
     runAndAssertNothing(compiledExpr.get());
@@ -138,7 +138,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToLower) {
     // BSONString test.
     auto bsonStringObj = BSON("string"
                               << "HELLO");
-    auto bsonStringVal = value::bitcastFrom(bsonStringObj["string"].value());
+    auto bsonStringVal = value::bitcastFrom<const char*>(bsonStringObj["string"].value());
     toLowerAccessor.reset(value::TypeTags::bsonString, bsonStringVal);
     runAndAssertExpression(compiledExpr.get(), "hello");
 
@@ -160,7 +160,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToLower) {
     runAndAssertNothing(compiledExpr.get());
 
     // Date test.
-    toLowerAccessor.reset(sbe::value::TypeTags::Date, value::bitcastFrom<uint64_t>(4400));
+    toLowerAccessor.reset(sbe::value::TypeTags::Date, value::bitcastFrom<int64_t>(4400));
     runAndAssertNothing(compiledExpr.get());
 
     // Timestamp test.
@@ -170,7 +170,7 @@ TEST_F(SBEToUpperToLowerTest, BasicToLower) {
 
     // BSONObj test.
     auto bsonObj = BSON("number" << 42);
-    auto bsonData = value::bitcastFrom(bsonObj.objdata());
+    auto bsonData = value::bitcastFrom<const char*>(bsonObj.objdata());
     auto [bsonTag, bsonVal] = value::copyValue(value::TypeTags::bsonObject, bsonData);
     toLowerAccessor.reset(bsonTag, bsonVal);
     runAndAssertNothing(compiledExpr.get());

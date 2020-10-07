@@ -49,11 +49,11 @@ protected:
         int numBytes = ba.objsize();
         uint8_t* data = new uint8_t[numBytes];
         memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
-        return {value::TypeTags::bsonArray, value::bitcastFrom(data)};
+        return {value::TypeTags::bsonArray, value::bitcastFrom<uint8_t*>(data)};
     }
 
     std::pair<value::TypeTags, value::Value> makeViewOfObject(const BSONObj& obj) {
-        return {value::TypeTags::bsonObject, value::bitcastFrom(obj.objdata())};
+        return {value::TypeTags::bsonObject, value::bitcastFrom<const char*>(obj.objdata())};
     }
 
     std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {
@@ -108,19 +108,19 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArraySet) {
     auto inputSlot = bindAccessor(&inputSlotAccessor);
 
     // Test that isMember can find basic values.
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 1);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY(1 << 2)), true);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
     runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY(1 << 2)), false);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
     runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY(BSONObj())), false);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, 1);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
     runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY(1 << 2)), true);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
     runAndAssertExpression(inputSlot, makeArraySet(BSON_ARRAY(1 << 2)), false);
 
     auto [decimalTag, decimalVal] = value::makeCopyDecimal(Decimal128{9});
@@ -172,19 +172,19 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberArray) {
     auto inputSlot = bindAccessor(&inputSlotAccessor);
 
     // Test that isMember can find basic values.
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 1);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY(1 << 2)), true);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
     runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY(1 << 2)), false);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
     runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY(BSONObj())), false);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, 1);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
     runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY(1 << 2)), true);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
     runAndAssertExpression(inputSlot, makeArray(BSON_ARRAY(1 << 2)), false);
 
     auto [decimalTag, decimalVal] = value::makeCopyDecimal(Decimal128{9});
@@ -237,19 +237,19 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberBSONArray) {
     auto inputSlot = bindAccessor(&inputSlotAccessor);
 
     // Test that isMember can find basic values.
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 1);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
     runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), true);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
     runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), false);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(3));
     runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(BSONObj())), false);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, 1);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1));
     runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), true);
 
-    inputSlotAccessor.reset(value::TypeTags::NumberInt64, 3);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(3));
     runAndAssertExpression(inputSlot, makeValue(BSON_ARRAY(1 << 2)), false);
 
     auto [decimalTag, decimalVal] = value::makeCopyDecimal(Decimal128{9});
@@ -302,7 +302,8 @@ TEST_F(SBEBuiltinIsMemberTest, IsMemberReturnsNothing) {
     auto inputSlot = bindAccessor(&inputSlotAccessor);
 
     // Test that invocation of 'isMember' returns nothing if the second argument isn't an array.
-    inputSlotAccessor.reset(value::TypeTags::NumberInt32, 1);
-    runAndAssertExpression(inputSlot, {value::TypeTags::NumberInt32, 0}, false);
+    inputSlotAccessor.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(1));
+    runAndAssertExpression(
+        inputSlot, {value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0)}, false);
 }
 }  // namespace mongo::sbe

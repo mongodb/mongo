@@ -65,7 +65,7 @@ private:
 
     value::ArrayAccessor _inArrayAccessor;
 
-    size_t _index{0};
+    int64_t _index{0};
     bool _inArray{false};
 };
 }  // namespace mongo::sbe

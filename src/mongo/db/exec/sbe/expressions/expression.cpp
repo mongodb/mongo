@@ -183,7 +183,8 @@ std::unique_ptr<vm::CodeFragment> EPrimBinary::compile(CompileCtx& ctx) const {
             break;
         case EPrimBinary::logicAnd: {
             auto codeFalseBranch = std::make_unique<vm::CodeFragment>();
-            codeFalseBranch->appendConstVal(value::TypeTags::Boolean, false);
+            codeFalseBranch->appendConstVal(value::TypeTags::Boolean,
+                                            value::bitcastFrom<bool>(false));
             // Jump to the merge point that will be right after the thenBranch (rhs).
             codeFalseBranch->appendJump(rhs->instrs().size());
 
@@ -198,7 +199,8 @@ std::unique_ptr<vm::CodeFragment> EPrimBinary::compile(CompileCtx& ctx) const {
         }
         case EPrimBinary::logicOr: {
             auto codeTrueBranch = std::make_unique<vm::CodeFragment>();
-            codeTrueBranch->appendConstVal(value::TypeTags::Boolean, true);
+            codeTrueBranch->appendConstVal(value::TypeTags::Boolean,
+                                           value::bitcastFrom<bool>(true));
 
             // Jump to the merge point that will be right after the thenBranch (true branch).
             rhs->appendJump(codeTrueBranch->instrs().size());
@@ -633,9 +635,10 @@ std::unique_ptr<vm::CodeFragment> EFail::compile(CompileCtx& ctx) const {
     auto code = std::make_unique<vm::CodeFragment>();
 
     code->appendConstVal(value::TypeTags::NumberInt64,
-                         value::bitcastFrom(static_cast<int64_t>(_code)));
+                         value::bitcastFrom<int64_t>(static_cast<int64_t>(_code)));
 
-    code->appendConstVal(value::TypeTags::StringBig, value::bitcastFrom(_message.c_str()));
+    code->appendConstVal(value::TypeTags::StringBig,
+                         value::bitcastFrom<const char*>(_message.c_str()));
 
     code->appendFail();
 

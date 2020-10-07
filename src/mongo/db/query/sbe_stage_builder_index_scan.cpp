@@ -291,10 +291,12 @@ generateOptimizedMultiIntervalIndexScan(
     for (auto&& [lowKey, highKey] : intervals) {
         auto [tag, val] = sbe::value::makeNewObject();
         auto obj = sbe::value::getObjectView(val);
-        obj->push_back(
-            "l"sv, sbe::value::TypeTags::ksValue, sbe::value::bitcastFrom(lowKey.release()));
-        obj->push_back(
-            "h"sv, sbe::value::TypeTags::ksValue, sbe::value::bitcastFrom(highKey.release()));
+        obj->push_back("l"sv,
+                       sbe::value::TypeTags::ksValue,
+                       sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()));
+        obj->push_back("h"sv,
+                       sbe::value::TypeTags::ksValue,
+                       sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()));
         arr->push_back(tag, val);
     }
 
@@ -368,8 +370,9 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> makeAnchorBranchF
     auto startKeySlot = slotIdGenerator->generate();
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
     projects.insert({startKeySlot,
-                     sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::ksValue,
-                                                sbe::value::bitcastFrom(startKey.release()))});
+                     sbe::makeE<sbe::EConstant>(
+                         sbe::value::TypeTags::ksValue,
+                         sbe::value::bitcastFrom<KeyString::Value*>(startKey.release()))});
     for (auto&& unusedSlot : unusedVarSlots) {
         projects.insert({unusedSlot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
     }
@@ -638,10 +641,10 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
         planNodeId,
         lowKeySlot,
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::ksValue,
-                                   sbe::value::bitcastFrom(lowKey.release())),
+                                   sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release())),
         highKeySlot,
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::ksValue,
-                                   sbe::value::bitcastFrom(highKey.release())));
+                                   sbe::value::bitcastFrom<KeyString::Value*>(highKey.release())));
 
     // Scan the index in the range {'lowKeySlot', 'highKeySlot'} (subject to inclusive or
     // exclusive boundaries), and produce a single field recordIdSlot that can be used to

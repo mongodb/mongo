@@ -44,26 +44,26 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
         case TypeTags::Nothing:
             break;
         case TypeTags::NumberInt32:
-            val = bitcastFrom(buf.read<int32_t>());
+            val = bitcastFrom<int32_t>(buf.read<int32_t>());
             break;
         case TypeTags::NumberInt64:
-            val = bitcastFrom(buf.read<int64_t>());
+            val = bitcastFrom<int64_t>(buf.read<int64_t>());
             break;
         case TypeTags::NumberDouble:
-            val = bitcastFrom(buf.read<double>());
+            val = bitcastFrom<double>(buf.read<double>());
             break;
         case TypeTags::NumberDecimal: {
             auto [decTag, decVal] = makeCopyDecimal(Decimal128{buf.read<Decimal128::Value>()});
             val = decVal;
         } break;
         case TypeTags::Date:
-            val = bitcastFrom(buf.read<int64_t>());
+            val = bitcastFrom<int64_t>(buf.read<int64_t>());
             break;
         case TypeTags::Timestamp:
-            val = bitcastFrom(buf.read<uint64_t>());
+            val = bitcastFrom<uint64_t>(buf.read<uint64_t>());
             break;
         case TypeTags::Boolean:
-            val = bitcastFrom(buf.read<char>());
+            val = bitcastFrom<bool>(buf.read<char>());
             break;
         case TypeTags::Null:
             break;
@@ -129,14 +129,14 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             auto size = buf.peek<LittleEndian<uint32_t>>();
             auto bson = new uint8_t[size];
             memcpy(bson, buf.skip(size), size);
-            val = bitcastFrom(bson);
+            val = bitcastFrom<uint8_t*>(bson);
             break;
         }
         case TypeTags::bsonArray: {
             auto size = buf.peek<LittleEndian<uint32_t>>();
             auto arr = new uint8_t[size];
             memcpy(arr, buf.skip(size), size);
-            val = bitcastFrom(arr);
+            val = bitcastFrom<uint8_t*>(arr);
             break;
         }
         case TypeTags::bsonBinData: {
@@ -144,7 +144,7 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             auto size = binDataSize + sizeof(uint32_t) + 1;
             auto binData = new uint8_t[size];
             memcpy(binData, buf.skip(size), size);
-            val = bitcastFrom(binData);
+            val = bitcastFrom<uint8_t*>(binData);
             break;
         }
         case TypeTags::ksValue: {
@@ -200,7 +200,7 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             buf.appendNum(bitcastTo<uint64_t>(val));
             break;
         case TypeTags::Boolean:
-            buf.appendNum(bitcastTo<char>(val));
+            buf.appendNum(static_cast<char>(bitcastTo<bool>(val)));
             break;
         case TypeTags::Null:
             break;

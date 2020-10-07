@@ -103,8 +103,8 @@ TEST_F(SBEConcatTest, ComputesStringConcat) {
                             << "bson ");
     auto bsonString2 = BSON("key"
                             << "string");
-    auto bsonStringVal1 = value::bitcastFrom(bsonString1["key"].value());
-    auto bsonStringVal2 = value::bitcastFrom(bsonString2["key"].value());
+    auto bsonStringVal1 = value::bitcastFrom<const char*>(bsonString1["key"].value());
+    auto bsonStringVal2 = value::bitcastFrom<const char*>(bsonString2["key"].value());
     slotAccessor1.reset(value::TypeTags::bsonString, bsonStringVal1);
     slotAccessor2.reset(value::TypeTags::bsonString, bsonStringVal2);
     runAndAssertExpression(compiledExpr.get(), "bson string");
@@ -128,7 +128,7 @@ TEST_F(SBEConcatTest, ComputesManyStringsConcat) {
 
     auto bsonString = BSON("key"
                            << "Test ");
-    auto bsonStringVal = value::bitcastFrom(bsonString["key"].value());
+    auto bsonStringVal = value::bitcastFrom<const char*>(bsonString["key"].value());
     auto [tag2, val2] = value::makeSmallString("for ");
     auto [tag3, val3] = value::makeNewString("many strings ");
     auto [tag4, val4] = value::makeSmallString("concat");
@@ -150,7 +150,7 @@ TEST_F(SBEConcatTest, ReturnsNothingForNonStringsConcat) {
 
     auto [tag1, val1] = value::makeNewString("abc");
     slotAccessor1.reset(tag1, val1);
-    slotAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom(int64_t{100}));
+    slotAccessor2.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(100));
     runAndAssertNothing(compiledExpr.get());
 }
 

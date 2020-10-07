@@ -156,7 +156,7 @@ TEST(SBEVM, Add) {
         auto [owned, tag, val] = interpreter.run(&code);
 
         ASSERT_EQUALS(tag, value::TypeTags::NumberInt64);
-        ASSERT_EQUALS(val, -12);
+        ASSERT_EQUALS(value::bitcastTo<int64_t>(val), -12);
     }
     {
         auto tagInt32 = value::TypeTags::NumberInt32;

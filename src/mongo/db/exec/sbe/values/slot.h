@@ -443,7 +443,7 @@ public:
             auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
             auto [tag, val] = compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
 
-            if (tag != value::TypeTags::NumberInt32 || val != 0) {
+            if (tag != value::TypeTags::NumberInt32 || value::bitcastTo<int32_t>(val) != 0) {
                 return false;
             }
         }

@@ -391,7 +391,8 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
             // short-circuiting occurs, the output returned should be false. For OR, when short-
             // circuiting occurs, the output returned should be true.
             auto shortCircuitVal = sbe::makeE<sbe::EConstant>(
-                sbe::value::TypeTags::Boolean, (logicOp == sbe::EPrimBinary::logicOr));
+                sbe::value::TypeTags::Boolean,
+                sbe::value::bitcastFrom<bool>(logicOp == sbe::EPrimBinary::logicOr));
             slot = slotIdGenerator->generate();
             stage = makeProject(std::move(stage), planNodeId, slot, std::move(shortCircuitVal));
         } else {
@@ -612,7 +613,8 @@ void generateArraySize(MatchExpressionVisitorContext* context,
             makeProject(EvalStage{},
                         context->planNodeId,
                         innerSlot,
-                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 1));
+                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                                   sbe::value::bitcastFrom<int64_t>(1)));
 
         auto traverseSlot = context->slotIdGenerator->generate();
         auto traverseStage =
@@ -633,12 +635,14 @@ void generateArraySize(MatchExpressionVisitorContext* context,
         // and compare it to the user provided value.
         auto sizeOutput = sbe::makeE<sbe::EPrimBinary>(
             sbe::EPrimBinary::eq,
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, size),
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                       sbe::value::bitcastFrom<int64_t>(size)),
             sbe::makeE<sbe::EIf>(
                 sbe::makeE<sbe::EFunction>("exists",
                                            sbe::makeEs(sbe::makeE<sbe::EVariable>(traverseSlot))),
                 sbe::makeE<sbe::EVariable>(traverseSlot),
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, 0)));
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                           sbe::value::bitcastFrom<int64_t>(0))));
 
         return {std::move(sizeOutput), std::move(traverseStage)};
     };
@@ -680,7 +684,9 @@ void generateComparison(MatchExpressionVisitorContext* context,
  */
 void generateAlwaysBoolean(MatchExpressionVisitorContext* context, bool value) {
     auto& frame = context->evalStack.back();
-    frame.output = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, value);
+
+    frame.output = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                              sbe::value::bitcastFrom<bool>(value));
 }
 
 /**
@@ -702,11 +708,12 @@ void generateBitTest(MatchExpressionVisitorContext* context,
         auto arr = sbe::value::getArrayView(bitPosVal);
         arr->reserve(bitPositions.size());
 
-        std::set<int> seenBits;
+        std::set<uint32_t> seenBits;
         for (size_t index = 0; index < bitPositions.size(); ++index) {
             auto currentBit = bitPositions[index];
             if (auto result = seenBits.insert(currentBit); result.second) {
-                arr->push_back(sbe::value::TypeTags::NumberInt64, currentBit);
+                arr->push_back(sbe::value::TypeTags::NumberInt64,
+                               sbe::value::bitcastFrom<int64_t>(currentBit));
             }
         }
 
@@ -718,13 +725,15 @@ void generateBitTest(MatchExpressionVisitorContext* context,
             sbe::makeEs(sbe::makeE<sbe::EConstant>(bitPosTag, bitPosVal),
                         sbe::makeE<sbe::EVariable>(inputSlot),
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                   static_cast<int32_t>(bitTestBehavior))));
+                                                   sbe::value::bitcastFrom<int32_t>(
+                                                       static_cast<int32_t>(bitTestBehavior)))));
 
         // Build An EExpression for the numeric bitmask case. The AllSet case tests if (mask &
         // value) == mask, and AllClear case tests if (mask & value) == 0. The AnyClear and the
         // AnySet case is the negation of the AllSet and AllClear cases, respectively.
         auto numericBitTestEExpr =
-            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64, expr->getBitMask());
+            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                                       sbe::value::bitcastFrom<int64_t>(expr->getBitMask()));
         if (bitTestBehavior == sbe::BitTestBehavior::AllSet ||
             bitTestBehavior == sbe::BitTestBehavior::AnyClear) {
             numericBitTestEExpr = sbe::makeE<sbe::EFunction>(
@@ -1300,7 +1309,7 @@ public:
             for (auto&& r : regexes) {
                 auto regex = RegexMatchExpression::makeRegex(r->getString(), r->getFlags());
                 arr->push_back(sbe::value::TypeTags::pcreRegex,
-                               sbe::value::bitcastFrom(regex.release()));
+                               sbe::value::bitcastFrom<pcrecpp::RE*>(regex.release()));
             }
 
             auto makePredicate =
@@ -1414,17 +1423,18 @@ public:
         // to the given remainder.
         auto makePredicate = [expr](sbe::value::SlotId inputSlot,
                                     EvalStage inputStage) -> EvalExprStagePair {
-            return {
-                makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(
-                    sbe::EPrimBinary::eq,
-                    sbe::makeE<sbe::EFunction>(
-                        "mod",
-                        sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
-                                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                                               expr->getDivisor()))),
-                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                               expr->getRemainder()))),
-                std::move(inputStage)};
+            return {makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(
+                        sbe::EPrimBinary::eq,
+                        sbe::makeE<sbe::EFunction>(
+                            "mod",
+                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
+                                        sbe::makeE<sbe::EConstant>(
+                                            sbe::value::TypeTags::NumberInt64,
+                                            sbe::value::bitcastFrom<int64_t>(expr->getDivisor())))),
+                        sbe::makeE<sbe::EConstant>(
+                            sbe::value::TypeTags::NumberInt64,
+                            sbe::value::bitcastFrom<int64_t>(expr->getRemainder())))),
+                    std::move(inputStage)};
         };
 
         generatePredicate(_context, expr->path(), std::move(makePredicate));
@@ -1455,7 +1465,7 @@ public:
         auto makePredicate = [expr](sbe::value::SlotId inputSlot,
                                     EvalStage inputStage) -> EvalExprStagePair {
             auto regex = RegexMatchExpression::makeRegex(expr->getString(), expr->getFlags());
-            auto ownedRegexVal = sbe::value::bitcastFrom(regex.release());
+            auto ownedRegexVal = sbe::value::bitcastFrom<pcrecpp::RE*>(regex.release());
 
             // TODO: In the future, this needs to account for the fact that the regex match
             // expression matches strings, but also matches stored regexes. For example,

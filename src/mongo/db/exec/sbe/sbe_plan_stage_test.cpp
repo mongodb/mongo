@@ -43,14 +43,14 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::makeValue(const B
     int numBytes = ba.objsize();
     uint8_t* data = new uint8_t[numBytes];
     memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
-    return {value::TypeTags::bsonArray, value::bitcastFrom(data)};
+    return {value::TypeTags::bsonArray, value::bitcastFrom<uint8_t*>(data)};
 }
 
 std::pair<value::TypeTags, value::Value> PlanStageTestFixture::makeValue(const BSONObj& bo) {
     int numBytes = bo.objsize();
     uint8_t* data = new uint8_t[numBytes];
     memcpy(data, reinterpret_cast<const uint8_t*>(bo.objdata()), numBytes);
-    return {value::TypeTags::bsonObject, value::bitcastFrom(data)};
+    return {value::TypeTags::bsonObject, value::bitcastFrom<uint8_t*>(data)};
 }
 
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateMockScan(
@@ -103,7 +103,8 @@ PlanStageTestFixture::generateMockScanMulti(int64_t numSlots,
             projectSlots.back(),
             makeE<EFunction>("getElement"sv,
                              makeEs(makeE<EVariable>(scanSlot),
-                                    makeE<EConstant>(value::TypeTags::NumberInt64, i))));
+                                    makeE<EConstant>(value::TypeTags::NumberInt64,
+                                                     value::bitcastFrom<int64_t>(i)))));
     }
 
     return {std::move(projectSlots),

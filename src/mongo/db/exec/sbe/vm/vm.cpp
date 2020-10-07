@@ -416,7 +416,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTa
     } else if (objTag == value::TypeTags::bsonObject) {
         auto be = value::bitcastTo<const char*>(objValue);
         auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
-        ;
         // Skip document length.
         be += 4;
         while (*be != 0) {
@@ -499,7 +498,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags
     // Initialize the accumulator.
     if (accTag == value::TypeTags::Nothing) {
         accTag = value::TypeTags::NumberInt64;
-        accValue = 0;
+        accValue = value::bitcastFrom<int64_t>(0);
     }
 
     return genericAdd(accTag, accValue, fieldTag, fieldValue);
@@ -522,7 +521,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMin(value::TypeTags
     }
 
     auto [tag, val] = genericCompare<std::less<>>(accTag, accValue, fieldTag, fieldValue);
-    if (tag == value::TypeTags::Boolean && val) {
+    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
         auto [tag, val] = value::copyValue(accTag, accValue);
         return {true, tag, val};
     } else {
@@ -548,7 +547,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::aggMax(value::TypeTags
     }
 
     auto [tag, val] = genericCompare<std::greater<>>(accTag, accValue, fieldTag, fieldValue);
-    if (tag == value::TypeTags::Boolean && val) {
+    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
         auto [tag, val] = value::copyValue(accTag, accValue);
         return {true, tag, val};
     } else {
@@ -670,7 +669,6 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDropFields(uint
     if (tagInObj == value::TypeTags::bsonObject) {
         auto be = value::bitcastTo<const char*>(valInObj);
         auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
-        ;
         // Skip document length.
         be += 4;
         while (*be != 0) {
@@ -798,7 +796,9 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(ui
 
     kb.appendDiscriminator(static_cast<KeyString::Discriminator>(discrimNum));
 
-    return {true, value::TypeTags::ksValue, value::bitcastFrom(new KeyString::Value(kb.release()))};
+    return {true,
+            value::TypeTags::ksValue,
+            value::bitcastFrom<KeyString::Value*>(new KeyString::Value(kb.release()))};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinAbs(uint8_t arity) {
@@ -927,7 +927,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(uint
     auto pcreRegex = value::getPcreRegexView(valuePcreRegex);
     auto regexMatchResult = pcreRegex->PartialMatch(pcreStringView);
 
-    return {false, value::TypeTags::Boolean, regexMatchResult};
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(regexMatchResult)};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(uint8_t arity) {
@@ -969,7 +969,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
             }
         }
         if (haveDate) {
-            return {false, value::TypeTags::Date, value::bitcastFrom(sum.toLong())};
+            return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(sum.toLong())};
         } else {
             auto [tag, val] = value::makeCopyDecimal(sum);
             return {true, tag, val};
@@ -990,27 +990,31 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum
         }
         if (haveDate) {
             uassert(ErrorCodes::Overflow, "date overflow in $add", sum.fitsLong());
-            return {false, value::TypeTags::Date, value::bitcastFrom(sum.getLong())};
+            return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(sum.getLong())};
         } else {
             switch (resultTag) {
                 case value::TypeTags::NumberInt32: {
                     auto result = sum.getLong();
                     if (sum.fitsLong() && result >= std::numeric_limits<int32_t>::min() &&
                         result <= std::numeric_limits<int32_t>::max()) {
-                        return {false, value::TypeTags::NumberInt32, value::bitcastFrom(result)};
+                        return {false,
+                                value::TypeTags::NumberInt32,
+                                value::bitcastFrom<int32_t>(result)};
                     }
                     // Fall through to the larger type.
                 }
                 case value::TypeTags::NumberInt64: {
                     if (sum.fitsLong()) {
-                        return {
-                            false, value::TypeTags::NumberInt64, value::bitcastFrom(sum.getLong())};
+                        return {false,
+                                value::TypeTags::NumberInt64,
+                                value::bitcastFrom<int64_t>(sum.getLong())};
                     }
                     // Fall through to the larger type.
                 }
                 case value::TypeTags::NumberDouble: {
-                    return {
-                        false, value::TypeTags::NumberDouble, value::bitcastFrom(sum.getDouble())};
+                    return {false,
+                            value::TypeTags::NumberDouble,
+                            value::bitcastFrom<double>(sum.getDouble())};
                 }
                 default:
                     MONGO_UNREACHABLE;
@@ -1073,7 +1077,7 @@ std::tuple<bool, value::TypeTags, value::Value> builtinDateHelper(
                       value::numericCast<int64_t>(typeTagMin, valueMin),
                       value::numericCast<int64_t>(typeTagSec, valueSec),
                       value::numericCast<int64_t>(typeTagMillis, valueMillis));
-    return {false, value::TypeTags::Date, date.asInt64()};
+    return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(date.asInt64())};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(uint8_t arity) {
@@ -1159,14 +1163,14 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition
     }
 
     auto bitPositions = value::getArrayView(maskValue);
-    auto binDataSize = value::getBSONBinDataSize(valueTag, value);
+    auto binDataSize = static_cast<int64_t>(value::getBSONBinDataSize(valueTag, value));
     auto binData = value::getBSONBinData(valueTag, value);
     auto bitTestBehavior = BitTestBehavior{value::bitcastTo<int32_t>(valueBitTestBehavior)};
 
     auto isBitSet = false;
     for (size_t idx = 0; idx < bitPositions->size(); ++idx) {
         auto [tagBitPosition, valueBitPosition] = bitPositions->getAt(idx);
-        auto bitPosition = value::bitcastTo<uint64_t>(valueBitPosition);
+        auto bitPosition = value::bitcastTo<int64_t>(valueBitPosition);
         if (bitPosition >= binDataSize * 8) {
             // If position to test is longer than the data to test against, zero-extend.
             isBitSet = false;
@@ -1194,14 +1198,14 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition
                 bitTestBehavior == BitTestBehavior::AnySet)))) {
             return {false,
                     value::TypeTags::Boolean,
-                    bitTestBehavior == BitTestBehavior::AnyClear ||
-                        bitTestBehavior == BitTestBehavior::AnySet};
+                    value::bitcastFrom<bool>(bitTestBehavior == BitTestBehavior::AnyClear ||
+                                             bitTestBehavior == BitTestBehavior::AnySet)};
         }
     }
     return {false,
             value::TypeTags::Boolean,
-            bitTestBehavior == BitTestBehavior::AllSet ||
-                bitTestBehavior == BitTestBehavior::AllClear};
+            value::bitcastFrom<bool>(bitTestBehavior == BitTestBehavior::AllSet ||
+                                     bitTestBehavior == BitTestBehavior::AllClear)};
 }
 
 
@@ -1236,7 +1240,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestZero(uin
     }
     auto result =
         (value::numericCast<int64_t>(maskTag, maskValue) & value::bitcastTo<int64_t>(numVal)) == 0;
-    return {false, value::TypeTags::Boolean, result};
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestMask(uint8_t arity) {
@@ -1252,7 +1256,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestMask(uin
 
     auto numMask = value::numericCast<int64_t>(maskTag, maskValue);
     auto result = (numMask & value::bitcastTo<int64_t>(numVal)) == numMask;
-    return {false, value::TypeTags::Boolean, result};
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(uint8_t arity) {
@@ -1261,12 +1265,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(uint8_
     if (tagOperand == value::TypeTags::Object) {
         BSONObjBuilder objBuilder;
         bson::convertToBsonObj(objBuilder, value::getObjectView(valOperand));
-        auto sz = objBuilder.done().objsize();
-        return {false, value::TypeTags::NumberInt32, value::bitcastFrom(sz)};
+        int32_t sz = objBuilder.done().objsize();
+        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(sz)};
     } else if (tagOperand == value::TypeTags::bsonObject) {
         auto beginObj = value::getRawPointerView(valOperand);
-        auto sz = ConstDataView(beginObj).read<LittleEndian<uint32_t>>();
-        return {false, value::TypeTags::NumberInt32, value::bitcastFrom(sz)};
+        int32_t sz = ConstDataView(beginObj).read<LittleEndian<int32_t>>();
+        return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(sz)};
     }
     return {false, value::TypeTags::Nothing, 0};
 }
@@ -1330,7 +1334,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(
             std::string str = str::stream()
                 << TimeZoneDatabase::utcZone().formatDate(
                        kISOFormatString,
-                       Date_t::fromMillisSinceEpoch(value::bitcastTo<uint64_t>(operandVal)));
+                       Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(operandVal)));
             auto [strTag, strVal] = value::makeNewString(str);
             return {true, strTag, strVal};
         }
@@ -1447,7 +1451,8 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTa
             case value::TypeTags::ArraySet: {
                 auto arrSet = value::getArraySetView(rhsValue);
                 auto& values = arrSet->values();
-                return {value::TypeTags::Boolean, values.find({lhsTag, lhsValue}) != values.end()};
+                return {value::TypeTags::Boolean,
+                        value::bitcastFrom<bool>(values.find({lhsTag, lhsValue}) != values.end())};
             }
             case value::TypeTags::Array:
             case value::TypeTags::bsonArray: {
@@ -1455,12 +1460,13 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTa
                 while (!rhsArr.atEnd()) {
                     auto [rhsTag, rhsVal] = rhsArr.getViewOfValue();
                     auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsVal);
-                    if (tag == value::TypeTags::NumberInt32 && val == 0) {
-                        return {value::TypeTags::Boolean, true};
+                    if (tag == value::TypeTags::NumberInt32 &&
+                        value::bitcastTo<int32_t>(val) == 0) {
+                        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
                     }
                     rhsArr.advance();
                 }
-                return {value::TypeTags::Boolean, false};
+                return {value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
             }
             default:
                 MONGO_UNREACHABLE;
@@ -1875,8 +1881,8 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                 case Instruction::negate: {
                     auto [owned, tag, val] = getFromStack(0);
 
-                    auto [resultOwned, resultTag, resultVal] =
-                        genericSub(value::TypeTags::NumberInt32, 0, tag, val);
+                    auto [resultOwned, resultTag, resultVal] = genericSub(
+                        value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0), tag, val);
 
                     topStack(resultOwned, resultTag, resultVal);
 
@@ -2176,7 +2182,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                 case Instruction::exists: {
                     auto [owned, tag, val] = getFromStack(0);
 
-                    topStack(false, value::TypeTags::Boolean, tag != value::TypeTags::Nothing);
+                    topStack(false,
+                             value::TypeTags::Boolean,
+                             value::bitcastFrom<bool>(tag != value::TypeTags::Nothing));
 
                     if (owned) {
                         value::releaseValue(tag, val);
@@ -2187,7 +2195,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, tag == value::TypeTags::Null);
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(tag == value::TypeTags::Null));
                     }
 
                     if (owned) {
@@ -2199,7 +2209,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, value::isObject(tag));
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isObject(tag)));
                     }
 
                     if (owned) {
@@ -2211,7 +2223,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, value::isArray(tag));
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isArray(tag)));
                     }
 
                     if (owned) {
@@ -2223,7 +2237,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, value::isString(tag));
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isString(tag)));
                     }
 
                     if (owned) {
@@ -2235,7 +2251,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, value::isNumber(tag));
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isNumber(tag)));
                     }
 
                     if (owned) {
@@ -2247,7 +2265,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, value::isBinData(tag));
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isBinData(tag)));
                     }
 
                     if (owned) {
@@ -2259,7 +2279,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, tag == value::TypeTags::Date);
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(tag == value::TypeTags::Date));
                     }
 
                     if (owned) {
@@ -2271,7 +2293,9 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
 
                     if (tag != value::TypeTags::Nothing) {
-                        topStack(false, value::TypeTags::Boolean, value::isNaN(tag, val));
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isNaN(tag, val)));
                     }
 
                     if (owned) {
@@ -2287,7 +2311,8 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
 
                     if (tag != value::TypeTags::Nothing) {
                         bool matches = static_cast<bool>(getBSONTypeMask(tag) & typeMask);
-                        topStack(false, value::TypeTags::Boolean, matches);
+                        topStack(
+                            false, value::TypeTags::Boolean, value::bitcastFrom<bool>(matches));
                     }
 
                     if (owned) {
@@ -2329,7 +2354,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                     auto [owned, tag, val] = getFromStack(0);
                     popStack();
 
-                    if (tag == value::TypeTags::Boolean && val) {
+                    if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
                         pcPointer += jumpOffset;
                     }
 
@@ -2385,7 +2410,7 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
 bool ByteCode::runPredicate(const CodeFragment* code) {
     auto [owned, tag, val] = run(code);
 
-    bool pass = (tag == value::TypeTags::Boolean) && (val != 0);
+    bool pass = (tag == value::TypeTags::Boolean) && value::bitcastTo<bool>(val);
 
     if (owned) {
         value::releaseValue(tag, val);
