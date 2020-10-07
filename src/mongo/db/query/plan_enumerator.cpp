@@ -410,6 +410,9 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
     childContext.outsidePreds = context.outsidePreds;
 
     if (MatchExpression::OR == node->matchType()) {
+        if (_orLimit == 0) {
+            return false;
+        }
         // For an OR to be indexed, all its children must be indexed.
         for (size_t i = 0; i < node->numChildren(); ++i) {
 
@@ -1298,12 +1301,16 @@ void PlanEnumerator::getIndexedPreds(MatchExpression* node,
 }
 
 bool PlanEnumerator::prepSubNodes(MatchExpression* node,
+
                                   PrepMemoContext context,
                                   vector<MemoID>* subnodesOut,
                                   vector<MemoID>* mandatorySubnodes) {
     for (size_t i = 0; i < node->numChildren(); ++i) {
         MatchExpression* child = node->getChild(i);
         if (MatchExpression::OR == child->matchType()) {
+            if (_orLimit == 0) {
+                return false;
+            }
             bool mandatory = expressionRequiresIndex(child);
             if (prepMemo(child, context)) {
                 size_t childID = memoIDForNode(child);
@@ -1329,7 +1336,6 @@ bool PlanEnumerator::prepSubNodes(MatchExpression* node,
             prepSubNodes(child, context, subnodesOut, mandatorySubnodes);
         }
     }
-
     return true;
 }
 

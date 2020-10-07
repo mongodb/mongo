@@ -2830,5 +2830,30 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationApplysToEachOrInTree) {
         "]}}");
 }
 
+TEST_F(QueryPlannerTest, NoOrSolutionsIfMaxOrSolutionsIsZero) {
+    auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
+    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
+    internalQueryEnumerationMaxOrSolutions.store(0);
+    addIndex(BSON("one" << 1));
+    addIndex(BSON("two" << 1));
+    runQuery(BSON(
+        "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        "{cscan: {"
+        "    filter:"
+        "        {'$or': ["
+        "            {'$and': [{one: {$eq: 0}}, {two: {$eq: 0}}]},"
+        "            {'$and': [{one: {$eq: 1}}, {two: {$eq: 1}}]}"
+        "        ]},"
+        "    collation: {},"
+        "    dir: 1}}");
+    // Ensure that when set to 1 we get a different result.
+    internalQueryEnumerationMaxOrSolutions.store(1);
+    runQuery(BSON(
+        "$or" << BSON_ARRAY(BSON("one" << 0 << "two" << 0) << BSON("one" << 1 << "two" << 1))));
+    assertNumSolutions(2U);
+}
+
 }  // namespace
 }  // namespace mongo

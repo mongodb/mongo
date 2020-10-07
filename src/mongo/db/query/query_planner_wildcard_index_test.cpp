@@ -1839,6 +1839,9 @@ TEST_F(QueryPlannerWildcardTest, CanAnswerInContainingEmptyObjectWhenPathIsMulti
 }
 
 TEST_F(QueryPlannerWildcardTest, CanProduceSortMergePlanWithWildcardIndex) {
+    auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
+    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
+    internalQueryEnumerationMaxOrSolutions.store(5);
     addWildcardIndex(BSON("$**" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
     runQueryAsCommand(fromjson("{filter: {$or: [{a: 1, b: 1}, {b: 2}]}, sort: {b: -1}}"));
@@ -1865,6 +1868,9 @@ TEST_F(QueryPlannerWildcardTest, CanProduceSortMergePlanWithWildcardIndex) {
 }
 
 TEST_F(QueryPlannerWildcardTest, ContainedOrPushdownWorksWithWildcardIndex) {
+    auto defaultMaxOr = internalQueryEnumerationMaxOrSolutions.load();
+    ON_BLOCK_EXIT([&] { internalQueryEnumerationMaxOrSolutions.store(defaultMaxOr); });
+    internalQueryEnumerationMaxOrSolutions.store(5);
     addWildcardIndex(BSON("$**" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
     runQuery(fromjson("{a: 1, $or: [{c: 2}, {b: 3}]}"));
