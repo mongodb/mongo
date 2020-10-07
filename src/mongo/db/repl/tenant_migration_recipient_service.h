@@ -234,7 +234,7 @@ public:
          * Persists the instance state doc and waits for it to be majority replicated.
          * Throws an user assertion on failure.
          */
-        SharedSemiFuture<void> _initializeStateDoc(WithLock);
+        SemiFuture<void> _initializeStateDoc(WithLock);
 
         /**
          * Creates a client, connects it to the donor, and authenticates it if authParams is
@@ -299,13 +299,13 @@ public:
          * And, it is responsible to populate the 'dataConsistentStopOpTime'
          * and 'cloneFinishedOpTime' fields in the state doc.
          */
-        SharedSemiFuture<void> _onCloneSuccess();
+        SemiFuture<void> _onCloneSuccess();
 
         /*
          * Returns a future that will be fulfilled when the tenant migration reaches consistent
          * state.
          */
-        ExecutorFuture<void> _getDataConsistentFuture();
+        SemiFuture<void> _getDataConsistentFuture();
 
         /*
          * Shuts down all components that are started by the instance.

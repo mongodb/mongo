@@ -298,7 +298,7 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
         .semi();
 }
 
-SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(WithLock) {
+SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(WithLock) {
     // If the instance state is not 'kUninitialized', then the instance is restarted by step
     // up. So, skip persisting the state doc. And, PrimaryOnlyService::onStepUp() waits for
     // majority commit of the primary no-op oplog entry written by the node in the newer
@@ -306,7 +306,7 @@ SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_initializeSta
     // instance's state document written in an older term on disk won't get rolled back for
     // step up case.
     if (_stateDoc.getState() != TenantMigrationRecipientStateEnum::kUninitialized) {
-        return {Future<void>::makeReady()};
+        return SemiFuture<void>::makeReady();
     }
 
     auto uniqueOpCtx = cc().makeOperationContext();
@@ -336,7 +336,9 @@ SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_initializeSta
     // Wait for the state doc to be majority replicated to make sure that the state doc doesn't
     // rollback.
     auto insertOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    return WaitForMajorityService::get(opCtx->getServiceContext()).waitUntilMajority(insertOpTime);
+    return WaitForMajorityService::get(opCtx->getServiceContext())
+        .waitUntilMajority(insertOpTime)
+        .semi();
 }
 
 void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLock) {
@@ -544,12 +546,12 @@ Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseC
     return std::move(startClonerFuture);
 }
 
-SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
+SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
     stdx::lock_guard lk(_mutex);
     // PrimaryOnlyService::onStepUp() before starting instance makes sure that the state doc
     // is majority committed, so we can also skip waiting for it to be majority replicated.
     if (_isCloneCompletedMarkerSet(lk)) {
-        return {Future<void>::makeReady()};
+        return SemiFuture<void>::makeReady();
     }
 
     auto opCtx = cc().makeOperationContext();
@@ -562,15 +564,16 @@ SharedSemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSucces
 
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
     return WaitForMajorityService::get(opCtx->getServiceContext())
-        .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
+        .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp())
+        .semi();
 }
 
-ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFuture() {
+SemiFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFuture() {
     stdx::lock_guard lk(_mutex);
     // PrimaryOnlyService::onStepUp() before starting instance makes sure that the state doc
     // is majority committed, so we can also skip waiting for it to be majority replicated.
     if (_stateDoc.getState() == TenantMigrationRecipientStateEnum::kConsistent) {
-        return ExecutorFuture<void>(**_scopedExecutor);
+        return SemiFuture<void>::makeReady();
     }
 
     return _tenantOplogApplier
@@ -587,7 +590,8 @@ ExecutorFuture<void> TenantMigrationRecipientService::Instance::_getDataConsiste
                 tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
             return WaitForMajorityService::get(opCtx->getServiceContext())
                 .waitUntilMajority(repl::ReplClientInfo::forClient(cc()).getLastOp());
-        });
+        })
+        .semi();
 }
 
 void TenantMigrationRecipientService::Instance::_shutdownComponents(WithLock lk) {
