@@ -2751,6 +2751,11 @@ functions:
       working_dir: src
       script: |
        set -o verbose
+
+       if [ -z "${instance_id}" ]; then
+        exit 0
+       fi
+
        ${activate_virtualenv}
         $python buildscripts/powercycle_operations.py tarEC2Artifacts
 
@@ -2760,6 +2765,10 @@ functions:
       shell: bash
       working_dir: src
       script: |
+        if [ -z "${instance_id}" ]; then
+          exit 0
+        fi
+
         ${activate_virtualenv}
         $python buildscripts/powercycle_operations.py copyEC2Artifacts
 
@@ -2789,6 +2798,10 @@ functions:
       shell: bash
       working_dir: src
       script: |
+        if [ -z "${instance_id}" ]; then
+          exit 0
+        fi
+
         ${activate_virtualenv}
         $python buildscripts/powercycle_operations.py gatherRemoteEventLogs
 
@@ -2798,6 +2811,10 @@ functions:
       shell: bash
       working_dir: "src"
       script: |
+        if [ -z "${instance_id}" ]; then
+          exit 0
+        fi
+
         ${activate_virtualenv}
         $python buildscripts/powercycle_operations.py gatherRemoteMongoCoredumps
 
@@ -2807,6 +2824,10 @@ functions:
       shell: bash
       working_dir: "src"
       script: |
+        if [ -z "${instance_id}" ]; then
+          exit 0
+        fi
+
         ${activate_virtualenv}
         $python buildscripts/powercycle_operations.py copyRemoteMongoCoredumps
 
