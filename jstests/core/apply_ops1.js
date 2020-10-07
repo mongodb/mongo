@@ -466,4 +466,60 @@ res = assert.commandFailed(db.adminCommand({
     ]
 }));
 assert.eq(res.code, 4772604);
+
+var insert_op1 = {_id: 13, x: 'inserted apply ops1'};
+var insert_op2 = {_id: 14, x: 'inserted apply ops2'};
+assert.commandWorked(db.adminCommand({
+    "applyOps": [{
+        op: 'c',
+        ns: 'admin.$cmd',
+        o: {
+            "applyOps": [{
+                op: 'c',
+                ns: 'test.$cmd',
+                o: {
+                    "applyOps": [
+                        {op: 'i', ns: t.getFullName(), o: insert_op1},
+                        {op: 'i', ns: t.getFullName(), o: insert_op2}
+                    ]
+                }
+            }],
+        }
+    }]
+}),
+                     "Nested apply ops was NOT successful");
+assert.eq(t.findOne({_id: 13}), insert_op1);
+assert.eq(t.findOne({_id: 14}), insert_op2);
+
+assert.commandWorked(db.adminCommand({
+    "applyOps": [{
+        op: 'c',
+        ns: 'admin.$cmd',
+        o: {
+            "applyOps": [{
+                op: 'c',
+                ns: 'test.$cmd',
+                o: {
+                    "applyOps": [
+                        {
+                            op: 'u',
+                            ns: t.getFullName(),
+                            o2: {_id: 13},
+                            o: {$set: {x: 'nested apply op update1'}}
+                        },
+                        {
+                            op: 'u',
+                            ns: t.getFullName(),
+                            o2: {_id: 14},
+                            o: {$set: {x: 'nested apply op update2'}}
+                        }
+                    ]
+                }
+            }],
+        }
+    }]
+}),
+                     "Nested apply ops was NOT successful");
+assert.eq(t.findOne({_id: 13}), {_id: 13, x: 'nested apply op update1'});
+assert.eq(t.findOne({_id: 14}), {_id: 14, x: 'nested apply op update2'});
 })();
