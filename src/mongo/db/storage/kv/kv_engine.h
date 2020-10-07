@@ -217,6 +217,12 @@ public:
     virtual Status dropIdent(RecoveryUnit* ru, StringData ident) = 0;
 
     /**
+     * Removes any knowledge of the ident from the storage engines metadata without removing the
+     * underlying files belonging to the ident.
+     */
+    virtual void dropIdentForImport(OperationContext* opCtx, StringData ident) = 0;
+
+    /**
      * Attempts to locate and recover a file that is "orphaned" from the storage engine's metadata,
      * but may still exist on disk if this is a durable storage engine. Returns DataModifiedByRepair
      * if a new record store was successfully created and Status::OK() if no data was modified.

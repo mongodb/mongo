@@ -98,6 +98,8 @@ public:
 
     virtual Status dropIdent(mongo::RecoveryUnit* ru, StringData ident);
 
+    virtual void dropIdentForImport(OperationContext* opCtx, StringData ident) {}
+
     virtual bool supportsDirectoryPerDB() const {
         return false;  // Not persistant so no Directories
     }

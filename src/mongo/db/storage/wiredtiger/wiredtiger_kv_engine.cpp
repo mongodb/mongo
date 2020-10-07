@@ -93,6 +93,7 @@
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/log_and_backoff.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
@@ -1642,6 +1643,42 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru, StringData ident) {
 
     invariantWTOK(ret);
     return Status::OK();
+}
+
+void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData ident) {
+    const std::string uri = _uri(ident);
+
+    WiredTigerSession session(_conn);
+
+    // Don't wait for the global checkpoint lock to be obtained in WiredTiger as it can take a
+    // substantial amount of time to be obtained if there is a concurrent checkpoint running. We
+    // will wait until we obtain exclusive access to the underlying table file though. As it isn't
+    // user visible at this stage in the import it should be readily available unless a backup
+    // cursor is open. In short, using "checkpoint_wait=false" and "lock_wait=true" means that we
+    // can potentially be waiting for a short period of time for WT_SESSION::drop() to run, but
+    // would rather get EBUSY than wait a long time for a checkpoint to complete.
+    const std::string config = "force=true,checkpoint_wait=false,lock_wait=true,remove_files=false";
+    int ret = 0;
+    size_t attempt = 0;
+    do {
+        Status status = opCtx->checkForInterruptNoAssert();
+        if (status.code() == ErrorCodes::InterruptedAtShutdown) {
+            return;
+        }
+
+        ++attempt;
+
+        ret = session.getSession()->drop(session.getSession(), uri.c_str(), config.c_str());
+        logAndBackoff(5114600,
+                      ::mongo::logv2::LogComponent::kStorage,
+                      logv2::LogSeverity::Debug(1),
+                      attempt,
+                      "WiredTiger dropping ident for import",
+                      "uri"_attr = uri,
+                      "config"_attr = config,
+                      "ret"_attr = ret);
+    } while (ret == EBUSY);
+    invariantWTOK(ret);
 }
 
 std::list<WiredTigerCachedCursor> WiredTigerKVEngine::filterCursorsWithQueuedDrops(

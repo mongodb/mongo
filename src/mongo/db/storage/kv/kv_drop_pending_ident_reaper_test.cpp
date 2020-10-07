@@ -48,6 +48,8 @@ class KVEngineMock : public KVEngine {
 public:
     Status dropIdent(RecoveryUnit* ru, StringData ident) override;
 
+    void dropIdentForImport(OperationContext* opCtx, StringData ident) override {}
+
     // Unused KVEngine functions below.
     RecoveryUnit* newRecoveryUnit() override {
         return nullptr;

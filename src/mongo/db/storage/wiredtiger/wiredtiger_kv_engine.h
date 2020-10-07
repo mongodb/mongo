@@ -203,6 +203,8 @@ public:
 
     Status dropIdent(RecoveryUnit* ru, StringData ident) override;
 
+    void dropIdentForImport(OperationContext* opCtx, StringData ident) override;
+
     Status okToRename(OperationContext* opCtx,
                       StringData fromNS,
                       StringData toNS,
@@ -472,7 +474,6 @@ private:
     std::string _rsOptions;
     std::string _indexOptions;
 
-    mutable Mutex _dropAllQueuesMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_dropAllQueuesMutex");
     mutable Mutex _identToDropMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_identToDropMutex");
     std::list<std::string> _identToDrop;
 

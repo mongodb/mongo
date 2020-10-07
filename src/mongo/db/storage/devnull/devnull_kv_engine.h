@@ -82,6 +82,8 @@ public:
         return Status::OK();
     }
 
+    virtual void dropIdentForImport(OperationContext* opCtx, StringData ident) {}
+
     virtual bool supportsDirectoryPerDB() const {
         return false;
     }

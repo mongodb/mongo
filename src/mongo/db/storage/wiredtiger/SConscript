@@ -93,6 +93,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/db_raii',
             '$BUILD_DIR/mongo/db/snapshot_window_options',
             '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+            '$BUILD_DIR/mongo/util/log_and_backoff',
             '$BUILD_DIR/mongo/util/options_parser/options_parser',
             'oplog_stone_parameters',
         ],
