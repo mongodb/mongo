@@ -310,7 +310,7 @@ struct ServerGlobalParams {
     // primaries can accept user-initiated writes and validate based on the feature compatibility
     // version. A secondary always validates in the upgraded mode so that it can sync new features,
     // even when in the downgraded feature compatibility mode.
-    AtomicWord<bool> validateFeaturesAsMaster{true};
+    AtomicWord<bool> validateFeaturesAsPrimary{true};
 
     std::vector<std::string> disabledSecureAllocatorDomains;
 

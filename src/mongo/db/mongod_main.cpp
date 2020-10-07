@@ -680,7 +680,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         if (replSettings.usingReplSets() || !gInternalValidateFeaturesAsPrimary) {
-            serverGlobalParams.validateFeaturesAsMaster.store(false);
+            serverGlobalParams.validateFeaturesAsPrimary.store(false);
         }
     }
 

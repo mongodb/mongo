@@ -550,8 +550,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     notifyFreeMonitoringOnTransitionToPrimary();
 
-    // It is only necessary to check the system indexes on the first transition to master.
-    // On subsequent transitions to master the indexes will have already been created.
+    // It is only necessary to check the system indexes on the first transition to primary.
+    // On subsequent transitions to primary the indexes will have already been created.
     static std::once_flag verifySystemIndexesOnce;
     std::call_once(verifySystemIndexesOnce, [opCtx] {
         const auto globalAuthzManager = AuthorizationManager::get(opCtx->getServiceContext());
@@ -560,7 +560,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         }
     });
 
-    serverGlobalParams.validateFeaturesAsMaster.store(true);
+    serverGlobalParams.validateFeaturesAsPrimary.store(true);
 
     return opTimeToReturn;
 }
