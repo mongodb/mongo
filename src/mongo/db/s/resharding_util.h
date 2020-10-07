@@ -50,6 +50,28 @@ namespace mongo {
 constexpr auto kReshardingOplogPrePostImageOps = "prePostImageOps"_sd;
 
 /**
+ * Emplaces the 'fetchTimestamp' onto the ClassWithFetchTimestamp if the timestamp has been
+ * emplaced inside the boost::optional.
+ */
+template <class ClassWithFetchTimestamp>
+void emplaceFetchTimestampIfExists(ClassWithFetchTimestamp& c,
+                                   boost::optional<Timestamp> fetchTimestamp) {
+    if (!fetchTimestamp) {
+        return;
+    }
+
+    invariant(!fetchTimestamp->isNull());
+
+    if (auto alreadyExistingFetchTimestamp = c.getFetchTimestamp()) {
+        invariant(fetchTimestamp == alreadyExistingFetchTimestamp);
+    }
+
+    FetchTimestamp fetchTimestampStruct;
+    fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
+    c.setFetchTimestampStruct(std::move(fetchTimestampStruct));
+}
+
+/**
  * Helper method to construct a DonorShardEntry with the fields specified.
  */
 DonorShardEntry makeDonorShard(ShardId shardId,
@@ -72,15 +94,12 @@ RecipientShardEntry makeRecipientShard(
 UUID getCollectionUUIDFromChunkManger(const NamespaceString& nss, const ChunkManager& cm);
 
 /**
- * Constructs the temporary resharding collection's namespace provided the original collection's
- * namespace and chunk manager.
+ * Assembles the namespace string for the temporary resharding collection based on the source
+ * namespace components.
  *
  *      <db>.system.resharding.<existing collection's UUID>
- *
- * Note: throws if the original collection does not have a UUID.
  */
-NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
-                                                const ChunkManager& cm);
+NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid);
 
 /**
  * Constructs a BatchedCommandRequest with batch type 'Insert'.

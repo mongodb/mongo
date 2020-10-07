@@ -34,10 +34,11 @@
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {
-constexpr StringData kReshardingDonorServiceName = "ReshardingDonorService"_sd;
 
 class ReshardingDonorService final : public repl::PrimaryOnlyService {
 public:
+    static constexpr StringData kServiceName = "ReshardingDonorService"_sd;
+
     explicit ReshardingDonorService(ServiceContext* serviceContext)
         : PrimaryOnlyService(serviceContext) {}
     ~ReshardingDonorService() = default;
@@ -45,7 +46,7 @@ public:
     class DonorStateMachine;
 
     StringData getServiceName() const override {
-        return kReshardingDonorServiceName;
+        return kServiceName;
     }
 
     NamespaceString getStateDocumentsNS() const override {

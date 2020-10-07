@@ -72,15 +72,6 @@ UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
     return *uuid;
 }
 
-// Assembles the namespace string for the temporary resharding collection based on the source
-// namespace components.
-NamespaceString getTempReshardingNss(StringData db, const UUID& sourceUuid) {
-    return NamespaceString(db,
-                           fmt::format("{}{}",
-                                       NamespaceString::kTemporaryReshardingCollectionPrefix,
-                                       sourceUuid.toString()));
-}
-
 // Ensure that this shard owns the document. This must be called after verifying that we
 // are in a resharding operation so that we are guaranteed that migrations are suspended.
 bool documentBelongsToMe(OperationContext* opCtx,
@@ -152,14 +143,12 @@ UUID getCollectionUUIDFromChunkManger(const NamespaceString& originalNss, const 
 
     return collectionUUID.get();
 }
-NamespaceString constructTemporaryReshardingNss(const NamespaceString& originalNss,
-                                                const ChunkManager& cm) {
-    auto collectionUUID = getCollectionUUIDFromChunkManger(originalNss, cm);
-    NamespaceString tempReshardingNss(
-        originalNss.db(),
-        "{}{}"_format(NamespaceString::kTemporaryReshardingCollectionPrefix,
-                      collectionUUID.toString()));
-    return tempReshardingNss;
+
+NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid) {
+    return NamespaceString(db,
+                           fmt::format("{}{}",
+                                       NamespaceString::kTemporaryReshardingCollectionPrefix,
+                                       sourceUuid.toString()));
 }
 
 BatchedCommandRequest buildInsertOp(const NamespaceString& nss, std::vector<BSONObj> docs) {
@@ -716,7 +705,7 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
     bool allowLocks = true;
     auto tempNssRoutingInfo = Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
         opCtx,
-        getTempReshardingNss(sourceNss.db(), getCollectionUuid(opCtx, sourceNss)),
+        constructTemporaryReshardingNss(sourceNss.db(), getCollectionUuid(opCtx, sourceNss)),
         allowLocks);
 
     uassert(ShardInvalidatedForTargetingInfo(sourceNss),

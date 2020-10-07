@@ -279,15 +279,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
         return;
     }
 
-    if (fetchTimestamp) {
-        auto& fetchTimestampStruct = replacementDoc.getFetchTimestampStruct();
-
-        // If the recipient is recovering and already knows the fetchTimestamp, it cannot change
-        if (fetchTimestampStruct.getFetchTimestamp())
-            invariant(fetchTimestampStruct.getFetchTimestamp().get() == fetchTimestamp.get());
-
-        fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
-    }
+    emplaceFetchTimestampIfExists(replacementDoc, std::move(fetchTimestamp));
 
     _updateRecipientDocument(std::move(replacementDoc));
 }

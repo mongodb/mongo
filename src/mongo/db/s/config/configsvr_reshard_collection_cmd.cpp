@@ -127,7 +127,8 @@ public:
             std::set<ShardId> recipientShardIds;
             std::vector<ChunkType> initialChunks;
             ChunkVersion version(1, 0, OID::gen());
-            auto tempReshardingNss = constructTemporaryReshardingNss(nss, cm);
+            auto tempReshardingNss = constructTemporaryReshardingNss(
+                nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
 
             if (presetReshardedChunksSpecified) {
                 const auto chunks = request().get_presetReshardedChunks().get();
@@ -211,7 +212,7 @@ public:
             // This promise will currently be falsely fulfilled by a call to interrupt() inside
             // the ReshardingCoordinatorService. This is to enable jsTests to pass while code
             // is still being committed.
-            // TODO SERVER-51212 Change this comment and assess the current call to .wait().
+            // TODO SERVER-51398 Change this comment and assess the current call to .wait().
             instance->getObserver()->awaitAllDonorsReadyToDonate().wait();
         }
 

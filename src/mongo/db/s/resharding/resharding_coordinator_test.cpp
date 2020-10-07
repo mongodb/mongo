@@ -38,6 +38,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -86,15 +87,7 @@ protected:
                                           {DonorShardEntry(ShardId("shard0000"))},
                                           {RecipientShardEntry(ShardId("shard0001"))});
         doc.setCommonReshardingMetadata(meta);
-        if (fetchTimestamp) {
-            auto fetchTimestampStruct = doc.getFetchTimestampStruct();
-            if (fetchTimestampStruct.getFetchTimestamp())
-                invariant(fetchTimestampStruct.getFetchTimestamp().get() == fetchTimestamp.get());
-
-            fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
-            doc.setFetchTimestampStruct(fetchTimestampStruct);
-        }
-
+        emplaceFetchTimestampIfExists(doc, std::move(fetchTimestamp));
         return doc;
     }
 
@@ -565,11 +558,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, PersistFetchTimestampStateTransitio
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
     expectedCoordinatorDoc.setState(CoordinatorStateEnum::kCloning);
-    Timestamp fetchTimestamp = Timestamp(1, 1);
-    auto fetchTimestampStruct = expectedCoordinatorDoc.getFetchTimestampStruct();
-    fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
-    expectedCoordinatorDoc.setFetchTimestampStruct(fetchTimestampStruct);
-
+    emplaceFetchTimestampIfExists(expectedCoordinatorDoc, Timestamp(1, 1));
     persistStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
 }
 

@@ -137,7 +137,9 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
+#include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_op_observer.h"
+#include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -309,7 +311,13 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     std::vector<std::unique_ptr<repl::PrimaryOnlyService>> services;
     services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
     services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-    services.push_back(std::make_unique<ReshardingCoordinatorService>(serviceContext));
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        services.push_back(std::make_unique<ReshardingCoordinatorService>(serviceContext));
+    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
+        services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
+    }
 
     for (auto& service : services) {
         registry->registerService(std::move(service));

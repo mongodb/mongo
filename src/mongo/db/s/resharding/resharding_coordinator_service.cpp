@@ -391,9 +391,7 @@ CollectionType createTempReshardingCollectionType(
 
     TypeCollectionRecipientFields recipient(
         std::move(donorShardIds), coordinatorDoc.getExistingUUID(), coordinatorDoc.getNss());
-    if (coordinatorDoc.getFetchTimestampStruct().getFetchTimestamp()) {
-        recipient.setFetchTimestampStruct(coordinatorDoc.getFetchTimestampStruct());
-    }
+    emplaceFetchTimestampIfExists(recipient, coordinatorDoc.getFetchTimestamp());
     tempEntryReshardingFields.setRecipientFields(recipient);
     collType.setReshardingFields(std::move(tempEntryReshardingFields));
 
@@ -650,7 +648,7 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    // TODO SERVER-51212 Remove this call.
+    // TODO SERVER-51398 Remove this call.
     interrupt({ErrorCodes::InternalError, "Early exit to support jsTesting"});
 
     return _reshardingCoordinatorObserver->awaitAllDonorsReadyToDonate()
@@ -764,15 +762,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_runUpdates(
     // Build new state doc for coordinator state update
     ReshardingCoordinatorDocument updatedCoordinatorDoc = updatedStateDoc;
     updatedCoordinatorDoc.setState(nextState);
-    if (fetchTimestamp) {
-        auto& fetchTimestampStruct = updatedCoordinatorDoc.getFetchTimestampStruct();
-        if (fetchTimestampStruct.getFetchTimestamp())
-            invariant(fetchTimestampStruct.getFetchTimestamp().get() == fetchTimestamp.get());
-
-        invariant(!fetchTimestamp->isNull());
-
-        fetchTimestampStruct.setFetchTimestamp(std::move(fetchTimestamp));
-    }
+    emplaceFetchTimestampIfExists(updatedCoordinatorDoc, std::move(fetchTimestamp));
 
     auto opCtx = cc().makeOperationContext();
     resharding::persistStateTransition(opCtx.get(), updatedCoordinatorDoc);

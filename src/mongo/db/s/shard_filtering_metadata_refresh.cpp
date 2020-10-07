@@ -41,6 +41,7 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -130,6 +131,16 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             }
 
             currentMetadata = forceGetCurrentMetadata(opCtx, nss);
+
+            if (currentMetadata && currentMetadata->isSharded()) {
+                // If the collection metadata after a refresh has 'reshardingFields', then pass it
+                // to the resharding subsystem to process.
+                const auto& reshardingFields = currentMetadata->getReshardingFields();
+                if (reshardingFields) {
+                    resharding::processReshardingFieldsForCollection(
+                        opCtx, nss, *currentMetadata, *reshardingFields);
+                }
+            }
         })
         .semi()
         .share();
