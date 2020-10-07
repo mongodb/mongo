@@ -1432,7 +1432,6 @@ env.CppUnitTest(
         'check_quorum_for_config_change_test.cpp',
         'drop_pending_collection_reaper_test.cpp',
         'idempotency_document_structure_test.cpp',
-        'idempotency_test.cpp',
         'idempotency_update_sequence_test.cpp',
         'initial_syncer_test.cpp',
         'isself_test.cpp',
@@ -1631,6 +1630,18 @@ env.CppUnitTest(
         'repl_coordinator_impl',
         'repl_coordinator_test_fixture',
         'replica_set_aware_service',
+    ],
+)
+
+env.CppUnitTest(
+    target='db_repl_idempotency_test',
+    source=[
+        'idempotency_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/update/update_test_helpers',
+        'idempotency_test_fixture',
+        'idempotency_test_util',
     ],
 )
 
