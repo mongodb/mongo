@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/util/str.h"
 
@@ -77,212 +78,72 @@ struct ExpressionVisitorContext {
             : variablesToBind{std::forward<Args>(args)...}, slotsForLetVariables{} {}
     };
 
-    struct LogicalExpressionEvalFrame {
-        std::unique_ptr<sbe::PlanStage> savedTraverseStage;
-        sbe::value::SlotVector savedRelevantSlots;
-
-        sbe::value::SlotId nextBranchResultSlot;
-
-        std::vector<std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>> branches;
-
-        // When traversing the branches of a $switch expression, the in-visitor will see each branch
-        // of the $switch _twice_: once for the "case" part of the branch (the condition) and once
-        // for the "then" part (the expression that the $switch will evaluate to if the condition
-        // evaluates to true). During the first visit, we temporarily store the condition here so
-        // that it is available to use during the second visit, which constructs the completed
-        // EExpression for the branch and stores it in the 'branches' vector.
-        boost::optional<std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>>
-            switchBranchConditionalStage;
-
-        LogicalExpressionEvalFrame(std::unique_ptr<sbe::PlanStage> traverseStage,
-                                   const sbe::value::SlotVector& relevantSlots,
-                                   sbe::value::SlotId nextBranchResultSlot)
-            : savedTraverseStage(std::move(traverseStage)),
-              savedRelevantSlots(relevantSlots),
-              nextBranchResultSlot(nextBranchResultSlot) {}
-    };
-
-    struct FilterExpressionEvalFrame {
-        std::unique_ptr<sbe::PlanStage> traverseStage;
-        sbe::value::SlotVector relevantSlots;
-
-        FilterExpressionEvalFrame(std::unique_ptr<sbe::PlanStage> traverseStage,
-                                  const sbe::value::SlotVector& relevantSlots)
-            : traverseStage(std::move(traverseStage)), relevantSlots(relevantSlots) {}
-    };
-
     ExpressionVisitorContext(std::unique_ptr<sbe::PlanStage> inputStage,
                              sbe::value::SlotIdGenerator* slotIdGenerator,
                              sbe::value::FrameIdGenerator* frameIdGenerator,
                              sbe::value::SlotId rootSlot,
-                             sbe::value::SlotVector* relevantSlots,
+                             const sbe::value::SlotVector& relevantSlots,
                              sbe::RuntimeEnvironment* env,
                              PlanNodeId planNodeId)
-        : traverseStage(std::move(inputStage)),
-          slotIdGenerator(slotIdGenerator),
+        : slotIdGenerator(slotIdGenerator),
           frameIdGenerator(frameIdGenerator),
           rootSlot(rootSlot),
-          relevantSlots(relevantSlots),
           runtimeEnvironment(env),
-          planNodeId(planNodeId) {}
-
-    void ensureArity(size_t arity) {
-        invariant(exprs.size() >= arity);
+          planNodeId(planNodeId) {
+        evalStack.emplaceFrame(EvalStage{std::move(inputStage), relevantSlots});
     }
 
-    /**
-     * Construct a UnionStage from the PlanStages in the 'branches' list and attach it to the inner
-     * side of a LoopJoinStage, which iterates over each branch of the UnionStage until it finds one
-     * that returns a result. Iteration ceases after the first branch that returns a result so that
-     * the remaining branches are "short circuited" and we don't do unnecessary work for for MQL
-     * expressions that are not evaluated.
-     */
-    void generateSubTreeForSelectiveExecution() {
-        auto& logicalExpressionEvalFrame = logicalExpressionEvalFrameStack.top();
+    void ensureArity(size_t arity) {
+        invariant(evalStack.topFrame().exprsCount() >= arity);
+    }
 
-        std::vector<sbe::value::SlotVector> branchSlots;
-        std::vector<std::unique_ptr<sbe::PlanStage>> branchStages;
-        for (auto&& [slot, stage] : logicalExpressionEvalFrame.branches) {
-            branchSlots.push_back(sbe::makeSV(slot));
-            branchStages.push_back(std::move(stage));
-        }
+    EvalStage extractCurrentEvalStage() {
+        return evalStack.topFrame().extractStage();
+    }
 
-        auto unionStageResultSlot = slotIdGenerator->generate();
-        auto unionOfBranches = sbe::makeS<sbe::UnionStage>(std::move(branchStages),
-                                                           std::move(branchSlots),
-                                                           sbe::makeSV(unionStageResultSlot),
-                                                           planNodeId);
-
-        // Restore 'relevantSlots' to the way it was before we started translating the logic
-        // operator.
-        *relevantSlots = std::move(logicalExpressionEvalFrame.savedRelevantSlots);
-
-        // The LoopJoinStage we are creating here will not expose any of the slots from its outer
-        // side except for the ones we explicity ask for. For that reason, we maintain the
-        // 'relevantSlots' list of slots that may still be referenced above this stage. All of the
-        // slots in 'letBindings' are relevant by this definition, but we track them separately,
-        // which is why we need to add them in now.
-        auto relevantSlotsWithLetBindings(*relevantSlots);
-        for (auto&& [_, slot] : environment) {
-            relevantSlotsWithLetBindings.push_back(slot);
-        }
-
-        // Put the union into a nested loop. The inner side of the nested loop will execute exactly
-        // once, trying each branch of the union until one of them short circuits or until it
-        // reaches the end. This process also restores the old 'traverseStage' value from before we
-        // started translating the logic operator, by placing it below the new nested loop stage.
-        auto stage = sbe::makeS<sbe::LoopJoinStage>(
-            std::move(logicalExpressionEvalFrame.savedTraverseStage),
-            sbe::makeS<sbe::LimitSkipStage>(std::move(unionOfBranches), 1, boost::none, planNodeId),
-            relevantSlotsWithLetBindings,
-            relevantSlotsWithLetBindings,
-            nullptr /* predicate */,
-            planNodeId);
-
-        // We've already restored all necessary state from the top 'logicalExpressionEvalFrameStack'
-        // entry, so we are done with it.
-        logicalExpressionEvalFrameStack.pop();
-
-        // The final result of the logic operator is stored in the 'branchResultSlot' slot.
-        relevantSlots->push_back(unionStageResultSlot);
-        pushExpr(sbe::makeE<sbe::EVariable>(unionStageResultSlot), std::move(stage));
+    void setCurrentStage(EvalStage stage) {
+        evalStack.topFrame().setStage(std::move(stage));
     }
 
     std::unique_ptr<sbe::EExpression> popExpr() {
-        auto expr = std::move(exprs.top());
-        exprs.pop();
-        return expr;
+        return evalStack.topFrame().popExpr().extractExpr();
     }
 
     void pushExpr(std::unique_ptr<sbe::EExpression> expr) {
-        exprs.push(std::move(expr));
+        evalStack.topFrame().pushExpr(std::move(expr));
     }
 
-    void pushExpr(std::unique_ptr<sbe::EExpression> expr, std::unique_ptr<sbe::PlanStage> stage) {
-        exprs.push(std::move(expr));
-        traverseStage = std::move(stage);
+    void pushExpr(std::unique_ptr<sbe::EExpression> expr, EvalStage stage) {
+        pushExpr(std::move(expr));
+        evalStack.topFrame().setStage(std::move(stage));
     }
 
-    /**
-     * Temporarily reset 'traverseStage' and 'relevantSlots' so they are prepared for translating a
-     * $and/$or branch. (They will be restored later using the saved values in the
-     * 'logicalExpressionEvalFrameStack' top entry.) The new 'traverseStage' is actually a
-     * projection that will evaluate to a constant false (for $and) or true (for $or). Once this
-     * branch is fully contructed, it will have a filter stage that will either filter out the
-     * constant (when branch evaluation does not short circuit) or produce the constant value
-     * (therefore producing the short-circuit result). These branches are part of a union stage, so
-     * each time a branch fails to produce a value, execution moves on to the next branch. A limit
-     * stage above the union ensures that execution halts once one of the branches produces a
-     * result.
-     */
-    void prepareToTranslateShortCircuitingBranch(sbe::EPrimBinary::Op logicOp,
-                                                 sbe::value::SlotId branchResultSlot) {
-        invariant(!logicalExpressionEvalFrameStack.empty());
-        logicalExpressionEvalFrameStack.top().nextBranchResultSlot = branchResultSlot;
-
-        auto shortCircuitVal = (logicOp == sbe::EPrimBinary::logicOr);
-        auto shortCircuitExpr = sbe::makeE<sbe::EConstant>(
-            sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(shortCircuitVal));
-        traverseStage = sbe::makeProjectStage(
-            sbe::makeS<sbe::LimitSkipStage>(
-                sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId),
-            planNodeId,
-            branchResultSlot,
-            std::move(shortCircuitExpr));
-
-        // Slots created in a previous branch for this $and/$or are not accessible to any stages in
-        // this new branch, so we clear them from the 'relevantSlots' list.
-        *relevantSlots = logicalExpressionEvalFrameStack.top().savedRelevantSlots;
-
-        // The 'branchResultSlot' is where the new branch will place its result in the event of a
-        // short circuit, and it must be visible to the union stage after the branch executes.
-        relevantSlots->push_back(branchResultSlot);
+    std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> popFrame() {
+        auto [expr, stage] = evalStack.popFrame();
+        return {expr.extractExpr(), std::move(stage)};
     }
 
-    /**
-     * Temporarily reset 'traverseStage' and 'relevantSlots' so they are prepared for translating a
-     * $switch branch. They can be restored later using the 'logicalExpressionEvalFrameStack' top
-     * entry. Once it is fully constructed, this branch will evaluate to the "then" part of the
-     * branch if the condition is true or EOF otherwise. As with $and/$or branches (refer to the
-     * comment describing 'prepareToTranslateShortCircuitingBranch()'), these branches will become
-     * part of a UnionStage that executes the branches in turn until one yields a value.
-     */
-    void prepareToTranslateSwitchBranch(sbe::value::SlotId branchResultSlot) {
-        invariant(!logicalExpressionEvalFrameStack.empty());
-        logicalExpressionEvalFrameStack.top().nextBranchResultSlot = branchResultSlot;
-
-        traverseStage = sbe::makeS<sbe::LimitSkipStage>(
-            sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId);
-
-        // Slots created in a previous branch for this $switch are not accessible to any stages in
-        // this new branch, so we clear them from the 'relevantSlots' list.
-        *relevantSlots = logicalExpressionEvalFrameStack.top().savedRelevantSlots;
+    sbe::value::SlotVector getLexicalEnvironment() {
+        sbe::value::SlotVector lexicalEnvironment;
+        for (const auto& [_, slot] : environment) {
+            lexicalEnvironment.push_back(slot);
+        }
+        return lexicalEnvironment;
     }
 
-    /**
-     * This does the same thing as 'prepareToTranslateShortCircuitingBranch' but is intended to the
-     * last branch in an $and/$or, which cannot short circuit.
-     */
-    void prepareToTranslateConcludingLogicalBranch() {
-        invariant(!logicalExpressionEvalFrameStack.empty());
-
-        traverseStage = sbe::makeS<sbe::CoScanStage>(planNodeId);
-        *relevantSlots = logicalExpressionEvalFrameStack.top().savedRelevantSlots;
+    std::tuple<sbe::value::SlotId, std::unique_ptr<sbe::EExpression>, EvalStage> done() {
+        invariant(evalStack.framesCount() == 1);
+        auto [expr, stage] = popFrame();
+        return {slotIdGenerator->generate(),
+                std::move(expr),
+                stageOrLimitCoScan(std::move(stage), planNodeId)};
     }
 
-    std::tuple<sbe::value::SlotId,
-               std::unique_ptr<sbe::EExpression>,
-               std::unique_ptr<sbe::PlanStage>>
-    done() {
-        invariant(exprs.size() == 1);
-        return {slotIdGenerator->generate(), popExpr(), std::move(traverseStage)};
-    }
+    EvalStack<> evalStack;
 
-    std::unique_ptr<sbe::PlanStage> traverseStage;
     sbe::value::SlotIdGenerator* slotIdGenerator;
     sbe::value::FrameIdGenerator* frameIdGenerator;
     sbe::value::SlotId rootSlot;
-    std::stack<std::unique_ptr<sbe::EExpression>> exprs;
 
     // The lexical environment for the expression being traversed. A variable reference takes the
     // form "$$variable_name" in MQL's concrete syntax and gets transformed into a numeric
@@ -291,21 +152,16 @@ struct ExpressionVisitorContext {
     std::map<Variables::Id, sbe::value::SlotId> environment;
     std::stack<VarsFrame> varsFrameStack;
 
-    // TODO SERVER-51356: Replace these stacks with single stack of evaluation frames.
-    std::stack<FilterExpressionEvalFrame> filterExpressionEvalFrameStack;
-    std::stack<LogicalExpressionEvalFrame> logicalExpressionEvalFrameStack;
-
     // See the comment above the generateExpression() declaration for an explanation of the
     // 'relevantSlots' list.
-    sbe::value::SlotVector* relevantSlots;
     sbe::RuntimeEnvironment* runtimeEnvironment;
 
     // The id of the QuerySolutionNode to which the expression we are converting to SBE is attached.
     const PlanNodeId planNodeId;
 };
 
-std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverseHelper(
-    std::unique_ptr<sbe::PlanStage> inputStage,
+std::pair<sbe::value::SlotId, EvalStage> generateTraverseHelper(
+    EvalStage inputStage,
     sbe::value::SlotId inputSlot,
     const FieldPath& fp,
     size_t level,
@@ -322,7 +178,7 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverseH
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
     // to 'fieldSlot'.
-    inputStage = sbe::makeProjectStage(
+    inputStage = makeProject(
         std::move(inputStage),
         planNodeId,
         fieldSlot,
@@ -333,48 +189,43 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverseH
                             return std::string_view{fieldName.rawData(), fieldName.size()};
                         }()))));
 
-    std::unique_ptr<sbe::PlanStage> innerBranch;
+    EvalStage innerBranch;
     if (level == fp.getPathLength() - 1) {
-        innerBranch = sbe::makeProjectStage(
-            sbe::makeS<sbe::LimitSkipStage>(
-                sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId),
-            planNodeId,
-            outputSlot,
-            sbe::makeE<sbe::EVariable>(fieldSlot));
+        innerBranch = makeProject(makeLimitCoScanStage(planNodeId),
+                                  planNodeId,
+                                  outputSlot,
+                                  sbe::makeE<sbe::EVariable>(fieldSlot));
     } else {
         // Generate nested traversal.
-        auto [slot, stage] = generateTraverseHelper(
-            sbe::makeS<sbe::LimitSkipStage>(
-                sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId),
-            fieldSlot,
-            fp,
-            level + 1,
-            planNodeId,
-            slotIdGenerator);
-        innerBranch = sbe::makeProjectStage(
-            std::move(stage), planNodeId, outputSlot, sbe::makeE<sbe::EVariable>(slot));
+        auto [slot, stage] = generateTraverseHelper(makeLimitCoScanStage(planNodeId),
+                                                    fieldSlot,
+                                                    fp,
+                                                    level + 1,
+                                                    planNodeId,
+                                                    slotIdGenerator);
+        innerBranch =
+            makeProject(std::move(stage), planNodeId, outputSlot, sbe::makeE<sbe::EVariable>(slot));
     }
 
     // The final traverse stage for the current nested level.
     return {outputSlot,
-            sbe::makeS<sbe::TraverseStage>(std::move(inputStage),
-                                           std::move(innerBranch),
-                                           fieldSlot,
-                                           outputSlot,
-                                           outputSlot,
-                                           sbe::makeSV(),
-                                           nullptr,
-                                           nullptr,
-                                           planNodeId,
-                                           1)};
+            makeTraverse(std::move(inputStage),
+                         std::move(innerBranch),
+                         fieldSlot,
+                         outputSlot,
+                         outputSlot,
+                         nullptr,
+                         nullptr,
+                         planNodeId,
+                         1)};
 }
 
 /**
  * For the given MatchExpression 'expr', generates a path traversal SBE plan stage sub-tree
  * implementing the comparison expression.
  */
-std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverse(
-    std::unique_ptr<sbe::PlanStage> inputStage,
+std::pair<sbe::value::SlotId, EvalStage> generateTraverse(
+    EvalStage inputStage,
     sbe::value::SlotId inputSlot,
     bool expectsDocumentInputOnly,
     const FieldPath& fp,
@@ -389,25 +240,23 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateTraverse(
         // The general case: the value in the 'inputSlot' may be an array that will require
         // traversal.
         auto outputSlot{slotIdGenerator->generate()};
-        auto [innerBranchOutputSlot, innerBranch] = generateTraverseHelper(
-            sbe::makeS<sbe::LimitSkipStage>(
-                sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId),
-            inputSlot,
-            fp,
-            0,  // level
-            planNodeId,
-            slotIdGenerator);
+        auto [innerBranchOutputSlot, innerBranch] =
+            generateTraverseHelper(makeLimitCoScanStage(planNodeId),
+                                   inputSlot,
+                                   fp,
+                                   0,  // level
+                                   planNodeId,
+                                   slotIdGenerator);
         return {outputSlot,
-                sbe::makeS<sbe::TraverseStage>(std::move(inputStage),
-                                               std::move(innerBranch),
-                                               inputSlot,
-                                               outputSlot,
-                                               innerBranchOutputSlot,
-                                               sbe::makeSV(),
-                                               nullptr,
-                                               nullptr,
-                                               planNodeId,
-                                               1)};
+                makeTraverse(std::move(inputStage),
+                             std::move(innerBranch),
+                             inputSlot,
+                             outputSlot,
+                             innerBranchOutputSlot,
+                             nullptr,
+                             nullptr,
+                             planNodeId,
+                             1)};
     }
 }
 
@@ -475,10 +324,6 @@ std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
             sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(std::move(numericConvert32)))));
 }
 
-std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
-    return sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot, std::move(e));
-}
-
 void buildArrayAccessByConstantIndex(ExpressionVisitorContext* context,
                                      const std::string& exprName,
                                      int32_t index) {
@@ -532,7 +377,7 @@ public:
     void visit(ExpressionConcat* expr) final {}
     void visit(ExpressionConcatArrays* expr) final {}
     void visit(ExpressionCond* expr) final {
-        visitConditionalExpression(expr);
+        _context->evalStack.emplaceFrame(EvalStage{});
     }
     void visit(ExpressionDateFromString* expr) final {}
     void visit(ExpressionDateFromParts* expr) final {}
@@ -590,7 +435,7 @@ public:
     void visit(ExpressionStrLenCP* expr) final {}
     void visit(ExpressionSubtract* expr) final {}
     void visit(ExpressionSwitch* expr) final {
-        visitConditionalExpression(expr);
+        _context->evalStack.emplaceFrame(EvalStage{});
     }
     void visit(ExpressionToLower* expr) final {}
     void visit(ExpressionToUpper* expr) final {}
@@ -656,23 +501,7 @@ private:
             return;
         }
 
-        auto branchResultSlot = _context->slotIdGenerator->generate();
-        _context->logicalExpressionEvalFrameStack.emplace(
-            std::move(_context->traverseStage), *_context->relevantSlots, branchResultSlot);
-
-        _context->prepareToTranslateShortCircuitingBranch(logicOp, branchResultSlot);
-    }
-
-    /**
-     * Handle $switch and $cond, which have different syntax but are structurally identical in the
-     * AST.
-     */
-    void visitConditionalExpression(Expression* expr) {
-        auto branchResultSlot = _context->slotIdGenerator->generate();
-        _context->logicalExpressionEvalFrameStack.emplace(
-            std::move(_context->traverseStage), *_context->relevantSlots, branchResultSlot);
-
-        _context->prepareToTranslateSwitchBranch(branchResultSlot);
+        _context->evalStack.emplaceFrame(EvalStage{});
     }
 
     ExpressionVisitorContext* _context;
@@ -703,7 +532,7 @@ public:
     void visit(ExpressionConcat* expr) final {}
     void visit(ExpressionConcatArrays* expr) final {}
     void visit(ExpressionCond* expr) final {
-        visitConditionalExpression(expr);
+        _context->evalStack.emplaceFrame(EvalStage{});
     }
     void visit(ExpressionDateFromString* expr) final {}
     void visit(ExpressionDateFromParts* expr) final {}
@@ -721,11 +550,8 @@ public:
         auto currentElementSlot = _context->slotIdGenerator->generate();
         _context->environment.insert({variableId, currentElementSlot});
 
-        // Temporarily reset 'traverseStage' with limit 1/coscan tree to prevent from being
-        // rewritten by filter predicate's generated sub-tree.
-        _context->filterExpressionEvalFrameStack.emplace(std::move(_context->traverseStage),
-                                                         *_context->relevantSlots);
-        _context->traverseStage = makeLimitCoScanTree(_context->planNodeId);
+        // Push new frame to provide clean context for sub-tree generated by filter predicate.
+        _context->evalStack.emplaceFrame(EvalStage{});
     }
     void visit(ExpressionFloor* expr) final {}
     void visit(ExpressionIfNull* expr) final {}
@@ -750,10 +576,10 @@ public:
         // We create two bindings. First, the initializer result is bound to a slot when this
         // ProjectStage executes.
         auto slotToBind = _context->slotIdGenerator->generate();
-        _context->traverseStage = sbe::makeProjectStage(std::move(_context->traverseStage),
-                                                        _context->planNodeId,
-                                                        slotToBind,
-                                                        _context->popExpr());
+        _context->setCurrentStage(makeProject(_context->extractCurrentEvalStage(),
+                                              _context->planNodeId,
+                                              slotToBind,
+                                              _context->popExpr()));
         currentFrame.slotsForLetVariables.insert(slotToBind);
 
         // Second, we bind this variables AST-level name (with type Variable::Id) to the SlotId that
@@ -799,7 +625,7 @@ public:
     void visit(ExpressionStrLenCP* expr) final {}
     void visit(ExpressionSubtract* expr) final {}
     void visit(ExpressionSwitch* expr) final {
-        visitConditionalExpression(expr);
+        _context->evalStack.emplaceFrame(EvalStage{});
     }
     void visit(ExpressionToLower* expr) final {}
     void visit(ExpressionToUpper* expr) final {}
@@ -860,131 +686,7 @@ private:
         // The infix visitor should only visit expressions with more than one child.
         invariant(expr->getChildren().size() >= 2);
         invariant(logicOp == sbe::EPrimBinary::logicOr || logicOp == sbe::EPrimBinary::logicAnd);
-
-        auto frameId = _context->frameIdGenerator->generate();
-        auto branchExpr = generateCoerceToBoolExpression(sbe::EVariable{frameId, 0});
-        std::unique_ptr<sbe::EExpression> shortCircuitCondition;
-        if (logicOp == sbe::EPrimBinary::logicAnd) {
-            // The filter should take the short circuit path when the branch resolves to _false_, so
-            // we invert the filter condition.
-            shortCircuitCondition = sbe::makeE<sbe::ELocalBind>(
-                frameId,
-                sbe::makeEs(_context->popExpr()),
-                sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot, std::move(branchExpr)));
-        } else {
-            // For $or, keep the filter condition as is; the filter will take the short circuit path
-            // when the branch resolves to true.
-            shortCircuitCondition = sbe::makeE<sbe::ELocalBind>(
-                frameId, sbe::makeEs(_context->popExpr()), std::move(branchExpr));
-        }
-
-        auto branchStage = sbe::makeS<sbe::FilterStage<false>>(std::move(_context->traverseStage),
-                                                               std::move(shortCircuitCondition),
-                                                               _context->planNodeId);
-
-        auto& currentFrameStack = _context->logicalExpressionEvalFrameStack.top();
-        currentFrameStack.branches.emplace_back(
-            std::make_pair(currentFrameStack.nextBranchResultSlot, std::move(branchStage)));
-
-        if (currentFrameStack.branches.size() < (expr->getChildren().size() - 1)) {
-            _context->prepareToTranslateShortCircuitingBranch(
-                logicOp, _context->slotIdGenerator->generate());
-        } else {
-            // We have already translated all but one of the branches, meaning the next branch we
-            // translate will be the final one and does not need an short-circuit logic.
-            _context->prepareToTranslateConcludingLogicalBranch();
-        }
-    }
-
-    /**
-     * Handle $switch and $cond, which have different syntax but are structurally identical in the
-     * AST.
-     */
-    void visitConditionalExpression(Expression* expr) {
-        invariant(_context->logicalExpressionEvalFrameStack.size() > 0);
-
-        auto& logicalExpressionEvalFrame = _context->logicalExpressionEvalFrameStack.top();
-        auto& switchBranchConditionalStage =
-            logicalExpressionEvalFrame.switchBranchConditionalStage;
-
-        if (switchBranchConditionalStage == boost::none) {
-            // Here, _context->popExpr() represents the $switch branch's "case" child.
-            auto frameId = _context->frameIdGenerator->generate();
-            auto branchExpr = generateCoerceToBoolExpression(sbe::EVariable{frameId, 0});
-            auto conditionExpr = sbe::makeE<sbe::ELocalBind>(
-                frameId, sbe::makeEs(_context->popExpr()), std::move(branchExpr));
-
-            auto conditionalEvalStage =
-                sbe::makeProjectStage(std::move(_context->traverseStage),
-                                      _context->planNodeId,
-                                      logicalExpressionEvalFrame.nextBranchResultSlot,
-                                      std::move(conditionExpr));
-
-            // Store this case eval stage for use when visiting the $switch branch's "then" child.
-            switchBranchConditionalStage.emplace(logicalExpressionEvalFrame.nextBranchResultSlot,
-                                                 std::move(conditionalEvalStage));
-        } else {
-            // Here, _context->popExpr() represents the $switch branch's "then" child.
-
-            // Get the "case" child to form the outer part of the Loop Join.
-            auto [conditionalEvalStageSlot, conditionalEvalStage] =
-                std::move(*switchBranchConditionalStage);
-            switchBranchConditionalStage = boost::none;
-
-            // Create the "then" child (a BranchStage) to form the inner nlj stage.
-            auto branchStageResultSlot = logicalExpressionEvalFrame.nextBranchResultSlot;
-            auto thenStageResultSlot = _context->slotIdGenerator->generate();
-            auto unusedElseStageResultSlot = _context->slotIdGenerator->generate();
-
-            // Construct a BranchStage tree that will bind the evaluated "then" expression if the
-            // "case" expression evalautes to true and will EOF otherwise.
-            auto branchStage = sbe::makeS<sbe::BranchStage>(
-                sbe::makeProjectStage(std::move(_context->traverseStage),
-                                      _context->planNodeId,
-                                      thenStageResultSlot,
-                                      _context->popExpr()),
-                sbe::makeS<sbe::LimitSkipStage>(
-                    sbe::makeProjectStage(
-                        sbe::makeS<sbe::CoScanStage>(_context->planNodeId),
-                        _context->planNodeId,
-                        unusedElseStageResultSlot,
-                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)),
-                    0,
-                    boost::none,
-                    _context->planNodeId),
-                sbe::makeE<sbe::EVariable>(conditionalEvalStageSlot),
-                sbe::makeSV(thenStageResultSlot),
-                sbe::makeSV(unusedElseStageResultSlot),
-                sbe::makeSV(branchStageResultSlot),
-                _context->planNodeId);
-
-            // Get a list of slots that are used by $let expressions. These slots need to be
-            // available to the inner side of the LoopJoinStage, in case any of the branches want to
-            // reference one of the variables bound by the $let.
-            sbe::value::SlotVector outerCorrelated;
-            for (auto&& [_, slot] : _context->environment) {
-                outerCorrelated.push_back(slot);
-            }
-
-            // The true/false result of the condition, which is evaluated in the outer side of the
-            // LoopJoinStage, must be available to the inner side.
-            outerCorrelated.push_back(conditionalEvalStageSlot);
-
-            // Create a LoopJoinStage that will evaluate its outer child exactly once, to compute
-            // the true/false result of the branch condition, and then execute its inner child
-            // with the result of that condition bound to a correlated slot.
-            auto loopJoinStage = sbe::makeS<sbe::LoopJoinStage>(std::move(conditionalEvalStage),
-                                                                std::move(branchStage),
-                                                                outerCorrelated,
-                                                                outerCorrelated,
-                                                                nullptr /* predicate */,
-                                                                _context->planNodeId);
-
-            logicalExpressionEvalFrame.branches.emplace_back(std::make_pair(
-                logicalExpressionEvalFrame.nextBranchResultSlot, std::move(loopJoinStage)));
-        }
-
-        _context->prepareToTranslateSwitchBranch(_context->slotIdGenerator->generate());
+        _context->evalStack.emplaceFrame(EvalStage{});
     }
 
     ExpressionVisitorContext* _context;
@@ -1869,30 +1571,20 @@ public:
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
         const bool expectsDocumentInputOnly = slotId == _context->rootSlot;
-        auto [outputSlot, stage] = generateTraverse(std::move(_context->traverseStage),
+        auto [outputSlot, stage] = generateTraverse(_context->extractCurrentEvalStage(),
                                                     slotId,
                                                     expectsDocumentInputOnly,
                                                     expr->getFieldPathWithoutCurrentPrefix(),
                                                     _context->planNodeId,
                                                     _context->slotIdGenerator);
+
         _context->pushExpr(sbe::makeE<sbe::EVariable>(outputSlot), std::move(stage));
-        _context->relevantSlots->push_back(outputSlot);
     }
     void visit(ExpressionFilter* expr) final {
-        _context->ensureArity(2);
+        // Extract filter predicate expression and sub-tree.
+        auto [filterPredicate, filterStage] = _context->popFrame();
 
-        auto filterPredicate = _context->popExpr();
         auto input = _context->popExpr();
-
-        // Extract 'traverseStage' generated for filter predicate.
-        auto filterTraverseStage = std::move(_context->traverseStage);
-
-        // Restore old value of 'traverseStage' and 'relevantSlots' after filter predicate tree
-        // was built.
-        auto& filterPredicateEvalFrame = _context->filterExpressionEvalFrameStack.top();
-        _context->traverseStage = std::move(filterPredicateEvalFrame.traverseStage);
-        *_context->relevantSlots = filterPredicateEvalFrame.relevantSlots;
-        _context->filterExpressionEvalFrameStack.pop();
 
         // Filter predicate of $filter expression expects current array element to be stored in the
         // specific variable. We already allocated slot for it in the "in" visitor, now we just need
@@ -1919,7 +1611,7 @@ public:
         //       else
         //         fail()
         // )
-        // _context->traverseStage
+        // <current sub-tree stage>
         auto frameId = _context->frameIdGenerator->generate();
         auto binds = sbe::makeEs(std::move(input));
         sbe::EVariable inputRef(frameId, 0);
@@ -1937,24 +1629,24 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(checkInputArrayType));
 
         sbe::EVariable inputArrayVariable{inputArraySlot};
-        auto projectInputArray = sbe::makeProjectStage(std::move(_context->traverseStage),
-                                                       _context->planNodeId,
-                                                       inputArraySlot,
-                                                       std::move(inputArray));
+        auto projectInputArray = makeProject(_context->extractCurrentEvalStage(),
+                                             _context->planNodeId,
+                                             inputArraySlot,
+                                             std::move(inputArray));
 
         auto inputIsNotNullish = makeNot(generateNullOrMissing(inputArrayVariable));
         auto inputIsNotNullishSlot = _context->slotIdGenerator->generate();
-        auto fromBranch = sbe::makeProjectStage(std::move(projectInputArray),
-                                                _context->planNodeId,
-                                                inputIsNotNullishSlot,
-                                                std::move(inputIsNotNullish));
+        auto fromBranch = makeProject(std::move(projectInputArray),
+                                      _context->planNodeId,
+                                      inputIsNotNullishSlot,
+                                      std::move(inputIsNotNullish));
 
         // Construct 'in' branch of traverse stage. SBE tree stored in 'inBranch' variable looks
         // like this:
         //
         // cfilter Variable{inputIsNotNullishSlot}
         // filter filterPredicate
-        // filterTraverseStage
+        // filterStage
         //
         // Filter predicate can return non-boolean values. To fix this, we generate expression to
         // coerce it to bool type.
@@ -1963,28 +1655,13 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId,
                                         sbe::makeEs(std::move(filterPredicate)),
                                         generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
-        auto filterWithPredicate = sbe::makeS<sbe::FilterStage<false>>(
-            std::move(filterTraverseStage), std::move(boolFilterPredicate), _context->planNodeId);
+        auto filterWithPredicate = makeFilter<false>(
+            std::move(filterStage), std::move(boolFilterPredicate), _context->planNodeId);
 
         // If input array is null or missing, we do not evaluate filter predicate and return EOF.
-        auto innerBranch =
-            sbe::makeS<sbe::FilterStage<true>>(std::move(filterWithPredicate),
-                                               sbe::makeE<sbe::EVariable>(inputIsNotNullishSlot),
-                                               _context->planNodeId);
-
-        // Relevant slots from the _context->traverseStage might be used in the traverse 'in' branch
-        // by filter predicate through path expressions and variables. We need to pass them
-        // explicitly as correlated to traverse 'from' branch.
-        auto outerCorrelatedSlots = *_context->relevantSlots;
-
-        // Add all variables from the environment.
-        for (const auto& item : _context->environment) {
-            outerCorrelatedSlots.push_back(item.second);
-        }
-
-        // inputIsNotNullishSlot is used explicitly by cfilter stage added on top of traverse 'in'
-        // branch.
-        outerCorrelatedSlots.push_back(inputIsNotNullishSlot);
+        auto innerBranch = makeFilter<true>(std::move(filterWithPredicate),
+                                            sbe::makeE<sbe::EVariable>(inputIsNotNullishSlot),
+                                            _context->planNodeId);
 
         // Construct traverse stage with the following slots:
         // * inputArraySlot - slot containing input array of $filter expression
@@ -1993,17 +1670,16 @@ public:
         // * inputArraySlot - slot where 'in' branch of traverse stage stores current array
         //   element if it satisfies the filter predicate
         auto filteredArraySlot = _context->slotIdGenerator->generate();
-        auto traverseStage =
-            sbe::makeS<sbe::TraverseStage>(std::move(fromBranch),
-                                           std::move(innerBranch),
-                                           inputArraySlot /* inField */,
-                                           filteredArraySlot /* outField */,
-                                           inputArraySlot /* outFieldInner */,
-                                           std::move(outerCorrelatedSlots) /* outerCorrelated */,
-                                           nullptr /* foldExpr */,
-                                           nullptr /* finalExpr */,
-                                           _context->planNodeId,
-                                           1 /* nestedArraysDepth */);
+        auto traverseStage = makeTraverse(std::move(fromBranch),
+                                          std::move(innerBranch),
+                                          inputArraySlot /* inField */,
+                                          filteredArraySlot /* outField */,
+                                          inputArraySlot /* outFieldInner */,
+                                          nullptr /* foldExpr */,
+                                          nullptr /* finalExpr */,
+                                          _context->planNodeId,
+                                          1 /* nestedArraysDepth */,
+                                          _context->getLexicalEnvironment());
 
         // If input array is null or missing, 'in' stage of traverse will return EOF. In this case
         // traverse sets output slot (filteredArraySlot) to Nothing. We replace it with Null to
@@ -2519,14 +2195,15 @@ private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
         invariant(logicOp == sbe::EPrimBinary::logicAnd || logicOp == sbe::EPrimBinary::logicOr);
 
-        if (expr->getChildren().size() == 0) {
+        size_t numChildren = expr->getChildren().size();
+        if (numChildren == 0) {
             // Empty $and and $or always evaluate to their logical operator's identity value: true
             // and false, respectively.
             auto logicIdentityVal = (logicOp == sbe::EPrimBinary::logicAnd);
             _context->pushExpr(sbe::makeE<sbe::EConstant>(
                 sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(logicIdentityVal)));
             return;
-        } else if (expr->getChildren().size() == 1) {
+        } else if (numChildren == 1) {
             // No need for short circuiting logic in a singleton $and/$or. Just execute the branch
             // and return its result as a bool.
             auto frameId = _context->frameIdGenerator->generate();
@@ -2538,24 +2215,29 @@ private:
             return;
         }
 
-        auto& logicalExpressionEvalFrame = _context->logicalExpressionEvalFrameStack.top();
+        std::vector<EvalExprStagePair> branches;
+        for (size_t i = 0; i < numChildren; ++i) {
+            auto [expr, stage] = _context->popFrame();
 
-        // The last branch works differently from the others. It just uses a project stage to
-        // produce a true or false value for the branch result.
-        auto frameId = _context->frameIdGenerator->generate();
-        auto lastBranchExpr =
-            sbe::makeE<sbe::ELocalBind>(frameId,
-                                        sbe::makeEs(_context->popExpr()),
-                                        generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
-        auto lastBranchResultSlot = _context->slotIdGenerator->generate();
-        auto lastBranch = sbe::makeProjectStage(std::move(_context->traverseStage),
-                                                _context->planNodeId,
-                                                lastBranchResultSlot,
-                                                std::move(lastBranchExpr));
-        logicalExpressionEvalFrame.branches.emplace_back(
-            std::make_pair(lastBranchResultSlot, std::move(lastBranch)));
+            auto frameId = _context->frameIdGenerator->generate();
+            auto coercedExpr = sbe::makeE<sbe::ELocalBind>(
+                frameId,
+                sbe::makeEs(std::move(expr)),
+                generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
 
-        _context->generateSubTreeForSelectiveExecution();
+            branches.emplace_back(std::move(coercedExpr), std::move(stage));
+        }
+        std::reverse(branches.begin(), branches.end());
+
+        auto [resultExpr, opStage] = generateShortCircuitingLogicalOp(
+            logicOp, std::move(branches), _context->planNodeId, _context->slotIdGenerator);
+
+        auto loopJoinStage = makeLoopJoin(_context->extractCurrentEvalStage(),
+                                          std::move(opStage),
+                                          _context->planNodeId,
+                                          _context->getLexicalEnvironment());
+
+        _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
     }
 
     /**
@@ -2563,32 +2245,65 @@ private:
      * AST.
      */
     void visitConditionalExpression(Expression* expr) {
-        invariant(_context->logicalExpressionEvalFrameStack.size() > 0);
-        auto& logicalExpressionEvalFrame = _context->logicalExpressionEvalFrameStack.top();
-
-        // If this is not boost::none, that would mean the AST somehow had a branch with a "case"
-        // condition but without a "then" value.
-        invariant(logicalExpressionEvalFrame.switchBranchConditionalStage == boost::none);
-
         // The default case is always the last child in the ExpressionSwitch. If it is unspecified
         // in the user's query, it is a nullptr. In ExpressionCond, the last child is the "else"
         // branch, and it is guaranteed not to be nullptr.
-        auto defaultExpr = expr->getChildren().back() == nullptr
-            ? sbe::makeE<sbe::EFail>(ErrorCodes::Error{4934200},
-                                     "$switch could not find a matching branch for an "
-                                     "input, and no default was specified.")
-            : this->_context->popExpr();
+        if (expr->getChildren().back() == nullptr) {
+            _context->pushExpr(
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4934200},
+                                       "$switch could not find a matching branch for an "
+                                       "input, and no default was specified."));
+        }
 
-        auto defaultBranchStage =
-            sbe::makeProjectStage(std::move(_context->traverseStage),
-                                  _context->planNodeId,
-                                  logicalExpressionEvalFrame.nextBranchResultSlot,
-                                  std::move(defaultExpr));
+        auto numChildren = expr->getChildren().size();
+        std::vector<EvalExprStagePair> branches;
+        branches.reserve(numChildren);
+        for (size_t i = 0; i < numChildren / 2 + 1; ++i) {
+            auto [expr, stage] = _context->popFrame();
 
-        logicalExpressionEvalFrame.branches.emplace_back(std::make_pair(
-            logicalExpressionEvalFrame.nextBranchResultSlot, std::move(defaultBranchStage)));
+            if (i == 0) {
+                // The first branch is the default value.
+                branches.emplace_back(std::move(expr), std::move(stage));
+                continue;
+            }
 
-        _context->generateSubTreeForSelectiveExecution();
+            auto thenSlot = _context->slotIdGenerator->generate();
+            auto thenStage =
+                makeProject(std::move(stage), _context->planNodeId, thenSlot, std::move(expr));
+
+            // Construct a FilterStage tree that will EOF if "case" expression returns false. In
+            // this case inner branch of loop join with "then" expression will never be executed.
+            std::tie(expr, stage) = _context->popFrame();
+            auto frameId = _context->frameIdGenerator->generate();
+            auto coercedExpr = sbe::makeE<sbe::ELocalBind>(
+                frameId,
+                sbe::makeEs(std::move(expr)),
+                generateCoerceToBoolExpression(sbe::EVariable{frameId, 0}));
+            auto conditionStage =
+                makeFilter<false>(std::move(stage), std::move(coercedExpr), _context->planNodeId);
+
+            // Create a LoopJoinStage that will evaluate its outer child exactly once. If outer
+            // child produces non-EOF result (i.e. condition evaluated to true), inner child is
+            // executed. Inner child simply bounds result of "then" expression to a slot.
+            auto loopJoinStage = makeLoopJoin(std::move(conditionStage),
+                                              std::move(thenStage),
+                                              _context->planNodeId,
+                                              _context->getLexicalEnvironment());
+
+            branches.emplace_back(thenSlot, std::move(loopJoinStage));
+        }
+
+        std::reverse(branches.begin(), branches.end());
+
+        auto [resultExpr, resultStage] = generateSingleResultUnion(
+            std::move(branches), {}, _context->planNodeId, _context->slotIdGenerator);
+
+        auto loopJoinStage = makeLoopJoin(_context->extractCurrentEvalStage(),
+                                          std::move(resultStage),
+                                          _context->planNodeId,
+                                          _context->getLexicalEnvironment());
+
+        _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
     }
 
     /**
@@ -2926,7 +2641,7 @@ generateExpression(OperationContext* opCtx,
                                      slotIdGenerator,
                                      frameIdGenerator,
                                      rootSlot,
-                                     relevantSlots,
+                                     *relevantSlots,
                                      env,
                                      planNodeId);
 
@@ -2935,6 +2650,9 @@ generateExpression(OperationContext* opCtx,
     ExpressionPostVisitor postVisitor{&context};
     ExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
     expression_walker::walk(&walker, expr);
-    return context.done();
+
+    auto [slotId, resultExpr, resultStage] = context.done();
+    *relevantSlots = std::move(resultStage.outSlots);
+    return {slotId, std::move(resultExpr), std::move(resultStage.stage)};
 }
 }  // namespace mongo::stage_builder

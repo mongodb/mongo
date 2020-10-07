@@ -1,7 +1,8 @@
 /**
  * Basic test to verify the output of $indexStats.
  *
- * @tags: [assumes_read_concern_unchanged, requires_wiredtiger, do_not_wrap_aggregations_in_facets]
+ * @tags: [assumes_read_concern_unchanged, requires_wiredtiger, do_not_wrap_aggregations_in_facets,
+ * uses_parallel_shell]
  */
 (function() {
 "use strict";

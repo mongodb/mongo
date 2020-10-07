@@ -29,11 +29,15 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/filter.h"
+#include "mongo/db/exec/sbe/stages/project.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo::stage_builder {
@@ -112,6 +116,16 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1);
 
 /**
+ * Same as 'makeLimitCoScanTree()', but returns 'EvalStage' with empty 'outSlots' vector.
+ */
+EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit = 1);
+
+/**
+ * If 'stage.stage' is 'nullptr', return limit-1/coscan tree. Otherwise, return stage.
+ */
+EvalStage stageOrLimitCoScan(EvalStage stage, PlanNodeId planNodeId, long long limit = 1);
+
+/**
  * Wrap expression into logical negation.
  */
 std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e);
@@ -121,5 +135,93 @@ std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e);
  * expression.
  */
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e);
+
+/**
+ * If given 'EvalExpr' already contains a slot, simply returns it. Otherwise, allocates a new slot
+ * and creates project stage to assign expression to this new slot. After that, new slot and project
+ * stage are returned.
+ */
+std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
+    EvalExpr expr,
+    EvalStage stage,
+    PlanNodeId planNodeId,
+    sbe::value::SlotIdGenerator* slotIdGenerator);
+
+template <bool IsConst>
+EvalStage makeFilter(EvalStage stage,
+                     std::unique_ptr<sbe::EExpression> filter,
+                     PlanNodeId planNodeId) {
+    stage = stageOrLimitCoScan(std::move(stage), planNodeId);
+
+    return {sbe::makeS<sbe::FilterStage<IsConst>>(
+                std::move(stage.stage), std::move(filter), planNodeId),
+            std::move(stage.outSlots)};
+}
+
+template <typename... Ts>
+EvalStage makeProject(EvalStage stage, PlanNodeId planNodeId, Ts&&... pack) {
+    stage = stageOrLimitCoScan(std::move(stage), planNodeId);
+
+    auto outSlots = std::move(stage.outSlots);
+    auto projects = makeEM(std::forward<Ts>(pack)...);
+
+    for (auto& [slot, expr] : projects) {
+        outSlots.push_back(slot);
+    }
+
+    return {sbe::makeS<sbe::ProjectStage>(std::move(stage.stage), std::move(projects), planNodeId),
+            std::move(outSlots)};
+}
+
+/**
+ * Creates loop join stage. All 'outSlots' from the 'left' argument along with slots from the
+ * 'lexicalEnvironment' argument are passed as correlated.
+ * If stage in 'left' or 'right' argument is 'nullptr', it is treated as if it was limit-1/coscan.
+ * In this case, loop join stage is not created. 'right' stage is returned if 'left' is 'nullptr'.
+ * 'left' stage is returned if 'right' is 'nullptr'.
+ */
+EvalStage makeLoopJoin(EvalStage left,
+                       EvalStage right,
+                       PlanNodeId planNodeId,
+                       const sbe::value::SlotVector& lexicalEnvironment = {});
+
+/**
+ * Creates traverse stage. All 'outSlots' from 'outer' argument (except for 'inField') along with
+ * slots from the 'lexicalEnvironment' argument are passed as correlated.
+ */
+EvalStage makeTraverse(EvalStage outer,
+                       EvalStage inner,
+                       sbe::value::SlotId inField,
+                       sbe::value::SlotId outField,
+                       sbe::value::SlotId outFieldInner,
+                       std::unique_ptr<sbe::EExpression> foldExpr,
+                       std::unique_ptr<sbe::EExpression> finalExpr,
+                       PlanNodeId planNodeId,
+                       boost::optional<size_t> nestedArraysDepth,
+                       const sbe::value::SlotVector& lexicalEnvironment = {});
+
+using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
+    EvalExpr expr,
+    EvalStage stage,
+    PlanNodeId planNodeId,
+    sbe::value::SlotIdGenerator* slotIdGenerator)>;
+
+/**
+ * Creates limit-1/union stage with specified branches. Each branch is passed to 'branchFn' first.
+ * If 'branchFn' is not set, expression from branch is simply projected to a slot.
+ */
+EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branches,
+                                            BranchFn branchFn,
+                                            PlanNodeId planNodeId,
+                                            sbe::value::SlotIdGenerator* slotIdGenerator);
+
+/**
+ * Creates tree with short-circuiting for OR and AND. Each element in 'braches' argument represents
+ * logical expression and sub-tree generated for it.
+ */
+EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
+                                                   std::vector<EvalExprStagePair> branches,
+                                                   PlanNodeId planNodeId,
+                                                   sbe::value::SlotIdGenerator* slotIdGenerator);
 
 }  // namespace mongo::stage_builder

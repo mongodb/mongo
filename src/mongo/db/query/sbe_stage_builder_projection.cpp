@@ -329,7 +329,6 @@ public:
         // inclusion projection also add constant filter stage on top to filter out input values for
         // nested traversal if they're not documents.
         auto outputSlot = _context->slotIdGenerator->generate();
-        _context->relevantSlots.push_back(outputSlot);
         _context->evals.push(
             {{_context->topLevel().inputSlot,
               outputSlot,
