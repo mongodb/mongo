@@ -12926,45 +12926,45 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_fast_memory,live_record_incompatible
   tasks:
   - name: compile_without_package_TG
-  - name: .aggfuzzer
-  - name: .aggregation
-  - name: audit
-  - name: .auth !.multiversion !.non_live_record
-  - name: .causally_consistent !.sharding
-  - name: .change_streams
-  - name: .misc_js !.non_live_record
-  - name: .concurrency !.ubsan !.no_txns !.debug_only !.stepdowns !.non_live_record
-  - name: .encrypt
-  - name: initial_sync_fuzzer_gen
+#  - name: .aggfuzzer
+#  - name: .aggregation
+#  - name: audit
+#  - name: .auth !.multiversion !.non_live_record
+#  - name: .causally_consistent !.sharding
+#  - name: .change_streams
+#  - name: .misc_js !.non_live_record
+#  - name: .concurrency !.ubsan !.no_txns !.debug_only !.stepdowns !.non_live_record
+#  - name: .encrypt
+#  - name: initial_sync_fuzzer_gen
   - name: .jscore .common
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_op_query
-  - name: jsCore_txns_large_txns_format
-  - name: jsonSchema
-  - name: .jstestfuzz !.flow_control !.stepdowns !.causal
-  - name: multiversion_sanity_check_gen
-  - name: mqlrun
-  - name: .multi_shard
-  - name: tenant_migration_jscore_passthrough_gen
-  - name: .query_fuzzer
-  - name: .read_write_concern
-  - name: .replica_sets !.encrypt !.auth !.non_live_record
-  - name: replica_sets_reconfig_jscore_passthrough_gen
-  - name: replica_sets_reconfig_jscore_stepdown_passthrough
-  - name: retryable_writes_jscore_passthrough_gen
-  - name: retryable_writes_jscore_stepdown_passthrough
-  - name: .read_only
-  - name: .rollbackfuzzer
-  - name: sasl
-  - name: search
-  - name: search_auth
-  - name: search_ssl
-  - name: session_jscore_passthrough
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .txns
-  - name: .sharding .common !.non_live_record
-  - name: snmp
-  - name: .updatefuzzer
+#  - name: jsCore_minimum_batch_size
+#  - name: jsCore_op_query
+#  - name: jsCore_txns_large_txns_format
+#  - name: jsonSchema
+#  - name: .jstestfuzz !.flow_control !.stepdowns !.causal
+#  - name: multiversion_sanity_check_gen
+#  - name: mqlrun
+#  - name: .multi_shard
+#  - name: tenant_migration_jscore_passthrough_gen
+#  - name: .query_fuzzer
+#  - name: .read_write_concern
+#  - name: .replica_sets !.encrypt !.auth !.non_live_record
+#  - name: replica_sets_reconfig_jscore_passthrough_gen
+#  - name: replica_sets_reconfig_jscore_stepdown_passthrough
+#  - name: retryable_writes_jscore_passthrough_gen
+#  - name: retryable_writes_jscore_stepdown_passthrough
+#  - name: .read_only
+#  - name: .rollbackfuzzer
+#  - name: sasl
+#  - name: search
+#  - name: search_auth
+#  - name: search_ssl
+#  - name: session_jscore_passthrough
+#  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+#  - name: .sharding .txns
+#  - name: .sharding .common !.non_live_record
+#  - name: snmp
+#  - name: .updatefuzzer
 
 - <<: *enterprise-rhel-62-64-bit-dynamic-required-template
   name: rhel-62-64-bit-dynamic-visibility-test
