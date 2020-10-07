@@ -220,20 +220,16 @@ public:
 
 class DurableCatalogImpl::AddIndexChange : public RecoveryUnit::Change {
 public:
-    AddIndexChange(OperationContext* opCtx,
-                   RecoveryUnit* ru,
-                   StorageEngineInterface* engine,
-                   StringData ident)
-        : _opCtx(opCtx), _recoveryUnit(ru), _engine(engine), _ident(ident.toString()) {}
+    AddIndexChange(RecoveryUnit* ru, StorageEngineInterface* engine, StringData ident)
+        : _recoveryUnit(ru), _engine(engine), _ident(ident.toString()) {}
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
         // Intentionally ignoring failure.
         auto kvEngine = _engine->getEngine();
-        MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_recoveryUnit, _ident);
+        kvEngine->dropIdent(_recoveryUnit, _ident).ignore();
     }
 
-    OperationContext* const _opCtx;
     RecoveryUnit* const _recoveryUnit;
     StorageEngineInterface* _engine;
     const std::string _ident;
@@ -1138,7 +1134,7 @@ Status DurableCatalogImpl::prepareForIndexBuild(OperationContext* opCtx,
         opCtx, getCollectionOptions(opCtx, catalogId), ident, spec, prefix);
     if (status.isOK()) {
         opCtx->recoveryUnit()->registerChange(
-            std::make_unique<AddIndexChange>(opCtx, opCtx->recoveryUnit(), _engine, ident));
+            std::make_unique<AddIndexChange>(opCtx->recoveryUnit(), _engine, ident));
     }
 
     return status;

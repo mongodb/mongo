@@ -172,7 +172,7 @@ Status KVEngine::dropIdent(mongo::RecoveryUnit* ru, StringData ident) {
         lock.unlock();
         if (isRecordStore) {  // ident is RecordStore.
             CollectionOptions s;
-            auto rs = getRecordStore(nullptr, ""_sd, ident, s);
+            auto rs = getRecordStore(/*opCtx=*/nullptr, ""_sd, ident, s);
             dropStatus =
                 checked_cast<RecordStore*>(rs.get())->truncateWithoutUpdatingCount(ru).getStatus();
         } else {  // ident is SortedDataInterface.

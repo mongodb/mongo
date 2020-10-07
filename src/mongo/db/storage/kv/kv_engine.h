@@ -210,10 +210,9 @@ public:
     virtual Status repairIdent(OperationContext* opCtx, StringData ident) = 0;
 
     /**
-     * Takes a RecoveryUnit. Obtaining the RecoveryUnit from the OperationContext is not
-     * necessarily possible, since as of SERVER-44139 dropIdent can be called as part of
-     * multi-document transactions, which use the same RecoveryUnit throughout but not the same
-     * OperationContext.
+     * Removes any knowledge of the ident from the storage engines metadata which includes removing
+     * the underlying files belonging to the ident. If the storage engine is unable to process the
+     * removal immediately, we enqueue it to be removed at a later time.
      */
     virtual Status dropIdent(RecoveryUnit* ru, StringData ident) = 0;
 
