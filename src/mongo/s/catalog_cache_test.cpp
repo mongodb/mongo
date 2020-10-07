@@ -223,6 +223,17 @@ TEST_F(CatalogCacheTest, InvalidateSingleDbOnShardRemoval) {
     ASSERT_EQ(cachedDb.primaryId(), kShards[1]);
 }
 
+TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
+    // onStaleDatabaseVesrsion must invalidate the database entry if invoked with no version
+    const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
+    loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], true, dbVersion)});
+
+    _catalogCache->onStaleDatabaseVersion(kNss.db(), boost::none);
+
+    const auto status = _catalogCache->getDatabase(operationContext(), kNss.db()).getStatus();
+    ASSERT(status == ErrorCodes::InternalError);
+}
+
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), 1);
     const auto cachedCollVersion = ChunkVersion(1, 0, OID::gen());

@@ -285,6 +285,7 @@ TEST_F(ReshardingRecipientServiceTest,
                                                    << "indexOne")};
     auto future = launchAsync([&] {
         expectStaleDbVersionError(kOrigNss, "listCollections");
+        expectGetDatabase(kOrigNss, shards[1].getHost());
         expectListCollections(
             kOrigNss,
             kOrigUUID,
