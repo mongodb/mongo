@@ -302,17 +302,21 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, false);
 
-    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+    {
+        AutoGetCollection coll(opCtx, kNss, MODE_IX);
 
-    // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter has
-    // been updated to detect frozen migrations.
-    if (!OperationShardingState::isOperationVersioned(opCtx)) {
-        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-            kNss, env.version, env.dbVersion);
+        // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter
+        // has been updated to detect frozen migrations.
+        if (!OperationShardingState::isOperationVersioned(opCtx)) {
+            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+                kNss, env.version, env.dbVersion);
+        }
+
+        ASSERT_THROWS(getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10)),
+                      ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>);
     }
 
-    ASSERT_THROWS(getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10)),
-                  ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>);
+    auto sw = catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, env.tempNss);
 }
 
 TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
