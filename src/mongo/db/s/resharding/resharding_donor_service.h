@@ -98,6 +98,8 @@ public:
 
 private:
     // The following functions correspond to the actions to take at a particular donor state.
+    void _transitionToPreparingToDonate();
+
     void _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating();
 
     ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenStartMirroring(

@@ -102,7 +102,7 @@ ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
 void ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
-        .then([this] { _transitionState(DonorStateEnum::kPreparingToDonate); })
+        .then([this] { _transitionToPreparingToDonate(); })
         .then([this] { _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating(); })
         .then([this, executor] {
             return _awaitAllRecipientsDoneApplyingThenStartMirroring(executor);
@@ -155,6 +155,14 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
 
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     boost::optional<TypeCollectionReshardingFields> reshardingFields) {}
+
+void ReshardingDonorService::DonorStateMachine::_transitionToPreparingToDonate() {
+    if (_donorDoc.getState() > DonorStateEnum::kUnused) {
+        return;
+    }
+
+    _transitionState(DonorStateEnum::kPreparingToDonate);
+}
 
 void ReshardingDonorService::DonorStateMachine::
     _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating() {
