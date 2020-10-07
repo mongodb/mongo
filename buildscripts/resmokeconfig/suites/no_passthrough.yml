@@ -4,6 +4,7 @@ selector:
   roots:
   - jstests/noPassthrough/*.js
   - src/mongo/db/modules/*/jstests/hot_backups/*.js
+  - src/mongo/db/modules/*/jstests/live_import/*.js
 
   # Self-tests for the Concurrency testing framework are run as part of this test suite.
   - jstests/concurrency/*.js
