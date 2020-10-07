@@ -36,17 +36,25 @@
 
 namespace mongo::stage_builder {
 /**
- * Generates an SBE plan stage sub-tree implementing an index scan.
+ * This method generates an SBE plan stage tree implementing an index scan. It returns a tuple
+ * containing: (1) a slot procued by the index scan that holds the record ID ('recordIdSlot');
+ * (2) a slot vector produced by the index scan which hold parts of the index key ('indexKeySlots');
+ * and (3) the SBE plan stage tree. 'indexKeySlots' will only contain slots for the parts of the
+ * index key specified by the 'indexKeysToInclude' bitset.
+ *
+ * If the caller provides a slot ID for the 'returnKeySlot' parameter, this method will populate
+ * the specified slot with the rehydrated index key for each record.
  */
-std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateIndexScan(
-    OperationContext* opCtx,
-    const CollectionPtr& collection,
-    const IndexScanNode* ixn,
-    boost::optional<sbe::value::SlotId> returnKeySlot,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    sbe::value::SpoolIdGenerator* spoolIdGenerator,
-    PlanYieldPolicy* yieldPolicy,
-    TrialRunProgressTracker* tracker);
+std::tuple<sbe::value::SlotId, sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>>
+generateIndexScan(OperationContext* opCtx,
+                  const CollectionPtr& collection,
+                  const IndexScanNode* ixn,
+                  boost::optional<sbe::value::SlotId> returnKeySlot,
+                  sbe::IndexKeysInclusionSet indexKeysToInclude,
+                  sbe::value::SlotIdGenerator* slotIdGenerator,
+                  sbe::value::SpoolIdGenerator* spoolIdGenerator,
+                  PlanYieldPolicy* yieldPolicy,
+                  TrialRunProgressTracker* tracker);
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds. The

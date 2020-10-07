@@ -154,6 +154,7 @@ selector:
   - jstests/core/find_and_modify_metrics.js
   - jstests/core/find_and_modify_server6226.js
   - jstests/core/find_and_modify_server6865.js
+  - jstests/core/find_covered_projection.js
   - jstests/core/find_dedup.js
   - jstests/core/find_project_sort.js
   - jstests/core/finda.js

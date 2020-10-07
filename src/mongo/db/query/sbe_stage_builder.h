@@ -118,6 +118,7 @@ private:
     std::unique_ptr<sbe::PlanStage> buildSort(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildSortKeyGeneraror(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildProjectionSimple(const QuerySolutionNode* root);
+    std::unique_ptr<sbe::PlanStage> buildProjectionCovered(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildProjectionDefault(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildOr(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildText(const QuerySolutionNode* root);
@@ -143,6 +144,14 @@ private:
     // A slot here indicates that the plan has a ReturnKeyStage at its root and that any index scans
     // should inflate each index entry into an object and bind it to this slot.
     boost::optional<sbe::value::SlotId> _returnKeySlot;
+
+    // A bitset here indicates that we have a covered projection that is expecting to read values
+    // from an index scan.
+    boost::optional<sbe::IndexKeysInclusionSet> _indexKeysToInclude;
+
+    // When an index scan produces values for a covered projection, this is where the slots for the
+    // produced values are stored.
+    boost::optional<sbe::value::SlotVector> _indexKeySlots;
 
     // These two flags control whether we're in the middle of the process of building a special
     // union sub-tree implementing a tailable cursor collection scan, and if so, whether we're
