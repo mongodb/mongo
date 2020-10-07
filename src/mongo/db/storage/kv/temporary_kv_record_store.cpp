@@ -65,7 +65,7 @@ void TemporaryKVRecordStore::finalizeTemporaryTable(OperationContext* opCtx,
     // destructed while we're using it.
     invariant(opCtx->lockState()->isReadLocked());
 
-    auto status = _kvEngine->dropIdent(opCtx, opCtx->recoveryUnit(), _rs->getIdent());
+    auto status = _kvEngine->dropIdent(opCtx->recoveryUnit(), _rs->getIdent());
 
     if (!status.isOK()) {
         LOGV2_ERROR(4841503, "Failed to drop temporary table", "ident"_attr = _rs->getIdent());

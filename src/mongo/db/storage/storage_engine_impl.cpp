@@ -489,7 +489,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         const auto& toRemove = it;
         LOGV2(22251, "Dropping unknown ident", "ident"_attr = toRemove);
         WriteUnitOfWork wuow(opCtx);
-        fassert(40591, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), toRemove));
+        fassert(40591, _engine->dropIdent(opCtx->recoveryUnit(), toRemove));
         wuow.commit();
     }
 
@@ -621,7 +621,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                       "namespace"_attr = coll,
                       "index"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
-                fassert(50713, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), indexIdent));
+                fassert(50713, _engine->dropIdent(opCtx->recoveryUnit(), indexIdent));
                 indexesToDrop.push_back(indexName);
                 continue;
             }
@@ -647,7 +647,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     for (auto&& temp : internalIdentsToDrop) {
         LOGV2(22257, "Dropping internal ident", "ident"_attr = temp);
         WriteUnitOfWork wuow(opCtx);
-        fassert(51067, _engine->dropIdent(opCtx, opCtx->recoveryUnit(), temp));
+        fassert(51067, _engine->dropIdent(opCtx->recoveryUnit(), temp));
         wuow.commit();
     }
 
@@ -1038,8 +1038,9 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
 
 void StorageEngineImpl::addDropPendingIdent(const Timestamp& dropTimestamp,
                                             const NamespaceString& nss,
-                                            std::shared_ptr<Ident> ident) {
-    _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident);
+                                            std::shared_ptr<Ident> ident,
+                                            const DropIdentCallback& onDrop) {
+    _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident, onDrop);
 }
 
 void StorageEngineImpl::checkpoint() {

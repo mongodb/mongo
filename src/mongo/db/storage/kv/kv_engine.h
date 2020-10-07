@@ -210,14 +210,12 @@ public:
     virtual Status repairIdent(OperationContext* opCtx, StringData ident) = 0;
 
     /**
-     * Takes both an OperationContext and a RecoveryUnit, since most storage engines except for
-     * mobile only need the RecoveryUnit. Obtaining the RecoveryUnit from the OperationContext is
-     * not necessarily possible, since as of SERVER-44139 dropIdent can be called as part of
+     * Takes a RecoveryUnit. Obtaining the RecoveryUnit from the OperationContext is not
+     * necessarily possible, since as of SERVER-44139 dropIdent can be called as part of
      * multi-document transactions, which use the same RecoveryUnit throughout but not the same
      * OperationContext.
-     * TODO(SERVER-45371) Remove OperationContext argument.
      */
-    virtual Status dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) = 0;
+    virtual Status dropIdent(RecoveryUnit* ru, StringData ident) = 0;
 
     /**
      * Attempts to locate and recover a file that is "orphaned" from the storage engine's metadata,

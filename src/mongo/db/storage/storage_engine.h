@@ -78,6 +78,8 @@ public:
     using OldestActiveTransactionTimestampCallback =
         std::function<OldestActiveTransactionTimestampResult(Timestamp stableTimestamp)>;
 
+    using DropIdentCallback = std::function<void(const NamespaceString& ns)>;
+
     /**
      * The interface for creating new instances of storage engines.
      *
@@ -472,7 +474,8 @@ public:
      */
     virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
                                      const NamespaceString& nss,
-                                     std::shared_ptr<Ident> ident) = 0;
+                                     std::shared_ptr<Ident> ident,
+                                     const DropIdentCallback& onDrop = nullptr) = 0;
 
     /**
      * Called when the checkpoint thread instructs the storage engine to take a checkpoint. The
@@ -661,6 +664,8 @@ public:
     virtual Status currentFilesCompatible(OperationContext* opCtx) const = 0;
 
     virtual int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) = 0;
+
+    virtual bool isUsingDirectoryPerDb() const = 0;
 
     virtual KVEngine* getEngine() = 0;
     virtual const KVEngine* getEngine() const = 0;

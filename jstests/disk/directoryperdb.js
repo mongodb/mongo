@@ -74,8 +74,9 @@ checkDBDirectoryNonexistent = function(conn, dbToCheck) {
     } else if (dbToCheck == Array(22).join('処')) {
         dir = dbpath + Array(22).join('.229.135.166');
     }
-    var files = listFiles(dir);
-    assert.eq(files.length, 0, 'Files left behind in database directory');
+    assert(!files.some(file => file.name === dir),
+           "Database " + dbToCheck + " directory " + dir +
+               " left behind when it should have been removed");
     return conn;
 };
 

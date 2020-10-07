@@ -162,9 +162,7 @@ std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
         return std::make_unique<SortedDataInterfaceStandard>(opCtx, ident, desc);
 }
 
-Status KVEngine::dropIdent(OperationContext* unusedOpCtx,
-                           mongo::RecoveryUnit* ru,
-                           StringData ident) {
+Status KVEngine::dropIdent(mongo::RecoveryUnit* ru, StringData ident) {
     Status dropStatus = Status::OK();
     stdx::unique_lock lock(_identsLock);
     if (_idents.count(ident.toString()) > 0) {
@@ -174,7 +172,7 @@ Status KVEngine::dropIdent(OperationContext* unusedOpCtx,
         lock.unlock();
         if (isRecordStore) {  // ident is RecordStore.
             CollectionOptions s;
-            auto rs = getRecordStore(/*unused*/ unusedOpCtx, ""_sd, ident, s);
+            auto rs = getRecordStore(nullptr, ""_sd, ident, s);
             dropStatus =
                 checked_cast<RecordStore*>(rs.get())->truncateWithoutUpdatingCount(ru).getStatus();
         } else {  // ident is SortedDataInterface.

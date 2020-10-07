@@ -201,7 +201,7 @@ public:
                                                                        const IndexDescriptor* desc,
                                                                        KVPrefix prefix) override;
 
-    Status dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) override;
+    Status dropIdent(RecoveryUnit* ru, StringData ident) override;
 
     Status okToRename(OperationContext* opCtx,
                       StringData fromNS,

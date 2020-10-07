@@ -230,8 +230,7 @@ public:
     virtual void rollback() {
         // Intentionally ignoring failure.
         auto kvEngine = _engine->getEngine();
-        MONGO_COMPILER_VARIABLE_UNUSED auto status =
-            kvEngine->dropIdent(_opCtx, _recoveryUnit, _ident);
+        MONGO_COMPILER_VARIABLE_UNUSED auto status = kvEngine->dropIdent(_recoveryUnit, _ident);
     }
 
     OperationContext* const _opCtx;
@@ -887,11 +886,10 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
 
     auto ru = opCtx->recoveryUnit();
     CollectionUUID uuid = options.uuid.get();
-    opCtx->recoveryUnit()->onRollback(
-        [opCtx, ru, catalog = this, nss, ident = entry.ident, uuid]() {
-            // Intentionally ignoring failure
-            catalog->_engine->getEngine()->dropIdent(opCtx, ru, ident).ignore();
-        });
+    opCtx->recoveryUnit()->onRollback([ru, catalog = this, nss, ident = entry.ident, uuid]() {
+        // Intentionally ignoring failure
+        catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
+    });
 
     auto rs =
         _engine->getEngine()->getGroupedRecordStore(opCtx, nss.ns(), entry.ident, options, prefix);
@@ -976,12 +974,12 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
 
     auto ru = opCtx->recoveryUnit();
     opCtx->recoveryUnit()->onRollback(
-        [opCtx, ru, catalog = this, nss, ident = entry.ident, indexIdents = indexIdents]() {
+        [ru, catalog = this, nss, ident = entry.ident, indexIdents = indexIdents]() {
             // TODO SERVER-51146: dropIdent without removing the files.
             // Intentionally ignoring failure
-            catalog->_engine->getEngine()->dropIdent(opCtx, ru, ident).ignore();
+            catalog->_engine->getEngine()->dropIdent(ru, ident).ignore();
             for (const auto& indexIdent : indexIdents) {
-                catalog->_engine->getEngine()->dropIdent(opCtx, ru, indexIdent).ignore();
+                catalog->_engine->getEngine()->dropIdent(ru, indexIdent).ignore();
             }
         });
 

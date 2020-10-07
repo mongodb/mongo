@@ -81,7 +81,8 @@ public:
      */
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
-                             std::shared_ptr<Ident> ident);
+                             std::shared_ptr<Ident> ident,
+                             const StorageEngine::DropIdentCallback& onDrop = nullptr);
 
     /**
      * Returns earliest drop timestamp in '_dropPendingIdents'.
@@ -120,6 +121,9 @@ private:
         // The collection or index data can be safely dropped when no references to this token
         // remain.
         std::weak_ptr<void> dropToken;
+
+        // Callback to run once the ident has been dropped.
+        StorageEngine::DropIdentCallback onDrop;
     };
 
     // Container type for drop-pending namespaces. We use a multimap so that we can order the

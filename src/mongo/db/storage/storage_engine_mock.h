@@ -174,13 +174,17 @@ public:
     }
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
-                             std::shared_ptr<Ident> ident) final {}
+                             std::shared_ptr<Ident> ident,
+                             const DropIdentCallback& onDrop) final {}
     void checkpoint() final {}
     Status currentFilesCompatible(OperationContext* opCtx) const final {
         return Status::OK();
     }
     int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) final {
         return 0;
+    }
+    bool isUsingDirectoryPerDb() const final {
+        return false;
     }
     KVEngine* getEngine() final {
         return nullptr;

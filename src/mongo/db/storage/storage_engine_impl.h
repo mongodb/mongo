@@ -316,7 +316,8 @@ public:
 
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
-                             std::shared_ptr<Ident> ident) override;
+                             std::shared_ptr<Ident> ident,
+                             const DropIdentCallback& onDrop) override;
 
     void checkpoint() override;
 
@@ -355,6 +356,10 @@ public:
     }
 
     int64_t sizeOnDiskForDb(OperationContext* opCtx, StringData dbName) override;
+
+    bool isUsingDirectoryPerDb() const override {
+        return _options.directoryPerDB;
+    }
 
 private:
     using CollIter = std::list<std::string>::iterator;

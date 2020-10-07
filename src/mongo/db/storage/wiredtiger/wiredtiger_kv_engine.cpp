@@ -1608,7 +1608,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     return std::move(rs);
 }
 
-Status WiredTigerKVEngine::dropIdent(OperationContext* opCtx, RecoveryUnit* ru, StringData ident) {
+Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru, StringData ident) {
     string uri = _uri(ident);
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(ru);

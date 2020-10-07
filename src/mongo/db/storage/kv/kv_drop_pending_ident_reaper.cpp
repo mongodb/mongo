@@ -46,7 +46,8 @@ KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(e
 
 void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestamp,
                                                    const NamespaceString& nss,
-                                                   std::shared_ptr<Ident> ident) {
+                                                   std::shared_ptr<Ident> ident,
+                                                   const StorageEngine::DropIdentCallback& onDrop) {
     stdx::lock_guard<Latch> lock(_mutex);
     const auto equalRange = _dropPendingIdents.equal_range(dropTimestamp);
     const auto& lowerBound = equalRange.first;
@@ -57,16 +58,14 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
         info.nss = nss;
         info.identName = ident->getIdent();
         info.dropToken = ident;
+        info.onDrop = std::move(onDrop);
         _dropPendingIdents.insert(std::make_pair(dropTimestamp, info));
     } else {
-        LOGV2_FATAL_NOTRACE(
-            51023,
-            "Failed to add drop-pending ident {ident} ({namespace}) with drop timestamp "
-            "{dropTimestamp}: duplicate timestamp and ident pair.",
-            "Failed to add drop-pending ident, duplicate timestamp and ident pair",
-            "ident"_attr = ident->getIdent(),
-            "namespace"_attr = nss,
-            "dropTimestamp"_attr = dropTimestamp);
+        LOGV2_FATAL_NOTRACE(51023,
+                            "Failed to add drop-pending ident, duplicate timestamp and ident pair",
+                            "ident"_attr = ident->getIdent(),
+                            logAttrs(nss),
+                            "dropTimestamp"_attr = dropTimestamp);
     }
 }
 
@@ -120,26 +119,25 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
         const auto& nss = identInfo.nss;
         const auto& identName = identInfo.identName;
         LOGV2(22237,
-              "Completing drop for ident {ident} (ns: {namespace}) with drop timestamp "
-              "{dropTimestamp}",
               "Completing drop for ident",
               "ident"_attr = identName,
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "dropTimestamp"_attr = dropTimestamp);
         WriteUnitOfWork wuow(opCtx);
-        auto status = _engine->dropIdent(opCtx, opCtx->recoveryUnit(), identName);
+        auto status = _engine->dropIdent(opCtx->recoveryUnit(), identName);
         if (!status.isOK()) {
-            LOGV2_FATAL_NOTRACE(
-                51022,
-                "Failed to remove drop-pending ident {ident}(ns: {namespace}) with drop "
-                "timestamp {dropTimestamp}: {error}",
-                "Failed to remove drop-pending ident",
-                "ident"_attr = identName,
-                "namespace"_attr = nss,
-                "dropTimestamp"_attr = dropTimestamp,
-                "error"_attr = status);
+            LOGV2_FATAL_NOTRACE(51022,
+                                "Failed to remove drop-pending ident",
+                                "ident"_attr = identName,
+                                logAttrs(nss),
+                                "dropTimestamp"_attr = dropTimestamp,
+                                "error"_attr = status);
         }
         wuow.commit();
+
+        if (identInfo.onDrop) {
+            identInfo.onDrop(nss);
+        }
     }
 
     {

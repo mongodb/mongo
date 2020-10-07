@@ -96,7 +96,7 @@ public:
 
     virtual void endBackup(OperationContext* opCtx) {}
 
-    virtual Status dropIdent(OperationContext* opCtx, mongo::RecoveryUnit* ru, StringData ident);
+    virtual Status dropIdent(mongo::RecoveryUnit* ru, StringData ident);
 
     virtual bool supportsDirectoryPerDB() const {
         return false;  // Not persistant so no Directories

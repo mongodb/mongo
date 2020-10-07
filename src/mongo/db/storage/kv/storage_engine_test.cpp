@@ -99,7 +99,7 @@ TEST_F(StorageEngineTest, ReconcileIdentsTest) {
     ASSERT_EQUALS("_id", toRebuild.indexName);
 
     // Now drop the `db.coll1` table, while leaving the DurableCatalog entry.
-    ASSERT_OK(dropIdent(opCtx.get(), opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
     ASSERT_EQUALS(static_cast<const unsigned long>(1), getAllKVEngineIdents(opCtx.get()).size());
 
     // Reconciling this should result in an error.
@@ -115,7 +115,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphansAfterUncleanShutdown) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get(), opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the collection has been dropped because the
@@ -349,7 +349,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphans) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get(), opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // After the catalog is reloaded, we expect that the ident has been recovered because the
@@ -374,7 +374,7 @@ TEST_F(StorageEngineRepairTest, ReconcileSucceeds) {
     auto swCollInfo = createCollection(opCtx.get(), collNs);
     ASSERT_OK(swCollInfo.getStatus());
 
-    ASSERT_OK(dropIdent(opCtx.get(), opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
+    ASSERT_OK(dropIdent(opCtx.get()->recoveryUnit(), swCollInfo.getValue().ident));
     ASSERT(collectionExists(opCtx.get(), collNs));
 
     // Reconcile would normally return an error if a collection existed with a missing ident in the

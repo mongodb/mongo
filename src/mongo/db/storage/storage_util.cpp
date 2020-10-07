@@ -33,8 +33,11 @@
 
 #include <string>
 
+#include <boost/filesystem/operations.hpp>
+
 #include "mongo/db/storage/storage_util.h"
 
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -94,7 +97,7 @@ void removeIndex(OperationContext* opCtx,
             storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident);
         } else {
             auto kvEngine = storageEngine->getEngine();
-            kvEngine->dropIdent(opCtx, recoveryUnit, ident->getIdent()).ignore();
+            kvEngine->dropIdent(recoveryUnit, ident->getIdent()).ignore();
         }
     });
 }
@@ -119,25 +122,52 @@ Status dropCollection(OperationContext* opCtx,
     // RecoveryUnit throughout but not the same OperationContext.
     auto recoveryUnit = opCtx->recoveryUnit();
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const auto& collectionCatalog = CollectionCatalog::get(opCtx);
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successuflly committed.
-    opCtx->recoveryUnit()->onCommit([opCtx, recoveryUnit, storageEngine, nss, ident](
+    opCtx->recoveryUnit()->onCommit([recoveryUnit, storageEngine, &collectionCatalog, nss, ident](
                                         boost::optional<Timestamp> commitTimestamp) {
+        StorageEngine::DropIdentCallback onDrop = [storageEngine,
+                                                   &collectionCatalog](const NamespaceString& ns) {
+            // Nothing to do if not using directoryperdb or there are still collections in the
+            // database.
+            if (!storageEngine->isUsingDirectoryPerDb() ||
+                collectionCatalog.begin(nullptr, ns.db()) != collectionCatalog.end(nullptr)) {
+                return;
+            }
+
+            boost::system::error_code ec;
+            boost::filesystem::remove(storageEngine->getFilesystemPathForDb(ns.db().toString()),
+                                      ec);
+
+            if (!ec) {
+                LOGV2(4888200, "Removed empty database directory", "db"_attr = ns.db());
+            } else if (collectionCatalog.begin(nullptr, ns.db()) ==
+                       collectionCatalog.end(nullptr)) {
+                // It is possible for a new collection to be created in the database between
+                // when we check whether the database is empty and actually attempting to
+                // remove the directory. In this case, don't log that the removal failed
+                // because it is expected.
+                LOGV2(4888201,
+                      "Failed to remove database directory",
+                      "db"_attr = ns.db(),
+                      "error"_attr = ec.message());
+            }
+        };
+
         if (storageEngine->supportsPendingDrops() && commitTimestamp) {
             LOGV2(22214,
-                  "Deferring table drop for collection '{namespace}'. Ident: {ident}, "
-                  "commit timestamp: {commitTimestamp}",
                   "Deferring table drop for collection",
                   logAttrs(nss),
                   "ident"_attr = ident->getIdent(),
                   "commitTimestamp"_attr = commitTimestamp);
-            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident);
+            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, onDrop);
         } else {
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to
             // the collection, we should never see it again anyway.
-            auto kvEngine = storageEngine->getEngine();
-            kvEngine->dropIdent(opCtx, recoveryUnit, ident->getIdent()).ignore();
+            storageEngine->getEngine()->dropIdent(recoveryUnit, ident->getIdent()).ignore();
+            onDrop(nss);
         }
     });
 
