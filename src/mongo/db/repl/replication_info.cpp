@@ -70,9 +70,9 @@ namespace mongo {
 
 // Hangs in the beginning of each hello command when set.
 MONGO_FAIL_POINT_DEFINE(waitInHello);
-// Awaitable isMaster requests with the proper topologyVersions will sleep for maxAwaitTimeMS on
+// Awaitable hello requests with the proper topologyVersions will sleep for maxAwaitTimeMS on
 // standalones. This failpoint will hang right before doing this sleep when set.
-MONGO_FAIL_POINT_DEFINE(hangWaitingForIsMasterResponseOnStandalone);
+MONGO_FAIL_POINT_DEFINE(hangWaitingForHelloResponseOnStandalone);
 
 using std::list;
 using std::string;
@@ -138,11 +138,11 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
 
         HelloMetrics::get(opCtx)->incrementNumAwaitingTopologyChanges();
         ON_BLOCK_EXIT([&] { HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges(); });
-        if (MONGO_unlikely(hangWaitingForIsMasterResponseOnStandalone.shouldFail())) {
+        if (MONGO_unlikely(hangWaitingForHelloResponseOnStandalone.shouldFail())) {
             // Used in tests that wait for this failpoint to be entered to guarantee that the
             // request is waiting and metrics have been updated.
-            LOGV2(31462, "Hanging due to hangWaitingForIsMasterResponseOnStandalone failpoint.");
-            hangWaitingForIsMasterResponseOnStandalone.pauseWhileSet(opCtx);
+            LOGV2(31462, "Hanging due to hangWaitingForHelloResponseOnStandalone failpoint.");
+            hangWaitingForHelloResponseOnStandalone.pauseWhileSet(opCtx);
         }
         opCtx->sleepFor(Milliseconds(*maxAwaitTimeMS));
     }
