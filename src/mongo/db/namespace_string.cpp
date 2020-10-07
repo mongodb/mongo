@@ -126,6 +126,8 @@ bool NamespaceString::isLegalClientSystemNS() const {
             return true;
         if (coll() == kIndexBuildEntryNamespace.coll())
             return true;
+        if (coll().find(".system.resharding.") != std::string::npos)
+            return true;
     } else if (db() == kLocalDb) {
         if (coll() == kSystemReplSetNamespace.coll())
             return true;
@@ -140,7 +142,6 @@ bool NamespaceString::isLegalClientSystemNS() const {
     if (coll() == kSystemDotViewsCollectionName)
         return true;
     if (isTemporaryReshardingCollection()) {
-        // Permit integration testing on resharding collections.
         return true;
     }
 

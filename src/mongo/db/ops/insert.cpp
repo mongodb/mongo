@@ -227,6 +227,10 @@ Status userAllowedCreateNS(const NamespaceString& ns) {
             return Status::OK();
         }
 
+        if (ns.isConfigDB() && ns.isLegalClientSystemNS()) {
+            return Status::OK();
+        }
+
         return Status(ErrorCodes::BadValue, str::stream() << "Invalid namespace: " << ns);
     }
 
