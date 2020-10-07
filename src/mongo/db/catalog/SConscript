@@ -507,6 +507,7 @@ env.CppUnitTest(
         'collection_options_test.cpp',
         'collection_test.cpp',
         'collection_validation_test.cpp',
+        'collection_writer_test.cpp',
         'commit_quorum_options_test.cpp',
         'create_collection_test.cpp',
         'database_test.cpp',
