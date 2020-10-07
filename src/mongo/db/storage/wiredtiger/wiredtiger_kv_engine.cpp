@@ -1550,9 +1550,14 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp oldestTimestamp, bool forc
 }
 
 void WiredTigerKVEngine::setInitialDataTimestamp(Timestamp initialDataTimestamp) {
+    _initialDataTimestamp.store(initialDataTimestamp.asULL());
     if (_checkpointThread) {
         _checkpointThread->setInitialDataTimestamp(initialDataTimestamp);
     }
+}
+
+Timestamp WiredTigerKVEngine::getInitialDataTimestamp() const {
+    return Timestamp(_initialDataTimestamp.load());
 }
 
 bool WiredTigerKVEngine::supportsRecoverToStableTimestamp() const {
