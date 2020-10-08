@@ -936,11 +936,9 @@ HeartbeatResponseAction TopologyCoordinator::processHeartbeatResponse(
     invariant(hbStats.getLastHeartbeatStartDate() != Date_t());
     const bool isUnauthorized = (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
         (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
-    const bool isInvalid = hbResponse.getStatus().code() == ErrorCodes::InvalidReplicaSetConfig;
 
-    // Replication of auth changes can cause temporary auth failures, and a temporary DNS outage can
-    // make a node return InvalidReplicaSetConfig if it can't find itself in the config.
-    if (hbResponse.isOK() || isUnauthorized || isInvalid) {
+    // Replication of auth changes can cause temporary auth failures.
+    if (hbResponse.isOK() || isUnauthorized) {
         hbStats.hit(networkRoundTripTime);
     } else {
         hbStats.miss();

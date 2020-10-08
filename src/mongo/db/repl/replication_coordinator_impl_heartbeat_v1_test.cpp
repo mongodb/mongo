@@ -1120,7 +1120,7 @@ TEST_F(ReplCoordHBV1Test, IgnoreTheContentsOfMetadataWhenItsReplicaSetIdDoesNotM
     ASSERT_TRUE(members[1].isABSONObj());
     auto member = members[1].Obj();
     ASSERT_EQ(host2, HostAndPort(member["name"].String()));
-    ASSERT_EQ(MemberState(MemberState::RS_UNKNOWN).toString(),
+    ASSERT_EQ(MemberState(MemberState::RS_DOWN).toString(),
               MemberState(member["state"].numberInt()).toString());
 }
 
