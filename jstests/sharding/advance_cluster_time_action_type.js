@@ -47,7 +47,8 @@ const cmdObj = {
 };
 jsTestLog("running NonTrusted. command: " + tojson(cmdObj));
 res = testDB.runCommand(cmdObj);
-assert.commandFailed(res, "Command request was: " + tojsononeline(cmdObj));
+assert.commandFailedWithCode(
+    res, ErrorCodes.TimeProofMismatch, "Command request was: " + tojsononeline(cmdObj));
 
 assert.eq(1, testDB.auth("Trusted", "pwd"));
 jsTestLog("running Trusted. command: " + tojson(cmdObj));

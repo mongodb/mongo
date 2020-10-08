@@ -50,6 +50,7 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(alwaysValidateClientsClusterTime);
 MONGO_FAIL_POINT_DEFINE(throwClientDisconnectInSignLogicalTimeForExternalClients);
 
 const auto getLogicalTimeValidator =
@@ -158,7 +159,8 @@ SignedLogicalTime LogicalTimeValidator::signLogicalTime(OperationContext* opCtx,
 Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogicalTime& newTime) {
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        if (newTime.getTime() <= _lastSeenValidTime.getTime()) {
+        if (newTime.getTime() <= _lastSeenValidTime.getTime() &&
+            !MONGO_unlikely(alwaysValidateClientsClusterTime.shouldFail())) {
             return Status::OK();
         }
     }
