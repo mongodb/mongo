@@ -83,6 +83,11 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
                         # Use the current time as the time that the test finished running.
                         test_info.end_time = combining_time
 
+                    # If we receive a SIGUSR1 then we may start combining reports before
+                    # their start time has been set.
+                    if test_info.start_time is None:
+                        test_info.start_time = combining_time
+
                     combined_report.test_infos.append(test_info)
 
                 combined_report.num_dynamic += report.num_dynamic
