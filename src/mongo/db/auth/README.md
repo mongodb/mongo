@@ -3,7 +3,6 @@
 ## Table of Contents
 
 - [High Level Overview](#high-level-overview)
-  - [Cursors and Operations](#cursors-and-operations)
 - [Authentication](#authentication)
   - [SASL](#sasl)
     - [Speculative Auth](#speculative-authentication)
@@ -18,10 +17,29 @@
     - [Local Authorization](#local-authorization)
     - [LDAP Authorization](#ldap-authorization)
     - [X.509 Authorization](#x509-authorization)
+  - [Cursors and Operations](#cursors-and-operations)
 
 ## High Level Overview
 
-### Cursors and Operations
+Authentication and Authorization are important steps in connection establishment. After a client
+with authentication credentials establishes a network session, it will begin the authentication
+process, which begins with the client sending a cmdHello which specifies a username. If the client
+supports speculative authentication, it will try to guess a mechanism which might be supported by
+the user and send the first authentication message for that mechanism in the `CmdHello`. The server
+responds with [`saslSupportedMechs`](#sasl-supported-mechs) available for the specified username,
+and if possible, begins [`speculativeAuth`](#speculative-authentication) by attempting to perform
+the `saslStart` step by using the authentication message, cutting down one network roundtrip. If
+speculative auth was not possible, the server indicates so in the response to the `CmdHello` and the
+client performs a
+[`saslStart`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/sasl_commands.cpp#L68)
+command with a selected mechanism. If another step is required, the client sends a
+[`saslContinue`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/sasl_commands.cpp#L102)
+command to the server. The saslContinue step iterates until the authentication is either accepted or
+rejected. If the authentication attempt is successful, the server grants the authorization rights of
+the user by calling functions from the [`AuthorizationManager`](#authorization). When a user becomes
+authorized, the [`AuthorizationSession`](#authorization) for the `Client` becomes populated with the
+user credentials and roles. The authorization session is then used to check permissions when the
+`Client` issues commands against the database.
 
 ## Authentication
 
@@ -211,19 +229,22 @@ addition access, thus upon completing [authentication](#Authentication), a clien
 tends to expand. Similarly, upon logout a client's authorization tends to shrink. It is important to
 pay attention to the distinction between these two similar, closely related words.
 
-An auth enabled server establishes an `AuthorizationSession`, attached to the `Client` object as a
-decoration. The Authorization Session's job is to handle all the authorization information for a
-single `Client` object. Note that if auth is not enabled, this decoration remains uninitialized, and
-all further steps are skipepd. Until the client chooses to authenticate, this AuthorizationSession
-contains an empty AuthorizedUsers set (and by extension an empty AuthorizedRoles set), and is this
-"unauthorized", also known as "pre-auth".
+An auth enabled server establishes an
+[`AuthorizationSession`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/authorization_session.h),
+attached to the `Client` object as a decoration. The Authorization Session's job is to handle all
+the authorization information for a single `Client` object. Note that if auth is not enabled, this
+decoration remains uninitialized, and all further steps are skipped. Until the client chooses to
+authenticate, this AuthorizationSession contains an empty AuthorizedUsers set (and by extension an
+empty AuthorizedRoles set), and is this "unauthorized", also known as "pre-auth".
 
-When a client connects to a database and authorization is enabled, authentication sends a request
-to get the authorization information of a specific user by calling addAndAuthorizeUser() on the
+When a client connects to a database and authorization is enabled, authentication sends a request to
+get the authorization information of a specific user by calling addAndAuthorizeUser() on the
 AuthorizationSession and passing in the UserName as an identifier.  The `AuthorizationSession` calls
-functions defined in the `AuthorizationManager` (described in the next paragraph) to both get the
-correct `User` object (defined below) from the database and to check that the users attributed to a
-specific Client have the correct permissions to execute commands.
+functions defined in the
+[`AuthorizationManager`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/authorization_manager.h)
+(described in the next paragraph) to both get the correct `User` object (defined below) from the
+database and to check that the users attributed to a specific Client have the correct permissions to
+execute commands.
 [Here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session_impl.cpp#L126)
 is the authorization session calling into the authorization manager to acquire a user.
 
@@ -448,3 +469,33 @@ Peer Info struct, which is eventually used by
 if X509 authorization is used. A tunable parameter in X509 Authorization is tlsCATrusts. TLSCATrusts
 is a setParameter that allows a user to specify a mapping of CAs that are trusted to use X509
 Authorization to a set of roles that are allowed to be specified by the CA.
+
+### Cursors and Operations
+
+When running a query, the database batches results in groups, allowing clients to get the remainder
+of the results by calling
+[`getMore`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/commands/getmore_cmd.cpp). In
+order to ensure correct authorization rights to run the `getMore` command, there are some extra
+authorization checks that need to be run using cursors and operations. When a CRUD operation is run,
+a cursor is created with client information and registered with the CursorManager. When `getMore` is
+called, the command uses the cursor to gather the next batch of results for the request. When a
+cursor is created, a list of the client's authenticated users and privileges required to run the
+command are added to the cursor. When the getMore command is issued, before continuing the CRUD
+operation to return the next batch of data, a method called
+[`isCoauthorizedWith`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/authorization_session.h#L343-L346)
+is run by the [`AuthorizationSession`](#authorization) against the list of identities copied to the
+cursor and the Client object. `isCoauthorizedWith` returns true if the `AuthorizationSession` and
+the authenticated users on the cursor share an authenticated user, or if both have no authenticated
+users. If `isCoauthorizedWith` is true, the function `isAuthorizedForPrivileges` is called on the
+`AuthorizationSession` to see if the current session has all the privileges to run the initial
+command that created the cursor, using the privileges stored on the cursor from earlier. If both of
+these checks pass, the getMore command is allowed to proceed, else it errors stating that the cursor
+was not created by the same user.
+
+Every operation that is performed by a client generates an
+[`OperationContext`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/operation_context.h#L77).
+If a client has `ActionType::killop` on the cluster resource, then the client is able to kill its
+operations if it has the same users (impersonated or otherwise) as the client that owns the
+`OperationContext` by issuing a `{killOp: 1}` command. When the command is issued, it calls
+[`isCoauthorizedWithClient`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/authorization_session.h#L332-L341)
+and checks the current client's authorized users and authorized impersonated users.
