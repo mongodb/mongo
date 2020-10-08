@@ -87,6 +87,10 @@ all:
     test_file: jstests/replsets/ismaster1.js
   - ticket: SERVER-46625
     test_file: jstests/core/command_json_schema_field.js
+  - ticket: SERVER-51262
+    test_file: jstests/replsets/read_operations_during_rollback.js
+  - ticket: SERVER-51262
+    test_file: jstests/replsets/transactions_on_secondaries_not_allowed.js
 
 suites:
 

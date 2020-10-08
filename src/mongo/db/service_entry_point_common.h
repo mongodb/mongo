@@ -42,9 +42,9 @@ namespace mongo {
 extern FailPoint rsStopGetMore;
 extern FailPoint respondWithNotPrimaryInCommandDispatch;
 
-// When active, we won't check if we are master in command dispatch. Activate this if you want to
+// When active, we won't check if we are primary in command dispatch. Activate this if you want to
 // test failing during command execution.
-extern FailPoint skipCheckingForNotMasterInCommandDispatch;
+extern FailPoint skipCheckingForNotPrimaryInCommandDispatch;
 
 /**
  * Helpers for writing ServiceEntryPointImpl implementations from a reusable core.
