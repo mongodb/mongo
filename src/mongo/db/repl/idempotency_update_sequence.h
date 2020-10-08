@@ -48,14 +48,14 @@ class BSONObjBuilder;
 struct UpdateSequenceGeneratorConfig {
     UpdateSequenceGeneratorConfig(std::set<StringData> fields_,
                                   std::size_t depth_,
-                                  std::size_t length_,
+                                  std::size_t lengthOfNumericComponent_,
                                   double scalarProbability_ = 0.250,
                                   double docProbability_ = 0.250,
                                   double arrProbability_ = 0.250);
 
     const std::set<StringData> fields = {};
     const std::size_t depth = 0;
-    const std::size_t length = 0;
+    const std::size_t lengthOfNumericComponent = 0;
     const double scalarProbability = 0.250;
     const double docProbability = 0.250;
     const double arrProbability = 0.250;

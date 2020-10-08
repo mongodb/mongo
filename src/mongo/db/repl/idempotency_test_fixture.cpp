@@ -211,7 +211,7 @@ void IdempotencyTest::testOpsAreIdempotent(std::vector<OplogEntry> ops, Sequence
 
         auto state2 = validateAllCollections();
         if (state1 != state2) {
-            FAIL(getStatesString(state1, state2, fullSequence));
+            FAIL(getStatesString(state1, state2, ops, fullSequence));
         }
     }
 }
@@ -434,7 +434,8 @@ CollectionState IdempotencyTest::validate(const NamespaceString& nss) {
 
 std::string IdempotencyTest::getStatesString(const std::vector<CollectionState>& state1,
                                              const std::vector<CollectionState>& state2,
-                                             const std::vector<OplogEntry>& ops) {
+                                             const std::vector<OplogEntry>& state1Ops,
+                                             const std::vector<OplogEntry>& state2Ops) {
     StringBuilder sb;
     sb << "The states:\n";
     for (const auto& s : state1) {
@@ -446,7 +447,7 @@ std::string IdempotencyTest::getStatesString(const std::vector<CollectionState>&
     }
     sb << "found after applying the operations a second time, therefore breaking idempotency.\n";
     sb << "Applied ops:\n";
-    for (const auto& op : ops) {
+    for (const auto& op : state2Ops) {
         sb << op.toString() << "\n";
     }
     return sb.str();

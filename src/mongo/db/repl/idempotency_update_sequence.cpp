@@ -43,13 +43,13 @@ namespace mongo {
 
 UpdateSequenceGeneratorConfig::UpdateSequenceGeneratorConfig(std::set<StringData> fields_,
                                                              std::size_t depth_,
-                                                             std::size_t length_,
+                                                             std::size_t lengthOfNumericComponent_,
                                                              double scalarProbability_,
                                                              double docProbability_,
                                                              double arrProbability_)
     : fields(std::move(fields_)),
       depth(depth_),
-      length(length_),
+      lengthOfNumericComponent(lengthOfNumericComponent_),
       scalarProbability(scalarProbability_),
       docProbability(docProbability_),
       arrProbability(arrProbability_) {}
@@ -79,7 +79,7 @@ void UpdateSequenceGenerator::_generatePaths(const UpdateSequenceGeneratorConfig
     }
 
     if (!path.empty()) {
-        for (std::size_t i = 0; i < config.length; i++) {
+        for (std::size_t i = 0; i < config.lengthOfNumericComponent; i++) {
             FieldRef arrPathRef(path);
             arrPathRef.appendPart(std::to_string(i));
             auto arrPath = arrPathRef.dottedField().toString();
@@ -101,7 +101,7 @@ void UpdateSequenceGenerator::_generatePaths(const UpdateSequenceGeneratorConfig
         _paths.push_back(docPath);
         UpdateSequenceGeneratorConfig remainingConfig = {remainingFields,
                                                          config.depth,
-                                                         config.length,
+                                                         config.lengthOfNumericComponent,
                                                          config.scalarProbability,
                                                          config.docProbability,
                                                          config.arrProbability};
@@ -261,8 +261,9 @@ DocumentStructureEnumerator UpdateSequenceGenerator::_getValidEnumeratorForPath(
         remainingDepth -= 1;
     }
 
-    DocumentStructureEnumerator enumerator({remainingFields, remainingDepth, this->_config.length},
-                                           this->_scalarGenerator);
+    DocumentStructureEnumerator enumerator(
+        {remainingFields, remainingDepth, this->_config.lengthOfNumericComponent},
+        this->_scalarGenerator);
     return enumerator;
 }
 

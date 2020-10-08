@@ -66,7 +66,8 @@ protected:
 
     std::string getStatesString(const std::vector<CollectionState>& state1,
                                 const std::vector<CollectionState>& state2,
-                                const std::vector<OplogEntry>& ops) override;
+                                const std::vector<OplogEntry>& state1Ops,
+                                const std::vector<OplogEntry>& state2Ops) override;
 
     Status resetState() override;
 
@@ -146,16 +147,17 @@ std::vector<OplogEntry> RandomizedIdempotencyTest::createUpdateSequence(
 
 std::string RandomizedIdempotencyTest::getStatesString(const std::vector<CollectionState>& state1,
                                                        const std::vector<CollectionState>& state2,
-                                                       const std::vector<OplogEntry>& ops) {
+                                                       const std::vector<OplogEntry>& state1Ops,
+                                                       const std::vector<OplogEntry>& state2Ops) {
     LOGV2(21157,
           "{IdempotencyTest_getStatesString_state1_state2_ops}",
           "IdempotencyTest_getStatesString_state1_state2_ops"_attr =
-              IdempotencyTest::getStatesString(state1, state2, ops));
+              IdempotencyTest::getStatesString(state1, state2, state1Ops, state2Ops));
     StringBuilder sb;
     sb << "Ran update ops: ";
     sb << "[ ";
     bool firstIter = true;
-    for (const auto& op : ops) {
+    for (const auto& op : state2Ops) {
         if (!firstIter) {
             sb << ", ";
         } else {
@@ -166,9 +168,13 @@ std::string RandomizedIdempotencyTest::getStatesString(const std::vector<Collect
     sb << " ]\n";
 
     ASSERT_OK(resetState());
+    ASSERT_OK(runOpsInitialSync(state1Ops));
+    sb << "Document at the end of state1: " << getDoc() << "\n";
 
-    sb << "Start: " << getDoc() << "\n";
-    for (const auto& op : ops) {
+    ASSERT_OK(resetState());
+
+    sb << "Start document for state2: " << getDoc() << "\n";
+    for (const auto& op : state2Ops) {
         ASSERT_OK(runOpInitialSync(op));
         sb << "Apply: " << op.getObject() << "\n  ==> " << getDoc() << "\n";
     }
@@ -193,8 +199,8 @@ void RandomizedIdempotencyTest::runIdempotencyTestCase() {
         ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_RECOVERING));
 
     std::set<StringData> fields{"a", "b"};
-    size_t depth = 1;
-    size_t length = 1;
+    size_t depth = 2;
+    const size_t lengthOfNumericComponent = 1;
 
     // Eliminate modification of array elements, because they cause theoretically valid sequences
     // that cause idempotency issues.
@@ -205,15 +211,19 @@ void RandomizedIdempotencyTest::runIdempotencyTestCase() {
     this->seed = SecureRandom().nextInt64();
     PseudoRandom seedGenerator(this->seed);
     RandomizedScalarGenerator scalarGenerator{PseudoRandom(seedGenerator.nextInt64())};
-    UpdateSequenceGenerator updateGenerator(
-        {fields, depth, length, kScalarProbability, kDocProbability, kArrProbability},
-        PseudoRandom{seedGenerator.nextInt64()},
-        &scalarGenerator);
+    UpdateSequenceGenerator updateGenerator({fields,
+                                             depth,
+                                             lengthOfNumericComponent,
+                                             kScalarProbability,
+                                             kDocProbability,
+                                             kArrProbability},
+                                            PseudoRandom{seedGenerator.nextInt64()},
+                                            &scalarGenerator);
 
     const bool kSkipDocs = kDocProbability == 0.0;
     const bool kSkipArrs = kArrProbability == 0.0;
-    DocumentStructureEnumerator enumerator({fields, depth, length, kSkipDocs, kSkipArrs},
-                                           &scalarGenerator);
+    DocumentStructureEnumerator enumerator(
+        {fields, depth, lengthOfNumericComponent, kSkipDocs, kSkipArrs}, &scalarGenerator);
 
     const size_t kUpdateSequenceLength = 5;
     // For the sake of keeping the speed of iteration sane and feasible.
@@ -246,17 +256,10 @@ void RandomizedIdempotencyTest::runUpdateV2IdempotencyTestCase(double v2Probabil
     // idempotency if the entries are applied on an input document '{a: []}'. These entries should
     // not have been generated in practice if the starting document is '{a: []}', but the current
     // 'UpdateSequenceGenerator' is not smart enough to figure that out.
-    const double kScalarProbability = 0.375;
-    const double kDocProbability = 0.375;
-    const double kArrProbability = 0;
+    const size_t lengthOfNumericComponent = 0;
 
     std::set<StringData> fields{"f00", "f10", "f01", "f11", "f02", "f20"};
-    UpdateSequenceGenerator updateV1Generator({fields,
-                                               2 /* depth */,
-                                               2 /* length */,
-                                               kScalarProbability,
-                                               kDocProbability,
-                                               kArrProbability},
+    UpdateSequenceGenerator updateV1Generator({fields, 2 /* depth */, lengthOfNumericComponent},
                                               PseudoRandom(seedGenerator.nextInt64()),
                                               &scalarGenerator);
 
