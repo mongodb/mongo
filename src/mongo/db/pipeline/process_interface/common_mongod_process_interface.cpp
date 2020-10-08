@@ -194,7 +194,14 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
         auto entry = idxCatalog->getEntry(idx);
         doc["spec"] = Value(idx->infoObj());
 
-        if (!entry->isReady(opCtx)) {
+        // Not all indexes in the CollectionIndexUsageTracker may be visible or consistent with our
+        // snapshot. For this reason, it is unsafe to check `isReady` on the entry, which
+        // asserts that the index's in-memory state is consistent with our snapshot.
+        if (!entry->isPresentInMySnapshot(opCtx)) {
+            continue;
+        }
+
+        if (!entry->isReadyInMySnapshot(opCtx)) {
             doc["building"] = Value(true);
         }
 
