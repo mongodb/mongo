@@ -635,13 +635,11 @@ void DBClientCursor::kill() {
                 }
             };
 
+            // We only need to kill the cursor if there aren't pending replies. Pending replies
+            // indicates that this is an exhaust cursor, so the connection must be closed and the
+            // cursor will automatically be cleaned up by the upstream server.
             if (_client && !_connectionHasPendingReplies) {
                 killCursor(_client);
-            } else {
-                // Use a side connection to send the kill cursor request.
-                verify(_scopedHost.size() || (_client && _connectionHasPendingReplies));
-                DBClientBase::withConnection_do_not_use(
-                    _client ? _client->getServerAddress() : _scopedHost, killCursor);
             }
         }
     });
