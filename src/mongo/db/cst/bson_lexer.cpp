@@ -212,7 +212,7 @@ const StringMap<ParserGen::token_type> reservedKeyFieldnameLookup = {
     {"$concatArrays", ParserGen::token::CONCAT_ARRAYS},
     {"$filter", ParserGen::token::FILTER},
     {"$first", ParserGen::token::FIRST},
-    {"$in", ParserGen::token::IN},
+    {"$in", ParserGen::token::IN_},
     {"$indexOfArray", ParserGen::token::INDEX_OF_ARRAY},
     {"$isArray", ParserGen::token::IS_ARRAY},
     {"as", ParserGen::token::ARG_AS},

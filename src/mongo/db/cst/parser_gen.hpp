@@ -820,7 +820,7 @@ public:
             GTE = 90,                          // GTE
             HOUR = 91,                         // HOUR
             ID = 92,                           // ID
-            IN = 93,                           // IN
+            IN_ = 93,                          // IN
             INDEX_KEY = 94,                    // "indexKey"
             INDEX_OF_ARRAY = 95,               // INDEX_OF_ARRAY
             INDEX_OF_BYTES = 96,               // INDEX_OF_BYTES
@@ -2480,7 +2480,7 @@ public:
                 tok == token::EXPONENT || tok == token::EXPR || tok == token::FILTER ||
                 tok == token::FIRST || tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
                 tok == token::GEO_NEAR_POINT || tok == token::GT || tok == token::GTE ||
-                tok == token::HOUR || tok == token::ID || tok == token::IN ||
+                tok == token::HOUR || tok == token::ID || tok == token::IN_ ||
                 tok == token::INDEX_KEY || tok == token::INDEX_OF_ARRAY ||
                 tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
                 tok == token::INT_NEGATIVE_ONE || tok == token::INT_ONE || tok == token::INT_ZERO ||
@@ -2558,7 +2558,7 @@ public:
                 tok == token::EXPONENT || tok == token::EXPR || tok == token::FILTER ||
                 tok == token::FIRST || tok == token::FLOOR || tok == token::GEO_NEAR_DISTANCE ||
                 tok == token::GEO_NEAR_POINT || tok == token::GT || tok == token::GTE ||
-                tok == token::HOUR || tok == token::ID || tok == token::IN ||
+                tok == token::HOUR || tok == token::ID || tok == token::IN_ ||
                 tok == token::INDEX_KEY || tok == token::INDEX_OF_ARRAY ||
                 tok == token::INDEX_OF_BYTES || tok == token::INDEX_OF_CP ||
                 tok == token::INT_NEGATIVE_ONE || tok == token::INT_ONE || tok == token::INT_ZERO ||
@@ -3698,11 +3698,11 @@ public:
 #endif
 #if 201103L <= YY_CPLUSPLUS
     static symbol_type make_IN(location_type l) {
-        return symbol_type(token::IN, std::move(l));
+        return symbol_type(token::IN_, std::move(l));
     }
 #else
     static symbol_type make_IN(const location_type& l) {
-        return symbol_type(token::IN, l);
+        return symbol_type(token::IN_, l);
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
