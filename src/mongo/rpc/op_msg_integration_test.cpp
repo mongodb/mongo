@@ -204,12 +204,12 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
 
         uassertStatusOK(conn.connect(host, "integration_test"));  // Reconnect.
 
-        // Disable eager checking of master to simulate a stepdown occurring after the check. This
+        // Disable eager checking of primary to simulate a stepdown occurring after the check. This
         // should respect w:0.
         BSONObj output;
         ASSERT(conn.runCommand("admin",
                                fromjson(R"({
-                                   configureFailPoint: 'skipCheckingForNotMasterInCommandDispatch',
+                                   configureFailPoint: 'skipCheckingForNotPrimaryInCommandDispatch',
                                    mode: 'alwaysOn'
                                })"),
                                output))
@@ -219,7 +219,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
             ASSERT(conn.runCommand("admin",
                                    fromjson(R"({
                                           configureFailPoint:
-                                              'skipCheckingForNotMasterInCommandDispatch',
+                                              'skipCheckingForNotPrimaryInCommandDispatch',
                                           mode: 'off'
                                       })"),
                                    output))

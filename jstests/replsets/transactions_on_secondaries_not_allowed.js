@@ -31,7 +31,7 @@ rst.awaitLastOpCommitted();
 // Disable the best-effort check for primary-ness in the service entry point, so that we
 // exercise the real check for primary-ness in TransactionParticipant::beginOrContinue.
 assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: "skipCheckingForNotMasterInCommandDispatch", mode: "alwaysOn"}));
+    {configureFailPoint: "skipCheckingForNotPrimaryInCommandDispatch", mode: "alwaysOn"}));
 
 // Initiate a session on the secondary.
 const sessionOptions = {

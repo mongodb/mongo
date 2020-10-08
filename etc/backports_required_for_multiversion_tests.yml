@@ -74,6 +74,10 @@ all:
     test_file: jstests/replsets/ismaster1.js
   - ticket: SERVER-49991
     test_file: jstests/replsets/get_replication_info_helper.js
+  - ticket: SERVER-51262
+    test_file: jstests/replsets/read_operations_during_rollback.js
+  - ticket: SERVER-51262
+    test_file: jstests/replsets/transactions_on_secondaries_not_allowed.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

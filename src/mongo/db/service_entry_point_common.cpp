@@ -99,7 +99,7 @@ namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(rsStopGetMore);
 MONGO_FAIL_POINT_DEFINE(respondWithNotPrimaryInCommandDispatch);
-MONGO_FAIL_POINT_DEFINE(skipCheckingForNotMasterInCommandDispatch);
+MONGO_FAIL_POINT_DEFINE(skipCheckingForNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
@@ -764,7 +764,7 @@ void execCommandDatabase(OperationContext* opCtx,
         const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
 
         if (!opCtx->getClient()->isInDirectClient() &&
-            !MONGO_FAIL_POINT(skipCheckingForNotMasterInCommandDispatch)) {
+            !MONGO_FAIL_POINT(skipCheckingForNotPrimaryInCommandDispatch)) {
             const bool inMultiDocumentTransaction = (sessionOptions.getAutocommit() == false);
             auto allowed = command->secondaryAllowed(opCtx->getServiceContext());
             bool alwaysAllowed = allowed == Command::AllowedOnSecondary::kAlways;
