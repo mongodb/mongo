@@ -90,8 +90,15 @@ const actualCacheSizeGB = assert.commandWorked(secondary.adminCommand({getCmdLin
 jsTestLog('Secondary was restarted with a storage cache size of ' + actualCacheSizeGB + ' GB.');
 assert.eq(1, actualCacheSizeGB);
 
-checkLog.contains(secondary, 'Starting recovery oplog application');
 jsTestLog('Applying updates on secondary ' + secondary.host + ' during recovery.');
+
+// Log ID 21536 - Completed oplog application for recovery.
+checkLog.containsJson(secondary, 21536, {
+    numBatches: 1,
+    numOpsApplied: function(numOpsApplied) {
+        return numOpsApplied >= numDocs * numUpdates;
+    }
+});
 
 // This ensures that the node is able to complete recovery and transition to SECONDARY.
 rst.awaitReplication();
