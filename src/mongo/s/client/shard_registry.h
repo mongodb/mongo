@@ -428,6 +428,8 @@ private:
 
     std::pair<std::vector<LatestConnStrings::value_type>, Increment> _getLatestConnStrings() const;
 
+    void _removeReplicaSet(const std::string& setName);
+
     void _initializeCacheIfNecessary() const;
 
     void _periodicReload(const executor::TaskExecutor::CallbackArgs& cbArgs);

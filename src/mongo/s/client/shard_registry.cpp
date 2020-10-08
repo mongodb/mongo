@@ -194,6 +194,7 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
 
         auto name = shard->getConnString().getSetName();
         ReplicaSetMonitor::remove(name);
+        _removeReplicaSet(name);
         for (auto& callback : _shardRemovalHooks) {
             // Run callbacks asynchronously.
             // TODO SERVER-50906: Consider running these callbacks synchronously.
@@ -373,6 +374,11 @@ std::pair<std::vector<ShardRegistry::LatestConnStrings::value_type>, ShardRegist
 ShardRegistry::_getLatestConnStrings() const {
     stdx::unique_lock<Latch> lock(_mutex);
     return {{_latestConnStrings.begin(), _latestConnStrings.end()}, _rsmIncrement.load()};
+}
+
+void ShardRegistry::_removeReplicaSet(const std::string& setName) {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _latestConnStrings.erase(setName);
 }
 
 void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
