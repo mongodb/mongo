@@ -82,6 +82,10 @@ all:
     test_file: jstests/sharding/awaitable_isMaster_primary_failures.js
   - ticket: SERVER-50420
     test_file: jstests/replsets/server_status_repl_is_writable_primary.js
+  - ticket: SERVER-51262
+    test_file: jstests/replsets/read_operations_during_rollback.js
+  - ticket: SERVER-51262
+    test_file: jstests/replsets/transactions_on_secondaries_not_allowed.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
