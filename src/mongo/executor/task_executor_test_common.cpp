@@ -44,6 +44,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/str.h"
 
@@ -52,7 +53,7 @@ namespace executor {
 namespace {
 
 using ExecutorFactory =
-    std::function<std::unique_ptr<TaskExecutor>(std::unique_ptr<NetworkInterfaceMock>)>;
+    std::function<std::shared_ptr<TaskExecutor>(std::unique_ptr<NetworkInterfaceMock>)>;
 
 class CommonTaskExecutorTestFixture : public TaskExecutorTest {
 public:
@@ -60,7 +61,7 @@ public:
         : _makeExecutor(std::move(makeExecutor)) {}
 
 private:
-    std::unique_ptr<TaskExecutor> makeTaskExecutor(
+    std::shared_ptr<TaskExecutor> makeTaskExecutor(
         std::unique_ptr<NetworkInterfaceMock> net) override {
         return _makeExecutor(std::move(net));
     }
@@ -159,6 +160,12 @@ auto makeSetStatusOnRemoteCommandCompletionClosure(const RemoteCommandRequest* e
         *outStatus = cbData.response.status;
     };
 }
+
+static inline const RemoteCommandRequest kDummyRequest{HostAndPort("localhost", 27017),
+                                                       "mydb",
+                                                       BSON("whatsUp"
+                                                            << "doc"),
+                                                       nullptr};
 
 COMMON_EXECUTOR_TEST(RunOne) {
     TaskExecutor& executor = getExecutor();
@@ -416,13 +423,8 @@ COMMON_EXECUTOR_TEST(ScheduleRemoteCommand) {
     TaskExecutor& executor = getExecutor();
     launchExecutorThread();
     Status status1 = getDetectableErrorStatus();
-    const RemoteCommandRequest request(HostAndPort("localhost", 27017),
-                                       "mydb",
-                                       BSON("whatsUp"
-                                            << "doc"),
-                                       nullptr);
     TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
-        request, makeSetStatusOnRemoteCommandCompletionClosure(&request, &status1)));
+        kDummyRequest, makeSetStatusOnRemoteCommandCompletionClosure(&kDummyRequest, &status1)));
     net->enterNetwork();
     ASSERT(net->hasReadyRequests());
     NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
@@ -439,13 +441,8 @@ COMMON_EXECUTOR_TEST(ScheduleRemoteCommand) {
 COMMON_EXECUTOR_TEST(ScheduleAndCancelRemoteCommand) {
     TaskExecutor& executor = getExecutor();
     Status status1 = getDetectableErrorStatus();
-    const RemoteCommandRequest request(HostAndPort("localhost", 27017),
-                                       "mydb",
-                                       BSON("whatsUp"
-                                            << "doc"),
-                                       nullptr);
     TaskExecutor::CallbackHandle cbHandle = unittest::assertGet(executor.scheduleRemoteCommand(
-        request, makeSetStatusOnRemoteCommandCompletionClosure(&request, &status1)));
+        kDummyRequest, makeSetStatusOnRemoteCommandCompletionClosure(&kDummyRequest, &status1)));
     executor.cancel(cbHandle);
     launchExecutorThread();
     getNet()->enterNetwork();
@@ -457,6 +454,94 @@ COMMON_EXECUTOR_TEST(ScheduleAndCancelRemoteCommand) {
     ASSERT_EQUALS(ErrorCodes::CallbackCanceled, status1);
 }
 
+COMMON_EXECUTOR_TEST(
+    ScheduleRemoteCommandWithCancelationTokenSuccessfullyCancelsRequestIfCanceledAfterFunctionCallButBeforeProcessing) {
+    TaskExecutor& executor = getExecutor();
+    CancelationSource cancelSource;
+    auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
+
+    cancelSource.cancel();
+
+    launchExecutorThread();
+    getNet()->enterNetwork();
+    getNet()->runReadyNetworkOperations();
+    getNet()->exitNetwork();
+
+    // Wait for cancelation to happen and expect error status on future.
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, responseFuture.getNoThrow());
+
+    shutdownExecutorThread();
+    joinExecutorThread();
+}
+
+COMMON_EXECUTOR_TEST(
+    ScheduleRemoteCommandWithCancelationTokenSuccessfullyCancelsRequestIfCanceledBeforeFunctionCallAndBeforeProcessing) {
+    TaskExecutor& executor = getExecutor();
+
+    CancelationSource cancelSource;
+    // Cancel before calling scheduleRemoteCommand.
+    cancelSource.cancel();
+    auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
+
+    // The result should be immediately available.
+    ASSERT_EQUALS(ErrorCodes::CallbackCanceled, responseFuture.getNoThrow());
+}
+
+COMMON_EXECUTOR_TEST(
+    ScheduleRemoteCommandWithCancelationTokenDoesNotCancelRequestIfCanceledAfterProcessing) {
+    TaskExecutor& executor = getExecutor();
+    CancelationSource cancelSource;
+    auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
+
+    launchExecutorThread();
+    getNet()->enterNetwork();
+    // Respond to the request.
+    getNet()->scheduleSuccessfulResponse(BSONObj{});
+    getNet()->runReadyNetworkOperations();
+    getNet()->exitNetwork();
+
+    // Response should be ready and okay.
+    ASSERT_OK(responseFuture.getNoThrow());
+
+    // Cancel after the response has already been processed. This shouldn't do anything or cause an
+    // error.
+    cancelSource.cancel();
+
+    shutdownExecutorThread();
+    joinExecutorThread();
+}
+
+COMMON_EXECUTOR_TEST(
+    ScheduleRemoteCommandWithCancelationTokenReturnsShutdownInProgressIfExecutorAlreadyShutdownAndCancelNotCalled) {
+    TaskExecutor& executor = getExecutor();
+
+    launchExecutorThread();
+    shutdownExecutorThread();
+    joinExecutorThread();
+
+    auto responseFuture =
+        executor.scheduleRemoteCommand(kDummyRequest, CancelationToken::uncancelable());
+    ASSERT_EQ(responseFuture.getNoThrow().getStatus().code(), ErrorCodes::ShutdownInProgress);
+}
+
+COMMON_EXECUTOR_TEST(
+    ScheduleRemoteCommandWithCancelationTokenReturnsShutdownInProgressIfExecutorAlreadyShutdownAndCancelCalled) {
+    TaskExecutor& executor = getExecutor();
+
+    CancelationSource cancelSource;
+    auto responseFuture = executor.scheduleRemoteCommand(kDummyRequest, cancelSource.token());
+
+    launchExecutorThread();
+    shutdownExecutorThread();
+    joinExecutorThread();
+
+    // Should already be ready. Returns CallbackCanceled and not ShutdownInProgress as an
+    // implementation detail.
+    ASSERT_EQ(responseFuture.getNoThrow().getStatus().code(), ErrorCodes::CallbackCanceled);
+
+    // Shouldn't do anything or cause an error.
+    cancelSource.cancel();
+}
 
 COMMON_EXECUTOR_TEST(RemoteCommandWithTimeout) {
     NetworkInterfaceMock* net = getNet();

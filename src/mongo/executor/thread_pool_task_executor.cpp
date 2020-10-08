@@ -633,9 +633,7 @@ void ThreadPoolTaskExecutor::runCallback(std::shared_ptr<CallbackState> cbStateA
     setCallbackForHandle(&cbHandle, cbStateArg);
     CallbackArgs args(this,
                       std::move(cbHandle),
-                      cbStateArg->canceled.load()
-                          ? Status({ErrorCodes::CallbackCanceled, "Callback canceled"})
-                          : Status::OK());
+                      cbStateArg->canceled.load() ? kCallbackCanceledErrorStatus : Status::OK());
     invariant(!cbStateArg->isFinished.load());
     {
         // After running callback function, clear 'cbStateArg->callback' to release any resources
@@ -809,9 +807,7 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
     setCallbackForHandle(&cbHandle, cbState);
     CallbackArgs args(this,
                       std::move(cbHandle),
-                      cbState->canceled.load()
-                          ? Status({ErrorCodes::CallbackCanceled, "Callback canceled"})
-                          : Status::OK());
+                      cbState->canceled.load() ? kCallbackCanceledErrorStatus : Status::OK());
 
     if (!cbState->isFinished.load()) {
         TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {};

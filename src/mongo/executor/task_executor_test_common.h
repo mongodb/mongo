@@ -51,7 +51,7 @@ class TaskExecutor;
  */
 void addTestsForExecutor(
     const std::string& suiteName,
-    std::function<std::unique_ptr<TaskExecutor>(std::unique_ptr<NetworkInterfaceMock>)>
+    std::function<std::shared_ptr<TaskExecutor>(std::unique_ptr<NetworkInterfaceMock>)>
         makeExecutor);
 
 }  // namespace executor

@@ -61,10 +61,10 @@ ThreadPoolMock::Options ThreadPoolExecutorTest::makeThreadPoolMockOptions() cons
     return _options;
 }
 
-std::unique_ptr<TaskExecutor> ThreadPoolExecutorTest::makeTaskExecutor(
+std::shared_ptr<TaskExecutor> ThreadPoolExecutorTest::makeTaskExecutor(
     std::unique_ptr<NetworkInterfaceMock> net) {
     auto options = makeThreadPoolMockOptions();
-    return makeThreadPoolTestExecutor(std::move(net), std::move(options));
+    return makeSharedThreadPoolTestExecutor(std::move(net), std::move(options));
 }
 
 }  // namespace executor

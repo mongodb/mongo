@@ -47,9 +47,7 @@ static const inline auto kDefaultShutdownStatus =
  * Implements the wrapping indirection needed to satisfy the ScopedTaskExecutor contract.  Note
  * that at least shutdown() must be called on this type before destruction.
  */
-class ScopedTaskExecutor::Impl : public std::enable_shared_from_this<ScopedTaskExecutor::Impl>,
-                                 public TaskExecutor {
-
+class ScopedTaskExecutor::Impl : public TaskExecutor {
 public:
     Impl(std::shared_ptr<TaskExecutor> executor, Status shutdownStatus)
         : _executor(std::move(executor)), _shutdownStatus(std::move(shutdownStatus)) {}
@@ -184,6 +182,17 @@ public:
 
 private:
     /**
+     * Helper function to get a shared_ptr<ScopedTaskExecutor::Impl> to this object, akin to
+     * shared_from_this(). TaskExecutor (the parent class of ScopedTaskExecutor::Impl) inherits from
+     * std::enable_shared_from_this, so shared_from_this() returns a std::shared_ptr<TaskExecutor>,
+     * which means we need to cast it to use it as a pointer to the subclass
+     * ScopedTaskExecutor::Impl.
+     */
+    std::shared_ptr<ScopedTaskExecutor::Impl> shared_self() {
+        return std::static_pointer_cast<ScopedTaskExecutor::Impl>(shared_from_this());
+    }
+
+    /**
      * Wraps a scheduling call, along with its callback, so that:
      *
      * 1. If the callback is run, it is invoked with a not-okay argument if this task executor or
@@ -250,7 +259,7 @@ private:
 
         // State 2 - Indeterminate state.  We don't know yet if the task will get scheduled.
         auto swCbHandle = std::forward<ScheduleCall>(schedule)(
-            [id, work = std::forward<Work>(work), self = shared_from_this()](const auto& cargs) {
+            [id, work = std::forward<Work>(work), self = shared_self()](const auto& cargs) {
                 using ArgsT = std::decay_t<decltype(cargs)>;
 
                 stdx::unique_lock<Latch> lk(self->_mutex);

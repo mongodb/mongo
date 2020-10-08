@@ -68,7 +68,7 @@ void TaskExecutorTest::setUp() {
 }
 
 void TaskExecutorTest::tearDown() {
-    _executor.reset(nullptr);
+    _executor.reset();
     _net = nullptr;
 }
 

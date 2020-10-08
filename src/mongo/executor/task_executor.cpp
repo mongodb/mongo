@@ -34,6 +34,71 @@
 namespace mongo {
 namespace executor {
 
+namespace {
+
+Status wrapCallbackHandleWithCancelToken(
+    const std::shared_ptr<TaskExecutor>& executor,
+    const StatusWith<TaskExecutor::CallbackHandle>& swCallbackHandle,
+    const CancelationToken& token) {
+    if (!swCallbackHandle.isOK()) {
+        return swCallbackHandle.getStatus();
+    }
+
+    token.onCancel()
+        .unsafeToInlineFuture()
+        .then([executor, callbackHandle = std::move(swCallbackHandle.getValue())]() mutable {
+            executor->cancel(callbackHandle);
+        })
+        .getAsync([](auto) {});
+    return Status::OK();
+}
+
+/**
+ * Takes a schedule(Exhaust)RemoteCommand(OnAny)-style function and wraps it to return a future and
+ * be cancelable with CancelationTokens.
+ */
+template <typename Request, typename Response, typename ScheduleFn>
+ExecutorFuture<Response> wrapScheduleCallWithCancelTokenAndFuture(
+    const std::shared_ptr<TaskExecutor>& executor,
+    ScheduleFn&& schedule,
+    const Request& request,
+    const CancelationToken& token,
+    const BatonHandle& baton) {
+    if (token.isCanceled()) {
+        return ExecutorFuture<Response>(executor, TaskExecutor::kCallbackCanceledErrorStatus);
+    }
+
+    auto [promise, future] = makePromiseFuture<Response>();
+    // This has to be made shared because otherwise we'd have to move the promise into this
+    // callback, and would be unable to use it in the case where scheduling the request fails below.
+    auto sharedPromise = std::make_shared<Promise<Response>>(std::move(promise));
+    auto signalPromiseOnCompletion = [sharedPromise](const auto& args) mutable {
+        auto status = args.response.status;
+        if (status.isOK()) {
+            sharedPromise->emplaceValue(std::move(args.response));
+        } else {
+            // Only set an error on failures to send the request (including if the request was
+            // canceled). Errors from the remote host will be contained in the response.
+            sharedPromise->setError(status);
+        }
+    };
+
+    auto scheduleStatus = wrapCallbackHandleWithCancelToken(
+        executor,
+        std::forward<ScheduleFn>(schedule)(request, std::move(signalPromiseOnCompletion), baton),
+        token);
+
+    if (!scheduleStatus.isOK()) {
+        // If scheduleStatus is not okay, then the callback signalPromiseOnCompletion should never
+        // run, meaning that it will be okay to set the promise here.
+        sharedPromise->setError(scheduleStatus);
+    }
+
+    return std::move(future).thenRunOn(executor);
+}
+
+}  // namespace
+
 TaskExecutor::TaskExecutor() = default;
 TaskExecutor::~TaskExecutor() = default;
 
@@ -123,6 +188,30 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleRemoteCommand(
                                       baton);
 }
 
+ExecutorFuture<TaskExecutor::ResponseStatus> TaskExecutor::scheduleRemoteCommand(
+    const RemoteCommandRequest& request, const CancelationToken& token, const BatonHandle& baton) {
+    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
+                                                    TaskExecutor::ResponseStatus>(
+        shared_from_this(),
+        [this](const auto&... args) { return scheduleRemoteCommand(args...); },
+        request,
+        token,
+        baton);
+}
+
+ExecutorFuture<TaskExecutor::ResponseOnAnyStatus> TaskExecutor::scheduleRemoteCommandOnAny(
+    const RemoteCommandRequestOnAny& request,
+    const CancelationToken& token,
+    const BatonHandle& baton) {
+    return wrapScheduleCallWithCancelTokenAndFuture<decltype(request),
+                                                    TaskExecutor::ResponseOnAnyStatus>(
+        shared_from_this(),
+        [this](const auto&... args) { return scheduleRemoteCommandOnAny(args...); },
+        request,
+        token,
+        baton);
+}
+
 StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteCommand(
     const RemoteCommandRequest& request,
     const RemoteCommandCallbackFn& cb,
@@ -133,6 +222,5 @@ StatusWith<TaskExecutor::CallbackHandle> TaskExecutor::scheduleExhaustRemoteComm
                                              },
                                              baton);
 }
-
 }  // namespace executor
 }  // namespace mongo

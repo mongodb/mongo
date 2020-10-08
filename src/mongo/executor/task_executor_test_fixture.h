@@ -90,13 +90,13 @@ private:
      */
     void _doTest() override;
 
-    virtual std::unique_ptr<TaskExecutor> makeTaskExecutor(
+    virtual std::shared_ptr<TaskExecutor> makeTaskExecutor(
         std::unique_ptr<NetworkInterfaceMock> net) = 0;
 
     virtual void postExecutorThreadLaunch();
 
     NetworkInterfaceMock* _net;
-    std::unique_ptr<TaskExecutor> _executor;
+    std::shared_ptr<TaskExecutor> _executor;
 };
 
 }  // namespace executor

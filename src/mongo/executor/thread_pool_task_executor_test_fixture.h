@@ -69,7 +69,7 @@ public:
 
 private:
     virtual ThreadPoolMock::Options makeThreadPoolMockOptions() const;
-    std::unique_ptr<TaskExecutor> makeTaskExecutor(
+    std::shared_ptr<TaskExecutor> makeTaskExecutor(
         std::unique_ptr<NetworkInterfaceMock> net) override;
 
     // Returned by makeThreadPoolMockOptions().
