@@ -42,6 +42,7 @@ a notice will be included in
 | [Pcre]                     | BSD-3-Clause      | 8.44             | 8.42              |                      |                ✗                |
 | [S2]                       | Apache-2.0        |                  | Unknown           |          ✗           |                ✗                |
 | [SafeInt]                  | MIT               | 3.24             | 3.23              |                      |                                 |
+| [schemastore.org]          | Apache-2.0        |                  | 6847cfc3a1        |                      |                                 |
 | [scons]                    | MIT               | 3.1.2            | 3.1.2             |                      |                                 |
 | [Snappy]                   | BSD-3-Clause      | 1.1.8            | 1.1.7             |          ✗           |                ✗                |
 | [timelib]                  | MIT               | 2018.03          | 2018.01           |                      |                ✗                |
@@ -74,6 +75,7 @@ a notice will be included in
 [Pcre]: http://www.pcre.org/
 [S2]: https://github.com/google/s2geometry
 [SafeInt]: https://github.com/dcleblanc/SafeInt
+[schemastore.org]: https://www.schemastore.org/json/
 [scons]: https://github.com/SCons/scons
 [Snappy]: https://github.com/google/snappy/releases
 [timelib]: https://github.com/derickr/timelib

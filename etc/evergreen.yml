@@ -3530,6 +3530,7 @@ tasks:
           - "src/mongo/util/options_parser/test_config_files/**"
           - "src/third_party/JSON-Schema-Test-Suite/tests/draft4/**"
           - "src/third_party/mock_ocsp_responder/**"
+          - "src/third_party/schemastore.org/**"
         exclude_files:
           - "*_test.pdb"
 
