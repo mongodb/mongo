@@ -247,8 +247,6 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                   "db"_attr = dbName,
                                   "version"_attr = version.toBSONForLogging());
         _databaseCache.advanceTimeInStore(dbName.toString(), version);
-    } else {
-        _databaseCache.invalidate(dbName.toString());
     }
 }
 
