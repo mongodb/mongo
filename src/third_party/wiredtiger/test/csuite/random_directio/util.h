@@ -30,5 +30,4 @@
  * util.h
  * 	Utility functions for test that simulates system crashes.
  */
-
-extern void copy_directory(const char *, const char *, bool);
+extern bool copy_directory(const char *, const char *, bool);

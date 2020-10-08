@@ -208,7 +208,9 @@ __posix_fs_remove(
 
 #ifdef __linux__
     /* Flush the backing directory to guarantee the remove. */
+    WT_RET(__wt_log_printf(session, "REMOVE: posix_directory_sync %s", name));
     WT_RET(__posix_directory_sync(session, name));
+    WT_RET(__wt_log_printf(session, "REMOVE: DONE posix_directory_sync %s", name));
 #endif
     return (0);
 }
@@ -248,7 +250,9 @@ __posix_fs_rename(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
      * not provide the guarantee or only provide the guarantee with specific mount options. Flush
      * both of the from/to directories until it's a performance problem.
      */
+    WT_RET(__wt_log_printf(session, "RENAME: posix_directory_sync %s", from));
     WT_RET(__posix_directory_sync(session, from));
+    WT_RET(__wt_log_printf(session, "RENAME: DONE posix_directory_sync %s", from));
 
     /*
      * In almost all cases, we're going to be renaming files in the same directory, we can at least
@@ -807,8 +811,11 @@ __posix_open_file(WT_FILE_SYSTEM *file_system, WT_SESSION *wt_session, const cha
     /*
      * Durability: some filesystems require a directory sync to be confident the file will appear.
      */
-    if (LF_ISSET(WT_FS_OPEN_DURABLE))
+    if (LF_ISSET(WT_FS_OPEN_DURABLE)) {
+        WT_ERR(__wt_log_printf(session, "OPEN/CREATE: posix_directory_sync %s", name));
         WT_ERR(__posix_directory_sync(session, name));
+        WT_ERR(__wt_log_printf(session, "OPEN/CREATE: DONE posix_directory_sync %s", name));
+    }
 #endif
 
     WT_ERR(__posix_open_file_cloexec(session, pfh->fd, name));
