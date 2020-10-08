@@ -761,7 +761,7 @@ Status runAggregate(OperationContext* opCtx,
         auto bodyBuilder = result->getBodyBuilder();
         if (auto pipelineExec = dynamic_cast<PlanExecutorPipeline*>(explainExecutor)) {
             Explain::explainPipeline(
-                pipelineExec, true /* executePipeline */, *(expCtx->explain), &bodyBuilder);
+                pipelineExec, true /* executePipeline */, *(expCtx->explain), cmdObj, &bodyBuilder);
         } else {
             invariant(explainExecutor->getOpCtx() == opCtx);
             // The explainStages() function for a non-pipeline executor may need to execute the plan
@@ -773,6 +773,7 @@ Status runAggregate(OperationContext* opCtx,
                                    ctx->getCollection(),
                                    *(expCtx->explain),
                                    BSON("optimizedPipeline" << true),
+                                   cmdObj,
                                    &bodyBuilder);
         }
     } else {

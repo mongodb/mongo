@@ -634,8 +634,12 @@ bool runQuery(OperationContext* opCtx,
         bb.skip(sizeof(QueryResult::Value));
 
         BSONObjBuilder explainBob;
-        Explain::explainStages(
-            exec.get(), collection.getCollection(), verbosity, BSONObj(), &explainBob);
+        Explain::explainStages(exec.get(),
+                               collection.getCollection(),
+                               verbosity,
+                               BSONObj(),
+                               upconvertedQuery,
+                               &explainBob);
 
         // Add the resulting object to the return buffer.
         BSONObj explainObj = explainBob.obj();

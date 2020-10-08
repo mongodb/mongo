@@ -327,6 +327,7 @@ Status ClusterExplain::buildExplainResult(
     const vector<AsyncRequestsSender::Response>& shardResponses,
     const char* mongosStageName,
     long long millisElapsed,
+    const BSONObj& command,
     BSONObjBuilder* out) {
     // Explain only succeeds if all shards support the explain command.
     try {
@@ -338,6 +339,7 @@ Status ClusterExplain::buildExplainResult(
     buildPlannerInfo(opCtx, shardResponses, mongosStageName, out);
     buildExecStats(shardResponses, mongosStageName, millisElapsed, out);
     explain_common::generateServerInfo(out);
+    appendIfRoom(out, command, "command");
 
     return Status::OK();
 }

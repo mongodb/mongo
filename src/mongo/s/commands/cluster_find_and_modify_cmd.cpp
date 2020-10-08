@@ -264,8 +264,12 @@ public:
             shard->getId(), response, shard->getConnString().getServers().front()};
 
         auto bodyBuilder = result->getBodyBuilder();
-        return ClusterExplain::buildExplainResult(
-            opCtx, {arsResponse}, ClusterExplain::kSingleShard, millisElapsed, &bodyBuilder);
+        return ClusterExplain::buildExplainResult(opCtx,
+                                                  {arsResponse},
+                                                  ClusterExplain::kSingleShard,
+                                                  millisElapsed,
+                                                  cmdObj,
+                                                  &bodyBuilder);
     }
 
     bool run(OperationContext* opCtx,

@@ -264,7 +264,7 @@ public:
 
         auto bodyBuilder = result->getBodyBuilder();
         return ClusterExplain::buildExplainResult(
-            opCtx, shardResponses, mongosStageName, millisElapsed, &bodyBuilder);
+            opCtx, shardResponses, mongosStageName, millisElapsed, cmdObj, &bodyBuilder);
     }
 
 private:

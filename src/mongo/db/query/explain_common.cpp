@@ -47,4 +47,24 @@ void generateServerInfo(BSONObjBuilder* out) {
     serverBob.doneFast();
 }
 
+bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out) {
+    if ((out->len() + toAppend.objsize()) < BSONObjMaxUserSize) {
+        out->append(fieldName, toAppend);
+        return true;
+    }
+
+    // The reserved buffer size for the warning message if 'out' exceeds the max BSON user size.
+    const int warningMsgSize = fieldName.size() + 60;
+
+    // Unless 'out' has already exceeded the max BSON user size, add a warning indicating
+    // that data has been truncated.
+    if (out->len() < BSONObjMaxUserSize - warningMsgSize) {
+        out->append("warning",
+                    str::stream() << "'" << fieldName << "'"
+                                  << " has been omitted due to BSON size limit");
+    }
+
+    return false;
+}
+
 }  // namespace mongo::explain_common

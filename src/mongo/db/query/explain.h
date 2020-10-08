@@ -59,6 +59,8 @@ public:
      *
      * The 'extraInfo' parameter specifies additional information to include into the output.
      *
+     * The 'command' parameter represents the command object that is being explained.
+     *
      * Does not take ownership of its arguments.
      *
      * During this call it may be required to execute the plan to collect statistics. If the
@@ -72,6 +74,7 @@ public:
                               const CollectionPtr& collection,
                               ExplainOptions::Verbosity verbosity,
                               BSONObj extraInfo,
+                              const BSONObj& command,
                               BSONObjBuilder* out);
     /**
      * Adds "queryPlanner" and "executionStats" (if requested in verbosity) fields to 'out'. Unlike
@@ -88,6 +91,7 @@ public:
      * query wasn't executed).
      * - 'winningPlanTrialStats' is the stats of the winning plan during the trial period. May be
      * nullptr.
+     * - 'command' represents the command object that is being explained.
      * - 'out' is the builder for the explain output.
      */
     static void explainStages(
@@ -97,6 +101,7 @@ public:
         Status executePlanStatus,
         boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
         BSONObj extraInfo,
+        const BSONObj& command,
         BSONObjBuilder* out);
 
     /**
@@ -108,10 +113,13 @@ public:
      * If 'verbosity' >= 'kExecStats' the 'executePipeline' flag is used to indicate whether the
      * pipeline needs to be executed first, before the stats is collected. Otherwise, it is assumed
      * that the plan was already executed until EOF and the stats are ready for collection.
+     *
+     * The 'command' parameter represents the command object that is being explained.
      */
     static void explainPipeline(PlanExecutor* exec,
                                 bool executePipeline,
                                 ExplainOptions::Verbosity verbosity,
+                                const BSONObj& command,
                                 BSONObjBuilder* out);
 
     /**

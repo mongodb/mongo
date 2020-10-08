@@ -69,6 +69,7 @@ public:
         const std::vector<AsyncRequestsSender::Response>& shardResponses,
         const char* mongosStageName,
         long long millisElapsed,
+        const BSONObj& command,
         BSONObjBuilder* out);
 
 

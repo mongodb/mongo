@@ -43,4 +43,10 @@ namespace mongo::explain_common {
  */
 void generateServerInfo(BSONObjBuilder* out);
 
+/**
+ * Conditionally appends a BSONObj to 'bob' depending on whether or not the maximum user size for a
+ * BSON object will be exceeded.
+ */
+bool appendIfRoom(const BSONObj& toAppend, StringData fieldName, BSONObjBuilder* out);
+
 }  // namespace mongo::explain_common

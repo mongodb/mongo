@@ -144,7 +144,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
         if (expCtx->explain) {
             Explain::explainPipeline(
-                exec.get(), false /* executePipeline  */, *expCtx->explain, &result);
+                exec.get(), false /* executePipeline  */, *expCtx->explain, cmd, &result);
         }
 
         PlanSummaryStats planSummaryStats;

@@ -596,8 +596,12 @@ private:
         _commandOpWrite(
             opCtx, _batchedRequest.getNS(), explainCmd, targetingBatchItem, &shardResponses);
         auto bodyBuilder = result->getBodyBuilder();
-        uassertStatusOK(ClusterExplain::buildExplainResult(
-            opCtx, shardResponses, ClusterExplain::kWriteOnShards, timer.millis(), &bodyBuilder));
+        uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
+                                                           shardResponses,
+                                                           ClusterExplain::kWriteOnShards,
+                                                           timer.millis(),
+                                                           _request->body,
+                                                           &bodyBuilder));
     }
 
     NamespaceString ns() const override {

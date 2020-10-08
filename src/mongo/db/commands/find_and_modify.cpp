@@ -299,7 +299,7 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(
-                exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);
+                exec.get(), collection.getCollection(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
         } else {
             auto request = UpdateRequest();
             request.setNamespaceString(nsString);
@@ -323,7 +323,7 @@ public:
 
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(
-                exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);
+                exec.get(), collection.getCollection(), verbosity, BSONObj(), cmdObj, &bodyBuilder);
         }
 
         return Status::OK();

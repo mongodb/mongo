@@ -557,8 +557,12 @@ private:
                                                           &parsedUpdate,
                                                           verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(
-                exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);
+            Explain::explainStages(exec.get(),
+                                   collection.getCollection(),
+                                   verbosity,
+                                   BSONObj(),
+                                   _commandObj,
+                                   &bodyBuilder);
         }
 
         write_ops::Update _batch;
@@ -600,8 +604,9 @@ private:
     class Invocation final : public InvocationBase {
     public:
         Invocation(const WriteCommand* cmd, const OpMsgRequest& request)
-            : InvocationBase(cmd, request), _batch(DeleteOp::parse(request)) {}
-
+            : InvocationBase(cmd, request),
+              _batch(DeleteOp::parse(request)),
+              _commandObj(request.body) {}
 
     private:
         NamespaceString ns() const override {
@@ -654,11 +659,17 @@ private:
                                                           &parsedDelete,
                                                           verbosity));
             auto bodyBuilder = result->getBodyBuilder();
-            Explain::explainStages(
-                exec.get(), collection.getCollection(), verbosity, BSONObj(), &bodyBuilder);
+            Explain::explainStages(exec.get(),
+                                   collection.getCollection(),
+                                   verbosity,
+                                   BSONObj(),
+                                   _commandObj,
+                                   &bodyBuilder);
         }
 
         write_ops::Delete _batch;
+
+        const BSONObj& _commandObj;
     };
 
     std::unique_ptr<CommandInvocation> parse(OperationContext*,

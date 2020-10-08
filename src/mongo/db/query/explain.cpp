@@ -66,6 +66,7 @@
 
 namespace mongo {
 namespace {
+
 /**
  * Adds the 'queryPlanner' explain section to the BSON object being built by 'out'.
  *
@@ -269,6 +270,7 @@ void Explain::explainStages(PlanExecutor* exec,
                             Status executePlanStatus,
                             boost::optional<PlanExplainer::PlanStatsDetails> winningPlanTrialStats,
                             BSONObj extraInfo,
+                            const BSONObj& command,
                             BSONObjBuilder* out) {
     //
     // Use the stats trees to produce explain BSON.
@@ -281,11 +283,14 @@ void Explain::explainStages(PlanExecutor* exec,
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         generateExecutionInfo(exec, verbosity, executePlanStatus, winningPlanTrialStats, out);
     }
+
+    explain_common::appendIfRoom(command, "command", out);
 }
 
 void Explain::explainPipeline(PlanExecutor* exec,
                               bool executePipeline,
                               ExplainOptions::Verbosity verbosity,
+                              const BSONObj& command,
                               BSONObjBuilder* out) {
     invariant(exec);
     invariant(out);
@@ -303,12 +308,15 @@ void Explain::explainPipeline(PlanExecutor* exec,
     *out << "stages" << Value(pipelineExec->writeExplainOps(verbosity));
 
     explain_common::generateServerInfo(out);
+
+    explain_common::appendIfRoom(command, "command", out);
 }
 
 void Explain::explainStages(PlanExecutor* exec,
                             const CollectionPtr& collection,
                             ExplainOptions::Verbosity verbosity,
                             BSONObj extraInfo,
+                            const BSONObj& command,
                             BSONObjBuilder* out) {
     auto&& explainer = exec->getPlanExplainer();
     auto winningPlanTrialStats = explainer.getWinningPlanStats(verbosity);
@@ -331,8 +339,14 @@ void Explain::explainStages(PlanExecutor* exec,
         }
     }
 
-    explainStages(
-        exec, *collectionPtr, verbosity, executePlanStatus, winningPlanTrialStats, extraInfo, out);
+    explainStages(exec,
+                  *collectionPtr,
+                  verbosity,
+                  executePlanStatus,
+                  winningPlanTrialStats,
+                  extraInfo,
+                  command,
+                  out);
 
     explain_common::generateServerInfo(out);
 }

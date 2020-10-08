@@ -179,8 +179,12 @@ public:
                     ClusterExplain::getStageNameForReadOp(shardResponses.size(), _request.body);
 
                 auto bodyBuilder = result->getBodyBuilder();
-                uassertStatusOK(ClusterExplain::buildExplainResult(
-                    opCtx, shardResponses, mongosStageName, millisElapsed, &bodyBuilder));
+                uassertStatusOK(ClusterExplain::buildExplainResult(opCtx,
+                                                                   shardResponses,
+                                                                   mongosStageName,
+                                                                   millisElapsed,
+                                                                   _request.body,
+                                                                   &bodyBuilder));
 
             } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
                 auto bodyBuilder = result->getBodyBuilder();

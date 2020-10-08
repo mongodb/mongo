@@ -228,6 +228,7 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
                                _execStatus,
                                _winningPlanTrialStats,
                                BSONObj(),
+                               BSONObj(),
                                &explainStatsBuilder);
     }
 
