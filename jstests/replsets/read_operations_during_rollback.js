@@ -77,7 +77,7 @@
 
     // Disable the best-effort check for primary-ness in the service entry point, so that we
     // exercise the real check for primary-ness in 'find' and 'getMore' commands.
-    setFailPoint(rollbackNode, "skipCheckingForNotMasterInCommandDispatch");
+    setFailPoint(rollbackNode, "skipCheckingForNotPrimaryInCommandDispatch");
     jsTestLog("Reading during rollback (again with command dispatch checks disabled).");
     assert.commandFailedWithCode(rollbackNode.getDB(dbName).runCommand({"find": collName}),
                                  ErrorCodes.NotMasterOrSecondary);
