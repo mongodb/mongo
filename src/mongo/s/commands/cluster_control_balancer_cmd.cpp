@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/init.h"
@@ -34,6 +36,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 
@@ -46,10 +49,12 @@ class BalancerControlCommand : public BasicCommand {
 public:
     BalancerControlCommand(StringData name,
                            StringData configsvrCommandName,
-                           ActionType authorizationAction)
+                           ActionType authorizationAction,
+                           bool logCommand)
         : BasicCommand(name),
           _configsvrCommandName(configsvrCommandName),
-          _authorizationAction(authorizationAction) {}
+          _authorizationAction(authorizationAction),
+          _logCommand(logCommand) {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
@@ -83,6 +88,12 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+
+        if (_logCommand)
+            LOGV2(5054300,
+                  "About to run balancer control command",
+                  "cmd"_attr = _configsvrCommandName);
+
         auto cmdResponse = uassertStatusOK(
             configShard->runCommandWithFixedRetryAttempts(opCtx,
                                                           kPrimaryOnlyReadPreference,
@@ -100,24 +111,30 @@ public:
 private:
     const StringData _configsvrCommandName;
     const ActionType _authorizationAction;
+    const bool _logCommand;
 };
 
 class BalancerStartCommand : public BalancerControlCommand {
 public:
     BalancerStartCommand()
-        : BalancerControlCommand("balancerStart", "_configsvrBalancerStart", ActionType::update) {}
+        : BalancerControlCommand(
+              "balancerStart", "_configsvrBalancerStart", ActionType::update, true /* log cmd */) {}
 };
 
 class BalancerStopCommand : public BalancerControlCommand {
 public:
     BalancerStopCommand()
-        : BalancerControlCommand("balancerStop", "_configsvrBalancerStop", ActionType::update) {}
+        : BalancerControlCommand(
+              "balancerStop", "_configsvrBalancerStop", ActionType::update, true /* log cmd */) {}
 };
 
 class BalancerStatusCommand : public BalancerControlCommand {
 public:
     BalancerStatusCommand()
-        : BalancerControlCommand("balancerStatus", "_configsvrBalancerStatus", ActionType::find) {}
+        : BalancerControlCommand("balancerStatus",
+                                 "_configsvrBalancerStatus",
+                                 ActionType::find,
+                                 false /* do not log cmd */) {}
 };
 
 MONGO_INITIALIZER(ClusterBalancerControlCommands)(InitializerContext* context) {
