@@ -10320,6 +10320,8 @@ buildvariants:
     large_distro_name: rhel62-large
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
+    test_flags: >-
+        --mongodSetParameters="{featureFlagTimeSeriesCollection: true}"
   tasks:
   - name: compile_parallel_TG
     distros:
