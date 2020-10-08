@@ -416,14 +416,3 @@ server_parameters:
     cpp_varname: "internalQueryEnableCSTParser"
     cpp_vartype: AtomicWord<bool>
     default: false
-
-  internalQueryMaxDocValidationErrorConsideredValues:
-    description: "Limits the number of values reported in the 'consideredValues' array when
-    generating a descriptive document validation error."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryMaxDocValidationErrorConsideredValues"
-    cpp_vartype: AtomicWord<int>
-    default:
-        expr: 10
-    validator:
-        gt: 0
