@@ -70,13 +70,13 @@ struct IndexInfo {
 struct IndexEntryInfo {
     IndexEntryInfo(const IndexInfo& indexInfo,
                    RecordId entryRecordId,
-                   boost::optional<BSONElement> entryIdKey,
+                   BSONObj entryIdKey,
                    KeyString::Value entryKeyString);
     const std::string indexName;
     const BSONObj keyPattern;
     const Ordering ord;
     RecordId recordId;
-    boost::optional<BSONElement> idKey;
+    BSONObj idKey;
     KeyString::Value keyString;
 };
 
@@ -224,7 +224,7 @@ private:
                           const BSONObj& keyPattern,
                           RecordId recordId,
                           const BSONObj& indexKey,
-                          boost::optional<BSONElement> idKey);
+                          const BSONObj& idKey);
 
     /**
      * Returns a hashed value from the given KeyString and index namespace.

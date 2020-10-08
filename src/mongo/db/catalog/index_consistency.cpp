@@ -81,13 +81,13 @@ IndexInfo::IndexInfo(const IndexDescriptor* descriptor, IndexAccessMethod* index
 
 IndexEntryInfo::IndexEntryInfo(const IndexInfo& indexInfo,
                                RecordId entryRecordId,
-                               boost::optional<BSONElement> entryIdKey,
+                               BSONObj entryIdKey,
                                KeyString::Value entryKeyString)
     : indexName(indexInfo.indexName),
       keyPattern(indexInfo.keyPattern),
       ord(indexInfo.ord),
       recordId(entryRecordId),
-      idKey(entryIdKey),
+      idKey(entryIdKey.getOwned()),
       keyString(entryKeyString) {}
 
 IndexConsistency::IndexConsistency(OperationContext* opCtx,
@@ -311,16 +311,17 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
         invariant(record);
 
         BSONObj data = record->data.toBson();
-        boost::optional<BSONElement> idKey = boost::none;
+
+        BSONObjBuilder idKeyBuilder;
         if (data.hasField("_id")) {
-            idKey = data["_id"];
+            idKeyBuilder.append(data["_id"]);
         }
 
         // Cannot have duplicate KeyStrings during the document scan phase for the same index.
         IndexKey key = _generateKeyForMap(*indexInfo, ks);
         invariant(_missingIndexEntries.count(key) == 0);
         _missingIndexEntries.insert(
-            std::make_pair(key, IndexEntryInfo(*indexInfo, recordId, idKey, ks)));
+            std::make_pair(key, IndexEntryInfo(*indexInfo, recordId, idKeyBuilder.obj(), ks)));
     }
 }
 
@@ -354,7 +355,7 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
         auto indexKey =
             KeyString::toBsonSafe(ks.getBuffer(), ks.getSize(), indexInfo->ord, ks.getTypeBits());
         BSONObj info = _generateInfo(
-            indexInfo->indexName, indexInfo->keyPattern, recordId, indexKey, boost::none);
+            indexInfo->indexName, indexInfo->keyPattern, recordId, indexKey, BSONObj());
 
         IndexKey key = _generateKeyForMap(*indexInfo, ks);
         if (_missingIndexEntries.count(key) == 0) {
@@ -460,7 +461,7 @@ BSONObj IndexConsistency::_generateInfo(const std::string& indexName,
                                         const BSONObj& keyPattern,
                                         RecordId recordId,
                                         const BSONObj& indexKey,
-                                        boost::optional<BSONElement> idKey) {
+                                        const BSONObj& idKey) {
 
     // We need to rehydrate the indexKey for improved readability.
     // {"": ObjectId(...)} -> {"_id": ObjectId(...)}
@@ -478,8 +479,9 @@ BSONObj IndexConsistency::_generateInfo(const std::string& indexName,
 
     BSONObj rehydratedKey = b.done();
 
-    if (idKey) {
-        return BSON("indexName" << indexName << "recordId" << recordId.repr() << "idKey" << *idKey
+    if (!idKey.isEmpty()) {
+        invariant(idKey.nFields() == 1);
+        return BSON("indexName" << indexName << "recordId" << recordId.repr() << "idKey" << idKey
                                 << "indexKey" << rehydratedKey);
     } else {
         return BSON("indexName" << indexName << "recordId" << recordId.repr() << "indexKey"
