@@ -56,7 +56,7 @@
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/write_concern_error_detail.h"
@@ -553,8 +553,8 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
 
     auto threadName = client->desc();
     auto appName = StringData();
-    if (const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata()) {
-        appName = clientMetadata.get().getApplicationName();
+    if (auto clientMetadata = ClientMetadata::get(client)) {
+        appName = clientMetadata->getApplicationName();
     }
     auto isInternalClient = client->session()->getTags() & transport::Session::kInternalClient;
 
@@ -703,8 +703,7 @@ void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
     waitInCommandMarkKillOnClientDisconnect.executeIf(
         [&](const BSONObj&) { waitInCommandMarkKillOnClientDisconnect.pauseWhileSet(opCtx); },
         [&](const BSONObj& obj) {
-            const auto& md =
-                ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
+            auto md = ClientMetadata::get(opCtx->getClient());
             return md && (md->getApplicationName() == obj["appName"].str());
         });
 }

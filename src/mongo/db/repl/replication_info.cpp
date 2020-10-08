@@ -61,7 +61,6 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/transport/ismaster_metrics.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point.h"
@@ -289,33 +288,11 @@ public:
             sessionTagsToSet |= transport::Session::kKeepOpen;
         }
 
-        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
-        bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
-
-        if (!seenIsMaster) {
-            clientMetadataIsMasterState.setSeenIsMaster();
-        }
-
-        BSONElement element = cmdObj[kMetadataDocumentName];
-        if (!element.eoo()) {
-            if (seenIsMaster) {
-                uasserted(ErrorCodes::ClientMetadataCannotBeMutated,
-                          "The client metadata document may only be sent in the first isMaster");
-            }
-
-            auto parsedClientMetadata = uassertStatusOK(ClientMetadata::parse(element));
-
-            invariant(parsedClientMetadata);
-
-            parsedClientMetadata->logClientMetadata(opCtx->getClient());
-
-            clientMetadataIsMasterState.setClientMetadata(opCtx->getClient(),
-                                                          std::move(parsedClientMetadata));
-        }
-
-        if (!seenIsMaster) {
-            auto sniName = opCtx->getClient()->getSniNameForSession();
-            SplitHorizon::setParameters(opCtx->getClient(), std::move(sniName));
+        auto client = opCtx->getClient();
+        if (ClientMetadata::tryFinalize(client)) {
+            // If we are the first hello, then set split horizon parameters.
+            auto sniName = client->getSniNameForSession();
+            SplitHorizon::setParameters(client, std::move(sniName));
         }
 
         // Parse the optional 'internalClient' field. This is provided by incoming connections from

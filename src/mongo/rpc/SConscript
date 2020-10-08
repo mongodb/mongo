@@ -134,7 +134,6 @@ env.Library(
     target='client_metadata',
     source=[
         'metadata/client_metadata.cpp',
-        'metadata/client_metadata_ismaster.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -46,38 +46,35 @@ constexpr auto kMetadataDocumentName = "client"_sd;
 
 /**
  * The ClientMetadata class is responsible for parsing the client metadata document that is received
- * in isMaster from clients. This class also provides static methods for client libraries to create
- * a valid client metadata document.
+ * in the "client" field of the first hello from clients. The client metadata document can also be
+ * parsed from the "$client" field of any operation. This class also provides static methods for
+ * client libraries to write a valid client metadata document.
  *
- * Example document of isMaster request with client metadata document:
+ * Example client metadata document:
  * {
- *    "isMaster" : 1,
- *    "client" : {
- *        "application" : {              // Optional
- *            "name" : "string"          // Optional with caveats
- *        },
- *        "driver" : {                   // Required, Informational Only
- *            "name" : "string",         // Required, Informational Only
- *            "version" : "string"       // Required, Informational Only
- *        },
- *        "os" : {                       // Required, Informational Only
- *            "type" : "string",         // Required, Informational Only, See note
- *            "name" : "string",         // Optional, Informational Only
- *            "architecture" : "string", // Optional, Informational Only
- *            "version" : "string"       // Optional, Informational Only
- *        }
- *        "mongos" : {                   // Optional, Informational Only
- *            "host" : "string",         // Optional, Informational Only
- *            "client" : "string",       // Optional, Informational Only
- *            "version" : "string"       // Optional, Informational Only
- *        }
- *    }
+ *     "application" : {              // Optional
+ *         "name" : "string"          // Optional with caveats
+ *     },
+ *     "driver" : {                   // Required, Informational Only
+ *         "name" : "string",         // Required, Informational Only
+ *         "version" : "string"       // Required, Informational Only
+ *     },
+ *     "os" : {                       // Required, Informational Only
+ *         "type" : "string",         // Required, Informational Only, See note
+ *         "name" : "string",         // Optional, Informational Only
+ *         "architecture" : "string", // Optional, Informational Only
+ *         "version" : "string"       // Optional, Informational Only
+ *     }
+ *     "mongos" : {                   // Optional, Informational Only
+ *         "host" : "string",         // Optional, Informational Only
+ *         "client" : "string",       // Optional, Informational Only
+ *         "version" : "string"       // Optional, Informational Only
+ *     }
  * }
  *
- * For this classes' purposes, the client metadata document is the sub-document in "client". It is
- * allowed to contain additional fields that are not listed in the example above. These additional
- * fields are ignore by this class. The "os" document "type" field is required (defaults to
- * "unknown" in Mongo Drivers). The "driver", and "os" documents while required, are for
+ * It is allowed to contain additional fields that are not listed in the example above. These
+ * additional fields are ignore by this class. The "os" document "type" field is required (defaults
+ * to "unknown" in Mongo Drivers). The "driver", and "os" documents while required, are for
  * informational purposes only. The content is logged to disk but otherwise ignored.
  *
  * See Driver Specification: "MongoDB Handshake" for more information.
@@ -91,7 +88,55 @@ public:
     ClientMetadata& operator=(ClientMetadata&&) = default;
 
     /**
-     * Parse and validate a client metadata document contained in an isMaster request.
+     * Get the ClientMetadata for the Client.
+     *
+     * This function may return nullptr for either of two reasons:
+     * - The ClientMetadata hasn't been finalized yet via tryFinalize().
+     * - The ClientMetadata wasn't provided at all.
+     *
+     * The pointer to ClientMetadata is valid to use if:
+     * - You hold the Client lock.
+     * - You are on the Client's thread.
+     */
+    static const ClientMetadata* getForClient(Client* client) noexcept;
+
+    /**
+     * Get the ClientMetadata for the OperationContext.
+     *
+     * This function may return nullptr if there was no ClientMetadata provided for the
+     * OperationContext.
+     *
+     * The pointer to ClientMetadata is valid to use if:
+     * - You hold the Client lock.
+     * - You are on the Client's thread.
+     */
+    static const ClientMetadata* getForOperation(OperationContext* opCtx) noexcept;
+
+    /**
+     * Get the prioritized ClientMetadata for the Client.
+     *
+     * This function returns getForOperation() if it returns a valid pointer, otherwise it returns
+     * getForClient().
+     *
+     * The pointer to ClientMetadata is valid to use if:
+     * - You hold the Client lock.
+     * - You are on the Client's thread.
+     */
+    static const ClientMetadata* get(Client* client) noexcept;
+
+    /**
+     * Set the ClientMetadata for the Client directly.
+     *
+     * This should only be used in testing. It sets the ClientMetadata as finalized but does not
+     * check if it was previously finalized. It allows the user to replace the ClientMetadata for
+     * a Client, which is disallowed if done via setFromMetadata().
+     *
+     * This function takes the Client lock.
+     */
+    static void setAndFinalize(Client* client, boost::optional<ClientMetadata> meta);
+
+    /**
+     * Parse and validate a client metadata document contained in a hello request.
      *
      * Empty or non-existent sub-documents are permitted. Non-empty documents are required to have
      * the fields driver.name, driver.version, and os.type which must be strings.
@@ -153,6 +198,47 @@ public:
                             StringData driverVersion,
                             StringData appName,
                             BSONObjBuilder* builder);
+
+    /**
+     * Mark the ClientMetadata as finalized.
+     *
+     * Once this function is called, no future hello can mutate the ClientMetadata.
+     *
+     * This function takes the Client lock.
+     */
+    static bool tryFinalize(Client* client);
+
+    /**
+     * Set the ClientMetadata for the Client by reading it from the given BSONElement.
+     *
+     * This function throws if the ClientMetadata has already been finalized but the BSONElement is
+     * an object. ClientMetadata is allowed to be set via the first hello only.
+     *
+     * This function takes the Client lock.
+     */
+    static void setFromMetadata(Client* client, BSONElement& elem);
+
+    /**
+     * Set the ClientMetadata for the OperationContext by reading it from the given BSONElement.
+     *
+     * This function throws if called more than once for the same OperationContext.
+     *
+     * This function takes the Client lock.
+     */
+    static void setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem);
+
+    /**
+     * Read from the $client field in requests.
+     *
+     * Throws an error if the $client section is not valid. It is valid for it to not exist though.
+     */
+    static boost::optional<ClientMetadata> readFromMetadata(BSONElement& elem);
+
+    /**
+     * Write the $client section to request bodies if there is a non-empty client metadata
+     * connection with the current client.
+     */
+    void writeToMetadata(BSONObjBuilder* builder) const noexcept;
 
     /**
      * Modify the existing client metadata document to include a mongos section.

@@ -33,7 +33,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 
 namespace mongo {
 namespace {
@@ -69,29 +68,10 @@ public:
                      BSONObjBuilder& result) {
 
         auto wireSpec = WireSpec::instance().get();
-        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
-        bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
-        if (!seenIsMaster) {
-            clientMetadataIsMasterState.setSeenIsMaster();
-        }
 
-        BSONElement element = cmdObj[kMetadataDocumentName];
-        if (!element.eoo()) {
-            if (seenIsMaster) {
-                uasserted(ErrorCodes::ClientMetadataCannotBeMutated,
-                          "The client metadata document may only be sent in the first isMaster");
-            }
-
-            auto swParseClientMetadata = ClientMetadata::parse(element);
-            uassertStatusOK(swParseClientMetadata.getStatus());
-
-            invariant(swParseClientMetadata.getValue());
-
-            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
-
-            clientMetadataIsMasterState.setClientMetadata(
-                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
-        }
+        auto metaElem = cmdObj[kMetadataDocumentName];
+        ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
+        ClientMetadata::tryFinalize(opCtx->getClient());
 
         result.appendBool("ismaster", true);
 

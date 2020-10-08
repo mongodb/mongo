@@ -37,7 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/config_server_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/rpc/metadata/sharding_metadata.h"
@@ -59,6 +59,7 @@ void readRequestMetadata(OperationContext* opCtx,
     BSONElement configSvrElem;
     BSONElement trackingElem;
     BSONElement clientElem;
+    BSONElement helloClientElem;
     BSONElement impersonationElem;
     BSONElement clientOperationKeyElem;
 
@@ -96,7 +97,13 @@ void readRequestMetadata(OperationContext* opCtx,
 
     readImpersonatedUserMetadata(impersonationElem, opCtx);
 
-    uassertStatusOK(ClientMetadataIsMasterState::readFromMetadata(opCtx, clientElem));
+    // We check for "$client" but not "client" here, because currentOp can filter on "client" as
+    // a top-level field.
+    if (clientElem) {
+        // The '$client' field is populated by mongos when it sends requests to shards on behalf of
+        // its own requests. This may or may not be relevant for SERVER-50804.
+        ClientMetadata::setFromMetadataForOperation(opCtx, clientElem);
+    }
 
     ConfigServerMetadata::get(opCtx) =
         uassertStatusOK(ConfigServerMetadata::readFromMetadata(configSvrElem));

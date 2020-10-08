@@ -42,7 +42,6 @@
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -99,34 +98,8 @@ public:
 
         waitInHello.pauseWhileSet(opCtx);
 
-        auto& clientMetadataIsMasterState = ClientMetadataIsMasterState::get(opCtx->getClient());
-        bool seenIsMaster = clientMetadataIsMasterState.hasSeenIsMaster();
-        if (!seenIsMaster) {
-            clientMetadataIsMasterState.setSeenIsMaster();
-        }
-
-        BSONElement element = cmdObj[kMetadataDocumentName];
-        if (!element.eoo()) {
-            if (seenIsMaster) {
-                uasserted(ErrorCodes::ClientMetadataCannotBeMutated,
-                          "The client metadata document may only be sent in the first isMaster");
-            }
-
-            auto swParseClientMetadata = ClientMetadata::parse(element);
-            uassertStatusOK(swParseClientMetadata.getStatus());
-
-            invariant(swParseClientMetadata.getValue());
-
-            swParseClientMetadata.getValue().get().logClientMetadata(opCtx->getClient());
-
-            swParseClientMetadata.getValue().get().setMongoSMetadata(
-                getHostNameCachedAndPort(),
-                opCtx->getClient()->clientAddress(true),
-                VersionInfoInterface::instance().version());
-
-            clientMetadataIsMasterState.setClientMetadata(
-                opCtx->getClient(), std::move(swParseClientMetadata.getValue()));
-        }
+        auto client = opCtx->getClient();
+        ClientMetadata::tryFinalize(client);
 
         // If a client is following the awaitable isMaster protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.

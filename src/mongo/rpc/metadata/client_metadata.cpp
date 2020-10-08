@@ -44,8 +44,11 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
@@ -71,6 +74,13 @@ constexpr uint32_t kMaxMongoSMetadataDocumentByteLength = 512U;
 // for MongoD to try to ensure that the appended information does not cause a failure.
 constexpr uint32_t kMaxMongoDMetadataDocumentByteLength = 1024U;
 constexpr uint32_t kMaxApplicationNameByteLength = 128U;
+
+struct ClientMetadataState {
+    bool isFinalized = false;
+    boost::optional<ClientMetadata> meta;
+};
+const auto getClientState = Client::declareDecoration<ClientMetadataState>();
+const auto getOperationState = OperationContext::declareDecoration<ClientMetadataState>();
 
 }  // namespace
 
@@ -440,6 +450,112 @@ void ClientMetadata::logClientMetadata(Client* client) const {
 
 StringData ClientMetadata::fieldName() {
     return kClientMetadataFieldName;
+}
+
+bool ClientMetadata::tryFinalize(Client* client) {
+    auto lk = stdx::unique_lock(*client);
+    auto& state = getClientState(client);
+    if (std::exchange(state.isFinalized, true)) {
+        return false;
+    }
+
+    lk.unlock();
+
+    if (state.meta) {
+        // If we reach this point, the ClientMetadata is effectively immutable because isFinalized
+        // is true.
+        state.meta->logClientMetadata(client);
+    }
+
+    return true;
+}
+
+const ClientMetadata* ClientMetadata::getForClient(Client* client) noexcept {
+    auto& state = getClientState(client);
+    if (!state.isFinalized || !state.meta) {
+        return nullptr;
+    }
+    return &state.meta.get();
+}
+
+const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) noexcept {
+    auto& state = getOperationState(opCtx);
+    if (!state.isFinalized) {
+        return nullptr;
+    }
+    invariant(state.meta);
+    return &state.meta.get();
+}
+
+const ClientMetadata* ClientMetadata::get(Client* client) noexcept {
+    if (auto opCtx = client->getOperationContext()) {
+        if (auto meta = getForOperation(opCtx)) {
+            return meta;
+        }
+    }
+
+    return getForClient(client);
+}
+
+void ClientMetadata::setAndFinalize(Client* client, boost::optional<ClientMetadata> meta) {
+    invariant(TestingProctor::instance().isEnabled());
+
+    auto lk = stdx::lock_guard(*client);
+
+    auto& state = getClientState(client);
+    state.isFinalized = true;
+    state.meta = std::move(meta);
+}
+
+void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, BSONElement& elem) {
+    auto lk = stdx::lock_guard(*opCtx->getClient());
+
+    auto& state = getOperationState(opCtx);
+    auto wasFinalized = std::exchange(state.isFinalized, true);
+    uassert(ErrorCodes::ClientMetadataCannotBeMutated,
+            "The client metadata document may only be set once per operation",
+            !wasFinalized);
+
+    state.meta = ClientMetadata::readFromMetadata(elem);
+}
+
+void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
+    auto& state = getClientState(client);
+
+    {
+        auto lk = stdx::lock_guard(*client);
+        if (state.isFinalized) {
+            uassert(ErrorCodes::ClientMetadataCannotBeMutated,
+                    "The client metadata document may only be sent in the first hello",
+                    elem.eoo());
+            return;
+        }
+    }
+
+    auto meta = ClientMetadata::readFromMetadata(elem);
+    if (meta && isMongos()) {
+        // If we had a full ClientMetadata and we're on mongos, attach some additional client data.
+        meta->setMongoSMetadata(getHostNameCachedAndPort(),
+                                client->clientAddress(true),
+                                VersionInfoInterface::instance().version());
+    }
+
+    auto lk = stdx::lock_guard(*client);
+    state.meta = std::move(meta);
+}
+
+boost::optional<ClientMetadata> ClientMetadata::readFromMetadata(BSONElement& element) {
+    return uassertStatusOK(ClientMetadata::parse(element));
+}
+
+void ClientMetadata::writeToMetadata(BSONObjBuilder* builder) const noexcept {
+    auto& document = getDocument();
+    if (document.isEmpty()) {
+        // Skip appending metadata if there is none
+        return;
+    }
+
+    builder->append(ClientMetadata::fieldName(), document);
 }
 
 }  // namespace mongo

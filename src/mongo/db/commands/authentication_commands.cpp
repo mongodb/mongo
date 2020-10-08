@@ -58,7 +58,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/client_metadata_ismaster.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/net/ssl_manager.h"
@@ -114,9 +113,7 @@ Status _authenticateX509(OperationContext* opCtx, const UserName& user, const BS
                               "authentication. The current configuration does not allow "
                               "x.509 cluster authentication, check the --clusterAuthMode flag");
             }
-            auto& clientMetadata =
-                ClientMetadataIsMasterState::get(opCtx->getClient()).getClientMetadata();
-            if (clientMetadata) {
+            if (auto clientMetadata = ClientMetadata::get(opCtx->getClient())) {
                 auto clientMetadataDoc = clientMetadata->getDocument();
                 auto driverName = clientMetadataDoc.getObjectField("driver"_sd)
                                       .getField("name"_sd)

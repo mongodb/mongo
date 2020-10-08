@@ -68,6 +68,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -312,11 +313,12 @@ void runCommand(OperationContext* opCtx,
         return;
     }
 
+    const auto isHello = command->getName() == "hello"_sd || command->getName() == "isMaster"_sd;
+
     opCtx->setExhaust(OpMsg::isFlagSet(m, OpMsg::kExhaustSupported));
     const auto session = opCtx->getClient()->session();
     if (session) {
-        if (!opCtx->isExhaust() ||
-            (command->getName() != "hello"_sd && command->getName() != "isMaster"_sd)) {
+        if (!opCtx->isExhaust() || !isHello) {
             InExhaustHello::get(session.get())->setInExhaust(false, commandName);
         }
     }
@@ -390,19 +392,26 @@ void runCommand(OperationContext* opCtx,
         return;
     }
 
-    auto& apiParams = APIParameters::get(opCtx);
-    auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
-    const auto& clientMetadata = ClientMetadataIsMasterState::get(client).getClientMetadata();
-    if (clientMetadata) {
-        auto appName = clientMetadata.get().getApplicationName().toString();
-        apiVersionMetrics.update(appName, apiParams);
-    }
-
-    boost::optional<RouterOperationContextSession> routerSession;
     try {
+        if (isHello) {
+            // Preload generic ClientMetadata ahead of our first hello request. After the first
+            // request, metaElement should always be empty.
+            auto metaElem = request.body[kMetadataDocumentName];
+            ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
+        }
+
+        auto& apiParams = APIParameters::get(opCtx);
+        auto& apiVersionMetrics = APIVersionMetrics::get(opCtx->getServiceContext());
+        if (auto clientMetadata = ClientMetadata::get(client)) {
+            auto appName = clientMetadata->getApplicationName().toString();
+            apiVersionMetrics.update(appName, apiParams);
+        }
+
         rpc::readRequestMetadata(opCtx, request.body, command->requiresAuth());
 
         CommandHelpers::evaluateFailCommandFailPoint(opCtx, invocation.get());
+
+        boost::optional<RouterOperationContextSession> routerSession;
         bool startTransaction = false;
         if (osi.getAutocommit()) {
             routerSession.emplace(opCtx);
