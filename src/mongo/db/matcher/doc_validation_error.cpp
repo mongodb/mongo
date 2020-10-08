@@ -70,6 +70,9 @@ using AnnotationMode = ErrorAnnotation::Mode;
 using LeafArrayBehavior = ElementPath::LeafArrayBehavior;
 using NonLeafArrayBehavior = ElementPath::NonLeafArrayBehavior;
 
+// Fail point which simulates an internal error for testing.
+MONGO_FAIL_POINT_DEFINE(docValidationInternalErrorFailPoint);
+
 /**
  * Enumerated type which describes whether an error should be described normally or in an
  * inverted sense when in a negated context. More precisely, when a MatchExpression fails to match a
@@ -115,6 +118,8 @@ struct ValidationErrorFrame {
     BSONObj currentDoc;
     // Tracks whether the generated error should be described normally or in an inverted context.
     InvertError inversion;
+    // Tracks whether the array of 'consideredValues' was truncated for this frame.
+    bool consideredValuesTruncated = false;
 };
 
 using RuntimeState = ValidationErrorFrame::RuntimeState;
@@ -123,7 +128,17 @@ using RuntimeState = ValidationErrorFrame::RuntimeState;
  * A struct which tracks context during error generation.
  */
 struct ValidationErrorContext {
-    ValidationErrorContext(const BSONObj& rootDoc) : rootDoc(rootDoc) {}
+    ValidationErrorContext(const BSONObj& rootDoc,
+                           bool truncate,
+                           const int maxDocValidationErrorSize,
+                           const int maxConsideredValuesElements)
+        : rootDoc(rootDoc),
+          truncate(truncate),
+          kMaxDocValidationErrorSize(maxDocValidationErrorSize),
+          kMaxConsideredValuesElements(maxConsideredValuesElements) {
+        invariant(kMaxConsideredValuesElements > 0);
+        invariant(kMaxDocValidationErrorSize > 0);
+    }
 
     /**
      * Utilities which add/remove ValidationErrorFrames from 'frames'.
@@ -220,6 +235,46 @@ struct ValidationErrorContext {
         frames.top().inversion = inversion;
     }
 
+    /**
+     * Verify that the size of 'builder' combined with that of 'item' are of valid size before
+     * appending the latter to the former; throws a BSONObjectTooLarge error otherwise.
+     */
+    template <class ItemType, class BuilderType>
+    void verifySize(const ItemType& item, const BuilderType& builder) {
+        uassert(ErrorCodes::BSONObjectTooLarge,
+                "doc validation error builder exceeded maximum size",
+                builder.len() + item.objsize() <= kMaxDocValidationErrorSize);
+    }
+
+    template <class BuilderType>
+    void verifySize(const BSONElement& item, const BuilderType& builder) {
+        uassert(ErrorCodes::BSONObjectTooLarge,
+                "doc validation error builder exceeded maximum size",
+                builder.len() + item.size() <= kMaxDocValidationErrorSize);
+    }
+
+    template <class ItemType, class BuilderType>
+    void verifySizeAndAppend(const ItemType& item,
+                             const std::string& fieldName,
+                             BuilderType* builder) {
+        verifySize(item, *builder);
+        builder->append(fieldName, item);
+    }
+
+    template <class ItemType>
+    void verifySizeAndAppend(const ItemType& item, BSONArrayBuilder* builder) {
+        verifySize(item, *builder);
+        builder->append(item);
+    }
+
+    template <class BuilderType>
+    void verifySizeAndAppendAs(const BSONElement& item,
+                               const std::string& fieldName,
+                               BuilderType* builder) {
+        verifySize(item, *builder);
+        builder->appendAs(item, fieldName);
+    }
+
     bool haveLatestCompleteError() {
         return !stdx::holds_alternative<std::monostate>(latestCompleteError);
     }
@@ -228,10 +283,12 @@ struct ValidationErrorContext {
      * Appends the latest complete error to 'builder'.
      */
     void appendLatestCompleteError(BSONObjBuilder* builder) {
+        const static std::string kDetailsString = "details";
         stdx::visit(
-            visit_helper::Overloaded{
-                [&](const auto& details) -> void { builder->append("details", details); },
-                [&](const std::monostate& arr) -> void { MONGO_UNREACHABLE }},
+            visit_helper::Overloaded{[&](const auto& details) -> void {
+                                         verifySizeAndAppend(details, kDetailsString, builder);
+                                     },
+                                     [&](const std::monostate& arr) -> void { MONGO_UNREACHABLE }},
             latestCompleteError);
     }
 
@@ -246,8 +303,16 @@ struct ValidationErrorContext {
     /**
      * Returns whether 'expr' will produce an array as an error.
      */
-    bool producesArray(const MatchExpression& expr) {
+    bool producesArray(const MatchExpression& expr) const {
         return expr.getErrorAnnotation()->operatorName == "_internalSubschema";
+    }
+    bool isConsideredValuesTruncated() const {
+        invariant(!frames.empty());
+        return frames.top().consideredValuesTruncated;
+    }
+    void markConsideredValuesAsTruncated() {
+        invariant(!frames.empty());
+        frames.top().consideredValuesTruncated = true;
     }
 
     /**
@@ -297,6 +362,14 @@ struct ValidationErrorContext {
     stdx::variant<std::monostate, BSONObj, BSONArray> latestCompleteError = std::monostate();
     // Document which failed to match against the collection's validator.
     const BSONObj& rootDoc;
+    // Tracks whether the generated error should omit appending 'specifiedAs' and
+    // 'consideredValues' to avoid generating an error larger than the maximum BSONObj size.
+    const bool truncate = false;
+    // The maximum allowed size for a doc validation error.
+    const int kMaxDocValidationErrorSize;
+    // Tracks the maximum number of values that will be reported in the 'consideredValues' array
+    // for leaf operators.
+    const int kMaxConsideredValuesElements;
 };
 
 /**
@@ -320,7 +393,8 @@ void finishLogicalOperatorChildError(const ListOfMatchExpression* expr,
                 ctx->appendLatestCompleteError(&subBuilder);
                 subBuilder.done();
             } else {
-                ctx->getCurrentArrayBuilder().append(ctx->getLatestCompleteErrorObject());
+                ctx->verifySizeAndAppend(ctx->getLatestCompleteErrorObject(),
+                                         &ctx->getCurrentArrayBuilder());
             }
         }
     }
@@ -640,7 +714,8 @@ public:
             appendConsideredValue(attributeValueAsArray);
             auto duplicateValue = expr->findFirstDuplicateValue(attributeValueAsArray);
             invariant(duplicateValue);
-            _context->getCurrentObjBuilder().appendAs(duplicateValue, "duplicatedValue"_sd);
+            _context->verifySizeAndAppendAs(
+                duplicateValue, "duplicatedValue", &_context->getCurrentObjBuilder());
         } else {
             _context->setCurrentRuntimeState(RuntimeState::kNoError);
         }
@@ -763,7 +838,14 @@ private:
         }
     }
     void appendSpecifiedAs(const ErrorAnnotation& annotation, BSONObjBuilder* bob) {
-        bob->append("specifiedAs", annotation.annotation);
+        // Omit 'specifiedAs' if we are generating a truncated error.
+        if (_context->truncate) {
+            return;
+        }
+        // Since this function can append values that are proportional to the size of the
+        // original validator expression, verify that the current builders do not exceed the
+        // maximum allowed validation error size.
+        _context->verifySizeAndAppend(annotation.annotation, "specifiedAs", bob);
     }
     void appendErrorDetails(const MatchExpression& expr) {
         auto annotation = expr.getErrorAnnotation();
@@ -779,12 +861,22 @@ private:
         BSONMatchableDocument doc(_context->getCurrentDocument());
         MatchableDocument::IteratorHolder cursor(&doc, &path);
         BSONArrayBuilder bab;
-        while (cursor->more()) {
+        auto maxConsideredElements = _context->kMaxConsideredValuesElements;
+        while (cursor->more() && bab.arrSize() < maxConsideredElements) {
             auto elem = cursor->next().element();
             if (elem.eoo()) {
                 break;
             } else {
                 bab.append(elem);
+            }
+        }
+
+        // Indicate that 'consideredValues' has been truncated if there are non eoo elements left
+        // in 'cursor'.
+        if (cursor->more() && bab.arrSize() == maxConsideredElements) {
+            auto elem = cursor->next().element();
+            if (!elem.eoo()) {
+                _context->markConsideredValuesAsTruncated();
             }
         }
         return bab.arr();
@@ -867,22 +959,27 @@ private:
         }
     }
     void appendConsideredValue(const BSONArray& array) {
-        _context->getCurrentObjBuilder().append("consideredValue"_sd, array);
+        _context->verifySizeAndAppend(array, "consideredValue", &_context->getCurrentObjBuilder());
     }
     void appendConsideredValues(const BSONArray& arr) {
         int size = arr.nFields();
-        if (size == 0) {
-            return;  // there are no values to append
+        // Return if there are no values to append or if we are generating a truncated error.
+        if (size == 0 || _context->truncate) {
+            return;
         }
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
         if (size == 1) {
-            bob.appendAs(arr[0], "consideredValue");
+            _context->verifySizeAndAppendAs(arr[0], "consideredValue", &bob);
         } else {
-            bob.append("consideredValues", arr);
+            _context->verifySizeAndAppend(arr, "consideredValues", &bob);
+        }
+
+        if (_context->isConsideredValuesTruncated()) {
+            bob.append("consideredValuesTruncated", true);
         }
     }
     void appendConsideredTypes(const BSONArray& arr) {
-        if (arr.nFields() == 0) {
+        if (arr.isEmpty()) {
             return;  // no values means no considered types
         }
         BSONObjBuilder& bob = _context->getCurrentObjBuilder();
@@ -1187,7 +1284,8 @@ private:
         while (it.more()) {
             detailsArrayBuilder.append(it.next());
         }
-        _context->getCurrentObjBuilder().append("additionalItems"_sd, detailsArrayBuilder.arr());
+        _context->verifySizeAndAppend(
+            detailsArrayBuilder.arr(), "additionalItems", &_context->getCurrentObjBuilder());
     }
 
     /**
@@ -1580,32 +1678,14 @@ bool hasErrorAnnotations(const MatchExpression& validatorExpr) {
 }
 
 /**
- * Generates a document validation error using match expression 'validatorExpr' for document
- * 'doc'.
+ * Appends the object id of 'doc' to 'builder' under the 'failingDocumentId' field.
  */
-BSONObj generateDocumentValidationError(const MatchExpression& validatorExpr, const BSONObj& doc) {
-    ValidationErrorContext context(doc);
-    ValidationErrorPreVisitor preVisitor{&context};
-    ValidationErrorInVisitor inVisitor{&context};
-    ValidationErrorPostVisitor postVisitor{&context};
-
-    // TODO SERVER-49446: Once all nodes have ErrorAnnotations, this check should be converted to an
-    // invariant check that all nodes have an annotation. Also add an invariant to the
-    // DocumentValidationFailureInfo constructor to check that it is initialized with a non-empty
-    // object.
-    if (!hasErrorAnnotations(validatorExpr)) {
-        return BSONObj();
-    }
-    MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
-    tree_walker::walk<true, MatchExpression>(&validatorExpr, &walker);
-
-    // There should be no frames when error generation is complete as the finished error will be
-    // stored in 'context'.
-    invariant(context.frames.empty());
-    auto error = context.getLatestCompleteErrorObject();
-    invariant(!error.isEmpty());
-    return error;
+void appendDocumentId(const BSONObj& doc, BSONObjBuilder* builder) {
+    BSONElement objectIdElement;
+    invariant(doc.getObjectID(objectIdElement));
+    builder->appendAs(objectIdElement, "failingDocumentId"_sd);
 }
+
 /**
  * Returns true if 'generatedError' is of valid depth; false otherwise.
  */
@@ -1628,6 +1708,63 @@ bool checkValidationErrorDepth(const BSONObj& generatedError) {
     }
     return true;
 }
+
+/**
+ * Generates a document validation error using match expression 'validatorExpr' for document
+ * 'doc'.
+ */
+BSONObj generateErrorHelper(const MatchExpression& validatorExpr,
+                            const BSONObj& doc,
+                            bool truncate,
+                            const int maxDocValidationErrorSize,
+                            const int maxConsideredValues) {
+    // Throw if 'docValidationInternalErrorFailPoint' is enabled.
+    uassert(4944300,
+            "docValidationInternalErrorFailPoint is enabled",
+            !docValidationInternalErrorFailPoint.shouldFail());
+
+    ValidationErrorContext context(doc, truncate, maxDocValidationErrorSize, maxConsideredValues);
+    ValidationErrorPreVisitor preVisitor{&context};
+    ValidationErrorInVisitor inVisitor{&context};
+    ValidationErrorPostVisitor postVisitor{&context};
+
+    // TODO SERVER-49446: Once all nodes have ErrorAnnotations, this check should be converted to an
+    // invariant check that all nodes have an annotation. Also add an invariant to the
+    // DocumentValidationFailureInfo constructor to check that it is initialized with a non-empty
+    // object.
+    if (!hasErrorAnnotations(validatorExpr)) {
+        return BSONObj();
+    }
+    MatchExpressionWalker walker{&preVisitor, &inVisitor, &postVisitor};
+    tree_walker::walk<true, MatchExpression>(&validatorExpr, &walker);
+
+    // There should be no frames when error generation is complete as the finished error will be
+    // stored in 'context'.
+    invariant(context.frames.empty());
+    auto error = context.getLatestCompleteErrorObject();
+    invariant(!error.isEmpty());
+
+    // Add document id to the error object.
+    BSONObjBuilder objBuilder;
+    appendDocumentId(doc, &objBuilder);
+
+    // Record whether the generated error was truncated.
+    if (truncate)
+        objBuilder.append("truncated", true);
+    // Add errors from match expressions.
+    objBuilder.append("details"_sd, std::move(error));
+
+    auto finalError = objBuilder.obj();
+    // Verify that the generated error is of valid depth.
+    if (!checkValidationErrorDepth(finalError)) {
+        BSONObjBuilder errorDetails;
+        static constexpr auto kDeeplyNestedError = "generated error was too deeply nested";
+        errorDetails.append("reason", kDeeplyNestedError);
+        errorDetails.append("truncated", true);
+        return errorDetails.obj();
+    }
+    return finalError;
+}
 }  // namespace
 
 std::shared_ptr<const ErrorExtraInfo> DocumentValidationFailureInfo::parse(const BSONObj& obj) {
@@ -1649,27 +1786,43 @@ const BSONObj& DocumentValidationFailureInfo::getDetails() const {
     return _details;
 }
 
-BSONObj generateError(const MatchExpression& validatorExpr, const BSONObj& doc) {
-    auto error = generateDocumentValidationError(validatorExpr, doc);
-    BSONObjBuilder objBuilder;
-
-    // Add document id to the error object.
-    BSONElement objectIdElement;
-    invariant(doc.getObjectID(objectIdElement));
-    objBuilder.appendAs(objectIdElement, "failingDocumentId"_sd);
-
-    // Add errors from match expressions.
-    objBuilder.append("details"_sd, std::move(error));
-    auto finalError = objBuilder.obj();
-
-    // Verify that the generated error is of valid depth.
-    if (!checkValidationErrorDepth(finalError)) {
-        BSONObjBuilder errorDetails;
-        static constexpr auto kDeeplyNestedError = "generated error was too deeply nested";
-        errorDetails.append("reason", kDeeplyNestedError);
-        errorDetails.append("truncated", true);
-        return errorDetails.obj();
+BSONObj generateError(const MatchExpression& validatorExpr,
+                      const BSONObj& doc,
+                      const int maxDocValidationErrorSize,
+                      const int maxConsideredValues) {
+    // Attempt twice to generate a detailed document validation error before reporting to the user
+    // that the generated error grew too large.
+    constexpr static auto kNoteString = "note";
+    bool truncate = false;
+    for (auto attempt = 0; attempt < 2; ++attempt) {
+        try {
+            auto error = generateErrorHelper(
+                validatorExpr, doc, truncate, maxDocValidationErrorSize, maxConsideredValues);
+            uassert(ErrorCodes::BSONObjectTooLarge,
+                    "doc validation error exceeded maximum size",
+                    error.objsize() <= maxDocValidationErrorSize);
+            return error;
+        } catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+            // Try again, but this time omit details such as 'consideredValues' or 'specifiedAs'
+            // that are proportional to the size of the validator expression or the failed document.
+            truncate = true;
+        } catch (const DBException& e) {
+            BSONObjBuilder error;
+            appendDocumentId(doc, &error);
+            static constexpr auto kErrorReason = "failed to generate document validation error";
+            error.append(kNoteString, kErrorReason);
+            BSONObjBuilder subBuilder = error.subobjStart("details");
+            e.serialize(&subBuilder);
+            subBuilder.done();
+            return error.obj();
+        }
     }
-    return finalError;
+    // If we've reached here, both attempts failed to generate a sufficiently small error. Return
+    // an error indicating as much to the user.
+    BSONObjBuilder error;
+    appendDocumentId(doc, &error);
+    static constexpr auto kTruncationReason = "detailed error was too large";
+    error.append(kNoteString, kTruncationReason);
+    return error.obj();
 }
 }  // namespace mongo::doc_validation_error
