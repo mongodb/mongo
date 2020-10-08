@@ -5,6 +5,8 @@
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
+//   # The aggregation stage $currentOp cannot run with a readConcern other than 'local'
+//   assumes_read_concern_unchanged,
 //   does_not_support_stepdowns,
 //   # Uses $where operator
 //   requires_scripting,
@@ -12,57 +14,60 @@
 //   uses_parallel_shell,
 // ]
 
-t = db.count10;
-t.drop();
+(function() {
+"use strict";
 
-for (i = 0; i < 100; i++) {
-    t.save({x: i});
+var coll = db.count10;
+coll.drop();
+
+var bulk = coll.initializeUnorderedBulkOp();
+for (var i = 0; i < 100; i++) {
+    coll.insertOne({x: i});
 }
+assert.commandWorked(bulk.execute());
 
 // Start a parallel shell which repeatedly checks for a count
 // query using db.currentOp(). As soon as the op is found,
 // kill it via db.killOp().
-s = startParallelShell('assert.soon(function() {' +
-                       '   current = db.currentOp({"ns": db.count10.getFullName(), ' +
-                       '                           "command.count": db.count10.getName()}); ' +
+var s = startParallelShell(function() {
+    assert.soon(function() {
+        var currentCountOps =
+            db.getSiblingDB("admin")
+                .aggregate([
+                    {$currentOp: {}},
+                    {
+                        $match:
+                            {"ns": db.count10.getFullName(), "command.count": db.count10.getName()}
+                    },
+                    {$limit: 1}
+                ])
+                .toArray();
 
-                       // Check that we found the count op. If not, return false so
-                       // that assert.soon will retry.
-                       '   assert("inprog" in current); ' +
-                       '   if (current.inprog.length === 0) { ' +
-                       '       jsTest.log("count10.js: did not find count op, retrying"); ' +
-                       '       printjson(current); ' +
-                       '       return false; ' +
-                       '   } ' +
-                       '   countOp = current.inprog[0]; ' +
-                       '   if (!countOp) { ' +
-                       '       jsTest.log("count10.js: did not find count op, retrying"); ' +
-                       '       printjson(current); ' +
-                       '       return false; ' +
-                       '   } ' +
+        // Check that we found the count op. If not, return false so
+        // that assert.soon will retry.
+        if (currentCountOps.length !== 1) {
+            jsTest.log("Still didn't find count operation in the currentOp log.");
+            return false;
+        }
 
-                       // Found the count op. Try to kill it.
-                       '   jsTest.log("count10.js: found count op:"); ' +
-                       '   printjson(current); ' +
-                       '   printjson(db.killOp(countOp.opid)); ' +
-                       '   return true; ' +
-                       '}, "count10.js: could not find count op after retrying, gave up");');
+        var countOp = currentCountOps[0];
+        jsTest.log("Found count op:");
+        printjson(countOp);
+        // Found the count op. Try to kill it.
+        assert.commandWorked(db.killOp(countOp.opid));
+        return true;
+    }, "Could not find count op after retrying, gave up");
+});
 
-function getKilledCount() {
-    try {
-        db.count10.find("sleep(1000)").count();
-        jsTest.log("count10.js: count op completed without being killed");
-    } catch (e) {
-        return e;
-    }
-}
+var res = assert.throws(function() {
+    coll.find("sleep(1000)").count();
+}, [], "Count op completed without being killed");
 
-var res = getKilledCount();
-jsTest.log("count10.js: killed count output start");
+jsTest.log("Killed count output start");
 printjson(res);
-jsTest.log("count10.js: killed count output end");
-assert(res);
+jsTest.log("Killed count output end");
 assert(res.message.match(/count failed/) !== null);
 assert(res.message.match(/\"code\"/) !== null);
 
 s();
+})();
