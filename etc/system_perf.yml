@@ -493,6 +493,55 @@ tasks:
           fi
     - func: "compile mongodb"
 
+- name: renew_ssl_cert
+  commands:
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+    # Use AWS user that has route53 permissions required by certbot plugin
+    - command: shell.exec
+      params:
+        script: |
+          sudo -i
+          mkdir /root/.aws
+          cat > /root/.aws/credentials << EOF
+          [default]
+          aws_access_key_id = ${terraform_key}
+          aws_secret_access_key = ${terraform_secret}
+          EOF
+          exit
+    # Run the script to generate ssl cert files
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi ./src/dsi/configurations/mongodb_setup/ssl/generate-ssl-cert.sh
+    # Upload files for further DSI usage
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: member.pem
+        # path to the remote file is intended to be static
+        remote_file: dsi/ssl/member.pem
+        bucket: mciuploads
+        # the visibility has to be public for consumption by DSI
+        permissions: public-read
+        content_type: text/plain
+        display_name: member.pem
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: root.crt
+        # path to the remote file is intended to be static
+        remote_file: dsi/ssl/root.crt
+        bucket: mciuploads
+        # the visibility has to be public for consumption by DSI
+        permissions: public-read
+        content_type: text/plain
+        display_name: root.crt
+
 - name: linkbench
   priority: 5
   commands:
@@ -1577,3 +1626,12 @@ buildvariants:
       - "rhel70-perf-replset"
   depends_on: *_compile_wtdevelop_amazon2
   tasks: *3nodetasks
+
+- name: renew-ssl-cert
+  display_name: Renew SSL Cert
+  batchtime: 10080 # 7 days
+  modules: *modules
+  run_on:  # Certbot with route53 plugin is installed on RHEL80
+    - "rhel80-small"
+  tasks:
+    - name: renew_ssl_cert
