@@ -48,6 +48,7 @@ configs:
         short_name: bind_ip_all
         arg_vartype: Switch
         canonicalize: canonicalizeNetBindIpAll
+        conflicts: 'net.bindIp'
 
     noauth:
         description: 'Run without security'
