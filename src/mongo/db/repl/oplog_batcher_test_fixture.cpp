@@ -190,6 +190,28 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::option
                       boost::none);  // _id
 }
 
+OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
+    BSONObj oField = BSON("msg" << msg << "count" << t);
+    return OplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
+                      boost::none,                 // hash
+                      OpTypeEnum::kNoop,           // op type
+                      NamespaceString(""),         // namespace
+                      boost::none,                 // uuid
+                      boost::none,                 // fromMigrate
+                      OplogEntry::kOplogVersion,   // version
+                      oField,                      // o
+                      boost::none,                 // o2
+                      {},                          // sessionInfo
+                      boost::none,                 // upsert
+                      Date_t() + Seconds(t),       // wall clock time
+                      boost::none,                 // statement id
+                      boost::none,   // optime of previous write within same transaction
+                      boost::none,   // pre-image optime
+                      boost::none,   // post-image optime
+                      boost::none,   // ShardId of resharding recipient
+                      boost::none);  // _id
+}
+
 /**
  * Generates an applyOps oplog entry with the given number used for the timestamp.
  */

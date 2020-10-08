@@ -115,6 +115,7 @@ public:
         size_t toApplyDocumentCount = 0;
         size_t toApplyDocumentBytes = 0;
         OpTime lastDocument = OpTime();
+        Timestamp resumeToken = Timestamp();
     };
 
     /**
@@ -180,6 +181,7 @@ public:
                  StartingPoint startingPoint = StartingPoint::kSkipFirstDoc,
                  BSONObj filter = BSONObj(),
                  ReadConcernArgs readConcern = ReadConcernArgs(),
+                 bool requestResumeToken = false,
                  StringData name = "oplog fetcher"_sd);
 
     virtual ~OplogFetcher();
@@ -446,6 +448,10 @@ private:
     // of "afterClusterTime: Timestamp(0,1)".
     ReadConcernArgs _queryReadConcern;
 
+    // Specifies if the oplog fetcher should request a resume token and provide it to
+    // _enqueueDocumentsFn.
+    const bool _requestResumeToken;
+
     // Handle to currently scheduled _runQuery task.
     executor::TaskExecutor::CallbackHandle _runQueryHandle;
 
@@ -470,6 +476,7 @@ public:
         OplogFetcher::StartingPoint startingPoint = OplogFetcher::StartingPoint::kSkipFirstDoc,
         BSONObj filter = BSONObj(),
         ReadConcernArgs readConcern = ReadConcernArgs(),
+        bool requestResumeToken = false,
         StringData name = "oplog fetcher"_sd) const = 0;
 };
 
@@ -491,6 +498,7 @@ public:
         OplogFetcher::StartingPoint startingPoint = OplogFetcher::StartingPoint::kSkipFirstDoc,
         BSONObj filter = BSONObj(),
         ReadConcernArgs readConcern = ReadConcernArgs(),
+        bool requestResumeToken = false,
         StringData name = "oplog_fetcher"_sd) const final {
         return std::make_unique<T>(executor,
                                    lastFetched,
@@ -506,6 +514,7 @@ public:
                                    startingPoint,
                                    std::move(filter),
                                    std::move(readConcern),
+                                   requestResumeToken,
                                    name);
     }
 

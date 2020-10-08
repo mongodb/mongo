@@ -41,6 +41,7 @@
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
@@ -188,6 +189,7 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
                            StartingPoint startingPoint,
                            BSONObj filter,
                            ReadConcernArgs readConcern,
+                           bool requestResumeToken,
                            StringData name)
     : AbstractAsyncComponent(executor, name.toString()),
       _source(source),
@@ -204,7 +206,8 @@ OplogFetcher::OplogFetcher(executor::TaskExecutor* executor,
       _batchSize(batchSize),
       _startingPoint(startingPoint),
       _queryFilter(filter),
-      _queryReadConcern(readConcern) {
+      _queryReadConcern(readConcern),
+      _requestResumeToken(requestResumeToken) {
     invariant(config.isInitialized());
     invariant(!_lastFetched.isNull());
     invariant(onShutdownCallbackFn);
@@ -504,6 +507,10 @@ BSONObj OplogFetcher::_makeFindQuery(long long findTimeout) const {
     filterBob.done();
 
     queryBob.append("$maxTimeMS", findTimeout);
+    if (_requestResumeToken) {
+        queryBob.append("$hint", BSON("$natural" << 1));
+        queryBob.append("$_requestResumeToken", true);
+    }
 
     auto lastCommittedWithCurrentTerm =
         _dataReplicatorExternalState->getCurrentTermAndLastCommittedOpTime();
@@ -766,6 +773,13 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     networkByteStats.increment(info.networkDocumentBytes);
 
     oplogBatchStats.recordMillis(_lastBatchElapsedMS, documents.empty());
+
+    if (_cursor->getPostBatchResumeToken()) {
+        auto pbrt = ResumeTokenOplogTimestamp::parse(
+            IDLParserErrorContext("OplogFetcher PostBatchResumeToken"),
+            *_cursor->getPostBatchResumeToken());
+        info.resumeToken = pbrt.getTs();
+    }
 
     auto status = _enqueueDocumentsFn(firstDocToApply, documents.cend(), info);
     if (!status.isOK()) {

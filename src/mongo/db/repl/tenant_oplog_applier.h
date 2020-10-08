@@ -62,6 +62,10 @@ public:
                 return recipientOpTime < other.recipientOpTime;
             return donorOpTime < other.donorOpTime;
         }
+        std::string toString() const {
+            return BSON("donorOpTime" << donorOpTime << "recipientOpTime" << recipientOpTime)
+                .toString();
+        }
         OpTime donorOpTime;
         OpTime recipientOpTime;
     };
@@ -81,11 +85,6 @@ public:
      * than passed-in time.
      */
     SemiFuture<OpTimePair> getNotificationForOpTime(OpTime donorOpTime);
-
-    /**
-     * Returns the last donor and recipient optimes of the last batch applied.
-     */
-    OpTimePair getLastBatchCompletedOpTimes();
 
     void setBatchLimits_forTest(TenantOplogBatcher::BatchLimits limits) {
         _limits = limits;

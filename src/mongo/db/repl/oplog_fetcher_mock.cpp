@@ -51,6 +51,7 @@ OplogFetcherMock::OplogFetcherMock(
     StartingPoint startingPoint,
     BSONObj filter,
     ReadConcernArgs readConcern,
+    bool requestResumeToken,
     StringData name)
     : OplogFetcher(executor,
                    lastFetched,
@@ -69,6 +70,7 @@ OplogFetcherMock::OplogFetcherMock(
                    startingPoint,
                    filter,
                    readConcern,
+                   requestResumeToken,
                    name),
       _oplogFetcherRestartDecision(std::move(oplogFetcherRestartDecision)),
       _onShutdownCallbackFn(std::move(onShutdownCallbackFn)),
@@ -84,7 +86,9 @@ OplogFetcherMock::~OplogFetcherMock() {
     }
 }
 
-void OplogFetcherMock::receiveBatch(CursorId cursorId, OplogFetcher::Documents documents) {
+void OplogFetcherMock::receiveBatch(CursorId cursorId,
+                                    OplogFetcher::Documents documents,
+                                    boost::optional<Timestamp> resumeToken) {
     {
         stdx::lock_guard<Latch> lock(_mutex);
         if (!_isActive_inlock()) {
@@ -105,25 +109,28 @@ void OplogFetcherMock::receiveBatch(CursorId cursorId, OplogFetcher::Documents d
         return;
     }
 
+    auto info = validateResult.getValue();
+    if (resumeToken) {
+        info.resumeToken = *resumeToken;
+    }
+
+    // Enqueue documents in a separate thread with a different client than the test thread. This
+    // is to avoid interfering the thread local client in the test thread.
+    Status status = Status::OK();
+    stdx::thread enqueueDocumentThread([&]() {
+        Client::initThread("enqueueDocumentThread");
+        status = _enqueueDocumentsFn(documents.cbegin(), documents.cend(), info);
+    });
+    // Wait until the enqueue finishes.
+    enqueueDocumentThread.join();
+
+    // Shutdown the OplogFetcher with error if enqueue fails.
+    if (!status.isOK()) {
+        shutdownWith(status);
+        return;
+    }
+
     if (!documents.empty()) {
-        auto info = validateResult.getValue();
-
-        // Enqueue documents in a separate thread with a different client than the test thread. This
-        // is to avoid interfering the thread local client in the test thread.
-        Status status = Status::OK();
-        stdx::thread enqueueDocumentThread([&]() {
-            Client::initThread("enqueueDocumentThread");
-            status = _enqueueDocumentsFn(documents.cbegin(), documents.cend(), info);
-        });
-        // Wait until the enqueue finishes.
-        enqueueDocumentThread.join();
-
-        // Shutdown the OplogFetcher with error if enqueue fails.
-        if (!status.isOK()) {
-            shutdownWith(status);
-            return;
-        }
-
         // Update lastFetched to the last oplog entry enqueued.
         auto lastDocRes = OpTime::parseFromOplogEntry(documents.back());
         if (!lastDocRes.isOK()) {

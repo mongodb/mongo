@@ -246,7 +246,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithExistingCollectionInitializesCorrec
     oplogBuffer.startup(_opCtx.get());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_NOT_EQUALS(oplogBuffer.getSize(), 0UL);
-    ASSERT_EQUALS(Timestamp(1, 1), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(1, 1), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(Timestamp(0, 0), oplogBuffer.getLastPoppedTimestamp_forTest());
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, oplog);
 
@@ -276,7 +276,7 @@ TEST_F(OplogBufferCollectionTest, StartupWithEmptyExistingCollectionInitializesC
     oplogBuffer.startup(_opCtx.get());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
-    ASSERT_EQUALS(Timestamp(0, 0), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(0, 0), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(Timestamp(0, 0), oplogBuffer.getLastPoppedTimestamp_forTest());
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {});
 
@@ -390,7 +390,7 @@ TEST_F(OplogBufferCollectionTest,
     oplogBuffer.startup(_opCtx.get());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
-    ASSERT_EQUALS(Timestamp(0, 0), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(0, 0), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(Timestamp(0, 0), oplogBuffer.getLastPoppedTimestamp_forTest());
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {});
 }
@@ -664,14 +664,14 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     oplogBuffer.startup(_opCtx.get());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
-    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     const std::vector<BSONObj> oplog = {makeOplogEntry(1)};
     oplogBuffer.push(_opCtx.get(), oplog.cbegin(), oplog.cend());
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog[0].objsize()));
-    ASSERT_EQUALS(oplog[0]["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(oplog[0]["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog});
@@ -680,7 +680,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     oplogBuffer.push(_opCtx.get(), oplog2.cbegin(), oplog2.cend());
     ASSERT_EQUALS(oplogBuffer.getCount(), 2UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog[0].objsize() + oplog2[0].objsize()));
-    ASSERT_EQUALS(oplog2[0]["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(oplog2[0]["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog[0], oplog2[0]});
@@ -690,7 +690,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_BSONOBJ_EQ(oplog[0], poppedDoc);
     ASSERT_EQUALS(oplogBuffer.getCount(), 1UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), std::size_t(oplog2[0].objsize()));
-    ASSERT_EQUALS(oplog2[0]["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(oplog2[0]["ts"].timestamp(), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(oplog[0]["ts"].timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {oplog[0], oplog2[0]});
@@ -699,7 +699,7 @@ TEST_F(OplogBufferCollectionTest, ClearClearsCollection) {
     ASSERT_TRUE(AutoGetCollectionForReadCommand(_opCtx.get(), nss).getCollection());
     ASSERT_EQUALS(oplogBuffer.getCount(), 0UL);
     ASSERT_EQUALS(oplogBuffer.getSize(), 0UL);
-    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp_forTest());
+    ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPushedTimestamp());
     ASSERT_EQUALS(Timestamp(), oplogBuffer.getLastPoppedTimestamp_forTest());
 
     _assertDocumentsInCollectionEquals(_opCtx.get(), nss, {});

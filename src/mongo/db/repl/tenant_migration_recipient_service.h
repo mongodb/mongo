@@ -60,6 +60,7 @@ class TenantMigrationRecipientService final : public PrimaryOnlyService {
 public:
     static constexpr StringData kTenantMigrationRecipientServiceName =
         "TenantMigrationRecipientService"_sd;
+    static constexpr StringData kNoopMsg = "Resume token noop"_sd;
 
     explicit TenantMigrationRecipientService(ServiceContext* serviceContext);
     ~TenantMigrationRecipientService() = default;

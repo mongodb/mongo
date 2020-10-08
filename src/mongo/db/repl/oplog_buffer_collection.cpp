@@ -161,7 +161,9 @@ void OplogBufferCollection::push(OperationContext* opCtx,
         auto previousTimestamp = ts;
         std::tie(doc, ts) = addIdToDocument(value);
         invariant(!value.isEmpty());
-        invariant(ts > previousTimestamp);
+        invariant(ts > previousTimestamp,
+                  str::stream() << "ts: " << ts.toString()
+                                << ", previous: " << previousTimestamp.toString());
         return InsertStatement(doc);
     });
 
@@ -403,7 +405,7 @@ void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
     fassert(40155, _storageInterface->dropCollection(opCtx, _nss));
 }
 
-Timestamp OplogBufferCollection::getLastPushedTimestamp_forTest() const {
+Timestamp OplogBufferCollection::getLastPushedTimestamp() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _lastPushedTimestamp;
 }

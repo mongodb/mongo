@@ -490,6 +490,7 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         OplogFetcher::StartingPoint::kEnqueueFirstDoc,
         _getOplogFetcherFilter(),
         ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern),
+        true /* requestResumeToken */,
         "TenantOplogFetcher_" + getTenantId() + "_" + getMigrationUUID().toString());
     _donorOplogFetcher->setConnection(std::move(_oplogFetcherClient));
     uassertStatusOK(_donorOplogFetcher->startup());
@@ -502,16 +503,43 @@ Status TenantMigrationRecipientService::Instance::_enqueueDocuments(
 
     invariant(_donorOplogBuffer);
 
-    if (info.toApplyDocumentCount == 0)
-        return Status::OK();
-
     auto opCtx = cc().makeOperationContext();
-    // Wait for enough space.
-    _donorOplogBuffer->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
+    if (info.toApplyDocumentCount != 0) {
+        // Wait for enough space.
+        _donorOplogBuffer->waitForSpace(opCtx.get(), info.toApplyDocumentBytes);
 
-    // Buffer docs for later application.
-    _donorOplogBuffer->push(opCtx.get(), begin, end);
+        // Buffer docs for later application.
+        _donorOplogBuffer->push(opCtx.get(), begin, end);
+    }
+    if (info.resumeToken.isNull()) {
+        return Status(ErrorCodes::Error(5124600), "Resume token returned is null");
+    }
 
+    const auto lastPushedTS = _donorOplogBuffer->getLastPushedTimestamp();
+    if (lastPushedTS == info.resumeToken) {
+        // We don't want to insert a resume token noop if it would be a duplicate.
+        return Status::OK();
+    }
+    invariant(lastPushedTS < info.resumeToken,
+              str::stream() << "LastPushed: " << lastPushedTS.toString()
+                            << ", resumeToken: " << info.resumeToken.toString());
+
+    MutableOplogEntry noopEntry;
+    noopEntry.setOpType(repl::OpTypeEnum::kNoop);
+    noopEntry.setObject(BSON("msg" << TenantMigrationRecipientService::kNoopMsg << "tenantId"
+                                   << getTenantId() << "migrationId" << getMigrationUUID()));
+    noopEntry.setTimestamp(info.resumeToken);
+    // This term is not used for anything.
+    noopEntry.setTerm(OpTime::kUninitializedTerm);
+
+    // Use an empty namespace string so this op is ignored by the applier.
+    noopEntry.setNss({});
+    // Use an empty wall clock time since we have no wall clock time, but we must give it one, and
+    // we want it to be clearly fake.
+    noopEntry.setWallClockTime({});
+
+    OplogBuffer::Batch noopVec = {noopEntry.toBSON()};
+    _donorOplogBuffer->push(opCtx.get(), noopVec.cbegin(), noopVec.cend());
     return Status::OK();
 }
 

@@ -82,6 +82,9 @@ private:
 OplogEntry makeInsertOplogEntry(int t,
                                 const NamespaceString& nss,
                                 boost::optional<UUID> uuid = boost::none);
+
+OplogEntry makeNoopOplogEntry(int t, const StringData& msg);
+
 OplogEntry makeApplyOpsOplogEntry(int t,
                                   bool prepare,
                                   const std::vector<OplogEntry>& innerOps = {});
