@@ -101,6 +101,7 @@ class UUID {
     friend class TypeCollectionReshardingFields;
     friend class VoteCommitIndexBuild;
     friend class ImportCollectionOplogEntry;
+    friend class VoteCommitImportCollection;
 
 
 public:
