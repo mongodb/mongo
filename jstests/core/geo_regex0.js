@@ -1,8 +1,5 @@
 // From SERVER-2247
 // Tests to make sure regex works with geo indices
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.regex0;
 t.drop();

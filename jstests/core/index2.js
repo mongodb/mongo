@@ -1,7 +1,4 @@
 /**test indexing where the key is an embedded object.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 
 t = db.embeddedIndexTest2;

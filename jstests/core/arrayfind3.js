@@ -1,9 +1,3 @@
-
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 t = db.arrayfind3;
 t.drop();
 

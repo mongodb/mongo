@@ -1,7 +1,4 @@
 // Multikey geo values tests - SERVER-3793.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.jstests_geo_multikey0;
 t.drop();

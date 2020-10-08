@@ -1,8 +1,5 @@
 /**
  * Use of GeoJSON points should be prohibited with a 2d index, SERVER-10636.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 
 var t = db.geo_2d_with_geojson_point;

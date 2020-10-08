@@ -4,7 +4,6 @@
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_capped,
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 // Test attaching maxTimeMS to a getMore command.

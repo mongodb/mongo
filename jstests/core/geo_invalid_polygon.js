@@ -1,8 +1,5 @@
 // With invalid geometry, error message should include _id
 // SERVER-8992
-// @tags: [
-//   sbe_incompatible,
-// ]
 t = db.geo_invalid_polygon;
 t.drop();
 

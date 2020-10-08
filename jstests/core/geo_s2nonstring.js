@@ -1,7 +1,4 @@
 // Added to make sure that S2 indexing's string AND non-string keys work.
-// @tags: [
-//   sbe_incompatible,
-// ]
 t = db.geo_s2nonstring;
 t.drop();
 

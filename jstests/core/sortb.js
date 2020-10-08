@@ -1,8 +1,5 @@
 // Test that the in memory sort capacity limit is checked for all "top N" sort candidates.
 // SERVER-4716
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

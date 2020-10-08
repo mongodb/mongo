@@ -2,7 +2,6 @@
 // expected.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
-//   sbe_incompatible,
 // ]
 
 // Tests 2dsphere index option "2dsphereIndexVersion".  Verifies that GeoJSON objects that are new

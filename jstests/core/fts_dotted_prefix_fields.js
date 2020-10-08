@@ -1,8 +1,5 @@
 // Test that text search works correct when the text index has dotted paths as the non-text
 // prefixes.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

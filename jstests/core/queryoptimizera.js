@@ -1,7 +1,6 @@
 // @tags: [
 //   does_not_support_stepdowns,
 //   requires_capped,
-//   sbe_incompatible,
 // ]
 
 // Check that a warning message about doing a capped collection scan for a query with an _id

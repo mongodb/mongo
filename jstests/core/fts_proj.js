@@ -1,8 +1,5 @@
 /**
  * Projection tests for FTS queries.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

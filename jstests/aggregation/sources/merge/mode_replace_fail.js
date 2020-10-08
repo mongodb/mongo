@@ -1,7 +1,4 @@
 // Tests the behaviour of the $merge stage with whenMatched=replace and whenNotMatched=fail.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

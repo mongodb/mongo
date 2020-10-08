@@ -1,9 +1,6 @@
 //
 // Tests valid cases for creation of 2dsphere index
 //
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 var coll = db.getCollection("twodspherevalid");
 

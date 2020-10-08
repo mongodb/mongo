@@ -1,9 +1,6 @@
 /**
  * Matching behavior for $elemMatch applied to a top level element.
  * Includes tests for bugs described in SERVER-1264 and SERVER-4180.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

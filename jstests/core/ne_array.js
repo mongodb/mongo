@@ -4,7 +4,6 @@
 // returned for this type of query when an index is present.
 // @tags: [
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 (function() {
 const coll = db.ne_array;

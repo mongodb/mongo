@@ -7,7 +7,6 @@
  *    requires_getmore,
  *    requires_non_retryable_writes,
  *    requires_profiling,
- *    sbe_incompatible,
  *  ]
  */
 (function() {

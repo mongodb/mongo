@@ -7,7 +7,6 @@
 //   assumes_read_preference_unchanged,
 //   requires_capped,
 //   requires_getmore,
-//   sbe_incompatible,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
 // ]

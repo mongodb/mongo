@@ -1,6 +1,5 @@
 // @tags: [
 //   requires_capped,
-//   sbe_incompatible,
 // ]
 //
 // Tests that combine $geoNear and tailable cursors.

@@ -1,9 +1,6 @@
 /**
  * Test that 'queryHash' and 'planCacheKey' from explain() output have sensible values
  * across catalog changes.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

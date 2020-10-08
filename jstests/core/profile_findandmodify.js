@@ -1,7 +1,6 @@
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
 // @tags: [
 //   requires_profiling,
-//   sbe_incompatible,
 //   requires_fcv_47,
 // ]
 

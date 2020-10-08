@@ -6,7 +6,6 @@
 // @tags: [
 //   requires_collstats,
 //   requires_pipeline_optimization,
-//   sbe_incompatible,
 // ]
 (function() {
 'use strict';

@@ -6,7 +6,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

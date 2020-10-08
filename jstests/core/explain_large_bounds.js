@@ -2,7 +2,6 @@
  * Make sure explain succeeds even when the index bounds are really big.
  * @tags: [
  *   resource_intensive,
- *   sbe_incompatible,
  * ]
  */
 (function() {

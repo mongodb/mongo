@@ -2,7 +2,6 @@
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   requires_profiling,
-//   sbe_incompatible,
 //   requires_fcv_47,
 // ]
 

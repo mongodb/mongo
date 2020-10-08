@@ -14,7 +14,6 @@
  *   operations_longer_than_stepdown_interval_in_txns,
  *   # Uses index building in background
  *   requires_background_index,
- *   sbe_incompatible,
  * ]
  */
 

@@ -1,7 +1,4 @@
 // See SERVER-7794.
-// @tags: [
-//   sbe_incompatible,
-// ]
 t = db.geo_s2nopoints;
 t.drop();
 

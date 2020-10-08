@@ -1,7 +1,4 @@
 // SERVER-393 Test indexed matching with $exists.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.jstests_exists6;
 t.drop();

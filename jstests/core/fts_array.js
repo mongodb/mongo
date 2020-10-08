@@ -1,8 +1,5 @@
 /**
  * Tests for the interaction between FTS indexes and arrays.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

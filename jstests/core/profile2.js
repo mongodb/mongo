@@ -3,7 +3,6 @@
 // Special db so that it can be run in parallel tests.
 // @tags: [
 //   requires_profiling,
-//   sbe_incompatible,
 // ]
 
 var coll = db.getSiblingDB("profile2").profile2;

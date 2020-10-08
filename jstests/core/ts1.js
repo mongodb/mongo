@@ -3,7 +3,6 @@
 // if the inserts are into a sharded collection.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

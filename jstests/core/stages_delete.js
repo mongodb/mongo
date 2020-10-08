@@ -4,7 +4,6 @@
 //   assumes_write_concern_unchanged,
 //   does_not_support_stepdowns,
 //   requires_fastcount,
-//   sbe_incompatible,
 //   uses_testing_only_commands,
 // ]
 

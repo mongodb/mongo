@@ -3,7 +3,6 @@
 //
 // @tags: [
 //   requires_fastcount,
-//   sbe_incompatible,
 // ]
 
 // Create a polygon of some shape (no holes)

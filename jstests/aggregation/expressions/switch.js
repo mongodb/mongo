@@ -1,8 +1,5 @@
 // In SERVER-10689, the $switch expression was introduced. In this file, we test the functionality
 // of the expression.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 (function() {
 "use strict";

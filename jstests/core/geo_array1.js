@@ -1,7 +1,4 @@
 // Make sure many locations in one doc works, in the form of an array
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.geoarray1;
 function test(index) {

@@ -7,7 +7,6 @@
  * @tags: [
  *   requires_find_command,
  *   requires_non_retryable_writes,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -2,7 +2,6 @@
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,
 //   requires_profiling,
-//   sbe_incompatible,
 // ]
 // special db so that it can be run in parallel tests
 var stddb = db;

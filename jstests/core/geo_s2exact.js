@@ -1,7 +1,4 @@
 // Queries on exact geometry should return the exact geometry.
-// @tags: [
-//   sbe_incompatible,
-// ]
 t = db.geo_s2exact;
 t.drop();
 

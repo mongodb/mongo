@@ -1,6 +1,5 @@
 // @tags: [
 //   requires_fastcount,
-//   sbe_incompatible,
 // ]
 
 t = db.arrayfind1;

@@ -2,7 +2,6 @@
 //
 // @tags: [
 //   requires_fastcount,
-//   sbe_incompatible,
 // ]
 
 // The setup to reproduce was/is to create a set of points where the

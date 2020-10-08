@@ -8,8 +8,5 @@ var intersectingPolygon = {
 };
 /**
  * Self intersecting polygons should cause a parse exception.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 assert.writeError(t.insert({geo: intersectingPolygon}));

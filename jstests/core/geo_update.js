@@ -3,7 +3,6 @@
 // key.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
 // Tests geo queries w/ update & upsert

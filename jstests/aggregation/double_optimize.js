@@ -12,7 +12,6 @@
 //   do_not_wrap_aggregations_in_facets,
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

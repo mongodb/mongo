@@ -1,8 +1,5 @@
 // Validation test for SERVER-14753. Note that the issue under test is a memory leak, so this
 // test would only be expected to fail when run under address sanitizer.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 (function() {
 

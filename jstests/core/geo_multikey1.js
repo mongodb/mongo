@@ -1,7 +1,4 @@
 // Multikey geo index tests with parallel arrays.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.jstests_geo_multikey1;
 t.drop();
