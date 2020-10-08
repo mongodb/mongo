@@ -4588,7 +4588,7 @@ int ParserGen::parse() {
 #line 4449 "parser_gen.cpp"
                     break;
 
-                    case 275:  // aggExprAsUserFieldname: IN
+                    case 275:  // aggExprAsUserFieldname: IN_
 #line 1381 "grammar.yy"
                     {
                         yylhs.value.as<CNode::Fieldname>() = UserFieldname{"$in"};
@@ -6351,7 +6351,7 @@ int ParserGen::parse() {
 #line 5920 "parser_gen.cpp"
                     break;
 
-                    case 477:  // in: "object" IN exprFixedTwoArg "end of object"
+                    case 477:  // in: "object" IN_ exprFixedTwoArg "end of object"
 #line 2033 "grammar.yy"
                     {
                         yylhs.value.as<CNode>() = CNode{CNode::ObjectChildren{
@@ -10261,7 +10261,7 @@ const char* const ParserGen::yytname_[] = {"\"EOF\"",
                                            "GTE",
                                            "HOUR",
                                            "ID",
-                                           "IN",
+                                           "IN_",
                                            "\"indexKey\"",
                                            "INDEX_OF_ARRAY",
                                            "INDEX_OF_BYTES",

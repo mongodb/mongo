@@ -209,7 +209,7 @@
     GTE
     HOUR
     ID
-    IN
+    IN_
     INDEX_KEY "indexKey"
     INDEX_OF_ARRAY
     INDEX_OF_BYTES
@@ -1378,7 +1378,7 @@ aggExprAsUserFieldname:
     | FIRST {
         $$ = UserFieldname{"$first"};
     }
-    | IN {
+    | IN_ {
         $$ = UserFieldname{"$in"};
     }
     | INDEX_OF_ARRAY {
@@ -2030,7 +2030,7 @@ first:
 ;
 
 in:
-  START_OBJECT IN exprFixedTwoArg END_OBJECT {
+  START_OBJECT IN_ exprFixedTwoArg END_OBJECT {
         $$ = CNode{CNode::ObjectChildren{{KeyFieldname::in,
                                            $exprFixedTwoArg}}};
     }

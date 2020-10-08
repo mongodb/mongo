@@ -820,7 +820,7 @@ public:
             GTE = 90,                          // GTE
             HOUR = 91,                         // HOUR
             ID = 92,                           // ID
-            IN_ = 93,                          // IN
+            IN_ = 93,                          // IN_
             INDEX_KEY = 94,                    // "indexKey"
             INDEX_OF_ARRAY = 95,               // INDEX_OF_ARRAY
             INDEX_OF_BYTES = 96,               // INDEX_OF_BYTES
@@ -1049,7 +1049,7 @@ public:
             S_GTE = 90,                                 // GTE
             S_HOUR = 91,                                // HOUR
             S_ID = 92,                                  // ID
-            S_IN = 93,                                  // IN
+            S_IN_ = 93,                                 // IN_
             S_INDEX_KEY = 94,                           // "indexKey"
             S_INDEX_OF_ARRAY = 95,                      // INDEX_OF_ARRAY
             S_INDEX_OF_BYTES = 96,                      // INDEX_OF_BYTES
@@ -3697,11 +3697,11 @@ public:
     }
 #endif
 #if 201103L <= YY_CPLUSPLUS
-    static symbol_type make_IN(location_type l) {
+    static symbol_type make_IN_(location_type l) {
         return symbol_type(token::IN_, std::move(l));
     }
 #else
-    static symbol_type make_IN(const location_type& l) {
+    static symbol_type make_IN_(const location_type& l) {
         return symbol_type(token::IN_, l);
     }
 #endif
