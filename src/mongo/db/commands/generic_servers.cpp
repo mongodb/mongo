@@ -51,6 +51,7 @@
 
 namespace mongo {
 namespace {
+MONGO_FAIL_POINT_DEFINE(hangInGetLog);
 
 class FeaturesCmd : public BasicCommand {
 public:
@@ -245,6 +246,8 @@ public:
                       str::stream() << "Argument to getLog must be of type String; found "
                                     << val.toString(false) << " of type " << typeName(val.type()));
         }
+
+        hangInGetLog.pauseWhileSet();
 
         std::string p = val.String();
         if (p == "*") {

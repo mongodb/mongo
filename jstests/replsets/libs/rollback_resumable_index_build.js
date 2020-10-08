@@ -129,24 +129,27 @@ const RollbackResumableIndexBuildTest = class {
         // after rollback.
         assert.commandWorked(originalPrimary.adminCommand({clearLog: "global"}));
 
-        const awaitDisableFailPoint = startParallelShell(
-            // Wait for the index build to be aborted for rollback.
-            funWithArgs(
-                function(buildUUID, locksYieldedFailPointName) {
-                    checkLog.containsJson(db.getMongo(), 465611, {
-                        buildUUID: function(uuid) {
-                            return uuid["uuid"]["$uuid"] === buildUUID;
-                        }
-                    });
+        // The parallel shell performs a checkLog, so use this failpoint to synchronize starting
+        // the parallel shell with rollback.
+        const getLogFp = configureFailPoint(originalPrimary, "hangInGetLog");
 
-                    // Disable the failpoint so that the builder thread can exit and rollback can
-                    // continue.
-                    assert.commandWorked(db.adminCommand(
-                        {configureFailPoint: locksYieldedFailPointName, mode: "off"}));
-                },
-                buildUUID,
-                locksYieldedFailPointName),
-            originalPrimary.port);
+        const awaitDisableFailPoint = startParallelShell(
+            funWithArgs(function(buildUUID, locksYieldedFailPointName) {
+                // Wait for the index build to be aborted for rollback.
+                checkLog.containsJson(db.getMongo(), 465611, {
+                    buildUUID: function(uuid) {
+                        return uuid["uuid"]["$uuid"] === buildUUID;
+                    }
+                });
+
+                // Disable the failpoint so that the builder thread can exit and rollback can
+                // continue.
+                assert.commandWorked(
+                    db.adminCommand({configureFailPoint: locksYieldedFailPointName, mode: "off"}));
+            }, buildUUID, locksYieldedFailPointName), originalPrimary.port);
+
+        getLogFp.wait();
+        getLogFp.off();
 
         rollbackTest.transitionToSyncSourceOperationsDuringRollback();
         awaitDisableFailPoint();
