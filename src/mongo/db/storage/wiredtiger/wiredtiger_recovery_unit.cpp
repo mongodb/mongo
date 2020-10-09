@@ -361,7 +361,7 @@ void WiredTigerRecoveryUnit::refreshSnapshot() {
     WiredTigerBeginTxnBlock txnOpen(newSession->getSession(),
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
-                                    RoundUpReadTimestamp::kRound);
+                                    RoundUpReadTimestamp::kNoRoundForce);
     if (_timestampReadSource != ReadSource::kNoTimestamp) {
         auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
         fassert(5035300, status);
