@@ -255,8 +255,7 @@ bool SdamServerSelector::recencyFilter(const ReadPreferenceSetting& readPref,
     bool result = true;
 
     if (!readPref.minClusterTime.isNull()) {
-        result =
-            result && (s->getOpTime() && s->getOpTime()->getTimestamp() >= readPref.minClusterTime);
+        result = (s->getOpTime() && s->getOpTime()->getTimestamp() >= readPref.minClusterTime);
     }
 
     if (readPref.maxStalenessSeconds.count()) {
