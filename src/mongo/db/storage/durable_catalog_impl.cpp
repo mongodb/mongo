@@ -898,6 +898,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& metadata,
+    const BSONObj& storageMetadata,
     DurableCatalogImpl::ImportCollectionUUIDOption uuidOption) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     invariant(nss.coll().size() > 0);
@@ -935,7 +936,8 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     Entry& entry = swEntry.getValue();
 
     auto kvEngine = _engine->getEngine();
-    Status status = kvEngine->importRecordStore(opCtx, nss.ns(), entry.ident, md.options);
+    Status status =
+        kvEngine->importRecordStore(opCtx, nss.ns(), entry.ident, md.options, storageMetadata);
     if (!status.isOK())
         return status;
 
@@ -949,7 +951,8 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
             auto idxName = spec["name"].String();
             auto ident = idxIdent[idxName].String();
             IndexDescriptor idxDes(nullptr, IndexNames::findPluginName(keyPattern), spec);
-            status = kvEngine->importSortedDataInterface(opCtx, nss, md.options, ident, &idxDes);
+            status = kvEngine->importSortedDataInterface(
+                opCtx, nss, md.options, ident, &idxDes, storageMetadata);
             if (!status.isOK()) {
                 return status;
             }

@@ -149,6 +149,7 @@ void applyImportCollectionDefault(OperationContext* opCtx,
                                   long long numRecords,
                                   long long dataSize,
                                   const BSONObj& catalogEntry,
+                                  const BSONObj& storageMetadata,
                                   bool isDryRun,
                                   OplogApplication::Mode mode) {
     LOGV2_FATAL_NOTRACE(5114200,
@@ -159,6 +160,7 @@ void applyImportCollectionDefault(OperationContext* opCtx,
                         "numRecords"_attr = numRecords,
                         "dataSize"_attr = dataSize,
                         "catalogEntry"_attr = redact(catalogEntry),
+                        "storageMetadata"_attr = redact(storageMetadata),
                         "isDryRun"_attr = isDryRun);
 }
 
@@ -928,6 +930,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                 importEntry.getNumRecords(),
                                 importEntry.getDataSize(),
                                 importEntry.getCatalogEntry(),
+                                importEntry.getStorageMetadata(),
                                 importEntry.getDryRun(),
                                 mode);
           return Status::OK();

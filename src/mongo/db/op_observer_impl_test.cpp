@@ -471,14 +471,22 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
     // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
     auto catalogEntry = BSON("ns" << nss.ns() << "ident"
                                   << "collection-7-1792004489479993697");
+    auto storageMetadata = BSON("storage"
+                                << "metadata");
     bool isDryRun = false;
 
     // Write to the oplog.
     {
         AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
-        opObserver.onImportCollection(
-            opCtx.get(), importUUID, nss, numRecords, dataSize, catalogEntry, isDryRun);
+        opObserver.onImportCollection(opCtx.get(),
+                                      importUUID,
+                                      nss,
+                                      numRecords,
+                                      dataSize,
+                                      catalogEntry,
+                                      storageMetadata,
+                                      isDryRun);
         wunit.commit();
     }
 
@@ -488,7 +496,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
     ASSERT_TRUE(OplogEntry::CommandType::kImportCollection == oplogEntry.getCommandType());
 
     ImportCollectionOplogEntry importCollection(
-        nss, importUUID, numRecords, dataSize, catalogEntry, isDryRun);
+        nss, importUUID, numRecords, dataSize, catalogEntry, storageMetadata, isDryRun);
     ASSERT_BSONOBJ_EQ(importCollection.toBSON(), oplogEntry.getObject());
 }
 

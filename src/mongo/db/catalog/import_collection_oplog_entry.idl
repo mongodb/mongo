@@ -54,6 +54,9 @@ structs:
       catalogEntry:
         description: "Catalog entry corresponding to the collection"
         type: object
+      storageMetadata:
+        description: "Contains the storage engines file and table metadata for each ident"
+        type: object
       dryRun:
         description: "Import as a dryRun when true"
         type: bool

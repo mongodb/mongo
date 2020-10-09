@@ -171,7 +171,8 @@ public:
     Status importRecordStore(OperationContext* opCtx,
                              StringData ns,
                              StringData ident,
-                             const CollectionOptions& options) override;
+                             const CollectionOptions& options,
+                             const BSONObj& storageMetadata) override;
 
     std::unique_ptr<RecordStore> getGroupedRecordStore(OperationContext* opCtx,
                                                        StringData ns,
@@ -189,7 +190,8 @@ public:
                                      const NamespaceString& nss,
                                      const CollectionOptions& collOptions,
                                      StringData ident,
-                                     const IndexDescriptor* desc) override;
+                                     const IndexDescriptor* desc,
+                                     const BSONObj& storageMetadata) override;
 
     /**
      * Drops the specified ident for resumable index builds.

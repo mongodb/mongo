@@ -170,6 +170,7 @@ public:
     virtual StatusWith<ImportResult> importCollection(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const BSONObj& metadata,
+                                                      const BSONObj& storageMetadata,
                                                       ImportCollectionUUIDOption uuidOption) = 0;
 
     virtual Status renameCollection(OperationContext* opCtx,

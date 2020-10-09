@@ -1305,7 +1305,8 @@ Status WiredTigerKVEngine::createGroupedRecordStore(OperationContext* opCtx,
 Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
                                              StringData ns,
                                              StringData ident,
-                                             const CollectionOptions& options) {
+                                             const CollectionOptions& options,
+                                             const BSONObj& storageMetadata) {
     _ensureIdentPath(ident);
     WiredTigerSession session(_conn);
 
@@ -1515,7 +1516,8 @@ Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      const CollectionOptions& collOptions,
                                                      StringData ident,
-                                                     const IndexDescriptor* desc) {
+                                                     const IndexDescriptor* desc,
+                                                     const BSONObj& storageMetadata) {
     _ensureIdentPath(ident);
 
     std::string collIndexOptions;

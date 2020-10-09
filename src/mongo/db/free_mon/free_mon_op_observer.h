@@ -147,6 +147,7 @@ public:
                             long long numRecords,
                             long long dataSize,
                             const BSONObj& catalogEntry,
+                            const BSONObj& storageMetadata,
                             bool isDryRun) final {}
 
     repl::OpTime preRenameCollection(OperationContext* opCtx,

@@ -300,6 +300,7 @@ public:
                                     long long numRecords,
                                     long long dataSize,
                                     const BSONObj& catalogEntry,
+                                    const BSONObj& storageMetadata,
                                     bool isDryRun) = 0;
 
     virtual void onApplyOps(OperationContext* opCtx,

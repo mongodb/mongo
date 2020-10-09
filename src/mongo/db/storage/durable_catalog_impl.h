@@ -125,6 +125,7 @@ public:
     StatusWith<ImportResult> importCollection(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const BSONObj& metadata,
+                                              const BSONObj& storageMetadata,
                                               ImportCollectionUUIDOption uuidOption) override;
 
     Status renameCollection(OperationContext* opCtx,

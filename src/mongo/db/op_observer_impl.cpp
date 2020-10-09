@@ -896,9 +896,10 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
                                         long long numRecords,
                                         long long dataSize,
                                         const BSONObj& catalogEntry,
+                                        const BSONObj& storageMetadata,
                                         bool isDryRun) {
     ImportCollectionOplogEntry importCollection(
-        nss, importUUID, numRecords, dataSize, catalogEntry, isDryRun);
+        nss, importUUID, numRecords, dataSize, catalogEntry, storageMetadata, isDryRun);
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);

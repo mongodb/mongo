@@ -166,6 +166,7 @@ public:
                             long long numRecords,
                             long long dataSize,
                             const BSONObj& catalogEntry,
+                            const BSONObj& storageMetadata,
                             bool isDryRun) final;
     void onApplyOps(OperationContext* opCtx,
                     const std::string& dbName,

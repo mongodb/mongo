@@ -159,7 +159,8 @@ public:
     virtual Status importRecordStore(OperationContext* opCtx,
                                      StringData ns,
                                      StringData ident,
-                                     const CollectionOptions& options) {
+                                     const CollectionOptions& options,
+                                     const BSONObj& storageMetadata) {
         MONGO_UNREACHABLE;
     }
 
@@ -195,7 +196,8 @@ public:
                                              const NamespaceString& nss,
                                              const CollectionOptions& collOptions,
                                              StringData ident,
-                                             const IndexDescriptor* desc) {
+                                             const IndexDescriptor* desc,
+                                             const BSONObj& storageMetadata) {
         MONGO_UNREACHABLE;
     }
 
