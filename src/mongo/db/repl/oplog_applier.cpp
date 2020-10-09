@@ -140,7 +140,7 @@ std::unique_ptr<ThreadPool> makeReplWriterPool() {
 }
 
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount) {
-    return makeReplWriterPool(replWriterThreadCount, "ReplWriterWorker"_sd);
+    return makeReplWriterPool(threadCount, "ReplWriterWorker"_sd);
 }
 
 std::unique_ptr<ThreadPool> makeReplWriterPool(int threadCount,
