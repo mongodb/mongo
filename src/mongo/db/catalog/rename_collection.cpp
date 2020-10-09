@@ -696,12 +696,12 @@ Status renameBetweenDBs(OperationContext* opCtx,
             // Cursor is left one past the end of the batch inside writeConflictRetry.
             auto beginBatchId = record->id;
             Status status = writeConflictRetry(opCtx, "renameCollection", tmpName.ns(), [&] {
-                WriteUnitOfWork wunit(opCtx);
                 // Need to reset cursor if it gets a WCE midway through.
                 if (!record || (beginBatchId != record->id)) {
                     record = cursor->seekExact(beginBatchId);
                 }
                 for (int i = 0; record && (i < internalInsertMaxBatchSize.load()); i++) {
+                    WriteUnitOfWork wunit(opCtx);
                     const InsertStatement stmt(record->data.releaseToBson());
                     OpDebug* const opDebug = nullptr;
                     auto status = tmpColl->insertDocument(opCtx, stmt, opDebug, true);
@@ -709,6 +709,12 @@ Status renameBetweenDBs(OperationContext* opCtx,
                         return status;
                     }
                     record = cursor->next();
+
+                    // Used to make sure that a WCE can be handled by this logic without data loss.
+                    if (MONGO_unlikely(writeConflictInRenameCollCopyToTmp.shouldFail())) {
+                        throw WriteConflictException();
+                    }
+                    wunit.commit();
                 }
 
                 // Time to yield; make a safe copy of the current record before releasing our
@@ -722,11 +728,6 @@ Status renameBetweenDBs(OperationContext* opCtx,
                     writeConflictRetry(
                         opCtx, "retryRestoreCursor", ns, [&cursor] { cursor->restore(); });
                 });
-                // Used to make sure that a WCE can be handled by this logic without data loss.
-                if (MONGO_unlikely(writeConflictInRenameCollCopyToTmp.shouldFail())) {
-                    throw WriteConflictException();
-                }
-                wunit.commit();
                 return Status::OK();
             });
             if (!status.isOK())
