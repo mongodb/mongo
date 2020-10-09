@@ -1,4 +1,4 @@
-/*! @page devdoc-perf Performance Monitoring
+/*! @page tool-perf Performance Monitoring
 
 # Overview
 
@@ -23,7 +23,7 @@ blocking](https://perf.wiki.kernel.org/index.php/Tutorial#Profiling_sleep_times)
 I was not able to get it to do so after many attempts. For alternative ways to
 perform off-CPU analysis, read [this post by Brendan
 Gregg](http://www.brendangregg.com/offcpuanalysis.html) or use WiredTiger's
-@ref devdoc-optrack.
+@ref tool-optrack.
 
 What follows is a quick cheat sheet of how to use `perf` with WiredTiger. Most
 of the information in this cheat sheet comes from [this excellent tutorial by

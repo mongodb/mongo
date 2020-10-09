@@ -21,7 +21,7 @@ the ANSI C99, POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
 For more information on the WiredTiger architecture and why it might be
 right for your project, see:
 
-- @subpage architecture
+- @subpage overview
 
 For more information about building and installing WiredTiger, see:
 
@@ -34,6 +34,14 @@ For more information about writing WiredTiger applications, see:
 - @subpage programming_lang_java
 (The Java API is not available on Windows.)
 - @ref wt "WiredTiger API reference manual"
+
+For more information about the architecture and internals of WiredTiger, see:
+
+- @subpage arch-index
+
+For more information on tools and techniques used by WiredTiger developers, see:
+
+- @subpage tool-index
 
 For more information about administrating WiredTiger databases, see:
 
@@ -57,9 +65,5 @@ information, see:
 To browse the WiredTiger source code repository or contact us, see:
 
 - @subpage community
-
-For more information on WiredTiger internals, see:
-
-- @subpage devdoc-index
 
 */

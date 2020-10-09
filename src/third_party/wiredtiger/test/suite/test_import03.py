@@ -54,14 +54,14 @@ class test_import03(test_import_base):
     ])
 
     # Test something table specific like a projection.
-    def check_projections(self, uri, keys, values, ts):
+    def check_projections(self, uri, keys, values):
         for i in range(0, len(keys)):
             self.check_record(uri + '(country,capital)',
-                              keys[i], [values[i][0], values[i][1]], ts[i])
+                              keys[i], [values[i][0], values[i][1]])
             self.check_record(uri + '(country,population)',
-                              keys[i], [values[i][0], values[i][2]], ts[i])
+                              keys[i], [values[i][0], values[i][2]])
             self.check_record(uri + '(capital,population)',
-                              keys[i], [values[i][1], values[i][2]], ts[i])
+                              keys[i], [values[i][1], values[i][2]])
 
     def test_table_import(self):
         # Add some data and checkpoint.
@@ -119,6 +119,9 @@ class test_import03(test_import_base):
         self.populate(self.ntables, self.nrows)
         self.session.checkpoint()
 
+        # Bring forward the oldest to be past or equal to the timestamps we'll be importing.
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(ts[max_idx]))
+
         # Copy over the datafiles for the object we want to import.
         self.copy_file(original_db_table + '.wt', '.', newdir)
 
@@ -129,11 +132,11 @@ class test_import03(test_import_base):
         self.session.verify(uri)
 
         # Check that the previously inserted values survived the import.
-        self.check(uri, keys[:max_idx], values[:max_idx], ts[:max_idx])
+        self.check(uri, keys[:max_idx], values[:max_idx])
 
         # Check against projections when the table is not simple.
         if not self.is_simple:
-            self.check_projections(uri, keys[:max_idx], values[:max_idx], ts[:max_idx])
+            self.check_projections(uri, keys[:max_idx], values[:max_idx])
 
         # Compare configuration metadata.
         c = self.session.open_cursor('metadata:', None, None)
@@ -146,9 +149,9 @@ class test_import03(test_import_base):
         max_idx = len(keys)
         for i in range(min_idx, max_idx):
             self.update(uri, keys[i], values[i], ts[i])
-        self.check(uri, keys, values, ts)
+        self.check(uri, keys, values)
         if not self.is_simple:
-            self.check_projections(uri, keys, values, ts)
+            self.check_projections(uri, keys, values)
 
         # Perform a checkpoint.
         self.session.checkpoint()

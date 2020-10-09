@@ -43,6 +43,12 @@ class test_bug019(wttest.WiredTigerTestCase):
     # Modify rows so we write log records. We're writing a lot more than a
     # single log file, so we know the underlying library will churn through
     # log files.
+    def get_prealloc_used(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        prealloc = stat_cursor[stat.conn.log_prealloc_used][2]
+        stat_cursor.close()
+        return prealloc
+
     def get_prealloc_stat(self):
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         prealloc = stat_cursor[stat.conn.log_prealloc_max][2]
@@ -72,11 +78,11 @@ class test_bug019(wttest.WiredTigerTestCase):
     # assert a file is created within 90 seconds.
     def prepfiles(self):
         for i in range(1,90):
-                f = fnmatch.filter(os.listdir('.'), "*Prep*")
-                if f:
-                        return f
-                time.sleep(1.0)
-        self.assertFalse(not f)
+            f = fnmatch.filter(os.listdir('.'), "*Prep*")
+            if f:
+                return
+            time.sleep(1.0)
+        self.fail('No pre-allocated files created after 90 seconds')
 
     # There was a bug where pre-allocated log files accumulated on
     # Windows systems due to an issue with the directory list code.
@@ -97,23 +103,22 @@ class test_bug019(wttest.WiredTigerTestCase):
 
         # Loop, making sure pre-allocation is working and the range is moving.
         self.pr("Check pre-allocation range is moving")
-        older = self.prepfiles()
+        # Wait for pre-allocation to start.
+        self.prepfiles()
+        used = self.get_prealloc_used()
         for i in range(1, 10):
             self.populate(self.entries)
-            newer = self.prepfiles()
+            newused = self.get_prealloc_used()
+            self.pr("Iteration " + str(i))
+            self.pr("previous used " + str(used) + " now " + str(newused))
 
-            # Files can be returned in any order when reading a directory, older
-            # pre-allocated files can persist longer than newer files when newer
-            # files are returned first. Confirm files are being consumed.
-            if set(older) < set(newer):
+            # Make sure we're consuming pre-allocated files.
+            if used >= newused:
                 self.pr("FAILURE on Iteration " + str(i))
-                self.pr("FAILURE: Older")
-                self.pr(str(older))
-                self.pr("FAILURE: Newer")
-                self.pr(str(newer))
-            self.assertFalse(set(older) < set(newer))
+                self.pr("FAILURE: previous used " + str(used) + " now " + str(newused))
+            self.assertTrue(used < newused)
+            used = newused
 
-            older = newer
             self.session.checkpoint()
 
         # Wait for a long time for pre-allocate to drop in an idle system
