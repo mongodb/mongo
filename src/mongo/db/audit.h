@@ -279,6 +279,11 @@ void logCreateView(Client* client,
                    ErrorCodes::Error code);
 
 /**
+ * Logs the result of an importCollection command.
+ */
+void logImportCollection(Client* client, StringData nsname);
+
+/**
  * Logs the result of a createDatabase command.
  */
 void logCreateDatabase(Client* client, StringData dbname);

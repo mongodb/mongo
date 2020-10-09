@@ -113,6 +113,7 @@ namespace mongo {
     X(grantRolesToUser)      /* ID only */                                            \
     X(hostInfo)                                                                       \
     X(impersonate)                                                                    \
+    X(importCollection) /* ID only */                                                 \
     X(indexStats)                                                                     \
     X(inprog)                                                                         \
     X(insert)                                                                         \

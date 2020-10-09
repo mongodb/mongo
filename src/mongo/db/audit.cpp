@@ -153,6 +153,8 @@ void mongo::audit::logCreateView(Client* client,
                                  BSONArray pipeline,
                                  ErrorCodes::Error code) {}
 
+void mongo::audit::logImportCollection(Client* client, StringData nsname) {}
+
 void mongo::audit::logCreateDatabase(Client* client, StringData dbname) {}
 
 
