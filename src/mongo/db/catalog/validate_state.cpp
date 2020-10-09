@@ -131,7 +131,7 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
     _traverseRecordStoreCursor->save();
     _seekRecordStoreCursor->save();
 
-    if (isBackground()) {
+    if (isBackground() && _validateTs) {
         // End current transaction and begin a new one, to help ameliorate WiredTiger cache
         // pressure.
 
@@ -172,17 +172,20 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
               _indexes.size() == 0);
 
-    // Background validation will read from a snapshot opened on the kNoOverlap read source, which
-    // is the minimum of the last applied and all durable timestamps, instead of the latest data.
-    // Using the kNoOverlap read source prevents us from having to take the PBWM lock, which blocks
-    // replication. We cannot solely rely on the all durable timestamp as it can be set while we're
-    // in the middle of applying a batch on secondary nodes.
+    // Background validation (on replica sets) will read from a snapshot opened on the kNoOverlap
+    // read source, which is the minimum of the last applied and all durable timestamps, instead of
+    // the latest data. Using the kNoOverlap read source prevents us from having to take the PBWM
+    // lock, which blocks replication. We cannot solely rely on the all durable timestamp as it can
+    // be set while we're in the middle of applying a batch on secondary nodes.
+    // Background validation on standalones uses the kNoTimestamp read source because standalones
+    // have no timestamps to use for maintaining a consistent snapshot.
+    RecoveryUnit::ReadSource rs = RecoveryUnit::ReadSource::kNoTimestamp;
     if (isBackground()) {
         opCtx->recoveryUnit()->abandonSnapshot();
         // Background validation is expecting to read from the no overlap timestamp, but
         // standalones do not support timestamps. Therefore, if this process is currently running as
         // a standalone, don't use a timestamp.
-        RecoveryUnit::ReadSource rs;
+
         if (repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
             rs = RecoveryUnit::ReadSource::kNoOverlap;
         } else {
@@ -202,7 +205,12 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
         opCtx, _collection->getRecordStore(), &_dataThrottle);
     _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
         opCtx, _collection->getRecordStore(), &_dataThrottle);
-    _validateTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+
+    if (rs != RecoveryUnit::ReadSource::kNoTimestamp) {
+        invariant(rs == RecoveryUnit::ReadSource::kNoOverlap);
+        invariant(isBackground());
+        _validateTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+    }
 
     const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
     // The index iterator for ready indexes is timestamp-aware and will only return indexes that
