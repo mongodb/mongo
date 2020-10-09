@@ -263,7 +263,8 @@ using ApplyImportCollectionFn = std::function<void(OperationContext*,
                                                    long long,
                                                    long long,
                                                    const BSONObj&,
-                                                   bool)>;
+                                                   bool,
+                                                   OplogApplication::Mode)>;
 
 void registerApplyImportCollectionFn(ApplyImportCollectionFn func);
 

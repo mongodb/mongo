@@ -149,7 +149,8 @@ void applyImportCollectionDefault(OperationContext* opCtx,
                                   long long numRecords,
                                   long long dataSize,
                                   const BSONObj& catalogEntry,
-                                  bool isDryRun) {
+                                  bool isDryRun,
+                                  OplogApplication::Mode mode) {
     LOGV2_FATAL_NOTRACE(5114200,
                         "Applying importCollection is not supported with MongoDB Community "
                         "Edition, please use MongoDB Enterprise Edition",
@@ -919,17 +920,19 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
       {ErrorCodes::NamespaceNotFound, ErrorCodes::NamespaceExists}}},
     {"importCollection",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
-         auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-             IDLParserErrorContext("importCollectionOplogEntry"), entry.getObject());
-         applyImportCollection(opCtx,
-                               importEntry.getImportUUID(),
-                               importEntry.getImportCollection(),
-                               importEntry.getNumRecords(),
-                               importEntry.getDataSize(),
-                               importEntry.getCatalogEntry(),
-                               importEntry.getDryRun());
-         return Status::OK();
-     }}},
+          auto importEntry = mongo::ImportCollectionOplogEntry::parse(
+              IDLParserErrorContext("importCollectionOplogEntry"), entry.getObject());
+          applyImportCollection(opCtx,
+                                importEntry.getImportUUID(),
+                                importEntry.getImportCollection(),
+                                importEntry.getNumRecords(),
+                                importEntry.getDataSize(),
+                                importEntry.getCatalogEntry(),
+                                importEntry.getDryRun(),
+                                mode);
+          return Status::OK();
+      },
+      {ErrorCodes::NamespaceExists}}},
     {"applyOps",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
          return entry.shouldPrepare() ? applyPrepareTransaction(opCtx, entry, mode)
