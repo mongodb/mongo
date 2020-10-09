@@ -942,13 +942,13 @@ def get_command_env(env):
             # doesn't make builds on paths with spaces (Ninja and SCons issues)
             # nor expanding response file paths with spaces (Ninja issue) work.
             value = value.replace(r' ', r'$ ')
-            command_env += "{}='{}' ".format(key, value)
+            command_env += "export {}='{}';".format(key, value)
 
     env["NINJA_ENV_VAR_CACHE"] = command_env
     return command_env
 
 
-def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
+def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False, custom_env={}):
     """Generate a response file command provider for rule name."""
 
     # If win32 using the environment with a response file command will cause
@@ -996,6 +996,11 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
         variables[rule] = cmd
         if use_command_env:
             variables["env"] = get_command_env(env)
+
+            for key, value in custom_env.items():
+                variables["env"] += env.subst(
+                    f"export {key}={value};", target=targets, source=sources, executor=executor
+                ) + " "
         return rule, variables, [tool_command]
 
     return get_response_file_command
@@ -1176,7 +1181,7 @@ def register_custom_rule_mapping(env, pre_subst_string, rule):
     __NINJA_RULE_MAPPING[pre_subst_string] = rule
 
 
-def register_custom_rule(env, rule, command, description="", deps=None, pool=None, use_depfile=False):
+def register_custom_rule(env, rule, command, description="", deps=None, pool=None, use_depfile=False, use_response_file=False):
     """Allows specification of Ninja rules from inside SCons files."""
     rule_obj = {
         "command": command,
@@ -1191,6 +1196,10 @@ def register_custom_rule(env, rule, command, description="", deps=None, pool=Non
 
     if pool is not None:
         rule_obj["pool"] = pool
+
+    if use_response_file:
+        rule_obj["rspfile"] = "$out.rsp"
+        rule_obj["rspfile_content"] = "$rspc"
 
     env[NINJA_RULES][rule] = rule_obj
 

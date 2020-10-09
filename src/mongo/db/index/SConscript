@@ -108,12 +108,15 @@ env.Library(
 
 env.Library(
     target='index_access_method_factory',
-        source=[
-            'index_access_method_factory.cpp',
-        ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-        ],
+    source=[
+        'index_access_method_factory.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
 )
 
 serveronlyEnv = env.Clone()
@@ -143,6 +146,9 @@ serveronlyEnv.Library(
         '$BUILD_DIR/mongo/idl/server_parameter',
         'skipped_record_tracker',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+    ]
 )
 
 env.Library(
@@ -161,7 +167,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         'index_access_method',
         'key_generator',
-    ],
+    ]
 )
 
 env.Library(

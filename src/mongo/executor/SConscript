@@ -144,7 +144,10 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ]
+    ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
 )
 
 env.Library(
@@ -232,6 +235,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_TYPEINFO=[
+        'network_interface',
     ]
 )
 

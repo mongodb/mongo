@@ -76,6 +76,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/rpc/rpc',
+    ]
 )
 
 env.Library(

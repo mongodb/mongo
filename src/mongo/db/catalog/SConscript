@@ -167,6 +167,9 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         'index_catalog_entry',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
 )
 
 env.Library(
@@ -206,6 +209,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ]
 )
 
 env.Library(
@@ -454,6 +460,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/update_index_data',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/index/index_access_methods'
+    ]
 )
 
 env.Library(

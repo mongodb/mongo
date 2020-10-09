@@ -1723,15 +1723,29 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     # command but instead runs a function.
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(write_uuid_to_file, "Generating placeholder library $TARGET")
 
+libdeps_typeinfo = False
+
 if get_option('build-tools') == 'next':
     import libdeps_next as libdeps
+
+    if (has_option('sanitize') and 'undefined' in get_option('sanitize')
+        and env.ToolchainIs('clang', 'gcc')
+        and (env.TargetOSIs('posix') and not env.TargetOSIs('darwin'))):
+
+        libdeps_typeinfo = True
+
+    libdeps.setup_environment(
+        env,
+        emitting_shared=(link_model.startswith("dynamic")),
+        linting=get_option('libdeps-linting'),
+        sanitize_typeinfo=libdeps_typeinfo)
 else:
     import libdeps
 
-libdeps.setup_environment(
-    env,
-    emitting_shared=(link_model.startswith("dynamic")),
-    linting=get_option('libdeps-linting'))
+    libdeps.setup_environment(
+        env,
+        emitting_shared=(link_model.startswith("dynamic")),
+        linting=get_option('libdeps-linting'))
 
 # Both the abidw tool and the thin archive tool must be loaded after
 # libdeps, so that the scanners they inject can see the library
@@ -4114,6 +4128,41 @@ if get_option('ninja') != 'disabled':
         return dependencies
 
     env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
+
+    if libdeps_typeinfo and get_option('build-tools') == 'next':
+        # ninja will not handle the list action libdeps creates so in order for
+        # to build ubsan with ninja, we need to undo the list action and then
+        # create a special rule to handle the shlink typeinfo checks. If ninja is
+        # updated to handle list actions correctly, this whole section can go away.
+        base_action = env['BUILDERS']['SharedLibrary'].action
+        base_action.list[:] = base_action.list[:-2]
+
+        # Now we rewrite the command and set it up as a rule for ninja shlinks. We are
+        # cramming this all into a single command for ninja, so it is broken apart with
+        # commentation for each part.
+        env.NinjaRule(
+            "SHLINK",
+            libdeps.get_typeinfo_link_command().format(
+                ninjalink="$env$SHLINK @$out.rsp && ",
+                ldpath="",
+                target="${out}",
+                libdeps_tags="printenv",
+                tag='libdeps-cyclic-typeinfo'
+            ),
+            description="Linking $out",
+            deps=None,
+            pool="local_pool",
+            use_depfile=False,
+            use_response_file=True)
+
+        provider = env.NinjaGenResponseFileProvider(
+            "SHLINK",
+            "$SHLINK",
+            custom_env={
+                "TYPEINFO_TAGS":"'$LIBDEPS_TAGS'",
+                "LD_LIBRARY_PATH":"'$_LIBDEPS_LD_PATH'"})
+        env.NinjaRuleMapping("${SHLINKCOM}", provider)
+        env.NinjaRuleMapping(env["SHLINKCOM"], provider)
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the

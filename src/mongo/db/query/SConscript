@@ -249,27 +249,30 @@ env.Library(
 )
 
 env.Library(
-     target="sort_pattern",
-     source=[
-         "sort_pattern.cpp",
-     ],
-     LIBDEPS=[
-         '$BUILD_DIR/mongo/base',
-         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
-         '$BUILD_DIR/mongo/db/pipeline/expression_context',
-     ],
+    target="sort_pattern",
+    source=[
+        "sort_pattern.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/pipeline/expression_context',
+    ],
  )
 
 env.Library(
-     target="plan_yield_policy",
-     source=[
-         "plan_yield_policy.cpp",
-     ],
-     LIBDEPS=[
-         '$BUILD_DIR/mongo/base',
-         '$BUILD_DIR/mongo/util/elapsed_tracker',
-         '$BUILD_DIR/mongo/util/fail_point',
-     ],
+    target="plan_yield_policy",
+    source=[
+        "plan_yield_policy.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/util/elapsed_tracker',
+        '$BUILD_DIR/mongo/util/fail_point',
+    ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context',
+    ],
  )
 
 env.CppUnitTest(

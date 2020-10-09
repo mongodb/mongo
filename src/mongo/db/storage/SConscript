@@ -242,6 +242,9 @@ env.Library(
         'index_entry_comparison',
         'key_string',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+    ]
 )
 
 env.Library(
@@ -268,6 +271,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+    ]
 )
 
 
@@ -281,6 +287,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/unittest/unittest',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+    ]
 )
 
 env.Library(
@@ -350,6 +359,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         'recovery_unit_base',
     ],
+    LIBDEPS_TAGS=[
+        'libdeps-cyclic-typeinfo'
+    ],
+
 )
 
 env.Library(
@@ -440,6 +453,9 @@ env.Library(
         '$BUILD_DIR/mongo/util/fail_point',
         'flow_control_parameters',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+    ]
 )
 
 env.CppUnitTest(

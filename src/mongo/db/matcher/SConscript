@@ -94,6 +94,9 @@ env.Library(
         '$BUILD_DIR/mongo/scripting/scripting_server',
         'expressions',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/db/index/index_access_methods'
+    ]
 )
 
 env.CppUnitTest(

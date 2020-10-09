@@ -59,7 +59,7 @@ import textwrap
 import SCons.Errors
 import SCons.Scanner
 import SCons.Util
-
+import SCons
 
 class Constants:
     Libdeps = "LIBDEPS"
@@ -67,6 +67,7 @@ class Constants:
     LibdepsDependents = "LIBDEPS_DEPENDENTS"
     LibdepsInterface ="LIBDEPS_INTERFACE"
     LibdepsPrivate = "LIBDEPS_PRIVATE"
+    LibdepsTypeinfo = "LIBDEPS_TYPEINFO"
     LibdepsTags = "LIBDEPS_TAGS"
     LibdepsTagExpansion = "LIBDEPS_TAG_EXPANSIONS"
     MissingLibdep = "MISSING_LIBDEP_"
@@ -76,7 +77,7 @@ class Constants:
     SysLibdepsPrivate = "SYSLIBDEPS_PRIVATE"
 
 class dependency:
-    Public, Private, Interface = list(range(3))
+    Public, Private, Interface, Typeinfo = list(range(4))
 
     def __init__(self, value, deptype, listed_name):
         self.target_node = value
@@ -564,10 +565,18 @@ dependency_visibility_honored = {
     dependency.Interface: dependency.Interface,
 }
 
+dependency_visibility_typeinfo = {
+    dependency.Public: dependency.Public,
+    dependency.Private: dependency.Private,
+    dependency.Interface: dependency.Interface,
+    dependency.Typeinfo: dependency.Private,
+}
+
 dep_type_to_env_var = {
     dependency.Public: Constants.Libdeps,
     dependency.Private: Constants.LibdepsPrivate,
     dependency.Interface: Constants.LibdepsInterface,
+    dependency.Typeinfo: Constants.LibdepsTypeinfo,
 }
 
 class DependencyCycleError(SCons.Errors.UserError):
@@ -954,8 +963,59 @@ def expand_libdeps_with_flags(source, target, env, for_signature):
 
     return libdeps_with_flags
 
+def get_typeinfo_link_command():
+    if LibdepLinter.skip_linting:
+        return "{ninjalink}"
+    else:
+        return (
+        # This command is has flexibility to be used by the ninja tool, but the ninja tool
+        # does not currently support list actions as the command is used below, so we can
+        # allow ninja to put its link command here in front simulating a list action. For
+        # a normal scons build ninjalink should be empty string.
+        # TODO: When the ninja tool supports multi rule type link actions this can go
+        # away and turn into functions actions.
+        # https://jira.mongodb.org/browse/SERVER-51435
+        # https://jira.mongodb.org/browse/SERVER-51436
+        "{ninjalink}"
 
-def setup_environment(env, emitting_shared=False, linting='on'):
+        # Dependencies must exist in a shared lib that was built as a
+        # dependent to the current node, so LD_LIBRARY_PATH should be set to
+        # include all the LIBDEPS directories.
+        + "UNDEF_SYMBOLS=$$({ldpath}ldd -r {target} "
+
+        # filter out only undefined symbols and then remove the sanitizer symbols because
+        # we are focused on the missing mongo db symbols.
+        + "| grep '^undefined symbol: ' | grep -v '__[a-z]*san' "
+
+        # Demangle the remaining symbols, and filter out mongo typeinfo symbols for the current library.
+        + "| c++filt | grep 'mongo::' | grep 'typeinfo for' | grep {target}) "
+
+        # Check if a exemption tag exists to see if we should skip this error, or if
+        # we are in libdeps printing mode, disregard its existence since we will always print
+        + "&& {} ".format("true" if LibdepLinter.print_linter_errors else " [ -z \"$$({libdeps_tags} | grep \"{tag}\")\" ]")
+
+        # output the missing symbols to stdout and use sed to insert tabs at the front of
+        # each new line for neatness.
+        + r"""&& echo '\n\tLibdepLinter:\n\t\tMissing typeinfo definitions:' """
+        + r"""&& echo "$$UNDEF_SYMBOLS\n" | sed 's/^/\t\t\t/g' 1>&2 """
+
+        # Fail the build if we found issues and are not in print mode.
+        + "&& return {} ".format(int(not LibdepLinter.print_linter_errors))
+
+        # The final checks will pass the build if the tag exists or no symbols were found.
+        + "|| {libdeps_tags} | grep -q \"{tag}\" || [ -z \"$$UNDEF_SYMBOLS\" ]")
+
+def get_libdeps_ld_path(source, target, env, for_signature):
+    result = ""
+    for libdep in env['_LIBDEPS_GET_LIBS'](source, target, env, for_signature):
+        if libdep:
+            result += os.path.dirname(str(libdep)) + ":"
+    if result:
+        result = result[:-1]
+
+    return [result]
+
+def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinfo=False):
     """Set up the given build environment to do LIBDEPS tracking."""
 
     LibdepLinter.skip_linting = linting == 'off'
@@ -973,6 +1033,34 @@ def setup_environment(env, emitting_shared=False, linting='on'):
 
     env[Constants.Libdeps] = SCons.Util.CLVar()
     env[Constants.SysLibdeps] = SCons.Util.CLVar()
+
+    if sanitize_typeinfo and not LibdepLinter.skip_linting:
+
+        # Some sanitizers, notably the vptr check of ubsan, can cause
+        # additional symbol dependencies to exist. Unfortunately,
+        # building with the sanitizers also requires that we not build
+        # with -z,defs, which means that we cannot make such undefined
+        # symbols errors at link time. We can however hack together
+        # something which looks for undefined typeinfo nodes in the
+        # mongo namespace using `ldd -r`.  See
+        # https://jira.mongodb.org/browse/SERVER-49798 for more
+        # details.
+        env["_LIBDEPS_LD_PATH"] = get_libdeps_ld_path
+
+        base_action = env['BUILDERS']['SharedLibrary'].action
+        if not isinstance(base_action, SCons.Action.ListAction):
+            base_action = SCons.Action.ListAction([base_action])
+
+        base_action.list.extend([
+            SCons.Action.Action(
+                get_typeinfo_link_command().format(
+                    ninjalink="",
+                    ldpath="LD_LIBRARY_PATH=$_LIBDEPS_LD_PATH ",
+                    target="${TARGET}",
+                    libdeps_tags="echo \"$LIBDEPS_TAGS\"",
+                    tag='libdeps-cyclic-typeinfo'),
+                None)
+        ])
 
     # We need a way for environments to alter just which libdeps
     # emitter they want, without altering the overall program or
@@ -992,7 +1080,7 @@ def setup_environment(env, emitting_shared=False, linting='on'):
         LIBDEPS_SHAREMITTER=make_libdeps_emitter("SharedArchive", ignore_progdeps=True),
         SHAREMITTER=make_indirect_emitter("LIBDEPS_SHAREMITTER"),
         LIBDEPS_SHLIBEMITTER=make_libdeps_emitter(
-            "SharedLibrary", dependency_visibility_honored
+            "SharedLibrary", dependency_visibility_typeinfo if sanitize_typeinfo else dependency_visibility_honored
         ),
         SHLIBEMITTER=make_indirect_emitter("LIBDEPS_SHLIBEMITTER"),
         LIBDEPS_PROGEMITTER=make_libdeps_emitter(

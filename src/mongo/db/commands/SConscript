@@ -45,6 +45,9 @@ env.Library(
         '$BUILD_DIR/mongo/util/processinfo',
         'server_status_core',
     ],
+    LIBDEPS_TYPEINFO=[
+        '$BUILD_DIR/mongo/rpc/rpc',
+    ]
 )
 
 env.Library(
