@@ -49,6 +49,7 @@ verifyServerStatusElectionReasonCounterChange(initialPrimaryStatus.electionMetri
                                               newPrimaryStatus.electionMetrics,
                                               "priorityTakeover",
                                               1,
+                                              undefined, /* expectedNumSuccessful */
                                               true /* allowGreater */);
 
 replSet.stopSet();
