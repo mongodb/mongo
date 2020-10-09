@@ -6133,6 +6133,16 @@ tasks:
       use_large_distro: "true"
       fallback_num_sub_suites: 12
 
+# Only run hot_backups tests for hot_backups variant.
+- name: noPassthroughHotBackups_gen
+  commands:
+    - func: "generate resmoke tasks"
+      vars:
+        suite: no_passthrough
+        resmoke_args: --storageEngine=wiredTiger src/mongo/db/modules/*/jstests/hot_backups/*.js
+        use_large_distro: "true"
+        fallback_num_sub_suites: 12
+
 - name: noPassthroughWithMongod_gen
   tags: ["misc_js"]
   commands:
@@ -11151,7 +11161,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
   - name: jsCore
-  - name: noPassthrough_gen
+  - name: noPassthroughHotBackups_gen
 
 - <<: *enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit-no-libunwind
