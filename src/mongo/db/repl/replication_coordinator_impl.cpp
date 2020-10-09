@@ -4145,71 +4145,67 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
 
-    // Warn if running --nojournal and writeConcernMajorityJournalDefault = true
+    // Warn if using the in-memory (ephemeral) storage engine or running running --nojournal with
+    // writeConcernMajorityJournalDefault=true.
     StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    if (storageEngine && !storageEngine->isDurable() &&
-        (newConfig.getWriteConcernMajorityShouldJournal() &&
-         (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
-        LOGV2_OPTIONS(21369, {logv2::LogTag::kStartupWarnings}, "");
-        LOGV2_OPTIONS(
-            21370,
-            {logv2::LogTag::kStartupWarnings},
-            "** WARNING: This replica set node is running without journaling enabled but the ");
-        LOGV2_OPTIONS(
-            21371,
-            {logv2::LogTag::kStartupWarnings},
-            "**          writeConcernMajorityJournalDefault option to the replica set config ");
-        LOGV2_OPTIONS(21372,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          is set to true. The writeConcernMajorityJournalDefault ");
-        LOGV2_OPTIONS(21373,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          option to the replica set config must be set to false ");
-        LOGV2_OPTIONS(21374,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          or w:majority write concerns will never complete.");
-        LOGV2_OPTIONS(
-            21375,
-            {logv2::LogTag::kStartupWarnings},
-            "**          In addition, this node's memory consumption may increase until all");
-        LOGV2_OPTIONS(21376,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          available free RAM is exhausted.");
-        LOGV2_OPTIONS(21377, {logv2::LogTag::kStartupWarnings}, "");
-    }
-
-    // Warn if using the in-memory (ephemeral) storage engine with
-    // writeConcernMajorityJournalDefault = true
-    if (storageEngine && storageEngine->isEphemeral() &&
-        (newConfig.getWriteConcernMajorityShouldJournal() &&
-         (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
-        LOGV2_OPTIONS(21378, {logv2::LogTag::kStartupWarnings}, "");
-        LOGV2_OPTIONS(
-            21379,
-            {logv2::LogTag::kStartupWarnings},
-            "** WARNING: This replica set node is using in-memory (ephemeral) storage with the");
-        LOGV2_OPTIONS(
-            21380,
-            {logv2::LogTag::kStartupWarnings},
-            "**          writeConcernMajorityJournalDefault option to the replica set config ");
-        LOGV2_OPTIONS(
-            21381,
-            {logv2::LogTag::kStartupWarnings},
-            "**          set to true. The writeConcernMajorityJournalDefault option to the ");
-        LOGV2_OPTIONS(21382,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          replica set config must be set to false ");
-        LOGV2_OPTIONS(21383,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          or w:majority write concerns will never complete.");
-        LOGV2_OPTIONS(
-            21384,
-            {logv2::LogTag::kStartupWarnings},
-            "**          In addition, this node's memory consumption may increase until all");
-        LOGV2_OPTIONS(21385,
-                      {logv2::LogTag::kStartupWarnings},
-                      "**          available free RAM is exhausted.");
-        LOGV2_OPTIONS(21386, {logv2::LogTag::kStartupWarnings}, "");
+    if (storageEngine && newConfig.getWriteConcernMajorityShouldJournal() &&
+        (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal())) {
+        if (storageEngine->isEphemeral()) {
+            LOGV2_OPTIONS(21378, {logv2::LogTag::kStartupWarnings}, "");
+            LOGV2_OPTIONS(21379,
+                          {logv2::LogTag::kStartupWarnings},
+                          "** WARNING: This replica set node is using in-memory (ephemeral) "
+                          "storage with the");
+            LOGV2_OPTIONS(
+                21380,
+                {logv2::LogTag::kStartupWarnings},
+                "**          writeConcernMajorityJournalDefault option to the replica set config ");
+            LOGV2_OPTIONS(
+                21381,
+                {logv2::LogTag::kStartupWarnings},
+                "**          set to true. The writeConcernMajorityJournalDefault option to the ");
+            LOGV2_OPTIONS(21382,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          replica set config must be set to false ");
+            LOGV2_OPTIONS(21383,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          or w:majority write concerns will never complete.");
+            LOGV2_OPTIONS(
+                21384,
+                {logv2::LogTag::kStartupWarnings},
+                "**          In addition, this node's memory consumption may increase until all");
+            LOGV2_OPTIONS(21385,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          available free RAM is exhausted.");
+            LOGV2_OPTIONS(21386, {logv2::LogTag::kStartupWarnings}, "");
+        } else if (!storageEngine->isDurable()) {
+            LOGV2_OPTIONS(21369, {logv2::LogTag::kStartupWarnings}, "");
+            LOGV2_OPTIONS(
+                21370,
+                {logv2::LogTag::kStartupWarnings},
+                "** WARNING: This replica set node is running without journaling enabled but the ");
+            LOGV2_OPTIONS(
+                21371,
+                {logv2::LogTag::kStartupWarnings},
+                "**          writeConcernMajorityJournalDefault option to the replica set config ");
+            LOGV2_OPTIONS(21372,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          is set to true. The writeConcernMajorityJournalDefault ");
+            LOGV2_OPTIONS(21373,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          option to the replica set config must be set to false ");
+            LOGV2_OPTIONS(21374,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          or w:majority write concerns will never complete.");
+            LOGV2_OPTIONS(
+                21375,
+                {logv2::LogTag::kStartupWarnings},
+                "**          In addition, this node's memory consumption may increase until all");
+            LOGV2_OPTIONS(21376,
+                          {logv2::LogTag::kStartupWarnings},
+                          "**          available free RAM is exhausted.");
+            LOGV2_OPTIONS(21377, {logv2::LogTag::kStartupWarnings}, "");
+        }
     }
 
     // Since the ReplSetConfig always has a WriteConcernOptions, the only way to know if it has been
