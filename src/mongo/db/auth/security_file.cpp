@@ -32,7 +32,6 @@
 #include "mongo/db/auth/security_key.h"
 
 #include <algorithm>
-#include <cctype>
 #include <string>
 #include <sys/stat.h>
 #include <vector>

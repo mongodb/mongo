@@ -30,7 +30,6 @@
 #include "mongo/db/fts/fts_language.h"
 
 #include <algorithm>
-#include <cctype>
 #include <fmt/format.h>
 #include <map>
 #include <memory>
@@ -45,6 +44,7 @@
 #include "mongo/db/fts/fts_unicode_phrase_matcher.h"
 #include "mongo/db/fts/fts_unicode_tokenizer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo::fts {
 
@@ -59,8 +59,8 @@ using namespace fmt::literals;
 struct LanguageStringCompare {
     bool operator()(StringData a, StringData b) const {
         return std::lexicographical_compare(
-            a.begin(), a.end(), b.begin(), b.end(), [](unsigned char a, unsigned char b) {
-                return std::tolower(a) < std::tolower(b);
+            a.begin(), a.end(), b.begin(), b.end(), [](char a, char b) {
+                return ctype::toLower(a) < ctype::toLower(b);
             });
     }
 };

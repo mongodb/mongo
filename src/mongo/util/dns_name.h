@@ -30,7 +30,6 @@
 #pragma once
 
 #include <algorithm>
-#include <cctype>
 #include <iostream>
 #include <iterator>
 #include <sstream>
@@ -41,6 +40,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo {
 namespace dns {
@@ -117,13 +117,13 @@ public:
 
             // We permit dashes and numbers.  We also permit underscores for use with SRV records
             // and such.
-            if (!(ch == '-' || std::isalnum(ch) || (ch == '_' && parserState == kFirstLetter))) {
+            if (!(ch == '-' || ctype::isAlnum(ch) || (ch == '_' && parserState == kFirstLetter))) {
                 uasserted(ErrorCodes::DNSRecordTypeMismatch,
                           "A Domain Name cannot have tokens other than dash or alphanumerics.");
             }
             // All domain names are represented in lower-case letters, because DNS is case
             // insensitive.
-            name.push_back(std::tolower(ch));
+            name.push_back(ctype::toLower(ch));
             if (parserState == kFirstLetter) {
                 parserState = kNonPeriod;
             }
@@ -367,7 +367,7 @@ private:
     bool isEquivalentToIPv4DottedDecimal() const {
         return !_fullyQualified && _nameComponents.size() == 4 &&
             std::all_of(begin(_nameComponents), end(_nameComponents), [](const auto& s) {
-                return std::all_of(begin(s), end(s), [](char c) { return std::isdigit(c); });
+                return std::all_of(begin(s), end(s), [](char c) { return ctype::isDigit(c); });
             });
     }
 

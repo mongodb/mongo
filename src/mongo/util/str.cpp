@@ -29,9 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include <cctype>
-
 #include "mongo/base/parse_number.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 
@@ -90,8 +89,8 @@ int LexNumCmp::cmp(StringData sd1, StringData sd2, bool lexOnly) {
             return -1;
 
         if (!lexOnly) {
-            bool n1 = isdigit(sd1[s1]);
-            bool n2 = isdigit(sd2[s2]);
+            bool n1 = ctype::isDigit(sd1[s1]);
+            bool n2 = ctype::isDigit(sd2[s2]);
 
             if (n1 && n2) {
                 // get rid of leading 0s
@@ -105,9 +104,9 @@ int LexNumCmp::cmp(StringData sd1, StringData sd2, bool lexOnly) {
                 size_t e1 = s1;
                 size_t e2 = s2;
 
-                while (e1 < sd1.size() && isdigit(sd1[e1]))
+                while (e1 < sd1.size() && ctype::isDigit(sd1[e1]))
                     e1++;
-                while (e2 < sd2.size() && isdigit(sd2[e2]))
+                while (e2 < sd2.size() && ctype::isDigit(sd2[e2]))
                     e2++;
 
                 size_t len1 = e1 - s1;
@@ -225,7 +224,7 @@ std::string escape(StringData sd, bool escape_slash) {
 
 boost::optional<size_t> parseUnsignedBase10Integer(StringData fieldName) {
     // Do not accept positions like '-4' or '+4'
-    if (!std::isdigit(fieldName[0])) {
+    if (!ctype::isDigit(fieldName[0])) {
         return boost::none;
     }
     unsigned int index;

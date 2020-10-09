@@ -31,12 +31,11 @@
 
 #include "mongo/util/stacktrace.h"
 
-#include <cctype>
-
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo::stack_trace_detail {
 namespace {
@@ -82,7 +81,7 @@ StringData Hex::toHex(uint64_t x, Buf& buf, bool showBase) {
 uint64_t Hex::fromHex(StringData s) {
     uint64_t x = 0;
     for (char c : s) {
-        char uc = std::toupper(static_cast<unsigned char>(c));
+        char uc = ctype::toUpper(c);
         if (size_t pos = kDigits<16>.find(uc); pos == std::string::npos) {
             return x;
         } else {

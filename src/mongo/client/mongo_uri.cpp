@@ -47,6 +47,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/dns_name.h"
 #include "mongo/util/dns_query.h"
 #include "mongo/util/hex.h"
@@ -73,7 +74,7 @@ const std::vector<std::pair<std::string, std::string>> permittedTXTOptions = {{"
  */
 void mongo::uriEncode(std::ostream& ss, StringData toEncode, StringData passthrough) {
     for (const auto& c : toEncode) {
-        if ((c == '-') || (c == '_') || (c == '.') || (c == '~') || isalnum(c) ||
+        if ((c == '-') || (c == '_') || (c == '.') || (c == '~') || ctype::isAlnum(c) ||
             (passthrough.find(c) != std::string::npos)) {
             ss << c;
         } else {

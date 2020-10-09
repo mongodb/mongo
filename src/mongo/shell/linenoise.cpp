@@ -97,7 +97,6 @@
 
 #else /* _WIN32 */
 
-#include <cctype>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -105,13 +104,13 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
-#include <wctype.h>
 
 #endif /* _WIN32 */
 
 #include "linenoise.h"
 #include "linenoise_utf8.h"
 #include "mk_wcwidth.h"
+#include <cwctype>
 #include <errno.h>
 #include <fcntl.h>
 #include <memory>
@@ -1968,7 +1967,7 @@ int InputBuffer::incrementalHistorySearch(PromptBase& pi, int startChar) {
 }
 
 static bool isCharacterAlphanumeric(UChar32 testChar) {
-    return iswalnum(testChar);
+    return std::iswalnum(testChar);
 }
 
 int InputBuffer::getInputLine(PromptBase& pi) {

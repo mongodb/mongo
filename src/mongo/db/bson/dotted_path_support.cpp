@@ -31,13 +31,13 @@
 
 #include "mongo/db/bson/dotted_path_support.h"
 
-#include <cctype>
 #include <string>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo {
 namespace dotted_path_support {
@@ -74,9 +74,9 @@ void _extractAllElementsAlongPath(const BSONObj& obj,
                                              arrayComponents);
             } else if (e.type() == Array) {
                 bool allDigits = false;
-                if (next.size() > 0 && std::isdigit(next[0])) {
+                if (next.size() > 0 && ctype::isDigit(next[0])) {
                     unsigned temp = 1;
-                    while (temp < next.size() && std::isdigit(next[temp]))
+                    while (temp < next.size() && ctype::isDigit(next[temp]))
                         temp++;
                     allDigits = temp == next.size() || next[temp] == '.';
                 }

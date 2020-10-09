@@ -58,6 +58,7 @@
 #include <pcrecpp.h>
 
 #include "mongo/logv2/log.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/file.h"
 
 #define KLONG long
@@ -531,7 +532,7 @@ public:
             lineOff = 0;
 
             // trim whitespace and append 000 to replace kB.
-            while (isspace(meminfo.at(lineOff)))
+            while (ctype::isSpace(meminfo.at(lineOff)))
                 lineOff++;
             meminfo = meminfo.substr(lineOff);
 

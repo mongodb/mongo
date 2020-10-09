@@ -29,11 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include <cctype>
-
 #include "mongo/db/fts/unicode/string.h"
 #include "mongo/shell/linenoise_utf8.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/text.h"
 
 #ifdef MSC_VER
@@ -114,7 +113,7 @@ TEST(UnicodeString, CaseFolding) {
     // Test all ascii chars.
     for (unsigned char ch = 0; ch <= 0x7F; ch++) {
         const auto upper = std::string(1, ch);
-        const auto lower = std::string(1, std::tolower(ch));
+        const auto lower = std::string(1, ctype::toLower(ch));
         if (ch) {  // String's constructor doesn't handle embedded NUL bytes.
             ASSERT_EQUALS(lower, String(upper).toLowerToBuf(&buf, kNormal));
         }

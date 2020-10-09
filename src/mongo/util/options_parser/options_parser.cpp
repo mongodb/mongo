@@ -37,7 +37,6 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/program_options.hpp>
-#include <cctype>
 #include <cerrno>
 #include <fcntl.h>
 #include <fstream>
@@ -58,6 +57,7 @@
 #include "mongo/db/json.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
@@ -450,10 +450,10 @@ public:
         if (_trim == Trim::kWhitespace) {
             size_t start = 0;
             size_t end = str.size();
-            while ((start < end) && std::isspace(str[start])) {
+            while ((start < end) && ctype::isSpace(str[start])) {
                 ++start;
             }
-            while ((start < end) && std::isspace(str[end - 1])) {
+            while ((start < end) && ctype::isSpace(str[end - 1])) {
                 --end;
             }
             if ((start > 0) || (end < str.size())) {

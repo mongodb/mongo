@@ -47,6 +47,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -286,7 +287,7 @@ private:
         // This can throw for test cases that have invalid read preferences.
         auto readPrefObj = _jsonTest.getObjectField("read_preference");
         std::string mode = readPrefObj.getStringField("mode");
-        mode[0] = std::tolower(mode[0]);
+        mode[0] = ctype::toLower(mode[0]);
         auto tagSetsObj = readPrefObj["tag_sets"];
         auto tags = tagSetsObj ? BSONArray(readPrefObj["tag_sets"].Obj()) : BSONArray();
 

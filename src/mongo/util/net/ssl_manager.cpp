@@ -48,6 +48,7 @@
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_asio.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/net/ssl_options.h"
@@ -61,20 +62,6 @@ namespace mongo {
 SSLManagerCoordinator* theSSLManagerCoordinator;
 
 namespace {
-
-// Some of these duplicate the std::isalpha/std::isxdigit because we don't want them to be
-// affected by the current locale.
-inline bool isAlpha(char ch) {
-    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z');
-}
-
-inline bool isDigit(char ch) {
-    return (ch >= '0' && ch <= '9');
-}
-
-inline bool isHex(char ch) {
-    return isDigit(ch) || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
-}
 
 // This function returns true if the character is supposed to be escaped according to the rules
 // in RFC4514. The exception to the RFC the space character ' ' and the '#', because we've not
@@ -164,12 +151,12 @@ std::string RFC4514Parser::extractAttributeName() {
     std::function<bool(char ch)> characterCheck;
     // If the first character is a digit, then this is an OID and can only contain
     // numbers and '.'
-    if (isDigit(ch)) {
-        characterCheck = [](char ch) { return (isDigit(ch) || ch == '.'); };
+    if (ctype::isDigit(ch)) {
+        characterCheck = [](char ch) { return ctype::isDigit(ch) || ch == '.'; };
         // If the first character is an alpha, then this is a short name and can only
         // contain alpha/digit/hyphen characters.
-    } else if (isAlpha(ch)) {
-        characterCheck = [](char ch) { return (isAlpha(ch) || isDigit(ch) || ch == '-'); };
+    } else if (ctype::isAlpha(ch)) {
+        characterCheck = [](char ch) { return ctype::isAlnum(ch) || ch == '-'; };
         // Otherwise this is an invalid attribute name
     } else {
         uasserted(ErrorCodes::BadValue,
@@ -214,13 +201,13 @@ std::pair<std::string, RFC4514Parser::ValueTerminator> RFC4514Parser::extractVal
             if (isEscaped(ch)) {
                 sb << ch;
                 trailingSpaces = 0;
-            } else if (isHex(ch)) {
+            } else if (ctype::isXdigit(ch)) {
                 const std::array<char, 2> hexValStr = {ch, _advance()};
 
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "Escaped hex value contains invalid character \'"
                                       << hexValStr[1] << "\'",
-                        isHex(hexValStr[1]));
+                        ctype::isXdigit(hexValStr[1]));
                 const char hexVal = hexblob::decodePair(StringData(hexValStr.data(), 2));
                 sb << hexVal;
                 if (hexVal != ' ') {

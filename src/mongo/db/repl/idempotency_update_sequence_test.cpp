@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
-#include <cctype>
 #include <memory>
 
 #include "mongo/db/field_ref.h"

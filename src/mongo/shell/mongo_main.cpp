@@ -38,7 +38,6 @@
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/sinks.hpp>
-#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <pcrecpp.h>
@@ -73,6 +72,7 @@
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/transport_layer_asio.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
@@ -469,7 +469,7 @@ std::string getURIFromArgs(const std::string& arg,
 
         const auto colonPos = arg.find(':');
         if ((colonPos != std::string::npos) && ((colonPos + 1) < arg.size()) &&
-            isdigit(arg[colonPos + 1])) {
+            ctype::isDigit(arg[colonPos + 1])) {
             // Assume IPv4 or hostname with port.
             return parseDbHost("test", arg);
         }
@@ -544,7 +544,7 @@ static void edit(const std::string& whatToEdit) {
     // "whatToEdit" might look like a variable/property name
     bool editingVariable = true;
     for (const char* p = whatToEdit.c_str(); *p; ++p) {
-        if (!(isalnum(*p) || *p == '_' || *p == '.')) {
+        if (!(ctype::isAlnum(*p) || *p == '_' || *p == '.')) {
             editingVariable = false;
             break;
         }
@@ -1062,7 +1062,7 @@ int mongo_main(int argc, char* argv[]) {
                     shellHistoryAdd(linePtr);
 
                     const char* s = linePtr + 5;  // skip "edit "
-                    while (*s && isspace(*s))
+                    while (*s && ctype::isSpace(*s))
                         s++;
 
                     edit(s);

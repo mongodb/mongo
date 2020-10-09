@@ -30,12 +30,12 @@
 #include "mongo/util/hex.h"
 
 #include <algorithm>
-#include <cctype>
 #include <fmt/format.h>
 #include <iterator>
 #include <string>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo {
 
@@ -85,7 +85,7 @@ unsigned char decodePair(StringData c) {
 bool validate(StringData s) {
     // There must be an even number of characters, since each pair encodes a single byte.
     return s.size() % 2 == 0 &&
-        std::all_of(s.begin(), s.end(), [](unsigned char c) { return std::isxdigit(c); });
+        std::all_of(s.begin(), s.end(), [](auto c) { return ctype::isXdigit(c); });
 }
 
 std::string encode(StringData data) {

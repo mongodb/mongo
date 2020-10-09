@@ -35,8 +35,8 @@
  * TODO: De-inline.
  */
 
+#include <algorithm>
 #include <boost/optional.hpp>
-#include <ctype.h>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -45,6 +45,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/bits.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo::str {
 
@@ -201,7 +202,7 @@ inline unsigned toUnsigned(const std::string& a) {
     unsigned x = 0;
     const char* p = a.c_str();
     while (1) {
-        if (!isdigit(*p))
+        if (!ctype::isDigit(*p))
             break;
         x = x * 10 + (*p - '0');
         p++;
@@ -365,17 +366,10 @@ void splitStringDelim(const std::string& str, std::vector<std::string>* res, cha
 void joinStringDelim(const std::vector<std::string>& strs, std::string* res, char delim);
 
 inline std::string toLower(StringData input) {
-    std::string::size_type sz = input.size();
-
-    std::unique_ptr<char[]> line(new char[sz + 1]);
-    char* copy = line.get();
-
-    for (std::string::size_type i = 0; i < sz; i++) {
-        char c = input[i];
-        copy[i] = (char)tolower((int)c);
-    }
-    copy[sz] = 0;
-    return copy;
+    std::string r{input};
+    for (char& c : r)
+        c = ctype::toLower(c);
+    return r;
 }
 
 /** Functor for combining lexical and numeric comparisons. */

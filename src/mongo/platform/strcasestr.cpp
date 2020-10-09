@@ -39,7 +39,6 @@
 #if defined(_WIN32) || defined(__sun)
 
 #include <algorithm>
-#include <cctype>
 #include <cstring>
 #include <string>
 
@@ -48,6 +47,9 @@
 #else
 #define STRCASESTR_EMULATION_NAME strcasestr
 #endif
+
+#include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace pal {
@@ -60,18 +62,13 @@ namespace pal {
  * @return              ptr to start of 'needle' within 'haystack' if found, NULL otherwise
  */
 const char* STRCASESTR_EMULATION_NAME(const char* haystack, const char* needle) {
-    std::string haystackLower(haystack);
-    std::transform(haystackLower.begin(), haystackLower.end(), haystackLower.begin(), ::tolower);
-
-    std::string needleLower(needle);
-    std::transform(needleLower.begin(), needleLower.end(), needleLower.begin(), ::tolower);
-
-    // Use strstr() to find 'lowercased needle' in 'lowercased haystack'
-    // If found, use the location to compute the matching location in the original string
-    // If not found, return NULL
-    const char* haystackLowerStart = haystackLower.c_str();
-    const char* location = strstr(haystackLowerStart, needleLower.c_str());
-    return location ? (haystack + (location - haystackLowerStart)) : nullptr;
+    StringData hay(haystack);
+    StringData pat(needle);
+    auto caseEq = [](char a, char b) { return ctype::toLower(a) == ctype::toLower(b); };
+    auto pos = std::search(hay.begin(), hay.end(), pat.begin(), pat.end(), caseEq);
+    if (pos == hay.end())
+        return nullptr;
+    return haystack + (pos - hay.begin());
 }
 
 #if defined(__sun)

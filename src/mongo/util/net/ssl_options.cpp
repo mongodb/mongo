@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
@@ -57,7 +58,7 @@ std::vector<uint8_t> hexToVector(StringData hex) {
         std::string data = hexblob::decode(hex);
         return std::vector<uint8_t>(data.begin(), data.end());
     } catch (const ExceptionFor<ErrorCodes::FailedToParse>&) {
-        if (std::any_of(hex.begin(), hex.end(), [](unsigned char c) { return !isxdigit(c); })) {
+        if (std::any_of(hex.begin(), hex.end(), [](char c) { return !ctype::isXdigit(c); })) {
             uasserted(ErrorCodes::BadValue, "Not a valid hex string");
         }
         if (hex.size() % 2) {

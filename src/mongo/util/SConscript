@@ -619,6 +619,7 @@ icuEnv.CppUnitTest(
         'clock_source_mock_test.cpp',
         'concepts_test.cpp',
         'container_size_helper_test.cpp',
+        'ctype_test.cpp',
         'decimal_counter_test.cpp',
         'decorable_test.cpp',
         'diagnostic_info_test.cpp' if get_option('use-diagnostic-latches') == 'on' else [],
@@ -767,4 +768,9 @@ stacktraceEnv.Benchmark(
     source='stacktrace_bm.cpp',
     # See above for how to handle any future LIBDEPS additions here.
     # LIBDEPS=...
+)
+
+env.Benchmark(
+    target='string_bm',
+    source='string_bm.cpp',
 )

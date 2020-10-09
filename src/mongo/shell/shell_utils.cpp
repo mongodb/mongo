@@ -35,7 +35,6 @@
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
-#include <cctype>
 #include <memory>
 #include <set>
 #include <stdlib.h>
@@ -59,6 +58,7 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
@@ -256,7 +256,7 @@ bool isBalanced(const std::string& code) {
         }
         if ("~!%^&*-+=|:,<>/?."_sd.find(code[i]) != std::string::npos)
             danglingOp = true;
-        else if (!std::isspace(code[i]))
+        else if (!ctype::isSpace(code[i]))
             danglingOp = false;
     }
 

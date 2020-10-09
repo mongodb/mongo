@@ -31,6 +31,7 @@
 
 #include "mongo/bson/json.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <fmt/format.h>
 
@@ -40,6 +41,7 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/strtoll.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
@@ -1199,10 +1201,7 @@ Status JParse::field(std::string* result) {
         return quotedString(result);
     } else {
         // Unquoted key
-        // 'isspace()' takes an 'int' (signed), so (default signed) 'char's get sign-extended
-        // and therefore 'corrupted' unless we force them to be unsigned ... 0x80 becomes
-        // 0xffffff80 as seen by isspace when sign-extended ... we want it to be 0x00000080
-        while (_input < _input_end && isspace(*reinterpret_cast<const unsigned char*>(_input))) {
+        while (_input < _input_end && ctype::isSpace(*_input)) {
             ++_input;
         }
         if (_input >= _input_end) {
@@ -1372,10 +1371,7 @@ bool JParse::readTokenImpl(const char* token, bool advance) {
     if (token == nullptr) {
         return false;
     }
-    // 'isspace()' takes an 'int' (signed), so (default signed) 'char's get sign-extended
-    // and therefore 'corrupted' unless we force them to be unsigned ... 0x80 becomes
-    // 0xffffff80 as seen by isspace when sign-extended ... we want it to be 0x00000080
-    while (check < _input_end && isspace(*reinterpret_cast<const unsigned char*>(check))) {
+    while (check < _input_end && ctype::isSpace(*check)) {
         ++check;
     }
     while (*token != '\0') {
@@ -1418,13 +1414,7 @@ inline bool JParse::match(char matchChar, const char* matchSet) const {
 
 bool JParse::isHexString(StringData str) const {
     MONGO_JSON_DEBUG("str: " << str);
-    std::size_t i;
-    for (i = 0; i < str.size(); i++) {
-        if (!isxdigit(str[i])) {
-            return false;
-        }
-    }
-    return true;
+    return std::all_of(str.begin(), str.end(), [](char c) { return ctype::isXdigit(c); });
 }
 
 bool JParse::isBase64String(StringData str) const {

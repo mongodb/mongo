@@ -51,6 +51,7 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
 #include "third_party/s2/s2cell.h"
 #include "third_party/s2/s2regioncoverer.h"
@@ -264,7 +265,7 @@ string IndexBoundsBuilder::simpleRegex(const char* regex,
             // comment
             r = ss;
             break;
-        } else if (extended && isspace(c)) {
+        } else if (extended && ctype::isSpace(c)) {
             continue;
         } else {
             // self-matching char

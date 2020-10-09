@@ -40,6 +40,7 @@
 
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/ctype.h"
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "mongo/util/invariant.h"
 #undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
@@ -238,20 +239,10 @@ inline int StringData::compare(StringData other) const {
 }
 
 inline bool StringData::equalCaseInsensitive(StringData other) const {
-    if (other.size() != size())
-        return false;
-
-    for (size_t x = 0; x < size(); x++) {
-        char a = _data[x];
-        char b = other._data[x];
-        if (a == b)
-            continue;
-        if (tolower(a) == tolower(b))
-            continue;
-        return false;
-    }
-
-    return true;
+    return size() == other.size() &&
+        std::equal(begin(), end(), other.begin(), other.end(), [](char a, char b) {
+               return ctype::toLower(a) == ctype::toLower(b);
+           });
 }
 
 inline void StringData::copyTo(char* dest, bool includeEndingNull) const {

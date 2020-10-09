@@ -41,6 +41,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 
@@ -312,7 +313,8 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
         auto bias = offsetSpec[0] == '+' ? 1 : -1;
 
         // ±HH
-        if (offsetSpec.size() == 3 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2])) {
+        if (offsetSpec.size() == 3 && ctype::isDigit(offsetSpec[1]) &&
+            ctype::isDigit(offsetSpec[2])) {
             int offset;
             if (NumberParser().base(10)(offsetSpec.substr(1, 2), &offset).isOK()) {
                 return duration_cast<Seconds>(Hours(bias * offset));
@@ -321,8 +323,9 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
         }
 
         // ±HHMM
-        if (offsetSpec.size() == 5 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2]) &&
-            isdigit(offsetSpec[3]) && isdigit(offsetSpec[4])) {
+        if (offsetSpec.size() == 5 && ctype::isDigit(offsetSpec[1]) &&
+            ctype::isDigit(offsetSpec[2]) && ctype::isDigit(offsetSpec[3]) &&
+            ctype::isDigit(offsetSpec[4])) {
             int offset;
             if (NumberParser().base(10)(offsetSpec.substr(1, 4), &offset).isOK()) {
                 return duration_cast<Seconds>(Hours(bias * (offset / 100L)) +
@@ -332,8 +335,9 @@ boost::optional<Seconds> TimeZoneDatabase::parseUtcOffset(StringData offsetSpec)
         }
 
         // ±HH:MM
-        if (offsetSpec.size() == 6 && isdigit(offsetSpec[1]) && isdigit(offsetSpec[2]) &&
-            offsetSpec[3] == ':' && isdigit(offsetSpec[4]) && isdigit(offsetSpec[5])) {
+        if (offsetSpec.size() == 6 && ctype::isDigit(offsetSpec[1]) &&
+            ctype::isDigit(offsetSpec[2]) && offsetSpec[3] == ':' &&
+            ctype::isDigit(offsetSpec[4]) && ctype::isDigit(offsetSpec[5])) {
             int hourOffset, minuteOffset;
             if (!NumberParser().base(10)(offsetSpec.substr(1, 2), &hourOffset).isOK()) {
                 return boost::none;

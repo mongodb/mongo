@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
@@ -51,21 +50,16 @@
 #include "mongo/config.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
+
+namespace mongo {
 
 namespace {
 
-std::string toAsciiLowerCase(mongo::StringData input) {
-    std::string res = input.toString();
-    for (char& c : res) {
-        c = tolower(c);
-    }
-    return res;
-}
-
 // Returns the number of characters consumed from input string. If unable to parse,
 // it returns 0.
-size_t validateInputString(mongo::StringData input, std::uint32_t* signalingFlags) {
+size_t validateInputString(StringData input, std::uint32_t* signalingFlags) {
     // Input must be of these forms:
     // * Valid decimal (standard or scientific notation):
     //      /[-+]?\d*(.\d+)?([e][+\-]?\d+)?/
@@ -77,18 +71,18 @@ size_t validateInputString(mongo::StringData input, std::uint32_t* signalingFlag
     // Check for NaN and Infinity
     size_t start = (isSigned) ? 1 : 0;
     size_t charsConsumed = start;
-    mongo::StringData noSign = input.substr(start);
+    StringData noSign = input.substr(start);
     bool isNanOrInf = noSign == "nan" || noSign == "inf" || noSign == "infinity";
     if (isNanOrInf)
         return start + noSign.size();
 
     // Input starting with non digit
-    if (!std::isdigit(noSign[0])) {
+    if (!ctype::isDigit(noSign[0])) {
         if (noSign[0] != '.') {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            *signalingFlags = Decimal128::SignalingFlag::kInvalid;
             return 0;
         } else if (noSign.size() == 1) {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            *signalingFlags = Decimal128::SignalingFlag::kInvalid;
             return 0;
         }
     }
@@ -102,11 +96,11 @@ size_t validateInputString(mongo::StringData input, std::uint32_t* signalingFlag
         char c = noSign[i];
         if (c == '.') {
             if (parsedDot) {
-                *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+                *signalingFlags = Decimal128::SignalingFlag::kInvalid;
                 return 0;
             }
             parsedDot = true;
-        } else if (!std::isdigit(c)) {
+        } else if (!ctype::isDigit(c)) {
             break;
         } else {
             hasCoefficient = true;
@@ -119,7 +113,7 @@ size_t validateInputString(mongo::StringData input, std::uint32_t* signalingFlag
 
     if (isZero) {
         // Override inexact/overflow flag set by the intel library
-        *signalingFlags = mongo::Decimal128::SignalingFlag::kNoFlag;
+        *signalingFlags = Decimal128::SignalingFlag::kNoFlag;
     }
 
     // Input is valid if we've parsed the entire string
@@ -129,21 +123,21 @@ size_t validateInputString(mongo::StringData input, std::uint32_t* signalingFlag
 
     // String with empty coefficient and non-empty exponent
     if (!hasCoefficient) {
-        *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+        *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
     }
 
     // Check exponent
-    mongo::StringData exponent = noSign.substr(i);
+    StringData exponent = noSign.substr(i);
 
     if (exponent[0] != 'e' || exponent.size() < 2) {
-        *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+        *signalingFlags = Decimal128::SignalingFlag::kInvalid;
         return 0;
     }
     if (exponent[1] == '-' || exponent[1] == '+') {
         exponent = exponent.substr(2);
         if (exponent.size() == 0) {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
+            *signalingFlags = Decimal128::SignalingFlag::kInvalid;
             return 0;
         }
         charsConsumed += 2;
@@ -152,21 +146,13 @@ size_t validateInputString(mongo::StringData input, std::uint32_t* signalingFlag
         ++charsConsumed;
     }
 
-    for (size_t j = 0; j < exponent.size(); j++) {
-        char c = exponent[j];
-        if (!std::isdigit(c)) {
-            *signalingFlags = mongo::Decimal128::SignalingFlag::kInvalid;
-            return 0;
-        }
-        ++charsConsumed;
+    if (!std::all_of(exponent.begin(), exponent.end(), [](char c) { return ctype::isDigit(c); })) {
+        *signalingFlags = Decimal128::SignalingFlag::kInvalid;
+        return 0;
     }
+    charsConsumed += exponent.size();
     return charsConsumed;
 }
-}  // namespace
-
-namespace mongo {
-
-namespace {
 
 // Determine system's endian ordering in order to construct decimal 128 values directly
 constexpr bool kNativeLittle = (endian::Order::kNative == endian::Order::kLittle);
@@ -313,7 +299,7 @@ Decimal128::Decimal128(std::string stringValue,
                        std::uint32_t* signalingFlags,
                        RoundingMode roundMode,
                        size_t* charsConsumed) {
-    std::string lower = toAsciiLowerCase(stringValue);
+    std::string lower = str::toLower(stringValue);
     BID_UINT128 dec128;
     // The intel library function requires a char * while c_str() returns a const char*.
     // We're using const_cast here since the library function should not modify the input.

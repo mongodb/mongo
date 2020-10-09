@@ -32,9 +32,9 @@
 #include "mongo/db/field_ref.h"
 
 #include <algorithm>
-#include <cctype>
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo {
 
@@ -246,7 +246,7 @@ bool FieldRef::isNumericPathComponentStrict(StringData component) {
 
 bool FieldRef::isNumericPathComponentLenient(StringData component) {
     return !component.empty() &&
-        std::all_of(component.begin(), component.end(), [](auto c) { return std::isdigit(c); });
+        std::all_of(component.begin(), component.end(), [](auto c) { return ctype::isDigit(c); });
 }
 
 bool FieldRef::isNumericPathComponentStrict(FieldIndex i) const {

@@ -31,7 +31,6 @@
 
 #include "mongo/scripting/mozjs/bindata.h"
 
-#include <cctype>
 #include <iomanip>
 
 #include "mongo/bson/bsonobjbuilder.h"

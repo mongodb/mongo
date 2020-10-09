@@ -33,15 +33,17 @@
 
 #include "mongo/scripting/engine.h"
 
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
-#include <cctype>
 
+#include "mongo/base/string_data.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
 #include "mongo/util/text.h"
@@ -207,8 +209,10 @@ void Scope::storedFuncMod(OperationContext* opCtx) {
 
 void Scope::validateObjectIdString(const string& str) {
     uassert(10448, "invalid object id: length", str.size() == 24);
-    for (size_t i = 0; i < str.size(); i++)
-        uassert(10430, "invalid object id: not hex", std::isxdigit(str.at(i)));
+    auto isAllHex = [](StringData s) {
+        return std::all_of(s.begin(), s.end(), [](char c) { return ctype::isXdigit(c); });
+    };
+    uassert(10430, "invalid object id: not hex", isAllHex(str));
 }
 
 void Scope::loadStored(OperationContext* opCtx, bool ignoreNotConnected) {
@@ -615,12 +619,13 @@ bool hasJSReturn(const string& code) {
 
     // return is at start OR preceded by space
     // AND return is not followed by digit or letter
-    return (x == 0 || isspace(code[x - 1])) && !(isalpha(code[x + 6]) || isdigit(code[x + 6]));
+    return (x == 0 || ctype::isSpace(code[x - 1])) &&
+        !(ctype::isAlpha(code[x + 6]) || ctype::isDigit(code[x + 6]));
 }
 
 const char* jsSkipWhiteSpace(const char* raw) {
     while (raw[0]) {
-        while (isspace(*raw)) {
+        while (ctype::isSpace(*raw)) {
             ++raw;
         }
         if (raw[0] != '/' || raw[1] != '/')

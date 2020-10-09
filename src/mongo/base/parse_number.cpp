@@ -32,7 +32,6 @@
 #include "mongo/base/parse_number.h"
 
 #include <algorithm>
-#include <cctype>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
@@ -42,6 +41,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/overflow_arithmetic.h"
+#include "mongo/util/ctype.h"
 
 namespace mongo {
 namespace {
@@ -159,8 +159,7 @@ inline StatusWith<uint64_t> parseMagnitudeFromStringWithBase(uint64_t base,
 
 StringData removeLeadingWhitespace(StringData s) {
     return s.substr(std::distance(
-        s.begin(),
-        std::find_if_not(s.begin(), s.end(), [](unsigned char c) { return isspace(c); })));
+        s.begin(), std::find_if_not(s.begin(), s.end(), [](char c) { return ctype::isSpace(c); })));
 }
 
 template <typename NumberType>
@@ -210,24 +209,6 @@ Status parseNumberFromStringHelper(StringData s,
     return Status::OK();
 }
 
-#ifdef _WIN32
-
-namespace {
-
-/**
- * Converts ascii c-locale uppercase characters to lower case, leaves other char values
- * unchanged.
- */
-char toLowerAscii(char c) {
-    if (isascii(c) && isupper(c))
-        return _tolower(c);
-    return c;
-}
-
-}  // namespace
-
-#endif  // defined(_WIN32)
-
 template <>
 Status parseNumberFromStringHelper<double>(StringData stringValue,
                                            double* result,
@@ -241,7 +222,7 @@ Status parseNumberFromStringHelper<double>(StringData stringValue,
     if (stringValue.empty())
         return Status(ErrorCodes::FailedToParse, "Empty string");
 
-    if (!parser._skipLeadingWhitespace && isspace(stringValue[0]))
+    if (!parser._skipLeadingWhitespace && ctype::isSpace(stringValue[0]))
         return Status(ErrorCodes::FailedToParse, "Leading whitespace");
 
     std::string str = stringValue.toString();
@@ -254,7 +235,8 @@ Status parseNumberFromStringHelper<double>(StringData stringValue,
 #ifdef _WIN32
         // The Windows libc implementation of strtod cannot parse +/-infinity or nan,
         // so handle that here.
-        std::transform(str.begin(), str.end(), str.begin(), toLowerAscii);
+        for (char& c : str)
+            c = ctype::toLower(c);
         if (str == "nan"_sd) {
             *result = std::numeric_limits<double>::quiet_NaN();
             if (endptr)

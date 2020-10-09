@@ -32,6 +32,7 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"
 
@@ -74,7 +75,7 @@ void assertCmp(int expected, StringData s1, StringData s2, bool lexOnly = false)
 }
 
 TEST(StringUtilsTest, Simple2) {
-    ASSERT(!isdigit((char)255));
+    ASSERT(!ctype::isDigit((char)255));
 
     assertCmp(0, "a", "a");
     assertCmp(-1, "a", "aa");

@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_match.h"
 
+#include <algorithm>
 #include <memory>
 
 #include "mongo/db/exec/document_value/document.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -144,14 +146,8 @@ namespace {
 // input is well formed.
 
 bool isAllDigits(StringData str) {
-    if (str.empty())
-        return false;
-
-    for (size_t i = 0; i < str.size(); i++) {
-        if (!isdigit(str[i]))
-            return false;
-    }
-    return true;
+    return !str.empty() &&
+        std::all_of(str.begin(), str.end(), [](char c) { return ctype::isDigit(c); });
 }
 
 bool isFieldnameRedactSafe(StringData fieldName) {

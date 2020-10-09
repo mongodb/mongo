@@ -39,7 +39,6 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/iostreams/tee.hpp>
-#include <cctype>
 #include <fcntl.h>
 #include <fmt/format.h>
 #include <iostream>
@@ -71,6 +70,7 @@
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/net/hostandport.h"
@@ -591,14 +591,8 @@ boost::filesystem::path ProgramRunner::findProgram(const string& prog) {
     // needs to be appended.
     //
 
-    auto isExtensionValid = [](std::string extension) {
-        for (auto c : extension) {
-            if (std::isdigit(c)) {
-                return false;
-            }
-        }
-
-        return true;
+    auto isExtensionValid = [](std::string e) {
+        return std::all_of(e.begin(), e.end(), [](char c) { return !ctype::isDigit(c); });
     };
 
     if (!p.has_extension() || !isExtensionValid(p.extension().string())) {
