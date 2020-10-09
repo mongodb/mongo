@@ -407,12 +407,28 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
             return absl::Hash<int32_t>{}(bitcastTo<int32_t>(val));
         case TypeTags::NumberInt64:
             return absl::Hash<int64_t>{}(bitcastTo<int64_t>(val));
-        case TypeTags::NumberDouble:
+        case TypeTags::NumberDouble: {
             // Force doubles to integers for hashing.
-            return absl::Hash<int64_t>{}(bitcastTo<double>(val));
-        case TypeTags::NumberDecimal:
+            auto dbl = bitcastTo<double>(val);
+            if (auto asInt = representAs<int64_t>(dbl); asInt) {
+                return absl::Hash<int64_t>{}(*asInt);
+            } else {
+                // Doubles not representable as int64_t will hash as doubles.
+                return absl::Hash<double>{}(dbl);
+            }
+        }
+        case TypeTags::NumberDecimal: {
             // Force decimals to integers for hashing.
-            return absl::Hash<int64_t>{}(bitcastTo<Decimal128>(val).toLong());
+            auto dec = bitcastTo<Decimal128>(val);
+            if (auto asInt = representAs<int64_t>(dec); asInt) {
+                return absl::Hash<int64_t>{}(*asInt);
+            } else if (auto asDbl = representAs<double>(dec); asDbl) {
+                return absl::Hash<double>{}(*asDbl);
+            } else {
+                return absl::Hash<uint64_t>{}(dec.getValue().low64) ^
+                    absl::Hash<uint64_t>{}(dec.getValue().high64);
+            }
+        }
         case TypeTags::Date:
             return absl::Hash<int64_t>{}(bitcastTo<int64_t>(val));
         case TypeTags::Timestamp:

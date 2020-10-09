@@ -97,6 +97,55 @@ TEST(SBEValues, Hash) {
     ASSERT_EQUALS(value::hashValue(tagInt32, valInt32), value::hashValue(tagDecimal, valDecimal));
 
     value::releaseValue(tagDecimal, valDecimal);
+
+    auto tagDoubleInf = value::TypeTags::NumberDouble;
+    auto valDoubleInf = value::bitcastFrom<double>(std::numeric_limits<double>::infinity());
+
+    auto [tagDecimalInf, valDecimalInf] =
+        value::makeCopyDecimal(mongo::Decimal128(std::numeric_limits<double>::infinity()));
+
+    ASSERT_EQUALS(value::hashValue(tagDoubleInf, valDoubleInf),
+                  value::hashValue(tagDecimalInf, valDecimalInf));
+
+    value::releaseValue(tagDecimalInf, valDecimalInf);
+
+    auto tagDoubleNan = value::TypeTags::NumberDouble;
+    auto valDoubleNan = value::bitcastFrom<double>(std::numeric_limits<double>::quiet_NaN());
+
+    auto [tagDecimalNan, valDecimalNan] =
+        value::makeCopyDecimal(mongo::Decimal128(std::numeric_limits<double>::quiet_NaN()));
+
+    ASSERT_EQUALS(value::hashValue(tagDoubleNan, valDoubleNan),
+                  value::hashValue(tagDecimalNan, valDecimalNan));
+
+    value::releaseValue(tagDecimalNan, valDecimalNan);
+
+    // Start with a relatively large number that still fits in 64 bits.
+    int64_t num = 0x7000000000000000;
+    // And is exactly representable as double (there is enough zeroes in the right part of the
+    // number so we should be ok).
+    auto asDbl = representAs<double>(num);
+    ASSERT(asDbl);
+
+    // Now "shift" the number to the left by 10 bits making it out of range for 64 bit integer.
+    double asBigDbl = (*asDbl) * 1024.0;
+    ASSERT(!representAs<int64_t>(asBigDbl));
+
+    // Sanity check.
+    ASSERT(asBigDbl / 1024.0 == (*asDbl));
+
+    auto asDec = Decimal128(asBigDbl, Decimal128::kRoundTo34Digits);
+    ASSERT(asDec.toDouble() == asBigDbl);
+
+    auto tagDoubleBig = value::TypeTags::NumberDouble;
+    auto valDoubleBig = value::bitcastFrom<double>(asBigDbl);
+
+    auto [tagDecimalBig, valDecimalBig] = value::makeCopyDecimal(asDec);
+
+    ASSERT_EQUALS(value::hashValue(tagDoubleBig, valDoubleBig),
+                  value::hashValue(tagDecimalBig, valDecimalBig));
+
+    value::releaseValue(tagDecimalBig, valDecimalBig);
 }
 
 TEST(SBEValues, HashCompound) {
