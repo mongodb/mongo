@@ -1133,7 +1133,11 @@ function appendSetParameterArgs(argArray) {
     }
 
     let [baseProgramName, programVersion] = programName.split("-");
-    let programMajorMinorVersion = 0;
+
+    // Setting programMajorMinorVersion to the maximum value for the latest binary version
+    // simplifies version checks below.
+    const lastestMajorMinorVersion = Number.MAX_SAFE_INTEGER;
+    let programMajorMinorVersion = lastestMajorMinorVersion;
     if (programVersion) {
         let [major, minor, point] = programVersion.split(".");
         programMajorMinorVersion = parseInt(major) * 100 + parseInt(minor) * 10;
@@ -1144,7 +1148,7 @@ function appendSetParameterArgs(argArray) {
             argArray.push(...['--setParameter', "enableTestCommands=1"]);
         }
 
-        if (!programMajorMinorVersion || programMajorMinorVersion > 440) {
+        if (programMajorMinorVersion > 440) {
             if (jsTest.options().testingDiagnosticsEnabled) {
                 argArray.push(...['--setParameter', "testingDiagnosticsEnabled=1"]);
             }
@@ -1161,7 +1165,7 @@ function appendSetParameterArgs(argArray) {
         }
 
         // New options in 3.5.x
-        if (!programMajorMinorVersion || programMajorMinorVersion >= 350) {
+        if (programMajorMinorVersion >= 350) {
             if (jsTest.options().transportLayer) {
                 if (!argArrayContains("--transportLayer")) {
                     argArray.push(...["--transportLayer", jsTest.options().transportLayer]);
@@ -1174,7 +1178,7 @@ function appendSetParameterArgs(argArray) {
 
         // Since options may not be backward compatible, mongos options are not
         // set on older versions, e.g., mongos-3.0.
-        if (programName.endsWith('mongos')) {
+        if (baseProgramName === 'mongos' && programMajorMinorVersion == lastestMajorMinorVersion) {
             // apply setParameters for mongos
             if (jsTest.options().setParametersMongos) {
                 let params = jsTest.options().setParametersMongos;
@@ -1205,15 +1209,14 @@ function appendSetParameterArgs(argArray) {
             }
 
             // Set storageEngine for mongod. There was no storageEngine parameter before 3.0.
-            if (jsTest.options().storageEngine &&
-                (!programVersion || programMajorMinorVersion >= 300)) {
+            if (jsTest.options().storageEngine && (programMajorMinorVersion >= 300)) {
                 if (!argArrayContains("--storageEngine")) {
                     argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
                 }
             }
 
             // New mongod-specific option in 4.5.x.
-            if (!programMajorMinorVersion || programMajorMinorVersion >= 450) {
+            if (programMajorMinorVersion >= 450) {
                 // Allow the parameter to be overridden if set explicitly via TestData.
                 const parameters = jsTest.options().setParameters;
 
@@ -1229,7 +1232,7 @@ function appendSetParameterArgs(argArray) {
             }
 
             // New mongod-specific option in 4.4.
-            if (!programMajorMinorVersion || programMajorMinorVersion >= 440) {
+            if (programMajorMinorVersion >= 440) {
                 if (jsTest.options().setParameters &&
                     jsTest.options().setParameters['enableIndexBuildCommitQuorum'] !== undefined) {
                     if (!argArrayContainsSetParameterValue('enableIndexBuildCommitQuorum=')) {
@@ -1244,7 +1247,7 @@ function appendSetParameterArgs(argArray) {
             // TODO (SERVER-49407): Enable this parameter for 4.4 nodes after SERVER-21700 has been
             // backported to v4.4.
             // New mongod-specific option in 4.5.
-            if (!programMajorMinorVersion || programMajorMinorVersion >= 450) {
+            if (programMajorMinorVersion >= 450) {
                 // Allow the parameter to be overridden if set explicitly via TestData.
                 if ((jsTest.options().setParameters === undefined ||
                      jsTest.options()
@@ -1265,7 +1268,7 @@ function appendSetParameterArgs(argArray) {
             }
 
             // New mongod-specific options in 4.0.x
-            if (!programMajorMinorVersion || programMajorMinorVersion >= 400) {
+            if (programMajorMinorVersion >= 400) {
                 if (jsTest.options().transactionLifetimeLimitSeconds !== undefined) {
                     if (!argArrayContainsSetParameterValue("transactionLifetimeLimitSeconds=")) {
                         argArray.push(...["--setParameter",
@@ -1276,13 +1279,13 @@ function appendSetParameterArgs(argArray) {
             }
 
             // TODO: Make this unconditional in 3.8.
-            if (!programMajorMinorVersion || programMajorMinorVersion > 340) {
+            if (programMajorMinorVersion > 340) {
                 if (!argArrayContainsSetParameterValue('orphanCleanupDelaySecs=')) {
                     argArray.push(...['--setParameter', 'orphanCleanupDelaySecs=1']);
                 }
             }
 
-            if (!programMajorMinorVersion || programMajorMinorVersion >= 360) {
+            if (programMajorMinorVersion >= 360) {
                 if (jsTest.options().enableMajorityReadConcern !== undefined &&
                     !argArrayContains("--enableMajorityReadConcern")) {
                     argArray.push(...['--enableMajorityReadConcern',
@@ -1292,7 +1295,8 @@ function appendSetParameterArgs(argArray) {
 
             // Since options may not be backward compatible, mongod options are not
             // set on older versions, e.g., mongod-3.0.
-            if (programName.endsWith('mongod')) {
+            if (baseProgramName === 'mongod' &&
+                programMajorMinorVersion == lastestMajorMinorVersion) {
                 if (jsTest.options().storageEngine === "wiredTiger" ||
                     !jsTest.options().storageEngine) {
                     if (jsTest.options().storageEngineCacheSizeGB &&
