@@ -84,7 +84,9 @@ function runTest(downgradeVersion) {
     //
     // Upgrade the config db and the shards to the "latest" binVersion.
     //
-    st.upgradeCluster("latest", {upgradeShards: true, upgradeConfigs: true, upgradeMongos: false});
+    st.upgradeCluster(
+        "latest",
+        {upgradeShards: true, upgradeConfigs: true, upgradeMongos: false, waitUntilStable: true});
 
     //
     // Open and read a change stream on the upgraded cluster but still using a downgraded version of
@@ -96,7 +98,9 @@ function runTest(downgradeVersion) {
     // Upgrade mongos to the "latest" binVersion and then open and read a change stream, this time
     // with all cluster nodes upgraded but still in downgraded FCV.
     //
-    st.upgradeCluster("latest", {upgradeShards: false, upgradeConfigs: false, upgradeMongos: true});
+    st.upgradeCluster(
+        "latest",
+        {upgradeShards: false, upgradeConfigs: false, upgradeMongos: true, waitUntilStable: true});
     mongosConn = st.s;
     coll = mongosConn.getDB(dbName)[collName];
 
