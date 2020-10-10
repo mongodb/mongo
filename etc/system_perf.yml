@@ -1311,6 +1311,29 @@ buildvariants:
         variant: compile-amazon2
   tasks: *3nodetasks
 
+- name: linux-3-node-replSet-disabled-feature-flags
+  display_name: Linux 3-Node ReplSet (disabled feature flags)
+  batchtime: 10080  # 7 days
+  modules: *modules
+  expansions:
+    mongodb_setup: replica-disabled-feature-flags
+    infrastructure_provisioning: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-replset"
+  depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: genny_generate_all_tasks
+        variant: compile-amazon2
+  # TODO(SERVER-51482): re-enable 3nodetasks.
+  # tasks: *3nodetasks
+  tasks:
+    - name: crud_workloads
+
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
   batchtime: 10080  # 7 days
