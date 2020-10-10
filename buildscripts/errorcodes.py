@@ -25,7 +25,6 @@ except ImportError:
     import re  # type: ignore
 
 ASSERT_NAMES = ["uassert", "massert", "fassert", "fassertFailed"]
-MINIMUM_CODE = 10000
 MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
 
 # pylint: disable=invalid-name
@@ -38,7 +37,7 @@ AssertLocation = namedtuple("AssertLocation", ['sourceFile', 'byteOffset', 'line
 list_files = False  # pylint: disable=invalid-name
 
 
-def parse_source_files(callback):
+def parse_source_files(callback, src_root):
     """Walk MongoDB sourcefiles and invoke a callback for each AssertLocation found."""
 
     quick = [r"assert", r"Exception", r"ErrorCodes::Error", r"LOGV2", r"logAndBackoff"]
@@ -53,7 +52,7 @@ def parse_source_files(callback):
         re.compile(r"ErrorCodes::Error\s*[({]\s*(\d+)", re.MULTILINE)
     ]
 
-    for source_file in utils.get_all_source_files(prefix='src/mongo/'):
+    for source_file in utils.get_all_source_files(prefix=src_root):
         if list_files:
             print('scanning file: ' + source_file)
 
@@ -102,26 +101,41 @@ def is_terminated(lines):
     return ';' in code_block or code_block.count('(') - code_block.count(')') <= 0
 
 
-def get_next_code():
+def get_next_code(seen, server_ticket=0):
     """Find next unused assertion code.
 
     Called by: SConstruct and main()
     Since SConstruct calls us, codes[] must be global OR WE REPARSE EVERYTHING
     """
     if not codes:
-        read_error_codes()
+        (_, _, seen) = read_error_codes()
 
+    if server_ticket:
+        # Each SERVER ticket is allocated 100 error codes ranging from TICKET_00 -> TICKET_99.
+        def generator(seen, ticket):
+            avail_codes = list(range(ticket * 100, (ticket + 1) * 100))
+            avail_codes.reverse()
+            while avail_codes:
+                code = avail_codes.pop()
+                if str(code) in seen:
+                    continue
+                yield code
+            return "No more available codes for ticket. Ticket: {}".format(ticket)
+
+        return generator(seen, server_ticket)
+
+    # No server ticket. Return a generator that counts starting at highest + 1.
     highest = reduce(lambda x, y: max(int(x), int(y)), (loc.code for loc in codes))
-    return highest + 1
+    return iter(range(highest + 1, MAXIMUM_CODE))
 
 
 def check_error_codes():
     """Check error codes as SConstruct expects a boolean response from this function."""
-    (_, errors) = read_error_codes()
+    (_, errors, _) = read_error_codes()
     return len(errors) == 0
 
 
-def read_error_codes():
+def read_error_codes(src_root='src/mongo'):
     """Define callback, call parse_source_files() with callback, save matches to global codes list."""
     seen = {}
     errors = []
@@ -157,7 +171,7 @@ def read_error_codes():
         validate_code(assert_loc)
         check_dups(assert_loc)
 
-    parse_source_files(callback)
+    parse_source_files(callback, src_root)
 
     if "0" in seen:
         code = "0"
@@ -183,17 +197,17 @@ def read_error_codes():
         print("MALFORMED ID: %s" % loc.code)
         print("  %s:%d:%d:%s" % (loc.sourceFile, line, col, loc.lines))
 
-    return (codes, errors)
+    return (codes, errors, seen)
 
 
-def replace_bad_codes(errors, next_code):  # pylint: disable=too-many-locals
+def replace_bad_codes(errors, next_code_generator):  # pylint: disable=too-many-locals
     """Modify C++ source files to replace invalid assertion codes.
 
     For now, we only modify zero codes.
 
     Args:
         errors: list of AssertLocation
-        next_code: int, next non-conflicting assertion code
+        next_code_generator: generator -> int, next non-conflicting assertion code
     """
     zero_errors = [e for e in errors if int(e.code) == 0]
     skip_errors = [e for e in errors if int(e.code) != 0]
@@ -218,12 +232,29 @@ def replace_bad_codes(errors, next_code):  # pylint: disable=too-many-locals
             assert text[byte_offset] == '0'
             fh.seek(0)
             fh.write(text[:byte_offset])
-            fh.write(str(next_code))
+            fh.write(str(next(next_code_generator)))
             fh.write(text[byte_offset + 1:])
             fh.seek(0)
 
             print("LINE_%d_AFTER :%s" % (line_num, fh.readlines()[ln].rstrip()))
-        next_code += 1
+
+
+def coerce_to_number(ticket_value):
+    """Coerce the input into a number.
+
+    If the input is a number, return itself. Otherwise parses input strings of two forms.
+    'SERVER-12345' and '12345' will both return 12345'.
+    """
+    if isinstance(ticket_value, int):
+        return ticket_value
+
+    ticket_re = re.compile(r'(?:SERVER-)?(\d+)', re.IGNORECASE)
+    matches = ticket_re.fullmatch(ticket_value)
+    if not matches:
+        print("Unknown ticket number. Input: " + ticket_value)
+        return -1
+
+    return int(matches.group(1))
 
 
 def main():
@@ -235,26 +266,31 @@ def main():
                       help="Suppress output on success [default: %default]")
     parser.add_option("--list-files", dest="list_files", action="store_true", default=False,
                       help="Print the name of each file as it is scanned [default: %default]")
+    parser.add_option(
+        "--ticket", dest="ticket", type="str", action="store", default=0,
+        help="Generate error codes for a given SERVER ticket number. Inputs can be of"
+        " the form: `--ticket=12345` or `--ticket=SERVER-12345`.")
     (options, _) = parser.parse_args()
 
     global list_files  # pylint: disable=global-statement,invalid-name
     list_files = options.list_files
 
-    (_, errors) = read_error_codes()
+    (_, errors, seen) = read_error_codes()
     ok = len(errors) == 0
 
     if ok and options.quiet:
         return
 
-    next_code = get_next_code()
+    next_code_gen = get_next_code(seen, coerce_to_number(options.ticket))
 
     print("ok: %s" % ok)
-    print("next: %s" % next_code)
+    if not options.replace:
+        print("next: %s" % next(next_code_gen))
 
     if ok:
         sys.exit(0)
     elif options.replace:
-        replace_bad_codes(errors, next_code)
+        replace_bad_codes(errors, next_code_gen)
     else:
         print(ERROR_HELP)
         sys.exit(1)
