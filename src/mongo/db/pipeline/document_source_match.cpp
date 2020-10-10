@@ -447,8 +447,7 @@ boost::intrusive_ptr<DocumentSourceMatch> DocumentSourceMatch::descendMatchOnPat
         invariant(expression::isPathPrefixOf(descendOn, leafPath));
 
         auto newPath = leafPath.substr(descendOn.size() + 1);
-        if (node->getCategory() == MatchExpression::MatchCategory::kLeaf &&
-            node->matchType() != MatchExpression::TYPE_OPERATOR) {
+        if (node->getCategory() == MatchExpression::MatchCategory::kLeaf) {
             auto leafNode = static_cast<LeafMatchExpression*>(node);
             leafNode->setPath(newPath).transitional_ignore();
         } else if (node->getCategory() == MatchExpression::MatchCategory::kArrayMatching) {
