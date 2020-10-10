@@ -141,7 +141,7 @@ private:
     };
     using EventPtr = std::unique_ptr<Event>;
 
-    void _sendEvent(TopologyListenerPtr listener, const TopologyEventsPublisher::Event& event);
+    void _sendEvent(TopologyListener* listener, const TopologyEventsPublisher::Event& event);
     void _nextDelivery();
     void _scheduleNextDelivery();
 

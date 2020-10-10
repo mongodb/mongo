@@ -114,6 +114,18 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target='topology_listener_test',
+    source=['topology_listener_test.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/client/clientdriver_network',
+        '$BUILD_DIR/mongo/client/replica_set_monitor_protocol_test_util',
+        '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
+        'sdam',
+        'sdam_test',
+    ],
+)
+
+env.CppUnitTest(
 	target='server_selector_test',
 	source=['server_selector_test.cpp'],
 	LIBDEPS=[
