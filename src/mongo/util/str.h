@@ -35,7 +35,6 @@
  * TODO: De-inline.
  */
 
-#include "absl/base/internal/bits.h"
 #include <boost/optional.hpp>
 #include <ctype.h>
 #include <memory>
@@ -45,6 +44,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/bits.h"
 
 namespace mongo::str {
 
@@ -286,7 +286,7 @@ inline size_t getCodePointLength(char charByte) {
     invariant(isLeadingByte(charByte));
 
     // In UTF-8, the number of leading ones is the number of bytes the code point takes up.
-    return absl::base_internal::CountLeadingZeros64(~(uint64_t(charByte) << (64 - 8)));
+    return countLeadingZeros64(static_cast<unsigned char>(~charByte)) - 56;
 }
 
 /**
