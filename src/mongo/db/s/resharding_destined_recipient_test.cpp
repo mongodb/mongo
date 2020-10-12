@@ -268,6 +268,28 @@ protected:
         Helpers::update(opCtx, nss.toString(), filter, update);
     }
 
+    void deleteDoc(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const BSONObj& query,
+                   const ReshardingEnv& env) {
+        AutoGetCollection coll(opCtx, nss, MODE_IX);
+
+        // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter
+        // has been updated to detect frozen migrations.
+        if (!OperationShardingState::isOperationVersioned(opCtx)) {
+            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+                kNss, env.version, env.dbVersion);
+        }
+
+        RecordId rid = Helpers::findOne(opCtx, coll.getCollection(), query, false);
+        ASSERT(!rid.isNull());
+
+        WriteUnitOfWork wuow(opCtx);
+        OpDebug opDebug;
+        coll->deleteDocument(opCtx, kUninitializedStmtId, rid, &opDebug);
+        wuow.commit();
+    }
+
     repl::OplogEntry getLastOplogEntry(OperationContext* opCtx) {
         repl::OplogInterfaceLocal oplogInterface(opCtx);
         auto oplogIter = oplogInterface.makeIterator();
@@ -408,6 +430,48 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTran
 
     auto ops = info.getOperations();
     auto replOp = repl::ReplOperation::parse(IDLParserErrorContext("insertOp"), ops[0]);
+    ASSERT_EQ(replOp.getNss(), kNss);
+
+    auto recipShard = replOp.getDestinedRecipient();
+    ASSERT(recipShard);
+    ASSERT_EQ(*recipShard, env.destShard);
+}
+
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletes) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10 << "z" << 4));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    deleteDoc(opCtx, kNss, BSON("_id" << 0), env);
+
+    auto entry = getLastOplogEntry(opCtx);
+    auto recipShard = entry.getDestinedRecipient();
+
+    ASSERT(recipShard);
+    ASSERT_EQ(*recipShard, env.destShard);
+}
+
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTransaction) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 10));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    runInTransaction(opCtx, [&]() { deleteDoc(opCtx, kNss, BSON("_id" << 0), env); });
+
+    // Look for destined recipient in latest oplog entry. Since this write was done in a
+    // transaction, the write operation will be embedded in an applyOps entry and needs to be
+    // extracted.
+    auto entry = getLastOplogEntry(opCtx);
+    auto info = repl::ApplyOpsCommandInfo::parse(entry.getOperationToApply());
+
+    auto ops = info.getOperations();
+    auto replOp = repl::ReplOperation::parse(IDLParserErrorContext("deleteOp"), ops[0]);
     ASSERT_EQ(replOp.getNss(), kNss);
 
     auto recipShard = replOp.getDestinedRecipient();

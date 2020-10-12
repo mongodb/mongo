@@ -75,6 +75,9 @@ const OperationContext::Decoration<boost::optional<OpObserverImpl::DocumentKey>>
     documentKeyDecoration =
         OperationContext::declareDecoration<boost::optional<OpObserverImpl::DocumentKey>>();
 
+const OperationContext::Decoration<boost::optional<ShardId>> destinedRecipientDecoration =
+    OperationContext::declareDecoration<boost::optional<ShardId>>();
+
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
@@ -217,6 +220,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);
+    oplogEntry.setDestinedRecipient(destinedRecipientDecoration(opCtx));
 
     repl::OplogLink oplogLink;
     repl::appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, stmtId);
@@ -589,6 +593,10 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    BSONObj const& doc) {
     documentKeyDecoration(opCtx).emplace(getDocumentKey(opCtx, nss, doc));
 
+    repl::DurableReplOperation op;
+    shardAnnotateOplogEntry(opCtx, nss, doc, op);
+    destinedRecipientDecoration(opCtx) = op.getDestinedRecipient();
+
     shardObserveAboutToDelete(opCtx, nss, doc);
 }
 
@@ -613,6 +621,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         if (deletedDoc) {
             operation.setPreImage(deletedDoc->getOwned());
         }
+
+        operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));
 
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
