@@ -9,7 +9,13 @@
 assert.eq(jsTest.options().enableTestCommands, true);
 
 // we expect this to work just fine given that enableTestCommands is true by default
-var st = new ShardingTest({shards: {rs0: {nodes: 2}}, mongos: 1, config: 1, useBridge: true});
+var st = new ShardingTest({
+    shards: {rs0: {nodes: 2}},
+    mongos: 1,
+    config: 1,
+    useBridge: true,
+    rsOptions: {settings: {electionTimeoutMillis: 60000}}
+});
 var wc = {writeConcern: {w: 2, wtimeout: 4000}};
 
 // delayMessages from should cause a write error on this insert
