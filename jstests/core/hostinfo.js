@@ -1,43 +1,56 @@
 // SERVER-4615:  Ensure hostInfo() command returns expected results on each platform
+//
+(function() {
+    'use strict';
 
-assert.commandWorked(db.hostInfo());
-var hostinfo = db.hostInfo();
+    function commonOSAsserts(hostinfo) {
+        assert(hostinfo.os.hasOwnProperty('name'), "Missing " + hostinfo.os.type + " os name");
+        assert(hostinfo.os.hasOwnProperty('version'), "Missing " + hostinfo.os.type + " version");
+    }
 
-// test for os-specific fields
-if (hostinfo.os.type == "Windows") {
-    assert.neq(hostinfo.os.name, "" || null, "Missing Windows os name");
-    assert.neq(hostinfo.os.version, "" || null, "Missing Windows version");
+    function coresAsserts(hostinfo) {
+        assert.gt(
+            hostinfo.extra.physicalCores, 0, "Missing " + hostinfo.os.type + " physical cores");
+        assert.gt(hostinfo.system.numCores, 0, "Missing " + hostinfo.os.type + " logical cores");
+        assert.lte(hostinfo.extra.physicalCores,
+                   hostinfo.system.numCores,
+                   hostinfo.os.type + " physical cores not larger then logical cores");
+    }
 
-} else if (hostinfo.os.type == "Linux") {
-    assert.neq(hostinfo.os.name, "" || null, "Missing Linux os/distro name");
-    assert.neq(hostinfo.os.version, "" || null, "Missing Lindows version");
+    assert.commandWorked(db.hostInfo());
+    var hostinfo = db.hostInfo();
 
-} else if (hostinfo.os.type == "Darwin") {
-    assert.neq(hostinfo.os.name, "" || null, "Missing Darwin os name");
-    assert.neq(hostinfo.os.version, "" || null, "Missing Darwin version");
+    // test for os-specific fields
+    if (hostinfo.os.type == "Windows") {
+        commonOSAsserts(hostinfo);
+        coresAsserts(hostinfo);
+    } else if (hostinfo.os.type == "Linux") {
+        commonOSAsserts(hostinfo);
+        coresAsserts(hostinfo);
+    } else if (hostinfo.os.type == "Darwin") {
+        commonOSAsserts(hostinfo);
+        coresAsserts(hostinfo);
+    } else if (hostinfo.os.type == "BSD") {
+        commonOSAsserts(hostinfo);
+    }
 
-} else if (hostinfo.os.type == "BSD") {
-    assert.neq(hostinfo.os.name, "" || null, "Missing FreeBSD os name");
-    assert.neq(hostinfo.os.version, "" || null, "Missing FreeBSD version");
-}
+    if (hostinfo.os.type != "") {
+        assert(hostinfo.system.hasOwnProperty('hostname'), "Missing Hostname");
+        assert(hostinfo.system.hasOwnProperty('currentTime'), "Missing Current Time");
+        assert(hostinfo.system.hasOwnProperty('cpuAddrSize'), "Missing CPU Address Size");
+        assert(hostinfo.system.hasOwnProperty('memSizeMB'), "Missing Memory Size");
+        assert(hostinfo.system.hasOwnProperty('numCores'), "Missing Number of Cores");
+        assert(hostinfo.system.hasOwnProperty('cpuArch'), "Missing CPU Architecture");
+        assert(hostinfo.system.hasOwnProperty('numaEnabled'), "Missing NUMA flag");
+    }
 
-// comment out this block for systems which have not implemented hostinfo.
-if (hostinfo.os.type != "") {
-    assert.neq(hostinfo.system.hostname, "" || null, "Missing Hostname");
-    assert.neq(hostinfo.system.currentTime, "" || null, "Missing Current Time");
-    assert.neq(hostinfo.system.cpuAddrSize, "" || null || 0, "Missing CPU Address Size");
-    assert.neq(hostinfo.system.memSizeMB, "" || null, "Missing Memory Size");
-    assert.neq(hostinfo.system.numCores, "" || null || 0, "Missing Number of Cores");
-    assert.neq(hostinfo.system.cpuArch, "" || null, "Missing CPU Architecture");
-    assert.neq(hostinfo.system.numaEnabled, "" || null, "Missing NUMA flag");
-}
-
-var buildInfo = assert.commandWorked(db.runCommand({buildInfo: 1}));
-if (buildInfo.buildEnvironment && buildInfo.buildEnvironment.target_arch) {
-    let targetArch = buildInfo.buildEnvironment.target_arch;
-    if (targetArch == "i386")
-        assert.eq(hostinfo.system.cpuAddrSize, 32);
-    else
-        assert.eq(hostinfo.system.cpuAddrSize, 64);
-    assert.eq(hostinfo.system.cpuAddrSize, buildInfo.bits);
-}
+    var buildInfo = assert.commandWorked(db.runCommand({buildInfo: 1}));
+    if (buildInfo.buildEnvironment && buildInfo.buildEnvironment.target_arch) {
+        let targetArch = buildInfo.buildEnvironment.target_arch;
+        if (targetArch == "i386")
+            assert.eq(hostinfo.system.cpuAddrSize, 32);
+        else
+            assert.eq(hostinfo.system.cpuAddrSize, 64);
+        assert.eq(hostinfo.system.cpuAddrSize, buildInfo.bits);
+    }
+})();
