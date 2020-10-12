@@ -130,15 +130,24 @@ def resume_process(logger, pname, pid):
         logger.error("Process not found: %s", err.msg)
 
 
-def kill_processes(logger, processes):
-    """Kill processes with SIGKILL."""
-    logger.info("Starting to kill processes. Logs should be ignored from this point.")
+def teardown_processes(logger, processes, dump_pids):
+    """Kill processes with SIGKILL or SIGABRT."""
+    logger.info("Starting to kill or abort processes. Logs should be ignored from this point.")
+    procs = []
     for pinfo in processes:
         for pid in pinfo.pidv:
             try:
                 proc = psutil.Process(pid)
-                logger.info("Killing process %s with pid %d", pinfo.name, pid)
-                proc.kill()
+                if pid in dump_pids:
+                    logger.info("Aborting process %s with pid %d", pinfo.name, pid)
+                    proc.send_signal(signal.SIGABRT)
+                    # Sometimes a SIGABRT doesn't actually dump until the process is continued.
+                    proc.resume()
+                    procs.append(proc)
+                else:
+                    logger.info("Killing process %s with pid %d", pinfo.name, pid)
+                    proc.kill()
             except psutil.NoSuchProcess:
                 # Process has already terminated.
                 pass
+    psutil.wait_procs(procs)

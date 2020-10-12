@@ -81,12 +81,16 @@ class HangAnalyzer(Subcommand):
 
         trapped_exceptions = []
 
+        dump_pids = []
         # Dump all processes, except python & java.
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
             try:
                 dumpers.dbg.dump_info(
                     pinfo, self.options.dump_core
                     and _check_dump_quota(max_dump_size_bytes, dumpers.dbg.get_dump_ext()))
+            except dumper.DumpError as err:
+                self.root_logger.error(err.message)
+                dump_pids += err.dump_pids
             except Exception as err:  # pylint: disable=broad-except
                 self.root_logger.info("Error encountered when invoking debugger %s", err)
                 trapped_exceptions.append(traceback.format_exc())
@@ -113,9 +117,9 @@ class HangAnalyzer(Subcommand):
 
         self.root_logger.info("Done analyzing all processes for hangs")
 
-        # Kill processes if "-k" was specified.
+        # Kill and abort processes if "-k" was specified.
         if self.options.kill_processes:
-            process.kill_processes(self.root_logger, processes)
+            process.teardown_processes(self.root_logger, processes, dump_pids)
         else:
             # Resuming all suspended processes.
             for pinfo in [pinfo for pinfo in processes if not pinfo.name.startswith("python")]:

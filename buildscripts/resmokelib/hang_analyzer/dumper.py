@@ -216,11 +216,12 @@ class LLDBDumper(Dumper):
     def _process_specific(self, pinfo, take_dump, logger=None):
         """Return the commands that attach to each process, dump info and detach."""
         cmds = []
+        dump_files = self._dump_files(pinfo)
         for pid in pinfo.pidv:
             dump_command = ""
             if take_dump:
                 # Dump to file, dump_<process name>.<pid>.core
-                dump_file = "dump_%s.%d.%s" % (pinfo.name, pid, self.get_dump_ext())
+                dump_file = dump_files[pid]
                 dump_command = "process save-core %s" % dump_file
                 self._root_logger.info("Dumping core to %s", dump_file)
 
@@ -294,9 +295,25 @@ class LLDBDumper(Dumper):
         self._root_logger.info("Done analyzing %s processes with PIDs %s", pinfo.name,
                                str(pinfo.pidv))
 
+        if take_dump:
+            need_sigabrt = []
+            files = self._dump_files(pinfo)
+            for pid in files:
+                if not os.path.exists(files[pid]):
+                    need_sigabrt.append(pid)
+            if need_sigabrt:
+                raise DumpError(need_sigabrt)
+
     def get_dump_ext(self):
         """Return the dump file extension."""
         return "core"
+
+    def _dump_files(self, pinfo):
+        """Return a dict mapping pids to core dump filenames that this dumper can create."""
+        files = {}
+        for pid in pinfo.pidv:
+            files[pid] = "dump_%s.%d.%s" % (pinfo.name, pid, self.get_dump_ext())
+        return files
 
 
 # GDB dumper is for Linux
@@ -490,3 +507,18 @@ def _get_process_logger(dbg_output, pname: str, pid: int = None):
         process_logger.addHandler(f_handler)
 
     return process_logger
+
+
+class DumpError(Exception):
+    """
+    Exception raised for errors while dumping processes.
+
+    Tracks what cores still need to be generated.
+    """
+
+    def __init__(self, dump_pids, message=("Failed to create core dumps for some processes,"
+                                           " SIGABRT will be sent as a fallback if -k is set.")):
+        """Initialize error."""
+        self.dump_pids = dump_pids
+        self.message = message
+        super().__init__(self.message)
