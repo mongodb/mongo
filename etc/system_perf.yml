@@ -1329,10 +1329,7 @@ buildvariants:
         variant: compile-amazon2
       - name: genny_generate_all_tasks
         variant: compile-amazon2
-  # TODO(SERVER-51482): re-enable 3nodetasks.
-  # tasks: *3nodetasks
-  tasks:
-    - name: crud_workloads
+  tasks: *3nodetasks
 
 - name: linux-3-node-replSet-noflowcontrol
   display_name: Linux 3-Node ReplSet (Flow Control off)
