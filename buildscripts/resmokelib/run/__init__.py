@@ -39,7 +39,6 @@ from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
 _BENCHMARK_ARGUMENT_TITLE = "Benchmark/Benchrun test options"
 _EVERGREEN_ARGUMENT_TITLE = "Evergreen options"
-_CEDAR_ARGUMENT_TITLE = "Cedar options"
 
 
 class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
@@ -385,18 +384,18 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         from jasper import jasper_pb2
         from jasper import jasper_pb2_grpc
 
-        jasper_process.Process.pb = jasper_pb2
-        jasper_process.Process.rpc = jasper_pb2_grpc
+        jasper_process.Process.jasper_pb2 = jasper_pb2
+        jasper_process.Process.jasper_pb2_grpc = jasper_pb2_grpc
 
         jasper_port = config.BASE_PORT - 1
         jasper_conn_str = "localhost:%d" % jasper_port
+        jasper_process.Process.connection_str = jasper_conn_str
         jasper_command = [
             curator_path, "jasper", "service", "run", "rpc", "--port",
             str(jasper_port)
         ]
         self._jasper_server = process.Process(self._resmoke_logger, jasper_command)
         self._jasper_server.start()
-        config.JASPER_CONNECTION_STR = jasper_conn_str
 
         channel = grpc.insecure_channel(jasper_conn_str)
         grpc.channel_ready_future(channel).result()
@@ -974,17 +973,6 @@ class RunPlugin(PluginInterface):
 
         evergreen_options.add_argument("--versionId", dest="version_id", metavar="VERSION_ID",
                                        help="Sets the version ID of the task.")
-
-        cedar_options = parser.add_argument_group(
-            title=_CEDAR_ARGUMENT_TITLE,
-            description=("Options used to propagate Cedar service connection information."))
-
-        cedar_options.add_argument("--cedarURL", dest="cedar_url", metavar="CEDAR_URL",
-                                   help=("The URL of the Cedar service."))
-
-        cedar_options.add_argument("--cedarRPCPort", dest="cedar_rpc_port",
-                                   metavar="CEDAR_RPC_PORT",
-                                   help=("The RPC port of the Cedar service."))
 
         benchmark_options = parser.add_argument_group(
             title=_BENCHMARK_ARGUMENT_TITLE,
