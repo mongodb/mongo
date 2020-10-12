@@ -661,7 +661,8 @@ function runTests({conn, readMode, currentOp, truncatedOps, localOps}) {
 }
 
 function currentOpCommand(inputDB, filter, truncatedOps, localOps) {
-    return inputDB.currentOp(Object.assign(filter, {$truncateOps: truncatedOps}));
+    return inputDB.getSiblingDB("admin").runCommand(
+        Object.assign({currentOp: true, $truncateOps: truncatedOps}, filter));
 }
 
 function currentOpAgg(inputDB, filter, truncatedOps, localOps) {
