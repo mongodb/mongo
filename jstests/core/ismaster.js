@@ -66,16 +66,25 @@ checkResponseFields("hello");
 checkResponseFields("ismaster");
 checkResponseFields("isMaster");
 
+// As operations happen concurrently, the response objects may have different timestamps. To compare
+// response objects returned from calling commands directly and shell helpers below, we must remove
+// the timestamps.
+function removeTimestamps(cmdResponse) {
+    delete cmdResponse.localTime;
+    delete cmdResponse.operationTime;
+    delete cmdResponse.$clusterTime;
+    if (cmdResponse.lastWrite) {
+        delete cmdResponse.lastWrite.opTime;
+        delete cmdResponse.lastWrite.majorityOpTime;
+    }
+}
+
 // We also test the db.hello() and db.isMaster() helpers to ensure that they return
 // the same response objects as from running the commands directly.
-let cmdResponse1 = db.runCommand("hello");
-let cmdResponse2 = db.hello();
-delete cmdResponse1.localTime;
-delete cmdResponse2.localTime;
+let cmdResponse1 = removeTimestamps(db.runCommand("hello"));
+let cmdResponse2 = removeTimestamps(db.hello());
 assert.eq(cmdResponse1, cmdResponse2);
 
-cmdResponse1 = db.runCommand("isMaster");
-cmdResponse2 = db.isMaster();
-delete cmdResponse1.localTime;
-delete cmdResponse2.localTime;
+cmdResponse1 = removeTimestamps(db.runCommand("isMaster"));
+cmdResponse2 = removeTimestamps(db.isMaster());
 assert.eq(cmdResponse1, cmdResponse2);
