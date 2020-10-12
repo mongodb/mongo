@@ -7504,7 +7504,7 @@ tasks:
   commands:
   - func: "do non-compile setup"
   - command: shell.exec
-    type: test
+    type: setup
     params:
       working_dir: src
       silent: true
@@ -7520,7 +7520,7 @@ tasks:
         }
         END_OF_CREDS
   - command: shell.exec
-    type: setup
+    type: test
     params:
       working_dir: src/
       script: |

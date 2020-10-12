@@ -50,6 +50,7 @@ components:
     release_monitoring_id: 117
     local_directory_path: src/third_party/asio-master
     team_owner: "Service Architecture"
+    upgrade_suppression: SERVER-44078
 
   benchmark:
     homepage_url: https://github.com/google/benchmark
@@ -57,6 +58,7 @@ components:
     release_monitoring_id: 18299
     local_directory_path: src/third_party/benchmark
     team_owner: "Service Architecture"
+    upgrade_suppression: SERVER-49200
 
   "Boost C++ Libraries - boost":
     homepage_url: https://www.boost.org/
@@ -64,6 +66,7 @@ components:
     release_monitoring_id: 6845
     local_directory_path: src/third_party/boost-1.70.0
     team_owner: "Service Architecture"
+    upgrade_suppression: SERVER-44079
 
   concurrencytest:
     homepage_url: https://github.com/cgoldberg/concurrencytest
@@ -78,6 +81,7 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/SafeInt
     team_owner: "Service Architecture"
+    upgrade_suppression: SERVER-49213
 
   discover-python:
     homepage_url: https://pypi.org/project/discover/
@@ -92,6 +96,7 @@ components:
     release_monitoring_id: 11526
     local_directory_path: src/third_party/fmt
     team_owner: "Security"
+    upgrade_suppression: SERVER-45445
 
   google/s2geometry:
     homepage_url: https://github.com/google/s2geometry
@@ -107,6 +112,8 @@ components:
     release_monitoring_id: 4844
     local_directory_path: src/third_party/snappy-1.1.7
     team_owner: "Execution"
+    upgrade_suppression: SERVER-47281
+    # TODO - bad version data
 
   gperftools:
     homepage_url: https://github.com/gperftools/gperftools
@@ -123,6 +130,7 @@ components:
     local_directory_path: src/third_party/icu4c-57.1
     team_owner: "Query"
     vulnerability_suppression: SERVER-49211
+    upgrade_suppression: SERVER-49211
 
   "Intel Decimal Floating-Point Math Library":
     homepage_url: https://software.intel.com/content/www/us/en/develop/articles/intel-decimal-floating-point-math-library.html
@@ -176,6 +184,7 @@ components:
     local_directory_path: src/third_party/mozjs-60
     team_owner: "Query"
     vulnerability_suppression: SERVER-42427
+    upgrade_suppression: SERVER-42427
 
   "mpark-variant-devel":
     homepage_url: https://github.com/mpark/variant
@@ -206,6 +215,7 @@ components:
     release_monitoring_id: 2610
     local_directory_path: src/third_party/pcre-8.42
     team_owner: "Query"
+    upgrade_suppression: SERVER-47278
 
   python-testscenarios:
     homepage_url: https://launchpad.net/testscenarios
@@ -227,6 +237,7 @@ components:
     release_monitoring_id: 4770
     local_directory_path: src/third_party/scons-3.1.2
     team_owner: "Service Development Platform"
+    upgrade_suppression: SERVER-49324
 
   smhasher:
     homepage_url: https://github.com/aappleby/smhasher
@@ -284,6 +295,7 @@ components:
     release_monitoring_id: 5284
     local_directory_path: src/third_party/yaml-cpp-0.6.2
     team_owner: "Security"
+    upgrade_suppression: SERVER-48258
 
   yhirose/cpp-peglib:
     homepage_url: https://github.com/yhirose/cpp-peglib
@@ -306,3 +318,4 @@ components:
     release_monitoring_id: 12083
     local_directory_path: src/third_party/zstandard-1.4.4
     team_owner: "Execution"
+    upgrade_suppression: SERVER-49230

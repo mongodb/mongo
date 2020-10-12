@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Utility script to run Black Duck scans and query Black Duck database."""
+#pylint: disable=too-many-lines
 
 import argparse
 import datetime
+import functools
 import io
 import json
 import logging
@@ -45,6 +47,17 @@ BLACKDUCK_TIMEOUT_SECS = 600
 
 # Black Duck hub api uses this file to get settings
 BLACKDUCK_RESTCONFIG = ".restconfig.json"
+
+# Wiki page where we document more information about Black Duck
+BLACKDUCK_WIKI_PAGE = "https://wiki.corp.mongodb.com/display/KERNEL/Black+Duck"
+
+# Black Duck failed report prefix
+BLACKDUCK_FAILED_PREFIX = "A Black Duck scan was run and failed"
+
+############################################################################
+
+# Globals
+BLACKDUCK_PROJECT_URL = None
 
 ############################################################################
 
@@ -96,7 +109,8 @@ class HTTPHandler(object):
 
         self.url_root = url_root
 
-    def _make_url(self, endpoint):
+    def make_url(self, endpoint):
+        """Generate a url to post to."""
         return "%s/%s/" % (self.url_root.rstrip("/"), endpoint.strip("/"))
 
     def post(self, endpoint, data=None, headers=None, timeout_secs=BUILD_LOGGER_TIMEOUT_SECS):
@@ -113,7 +127,7 @@ class HTTPHandler(object):
         headers = default_if_none(headers, {})
         headers["Content-Type"] = "application/json; charset=utf-8"
 
-        url = self._make_url(endpoint)
+        url = self.make_url(endpoint)
 
         LOGGER.info("POSTING to %s", url)
 
@@ -225,6 +239,8 @@ class BuildloggerServer(object):
         except:  # pylint: disable=bare-except
             raise ValueError("Encountered an error.")
 
+        return self.handler.make_url(endpoint)
+
 
 def _to_dict(items, func):
     dm = {}
@@ -250,6 +266,154 @@ def _compute_security_risk(security_risk_profile):
     return "OK"
 
 
+@functools.total_ordering
+class VersionInfo:
+    """Parse and break apart version strings so they can be compared."""
+
+    def __init__(self, ver_str):
+        """Parse a version string input a tuple of ints or mark it as a beta release."""
+        try:
+
+            self.ver_str = ver_str
+            self.production_version = True
+
+            # Abseil has an empty string for one version
+            if self.ver_str == "":
+                self.production_version = False
+                return
+
+            # Special case Intel's Decimal library since it is just too weird
+            if ver_str == "v2.0 U1":
+                self.ver_array = [2, 0]
+                return
+
+            # "git" is an abseil version
+            # "unknown_version" comes from this script when components do not have versions
+            # icu has cldr, release, snv, milestone, latest
+            # zlib has alt and task
+            # boost has ubuntu, fc, old-boost, start, ....
+            # BlackDuck thinks boost 1.70.0 was released on 2007 which means we have to check hundreds of versions
+            bad_keywords = [
+                "unknown_version", "rc", "alpha", "beta", "git", "release", "cldr", "svn", "cvs",
+                "milestone", "latest", "alt", "task", "ubuntu", "fc", "old-boost", "start", "split",
+                "unofficial", "(", "ctp", "before", "review", "develop", "master", "filesystem",
+                "geometry", "icl", "intrusive", "old", "optional", "super", "docs", "+b", "-b",
+                "b1", ".0a", "system", "html", "interprocess"
+            ]
+            if [bad for bad in bad_keywords if bad in self.ver_str]:
+                self.production_version = False
+                return
+
+            # Clean the version information
+            # Some versions start with 'v'. Some components have a mix of 'v' and not 'v' prefixed versions so trim the 'v'
+            # MongoDB versions start with 'r'
+            if ver_str[0] == 'v' or ver_str[0] == 'r':
+                self.ver_str = ver_str[1:]
+
+            # Git hashes are not valid versions
+            if len(self.ver_str) == 40 and bytes.fromhex(self.ver_str):
+                self.production_version = False
+                return
+
+            # Clean out Mozilla's suffix
+            self.ver_str = self.ver_str.replace("esr", "")
+
+            # Clean out GPerfTool's prefix
+            self.ver_str = self.ver_str.replace("gperftools-", "")
+
+            # Clean out Yaml Cpp's prefix
+            self.ver_str = self.ver_str.replace("yaml-cpp-", "")
+
+            # Clean out Boosts's prefix
+            self.ver_str = self.ver_str.replace("boost-", "")
+            self.ver_str = self.ver_str.replace("asio-", "")
+
+            if self.ver_str.endswith('-'):
+                self.ver_str = self.ver_str[0:-1]
+
+            # Some versions end with "-\d", change the "-" since it just means a patch release from a debian/rpm package
+            # yaml-cpp has this problem where Black Duck sourced the wrong version information
+            self.ver_str = self.ver_str.replace("-", ".")
+
+            # Versions are generally a multi-part integer tuple
+            self.ver_array = [int(part) for part in self.ver_str.split(".")]
+
+        except:
+            LOGGER.error("Failed to parse version '%s', exception", ver_str)
+            raise
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __str__(self):
+        return ".".join([str(val) for val in self.ver_array])
+
+    def __eq__(self, other):
+        return (self.production_version, self.ver_array) == (other.production_version,
+                                                             other.ver_array)
+
+    def __gt__(self, other):
+        if self.production_version != other.production_version:
+            return self.production_version
+
+        return self.ver_array > other.ver_array
+
+
+def _test_version_info():
+    VersionInfo("v2.0 U1")
+    VersionInfo("60.7.0-esr")
+    VersionInfo("v1.1")
+    VersionInfo("0.4.2-1")
+    VersionInfo("7.0.2")
+    VersionInfo("gperftools-2.8")
+    VersionInfo("v1.5-rc2")
+    VersionInfo("r4.7.0-alpha")
+    VersionInfo("r4.2.10")
+    VersionInfo("2.0.0.1")
+    VersionInfo("7.0.2-2")
+    VersionInfo("git")
+    VersionInfo("20200225.2")
+    VersionInfo('release-68-alpha')
+    VersionInfo('cldr/2020-09-22')
+    VersionInfo('release-67-rc')
+    VersionInfo('66.1~rc')
+    VersionInfo('release-66-rc')
+    VersionInfo('release-66-preview')
+    VersionInfo('65.1')
+    VersionInfo('release-65-rc')
+    VersionInfo('64.2-rc')
+    VersionInfo('release-64-rc2')
+    VersionInfo('release-63-rc')
+    VersionInfo('last-cvs-commit')
+    VersionInfo('last-svn-commit')
+    VersionInfo('release-62-rc')
+    VersionInfo('cldr-32-beta2')
+    VersionInfo('release-60-rc')
+    VersionInfo('milestone-60-0-1')
+    VersionInfo('release-59-rc')
+    VersionInfo('milestone-59-0-1')
+    VersionInfo('release-58-2-eclipse-20170118')
+    VersionInfo('tools-release-58')
+    VersionInfo('icu-latest')
+    VersionInfo('icu4j-latest')
+    VersionInfo('icu4j-release-58-1')
+    VersionInfo('icu4j-release-58-rc')
+    VersionInfo('icu-release-58-rc')
+    VersionInfo('icu-milestone-58-0-1')
+    VersionInfo('icu4j-milestone-58-0-1')
+
+    VersionInfo('yaml-cpp-0.6.3')
+
+    VersionInfo('gb-c8-task188949.100')
+    VersionInfo('1.2.8-alt1.M80C.1')
+    VersionInfo('1.2.8-alt2')
+
+    assert VersionInfo('7.0.2.2') > VersionInfo('7.0.0.1')
+    assert VersionInfo('7.0.2.2') > VersionInfo('7.0.2')
+    assert VersionInfo('7.0.2.2') > VersionInfo('3.1')
+    assert VersionInfo('7.0.2.2') <= VersionInfo('8.0.2')
+
+
 class Component:
     """
     Black Duck Component description.
@@ -257,7 +421,7 @@ class Component:
     Contains a subset of information about a component extracted from Black Duck for a given project and version
     """
 
-    def __init__(self, name, version, licenses, policy_status, security_risk, newer_releases):
+    def __init__(self, name, version, licenses, policy_status, security_risk, newest_release):
         # pylint: disable=too-many-arguments
         """Initialize Black Duck component."""
         self.name = name
@@ -265,10 +429,10 @@ class Component:
         self.licenses = licenses
         self.policy_status = policy_status
         self.security_risk = security_risk
-        self.newer_releases = newer_releases
+        self.newest_release = newest_release
 
     @staticmethod
-    def parse(component):
+    def parse(hub, component):
         """Parse a Black Duck component from a dictionary."""
         name = component["componentName"]
         cversion = component.get("componentVersionName", "unknown_version")
@@ -277,9 +441,49 @@ class Component:
         policy_status = component["policyStatus"]
         security_risk = _compute_security_risk(component['securityRiskProfile'])
 
-        newer_releases = component["activityData"].get("newerReleases", None)
+        newer_releases = component["activityData"].get("newerReleases", 0)
 
-        return Component(name, cversion, licenses, policy_status, security_risk, newer_releases)
+        LOGGER.info("Retrievinng version information for Comp %s - %s  Releases %s", name, cversion,
+                    newer_releases)
+        cver = VersionInfo(cversion)
+        newest_release = None
+
+        # Blackduck's newerReleases is based on "releasedOn" date. This means that if a upstream component releases a beta or rc,
+        # it counts as newer but we do not consider those newer for our purposes
+        # Missing newerReleases means we do not have to upgrade
+        # TODO - remove skip of FireFox since it has soooo many versions
+        #if newer_releases > 0 and name not in ("Mozilla Firefox", "Boost C++ Libraries - boost"):
+
+        if newer_releases > 0:
+            limit = newer_releases + 1
+            versions_url = component["component"] + f"/versions?sort=releasedon%20desc&limit={limit}"
+
+            LOGGER.info("Retrieving version information via %s", versions_url)
+            vjson = hub.execute_get(versions_url).json()
+
+            versions = [(ver["versionName"], ver["releasedOn"]) for ver in vjson["items"]]
+
+            LOGGER.info("Known versions: %s ", versions)
+
+            versions = [ver["versionName"] for ver in vjson["items"]]
+
+            # For Firefox, only examine Extended Service Releases (i.e. esr), their long term support releases
+            if name == "Mozilla Firefox":
+                versions = [ver for ver in versions if "esr" in ver]
+
+            ver_info = [VersionInfo(ver) for ver in versions]
+            ver_info = [ver for ver in ver_info if ver.production_version]
+            LOGGER.info("Filtered versions: %s ", ver_info)
+
+            ver_info = sorted([ver for ver in ver_info if ver.production_version and ver > cver],
+                              reverse=True)
+
+            LOGGER.info("Sorted versions: %s ", ver_info)
+
+            if ver_info:
+                newest_release = ver_info[0]
+
+        return Component(name, cversion, licenses, policy_status, security_risk, newest_release)
 
 
 class BlackDuckConfig:
@@ -323,6 +527,8 @@ def _scan_cmd_args(args):
 
 
 def _query_blackduck():
+    # pylint: disable=global-statement
+    global BLACKDUCK_PROJECT_URL
 
     hub = HubInstance()
 
@@ -335,7 +541,9 @@ def _query_blackduck():
     LOGGER.info("Getting version components from blackduck")
     bom_components = hub.get_version_components(version)
 
-    components = [Component.parse(comp) for comp in bom_components["items"]]
+    components = [Component.parse(hub, comp) for comp in bom_components["items"]]
+
+    BLACKDUCK_PROJECT_URL = version["_meta"]["href"]
 
     return components
 
@@ -352,7 +560,7 @@ class TestResultEncoder(json.JSONEncoder):
 class TestResult:
     """A single test result in the Evergreen report.json format."""
 
-    def __init__(self, name, status):
+    def __init__(self, name, status, url):
         """Init test result."""
         # This matches the report.json schema
         # See https://github.com/evergreen-ci/evergreen/blob/789bee107d3ffb9f0f82ae344d72502945bdc914/model/task/task.go#L264-L284
@@ -361,6 +569,10 @@ class TestResult:
         self.test_file = name
         self.status = status
         self.exit_code = 1
+
+        if url:
+            self.url = url
+            self.url_raw = url + "?raw=1"
 
         if status == "pass":
             self.exit_code = 0
@@ -388,7 +600,7 @@ class ReportLogger(object, metaclass=ABCMeta):
     """Base Class for all report loggers."""
 
     @abstractmethod
-    def log_report(self, name: str, content: str):
+    def log_report(self, name: str, content: str) -> Optional[str]:
         """Get the command to run a linter."""
         pass
 
@@ -401,7 +613,7 @@ class LocalReportLogger(ReportLogger):
         if not os.path.exists(LOCAL_REPORTS_DIR):
             os.mkdir(LOCAL_REPORTS_DIR)
 
-    def log_report(self, name: str, content: str):
+    def log_report(self, name: str, content: str) -> Optional[str]:
         """Log report to a local file."""
         file_name = os.path.join(LOCAL_REPORTS_DIR, name + ".log")
 
@@ -418,12 +630,12 @@ class BuildLoggerReportLogger(ReportLogger):
 
         self.build_id = self.build_logger.new_build_id("bdh")
 
-    def log_report(self, name: str, content: str):
+    def log_report(self, name: str, content: str) -> Optional[str]:
         """Log report to a build logger."""
 
         content = content.split("\n")
 
-        self.build_logger.post_new_file(self.build_id, name, content)
+        return self.build_logger.post_new_file(self.build_id, name, content)
 
 
 def _get_default(list1, idx, default):
@@ -449,9 +661,10 @@ class TableWriter:
     def _write_row(col_sizes: [int], row: [str], writer: io.StringIO):
         writer.write("|")
         for idx, row_value in enumerate(row):
+            writer.write(" ")
             writer.write(row_value)
             writer.write(" " * (col_sizes[idx] - len(row_value)))
-            writer.write("|")
+            writer.write(" |")
         writer.write("\n")
 
     def print(self, writer: io.StringIO):
@@ -507,35 +720,44 @@ class ReportManager:
         self._results = TestResults()
         self._data = TableData()
 
+    @staticmethod
+    def _get_norm_comp_name(comp_name: str):
+        return comp_name.replace(" ", "_").replace("/", "_").lower()
+
     def write_report(self, comp_name: str, report_name: str, status: str, content: str):
         """
         Write a report about a test to the build logger.
 
         status is a string of "pass" or "fail"
         """
-        comp_name = comp_name.replace(" ", "_").replace("/", "_")
+        comp_name = ReportManager._get_norm_comp_name(comp_name)
 
         name = comp_name + "_" + report_name
 
         LOGGER.info("Writing Report %s - %s", name, status)
 
-        self._results.add_result(TestResult(name, status))
         self._data.add_value(comp_name, status)
 
-        # TODO - evaluate whether to wrap lines if that would look better in BFs
-        # The textwrap module strips empty lines by default
+        url = self._logger.log_report(name, content)
 
-        self._logger.log_report(name, content)
+        self._results.add_result(TestResult(name, status, url))
+
+    def add_report_metric(self, comp_name: str, metric: str):
+        """Add a column to be included in the pretty table."""
+        comp_name = ReportManager._get_norm_comp_name(comp_name)
+
+        self._data.add_value(comp_name, metric)
 
     def finish(self, reports_file: Optional[str]):
         """Generate final summary of all reports run."""
 
         if reports_file:
-            self.results.write(reports_file)
+            self._results.write(reports_file)
 
         stream = io.StringIO()
 
-        self._data.write(["Component", "Vulnerability"], stream)
+        self._data.write(
+            ["Component", "Vulnerability", "Upgrade", "Current Version", "Newest Version"], stream)
 
         print(stream.getvalue())
 
@@ -553,6 +775,7 @@ class ThirdPartyComponent:
 
         # optional fields
         self.vulnerability_suppression = None
+        self.upgrade_suppression = None
 
 
 def _get_field(name, ymap, field: str):
@@ -576,10 +799,44 @@ def _read_third_party_components():
                                  _get_field(comp, cmap, 'team_owner'))
 
         tp.vulnerability_suppression = cmap.get("vulnerability_suppression", None)
+        tp.upgrade_suppression = cmap.get("upgrade_suppression", None)
 
         third_party.append(tp)
 
     return third_party
+
+
+def _generate_report_upgrade(mgr: ReportManager, comp: Component, mcomp: ThirdPartyComponent,
+                             fail: bool):
+    if not fail:
+        mgr.write_report(comp.name, "upgrade_check", "pass", "Blackduck run passed")
+    else:
+        mgr.write_report(
+            comp.name, "upgrade_check", "fail", f"""{BLACKDUCK_FAILED_PREFIX}
+
+The {comp.name} library at {mcomp.local_path} is out of date. The current version is
+"{comp.version}" and the newest version is "{comp.newest_release}" according to Black Duck.
+
+MongoDB policy requires all third-party software to be updated to the latest version on the master
+branch.
+
+Next Steps:
+
+Build Baron: A BF ticket should be generated and assigned to "Service Development Platform" with this text.
+
+Developer: To address this build failure, the next steps are as follows:
+1. File a SERVER ticket to update the software if one already does not exist.
+2. Add a “upgrade_supression” to {THIRD_PARTY_COMPONENTS_FILE} with the SERVER ticket to acknowledge
+   this report. Note that you do not need to immediately update the library, just file a ticket.
+
+If you believe the library is already up-to-date but Black Duck has the wrong version, please update
+version information for this component at {BLACKDUCK_PROJECT_URL}.
+
+For more information, {BLACKDUCK_WIKI_PAGE}.
+""")
+
+    mgr.add_report_metric(comp.name, str(comp.version))
+    mgr.add_report_metric(comp.name, str(comp.newest_release))
 
 
 def _generate_report_vulnerability(mgr: ReportManager, comp: Component, mcomp: ThirdPartyComponent,
@@ -589,25 +846,28 @@ def _generate_report_vulnerability(mgr: ReportManager, comp: Component, mcomp: T
         return
 
     mgr.write_report(
-        comp.name, "vulnerability_check", "fail", f"""A Black Duck scan was run and failed.
+        comp.name, "vulnerability_check", "fail", f"""{BLACKDUCK_FAILED_PREFIX}
 
-The ${comp.name} library had HIGH and/or CRITICAL security issues. The current version in Black Duck is ${comp.version}.
+The {comp.name} library at {mcomp.local_path} had HIGH and/or CRITICAL security issues. The current
+version in Black Duck is "{comp.version}".
 
-MongoDB policy requires all third-party software to be updated to a version clean of HIGH and CRITICAL vulnerabilities on the master branch.
+MongoDB policy requires all third-party software to be updated to a version clean of HIGH and
+CRITICAL vulnerabilities on the master branch.
 
 Next Steps:
 
-Build Baron:
-A BF ticket should be generated and assigned to ${mcomp.team_owner} with this text.
+Build Baron: A BF ticket should be generated and assigned to "Service Development Platform" with this text.
 
-Developer:
-To address this build failure, the next steps are as follows:
-1. File a SERVER ticket to update the software if one already does not exist.
-2. Add a “vulnerability_supression” to etc/third_party_components.yml with the SERVER ticket
+Developer: To address this build failure, the next steps are as follows:
+1. File a SERVER ticket to update the software if one already does not exist. Note that you do not
+   need to immediately update the library, just file a ticket.
+2. Add a “vulnerability_supression” to {THIRD_PARTY_COMPONENTS_FILE} with the SERVER ticket to
+   acknowledge this report.
 
-If you believe the library is already up-to-date but Black Duck has the wrong version, you will need to update the Black Duck configuration.
+If you believe the library is already up-to-date but Black Duck has the wrong version, please update
+version information for this component at {BLACKDUCK_PROJECT_URL}.
 
-Note that you do not need to immediately update the library. For more information, https://wiki.corp.mongodb.com/Black Duck.
+ For more information, {BLACKDUCK_WIKI_PAGE}.
 """)
 
 
@@ -631,10 +891,21 @@ class Analyzer:
             # 1. Validate there are no security issues
             self._verify_vulnerability_status(comp)
 
+            # 2. Check for upgrade issues
+            self._verify_upgrade_status(comp)
+
+    def _verify_upgrade_status(self, comp: Component):
+        mcomp = self._get_mongo_component(comp)
+
+        if comp.newest_release and not mcomp.upgrade_suppression:
+            _generate_report_upgrade(self.mgr, comp, mcomp, True)
+        else:
+            _generate_report_upgrade(self.mgr, comp, mcomp, False)
+
     def _verify_vulnerability_status(self, comp: Component):
         mcomp = self._get_mongo_component(comp)
 
-        if comp.security_risk in ["HIGH", "CRITICAL"]:
+        if comp.security_risk in ["HIGH", "CRITICAL"] and not mcomp.vulnerability_suppression:
             _generate_report_vulnerability(self.mgr, comp, mcomp, True)
         else:
             _generate_report_vulnerability(self.mgr, comp, mcomp, False)
@@ -767,6 +1038,8 @@ def main() -> None:
     scan_and_report_cmd.set_defaults(func=_scan_and_report_args)
 
     args = parser.parse_args()
+
+    _test_version_info()
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
