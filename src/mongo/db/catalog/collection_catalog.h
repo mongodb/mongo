@@ -404,7 +404,7 @@ private:
     /**
      * Generation number to track changes to the catalog that could invalidate iterators.
      */
-    uint64_t _generationNumber;
+    uint64_t _generationNumber = 0;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).
