@@ -123,8 +123,8 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
 
     // need this first for names, etc...
     BSONObj keyPattern = _spec.getObjectField("key");
-    auto descriptor = std::make_unique<IndexDescriptor>(
-        collection, IndexNames::findPluginName(keyPattern), _spec);
+    auto descriptor =
+        std::make_unique<IndexDescriptor>(IndexNames::findPluginName(keyPattern), _spec);
 
     _indexName = descriptor->indexName();
 

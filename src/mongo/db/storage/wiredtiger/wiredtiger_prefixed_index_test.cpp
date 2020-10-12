@@ -79,7 +79,7 @@ public:
                                   << "v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion)
                                   << "unique" << true);
         auto collection = std::make_unique<CollectionMock>(nss);
-        IndexDescriptor desc(collection.get(), "", spec);
+        IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
 
         KVPrefix prefix = KVPrefix::generateNextPrefix();
@@ -111,7 +111,7 @@ public:
         }
 
         auto collection = std::make_unique<CollectionMock>(nss);
-        IndexDescriptor& desc = _descriptors.emplace_back(collection.get(), "", spec);
+        IndexDescriptor& desc = _descriptors.emplace_back("", spec);
 
         KVPrefix prefix = KVPrefix::generateNextPrefix();
         StatusWith<std::string> result = WiredTigerIndex::generateCreateString(

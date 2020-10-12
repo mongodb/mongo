@@ -159,8 +159,7 @@ public:
 
         CollectionPtr collection =
             CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collNs);
-        auto descriptor =
-            std::make_unique<IndexDescriptor>(collection, IndexNames::findPluginName(spec), spec);
+        auto descriptor = std::make_unique<IndexDescriptor>(IndexNames::findPluginName(spec), spec);
 
         auto ret = DurableCatalog::get(opCtx)->prepareForIndexBuild(opCtx,
                                                                     collection->getCatalogId(),

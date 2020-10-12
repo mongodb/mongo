@@ -236,8 +236,7 @@ TEST(KVEngineTestHarness, SimpleSorted1) {
         uow.commit();
     }
 
-    IndexDescriptor desc(collection.get(),
-                         "",
+    IndexDescriptor desc("",
                          BSON("v" << static_cast<int>(IndexDescriptor::kLatestIndexVersion) << "key"
                                   << BSON("a" << 1)));
     std::unique_ptr<SortedDataInterface> sorted;
@@ -1486,8 +1485,7 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
         uow.commit();
     }
 
-    IndexDescriptor desc(collection.get(),
-                         "",
+    IndexDescriptor desc("",
                          BSON("v"
                               << "1"
                               << "key" << BSON("a" << 1)));

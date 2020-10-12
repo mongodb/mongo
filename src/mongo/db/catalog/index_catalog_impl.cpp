@@ -127,8 +127,7 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
                           "geoHaystack indexes has been deprecated. Instead create a 2d index. See "
                           "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
         }
-        auto descriptor =
-            std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
+        auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
             TTLCollectionCache::get(opCtx->getServiceContext())
                 .registerTTLInfo(std::make_pair(_collection->uuid(), indexName));
@@ -798,7 +797,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
 
         if (desc) {
             // Index already exists with same name. Check whether the options are the same as well.
-            IndexDescriptor candidate(_collection, _getAccessMethodName(key), spec);
+            IndexDescriptor candidate(_getAccessMethodName(key), spec);
             auto indexComparison =
                 candidate.compareIndexOptions(opCtx, _collection->ns(), getEntry(desc));
 
@@ -857,7 +856,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
             // Index already exists with a different name. Check whether the options are identical.
             // We will return an error in either case, but this check allows us to generate a more
             // informative error message.
-            IndexDescriptor candidate(_collection, _getAccessMethodName(key), spec);
+            IndexDescriptor candidate(_getAccessMethodName(key), spec);
             auto indexComparison =
                 candidate.compareIndexOptions(opCtx, _collection->ns(), getEntry(desc));
 
@@ -1165,7 +1164,7 @@ const IndexDescriptor* IndexCatalogImpl::findIndexByKeyPatternAndOptions(
     const BSONObj& indexSpec,
     bool includeUnfinishedIndexes) const {
     std::unique_ptr<IndexIterator> ii = getIndexIterator(opCtx, includeUnfinishedIndexes);
-    IndexDescriptor needle(_collection, _getAccessMethodName(key), indexSpec);
+    IndexDescriptor needle(_getAccessMethodName(key), indexSpec);
     while (ii->more()) {
         const auto* entry = ii->next();
         if (needle.compareIndexOptions(opCtx, {}, entry) !=
@@ -1271,8 +1270,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     // Re-register this index in the index catalog with the new spec. Also, add the new index
     // to the CollectionQueryInfo.
-    auto newDesc =
-        std::make_unique<IndexDescriptor>(_collection, _getAccessMethodName(keyPattern), spec);
+    auto newDesc = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
     auto newEntry = createIndexEntry(opCtx, std::move(newDesc), CreateIndexEntryFlags::kIsReady);
     invariant(newEntry->isReady(opCtx));
     CollectionQueryInfo::get(_collection).addedIndex(opCtx, _collection, newEntry->descriptor());

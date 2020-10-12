@@ -31,7 +31,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -99,9 +98,7 @@ constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
 
-IndexDescriptor::IndexDescriptor(const CollectionPtr& collection,
-                                 const std::string& accessMethodName,
-                                 BSONObj infoObj)
+IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
       _indexType(IndexNames::nameToType(accessMethodName)),
       _infoObj(infoObj.getOwned()),

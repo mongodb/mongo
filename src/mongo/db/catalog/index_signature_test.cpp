@@ -60,8 +60,7 @@ public:
 
     std::unique_ptr<IndexDescriptor> makeIndexDescriptor(BSONObj spec) {
         auto keyPattern = spec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
-        return std::make_unique<IndexDescriptor>(
-            coll(), IndexNames::findPluginName(keyPattern), spec);
+        return std::make_unique<IndexDescriptor>(IndexNames::findPluginName(keyPattern), spec);
     }
 
     const NamespaceString& nss() const {

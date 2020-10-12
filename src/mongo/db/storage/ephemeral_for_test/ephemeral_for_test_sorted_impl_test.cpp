@@ -61,7 +61,7 @@ public:
                                   << "unique" << true);
 
         auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
-        IndexDescriptor desc(collection.get(), "", spec);
+        IndexDescriptor desc("", spec);
         invariant(desc.isIdIndex());
 
         return _kvEngine.getSortedDataInterface(&opCtx, "ident"_sd, &desc);
@@ -84,7 +84,7 @@ public:
         }
 
         auto collection = std::make_unique<CollectionMock>(NamespaceString(ns));
-        _descs.emplace_back(collection.get(), "", spec);
+        _descs.emplace_back("", spec);
         return _kvEngine.getSortedDataInterface(&opCtx, "ident"_sd, &_descs.back());
     }
 
