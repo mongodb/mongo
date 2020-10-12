@@ -19,7 +19,6 @@ import importlib
 import io
 import shutil
 import shlex
-import textwrap
 
 from glob import glob
 from os.path import join as joinpath
@@ -130,7 +129,7 @@ def get_order_only(node):
     """Return a list of order only dependencies for node."""
     if node.prerequisites is None:
         return []
-    return [get_path(src_file(prereq)) for prereq in node.prerequisites if is_valid_dependent_node(prereq)]
+    return [get_path(src_file(prereq)) for prereq in node.prerequisites]
 
 
 def get_dependencies(node, skip_sources=False):
@@ -139,44 +138,21 @@ def get_dependencies(node, skip_sources=False):
         return [
             get_path(src_file(child))
             for child in node.children()
-            if child not in node.sources and is_valid_dependent_node(child)
+            if child not in node.sources
         ]
-    return [get_path(src_file(child)) for child in node.children() if is_valid_dependent_node(child)]
+    return [get_path(src_file(child)) for child in node.children()]
 
 
-def get_inputs(node, skip_unknown_types=False):
-    """
-    Collect the Ninja inputs for node.
-
-    If the given node has inputs which can not be converted into something
-    Ninja can process, this will throw an exception. Optionally, those nodes
-    that are not processable can be skipped as inputs with the
-    skip_unknown_types keyword arg.
-    """
+def get_inputs(node):
+    """Collect the Ninja inputs for node."""
     executor = node.get_executor()
     if executor is not None:
         inputs = executor.get_all_sources()
     else:
         inputs = node.sources
 
-    # Some Nodes (e.g. Python.Value Nodes) won't have files associated. We allow these to be
-    # optionally skipped to enable the case where we will re-invoke SCons for things
-    # like TEMPLATE. Otherwise, we have no direct way to express the behavior for such
-    # Nodes in Ninja, so we raise a hard error
-    ninja_nodes = []
-    for input_node in inputs:
-        if isinstance(input_node, (SCons.Node.FS.Base, SCons.Node.Alias.Alias)):
-            ninja_nodes.append(input_node)
-        else:
-            if skip_unknown_types:
-                continue
-            raise Exception("Can't process {} node '{}' as an input for '{}'".format(
-                type(input_node),
-                str(input_node),
-                str(node)))
-
-    # convert node items into raw paths/aliases for ninja
-    return [get_path(src_file(o)) for o in ninja_nodes]
+    inputs = [get_path(src_file(o)) for o in inputs]
+    return inputs
 
 
 def get_outputs(node):
@@ -194,40 +170,6 @@ def get_outputs(node):
 
     return outputs
 
-def generate_depfile(env, node, dependencies):
-    """
-    Ninja tool function for writing a depfile. The depfile should include
-    the node path followed by all the dependent files in a makefile format.
-
-    dependencies arg can be a list or a subst generator which returns a list.
-    """
-
-    depfile = os.path.join(get_path(env['NINJA_BUILDDIR']), str(node) + '.depfile')
-
-    # subst_list will take in either a raw list or a subst callable which generates
-    # a list, and return a list of CmdStringHolders which can be converted into raw strings.
-    # If a raw list was passed in, then scons_list will make a list of lists from the original
-    # values and even subst items in the list if they are substitutable. Flatten will flatten
-    # the list in that case, to ensure for either input we have a list of CmdStringHolders.
-    deps_list = env.Flatten(env.subst_list(dependencies))
-
-    # Now that we have the deps in a list as CmdStringHolders, we can convert them into raw strings
-    # and make sure to escape the strings to handle spaces in paths. We also will sort the result
-    # keep the order of the list consistent.
-    escaped_depends = sorted([dep.escape(env.get("ESCAPE", lambda x: x)) for dep in deps_list])
-    depfile_contents = str(node) + ": " + ' '.join(escaped_depends)
-
-    need_rewrite = False
-    try:
-        with open(depfile, 'r') as f:
-            need_rewrite = (f.read() != depfile_contents)
-    except FileNotFoundError:
-        need_rewrite = True
-
-    if need_rewrite:
-        os.makedirs(os.path.dirname(depfile) or '.', exist_ok=True)
-        with open(depfile, 'w') as f:
-            f.write(depfile_contents)
 
 class SConsToNinjaTranslator:
     """Translates SCons Actions into Ninja build objects."""
@@ -299,14 +241,11 @@ class SConsToNinjaTranslator:
         # dependencies don't really matter when we're going to shove these to
         # the bottom of ninja's DAG anyway and Textfile builders can have text
         # content as their source which doesn't work as an implicit dep in
-        # ninja. We suppress errors on input Nodes types that we cannot handle
-        # since we expect that the re-invocation of SCons will handle dependency
-        # tracking for those Nodes and their dependents.
+        # ninja.
         if name == "_action":
             return {
                 "rule": "TEMPLATE",
                 "outputs": get_outputs(node),
-                "inputs": get_inputs(node, skip_unknown_types=True),
                 "implicit": get_dependencies(node, skip_sources=True),
             }
 
@@ -477,16 +416,8 @@ class NinjaState:
                 "rspfile_content": "$rspc",
                 "pool": "local_pool",
             },
-            # Ninja does not automatically delete the archive before
-            # invoking ar. The ar utility will append to an existing archive, which
-            # can cause duplicate symbols if the symbols moved between object files.
-            # Native SCons will perform this operation so we need to force ninja
-            # to do the same. See related for more info:
-            # https://jira.mongodb.org/browse/SERVER-49457
             "AR": {
-                "command": "{}$env$AR @$out.rsp".format(
-                    '' if sys.platform == "win32" else "rm -f $out && "
-                ),
+                "command": "$env$AR @$out.rsp",
                 "description": "Archiving $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",
@@ -546,7 +477,6 @@ class NinjaState:
                 "command": "$SCONS_INVOCATION_W_TARGETS",
                 "description": "Regenerating $out",
                 "generator": 1,
-                "depfile": os.path.join(get_path(env['NINJA_BUILDDIR']), '$out.depfile'),
                 # Console pool restricts to 1 job running at a time,
                 # it additionally has some special handling about
                 # passing stdin, stdout, etc to process in this pool
@@ -624,8 +554,6 @@ class NinjaState:
         ninja = self.writer_class(content, width=100)
 
         ninja.comment("Generated by scons. DO NOT EDIT.")
-
-        ninja.variable("builddir", get_path(self.env['NINJA_BUILDDIR']))
 
         for pool_name, size in self.pools.items():
             ninja.pool(pool_name, size)
@@ -736,16 +664,6 @@ class NinjaState:
 
                 build["outputs"] = first_output
 
-            # Optionally a rule can specify a depfile, and SCons can generate implicit
-            # dependencies into the depfile. This allows for dependencies to come and go
-            # without invalidating the ninja file. The depfile was created in ninja specifically
-            # for dealing with header files appearing and disappearing across rebuilds, but it can
-            # be repurposed for anything, as long as you have a way to regenerate the depfile.
-            # More specific info can be found here: https://ninja-build.org/manual.html#_depfile
-            if rule is not None and rule.get('depfile') and build.get('deps_files'):
-                path = build['outputs'] if SCons.Util.is_List(build['outputs']) else [build['outputs']]
-                generate_depfile(self.env, path[0], build.pop('deps_files', []))
-
             if "inputs" in build:
                 build["inputs"].sort()
 
@@ -756,13 +674,13 @@ class NinjaState:
 
             # Special handling for outputs and implicit since we need to
             # aggregate not replace for each builder.
-            for agg_key in ["outputs", "implicit", "inputs"]:
+            for agg_key in ["outputs", "implicit"]:
                 new_val = template_builds.get(agg_key, [])
 
                 # Use pop so the key is removed and so the update
                 # below will not overwrite our aggregated values.
                 cur_val = template_builder.pop(agg_key, [])
-                if is_List(cur_val):
+                if isinstance(cur_val, list):
                     new_val += cur_val
                 else:
                     new_val.append(cur_val)
@@ -780,25 +698,19 @@ class NinjaState:
         # generate this rule even though SCons should know we're
         # dependent on SCons files.
         #
-        # The REGENERATE rule uses depfile, so we need to generate the depfile
-        # in case any of the SConscripts have changed. The depfile needs to be
-        # path with in the build and the passed ninja file is an abspath, so
-        # we will use SCons to give us the path within the build. Normally
-        # generate_depfile should not be called like this, but instead be called
-        # through the use of custom rules, and filtered out in the normal
-        # list of build generation about. However, because the generate rule
-        # is hardcoded here, we need to do this generate_depfile call manually.
-        ninja_file_path = self.env.File(ninja_file).path
-        generate_depfile(
-            self.env,
-            ninja_file_path,
-            self.env['NINJA_REGENERATE_DEPS']
-        )
-
+        # TODO: We're working on getting an API into SCons that will
+        # allow us to query the actual SConscripts used. Right now
+        # this glob method has deficiencies like skipping
+        # jstests/SConscript and being specific to the MongoDB
+        # repository layout.
         ninja.build(
-            ninja_file_path,
+            self.env.File(ninja_file).path,
             rule="REGENERATE",
-            implicit=[__file__],
+            implicit=[
+                self.env.File("#SConstruct").path,
+                __file__,
+            ]
+            + sorted(glob("src/**/SConscript", recursive=True)),
         )
 
         # If we ever change the name/s of the rules that include
@@ -810,8 +722,8 @@ class NinjaState:
             pool="console",
             implicit=[ninja_file],
             variables={
-                "cmd": "ninja -f {} -t compdb {}CC CXX > compile_commands.json".format(
-                    ninja_file, '-x ' if self.env.get('NINJA_COMPDB_EXPAND') else ''
+                "cmd": "ninja -f {} -t compdb CC CXX > compile_commands.json".format(
+                    ninja_file
                 )
             },
         )
@@ -927,13 +839,7 @@ def get_command_env(env):
         if windows:
             command_env += "set '{}={}' && ".format(key, value)
         else:
-            # We address here *only* the specific case that a user might have
-            # an environment variable which somehow gets included and has
-            # spaces in the value. These are escapes that Ninja handles. This
-            # doesn't make builds on paths with spaces (Ninja and SCons issues)
-            # nor expanding response file paths with spaces (Ninja issue) work.
-            value = value.replace(r' ', r'$ ')
-            command_env += "{}='{}' ".format(key, value)
+            command_env += "{}={} ".format(key, value)
 
     env["NINJA_ENV_VAR_CACHE"] = command_env
     return command_env
@@ -987,7 +893,7 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False):
         variables[rule] = cmd
         if use_command_env:
             variables["env"] = get_command_env(env)
-        return rule, variables, [tool_command]
+        return rule, variables
 
     return get_response_file_command
 
@@ -1017,21 +923,13 @@ def generate_command(env, node, action, targets, sources, executor=None):
     return cmd.replace("$", "$$")
 
 
-def get_generic_shell_command(env, node, action, targets, sources, executor=None):
+def get_shell_command(env, node, action, targets, sources, executor=None):
     return (
         "CMD",
         {
             "cmd": generate_command(env, node, action, targets, sources, executor=None),
             "env": get_command_env(env),
         },
-        # Since this function is a rule mapping provider, it must return a list of dependencies,
-        # and usually this would be the path to a tool, such as a compiler, used for this rule.
-        # However this function is to generic to be able to reliably extract such deps
-        # from the command, so we return a placeholder empty list. It should be noted that
-        # generally this function will not be used soley and is more like a template to generate
-        # the basics for a custom provider which may have more specific options for a provier
-        # function for a custom NinjaRuleMapping.
-        []
     )
 
 
@@ -1067,38 +965,11 @@ def get_command(env, node, action):  # pylint: disable=too-many-branches
     if not comstr:
         return None
 
-    provider = __NINJA_RULE_MAPPING.get(comstr, get_generic_shell_command)
-    rule, variables, provider_deps = provider(sub_env, node, action, tlist, slist, executor=executor)
+    provider = __NINJA_RULE_MAPPING.get(comstr, get_shell_command)
+    rule, variables = provider(sub_env, node, action, tlist, slist, executor=executor)
 
     # Get the dependencies for all targets
     implicit = list({dep for tgt in tlist for dep in get_dependencies(tgt)})
-
-    # Now add in the other dependencies related to the command,
-    # e.g. the compiler binary. The ninja rule can be user provided so
-    # we must do some validation to resolve the dependency path for ninja.
-    for provider_dep in provider_deps:
-
-        provider_dep = sub_env.subst(provider_dep)
-        if not provider_dep:
-            continue
-
-        # If the tool is a node, then SCons will resolve the path later, if its not
-        # a node then we assume it generated from build and make sure it is existing.
-        if isinstance(provider_dep, SCons.Node.Node) or os.path.exists(provider_dep):
-            implicit.append(provider_dep)
-            continue
-
-        # Many commands will assume the binary is in the path, so
-        # we accept this as a possible input from a given command.
-        provider_dep_abspath = sub_env.WhereIs(provider_dep)
-        if provider_dep_abspath:
-            implicit.append(provider_dep_abspath)
-            continue
-
-        # Possibly these could be ignore and the build would still work, however it may not always
-        # rebuild correctly, so we hard stop, and force the user to fix the issue with the provided
-        # ninja rule.
-        raise Exception(f"Could not resolve path for {provider_dep} dependency on node '{node}'")
 
     ninja_build = {
         "order_only": get_order_only(node),
@@ -1162,20 +1033,17 @@ def register_custom_handler(env, name, handler):
 
 
 def register_custom_rule_mapping(env, pre_subst_string, rule):
-    """Register a function to call for a given rule."""
+    """Register a custom handler for SCons function actions."""
     global __NINJA_RULE_MAPPING
     __NINJA_RULE_MAPPING[pre_subst_string] = rule
 
 
-def register_custom_rule(env, rule, command, description="", deps=None, pool=None, use_depfile=False):
+def register_custom_rule(env, rule, command, description="", deps=None, pool=None):
     """Allows specification of Ninja rules from inside SCons files."""
     rule_obj = {
         "command": command,
         "description": description if description else "{} $out".format(rule),
     }
-
-    if use_depfile:
-        rule_obj["depfile"] = os.path.join(get_path(env['NINJA_BUILDDIR']), '$out.depfile')
 
     if deps is not None:
         rule_obj["deps"] = deps
@@ -1214,27 +1082,6 @@ def ninja_contents(original):
 
     return wrapper
 
-def CheckNinjaCompdbExpand(env, context):
-    """ Configure check testing if ninja's compdb can expand response files"""
-
-    context.Message('Checking if ninja compdb can expand response files... ')
-    ret, output = context.TryAction(
-        action='ninja -f $SOURCE -t compdb -x CMD_RSP > $TARGET',
-        extension='.ninja',
-        text=textwrap.dedent("""
-            rule CMD_RSP
-              command = $cmd @$out.rsp > fake_output.txt
-              description = Building $out
-              rspfile = $out.rsp
-              rspfile_content = $rspc
-            build fake_output.txt: CMD_RSP fake_input.txt
-              cmd = echo
-              pool = console
-              rspc = "test"
-            """))
-    result = '@fake_output.txt.rsp' not in output
-    context.Result(result)
-    return result
 
 def ninja_stat(_self, path):
     """
@@ -1345,19 +1192,11 @@ def generate(env):
     env["NINJA_PREFIX"] = env.get("NINJA_PREFIX", "build")
     env["NINJA_SUFFIX"] = env.get("NINJA_SUFFIX", "ninja")
     env["NINJA_ALIAS_NAME"] = env.get("NINJA_ALIAS_NAME", "generate-ninja")
-    env['NINJA_BUILDDIR'] = env.get("NINJA_BUILDDIR", env.Dir(".ninja").path)
+
     ninja_file_name = env.subst("${NINJA_PREFIX}.${NINJA_SUFFIX}")
     ninja_file = env.Ninja(target=ninja_file_name, source=[])
     env.AlwaysBuild(ninja_file)
     env.Alias("$NINJA_ALIAS_NAME", ninja_file)
-
-    # TODO: API for getting the SConscripts programmatically
-    # exists upstream: https://github.com/SCons/scons/issues/3625
-    def ninja_generate_deps(env):
-        return sorted([env.File("#SConstruct").path] + glob("**/SConscript", recursive=True))
-    env['_NINJA_REGENERATE_DEPS_FUNC'] = ninja_generate_deps
-
-    env['NINJA_REGENERATE_DEPS'] = env.get('NINJA_REGENERATE_DEPS', '${_NINJA_REGENERATE_DEPS_FUNC(__env__)}')
 
     # This adds the required flags such that the generated compile
     # commands will create depfiles as appropriate in the Ninja file.
@@ -1366,11 +1205,9 @@ def generate(env):
     else:
         env.Append(CCFLAGS=["-MMD", "-MF", "${TARGET}.d"])
 
-    env.AddMethod(CheckNinjaCompdbExpand, "CheckNinjaCompdbExpand")
-
     # Provide a way for custom rule authors to easily access command
     # generation.
-    env.AddMethod(get_generic_shell_command, "NinjaGetGenericShellCommand")
+    env.AddMethod(get_shell_command, "NinjaGetShellCommand")
     env.AddMethod(gen_get_response_file_command, "NinjaGenResponseFileProvider")
 
     # Provides a way for users to handle custom FunctionActions they

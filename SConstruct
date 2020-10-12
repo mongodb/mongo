@@ -106,10 +106,10 @@ SetOption('random', 1)
 #
 
 add_option('ninja',
-    choices=['enabled', 'disabled'],
+    choices=['stable', 'next', 'disabled'],
     default='disabled',
     nargs='?',
-    const='enabled',
+    const='stable',
     type='choice',
     help='Enable the build.ninja generator tool stable or canary version',
 )
@@ -286,6 +286,11 @@ add_option('sanitize',
 add_option('sanitize-coverage',
     help='enable selected coverage sanitizers',
     metavar='cov1,cov2,...covN',
+)
+
+add_option('llvm-symbolizer',
+    default='llvm-symbolizer',
+    help='name of (or path to) the LLVM symbolizer',
 )
 
 add_option('durableDefaultOn',
@@ -821,9 +826,6 @@ env_vars.Add('LINKFLAGS',
     help='Sets flags for the linker',
     converter=variable_shlex_converter)
 
-env_vars.Add('LLVM_SYMBOLIZER',
-    help='Name of or path to the LLVM symbolizer')
-
 env_vars.Add('MAXLINELENGTH',
     help='Maximum line length before using temp files',
     # This is very small, but appears to be the least upper bound
@@ -1129,7 +1131,7 @@ if get_option('install-mode') != 'hygienic':
 # user has opted into the next gen tools, add our experimental tool
 # directory into the default toolpath, ahead of whatever is already in
 # there so it overrides it.
-if get_option('build-tools') == 'next':
+if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
     SCons.Tool.DefaultToolpath.insert(0, os.path.abspath('site_scons/site_tools/next'))
 
 env = Environment(variables=env_vars, **envDict)
@@ -2843,19 +2845,31 @@ def doConfigure(myenv):
 
         sanitizer_list = get_option('sanitize').split(',')
 
-        using_asan = 'address' in sanitizer_list
-        using_fsan = 'fuzzer' in sanitizer_list
         using_lsan = 'leak' in sanitizer_list
+        using_asan = 'address' in sanitizer_list or using_lsan
         using_tsan = 'thread' in sanitizer_list
         using_ubsan = 'undefined' in sanitizer_list
+        using_fsan = 'fuzzer' in sanitizer_list
 
-        if using_lsan:
-            env.FatalError("Please use --sanitize=address instead of --sanitize=leak")
-
-        if using_asan and env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
+        if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental'] and (using_lsan or using_asan):
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
-            env.FatalError("Cannot use --sanitize=address with tcmalloc")
+            env.FatalError("Cannot use --sanitize=leak or --sanitize=address with tcmalloc")
+
+        # If the user asked for leak sanitizer, turn on the detect_leaks
+        # ASAN_OPTION. If they asked for address sanitizer as well, drop
+        # 'leak', because -fsanitize=leak means no address.
+        #
+        # --sanitize=leak:           -fsanitize=leak, detect_leaks=1
+        # --sanitize=address,leak:   -fsanitize=address, detect_leaks=1
+        # --sanitize=address:        -fsanitize=address
+        #
+        if using_lsan:
+            if using_asan:
+                myenv['ENV']['ASAN_OPTIONS'] = "detect_leaks=1"
+            myenv['ENV']['LSAN_OPTIONS'] = "suppressions=%s" % myenv.File("#etc/lsan.suppressions").abspath
+            if 'address' in sanitizer_list:
+                sanitizer_list.remove('leak')
 
         if using_fsan:
             def CheckForFuzzerCompilerSupport(context):
@@ -2919,6 +2933,7 @@ def doConfigure(myenv):
 
         blackfiles_map = {
             "address" : myenv.File("#etc/asan.blacklist"),
+            "leak" : myenv.File("#etc/asan.blacklist"),
             "thread" : myenv.File("#etc/tsan.blacklist"),
             "undefined" : myenv.File("#etc/ubsan.blacklist"),
         }
@@ -2986,20 +3001,21 @@ def doConfigure(myenv):
                 LINKFLAGS="${SANITIZER_BLACKLIST_GENERATOR}",
             )
 
-        symbolizer_option = ""
-        if env['LLVM_SYMBOLIZER']:
-            llvm_symbolizer = env['LLVM_SYMBOLIZER']
-
-            if not os.path.isabs(llvm_symbolizer):
-                llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
-
+        llvm_symbolizer = get_option('llvm-symbolizer')
+        if os.path.isabs(llvm_symbolizer):
             if not myenv.File(llvm_symbolizer).exists():
-                myenv.FatalError(f"Symbolizer binary at path {llvm_symbolizer} does not exist")
+                print("WARNING: Specified symbolizer '%s' not found" % llvm_symbolizer)
+                llvm_symbolizer = None
+        else:
+            llvm_symbolizer = myenv.WhereIs(llvm_symbolizer)
 
-            symbolizer_option = f":external_symbolizer_path=\"{llvm_symbolizer}\""
-
-        elif using_asan or using_tsan or using_ubsan:
-            myenv.FatalError("The address, thread, and undefined behavior sanitizers require llvm-symbolizer for meaningful reports")
+        tsan_options = ""
+        if llvm_symbolizer:
+            myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
+            myenv['ENV']['LSAN_SYMBOLIZER_PATH'] = llvm_symbolizer
+            tsan_options = "external_symbolizer_path=\"%s\" " % llvm_symbolizer
+        elif using_lsan:
+            myenv.FatalError("Using the leak sanitizer requires a valid symbolizer")
 
         if using_asan:
             # Unfortunately, abseil requires that we make these macros
@@ -3008,43 +3024,10 @@ def doConfigure(myenv):
             # compiler. We do this unconditionally because abseil is
             # basically pervasive via the 'base' library.
             myenv.AppendUnique(CPPDEFINES=['ADDRESS_SANITIZER'])
-            # If anything is changed, added, or removed in either asan_options or
-            # lsan_options, be sure to make the corresponding changes to the
-            # appropriate build variants in etc/evergreen.yml
-            asan_options = "detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1"
-            lsan_options = f"report_objects=1:suppressions={myenv.File('#etc/lsan.suppressions').abspath}"
-            env['ENV']['ASAN_OPTIONS'] = asan_options + symbolizer_option
-            env['ENV']['LSAN_OPTIONS'] = lsan_options + symbolizer_option
 
         if using_tsan:
-
-            if use_libunwind:
-                # TODO: SERVER-48622
-                #
-                # See https://github.com/google/sanitizers/issues/943
-                # for why we disallow combining TSAN with
-                # libunwind. We could, atlernatively, have added logic
-                # to automate the decision about whether to enable
-                # libunwind based on whether TSAN is enabled, but that
-                # logic is already complex, and it feels better to
-                # make it explicit that using TSAN means you won't get
-                # the benefits of libunwind. Fixing this is:
-                env.FatalError("Cannot use libunwind with TSAN, please add --use-libunwind=off to your compile flags")
-
-            # If anything is changed, added, or removed in
-            # tsan_options, be sure to make the corresponding changes
-            # to the appropriate build variants in etc/evergreen.yml
-            #
-            # TODO SERVER-49121: die_after_fork=0 is a temporary
-            # setting to allow tests to continue while we figure out
-            # why we're running afoul of it.
-            #
-            # TODO SERVER-48490: report_thread_leaks=0 suppresses
-            # reporting thread leaks, which we have because we don't
-            # do a clean shutdown of the ServiceContext.
-            #
-            tsan_options = f"halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions={myenv.File('#etc/tsan.suppressions').abspath}"
-            myenv['ENV']['TSAN_OPTIONS'] = tsan_options + symbolizer_option
+            tsan_options += "suppressions=\"%s\" " % myenv.File("#etc/tsan.suppressions").abspath
+            myenv['ENV']['TSAN_OPTIONS'] = tsan_options
             myenv.AppendUnique(CPPDEFINES=['THREAD_SANITIZER'])
 
         if using_ubsan:
@@ -3056,11 +3039,6 @@ def doConfigure(myenv):
             if not using_fsan and not AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover"):
                 AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover=undefined")
             myenv.AppendUnique(CPPDEFINES=['UNDEFINED_BEHAVIOR_SANITIZER'])
-            # If anything is changed, added, or removed in ubsan_options, be
-            # sure to make the corresponding changes to the appropriate build
-            # variants in etc/evergreen.yml
-            ubsan_options = "print_stacktrace=1"
-            myenv['ENV']['UBSAN_OPTIONS'] = ubsan_options + symbolizer_option
 
     if myenv.ToolchainIs('msvc') and optBuild:
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
@@ -3922,18 +3900,22 @@ elif env.ToolchainIs("gcc"):
 
 # Now that we are done with configure checks, enable ccache and
 # icecream if requested.
-if 'CCACHE' in env and env['CCACHE']:
-    ccache = Tool('ccache')
-    if not ccache.exists(env):
-        env.FatalError(f"Failed to load ccache tool with CCACHE={env['CCACHE']}")
-    ccache(env)
-if 'ICECC' in env and env['ICECC']:
-    env['ICECREAM_VERBOSE'] = env.Verbose()
-    env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
-    icecream = Tool('icecream')
-    if not icecream.exists(env):
-        env.FatalError(f"Failed to load icecream tool with ICECC={env['ICECC']}")
-    icecream(env)
+if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
+    if 'CCACHE' in env and env['CCACHE']:
+        ccache = Tool('ccache')
+        if not ccache.exists(env):
+            env.FatalError(f"Failed to load ccache tool with CCACHE={env['CCACHE']}")
+        ccache(env)
+    if 'ICECC' in env and env['ICECC']:
+        env['ICECREAM_VERBOSE'] = env.Verbose()
+        env['ICECREAM_TARGET_DIR'] = '$BUILD_ROOT/scons/icecream'
+        icecream = Tool('icecream')
+        if not icecream.exists(env):
+            env.FatalError(f"Failed to load icecream tool with ICECC={env['ICECC']}")
+        icecream(env)
+else:
+    env.Tool('ccache')
+    env.Tool('icecream')
 
 # Defaults for SCons provided flags. SetOption only sets the option to our value
 # if the user did not provide it. So for any flag here if it's explicitly passed
@@ -3988,31 +3970,34 @@ if get_option('ninja') != 'disabled':
             env.FatalError("Use of ccache is mandatory with --ninja and icecream older than 1.2. You are running {}.".format(env['ICECREAM_VERSION']))
 
     ninja_builder = Tool("ninja")
-    env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
-    ninja_builder.generate(env)
+    if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
+        env["NINJA_BUILDDIR"] = env.Dir("$BUILD_DIR/ninja")
+        ninja_builder.generate(env)
 
-    ninjaConf = Configure(env, help=False, custom_tests = {
-        'CheckNinjaCompdbExpand': env.CheckNinjaCompdbExpand,
-    })
-    env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
-    ninjaConf.Finish()
+        ninjaConf = Configure(env, help=False, custom_tests = {
+            'CheckNinjaCompdbExpand': env.CheckNinjaCompdbExpand,
+        })
+        env['NINJA_COMPDB_EXPAND'] = ninjaConf.CheckNinjaCompdbExpand()
+        ninjaConf.Finish()
 
-    # TODO: API for getting the sconscripts programmatically
-    # exists upstream: https://github.com/SCons/scons/issues/3625
-    def ninja_generate_deps(env, target, source, for_signature):
-        dependencies = env.Flatten([
-            'SConstruct',
-            glob(os.path.join('src', '**', 'SConscript'), recursive=True),
-            glob(os.path.join(os.path.expanduser('~/.scons/'), '**', '*.py'), recursive=True),
-            glob(os.path.join('site_scons', '**', '*.py'), recursive=True),
-            glob(os.path.join('buildscripts', '**', '*.py'), recursive=True),
-            glob(os.path.join('src/third_party/scons-*', '**', '*.py'), recursive=True),
-            glob(os.path.join('src/mongo/db/modules', '**', '*.py'), recursive=True),
-        ])
+        # TODO: API for getting the sconscripts programmatically
+        # exists upstream: https://github.com/SCons/scons/issues/3625
+        def ninja_generate_deps(env, target, source, for_signature):
+            dependencies = env.Flatten([
+                'SConstruct',
+                glob(os.path.join('src', '**', 'SConscript'), recursive=True),
+                glob(os.path.join(os.path.expanduser('~/.scons/'), '**', '*.py'), recursive=True),
+                glob(os.path.join('site_scons', '**', '*.py'), recursive=True),
+                glob(os.path.join('buildscripts', '**', '*.py'), recursive=True),
+                glob(os.path.join('src/third_party/scons-*', '**', '*.py'), recursive=True),
+                glob(os.path.join('src/mongo/db/modules', '**', '*.py'), recursive=True),
+            ])
 
-        return dependencies
+            return dependencies
 
-    env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
+        env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
+    else:
+        ninja_builder.generate(env)
 
     # idlc.py has the ability to print it's implicit dependencies
     # while generating, Ninja can consume these prints using the
@@ -4029,9 +4014,15 @@ if get_option('ninja') != 'disabled':
     )
 
     def get_idlc_command(env, node, action, targets, sources, executor=None):
-        _, variables, _ = env.NinjaGetGenericShellCommand(node, action, targets, sources, executor=executor)
+        if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
+            _, variables, _ = env.NinjaGetGenericShellCommand(node, action, targets, sources, executor=executor)
+        else:
+            _, variables = env.NinjaGetShellCommand(node, action, targets, sources, executor=executor)
         variables["msvc_deps_prefix"] = "import file:"
-        return "IDLC", variables, env.subst(env['IDLC']).split()
+        if get_option('build-tools') == 'next' or get_option('ninja') == 'next':
+            return "IDLC", variables, env.subst(env['IDLC']).split()
+        else:
+            return "IDLC", variables
 
     env.NinjaRuleMapping("$IDLCCOM", get_idlc_command)
     env.NinjaRuleMapping(env["IDLCCOM"], get_idlc_command)
