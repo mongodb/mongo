@@ -81,7 +81,7 @@ class HangAnalyzer(Subcommand):
 
         trapped_exceptions = []
 
-        dump_pids = []
+        dump_pids = {}
         # Dump all processes, except python & java.
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
             try:
@@ -90,7 +90,7 @@ class HangAnalyzer(Subcommand):
                     and _check_dump_quota(max_dump_size_bytes, dumpers.dbg.get_dump_ext()))
             except dumper.DumpError as err:
                 self.root_logger.error(err.message)
-                dump_pids += err.dump_pids
+                dump_pids = {**err.dump_pids, **dump_pids}
             except Exception as err:  # pylint: disable=broad-except
                 self.root_logger.info("Error encountered when invoking debugger %s", err)
                 trapped_exceptions.append(traceback.format_exc())

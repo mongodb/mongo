@@ -296,11 +296,11 @@ class LLDBDumper(Dumper):
                                str(pinfo.pidv))
 
         if take_dump:
-            need_sigabrt = []
+            need_sigabrt = {}
             files = self._dump_files(pinfo)
             for pid in files:
                 if not os.path.exists(files[pid]):
-                    need_sigabrt.append(pid)
+                    need_sigabrt[pid] = files[pid]
             if need_sigabrt:
                 raise DumpError(need_sigabrt)
 
