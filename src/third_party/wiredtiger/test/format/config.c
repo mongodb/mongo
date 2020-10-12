@@ -623,11 +623,6 @@ config_directio(void)
      * format just hung, and the 15-minute timeout isn't effective. We could play games to handle
      * child process termination, but it's not worth the effort.
      */
-    if (g.c_rebalance) {
-        if (config_is_perm("ops.rebalance"))
-            testutil_die(EINVAL, "direct I/O is incompatible with rebalance configurations");
-        config_single("ops.rebalance=off", false);
-    }
     if (g.c_salvage) {
         if (config_is_perm("ops.salvage"))
             testutil_die(EINVAL, "direct I/O is incompatible with salvage configurations");
@@ -707,8 +702,6 @@ config_in_memory(void)
         return;
     if (config_is_perm("ops.hs_cursor"))
         return;
-    if (config_is_perm("ops.rebalance"))
-        return;
     if (config_is_perm("ops.salvage"))
         return;
     if (config_is_perm("ops.verify"))
@@ -740,8 +733,6 @@ config_in_memory_reset(void)
         config_single("ops.hs_cursor=off", false);
     if (!config_is_perm("logging"))
         config_single("logging=off", false);
-    if (!config_is_perm("ops.rebalance"))
-        config_single("ops.rebalance=off", false);
     if (!config_is_perm("ops.salvage"))
         config_single("ops.salvage=off", false);
     if (!config_is_perm("ops.verify"))
@@ -927,12 +918,6 @@ config_transaction(void)
             testutil_die(EINVAL, "timestamps require transaction frequency set to 100");
     }
 
-    /* FIXME-WT-6410: temporarily disable rebalance with timestamps. */
-    if (g.c_txn_timestamps && g.c_rebalance) {
-        if (config_is_perm("ops.rebalance"))
-            testutil_die(EINVAL, "rebalance cannot run with timestamps");
-        config_single("ops.rebalance=off", false);
-    }
     /* FIXME-WT-6431: temporarily disable salvage with timestamps. */
     if (g.c_txn_timestamps && g.c_salvage) {
         if (config_is_perm("ops.salvage"))

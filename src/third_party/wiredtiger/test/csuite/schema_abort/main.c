@@ -122,7 +122,6 @@ typedef struct {
 #define CREATE_UNQ "create_unique"
 #define CURSOR "cursor"
 #define DROP "drop"
-#define REBALANCE "rebalance"
 #define UPGRADE "upgrade"
 #define VERIFY "verify"
 
@@ -384,25 +383,6 @@ test_drop(THREAD_DATA *td, int force)
         if (ret == EINVAL)
             testutil_die(ret, "session.commit drop");
     }
-    testutil_check(session->close(session, NULL));
-}
-
-/*
- * test_rebalance --
- *     Rebalance a tree.
- */
-static void
-test_rebalance(THREAD_DATA *td)
-{
-    WT_DECL_RET;
-    WT_SESSION *session;
-
-    testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-
-    if ((ret = session->rebalance(session, uri, NULL)) != 0)
-        if (ret != ENOENT && ret != EBUSY)
-            testutil_die(ret, "session.rebalance");
-
     testutil_check(session->close(session, NULL));
 }
 
@@ -680,14 +660,10 @@ thread_run(void *arg)
                 test_drop(td, __wt_random(&rnd) & 1);
                 break;
             case 6:
-                WT_PUBLISH(th_ts[td->info].op, REBALANCE);
-                test_rebalance(td);
-                break;
-            case 7:
                 WT_PUBLISH(th_ts[td->info].op, UPGRADE);
                 test_upgrade(td);
                 break;
-            case 8:
+            case 7:
                 WT_PUBLISH(th_ts[td->info].op, VERIFY);
                 test_verify(td);
                 break;

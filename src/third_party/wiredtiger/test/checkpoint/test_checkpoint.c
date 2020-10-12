@@ -65,7 +65,7 @@ main(int argc, char *argv[])
     g.sweep_stress = g.use_timestamps = false;
     runs = 1;
 
-    while ((ch = __wt_getopt(progname, argc, argv, "C:c:Dh:k:l:n:r:sT:t:W:x")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "C:c:Dh:k:l:n:pr:sT:t:W:x")) != EOF)
         switch (ch) {
         case 'c':
             g.checkpoint_name = __wt_optarg;
@@ -90,6 +90,9 @@ main(int argc, char *argv[])
             break;
         case 'n': /* operations */
             g.nops = (u_int)atoi(__wt_optarg);
+            break;
+        case 'p': /* prepare */
+            g.prepare = true;
             break;
         case 'r': /* runs */
             runs = atoi(__wt_optarg);
@@ -343,6 +346,7 @@ usage(void)
       "\t-k set number of keys to load\n"
       "\t-l specify a log file\n"
       "\t-n set number of operations each thread does\n"
+      "\t-p use prepare\n"
       "\t-r set number of runs (0 for continuous)\n"
       "\t-T specify a table configuration\n"
       "\t-t set a file type ( col | mix | row | lsm )\n"

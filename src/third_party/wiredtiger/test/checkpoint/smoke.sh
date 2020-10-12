@@ -28,6 +28,12 @@ $TEST_WRAPPER ./t -T 6 -t r
 echo "checkpoint: 6 row-store tables, named checkpoint"
 $TEST_WRAPPER ./t -c 'TeSt' -T 6 -t r
 
+echo "checkpoint: 6 row-store tables with prepare"
+$TEST_WRAPPER ./t -T 6 -t r -p
+
+echo "checkpoint: 6 row-store tables, named checkpoint with prepare"
+$TEST_WRAPPER ./t -c 'TeSt' -T 6 -t r -p
+
 # Temporarily disabled
 #echo "checkpoint: row-store tables, stress history store. Sweep and timestamps"
 #$TEST_WRAPPER ./t -t r -W 3 -r 2 -D -s -x -n 100000 -k 100000 -C cache_size=100MB

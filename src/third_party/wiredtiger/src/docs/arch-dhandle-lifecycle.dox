@@ -1,4 +1,4 @@
-/*! @page devdoc-dhandle-lifecycle Data Handle Lifecycle
+/*! @page arch-dhandle-lifecycle Data Handle Lifecycle
 
 A WiredTiger Data Handle (dhandle) is a generic representation of any named
 data source. This representation contains information such as its name,

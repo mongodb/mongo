@@ -202,7 +202,6 @@ typedef struct {
     uint32_t c_quiet;
     uint32_t c_random_cursor;
     uint32_t c_read_pct;
-    uint32_t c_rebalance;
     uint32_t c_repeat_data_pct;
     uint32_t c_reverse;
     uint32_t c_rows;
@@ -435,7 +434,6 @@ void wts_dump(const char *, bool);
 void wts_load(void);
 void wts_open(const char *, WT_CONNECTION **, WT_SESSION **, bool);
 void wts_read_scan(void);
-void wts_rebalance(void);
 void wts_reopen(void);
 void wts_salvage(void);
 void wts_stats(void);

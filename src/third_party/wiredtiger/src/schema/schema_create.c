@@ -45,6 +45,58 @@ __wt_direct_io_size_check(
 }
 
 /*
+ * __check_imported_ts --
+ *     Check the aggregated timestamps for each checkpoint in a file that we've imported. We're not
+ *     allowed to import files with timestamps ahead of our oldest timestamp since a subsequent
+ *     rollback to stable could result in data loss and historical reads could yield unexpected
+ *     values. Therefore, this function should return non-zero to callers to signify that this is
+ *     the case.
+ */
+static int
+__check_imported_ts(WT_SESSION_IMPL *session, const char *uri, const char *config)
+{
+    WT_CKPT *ckptbase, *ckpt;
+    WT_DECL_RET;
+    WT_TXN_GLOBAL *txn_global;
+
+    ckptbase = NULL;
+    txn_global = &S2C(session)->txn_global;
+
+    WT_ERR_NOTFOUND_OK(__wt_meta_ckptlist_get_with_config(session, false, &ckptbase, config), true);
+    if (ret == WT_NOTFOUND)
+        WT_ERR_MSG(session, EINVAL,
+          "%s: import could not find any checkpoint information in supplied metadata", uri);
+
+    /* Now iterate over each checkpoint and compare the aggregate timestamps with our oldest. */
+    WT_CKPT_FOREACH (ckptbase, ckpt) {
+        if (ckpt->ta.newest_start_durable_ts > txn_global->oldest_timestamp)
+            WT_ERR_MSG(session, EINVAL,
+              "%s: import found aggregated newest start durable timestamp newer than the current "
+              "oldest timestamp, newest_start_durable_ts=%" PRIu64 ", oldest_ts=%" PRIu64,
+              uri, ckpt->ta.newest_start_durable_ts, txn_global->oldest_timestamp);
+
+        /*
+         * No need to check "newest stop" here as "newest stop durable" serves that purpose. When a
+         * file has at least one record without a stop timestamp, "newest stop" will be set to max
+         * whereas "newest stop durable" refers to the newest non-max timestamp which is more useful
+         * to us in terms of comparing with oldest.
+         */
+        if (ckpt->ta.newest_stop_durable_ts > txn_global->oldest_timestamp) {
+            WT_ASSERT(session, ckpt->ta.newest_stop_durable_ts != WT_TS_MAX);
+            WT_ERR_MSG(session, EINVAL,
+              "%s: import found aggregated newest stop durable timestamp newer than the current "
+              "oldest timestamp, newest_stop_durable_ts=%" PRIu64 ", oldest_ts=%" PRIu64,
+              uri, ckpt->ta.newest_stop_durable_ts, txn_global->oldest_timestamp);
+        }
+    }
+
+err:
+    if (ckptbase != NULL)
+        __wt_meta_ckptlist_free(session, &ckptbase);
+    return (ret);
+}
+
+/*
  * __create_file --
  *     Create a new 'file:' object.
  */
@@ -104,6 +156,11 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
      * reconstruct the configuration metadata from the file.
      */
     if (import) {
+        /* First verify that the data to import exists on disk. */
+        WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
+        if (!exists)
+            WT_ERR_MSG(session, ENOENT, "%s", uri);
+
         import_repair =
           __wt_config_getones(session, config, "import.repair", &cval) == 0 && cval.val != 0;
         if (!import_repair) {
@@ -131,19 +188,20 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
                   uri);
             }
         }
-    }
-
-    if (import) {
-        WT_IGNORE_RET(__wt_fs_exist(session, filename, &exists));
-        if (!exists)
-            WT_ERR_MSG(session, ENOENT, "%s: attempted to import file that does not exist", uri);
     } else {
         /* Create the file. */
         WT_ERR(__wt_block_manager_create(session, filename, allocsize));
-    }
 
-    if (WT_META_TRACKING(session))
-        WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
+        /*
+         * Track the creation of this file.
+         *
+         * If something down the line fails, we're going to need to roll this back. Specifically do
+         * NOT track the op in the import case since we do not want to wipe a data file just because
+         * we fail to import it.
+         */
+        if (WT_META_TRACKING(session))
+            WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
+    }
 
     /*
      * If creating an ordinary file, append the file ID and current version numbers to the passed-in
@@ -163,6 +221,13 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
         } else {
             /* TO-DO: WT-6691 */
         }
+
+        /*
+         * Ensure that the timestamps in the imported data file are not in the future relative to
+         * our oldest timestamp.
+         */
+        if (import)
+            WT_ERR(__check_imported_ts(session, filename, fileconf));
     }
 
     /*
@@ -591,14 +656,15 @@ static int
 __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
 {
     WT_CONFIG conf;
-    WT_CONFIG_ITEM cgkey, cgval, cval;
+    WT_CONFIG_ITEM cgkey, cgval, ckey, cval;
     WT_DECL_RET;
     WT_TABLE *table;
     size_t cgsize;
-    int ncolgroups;
+    int ncolgroups, nkeys;
     char *tableconf, *cgname;
     const char *cfg[4] = {WT_CONFIG_BASE(session, table_meta), config, NULL, NULL};
     const char *tablename;
+    bool import, import_repair;
 
     cgname = NULL;
     table = NULL;
@@ -608,12 +674,37 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
 
     tablename = uri;
     WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
+    import = __wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0;
 
     /* Check if the table already exists. */
     if ((ret = __wt_metadata_search(session, uri, &tableconf)) != WT_NOTFOUND) {
-        if (exclusive)
+        /*
+         * Regardless of the 'exclusive' flag, we should raise an error if we try to import an
+         * existing URI rather than just silently returning.
+         */
+        if (exclusive || import)
             WT_TRET(EEXIST);
         goto err;
+    }
+
+    if (import) {
+        import_repair =
+          __wt_config_getones(session, config, "import.repair", &cval) == 0 && cval.val != 0;
+        /*
+         * If this is an import but not a repair, check that the exported table metadata is provided
+         * in the config.
+         */
+        if (!import_repair) {
+            __wt_config_init(session, &conf, config);
+            for (nkeys = 0; (ret = __wt_config_next(&conf, &ckey, &cval)) == 0; nkeys++)
+                ;
+            if (nkeys == 1)
+                WT_ERR_MSG(session, EINVAL,
+                  "%s: import requires that the table configuration is specified or the "
+                  "'repair' option is provided",
+                  uri);
+            WT_ERR_NOTFOUND_OK(ret, false);
+        }
     }
 
     WT_ERR(__wt_config_gets(session, cfg, "colgroups", &cval));

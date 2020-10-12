@@ -40,7 +40,6 @@ format()
 	    checkpoints=1 \
 	    data_source=file \
 	    ops=0 \
-	    rebalance=0 \
 	    salvage=0 \
 	    threads=4 \
 	    timer=2 \

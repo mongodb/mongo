@@ -1791,9 +1791,15 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
         read_flags = WT_READ_CACHE | WT_READ_NO_EVICT | WT_READ_NO_GEN | WT_READ_NO_WAIT |
           WT_READ_NOTFOUND_OK | WT_READ_RESTART_OK;
         if (btree->evict_ref == NULL) {
-            /* Ensure internal pages indexes remain valid */
-            WT_WITH_PAGE_INDEX(
-              session, ret = __wt_random_descent(session, &btree->evict_ref, read_flags));
+            for (;;) {
+                /* Ensure internal pages indexes remain valid */
+                WT_WITH_PAGE_INDEX(
+                  session, ret = __wt_random_descent(session, &btree->evict_ref, read_flags));
+                if (ret != WT_RESTART)
+                    break;
+                WT_STAT_CONN_INCR(session, cache_eviction_walk_restart);
+                WT_STAT_DATA_INCR(session, cache_eviction_walk_restart);
+            }
             WT_RET_NOTFOUND_OK(ret);
         }
         break;
@@ -2224,7 +2230,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     WT_REF *ref;
     WT_TRACK_OP_DECL;
     uint64_t time_start, time_stop;
-    uint32_t flags;
     uint8_t previous_state;
     bool app_timer;
 
@@ -2236,8 +2241,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
     app_timer = false;
     cache = S2C(session)->cache;
     time_start = time_stop = 0;
-
-    flags = 0;
 
     /*
      * An internal session flags either the server itself or an eviction worker thread.
@@ -2257,10 +2260,6 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
         }
     }
 
-    /* Set a flag to indicate that either eviction server or worker thread is evicting the page. */
-    if (F_ISSET(session, WT_SESSION_INTERNAL))
-        LF_SET(WT_REC_EVICTION_THREAD);
-
     /*
      * In case something goes wrong, don't pick the same set of pages every time.
      *
@@ -2270,7 +2269,7 @@ __evict_page(WT_SESSION_IMPL *session, bool is_server)
      */
     __wt_cache_read_gen_bump(session, ref->page);
 
-    WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, previous_state, flags));
+    WT_WITH_BTREE(session, btree, ret = __wt_evict(session, ref, previous_state, 0));
 
     (void)__wt_atomic_subv32(&btree->evict_busy, 1);
 

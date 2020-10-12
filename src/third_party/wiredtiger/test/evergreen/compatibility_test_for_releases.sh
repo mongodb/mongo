@@ -75,7 +75,6 @@ run_format()
         args+="leak_memory=1 "                  # Faster runs
         args+="logging=1 "                      # Test log compatibility
         args+="logging_compression=snappy "     # We only built with snappy, force the choice
-        args+="rebalance=0 "                    # Faster runs
         args+="rows=1000000 "
         args+="salvage=0 "                      # Faster runs
         args+="timer=4 "

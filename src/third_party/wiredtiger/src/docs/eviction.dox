@@ -11,7 +11,7 @@ accessed out of the memory to free up enough space to read data that
 are requested by the user but currently reside on the disk back into
 memory. This process is called eviction.
 
-@section overview Eviction overview
+@section eviction_overview Eviction overview
 
 The WiredTiger eviction runs in the background with one eviction server
 thread and several eviction worker threads.

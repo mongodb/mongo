@@ -1,4 +1,4 @@
-/*! @page architecture WiredTiger Architecture
+/*! @page overview WiredTiger Overview and Features
 
 The WiredTiger data engine is a high performance, scalable, transactional,
 production quality, open source, NoSQL data engine, created to maximize the

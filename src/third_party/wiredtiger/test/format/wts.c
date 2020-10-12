@@ -467,8 +467,8 @@ wts_close(WT_CONNECTION **connp, WT_SESSION **sessionp)
     /*
      * If running in-memory, there's only a single, shared WT_CONNECTION handle. Format currently
      * doesn't perform the operations coded to close and then re-open the database on in-memory
-     * databases (for example, salvage or rebalance), so the close gets all references, it doesn't
-     * have to avoid closing the real handle.
+     * databases (for example, salvage), so the close gets all references, it doesn't have to avoid
+     * closing the real handle.
      */
     if (conn == g.wts_conn_inmemory)
         g.wts_conn_inmemory = NULL;

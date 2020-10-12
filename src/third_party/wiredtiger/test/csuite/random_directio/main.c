@@ -765,6 +765,24 @@ check_schema(WT_SESSION *session, uint64_t lastid, uint32_t threadid, uint32_t f
     }
 }
 
+static void
+kill_child(pid_t pid)
+{
+    int status;
+
+    /*
+     * The child is stopped, it won't process an abort until it is continued. First signal the
+     * abort, then signal continue so that the child process will process the abort and dump core.
+     */
+    printf("Send abort to child process ID %d\n", (int)pid);
+    if (kill(pid, SIGABRT) != 0)
+        testutil_die(errno, "kill");
+    if (kill(pid, SIGCONT) != 0)
+        testutil_die(errno, "kill");
+    if (waitpid(pid, &status, 0) == -1)
+        testutil_die(errno, "waitpid");
+}
+
 /*
  * check_db --
  *     Make a copy of the database and verify its contents.
@@ -779,10 +797,10 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
     uint64_t gotid, id;
     uint64_t *lastid;
     uint32_t gotth, kvsize, th, threadmap;
-    int status;
     char checkdir[4096], dbgdir[4096], savedir[4096];
     char *gotkey, *gotvalue, *keybuf, *p;
     char **large_arr;
+    bool fatal;
 
     keybuf = dcalloc(datasize, 1);
     lastid = dcalloc(nth, sizeof(uint64_t));
@@ -803,29 +821,32 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
     printf(
       "Copy database home directory using direct I/O to run recovery,\n"
       "along with a saved 'pre-recovery' copy.\n");
-    copy_directory(home, checkdir, directio);
-    /* Copy the original home directory explicitly without direct I/O. */
-    copy_directory(home, dbgdir, false);
-    copy_directory(checkdir, savedir, false);
+    /*
+     * Copy the original home directory explicitly without direct I/O. Copy this first because
+     * copying with directio may abort and we want to see what the original copy saw.
+     */
+    fatal = copy_directory(home, dbgdir, false);
+    if (fatal) {
+        printf("FATAL: Copying from %s to %s, directio %d\n", home, dbgdir, false);
+        kill_child(pid);
+    }
+    fatal = copy_directory(home, checkdir, directio);
+    if (fatal) {
+        printf("FATAL: Copying from %s to %s, directio %d\n", home, checkdir, directio);
+        kill_child(pid);
+    }
+    fatal = copy_directory(checkdir, savedir, false);
+    if (fatal) {
+        printf("FATAL: Copying from %s to %s, directio %d\n", checkdir, savedir, false);
+        kill_child(pid);
+    }
 
     printf("Open database, run recovery and verify content\n");
     ret = wiredtiger_open(checkdir, NULL, ENV_CONFIG_REC, &conn);
     /* If this fails, abort the child process before we die so we can see what it was doing. */
     if (ret != 0) {
-        if (pid != 0) {
-            /*
-             * The child is stopped, it won't process an abort until it is continued. First signal
-             * the abort, then signal continue so that the child process will process the abort and
-             * dump core.
-             */
-            printf("Send abort to child process ID %d\n", (int)pid);
-            if (kill(pid, SIGABRT) != 0)
-                testutil_die(errno, "kill");
-            if (kill(pid, SIGCONT) != 0)
-                testutil_die(errno, "kill");
-            if (waitpid(pid, &status, 0) == -1)
-                testutil_die(errno, "waitpid");
-        }
+        if (pid != 0)
+            kill_child(pid);
         testutil_check(ret);
     }
     testutil_check(conn->open_session(conn, NULL, NULL, &session));

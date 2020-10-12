@@ -1,4 +1,4 @@
-/*! @page devdoc-xray Instrumentation and introspection with XRay
+/*! @page tool-xray Instrumentation and introspection with XRay
 
 # Instrumenting with XRay
 
@@ -75,7 +75,7 @@ of Brendan Gregg's FlameGraph script (\c flamegraph.pl).
 After running a program instrumented with XRay, a log file will be produced
 containing performance information. There is a tool called \c xray_to_optrack
 which is designed to convert this log to the [Operation Tracking]
-(@ref devdoc-optrack) format.
+(@ref tool-optrack) format.
 
 ## Step 1: Take a copy of the wtperf binary and the XRay log
 
@@ -146,6 +146,6 @@ our case, and \c xray_log is the log file.
 
 The script will produce one or more files with a prefix \c optrack. You can view
 these files with optrack tools, described in the [optrack documentation]
-(@ref devdoc-optrack).
+(@ref tool-optrack).
 
 */

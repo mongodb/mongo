@@ -1,4 +1,4 @@
-/*! @page devdoc-perf-flamegraphs CPU Flame Graphs
+/*! @page tool-perf-flamegraphs CPU Flame Graphs
 
 # Introduction
 
@@ -41,7 +41,7 @@ their full names.
 # Generating FlameGraphs
 
 To generate FlameGraphs, you first need to run perf and generate a perf.data
-file using the `perf record -g` command. [Click here](@ref devdoc-perf) for
+file using the `perf record -g` command. [Click here](@ref tool-perf) for
 instructions explaining how to do this with WiredTiger. Don't forget the `-g`
 option: you need it in order to record the call stacks!
 
