@@ -1,4 +1,5 @@
-// @tags: [does_not_support_stepdowns]
+// @tags: [does_not_support_stepdowns, assumes_read_concern_unchanged,
+// assumes_read_preference_unchanged ]
 
 t = db.getCollection("basic1");
 t.drop();
