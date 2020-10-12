@@ -810,10 +810,6 @@ WiredTigerKVEngine::~WiredTigerKVEngine() {
     _sessionCache.reset(NULL);
 }
 
-void WiredTigerKVEngine::notifyStartupComplete() {
-    WiredTigerUtil::notifyStartupComplete();
-}
-
 void WiredTigerKVEngine::appendGlobalStats(BSONObjBuilder& b) {
     BSONObjBuilder bb(b.subobjStart("concurrentTransactions"));
     {
@@ -942,8 +938,6 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
 
 void WiredTigerKVEngine::cleanShutdown() {
     log() << "WiredTigerKVEngine shutting down";
-    WiredTigerUtil::resetTableLoggingInfo();
-
     if (!_readOnly)
         syncSizeInfo(true);
     if (!_conn) {
