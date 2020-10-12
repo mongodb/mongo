@@ -3,7 +3,6 @@
 #pylint: disable=too-many-lines
 
 import argparse
-import datetime
 import functools
 import io
 import json
@@ -225,7 +224,7 @@ class BuildloggerServer(object):
             "test_id": test_id,
         }
 
-        dt = datetime.datetime.now().isoformat()
+        dt = time.time()
 
         dlines = [(dt, line) for line in lines]
 
