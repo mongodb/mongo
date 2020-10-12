@@ -45,8 +45,7 @@ assert.eq(output.numRemovedCorruptRecords,
 assert.eq(output.numRemovedExtraIndexEntries,
           1,
           "validate returned an invalid number of removed extra index entries" + tojson(output));
-// TODO SERVER-50185: Update keysPerIndex after repairing index inconsistencies
-// assert.eq(output.keysPerIndex._id_, 0, "expected 0 keys in index _id: " + tojson(output));
+assert.eq(output.keysPerIndex._id_, 0, "expected 0 keys in index _id: " + tojson(output));
 assert.eq(output.indexDetails._id_.valid,
           true,
           "validate returned indexDetails valid false when expected true" + tojson(output));
