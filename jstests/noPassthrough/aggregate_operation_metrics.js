@@ -51,7 +51,12 @@ assert.commandWorked(db2.coll2.insert({a: 1}));
 const secondary = rst.getSecondary();
 [primary, secondary].forEach(function(node) {
     jsTestLog("Testing node: " + node);
+
+    // Clear metrics after waiting for replication to ensure we are not observing metrics from
+    // a previous loop iteration.
     rst.awaitReplication();
+    const adminDB = node.getDB('admin');
+    adminDB.aggregate([{$operationMetrics: {clearMetrics: true}}]);
 
     assert.eq(node.getDB(db1Name).coll1.find({a: 1}).itcount(), 1);
     assert.eq(node.getDB(db1Name).coll2.find({a: 1}).itcount(), 1);
@@ -59,7 +64,6 @@ const secondary = rst.getSecondary();
     assert.eq(node.getDB(db2Name).coll2.find({a: 1}).itcount(), 1);
 
     // Run an aggregation with a batch size of 1.
-    const adminDB = node.getDB('admin');
     let cursor = adminDB.aggregate([{$operationMetrics: {}}], {cursor: {batchSize: 1}});
     assert(cursor.hasNext());
 
