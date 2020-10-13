@@ -228,6 +228,9 @@ selector:
   - jstests/sharding/api_params_transaction_sharded.js
   - jstests/sharding/api_params_transaction_unsharded.js
 
+  # SERVER-51495 reenable after resharding M3
+  - jstests/sharding/reshard_collection_basic.js
+
 executor:
   config:
     shell_options:
