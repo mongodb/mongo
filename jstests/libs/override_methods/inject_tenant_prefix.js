@@ -178,6 +178,26 @@ function createCmdObjWithTenantId(cmdObj) {
     return cmdObjWithTenantId;
 }
 
+/**
+ * If the given response object contains a TenantMigrationAborted error, returns the error object.
+ * Otherwise, returns null.
+ */
+function extractTenantMigrationAbortedError(resObj) {
+    if (resObj.code == ErrorCodes.TenantMigrationAborted) {
+        // Commands, like createIndex and dropIndex, have TenantMigrationAborted error in the top
+        // level
+        return resObj;
+    }
+    if (resObj.writeErrors) {
+        for (let writeError of resObj.writeErrors) {
+            if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+                return writeError;
+            }
+        }
+    }
+    return null;
+}
+
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     // Create another cmdObj from this command with TestData.tenantId prepended to all the
     // applicable database names and namespaces.
@@ -194,7 +214,8 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         // assume the command was run against the original database.
         removeTenantId(resObj);
 
-        if (resObj.code != ErrorCodes.TenantMigrationAborted) {
+        let tenantMigrationAbortedErr = extractTenantMigrationAbortedError(resObj);
+        if (!tenantMigrationAbortedErr) {
             return resObj;
         }
         jsTest.log("Got TenantMigrationAborted after trying " + numAttempts +
@@ -218,7 +239,8 @@ Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs)
         // assume the command was run against the original database.
         removeTenantId(resObj);
 
-        if (resObj.code != ErrorCodes.TenantMigrationAborted) {
+        let tenantMigrationAbortedErr = extractTenantMigrationAbortedError(resObj);
+        if (!tenantMigrationAbortedErr) {
             return resObj;
         }
         jsTest.log("Got TenantMigrationAborted after trying " + numAttempts +

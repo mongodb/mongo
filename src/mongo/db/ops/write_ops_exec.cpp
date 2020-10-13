@@ -276,6 +276,13 @@ bool handleError(OperationContext* opCtx,
         return false;
     }
 
+    if (ErrorCodes::isTenantMigrationError(ex)) {
+        // If an op fails due to a TenantMigrationError then subsequent ops will also fail due to a
+        // migration blocking, committing, or aborting.
+        out->results.emplace_back(ex.toStatus());
+        return false;
+    }
+
     out->results.emplace_back(ex.toStatus());
     return !wholeOp.getOrdered();
 }

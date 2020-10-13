@@ -69,7 +69,7 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
     }
 }
 
-void TenantMigrationAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCtx) {
+Status TenantMigrationAccessBlocker::waitUntilCommittedOrAbortedNoThrow(OperationContext* opCtx) {
     stdx::unique_lock<Latch> ul(_mutex);
 
     auto canWrite = [&]() { return _access == Access::kAllow; };
@@ -80,14 +80,11 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrBlock(OperationContext* opCt
 
     opCtx->waitForConditionOrInterrupt(
         _transitionOutOfBlockingCV, ul, [&]() { return canWrite() || _access == Access::kReject; });
+    return onCompletion().getNoThrow();
+}
 
-    auto status = onCompletion().getNoThrow();
-    if (status.isOK()) {
-        invariant(_access == Access::kReject);
-        uasserted(TenantMigrationCommittedInfo(_tenantId, _recipientConnString),
-                  "Write must be re-routed to the new owner of this tenant");
-    }
-    uassertStatusOK(status);
+void TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx) {
+    uassertStatusOK(waitUntilCommittedOrAbortedNoThrow(opCtx));
 }
 
 void TenantMigrationAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(
@@ -191,7 +188,10 @@ void TenantMigrationAccessBlocker::commit(repl::OpTime commitOpTime) {
 
             _access = Access::kReject;
             _transitionOutOfBlockingCV.notify_all();
-            _completionPromise.emplaceValue();
+            _completionPromise.setError(
+                {ErrorCodes::TenantMigrationCommitted,
+                 "Write must be re-routed to the new owner of this tenant",
+                 TenantMigrationCommittedInfo(_tenantId, _recipientConnString).toBSON()});
         })
         .getAsync([this, self = shared_from_this()](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
@@ -226,7 +226,7 @@ void TenantMigrationAccessBlocker::abort(repl::OpTime abortOpTime) {
             _access = Access::kAllow;
             _transitionOutOfBlockingCV.notify_all();
             _completionPromise.setError(
-                {ErrorCodes::TenantMigrationAborted, "tenant migration aborted"});
+                {ErrorCodes::TenantMigrationAborted, "Tenant migration aborted"});
         })
         .getAsync([this, self = shared_from_this()](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);

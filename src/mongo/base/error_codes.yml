@@ -29,6 +29,7 @@ error_categories:
     - ValidationError
     # Codes for internal use only that must never be returned in a network response.
     - InternalOnly
+    - TenantMigrationError
 
 error_codes:
     - {code: 0,name: OK}
@@ -381,14 +382,14 @@ error_codes:
     - {code: 318,name: ForTestingOptionalErrorExtraInfo,extra: OptionalErrorExtraInfoExample,extraIsOptional: True}
     - {code: 319,name: MovePrimaryInProgress}
 
-    - {code: 320, name: TenantMigrationConflict,extra: TenantMigrationConflictInfo}
-    - {code: 321, name: TenantMigrationCommitted,extra: TenantMigrationCommittedInfo}
+    - {code: 320, name: TenantMigrationConflict,extra: TenantMigrationConflictInfo,categories: [TenantMigrationError]}
+    - {code: 321, name: TenantMigrationCommitted,extra: TenantMigrationCommittedInfo,categories: [TenantMigrationError]}
 
     - {code: 322, name: APIVersionError, categories: [VersionedAPIError]}
     - {code: 323, name: APIStrictError, categories: [VersionedAPIError]}
     - {code: 324, name: APIDeprecationError, categories: [VersionedAPIError]}
 
-    - {code: 325, name: TenantMigrationAborted}
+    - {code: 325, name: TenantMigrationAborted,categories: [TenantMigrationError]}
 
     - {code: 326, name: OplogQueryMinTsMissing}
 

@@ -128,7 +128,8 @@ public:
     //
 
     void checkIfCanWriteOrThrow();
-    void checkIfCanWriteOrBlock(OperationContext* opCtx);
+    Status waitUntilCommittedOrAbortedNoThrow(OperationContext* opCtx);
+    void waitUntilCommittedOrAborted(OperationContext* opCtx);
 
     void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx);
     void checkIfCanDoClusterTimeReadOrBlock(OperationContext* opCtx,
