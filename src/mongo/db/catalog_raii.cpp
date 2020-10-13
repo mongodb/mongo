@@ -79,10 +79,21 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
               !nsOrUUID.dbname().empty() ? nsOrUUID.dbname() : nsOrUUID.nss()->db(),
               isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
               deadline) {
-    if (auto& nss = nsOrUUID.nss()) {
+    auto& nss = nsOrUUID.nss();
+    if (nss) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Namespace " << *nss << " is not a valid collection name",
                 nss->isValid());
+    }
+
+    // Out of an abundance of caution, force operations to acquire new snapshots after
+    // acquiring exclusive collection locks. Operations that hold MODE_X locks make an
+    // assumption that all writes are visible in their snapshot and no new writes will commit.
+    // This may not be the case if an operation already has a snapshot open before acquiring an
+    // exclusive lock.
+    if (modeColl == MODE_X) {
+        invariant(!opCtx->recoveryUnit()->inActiveTxn(),
+                  str::stream() << "Snapshot opened before acquiring X lock for " << *nss);
     }
 
     _collLock.emplace(opCtx, nsOrUUID, modeColl, deadline);

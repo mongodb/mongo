@@ -397,13 +397,13 @@ Status dropIndexes(OperationContext* opCtx,
             hangAfterAbortingIndexes.pauseWhileSet();
         }
 
-        // Take an exclusive lock on the collection now to be able to perform index catalog writes
-        // when removing ready indexes from disk.
-        collection.emplace(opCtx, dbAndUUID, MODE_X);
-
         // Abandon the snapshot as the index catalog will compare the in-memory state to the disk
         // state, which may have changed when we released the lock temporarily.
         opCtx->recoveryUnit()->abandonSnapshot();
+
+        // Take an exclusive lock on the collection now to be able to perform index catalog writes
+        // when removing ready indexes from disk.
+        collection.emplace(opCtx, dbAndUUID, MODE_X);
 
         db = collection->getDb();
         if (!*collection) {
