@@ -535,7 +535,7 @@ BSONObj ReplicationCoordinatorNoOp::runCmdOnPrimaryAndAwaitResponse(
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorNoOp::restartHeartbeats_forTest() {
+void ReplicationCoordinatorNoOp::restartScheduledHeartbeats_forTest() {
     MONGO_UNREACHABLE;
 }
 

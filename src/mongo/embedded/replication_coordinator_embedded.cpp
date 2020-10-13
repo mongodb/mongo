@@ -560,7 +560,7 @@ BSONObj ReplicationCoordinatorEmbedded::runCmdOnPrimaryAndAwaitResponse(
     MONGO_UNREACHABLE;
 }
 
-void ReplicationCoordinatorEmbedded::restartHeartbeats_forTest() {
+void ReplicationCoordinatorEmbedded::restartScheduledHeartbeats_forTest() {
     MONGO_UNREACHABLE;
 }
 

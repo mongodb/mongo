@@ -297,7 +297,7 @@ public:
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
-    virtual void restartHeartbeats_forTest() final;
+    virtual void restartScheduledHeartbeats_forTest() final;
 
 private:
     ServiceContext* const _service;

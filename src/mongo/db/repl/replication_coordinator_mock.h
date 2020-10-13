@@ -361,7 +361,7 @@ public:
                                             const BSONObj& cmdObj,
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
-    virtual void restartHeartbeats_forTest() override;
+    virtual void restartScheduledHeartbeats_forTest() override;
 
 private:
     ServiceContext* const _service;
