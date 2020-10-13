@@ -1201,7 +1201,7 @@ functions:
 
           python_loc=$(which ${python|/opt/mongodbtoolchain/v3/bin/python3})
           venv_dir="${workdir}/venv"
-          if command -V cygpath; then
+          if which cygpath; then
             # Sad note: We have to use the Windows path instead of the posix path here.
             # Otherwise, virtualenv may mistakenly resolve paths relative to c:\cygdrive.
             # Creating a virtualenv in cygwin with 'python -m venv', will not work correctly
@@ -1813,7 +1813,7 @@ functions:
 
           ${activate_virtualenv}
           export MYPY="$(
-            if command -V cygpath 2>/dev/null; then
+            if which cygpath 2>/dev/null; then
                 PATH+=":$(cypath "${workdir}")/venv_3/Scripts"
             else
                 PATH+=":${workdir}/venv_3/bin"
