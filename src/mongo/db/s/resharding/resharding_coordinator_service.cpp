@@ -58,7 +58,13 @@ void withAlternateSession(OperationContext* opCtx, Callable&& callable) {
     TxnNumber txnNumber = 0;
 
     auto guard = makeGuard([opCtx = asr.opCtx(), txnNumber] {
-        ShardingCatalogManager::get(opCtx)->abortTxnForConfigDocument(opCtx, txnNumber);
+        try {
+            ShardingCatalogManager::get(opCtx)->abortTxnForConfigDocument(opCtx, txnNumber);
+        } catch (const DBException& ex) {
+            LOGV2(5165900,
+                  "Failed to abort transaction to resharding metadata",
+                  "error"_attr = redact(ex));
+        }
     });
 
     callable(asr.opCtx(), txnNumber);

@@ -86,9 +86,9 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
             .response);
 }
 
-void runCommitOrAbortTxnForConfigDocument(OperationContext* opCtx,
-                                          TxnNumber txnNumber,
-                                          std::string cmdName) {
+BSONObj runCommitOrAbortTxnForConfigDocument(OperationContext* opCtx,
+                                             TxnNumber txnNumber,
+                                             std::string cmdName) {
     // Swap out the clients in order to get a fresh opCtx. Previous operations in this transaction
     // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
     // commit should not have a lock timeout.
@@ -121,9 +121,7 @@ void runCommitOrAbortTxnForConfigDocument(OperationContext* opCtx,
                                                   .serialize())
                               .get()
                               .response);
-
-    uassertStatusOK(getStatusFromCommandResult(replyOpMsg.body));
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(replyOpMsg.body));
+    return replyOpMsg.body;
 }
 
 }  // namespace
@@ -524,12 +522,20 @@ void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
 
 void ShardingCatalogManager::commitTxnForConfigDocument(OperationContext* opCtx,
                                                         TxnNumber txnNumber) {
-    runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "commitTransaction");
+    auto response = runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "commitTransaction");
+    uassertStatusOK(getStatusFromCommandResult(response));
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
 }
 
 void ShardingCatalogManager::abortTxnForConfigDocument(OperationContext* opCtx,
                                                        TxnNumber txnNumber) {
-    runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "abortTransaction");
+    auto response = runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "abortTransaction");
+
+    auto status = getStatusFromCommandResult(response);
+    if (status.code() != ErrorCodes::NoSuchTransaction) {
+        uassertStatusOK(status);
+        uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
+    }
 }
 
 }  // namespace mongo
