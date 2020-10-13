@@ -201,7 +201,8 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     LOGV2_DEBUG(
         20590, 5, "Winning solution", "bestSolution"_attr = redact(bestSolution->toString()));
 
-    auto explainer = plan_explainer_factory::make(bestCandidate.root);
+    auto explainer =
+        plan_explainer_factory::make(bestCandidate.root, bestSolution->_enumeratorExplainInfo);
     LOGV2_DEBUG(20591, 2, "Winning plan", "planSummary"_attr = explainer->getPlanSummary());
 
     _backupPlanIdx = kNoSuchPlan;

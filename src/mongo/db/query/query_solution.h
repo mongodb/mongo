@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/id_generator.h"
 
@@ -234,6 +235,19 @@ struct QuerySolutionNode {
                        [](auto& child) { return child.release(); });
     }
 
+    bool getScanLimit() {
+        if (hitScanLimit) {
+            return hitScanLimit;
+        }
+        for (const auto& child : children) {
+            if (child->getScanLimit()) {
+                hitScanLimit = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * True, if this node, or any of it's children is of the given 'type'.
      */
@@ -258,6 +272,8 @@ struct QuerySolutionNode {
     // If a stage has a non-NULL filter all values outputted from that stage must pass that
     // filter.
     std::unique_ptr<MatchExpression> filter;
+
+    bool hitScanLimit = false;
 
 protected:
     /**
@@ -366,6 +382,8 @@ public:
 
     // Owned here. Used by the plan cache.
     std::unique_ptr<SolutionCacheData> cacheData;
+
+    PlanEnumeratorExplainInfo _enumeratorExplainInfo;
 
 private:
     using QsnIdGenerator = IdGenerator<PlanNodeId>;

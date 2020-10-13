@@ -898,6 +898,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
             auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
             if (soln) {
+                soln->_enumeratorExplainInfo.merge(planEnumerator._explainInfo);
                 LOGV2_DEBUG(20978,
                             5,
                             "Planner: adding solution",

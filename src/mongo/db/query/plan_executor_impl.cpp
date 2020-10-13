@@ -132,9 +132,9 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
-    // If this PlanExecutor is executing a COLLSCAN, keep a pointer directly to the COLLSCAN stage.
-    // This is used for change streams in order to keep the the latest oplog timestamp and post
-    // batch resume token up to date as the oplog scan progresses.
+    // If this PlanExecutor is executing a COLLSCAN, keep a pointer directly to the COLLSCAN
+    // stage. This is used for change streams in order to keep the the latest oplog timestamp
+    // and post batch resume token up to date as the oplog scan progresses.
     if (auto collectionScan = getStageByType(_root.get(), STAGE_COLLSCAN)) {
         _collScanStage = static_cast<CollectionScan*>(collectionScan);
     }
@@ -152,6 +152,18 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
     }
 
     uassertStatusOK(_pickBestPlan());
+
+    if (_qs) {
+        _planExplainer->updateEnumeratorExplainInfo(_qs->_enumeratorExplainInfo);
+    } else if (const MultiPlanStage* mps = getMultiPlanStage()) {
+        const QuerySolution* soln = mps->bestSolution();
+        _planExplainer->updateEnumeratorExplainInfo(soln->_enumeratorExplainInfo);
+
+    } else if (auto subplan = getStageByType(_root.get(), STAGE_SUBPLAN)) {
+        auto subplanStage = static_cast<SubplanStage*>(subplan);
+        _planExplainer->updateEnumeratorExplainInfo(
+            subplanStage->compositeSolution()->_enumeratorExplainInfo);
+    }
 }
 
 Status PlanExecutorImpl::_pickBestPlan() {
@@ -180,8 +192,9 @@ Status PlanExecutorImpl::_pickBestPlan() {
         return cachedPlan->pickBestPlan(_yieldPolicy.get());
     }
 
-    // Finally, we might have an explicit TrialPhase. This specifies exactly two candidate plans,
-    // one of which is to be evaluated. If it fails the trial, then the backup plan is adopted.
+    // Finally, we might have an explicit TrialPhase. This specifies exactly two candidate
+    // plans, one of which is to be evaluated. If it fails the trial, then the backup plan is
+    // adopted.
     foundStage = getStageByType(_root.get(), STAGE_TRIAL);
     if (foundStage) {
         TrialStage* trialStage = static_cast<TrialStage*>(foundStage);
@@ -329,8 +342,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
     size_t writeConflictsInARow = 0;
 
     // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
-    // insert notifier the entire time we are in the loop.  Holding a shared pointer to the capped
-    // insert notifier is necessary for the notifierVersion to advance.
+    // insert notifier the entire time we are in the loop.  Holding a shared pointer to the
+    // capped insert notifier is necessary for the notifierVersion to advance.
     insert_listener::CappedInsertNotifierData cappedInsertNotifierData;
     if (insert_listener::shouldListenForInserts(_opCtx, _cq.get())) {
         // We always construct the CappedInsertNotifier for awaitData cursors.
@@ -502,8 +515,8 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
                             updateStats.objInserted);
     };
 
-    // If we're updating a non-existent collection, then the delete plan may have an EOF as the root
-    // stage.
+    // If we're updating a non-existent collection, then the delete plan may have an EOF as the
+    // root stage.
     if (_root->stageType() == STAGE_EOF) {
         const auto stats = std::make_unique<UpdateStats>();
         return updateStatsToResult(static_cast<const UpdateStats&>(*stats));
@@ -530,14 +543,14 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
 long long PlanExecutorImpl::executeDelete() {
     _executePlan();
 
-    // If we're deleting from a non-existent collection, then the delete plan may have an EOF as the
-    // root stage.
+    // If we're deleting from a non-existent collection, then the delete plan may have an EOF as
+    // the root stage.
     if (_root->stageType() == STAGE_EOF) {
         return 0LL;
     }
 
-    // If the collection exists, the delete plan may either have a delete stage at the root, or (for
-    // findAndModify) a projection stage wrapping a delete stage.
+    // If the collection exists, the delete plan may either have a delete stage at the root, or
+    // (for findAndModify) a projection stage wrapping a delete stage.
     switch (_root->stageType()) {
         case StageType::STAGE_PROJECTION_DEFAULT:
         case StageType::STAGE_PROJECTION_COVERED:

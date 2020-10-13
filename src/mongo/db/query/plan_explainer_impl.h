@@ -30,7 +30,9 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 /**
@@ -42,6 +44,8 @@ namespace mongo {
  */
 class PlanExplainerImpl final : public PlanExplainer {
 public:
+    PlanExplainerImpl(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo)
+        : PlanExplainer{explainInfo}, _root{root} {}
     PlanExplainerImpl(PlanStage* root) : _root{root} {}
 
     bool isMultiPlan() const final;

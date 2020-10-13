@@ -136,6 +136,10 @@ void generatePlannerInfo(PlanExecutor* exec,
     }
 
     auto&& explainer = exec->getPlanExplainer();
+    auto&& enumeratorInfo = explainer.getEnumeratorInfo();
+    plannerBob.append("maxIndexedOrSolutionsReached", enumeratorInfo.hitIndexedOrLimit);
+    plannerBob.append("maxIndexedAndSolutionsReached", enumeratorInfo.hitIndexedAndLimit);
+    plannerBob.append("maxScansToExplodeReached", enumeratorInfo.hitScanLimit);
     auto&& [winningStats, _] =
         explainer.getWinningPlanStats(ExplainOptions::Verbosity::kQueryPlanner);
     plannerBob.append("winningPlan", winningStats);

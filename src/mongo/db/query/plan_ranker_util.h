@@ -80,7 +80,8 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     for (size_t i = 0; i < statTrees.size(); ++i) {
         auto explainer = [&]() {
             if constexpr (std::is_same_v<PlanStageStatsType, PlanStageStats>) {
-                return plan_explainer_factory::make(candidates[i].root);
+                return plan_explainer_factory::make(candidates[i].root,
+                                                    candidates[i].solution->_enumeratorExplainInfo);
             } else {
                 static_assert(std::is_same_v<PlanStageStatsType, mongo::sbe::PlanStageStats>);
                 return plan_explainer_factory::make(candidates[i].root.get(),

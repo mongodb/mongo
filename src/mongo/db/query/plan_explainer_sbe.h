@@ -44,7 +44,8 @@ public:
                      const QuerySolution* solution,
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan)
-        : _root{root},
+        : PlanExplainer{solution},
+          _root{root},
           _solution{solution},
           _rejectedCandidates{std::move(rejectedCandidates)},
           _isMultiPlan{isMultiPlan} {}

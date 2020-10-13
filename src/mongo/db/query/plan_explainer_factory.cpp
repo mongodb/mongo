@@ -39,6 +39,10 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root) {
     return std::make_unique<PlanExplainerImpl>(root);
 }
 
+std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo) {
+    return std::make_unique<PlanExplainerImpl>(root, explainInfo);
+}
+
 std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root, const QuerySolution* solution) {
     return make(root, solution, {}, false);
 }

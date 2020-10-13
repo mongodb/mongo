@@ -35,6 +35,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -109,6 +110,8 @@ public:
      * added in order to indicate index usage.
      */
     std::unique_ptr<MatchExpression> getNext();
+
+    PlanEnumeratorExplainInfo _explainInfo;
 
 private:
     //

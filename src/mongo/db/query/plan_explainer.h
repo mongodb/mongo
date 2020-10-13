@@ -32,7 +32,9 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 /**
@@ -54,6 +56,12 @@ public:
      * caller, and different implementations may choose to provide different stats.
      */
     using PlanStatsDetails = std::pair<BSONObj, boost::optional<PlanSummaryStats>>;
+
+    PlanExplainer() {}
+    PlanExplainer(const QuerySolution* solution)
+        : _enumeratorExplainInfo{solution ? solution->_enumeratorExplainInfo
+                                          : PlanEnumeratorExplainInfo{}} {}
+    PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
 
     virtual ~PlanExplainer() = default;
 
@@ -103,5 +111,18 @@ public:
      */
     virtual std::vector<PlanStatsDetails> getCachedPlanStats(
         const PlanCacheEntry::DebugInfo& debugInfo, ExplainOptions::Verbosity verbosity) const = 0;
+
+    /**
+     * Returns an object containing what query knobs the planner hit during plan enumeration.
+     */
+    PlanEnumeratorExplainInfo getEnumeratorInfo() const {
+        return _enumeratorExplainInfo;
+    }
+    void updateEnumeratorExplainInfo(const PlanEnumeratorExplainInfo& other) {
+        _enumeratorExplainInfo.merge(other);
+    }
+
+protected:
+    PlanEnumeratorExplainInfo _enumeratorExplainInfo;
 };
 }  // namespace mongo

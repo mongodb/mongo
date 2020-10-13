@@ -36,6 +36,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"

@@ -159,6 +159,10 @@ void QuerySolution::assignNodeIds(QsnIdGenerator& idGenerator, QuerySolutionNode
 
 void QuerySolution::setRoot(std::unique_ptr<QuerySolutionNode> root) {
     _root = std::move(root);
+    if (_root) {
+        _enumeratorExplainInfo.hitScanLimit = _root->getScanLimit();
+    }
+
     QsnIdGenerator idGenerator;
     assignNodeIds(idGenerator, *_root);
 }

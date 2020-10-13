@@ -730,6 +730,7 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
 
     // Too many ixscans spoil the performance.
     if (totalNumScans > (size_t)internalQueryMaxScansToExplode.load()) {
+        (*solnRoot)->hitScanLimit = true;
         LOGV2_DEBUG(
             20950,
             5,

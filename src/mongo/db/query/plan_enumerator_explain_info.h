@@ -29,20 +29,17 @@
 
 #pragma once
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/query/plan_enumerator_explain_info.h"
-#include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/sbe_plan_ranker.h"
+namespace mongo {
 
-namespace mongo::plan_explainer_factory {
-std::unique_ptr<PlanExplainer> make(PlanStage* root);
-std::unique_ptr<PlanExplainer> make(PlanStage* root,
-                                    const PlanEnumeratorExplainInfo& enumeratorInfo);
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root, const QuerySolution* solution);
-std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
-                                    const QuerySolution* solution,
-                                    std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
-                                    bool isMultiPlan);
-}  // namespace mongo::plan_explainer_factory
+struct PlanEnumeratorExplainInfo {
+    bool hitIndexedOrLimit = false;
+    bool hitIndexedAndLimit = false;
+    bool hitScanLimit = false;
+
+    void merge(PlanEnumeratorExplainInfo other) {
+        hitIndexedOrLimit = hitIndexedOrLimit || other.hitIndexedOrLimit;
+        hitIndexedAndLimit = hitIndexedAndLimit || other.hitIndexedAndLimit;
+        hitScanLimit = hitScanLimit || other.hitScanLimit;
+    }
+};
+}  // namespace mongo

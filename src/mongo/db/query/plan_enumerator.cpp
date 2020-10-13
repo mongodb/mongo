@@ -411,6 +411,11 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
 
     if (MatchExpression::OR == node->matchType()) {
         if (_orLimit == 0) {
+            LOGV2_DEBUG(4862501,
+                        1,
+                        "plan enumerator exceeded threshold for OR enumerations",
+                        "orEnumerationLimit"_attr = _orLimit);
+            _explainInfo.hitIndexedOrLimit = true;
             return false;
         }
         // For an OR to be indexed, all its children must be indexed.
@@ -1097,6 +1102,12 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
             andAssignment->choices.push_back(std::move(indexAndSubnode));
             // Limit n^2.
             if (andAssignment->choices.size() - sizeBefore > _intersectLimit) {
+
+                LOGV2_DEBUG(4862502,
+                            1,
+                            "plan enumerator exceeded threshold for AND enumerations",
+                            "intersectLimit"_attr = _intersectLimit);
+                _explainInfo.hitIndexedAndLimit = true;
                 return;
             }
         }
@@ -1111,6 +1122,11 @@ void PlanEnumerator::enumerateAndIntersect(const IndexToPredMap& idxToFirst,
 
             // Limit n^2.
             if (andAssignment->choices.size() - sizeBefore > _intersectLimit) {
+                LOGV2_DEBUG(4862503,
+                            1,
+                            "plan enumerator exceeded threshold for AND enumerations",
+                            "intersectLimit"_attr = _intersectLimit);
+                _explainInfo.hitIndexedAndLimit = true;
                 return;
             }
 
@@ -1309,6 +1325,11 @@ bool PlanEnumerator::prepSubNodes(MatchExpression* node,
         MatchExpression* child = node->getChild(i);
         if (MatchExpression::OR == child->matchType()) {
             if (_orLimit == 0) {
+                LOGV2_DEBUG(4862500,
+                            1,
+                            "plan enumerator exceeded threshold for OR enumerations",
+                            "orEnumerationLimit"_attr = _orLimit);
+                _explainInfo.hitIndexedOrLimit = true;
                 return false;
             }
             bool mandatory = expressionRequiresIndex(child);
@@ -1783,6 +1804,7 @@ bool PlanEnumerator::nextMemo(size_t id) {
                         1,
                         "plan enumerator exceeded threshold for OR enumerations",
                         "orEnumerationLimit"_attr = _orLimit);
+            _explainInfo.hitIndexedOrLimit = true;
             return true;
         }
 
@@ -1806,6 +1828,7 @@ bool PlanEnumerator::nextMemo(size_t id) {
                         1,
                         "plan enumerator exceeded threshold for OR enumerations",
                         "orEnumerationLimit"_attr = _orLimit);
+            _explainInfo.hitIndexedOrLimit = true;
             return true;
         }
         return _nextMemoForLockstepOrAssignment(assignment);
