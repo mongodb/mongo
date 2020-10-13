@@ -93,7 +93,8 @@ Milliseconds ReplicationCoordinatorImpl::_getRandomizedElectionOffset_inlock() {
 }
 
 void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
-                                                    const HostAndPort& target) {
+                                                    const HostAndPort& target,
+                                                    int targetIndex) {
     stdx::lock_guard<Latch> lk(_mutex);
 
     _untrackHeartbeatHandle_inlock(cbData.myHandle);
@@ -113,7 +114,7 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
         target, "admin", heartbeatObj, BSON(rpc::kReplSetMetadataFieldName << 1), nullptr, timeout);
     const executor::TaskExecutor::RemoteCommandCallbackFn callback =
         [=](const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
-            return _handleHeartbeatResponse(cbData);
+            return _handleHeartbeatResponse(cbData, targetIndex);
         };
 
     LOGV2_FOR_HEARTBEATS(4615670,
@@ -123,11 +124,11 @@ void ReplicationCoordinatorImpl::_doMemberHeartbeat(executor::TaskExecutor::Call
                          "requestId"_attr = request.id,
                          "target"_attr = target,
                          "heartbeatObj"_attr = heartbeatObj);
-    _trackHeartbeatHandle_inlock(
-        _replExecutor->scheduleRemoteCommand(request, callback), HeartbeatState::kSent, target);
+    _trackHeartbeatHandle_inlock(_replExecutor->scheduleRemoteCommand(request, callback));
 }
 
 void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAndPort& target,
+                                                                   int targetIndex,
                                                                    Date_t when) {
     LOGV2_FOR_HEARTBEATS(4615618,
                          2,
@@ -135,13 +136,10 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget_inlock(const HostAnd
                          "Scheduling heartbeat",
                          "target"_attr = target,
                          "when"_attr = when);
-    _trackHeartbeatHandle_inlock(
-        _replExecutor->scheduleWorkAt(when,
-                                      [=](const executor::TaskExecutor::CallbackArgs& cbData) {
-                                          _doMemberHeartbeat(cbData, target);
-                                      }),
-        HeartbeatState::kScheduled,
-        target);
+    _trackHeartbeatHandle_inlock(_replExecutor->scheduleWorkAt(
+        when, [=](const executor::TaskExecutor::CallbackArgs& cbData) {
+            _doMemberHeartbeat(cbData, target, targetIndex);
+        }));
 }
 
 void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj response,
@@ -162,14 +160,14 @@ void ReplicationCoordinatorImpl::handleHeartbeatResponse_forTest(BSONObj respons
             _replExecutor->now(), _rsConfig.getReplSetName(), request.target);
 
         // Pretend we sent a request so that _untrackHeartbeatHandle_inlock succeeds.
-        _trackHeartbeatHandle_inlock(handle, HeartbeatState::kSent, request.target);
+        _trackHeartbeatHandle_inlock(handle);
     }
 
-    _handleHeartbeatResponse(cbData);
+    _handleHeartbeatResponse(cbData, targetIndex);
 }
 
 void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
-    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData) {
+    const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData, int targetIndex) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     // remove handle from queued heartbeats
@@ -347,7 +345,8 @@ void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
         }
     }
 
-    _scheduleHeartbeatToTarget_inlock(target, std::max(now, action.getNextHeartbeatStartDate()));
+    _scheduleHeartbeatToTarget_inlock(
+        target, targetIndex, std::max(now, action.getNextHeartbeatStartDate()));
 
     _handleHeartbeatResponseAction_inlock(action, hbStatusResponse, std::move(lk));
 }
@@ -858,26 +857,18 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(
-    const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,
-    HeartbeatState hbState,
-    const HostAndPort& target) {
+    const StatusWith<executor::TaskExecutor::CallbackHandle>& handle) {
     if (handle.getStatus() == ErrorCodes::ShutdownInProgress) {
         return;
     }
     fassert(18912, handle.getStatus());
-
-    // The target's HostAndPort should be safe to store, because it cannot change without a
-    // reconfig. On reconfig, all current heartbeats get cancelled and new requests are sent out, so
-    // there should not be a situation where the target node's HostAndPort changes but this
-    // heartbeat handle remains active.
-    _heartbeatHandles.push_back({handle.getValue(), hbState, target});
+    _heartbeatHandles.push_back(handle.getValue());
 }
 
 void ReplicationCoordinatorImpl::_untrackHeartbeatHandle_inlock(
     const executor::TaskExecutor::CallbackHandle& handle) {
-    const auto newEnd = std::remove_if(_heartbeatHandles.begin(),
-                                       _heartbeatHandles.end(),
-                                       [&](auto& hbHandle) { return hbHandle.handle == handle; });
+    const HeartbeatHandles::iterator newEnd =
+        std::remove(_heartbeatHandles.begin(), _heartbeatHandles.end(), handle);
     invariant(newEnd != _heartbeatHandles.end());
     _heartbeatHandles.erase(newEnd, _heartbeatHandles.end());
 }
@@ -885,8 +876,8 @@ void ReplicationCoordinatorImpl::_untrackHeartbeatHandle_inlock(
 void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
     LOGV2_FOR_HEARTBEATS(4615630, 2, "Cancelling all heartbeats");
 
-    for (const auto& hbHandle : _heartbeatHandles) {
-        _replExecutor->cancel(hbHandle.handle);
+    for (const auto& handle : _heartbeatHandles) {
+        _replExecutor->cancel(handle);
     }
     // Heartbeat callbacks will remove themselves from _heartbeatHandles when they execute with
     // CallbackCanceled status, so it's better to leave the handles in the list, for now.
@@ -896,51 +887,31 @@ void ReplicationCoordinatorImpl::_cancelHeartbeats_inlock() {
     }
 }
 
-void ReplicationCoordinatorImpl::restartScheduledHeartbeats_forTest() {
+void ReplicationCoordinatorImpl::restartHeartbeats_forTest() {
     stdx::unique_lock<Latch> lk(_mutex);
     invariant(getTestCommandsEnabled());
-    _restartScheduledHeartbeats_inlock();
+    LOGV2_FOR_HEARTBEATS(4406800, 0, "Restarting heartbeats");
+    _restartHeartbeats_inlock();
 };
 
-void ReplicationCoordinatorImpl::_restartScheduledHeartbeats_inlock() {
-    LOGV2_FOR_HEARTBEATS(5031800, 2, "Restarting all scheduled heartbeats");
-
-    const Date_t now = _replExecutor->now();
-    stdx::unordered_set<HostAndPort> restartedTargets;
-
-    for (auto& hbHandle : _heartbeatHandles) {
-        // Only cancel heartbeats that are scheduled. If a heartbeat request has already been
-        // sent, we should wait for the response instead.
-        if (hbHandle.hbState != HeartbeatState::kScheduled) {
-            continue;
-        }
-
-        LOGV2_FOR_HEARTBEATS(5031802, 2, "Restarting heartbeat", "target"_attr = hbHandle.target);
-        _replExecutor->cancel(hbHandle.handle);
-
-        // Track the members that we have cancelled heartbeats.
-        restartedTargets.insert(hbHandle.target);
-    }
-
-    for (auto target : restartedTargets) {
-        _scheduleHeartbeatToTarget_inlock(target, now);
-        _topCoord->restartHeartbeat(now, target);
-    }
+void ReplicationCoordinatorImpl::_restartHeartbeats_inlock() {
+    _cancelHeartbeats_inlock();
+    _startHeartbeats_inlock();
 }
 
 void ReplicationCoordinatorImpl::_startHeartbeats_inlock() {
     const Date_t now = _replExecutor->now();
     _seedList.clear();
-
     for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
         if (i == _selfIndex) {
             continue;
         }
-        auto target = _rsConfig.getMemberAt(i).getHostAndPort();
-        _scheduleHeartbeatToTarget_inlock(target, now);
-        _topCoord->restartHeartbeat(now, target);
+        _scheduleHeartbeatToTarget_inlock(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);
     }
 
+    _topCoord->restartHeartbeats();
+
+    _topCoord->resetAllMemberTimeouts(_replExecutor->now());
     _scheduleNextLivenessUpdate_inlock();
 }
 

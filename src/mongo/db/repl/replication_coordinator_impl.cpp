@@ -4137,7 +4137,7 @@ void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) 
     // Clear the sync source.
     _onFollowerModeStateChange();
     // Notify all secondaries of the election win.
-    _restartScheduledHeartbeats_inlock();
+    _restartHeartbeats_inlock();
     invariant(!_catchupState);
     _catchupState = std::make_unique<CatchupState>(this);
     _catchupState->start_inlock();
@@ -4707,7 +4707,7 @@ HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource(const OpTime& lastOp
     // of other members's state, allowing us to make informed sync source decisions.
     if (newSyncSource.empty() && !oldSyncSource.empty() && _selfIndex >= 0 &&
         !_getMemberState_inlock().primary()) {
-        _restartScheduledHeartbeats_inlock();
+        _restartHeartbeats_inlock();
     }
 
     return newSyncSource;
@@ -5201,7 +5201,7 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
                   "Scheduling heartbeat to fetch a new config since we are not "
                   "a member of our current config",
                   "senderHost"_attr = senderHost);
-            _scheduleHeartbeatToTarget_inlock(senderHost, now);
+            _scheduleHeartbeatToTarget_inlock(senderHost, -1, now);
         }
     } else if (result.isOK() &&
                response->getConfigVersionAndTerm() < args.getConfigVersionAndTerm()) {
@@ -5226,7 +5226,8 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
         // will trigger reconfig, which cancels and reschedules all heartbeats.
         else if (args.hasSender()) {
             LOGV2(21401, "Scheduling heartbeat to fetch a newer config", attr);
-            _scheduleHeartbeatToTarget_inlock(senderHost, now);
+            int senderIndex = _rsConfig.findMemberIndexByHostAndPort(senderHost);
+            _scheduleHeartbeatToTarget_inlock(senderHost, senderIndex, now);
         }
     } else if (result.isOK() && args.getPrimaryId() >= 0 &&
                (!response->hasPrimaryId() || response->getPrimaryId() != args.getPrimaryId())) {
@@ -5245,7 +5246,7 @@ Status ReplicationCoordinatorImpl::processHeartbeatV1(const ReplSetHeartbeatArgs
                   "myPrimaryId"_attr = myPrimaryId,
                   "senderAndPrimaryId"_attr = args.getPrimaryId(),
                   "senderTerm"_attr = args.getTerm());
-            _restartScheduledHeartbeats_inlock();
+            _restartHeartbeats_inlock();
         }
     }
     return result;

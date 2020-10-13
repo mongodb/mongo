@@ -383,7 +383,7 @@ public:
                                             OnRemoteCmdScheduledFn onRemoteCmdScheduled,
                                             OnRemoteCmdCompleteFn onRemoteCmdComplete) override;
 
-    virtual void restartScheduledHeartbeats_forTest() override;
+    virtual void restartHeartbeats_forTest() override;
 
     // ================== Test support API ===================
 
@@ -677,12 +677,7 @@ private:
         std::multimap<OpTime, SharedWaiterHandle> _waiters;
     };
 
-    enum class HeartbeatState { kScheduled = 0, kSent = 1 };
-    struct HeartbeatHandle {
-        executor::TaskExecutor::CallbackHandle handle;
-        HeartbeatState hbState;
-        HostAndPort target;
-    };
+    typedef std::vector<executor::TaskExecutor::CallbackHandle> HeartbeatHandles;
 
     // The state and logic of primary catchup.
     //
@@ -1015,21 +1010,22 @@ private:
                                             bool isRollbackAllowed);
 
     /**
-     * Schedules a heartbeat to be sent to "target" at "when".
+     * Schedules a heartbeat to be sent to "target" at "when". "targetIndex" is the index
+     * into the replica set config members array that corresponds to the "target", or -1 if
+     * "target" is not in _rsConfig.
      */
-    void _scheduleHeartbeatToTarget_inlock(const HostAndPort& target, Date_t when);
+    void _scheduleHeartbeatToTarget_inlock(const HostAndPort& target, int targetIndex, Date_t when);
 
     /**
      * Processes each heartbeat response.
      *
      * Schedules additional heartbeats, triggers elections and step downs, etc.
      */
-    void _handleHeartbeatResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData);
+    void _handleHeartbeatResponse(const executor::TaskExecutor::RemoteCommandCallbackArgs& cbData,
+                                  int targetIndex);
 
     void _trackHeartbeatHandle_inlock(
-        const StatusWith<executor::TaskExecutor::CallbackHandle>& handle,
-        HeartbeatState hbState,
-        const HostAndPort& target);
+        const StatusWith<executor::TaskExecutor::CallbackHandle>& handle);
 
     void _untrackHeartbeatHandle_inlock(const executor::TaskExecutor::CallbackHandle& handle);
 
@@ -1050,17 +1046,21 @@ private:
     void _cancelHeartbeats_inlock();
 
     /**
-     * Cancels all heartbeats that have been scheduled but not yet sent out, then reschedules them
-     * at the current time immediately. Called while holding replCoord _mutex.
+     * Cancels all heartbeats, then starts a heartbeat for each member in the current config.
+     * Called while holding replCoord _mutex.
      */
-    void _restartScheduledHeartbeats_inlock();
+    void _restartHeartbeats_inlock();
 
     /**
-     * Asynchronously sends a heartbeat to "target".
+     * Asynchronously sends a heartbeat to "target". "targetIndex" is the index
+     * into the replica set config members array that corresponds to the "target", or -1 if
+     * we don't have a valid replica set config.
      *
      * Scheduled by _scheduleHeartbeatToTarget_inlock.
      */
-    void _doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData, const HostAndPort& target);
+    void _doMemberHeartbeat(executor::TaskExecutor::CallbackArgs cbData,
+                            const HostAndPort& target,
+                            int targetIndex);
 
 
     MemberState _getMemberState_inlock() const;
@@ -1496,7 +1496,7 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationCoordinatorImpl::_mutex");  // (S)
 
     // Handles to actively queued heartbeats.
-    std::vector<HeartbeatHandle> _heartbeatHandles;  // (M)
+    HeartbeatHandles _heartbeatHandles;  // (M)
 
     // When this node does not know itself to be a member of a config, it adds
     // every host that sends it a heartbeat request to this set, and also starts

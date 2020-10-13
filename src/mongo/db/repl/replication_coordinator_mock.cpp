@@ -683,7 +683,7 @@ BSONObj ReplicationCoordinatorMock::runCmdOnPrimaryAndAwaitResponse(
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {
     return BSON("ok" << 1);
 }
-void ReplicationCoordinatorMock::restartScheduledHeartbeats_forTest() {
+void ReplicationCoordinatorMock::restartHeartbeats_forTest() {
     return;
 }
 
