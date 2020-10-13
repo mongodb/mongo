@@ -135,7 +135,8 @@ bool ReplicationCoordinatorNoOp::buildsIndexes() {
     MONGO_UNREACHABLE;
 }
 
-OpTimeAndWallTime ReplicationCoordinatorNoOp::getMyLastAppliedOpTimeAndWallTime() const {
+OpTimeAndWallTime ReplicationCoordinatorNoOp::getMyLastAppliedOpTimeAndWallTime(
+    bool rollbackSafe) const {
     MONGO_UNREACHABLE;
 }
 

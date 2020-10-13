@@ -228,7 +228,8 @@ void ReplicationCoordinatorEmbedded::resetMyLastOpTimes() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-OpTimeAndWallTime ReplicationCoordinatorEmbedded::getMyLastAppliedOpTimeAndWallTime() const {
+OpTimeAndWallTime ReplicationCoordinatorEmbedded::getMyLastAppliedOpTimeAndWallTime(
+    bool rollbackSafe) const {
     UASSERT_NOT_IMPLEMENTED;
 }
 

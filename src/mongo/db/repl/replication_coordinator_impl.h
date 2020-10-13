@@ -184,7 +184,8 @@ public:
     virtual void setMyHeartbeatMessage(const std::string& msg);
 
     virtual OpTime getMyLastAppliedOpTime() const override;
-    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
+    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(
+        bool rollbackSafe = false) const override;
 
     virtual OpTime getMyLastDurableOpTime() const override;
     virtual OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;

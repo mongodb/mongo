@@ -139,7 +139,8 @@ public:
     void setMyHeartbeatMessage(const std::string&) override;
 
     repl::OpTime getMyLastAppliedOpTime() const override;
-    repl::OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const override;
+    repl::OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(
+        bool rollbackSafe = false) const override;
 
     repl::OpTime getMyLastDurableOpTime() const override;
     repl::OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const override;

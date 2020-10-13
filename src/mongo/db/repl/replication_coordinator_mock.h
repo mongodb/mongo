@@ -149,7 +149,7 @@ public:
 
     virtual void setMyHeartbeatMessage(const std::string& msg);
 
-    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const;
+    virtual OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(bool rollbackSafe) const;
     virtual OpTime getMyLastAppliedOpTime() const;
 
     virtual OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const;

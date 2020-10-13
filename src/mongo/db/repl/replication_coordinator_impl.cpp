@@ -1413,8 +1413,12 @@ OpTime ReplicationCoordinatorImpl::getMyLastAppliedOpTime() const {
     return _getMyLastAppliedOpTime_inlock();
 }
 
-OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime() const {
+OpTimeAndWallTime ReplicationCoordinatorImpl::getMyLastAppliedOpTimeAndWallTime(
+    bool rollbackSafe) const {
     stdx::lock_guard<Latch> lock(_mutex);
+    if (rollbackSafe && _getMemberState_inlock().rollback()) {
+        return {};
+    }
     return _getMyLastAppliedOpTimeAndWallTime_inlock();
 }
 

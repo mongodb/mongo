@@ -131,7 +131,7 @@ public:
     void setMyHeartbeatMessage(const std::string&) final;
 
     OpTime getMyLastAppliedOpTime() const final;
-    OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime() const final;
+    OpTimeAndWallTime getMyLastAppliedOpTimeAndWallTime(bool rollbackSafe = false) const final;
 
     OpTime getMyLastDurableOpTime() const final;
     OpTimeAndWallTime getMyLastDurableOpTimeAndWallTime() const final;

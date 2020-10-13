@@ -274,9 +274,12 @@ void ReplicationCoordinatorMock::resetMyLastOpTimes() {
     _myLastDurableWallTime = Date_t();
 }
 
-OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastAppliedOpTimeAndWallTime() const {
+OpTimeAndWallTime ReplicationCoordinatorMock::getMyLastAppliedOpTimeAndWallTime(
+    bool rollbackSafe) const {
     stdx::lock_guard<Mutex> lk(_mutex);
-
+    if (rollbackSafe && _memberState.rollback()) {
+        return {};
+    }
     return {_myLastAppliedOpTime, _myLastAppliedWallTime};
 }
 

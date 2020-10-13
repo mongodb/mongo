@@ -1079,8 +1079,19 @@ JournalListener::Token ReplicationCoordinatorExternalStateImpl::getToken(Operati
         }
     }
 
-    // All other repl states use the last applied.
-    return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime();
+    // All other repl states use the 'lastApplied'.
+    //
+    // Setting 'rollbackSafe' will ensure that a safe lastApplied value is returned if we're in
+    // ROLLBACK state. 'lastApplied' may be momentarily set to an opTime from a divergent branch of
+    // history during rollback, so a benign default value will be returned instead to prevent a
+    // divergent 'lastApplied' from being used to forward the 'lastDurable' after rollback.
+    //
+    // No concurrency control is necessary and it is still safe if the node goes into ROLLBACK after
+    // getting the token because the JournalFlusher is shut down during rollback, before a divergent
+    // 'lastApplied' value is present. The JournalFlusher will start up again in ROLLBACK and never
+    // transition from non-ROLLBACK to ROLLBACK with a divergent 'lastApplied' value.
+    return repl::ReplicationCoordinator::get(_service)->getMyLastAppliedOpTimeAndWallTime(
+        /*rollbackSafe=*/true);
 }
 
 void ReplicationCoordinatorExternalStateImpl::onDurable(const JournalListener::Token& token) {
