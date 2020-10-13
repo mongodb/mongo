@@ -352,8 +352,7 @@ void ReplicationCoordinatorNoOp::incrementNumCatchUpOpsIfCatchingUp(long numOps)
     MONGO_UNREACHABLE;
 }
 
-Status ReplicationCoordinatorNoOp::processReplSetUpdatePosition(const UpdatePositionArgs&,
-                                                                long long*) {
+Status ReplicationCoordinatorNoOp::processReplSetUpdatePosition(const UpdatePositionArgs&) {
     MONGO_UNREACHABLE;
 }
 

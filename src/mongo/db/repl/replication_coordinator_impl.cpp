@@ -1748,8 +1748,7 @@ Status ReplicationCoordinatorImpl::setLastDurableOptime_forTest(long long cfgVer
 
     const UpdatePositionArgs::UpdateInfo update(
         OpTime(), Date_t(), opTime, wallTime, cfgVer, memberId);
-    long long configVersion;
-    const auto status = _setLastOptime(lock, update, &configVersion);
+    const auto status = _setLastOptime(lock, update);
     return status;
 }
 
@@ -1766,15 +1765,13 @@ Status ReplicationCoordinatorImpl::setLastAppliedOptime_forTest(long long cfgVer
 
     const UpdatePositionArgs::UpdateInfo update(
         opTime, wallTime, OpTime(), Date_t(), cfgVer, memberId);
-    long long configVersion;
-    const auto status = _setLastOptime(lock, update, &configVersion);
+    const auto status = _setLastOptime(lock, update);
     return status;
 }
 
 Status ReplicationCoordinatorImpl::_setLastOptime(WithLock lk,
-                                                  const UpdatePositionArgs::UpdateInfo& args,
-                                                  long long* configVersion) {
-    auto result = _topCoord->setLastOptime(args, _replExecutor->now(), configVersion);
+                                                  const UpdatePositionArgs::UpdateInfo& args) {
+    auto result = _topCoord->setLastOptime(args, _replExecutor->now());
     if (!result.isOK())
         return result.getStatus();
     const bool advancedOpTime = result.getValue();
@@ -4567,15 +4564,14 @@ void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk, boost::optional<
         opTime);
 }
 
-Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
-                                                                long long* configVersion) {
+Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePositionArgs& updates) {
     stdx::unique_lock<Latch> lock(_mutex);
     Status status = Status::OK();
     bool somethingChanged = false;
     for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
          update != updates.updatesEnd();
          ++update) {
-        status = _setLastOptime(lock, *update, configVersion);
+        status = _setLastOptime(lock, *update);
         if (!status.isOK()) {
             break;
         }

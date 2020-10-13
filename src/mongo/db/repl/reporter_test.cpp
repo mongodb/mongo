@@ -409,55 +409,6 @@ TEST_F(ReporterTest, UnsuccessfulCommandResponseStopsTheReporter) {
     assertReporterDone();
 }
 
-TEST_F(ReporterTestNoTriggerAtSetUp,
-       InvalidReplicaSetResponseToARequestWithoutConfigVersionStopsTheReporter) {
-    posUpdater->setConfigVersion(-1);
-    ASSERT_OK(reporter->trigger());
-    ASSERT_TRUE(reporter->isActive());
-
-    processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
-                                     << "errmsg"
-                                     << "newer config"
-                                     << "configVersion" << 100));
-
-    ASSERT_EQUALS(Status(ErrorCodes::InvalidReplicaSetConfig, "invalid config"), reporter->join());
-    assertReporterDone();
-}
-
-TEST_F(ReporterTest, InvalidReplicaSetResponseWithoutConfigVersionOnSyncTargetStopsTheReporter) {
-    processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
-                                     << "errmsg"
-                                     << "invalid config"));
-
-    ASSERT_EQUALS(Status(ErrorCodes::InvalidReplicaSetConfig, "invalid config"), reporter->join());
-    assertReporterDone();
-}
-
-TEST_F(ReporterTest, InvalidReplicaSetResponseWithSameConfigVersionOnSyncTargetStopsTheReporter) {
-    processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
-                                     << "errmsg"
-                                     << "invalid config"
-                                     << "configVersion" << posUpdater->getConfigVersion()));
-
-    ASSERT_EQUALS(Status(ErrorCodes::InvalidReplicaSetConfig, "invalid config"), reporter->join());
-    assertReporterDone();
-}
-
-TEST_F(ReporterTest,
-       InvalidReplicaSetResponseWithNewerConfigVersionOnSyncTargetDoesNotStopTheReporter) {
-    // Reporter should not retry update command on sync source immediately after seeing newer
-    // configuration.
-    ASSERT_OK(reporter->trigger());
-    ASSERT_TRUE(reporter->isWaitingToSendReport());
-
-    processNetworkResponse(BSON("ok" << 0 << "code" << int(ErrorCodes::InvalidReplicaSetConfig)
-                                     << "errmsg"
-                                     << "newer config"
-                                     << "configVersion" << posUpdater->getConfigVersion() + 1));
-
-    ASSERT_TRUE(reporter->isActive());
-}
-
 // Schedule while we are already scheduled, it should set "isWaitingToSendReport", then
 // automatically
 // schedule itself after finishing.

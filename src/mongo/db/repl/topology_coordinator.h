@@ -573,9 +573,7 @@ public:
      * Returns a Status if the position could not be set, false if the last optimes for the node
      * did not change, or true if either the last applied or last durable optime did change.
      */
-    StatusWith<bool> setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
-                                   Date_t now,
-                                   long long* configVersion);
+    StatusWith<bool> setLastOptime(const UpdatePositionArgs::UpdateInfo& args, Date_t now);
 
     /**
      * Sets the latest optime committed in the previous config to the current lastCommitted optime.

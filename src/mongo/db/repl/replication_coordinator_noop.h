@@ -200,7 +200,7 @@ public:
 
     Status processReplSetInitiate(OperationContext*, const BSONObj&, BSONObjBuilder*) final;
 
-    Status processReplSetUpdatePosition(const UpdatePositionArgs&, long long*) final;
+    Status processReplSetUpdatePosition(const UpdatePositionArgs&) final;
 
     std::vector<HostAndPort> getHostsWrittenTo(const OpTime&, bool) final;
 

@@ -263,8 +263,7 @@ public:
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj) override;
 
-    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
-                                                long long* configVersion) override;
+    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates) override;
 
     virtual bool buildsIndexes() override;
 
@@ -987,9 +986,7 @@ private:
      * "configVersion" will be populated with our config version if it and the configVersion
      * of "args" differ.
      */
-    Status _setLastOptime(WithLock lk,
-                          const UpdatePositionArgs::UpdateInfo& args,
-                          long long* configVersion);
+    Status _setLastOptime(WithLock lk, const UpdatePositionArgs::UpdateInfo& args);
 
     /**
      * This function will report our position externally (like upstream) if necessary.

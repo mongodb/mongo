@@ -1347,8 +1347,7 @@ void TopologyCoordinator::setMyLastDurableOpTimeAndWallTime(OpTimeAndWallTime op
 }
 
 StatusWith<bool> TopologyCoordinator::setLastOptime(const UpdatePositionArgs::UpdateInfo& args,
-                                                    Date_t now,
-                                                    long long* configVersion) {
+                                                    Date_t now) {
     if (_selfIndex == -1) {
         // Ignore updates when we're in state REMOVED.
         return Status(ErrorCodes::NotPrimaryOrSecondary,

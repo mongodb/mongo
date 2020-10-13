@@ -376,8 +376,7 @@ void ReplicationCoordinatorEmbedded::incrementNumCatchUpOpsIfCatchingUp(long num
     UASSERT_NOT_IMPLEMENTED;
 }
 
-Status ReplicationCoordinatorEmbedded::processReplSetUpdatePosition(const UpdatePositionArgs&,
-                                                                    long long*) {
+Status ReplicationCoordinatorEmbedded::processReplSetUpdatePosition(const UpdatePositionArgs&) {
     UASSERT_NOT_IMPLEMENTED;
 }
 

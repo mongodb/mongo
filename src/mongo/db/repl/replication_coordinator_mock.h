@@ -229,8 +229,7 @@ public:
                                           const BSONObj& configObj,
                                           BSONObjBuilder* resultObj);
 
-    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
-                                                long long* configVersion);
+    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates);
 
     virtual bool buildsIndexes();
 

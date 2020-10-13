@@ -47,49 +47,10 @@ namespace repl {
 
 namespace {
 
-const char kConfigVersionFieldName[] = "configVersion";
-
 // The number of replSetUpdatePosition commands a node sent to its sync source.
 Counter64 numUpdatePosition;
 ServerStatusMetricField<Counter64> displayNumUpdatePosition(
     "repl.network.replSetUpdatePosition.num", &numUpdatePosition);
-
-/**
- * Returns configuration version in update command object.
- * Returns -1 on failure.
- */
-template <typename UpdatePositionArgsType>
-long long _parseCommandRequestConfigVersion(const BSONObj& commandRequest) {
-    UpdatePositionArgsType args;
-    if (!args.initialize(commandRequest).isOK()) {
-        return -1;
-    }
-    if (args.updatesBegin() == args.updatesEnd()) {
-        return -1;
-    }
-    return args.updatesBegin()->cfgver;
-}
-
-/**
- * Returns true if config version in replSetUpdatePosition response is higher than config version in
- * locally generated update command request object.
- * Returns false if config version is missing in either document.
- */
-bool _isTargetConfigNewerThanRequest(const BSONObj& commandResult, const BSONObj& commandRequest) {
-    long long targetConfigVersion;
-    if (!bsonExtractIntegerField(commandResult, kConfigVersionFieldName, &targetConfigVersion)
-             .isOK()) {
-        return false;
-    }
-
-    const long long localConfigVersion =
-        _parseCommandRequestConfigVersion<UpdatePositionArgs>(commandRequest);
-    if (localConfigVersion == -1) {
-        return false;
-    }
-
-    return targetConfigVersion > localConfigVersion;
-}
 
 }  // namespace
 
@@ -283,20 +244,7 @@ void Reporter::_processResponseCallback(
         const auto& commandResult = rcbd.response.data;
         _status = getStatusFromCommandResult(commandResult);
 
-        // Some error types are OK and should not cause the reporter to stop sending updates to the
-        // sync target.
-        if (_status == ErrorCodes::InvalidReplicaSetConfig &&
-            _isTargetConfigNewerThanRequest(commandResult, rcbd.request.cmdObj)) {
-            LOGV2_DEBUG(
-                21589,
-                1,
-                "Reporter found newer configuration on sync source: {syncSource}. Retrying.",
-                "Reporter found newer configuration on sync source. Retrying",
-                "syncSource"_attr = _target);
-            _status = Status::OK();
-            // Do not resend update command immediately.
-            _isWaitingToSendReporter = false;
-        } else if (!_status.isOK()) {
+        if (!_status.isOK()) {
             _onShutdown_inlock();
             return;
         }

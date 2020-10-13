@@ -660,19 +660,12 @@ public:
             replCoord->processReplSetMetadata(metadata);
         }
 
-        // In the case of an update from a member with an invalid replica set config,
-        // we return our current config version.
-        long long configVersion = -1;
-
         UpdatePositionArgs args;
 
         status = args.initialize(cmdObj);
         if (status.isOK()) {
-            status = replCoord->processReplSetUpdatePosition(args, &configVersion);
+            status = replCoord->processReplSetUpdatePosition(args);
 
-            if (status == ErrorCodes::InvalidReplicaSetConfig) {
-                result.append("configVersion", configVersion);
-            }
             // TODO convert to uassertStatusOK once SERVER-34806 is done.
             return CommandHelpers::appendCommandStatusNoThrow(result, status);
         } else {

@@ -442,8 +442,7 @@ Status ReplicationCoordinatorMock::processReplSetInitiate(OperationContext* opCt
     return Status::OK();
 }
 
-Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const UpdatePositionArgs& updates,
-                                                                long long* configVersion) {
+Status ReplicationCoordinatorMock::processReplSetUpdatePosition(const UpdatePositionArgs& updates) {
     // TODO
     return Status::OK();
 }

@@ -745,8 +745,7 @@ public:
      * "configVersion" will be populated with our config version if and only if we return
      * InvalidReplicaSetConfig.
      */
-    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates,
-                                                long long* configVersion) = 0;
+    virtual Status processReplSetUpdatePosition(const UpdatePositionArgs& updates) = 0;
 
     /**
      * Returns a bool indicating whether or not this node builds indexes.
