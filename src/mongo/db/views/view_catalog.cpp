@@ -173,10 +173,6 @@ void ViewCatalog::_requireValidCatalog(WithLock) {
 }
 
 void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) {
-    Lock::CollectionLock systemViewsLock(
-        opCtx,
-        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
-        MODE_IS);
     stdx::lock_guard<Latch> lk(_mutex);
     _requireValidCatalog(lk);
     for (auto&& view : _viewMap) {
@@ -525,10 +521,6 @@ std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
 }
 
 std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, StringData ns) {
-    Lock::CollectionLock systemViewsLock(
-        opCtx,
-        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
-        MODE_IS);
     stdx::lock_guard<Latch> lk(_mutex);
     if (!_valid && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
@@ -547,20 +539,12 @@ std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, Str
 
 std::shared_ptr<ViewDefinition> ViewCatalog::lookupWithoutValidatingDurableViews(
     OperationContext* opCtx, StringData ns) {
-    Lock::CollectionLock systemViewsLock(
-        opCtx,
-        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
-        MODE_IS);
     stdx::lock_guard<Latch> lk(_mutex);
     return _lookup(lk, opCtx, ns, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
 }
 
 StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
                                                   const NamespaceString& nss) {
-    Lock::CollectionLock systemViewsLock(
-        opCtx,
-        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
-        MODE_IS);
     stdx::unique_lock<Latch> lock(_mutex);
 
     _requireValidCatalog(lock);
