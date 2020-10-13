@@ -27,43 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_access_blocker.h"
 
 namespace mongo {
 
-const ServiceContext::Decoration<TenantMigrationAccessBlockerByPrefix>
-    TenantMigrationAccessBlockerByPrefix::get =
-        ServiceContext::declareDecoration<TenantMigrationAccessBlockerByPrefix>();
+const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry>
+    TenantMigrationAccessBlockerRegistry::get =
+        ServiceContext::declareDecoration<TenantMigrationAccessBlockerRegistry>();
 
-void TenantMigrationAccessBlockerByPrefix::add(StringData dbPrefix,
+void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    // Assume that all tenant ids (i.e. 'dbPrefix') have equal length.
-    auto it = _tenantMigrationAccessBlockers.find(dbPrefix);
+    // Assume that all tenant ids (i.e. 'tenantId') have equal length.
+    auto it = _tenantMigrationAccessBlockers.find(tenantId);
 
     if (it != _tenantMigrationAccessBlockers.end()) {
         uasserted(ErrorCodes::ConflictingOperationInProgress,
-                  str::stream() << "Found active migration for database prefix \"" << it->first
-                                << "\" which conflicts with the specified database prefix \""
-                                << dbPrefix << "\"");
+                  str::stream() << "Found active migration for tenantId \"" << it->first
+                                << "\" which conflicts with the specified tenantId \"" << tenantId
+                                << "\"");
     }
 
-    _tenantMigrationAccessBlockers.emplace(dbPrefix, mtab);
+    _tenantMigrationAccessBlockers.emplace(tenantId, mtab);
 }
 
-void TenantMigrationAccessBlockerByPrefix::remove(StringData dbPrefix) {
+void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    auto it = _tenantMigrationAccessBlockers.find(dbPrefix);
+    auto it = _tenantMigrationAccessBlockers.find(tenantId);
     invariant(it != _tenantMigrationAccessBlockers.end());
 
     _tenantMigrationAccessBlockers.erase(it);
 }
 
 std::shared_ptr<TenantMigrationAccessBlocker>
-TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbName(StringData dbName) {
+TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForDbName(StringData dbName) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     auto it = std::find_if(
@@ -71,8 +71,8 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbName(S
         _tenantMigrationAccessBlockers.end(),
         [dbName](
             const std::pair<std::string, std::shared_ptr<TenantMigrationAccessBlocker>>& blocker) {
-            StringData dbPrefix = blocker.first;
-            return dbName.startsWith(dbPrefix + "_");
+            StringData tenantId = blocker.first;
+            return dbName.startsWith(tenantId + "_");
         });
 
     if (it == _tenantMigrationAccessBlockers.end()) {
@@ -83,11 +83,11 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbName(S
 }
 
 std::shared_ptr<TenantMigrationAccessBlocker>
-TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbPrefix(
-    StringData dbPrefix) {
+TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId(
+    StringData tenantId) {
     stdx::lock_guard<Latch> lg(_mutex);
 
-    auto it = _tenantMigrationAccessBlockers.find(dbPrefix);
+    auto it = _tenantMigrationAccessBlockers.find(tenantId);
     if (it != _tenantMigrationAccessBlockers.end()) {
         return it->second;
     } else {
@@ -95,7 +95,7 @@ TenantMigrationAccessBlockerByPrefix::getTenantMigrationAccessBlockerForDbPrefix
     }
 }
 
-void TenantMigrationAccessBlockerByPrefix::shutDown() {
+void TenantMigrationAccessBlockerRegistry::shutDown() {
     stdx::lock_guard<Latch> lg(_mutex);
     std::for_each(_tenantMigrationAccessBlockers.begin(),
                   _tenantMigrationAccessBlockers.end(),
@@ -103,7 +103,7 @@ void TenantMigrationAccessBlockerByPrefix::shutDown() {
     _tenantMigrationAccessBlockers.clear();
 }
 
-void TenantMigrationAccessBlockerByPrefix::appendInfoForServerStatus(BSONObjBuilder* builder) {
+void TenantMigrationAccessBlockerRegistry::appendInfoForServerStatus(BSONObjBuilder* builder) {
     stdx::lock_guard<Latch> lg(_mutex);
 
     std::for_each(

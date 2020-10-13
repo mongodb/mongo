@@ -37,23 +37,23 @@ const rst0Primary = rst0.getPrimary();
 const rst1Primary = rst1.getPrimary();
 
 const kConfigDonorsNS = "config.tenantMigrationDonors";
-const kDbPrefix = "testDbPrefix";
+const kTenantId = "testTenantId";
 
 // Test concurrent outgoing migrations to different recipients.
 (() => {
-    const dbPrefix = kDbPrefix + "ConcurrentOutgoingMigrationsToDifferentRecipient";
+    const tenantId = kTenantId + "ConcurrentOutgoingMigrationsToDifferentRecipient";
     const donorsColl = rst0Primary.getCollection(kConfigDonorsNS);
 
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: rst1.getURL(),
-        dbPrefix: dbPrefix + "0",
+        tenantId: tenantId + "0",
         readPreference: {mode: "primary"}
     };
     const migrationOpts1 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: rst2.getURL(),
-        dbPrefix: dbPrefix + "1",
+        tenantId: tenantId + "1",
         readPreference: {mode: "primary"}
     };
 
@@ -70,26 +70,26 @@ const kDbPrefix = "testDbPrefix";
     // Verify that both migrations succeeded.
     assert.commandWorked(migrationThread0.returnData());
     assert.commandWorked(migrationThread1.returnData());
-    assert(donorsColl.findOne({databasePrefix: migrationOpts0.dbPrefix, state: "committed"}));
-    assert(donorsColl.findOne({databasePrefix: migrationOpts1.dbPrefix, state: "committed"}));
+    assert(donorsColl.findOne({tenantId: migrationOpts0.tenantId, state: "committed"}));
+    assert(donorsColl.findOne({tenantId: migrationOpts1.tenantId, state: "committed"}));
 })();
 
 // Test concurrent incoming migrations from different donors.
 (() => {
-    const dbPrefix = kDbPrefix + "ConcurrentIncomingMigrations";
+    const tenantId = kTenantId + "ConcurrentIncomingMigrations";
     const donorsColl0 = rst0Primary.getCollection(kConfigDonorsNS);
     const donorsColl1 = rst1Primary.getCollection(kConfigDonorsNS);
 
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: rst2.getURL(),
-        dbPrefix: dbPrefix + "0",
+        tenantId: tenantId + "0",
         readPreference: {mode: "primary"}
     };
     const migrationOpts1 = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: rst2.getURL(),
-        dbPrefix: dbPrefix + "1",
+        tenantId: tenantId + "1",
         readPreference: {mode: "primary"}
     };
 
@@ -106,8 +106,8 @@ const kDbPrefix = "testDbPrefix";
     // Verify that both migrations succeeded.
     assert.commandWorked(migrationThread0.returnData());
     assert.commandWorked(migrationThread1.returnData());
-    assert(donorsColl0.findOne({databasePrefix: migrationOpts0.dbPrefix, state: "committed"}));
-    assert(donorsColl1.findOne({databasePrefix: migrationOpts1.dbPrefix, state: "committed"}));
+    assert(donorsColl0.findOne({tenantId: migrationOpts0.tenantId, state: "committed"}));
+    assert(donorsColl1.findOne({tenantId: migrationOpts1.tenantId, state: "committed"}));
 })();
 
 // TODO (SERVER-50467): Ensure that tenant migration donor only removes a ReplicaSetMonitor for
@@ -115,19 +115,19 @@ const kDbPrefix = "testDbPrefix";
 // migration thread could try to remove the recipient RSM while the other is still using it.
 // Test concurrent outgoing migrations to same recipient.
 // (() => {
-//     const dbPrefix = kDbPrefix + "ConcurrentOutgoingMigrationsToSameRecipient";
+//     const tenantId = kTenantId + "ConcurrentOutgoingMigrationsToSameRecipient";
 //     const donorsColl = rst0Primary.getCollection(kConfigDonorsNS);
 
 //     const migrationOpts0 = {
 //         migrationIdString: extractUUIDFromObject(UUID()),
 //         recipientConnString: rst1.getURL(),
-//         dbPrefix: dbPrefix + "0",
+//         tenantId: tenantId + "0",
 //         readPreference: {mode: "primary"}
 //     };
 //     const migrationOpts1 = {
 //         migrationIdString: extractUUIDFromObject(UUID()),
 //         recipientConnString: rst1.getURL(),
-//         dbPrefix: dbPrefix + "1",
+//         tenantId: tenantId + "1",
 //         readPreference: {mode: "primary"}
 //     };
 
@@ -152,8 +152,8 @@ const kDbPrefix = "testDbPrefix";
 //     // Verify that both migrations succeeded.
 //     assert.commandWorked(migrationThread0.returnData());
 //     assert.commandWorked(migrationThread1.returnData());
-//     assert(donorsColl.findOne({databasePrefix: migrationOpts0.dbPrefix, state: "committed"}));
-//     assert(donorsColl.findOne({databasePrefix: migrationOpts1.dbPrefix, state: "committed"}));
+//     assert(donorsColl.findOne({tenantId: migrationOpts0.tenantId, state: "committed"}));
+//     assert(donorsColl.findOne({tenantId: migrationOpts1.tenantId, state: "committed"}));
 
 //     // Verify that the recipient RSM was only created once and was removed after both migrations
 //     // finished.

@@ -29,7 +29,7 @@ const donorRst = new ReplSetTest(
 const recipientRst = new ReplSetTest(
     {nodes: 1, name: 'recipient', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
 
-const kDBPrefix = 'testDb';
+const kTenantId = 'testTenantId';
 
 recipientRst.startSet();
 recipientRst.initiate();
@@ -44,7 +44,7 @@ function testCurrentOpOutputForInProgressMigration(testParams) {
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix,
+        tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -77,7 +77,7 @@ function testCurrentOpOutputForCommittedMigration(testParams) {
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix,
+        tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
 

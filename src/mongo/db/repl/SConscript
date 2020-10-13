@@ -1315,7 +1315,7 @@ env.Library(
     target='tenant_migration_donor',
     source=[
         'tenant_migration_access_blocker.cpp',
-        'tenant_migration_access_blocker_by_prefix.cpp',
+        'tenant_migration_access_blocker_registry.cpp',
         'tenant_migration_access_blocker_server_status_section.cpp',
         'tenant_migration_donor_op_observer.cpp',
         'tenant_migration_donor_util.cpp',

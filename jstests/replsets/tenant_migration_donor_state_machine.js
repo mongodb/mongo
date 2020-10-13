@@ -26,7 +26,7 @@ let expectedNumRecipientForgetMigrationCmdSent = 0;
  * state document are eventually removed from the donor.
  */
 function testDonorForgetMigrationAfterMigrationCompletes(
-    donorRst, recipientRst, migrationId, dbPrefix) {
+    donorRst, recipientRst, migrationId, tenantId) {
     jsTest.log("Test donorForgetMigration after the migration completes");
     const donorPrimary = donorRst.getPrimary();
     const recipientPrimary = recipientRst.getPrimary();
@@ -45,8 +45,8 @@ function testDonorForgetMigrationAfterMigrationCompletes(
                         null == node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker);
     });
 
-    assert.soon(() => 0 ===
-                    donorPrimary.getCollection(kConfigDonorsNS).count({databasePrefix: dbPrefix}));
+    assert.soon(() =>
+                    0 === donorPrimary.getCollection(kConfigDonorsNS).count({tenantId: tenantId}));
     assert.soon(() => 0 ===
                     donorPrimary.adminCommand({serverStatus: 1})
                         .repl.primaryOnlyServices.TenantMigrationDonorService);
@@ -85,7 +85,7 @@ const donorPrimary = donorRst.getPrimary();
 const recipientPrimary = recipientRst.getPrimary();
 const kRecipientConnString = recipientRst.getURL();
 
-const kDBPrefix = "testDb";
+const kTenantId = "testDb";
 const kConfigDonorsNS = "config.tenantMigrationDonors";
 
 let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
@@ -97,7 +97,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix,
+        tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -110,12 +110,12 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     blockingFp.wait();
 
     let mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-    assert.eq(mtab[kDBPrefix].access, TenantMigrationUtil.accessState.kBlockingReadsAndWrites);
-    assert(mtab[kDBPrefix].blockTimestamp);
+    assert.eq(mtab[kTenantId].access, TenantMigrationUtil.accessState.kBlockingReadsAndWrites);
+    assert(mtab[kTenantId].blockTimestamp);
 
-    let donorDoc = configDonorsColl.findOne({databasePrefix: kDBPrefix});
+    let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
     let blockOplogEntry = donorPrimary.getDB("local").oplog.rs.findOne(
-        {ns: kConfigDonorsNS, op: "u", "o.databasePrefix": kDBPrefix});
+        {ns: kConfigDonorsNS, op: "u", "o.tenantId": kTenantId});
     assert.eq(donorDoc.state, "blocking");
     assert.eq(donorDoc.blockTimestamp, blockOplogEntry.ts);
 
@@ -130,7 +130,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     const res = assert.commandWorked(migrationThread.returnData());
     assert.eq(res.state, "committed");
 
-    donorDoc = configDonorsColl.findOne({databasePrefix: kDBPrefix});
+    donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
     let commitOplogEntry =
         donorPrimary.getDB("local").oplog.rs.findOne({ns: kConfigDonorsNS, op: "u", o: donorDoc});
     assert.eq(donorDoc.state, "committed");
@@ -138,9 +138,9 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
 
     assert.soon(() => {
         mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtab[kDBPrefix].access === TenantMigrationUtil.accessState.kReject;
+        return mtab[kTenantId].access === TenantMigrationUtil.accessState.kReject;
     });
-    assert(mtab[kDBPrefix].commitOrAbortOpTime);
+    assert(mtab[kTenantId].commitOrAbortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =
@@ -148,7 +148,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     assert.eq(recipientSyncDataMetrics.failed, 0);
     assert.eq(recipientSyncDataMetrics.total, expectedNumRecipientSyncDataCmdSent);
 
-    testDonorForgetMigrationAfterMigrationCompletes(donorRst, recipientRst, migrationId, kDBPrefix);
+    testDonorForgetMigrationAfterMigrationCompletes(donorRst, recipientRst, migrationId, kTenantId);
 })();
 
 (() => {
@@ -157,7 +157,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix,
+        tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -167,7 +167,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     assert.eq(res.state, "aborted");
     abortFp.off();
 
-    const donorDoc = configDonorsColl.findOne({databasePrefix: kDBPrefix});
+    const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
     const abortOplogEntry =
         donorPrimary.getDB("local").oplog.rs.findOne({ns: kConfigDonorsNS, op: "u", o: donorDoc});
     assert.eq(donorDoc.state, "aborted");
@@ -177,9 +177,9 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     let mtab;
     assert.soon(() => {
         mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtab[kDBPrefix].access === TenantMigrationUtil.accessState.kAllow;
+        return mtab[kTenantId].access === TenantMigrationUtil.accessState.kAllow;
     });
-    assert(mtab[kDBPrefix].commitOrAbortOpTime);
+    assert(mtab[kTenantId].commitOrAbortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =
@@ -187,7 +187,7 @@ configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
     assert.eq(recipientSyncDataMetrics.failed, 0);
     assert.eq(recipientSyncDataMetrics.total, expectedNumRecipientSyncDataCmdSent);
 
-    testDonorForgetMigrationAfterMigrationCompletes(donorRst, recipientRst, migrationId, kDBPrefix);
+    testDonorForgetMigrationAfterMigrationCompletes(donorRst, recipientRst, migrationId, kTenantId);
 })();
 
 // Drop the TTL index to make sure that the migration state is still available when the
@@ -200,7 +200,7 @@ configDonorsColl.dropIndex({expireAt: 1});
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix,
+        tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
 

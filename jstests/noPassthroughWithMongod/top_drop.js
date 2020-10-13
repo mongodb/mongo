@@ -18,9 +18,9 @@ function checkTopEntries(expectedEntries) {
 
     let entriesInTop = Object.keys(res.totals).filter(function(ns) {
         // This filter only includes non-system collections in our test database.
-        const dbPrefix = topDB.getName() + ".";
+        const tenantId = topDB.getName() + ".";
         const systemCollectionPrefix = "system.";
-        return ns.startsWith(dbPrefix) && !ns.startsWith(dbPrefix + systemCollectionPrefix);
+        return ns.startsWith(tenantId) && !ns.startsWith(tenantId + systemCollectionPrefix);
     });
     let expectedEntryNames = expectedEntries.map(function(coll) {
         return coll.getFullName();

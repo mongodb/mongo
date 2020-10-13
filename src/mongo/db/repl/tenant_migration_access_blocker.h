@@ -116,11 +116,11 @@ class TenantMigrationAccessBlocker
 public:
     TenantMigrationAccessBlocker(ServiceContext* serviceContext,
                                  std::shared_ptr<executor::TaskExecutor> executor,
-                                 std::string dbPrefix,
+                                 std::string tenantId,
                                  std::string recipientConnString)
         : _serviceContext(serviceContext),
           _executor(std::move(executor)),
-          _dbPrefix(std::move(dbPrefix)),
+          _tenantId(std::move(tenantId)),
           _recipientConnString(std::move(recipientConnString)) {}
 
     //
@@ -162,7 +162,7 @@ private:
 
     ServiceContext* _serviceContext;
     std::shared_ptr<executor::TaskExecutor> _executor;
-    std::string _dbPrefix;
+    std::string _tenantId;
     std::string _recipientConnString;
 
     // Protects the state below.

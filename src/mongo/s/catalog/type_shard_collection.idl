@@ -76,7 +76,7 @@ imports:
 
 structs:
     ShardCollectionTypeBase:
-        description: "Represents the layout and contents of documents contained in the shard 
+        description: "Represents the layout and contents of documents contained in the shard
                       server's config.collections collection."
         fields:
             _id:
@@ -90,7 +90,7 @@ structs:
                 optional: true
             epoch:
                 type: objectid
-                description: "Uniquely identifies this instance of the collection, in case of 
+                description: "Uniquely identifies this instance of the collection, in case of
                               drop/create or shard key refine."
                 optional: false
             key:
@@ -101,7 +101,7 @@ structs:
             defaultCollation:
                 type: object_owned
                 default: BSONObj()
-                description: "Optional collection default collation. If empty, implies simple 
+                description: "Optional collection default collation. If empty, implies simple
                               collation."
                 optional: false
             unique:
@@ -110,17 +110,17 @@ structs:
                 optional: false
             refreshing:
                 type: bool
-                description: "Set by primaries and used by shard secondaries to safely refresh chunk 
-                              metadata. Indicates whether the chunks collection is current being 
-                              updated, which means read results won't provide a complete view of the 
+                description: "Set by primaries and used by shard secondaries to safely refresh chunk
+                              metadata. Indicates whether the chunks collection is current being
+                              updated, which means read results won't provide a complete view of the
                               chunk metadata."
                 optional: true
             lastRefreshedCollectionVersion:
                 type: ChunkVersionLegacy
-                description: "Set by primaries and used by shard secondaries to safely refresh chunk 
-                              metadata. Indicates the collection version of the last complete chunk 
-                              metadata refresh, and is used to indicate if a refresh occurred if the 
-                              value is different than when the caller last checked -- because 
+                description: "Set by primaries and used by shard secondaries to safely refresh chunk
+                              metadata. Indicates the collection version of the last complete chunk
+                              metadata refresh, and is used to indicate if a refresh occurred if the
+                              value is different than when the caller last checked -- because
                               'refreshing' will be false both before and after a refresh occurs."
                 optional: true
             enterCriticalSectionCounter:

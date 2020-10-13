@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 
 namespace mongo {
 
@@ -48,7 +48,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         BSONObjBuilder result;
-        TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
             .appendInfoForServerStatus(&result);
         return result.obj();
     }

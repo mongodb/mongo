@@ -60,9 +60,9 @@ const Seconds kRecipientSyncDataTimeout(30);
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
-    ServiceContext* serviceContext, StringData dbPrefix) {
-    return TenantMigrationAccessBlockerByPrefix::get(serviceContext)
-        .getTenantMigrationAccessBlockerForDbPrefix(dbPrefix);
+    ServiceContext* serviceContext, StringData tenantId) {
+    return TenantMigrationAccessBlockerRegistry::get(serviceContext)
+        .getTenantMigrationAccessBlockerForTenantId(tenantId);
 }
 
 bool shouldStopInsertingDonorStateDoc(Status status) {
@@ -139,15 +139,15 @@ Status TenantMigrationDonorService::Instance::checkIfOptionsConflict(BSONObj opt
     auto stateDoc = tenant_migration_donor::parseDonorStateDocument(options);
 
     if (stateDoc.getId() != _stateDoc.getId() ||
-        stateDoc.getDatabasePrefix() != _stateDoc.getDatabasePrefix() ||
+        stateDoc.getTenantId() != _stateDoc.getTenantId() ||
         stateDoc.getRecipientConnectionString() != _stateDoc.getRecipientConnectionString() ||
         SimpleBSONObjComparator::kInstance.compare(stateDoc.getReadPreference().toInnerBSON(),
                                                    _stateDoc.getReadPreference().toInnerBSON()) !=
             0) {
         return Status(ErrorCodes::ConflictingOperationInProgress,
-                      str::stream() << "Found active migration for dbPrefix \""
-                                    << stateDoc.getDatabasePrefix() << "\" with different options "
-                                    << _stateDoc.toBSON());
+                      str::stream()
+                          << "Found active migration for tenantId \"" << stateDoc.getTenantId()
+                          << "\" with different options " << _stateDoc.toBSON());
     }
 
     return Status::OK();
@@ -259,8 +259,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                            case TenantMigrationDonorStateEnum::kBlocking: {
                                _stateDoc.setBlockTimestamp(oplogSlot.getTimestamp());
 
-                               auto mtab = getTenantMigrationAccessBlocker(
-                                   _serviceContext, _stateDoc.getDatabasePrefix());
+                               auto mtab = getTenantMigrationAccessBlocker(_serviceContext,
+                                                                           _stateDoc.getTenantId());
                                invariant(mtab);
 
                                mtab->startBlockingWrites();
@@ -446,7 +446,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
             repl::ReplicationCoordinator::get(opCtx)->getConfig().getConnectionString();
         RecipientSyncData request(_stateDoc.getId(),
                                   donorConnString.toString(),
-                                  _stateDoc.getDatabasePrefix().toString(),
+                                  _stateDoc.getTenantId().toString(),
                                   _stateDoc.getReadPreference());
         request.setReturnAfterReachingOpTime(_stateDoc.getBlockTimestamp());
         return request.toBSON(BSONObj());
@@ -546,8 +546,7 @@ void TenantMigrationDonorService::Instance::run(
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
-            auto mtab =
-                getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getDatabasePrefix());
+            auto mtab = getTenantMigrationAccessBlocker(_serviceContext, _stateDoc.getTenantId());
             if (status == ErrorCodes::ConflictingOperationInProgress || !mtab) {
                 stdx::lock_guard<Latch> lg(_mutex);
                 if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
@@ -569,7 +568,7 @@ void TenantMigrationDonorService::Instance::run(
             LOGV2(5006601,
                   "Tenant migration completed",
                   "migrationId"_attr = _stateDoc.getId(),
-                  "dbPrefix"_attr = _stateDoc.getDatabasePrefix(),
+                  "tenantId"_attr = _stateDoc.getTenantId(),
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
         })

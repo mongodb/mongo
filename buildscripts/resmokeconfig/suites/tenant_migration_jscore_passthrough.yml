@@ -67,7 +67,7 @@ executor:
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
       global_vars:
         TestData: &TestData
-          dbPrefix: "tenantMigrationDbPrefix"
+          tenantId: "tenantMigrationTenantId"
           # TODO (SERVER-50494): Implement proxy's retry logic for batch write commands.
           disableBatchWrites: true
       readMode: commands
@@ -83,7 +83,7 @@ executor:
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
-    # TODO (SERVER-49204): The ContinuousTenantMigration hook reuses TestData.dbPrefix hook for all
+    # TODO (SERVER-49204): The ContinuousTenantMigration hook reuses TestData.tenantId hook for all
     # migrations. Therefore, it needs to run the donorForgetMigration command after each migration
     # (i.e. test) in order to make the subsequent migration not conflict with the one run by the
     # previous test. Until we have the donorForgetMigration command, we need to specify n: 1 to

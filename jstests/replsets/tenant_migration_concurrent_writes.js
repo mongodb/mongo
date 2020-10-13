@@ -221,11 +221,11 @@ function testWriteNoMigration(testCase, testOpts) {
  * Tests that the donor rejects writes after the migration commits.
  */
 function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts) {
-    const dbPrefix = testOpts.dbName.split('_')[0];
+    const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -241,11 +241,11 @@ function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts)
  * Tests that the donor does not reject writes after the migration aborts.
  */
 function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
-    const dbPrefix = testOpts.dbName.split('_')[0];
+    const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -261,7 +261,7 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
     assert.soon(() => {
         const mtab =
             testOpts.primaryDB.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtab[dbPrefix].access === TenantMigrationUtil.accessState.kAllow;
+        return mtab[tenantId].access === TenantMigrationUtil.accessState.kAllow;
     });
 
     runCommand(testOpts);
@@ -272,11 +272,11 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
  * Tests that the donor blocks writes that are executed in the blocking state.
  */
 function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
-    const dbPrefix = testOpts.dbName.split('_')[0];
+    const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -305,11 +305,11 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
  * the migration commits.
  */
 function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, testOpts) {
-    const dbPrefix = testOpts.dbName.split('_')[0];
+    const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -350,11 +350,11 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
  * the migration aborts.
  */
 function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, testOpts) {
-    const dbPrefix = testOpts.dbName.split('_')[0];
+    const tenantId = testOpts.dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -880,7 +880,6 @@ const testFuncs = {
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        // Database name is [tenant_id (database prefix)]_[tenant defined database name]
         let baseDbName = commandName + "-" + testName + "0";
 
         if (testCase.skip) {

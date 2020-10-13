@@ -26,13 +26,13 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
         Args:
             hook_logger: the logger instance for this hook.
             fixture: the target TenantMigrationFixture containing two replica sets.
-            shell_options: contains the global_vars which contains TestData.dbPrefix to be used for
+            shell_options: contains the global_vars which contains TestData.tenantId to be used for
                            tenant migrations.
 
         """
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousTenantMigration.DESCRIPTION)
 
-        self._db_prefix = shell_options["global_vars"]["TestData"]["dbPrefix"]
+        self._tenant_id = shell_options["global_vars"]["TestData"]["tenantId"]
         if not isinstance(fixture, tenant_migration.TenantMigrationFixture) or \
                 fixture.get_num_replica_sets() != 2:
             raise ValueError(
@@ -58,7 +58,7 @@ class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-ins
         """Before test."""
         self.logger.info("Starting the migration thread.")
         self._tenant_migration_thread = _TenantMigrationThread(
-            self.logger, self._tenant_migration_fixture, self._db_prefix)
+            self.logger, self._tenant_migration_fixture, self._tenant_id)
         self._tenant_migration_thread.start()
 
     def after_test(self, test, test_report):
@@ -75,13 +75,13 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
     MAX_BLOCK_TIME_SECS = 2.5
     DONOR_START_MIGRATION_POLL_INTERVAL_SECS = 0.1
 
-    def __init__(self, logger, tenant_migration_fixture, db_prefix):
+    def __init__(self, logger, tenant_migration_fixture, tenant_id):
         """Initialize _TenantMigrationThread."""
         threading.Thread.__init__(self, name="TenantMigrationThread")
         self.daemon = True
         self.logger = logger
         self._tenant_migration_fixture = tenant_migration_fixture
-        self._db_prefix = db_prefix
+        self._tenant_id = tenant_id
 
         self._last_exec = time.time()
 
@@ -93,8 +93,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
         try:
             now = time.time()
-            self.logger.info("Starting a tenant migration for database prefix '%s'",
-                             self._db_prefix)
+            self.logger.info("Starting a tenant migration for tenantId '%s'", self._tenant_id)
             self._run_migration(self._tenant_migration_fixture)
             self._last_exec = time.time()
             self.logger.info("Completed a tenant migration in %0d ms",
@@ -164,7 +163,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         cmd_obj = {
             "donorStartMigration": 1, "migrationId": bson.Binary(uuid.uuid4().bytes, 4),
             "recipientConnectionString": recipient_rs.get_driver_connection_url(),
-            "databasePrefix": self._db_prefix, "readPreference": {"mode": "primary"}
+            "tenantId": self._tenant_id, "readPreference": {"mode": "primary"}
         }
 
         try:

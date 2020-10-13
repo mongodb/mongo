@@ -43,21 +43,21 @@ recipientRst.startSet();
 recipientRst.initiate();
 
 const kMaxSleepTimeMS = 1000;
-const kDBPrefix = 'testDb';
+const kTenantId = 'testTenantId';
 const kConfigDonorsNS = "config.tenantMigrationDonors";
 
 let donorPrimary = donorRst.getPrimary();
 let kRecipientConnString = recipientRst.getURL();
 let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
 
-function startMigration(host, recipientConnString, dbPrefix) {
+function startMigration(host, recipientConnString, tenantId) {
     const primary = new Mongo(host);
     try {
         primary.adminCommand({
             donorStartMigration: 1,
             migrationId: UUID(),
             recipientConnectionString: recipientConnString,
-            databasePrefix: dbPrefix,
+            tenantId: tenantId,
             readPreference: {mode: "primary"}
         });
     } catch (e) {
@@ -70,7 +70,7 @@ function startMigration(host, recipientConnString, dbPrefix) {
 }
 
 let migrationThread =
-    new Thread(startMigration, donorPrimary.host, kRecipientConnString, kDBPrefix);
+    new Thread(startMigration, donorPrimary.host, kRecipientConnString, kTenantId);
 
 // Force the migration to pause after entering a randomly selected state to simulate a failure.
 Random.setRandomSeed();
@@ -97,52 +97,52 @@ donorRst.startSet({
 
 donorPrimary = donorRst.getPrimary();
 configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
-let donorDoc = configDonorsColl.findOne({databasePrefix: kDBPrefix});
+let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
 if (donorDoc) {
     let state = donorDoc.state;
     switch (state) {
         case "data sync":
             assert.soon(
-                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                           .access == TenantMigrationUtil.accessState.kAllow);
             break;
         case "blocking":
             assert.soon(
-                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                           .access == TenantMigrationUtil.accessState.kBlockingReadsAndWrites);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
-                                        .getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                                        .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                                         .blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;
         case "committed":
             assert.soon(
-                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                           .access == TenantMigrationUtil.accessState.kReject);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
-                                        .getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                                        .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                                         .commitOrAbortOpTime,
                                     donorDoc.commitOrAbortOpTime) == 0);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
-                                        .getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                                        .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                                         .blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;
         case "aborted":
             assert.soon(
-                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                           .access == TenantMigrationUtil.accessState.kAllow);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
-                                        .getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                                        .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                                         .commitOrAbortOpTime,
                                     donorDoc.commitOrAbortOpTime) == 0);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
-                                        .getTenantMigrationAccessBlocker(donorPrimary, kDBPrefix)
+                                        .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
                                         .blockTimestamp,
                                     donorDoc.blockTimestamp) == 0);
             break;

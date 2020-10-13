@@ -37,17 +37,17 @@ namespace mongo {
 
 namespace {
 
-const std::set<std::string> kUnsupportedDatabasePrefixes{"", "admin", "local", "config"};
+const std::set<std::string> kUnsupportedTenantIds{"", "admin", "local", "config"};
 
 }  // namespace
 
-inline Status validateDbPrefix(const std::string& dbPrefix) {
+inline Status validateDatabasePrefix(const std::string& tenantId) {
     const bool isPrefixSupported =
-        kUnsupportedDatabasePrefixes.find(dbPrefix) == kUnsupportedDatabasePrefixes.end();
+        kUnsupportedTenantIds.find(tenantId) == kUnsupportedTenantIds.end();
 
     return isPrefixSupported
         ? Status::OK()
         : Status(ErrorCodes::BadValue,
-                 str::stream() << "cannot migrate databases with prefix \'" << dbPrefix << "'");
+                 str::stream() << "cannot migrate databases with prefix \'" << tenantId << "'");
 }
 }  // namespace mongo

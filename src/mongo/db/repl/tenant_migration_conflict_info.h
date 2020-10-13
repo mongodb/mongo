@@ -39,10 +39,10 @@ class TenantMigrationConflictInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TenantMigrationConflict;
 
-    TenantMigrationConflictInfo(const std::string dbPrefix) : _dbPrefix(std::move(dbPrefix)){};
+    TenantMigrationConflictInfo(const std::string tenantId) : _tenantId(std::move(tenantId)){};
 
-    const auto& getDatabasePrefix() const {
-        return _dbPrefix;
+    const auto& getTenantId() const {
+        return _tenantId;
     }
 
     BSONObj toBSON() const;
@@ -50,7 +50,7 @@ public:
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
-    std::string _dbPrefix;
+    std::string _tenantId;
 };
 using TenantMigrationConflictException = ExceptionFor<ErrorCodes::TenantMigrationConflict>;
 

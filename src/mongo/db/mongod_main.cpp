@@ -1177,7 +1177,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2_OPTIONS(5093807,
                       {LogComponent::kTenantMigration},
                       "Shutting down all TenantMigrationAccessBlockers on global shutdown");
-        TenantMigrationAccessBlockerByPrefix::get(serviceContext).shutDown();
+        TenantMigrationAccessBlockerRegistry::get(serviceContext).shutDown();
 
         LOGV2_OPTIONS(5093808,
                       {LogComponent::kTenantMigration},

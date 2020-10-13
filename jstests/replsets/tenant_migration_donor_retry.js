@@ -13,12 +13,12 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kDBPrefix = "testDb";
+const kTenantId = "testTenantId";
 let testNum = 0;
 const kConfigDonorsNS = "config.tenantMigrationDonors";
 
-function makeDbPrefix() {
-    return kDBPrefix + testNum++;
+function makeTenantId() {
+    return kTenantId + testNum++;
 }
 
 /**
@@ -38,7 +38,7 @@ function testMigrationAbortsOnRecipientSyncDataCmdError(
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix + makeDbPrefix(),
+        tenantId: kTenantId + makeTenantId(),
         readPreference: {mode: "primary"},
     };
 
@@ -87,7 +87,7 @@ function testMigrationAbortsOnRecipientForgetMigrationCmdError(donorRst, recipie
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: makeDbPrefix(),
+        tenantId: makeTenantId(),
         readPreference: {mode: "primary"},
     };
 
@@ -209,7 +209,7 @@ const kWriteErrorTimeMS = 50;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: makeDbPrefix(),
+        tenantId: makeTenantId(),
         readPreference: {mode: "primary"},
     };
 
@@ -240,7 +240,7 @@ const kWriteErrorTimeMS = 50;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix + "RetryOnStateDocUpdateError",
+        tenantId: kTenantId + "RetryOnStateDocUpdateError",
         readPreference: {mode: "primary"},
     };
 

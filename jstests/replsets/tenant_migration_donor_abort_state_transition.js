@@ -11,7 +11,7 @@ load("jstests/libs/uuid_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kDBPrefix = "testDbPrefix";
+const kTenantId = "testTenantId";
 
 const donorRst = new ReplSetTest(
     {nodes: 1, name: "donorRst", nodeOptions: {setParameter: {enableTenantMigrations: true}}});
@@ -38,7 +38,7 @@ function testAbortInitialState(donorRst) {
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        dbPrefix: kDBPrefix + "-initial",
+        tenantId: kTenantId + "-initial",
         recipientConnString: recipientRst.getURL(),
         readPreference: {mode: "primary"},
     };
@@ -61,7 +61,7 @@ function testAbortInitialState(donorRst) {
     // Verify that the migration completes successfully.
     assert.commandWorked(migrationThread.returnData());
     TenantMigrationUtil.waitForMigrationToCommit(
-        donorRst.nodes, migrationId, migrationOpts.dbPrefix);
+        donorRst.nodes, migrationId, migrationOpts.tenantId);
 }
 
 /**
@@ -79,7 +79,7 @@ function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nex
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        dbPrefix: kDBPrefix + "-" + nextState,
+        tenantId: kTenantId + "-" + nextState,
         recipientConnString: recipientRst.getURL(),
         readPreference: {mode: "primary"},
     };
@@ -109,10 +109,10 @@ function testAbortStateTransition(donorRst, pauseFailPoint, setUpFailPoints, nex
     assert.commandWorked(migrationThread.returnData());
     if (nextState == "aborted") {
         TenantMigrationUtil.waitForMigrationToAbort(
-            donorRst.nodes, migrationId, migrationOpts.dbPrefix);
+            donorRst.nodes, migrationId, migrationOpts.tenantId);
     } else {
         TenantMigrationUtil.waitForMigrationToCommit(
-            donorRst.nodes, migrationId, migrationOpts.dbPrefix);
+            donorRst.nodes, migrationId, migrationOpts.tenantId);
     }
 }
 

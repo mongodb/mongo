@@ -39,11 +39,11 @@ class TenantMigrationCommittedInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TenantMigrationCommitted;
 
-    TenantMigrationCommittedInfo(const std::string dbPrefix, const std::string recipientConnString)
-        : _dbPrefix(std::move(dbPrefix)), _recipientConnString(std::move(recipientConnString)){};
+    TenantMigrationCommittedInfo(const std::string tenantId, const std::string recipientConnString)
+        : _tenantId(std::move(tenantId)), _recipientConnString(std::move(recipientConnString)){};
 
-    const auto& getDatabasePrefix() const {
-        return _dbPrefix;
+    const auto& getTenantId() const {
+        return _tenantId;
     }
 
     const auto& getRecipientConnString() const {
@@ -55,7 +55,7 @@ public:
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
-    std::string _dbPrefix;
+    std::string _tenantId;
     std::string _recipientConnString;
 };
 using TenantMigrationCommittedException = ExceptionFor<ErrorCodes::TenantMigrationCommitted>;

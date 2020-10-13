@@ -42,7 +42,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(donorOpObserverFailAfterOnInsert);
 MONGO_FAIL_POINT_DEFINE(donorOpObserverFailAfterOnUpdate);
 
-const auto databasePrefixToDeleteDecoration = OperationContext::declareDecoration<std::string>();
+const auto tenantIdToDeleteDecoration = OperationContext::declareDecoration<std::string>();
 
 /**
  * Initializes the TenantMigrationAccessBlocker for the tenant migration denoted by the given state
@@ -55,18 +55,18 @@ void onTransitionToDataSync(OperationContext* opCtx,
     auto mtab = std::make_shared<TenantMigrationAccessBlocker>(
         opCtx->getServiceContext(),
         tenant_migration_donor::getTenantMigrationDonorExecutor(),
-        donorStateDoc.getDatabasePrefix().toString(),
+        donorStateDoc.getTenantId().toString(),
         donorStateDoc.getRecipientConnectionString().toString());
 
-    TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-        .add(donorStateDoc.getDatabasePrefix(), mtab);
+    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+        .add(donorStateDoc.getTenantId(), mtab);
 
     if (opCtx->writesAreReplicated()) {
         // onRollback is not registered on secondaries since secondaries should not fail to apply
         // the write.
         opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc] {
-            TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-                .remove(donorStateDoc.getDatabasePrefix());
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .remove(donorStateDoc.getTenantId());
         });
     }
 }
@@ -79,8 +79,8 @@ void onTransitionToBlocking(OperationContext* opCtx,
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kBlocking);
     invariant(donorStateDoc.getBlockTimestamp());
 
-    auto mtab = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbPrefix(donorStateDoc.getDatabasePrefix());
+    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForTenantId(donorStateDoc.getTenantId());
     invariant(mtab);
 
     if (!opCtx->writesAreReplicated()) {
@@ -104,8 +104,8 @@ void onTransitionToCommitted(OperationContext* opCtx,
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kCommitted);
     invariant(donorStateDoc.getCommitOrAbortOpTime());
 
-    auto mtab = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbPrefix(donorStateDoc.getDatabasePrefix());
+    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForTenantId(donorStateDoc.getTenantId());
     invariant(mtab);
 
     mtab->commit(donorStateDoc.getCommitOrAbortOpTime().get());
@@ -119,8 +119,8 @@ void onTransitionToAborted(OperationContext* opCtx,
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted);
     invariant(donorStateDoc.getCommitOrAbortOpTime());
 
-    auto mtab = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForDbPrefix(donorStateDoc.getDatabasePrefix());
+    auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForTenantId(donorStateDoc.getTenantId());
     invariant(mtab);
     mtab->abort(donorStateDoc.getCommitOrAbortOpTime().get());
 }
@@ -165,18 +165,18 @@ private:
  */
 class TenantMigrationDonorDeleteHandler final : public RecoveryUnit::Change {
 public:
-    TenantMigrationDonorDeleteHandler(OperationContext* opCtx, const std::string dbPrefix)
-        : _opCtx(opCtx), _dbPrefix(dbPrefix) {}
+    TenantMigrationDonorDeleteHandler(OperationContext* opCtx, const std::string tenantId)
+        : _opCtx(opCtx), _tenantId(tenantId) {}
 
     void commit(boost::optional<Timestamp>) override {
-        TenantMigrationAccessBlockerByPrefix::get(_opCtx->getServiceContext()).remove(_dbPrefix);
+        TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext()).remove(_tenantId);
     }
 
     void rollback() override {}
 
 private:
     OperationContext* _opCtx;
-    const std::string _dbPrefix;
+    const std::string _tenantId;
 };
 
 /**
@@ -261,7 +261,7 @@ void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
                 str::stream() << "cannot delete a donor's state document " << doc
                               << " since it has not been marked as garbage collectable",
                 donorStateDoc.getExpireAt());
-        databasePrefixToDeleteDecoration(opCtx) = donorStateDoc.getDatabasePrefix().toString();
+        tenantIdToDeleteDecoration(opCtx) = donorStateDoc.getTenantId().toString();
     }
 }
 
@@ -273,7 +273,7 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
                                               const boost::optional<BSONObj>& deletedDoc) {
     if (nss == NamespaceString::kTenantMigrationDonorsNamespace && !inRecoveryMode(opCtx)) {
         opCtx->recoveryUnit()->registerChange(std::make_unique<TenantMigrationDonorDeleteHandler>(
-            opCtx, databasePrefixToDeleteDecoration(opCtx)));
+            opCtx, tenantIdToDeleteDecoration(opCtx)));
     }
 }
 

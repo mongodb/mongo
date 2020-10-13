@@ -1,5 +1,5 @@
 /**
- * Tests that the donorStartMigration command throws a error if the provided database prefix
+ * Tests that the donorStartMigration command throws a error if the provided tenantId
  * is unsupported (i.e. '', 'admin', 'local' or 'config') or if the recipient connection string
  * matches the donor's connection string.
  *
@@ -15,15 +15,15 @@ rst.startSet();
 rst.initiate();
 const primary = rst.getPrimary();
 
-// Test unsupported database prefixes.
-const unsupportedDBPrefixes = ['', 'admin', 'local', 'config'];
+// Test unsupported tenantIds.
+const unsupportedTenantIds = ['', 'admin', 'local', 'config'];
 
-unsupportedDBPrefixes.forEach((dbPrefix) => {
+unsupportedTenantIds.forEach((tenantId) => {
     assert.commandFailedWithCode(primary.adminCommand({
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: "testRecipientConnString",
-        databasePrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"}
     }),
                                  ErrorCodes.BadValue);
@@ -34,7 +34,7 @@ assert.commandFailedWithCode(primary.adminCommand({
     donorStartMigration: 1,
     migrationId: UUID(),
     recipientConnectionString: rst.getURL(),
-    databasePrefix: "testDbPrefix",
+    tenantId: "testTenantId",
     readPreference: {mode: "primary"}
 }),
                              ErrorCodes.InvalidOptions);
@@ -45,7 +45,7 @@ assert.commandFailedWithCode(primary.adminCommand({
     donorStartMigration: 1,
     migrationId: UUID(),
     recipientConnectionString: conflictingRecipientConnectionString,
-    databasePrefix: "testDbPrefix",
+    tenantId: "testTenantId",
     readPreference: {mode: "primary"}
 }),
                              ErrorCodes.InvalidOptions);

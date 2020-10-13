@@ -26,9 +26,9 @@ const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 let charIndex = 0;
 
 /**
- * Returns a database prefix that will not match any existing prefix.
+ * Returns a tenantId that will not match any existing prefix.
  */
-function generateUniqueDbPrefix() {
+function generateUniqueTenantId() {
     assert.lt(charIndex, chars.length);
     return chars[charIndex++];
 }
@@ -62,7 +62,7 @@ let numRecipientSyncDataCmdSent = 0;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: rst1.getURL(),
-        dbPrefix: generateUniqueDbPrefix() + "RetryAfterMigrationCompletes",
+        tenantId: generateUniqueTenantId() + "RetryAfterMigrationCompletes",
         readPreference: {mode: "primary"}
     };
 
@@ -80,7 +80,7 @@ let numRecipientSyncDataCmdSent = 0;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: rst1.getURL(),
-        dbPrefix: generateUniqueDbPrefix() + "RetryBeforeMigrationCompletes",
+        tenantId: generateUniqueTenantId() + "RetryBeforeMigrationCompletes",
         readPreference: {mode: "primary"}
     };
 
@@ -118,7 +118,7 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted(
     // If the second donorStartMigration had started a duplicate migration, there would be two donor
     // state docs.
     let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
-    assert.eq(1, configDonorsColl.count({databasePrefix: migrationOpts0.dbPrefix}));
+    assert.eq(1, configDonorsColl.count({tenantId: migrationOpts0.tenantId}));
 }
 
 /**
@@ -146,15 +146,15 @@ function testConcurrentConflictingMigrations(donorPrimary, migrationOpts0, migra
 
     if (res0.ok) {
         assert.commandFailedWithCode(res1, ErrorCodes.ConflictingOperationInProgress);
-        assert.eq(1, configDonorsColl.count({databasePrefix: migrationOpts0.dbPrefix}));
-        if (migrationOpts0.dbPrefix != migrationOpts1.dbPrefix) {
-            assert.eq(0, configDonorsColl.count({databasePrefix: migrationOpts1.dbPrefix}));
+        assert.eq(1, configDonorsColl.count({tenantId: migrationOpts0.tenantId}));
+        if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
+            assert.eq(0, configDonorsColl.count({tenantId: migrationOpts1.tenantId}));
         }
     } else {
         assert.commandFailedWithCode(res0, ErrorCodes.ConflictingOperationInProgress);
-        assert.eq(1, configDonorsColl.count({databasePrefix: migrationOpts1.dbPrefix}));
-        if (migrationOpts0.dbPrefix != migrationOpts1.dbPrefix) {
-            assert.eq(0, configDonorsColl.count({databasePrefix: migrationOpts0.dbPrefix}));
+        assert.eq(1, configDonorsColl.count({tenantId: migrationOpts1.tenantId}));
+        if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
+            assert.eq(0, configDonorsColl.count({tenantId: migrationOpts0.tenantId}));
         }
     }
 }
@@ -165,7 +165,7 @@ function testConcurrentConflictingMigrations(donorPrimary, migrationOpts0, migra
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
             recipientConnString: rst1.getURL(),
-            dbPrefix: generateUniqueDbPrefix() + "DiffMigrationId",
+            tenantId: generateUniqueTenantId() + "DiffMigrationId",
             readPreference: {mode: "primary"}
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);
@@ -180,17 +180,17 @@ function testConcurrentConflictingMigrations(donorPrimary, migrationOpts0, migra
 
 // Test reusing a migrationId for different migration settings.
 
-// Test different database prefixes.
+// Test different tenantIds.
 (() => {
     let makeMigrationOpts = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
             recipientConnString: rst1.getURL(),
-            dbPrefix: generateUniqueDbPrefix() + "DiffDbPrefix",
+            tenantId: generateUniqueTenantId() + "DiffTenantId",
             readPreference: {mode: "primary"}
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);
-        migrationOpts1.dbPrefix = generateUniqueDbPrefix() + "DiffDbPrefix";
+        migrationOpts1.tenantId = generateUniqueTenantId() + "DiffTenantId";
         return [migrationOpts0, migrationOpts1];
     };
 
@@ -205,7 +205,7 @@ function testConcurrentConflictingMigrations(donorPrimary, migrationOpts0, migra
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
             recipientConnString: rst1.getURL(),
-            dbPrefix: generateUniqueDbPrefix() + "DiffRecipientConnString",
+            tenantId: generateUniqueTenantId() + "DiffRecipientConnString",
             readPreference: {mode: "primary"}
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);
@@ -224,7 +224,7 @@ function testConcurrentConflictingMigrations(donorPrimary, migrationOpts0, migra
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
             recipientConnString: rst1.getURL(),
-            dbPrefix: generateUniqueDbPrefix() + "DiffReadPref",
+            tenantId: generateUniqueTenantId() + "DiffReadPref",
             readPreference: {mode: "primary"}
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);

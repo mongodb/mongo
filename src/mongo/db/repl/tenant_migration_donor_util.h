@@ -32,7 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/executor/task_executor.h"
@@ -92,7 +92,7 @@ void migrationConflictHandler(OperationContext* opCtx,
                               rpc::ReplyBuilderInterface* replyBuilder) {
     checkIfCanReadOrBlock(opCtx, dbName);
 
-    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
+    auto& mtabByPrefix = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
 
     try {
         // callable will modify replyBuilder.
@@ -114,8 +114,8 @@ void migrationConflictHandler(OperationContext* opCtx,
         auto migrationConflictInfo = ex.extraInfo<TenantMigrationConflictInfo>();
         invariant(migrationConflictInfo);
 
-        if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlockerForDbPrefix(
-                migrationConflictInfo->getDatabasePrefix())) {
+        if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlockerForTenantId(
+                migrationConflictInfo->getTenantId())) {
             replyBuilder->getBodyBuilder().resetToEmpty();
             mtab->checkIfCanWriteOrBlock(opCtx);
         }

@@ -168,7 +168,7 @@ TenantMigrationRecipientService::Instance::Instance(BSONObj stateDoc)
     : PrimaryOnlyService::TypedInstance<Instance>(),
       _stateDoc(TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
                                                         stateDoc)),
-      _tenantId(_stateDoc.getDatabasePrefix().toString()),
+      _tenantId(_stateDoc.getTenantId().toString()),
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
       _readPreference(_stateDoc.getReadPreference()) {}
@@ -357,7 +357,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
                 2,
                 "Found last oplog entry at read concern majority optime on remote node",
                 "migrationId"_attr = getMigrationUUID(),
-                "tenantId"_attr = _stateDoc.getDatabasePrefix(),
+                "tenantId"_attr = _stateDoc.getTenantId(),
                 "lastOplogEntry"_attr = lastOplogEntry1Bson);
     auto lastOplogEntry1OpTime = uassertStatusOK(OpTime::parseFromOplogEntry(lastOplogEntry1Bson));
 
@@ -379,7 +379,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
                 "Transaction table entry for earliest transaction that was open at the read "
                 "concern majority optime on remote node (may be empty)",
                 "migrationId"_attr = getMigrationUUID(),
-                "tenantId"_attr = _stateDoc.getDatabasePrefix(),
+                "tenantId"_attr = _stateDoc.getTenantId(),
                 "earliestOpenTransaction"_attr = earliestOpenTransactionBson);
 
     pauseAfterRetrievingLastTxnMigrationRecipientInstance.pauseWhileSet();
@@ -399,7 +399,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
                 "Found last oplog entry at the read concern majority optime (after reading txn "
                 "table) on remote node",
                 "migrationId"_attr = getMigrationUUID(),
-                "tenantId"_attr = _stateDoc.getDatabasePrefix(),
+                "tenantId"_attr = _stateDoc.getTenantId(),
                 "lastOplogEntry"_attr = lastOplogEntry2Bson);
     auto lastOplogEntry2OpTime = uassertStatusOK(OpTime::parseFromOplogEntry(lastOplogEntry2Bson));
     _stateDoc.setStartApplyingOpTime(lastOplogEntry2OpTime);

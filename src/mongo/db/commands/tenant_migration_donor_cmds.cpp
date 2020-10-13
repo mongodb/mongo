@@ -78,7 +78,7 @@ public:
                 TenantMigrationDonorDocument(requestBody.getMigrationId(),
                                              requestBody.getRecipientConnectionString().toString(),
                                              requestBody.getReadPreference(),
-                                             requestBody.getDatabasePrefix().toString())
+                                             requestBody.getTenantId().toString())
                     .toBSON();
 
             auto donorService =

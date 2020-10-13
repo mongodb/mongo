@@ -15,7 +15,7 @@ var TenantMigrationUtil = (function() {
             donorStartMigration: 1,
             migrationId: UUID(migrationOpts.migrationIdString),
             recipientConnectionString: migrationOpts.recipientConnString,
-            databasePrefix: migrationOpts.dbPrefix,
+            tenantId: migrationOpts.tenantId,
             readPreference: migrationOpts.readPreference
         };
         const donorPrimary = new Mongo(donorPrimaryHost);
@@ -48,7 +48,7 @@ var TenantMigrationUtil = (function() {
             donorStartMigration: 1,
             migrationId: UUID(migrationOpts.migrationIdString),
             recipientConnectionString: migrationOpts.recipientConnString,
-            databasePrefix: migrationOpts.dbPrefix,
+            tenantId: migrationOpts.tenantId,
             readPreference: migrationOpts.readPreference
         };
 
@@ -111,65 +111,65 @@ var TenantMigrationUtil = (function() {
 
     /**
      * Returns true if the durable and in-memory state for the migration 'migrationId' and
-     * 'dbPrefix' is in state "committed", and false otherwise.
+     * 'tenantId' is in state "committed", and false otherwise.
      */
-    function isMigrationCommitted(node, migrationId, dbPrefix) {
+    function isMigrationCommitted(node, migrationId, tenantId) {
         const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
         if (configDonorsColl.findOne({_id: migrationId}).state != "committed") {
             return false;
         }
         const mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[dbPrefix].access === TenantMigrationUtil.accessState.kReject;
+        return mtabs[tenantId].access === TenantMigrationUtil.accessState.kReject;
     }
 
     /**
      * Returns true if the durable and in-memory state for the migration 'migrationId' and
-     * 'dbPrefix' is in state "aborted", and false otherwise.
+     * 'tenantId' is in state "aborted", and false otherwise.
      */
-    function isMigrationAborted(node, migrationId, dbPrefix) {
+    function isMigrationAborted(node, migrationId, tenantId) {
         const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
         if (configDonorsColl.findOne({_id: migrationId}).state != "aborted") {
             return false;
         }
         const mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[dbPrefix].access === TenantMigrationUtil.accessState.kAllow;
+        return mtabs[tenantId].access === TenantMigrationUtil.accessState.kAllow;
     }
 
     /**
-     * Asserts that the migration 'migrationId' and 'dbPrefix' is in state "committed" on all the
+     * Asserts that the migration 'migrationId' and 'tenantId' is in state "committed" on all the
      * given nodes.
      */
-    function assertMigrationCommitted(nodes, migrationId, dbPrefix) {
+    function assertMigrationCommitted(nodes, migrationId, tenantId) {
         nodes.forEach(node => {
-            assert(isMigrationCommitted(node, migrationId, dbPrefix));
+            assert(isMigrationCommitted(node, migrationId, tenantId));
         });
     }
 
     /**
-     * Asserts that the migration 'migrationId' and 'dbPrefix' eventually goes to state "committed"
+     * Asserts that the migration 'migrationId' and 'tenantId' eventually goes to state "committed"
      * on all the given nodes.
      */
-    function waitForMigrationToCommit(nodes, migrationId, dbPrefix) {
+    function waitForMigrationToCommit(nodes, migrationId, tenantId) {
         nodes.forEach(node => {
-            assert.soon(() => isMigrationCommitted(node, migrationId, dbPrefix));
+            assert.soon(() => isMigrationCommitted(node, migrationId, tenantId));
         });
     }
 
     /**
-     * Asserts that the migration 'migrationId' and 'dbPrefix' eventually goes to state "aborted"
+     * Asserts that the migration 'migrationId' and 'tenantId' eventually goes to state "aborted"
      * on all the given nodes.
      */
-    function waitForMigrationToAbort(nodes, migrationId, dbPrefix) {
+    function waitForMigrationToAbort(nodes, migrationId, tenantId) {
         nodes.forEach(node => {
-            assert.soon(() => isMigrationAborted(node, migrationId, dbPrefix));
+            assert.soon(() => isMigrationAborted(node, migrationId, tenantId));
         });
     }
 
     /**
-     * Asserts that durable and in-memory state for the migration 'migrationId' and 'dbPrefix' is
+     * Asserts that durable and in-memory state for the migration 'migrationId' and 'tenantId' is
      * eventually deleted from the given nodes.
      */
-    function waitForMigrationGarbageCollection(nodes, migrationId, dbPrefix) {
+    function waitForMigrationGarbageCollection(nodes, migrationId, tenantId) {
         nodes.forEach(node => {
             const configDonorsColl = node.getCollection("config.tenantMigrationDonors");
             assert.soon(() => 0 === configDonorsColl.count({_id: migrationId}));
@@ -181,17 +181,17 @@ var TenantMigrationUtil = (function() {
             let mtabs;
             assert.soon(() => {
                 mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-                return !mtabs || !mtabs[dbPrefix];
+                return !mtabs || !mtabs[tenantId];
             }, tojson(mtabs));
         });
     }
 
     /**
-     * Returns the TenantMigrationAccessBlocker associated with given the database prefix on the
+     * Returns the TenantMigrationAccessBlocker associated with given the tenantId on the
      * node.
      */
-    function getTenantMigrationAccessBlocker(node, dbPrefix) {
-        return node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker[dbPrefix];
+    function getTenantMigrationAccessBlocker(node, tenantId) {
+        return node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker[tenantId];
     }
 
     return {

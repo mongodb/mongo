@@ -72,11 +72,11 @@ function runCommand(db, cmd, expectedError) {
  * Tests that the donor rejects causal reads after the migration commits.
  */
 function testReadIsRejectedIfSentAfterMigrationHasCommitted(rst, testCase, dbName, collName) {
-    const dbPrefix = dbName.split('_')[0];
+    const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -92,7 +92,7 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(rst, testCase, dbNam
     // atClusterTime have read timestamp >= commitTimestamp.
     rst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbPrefix});
+    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
     const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
     nodes.forEach(node => {
         const db = node.getDB(dbName);
@@ -113,11 +113,11 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(rst, testCase, dbNam
  * Tests that the donor does not reject reads after the migration aborts.
  */
 function testReadIsAcceptedIfSentAfterMigrationHasAborted(rst, testCase, dbName, collName) {
-    const dbPrefix = dbName.split('_')[0];
+    const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -135,7 +135,7 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(rst, testCase, dbName,
     // atClusterTime have read timestamp >= abortTimestamp.
     rst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbPrefix});
+    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
     const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
     nodes.forEach(node => {
         const db = node.getDB(dbName);
@@ -153,11 +153,11 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(rst, testCase, dbName,
  * blockingTimestamp but does not block linearizable reads.
  */
 function testReadBlocksIfMigrationIsInBlocking(rst, testCase, dbName, collName) {
-    const dbPrefix = dbName.split('_')[0];
+    const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -176,7 +176,7 @@ function testReadBlocksIfMigrationIsInBlocking(rst, testCase, dbName, collName) 
     // unspecified atClusterTime have read timestamp >= blockTimestamp.
     rst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbPrefix});
+    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
         : testCase.command(collName);
@@ -205,11 +205,11 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(
         return;
     }
 
-    const dbPrefix = dbName.split('_')[0];
+    const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -238,7 +238,7 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(
     // unspecified atClusterTime have read timestamp >= blockTimestamp.
     rst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbPrefix});
+    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
         : testCase.command(collName);
@@ -268,11 +268,11 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(rst, testCase,
         return;
     }
 
-    const dbPrefix = dbName.split('_')[0];
+    const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         recipientConnString: kRecipientConnString,
-        dbPrefix: dbPrefix,
+        tenantId: tenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -302,7 +302,7 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(rst, testCase,
     // unspecified atClusterTime have read timestamp >= blockTimestamp.
     rst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({databasePrefix: dbPrefix});
+    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
         : testCase.command(collName);
@@ -409,7 +409,6 @@ const testFuncs = {
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
-        // Database name is [tenant_id (database prefix)]_[tenant defined database name]
         let dbName = testCaseName + "-" + testName + "_" + kTenantDefinedDbName;
         testFunc(donorRst, testCase, dbName, kCollName);
     }

@@ -14,7 +14,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kMaxSleepTimeMS = 1000;
 const kConfigDonorsNS = "config.tenantMigrationDonors";
-const kDBPrefix = "testDbPrefix";
+const kTenantId = "testTenantId";
 
 // Set the delay before a donor state doc is garbage collected to be short to speed up the test.
 const kGarbageCollectionDelayMS = 30 * 1000;
@@ -52,7 +52,7 @@ function testDonorStartMigrationInterrupt(
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix,
+        tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -60,7 +60,7 @@ function testDonorStartMigrationInterrupt(
         new Thread(TenantMigrationUtil.startMigration, donorPrimary.host, migrationOpts);
     migrationThread.start();
     sleep(Math.random() * kMaxSleepTimeMS);
-    interruptFunc(donorRst, migrationId, migrationOpts.dbPrefix);
+    interruptFunc(donorRst, migrationId, migrationOpts.tenantId);
     verifyCmdResponseFunc(migrationThread);
 
     donorRst.stopSet();
@@ -109,7 +109,7 @@ function testDonorForgetMigrationInterrupt(
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: recipientRst.getURL(),
-        dbPrefix: kDBPrefix,
+        tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
 
@@ -120,7 +120,7 @@ function testDonorForgetMigrationInterrupt(
         TenantMigrationUtil.forgetMigration, donorPrimary.host, migrationOpts.migrationIdString);
     forgetMigrationThread.start();
     sleep(Math.random() * kMaxSleepTimeMS);
-    interruptFunc(donorRst, migrationId, migrationOpts.dbPrefix);
+    interruptFunc(donorRst, migrationId, migrationOpts.tenantId);
     verifyCmdResponseFunc(forgetMigrationThread);
 
     donorRst.stopSet();
@@ -157,11 +157,11 @@ function assertCmdSucceededOrInterruptedDueToShutDown(cmdThread) {
  * primary stepped down or shut down after inserting the doc), asserts that the migration
  * eventually commits.
  */
-function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix) {
+function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, tenantId) {
     const donorPrimary = donorRst.getPrimary();
     const configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
     if (configDonorsColl.count({_id: migrationId}) > 0) {
-        TenantMigrationUtil.waitForMigrationToCommit(donorRst.nodes, migrationId, dbPrefix);
+        TenantMigrationUtil.waitForMigrationToCommit(donorRst.nodes, migrationId, tenantId);
     }
 }
 
@@ -197,28 +197,28 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
 
 (() => {
     jsTest.log("Test that the migration resumes on stepup");
-    testDonorStartMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
+    testDonorStartMigrationInterrupt((donorRst, migrationId, tenantId) => {
         // Use a short replSetStepDown seconds to make it more likely for the old primary to
         // step back up.
         assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
 
-        testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix);
+        testMigrationCommitsIfDurableStateExists(donorRst, migrationId, tenantId);
     }, assertCmdSucceededOrInterruptedDueToStepDown, 3 /* numDonorRsNodes */);
 })();
 
 (() => {
     jsTest.log("Test that the migration resumes after restart");
-    testDonorStartMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
+    testDonorStartMigrationInterrupt((donorRst, migrationId, tenantId) => {
         donorRst.stopSet(null /* signal */, true /*forRestart */);
         donorRst.startSet({restart: true, setParameter: {enableTenantMigrations: true}});
 
-        testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefix);
+        testMigrationCommitsIfDurableStateExists(donorRst, migrationId, tenantId);
     }, assertCmdSucceededOrInterruptedDueToShutDown, 3 /* numDonorRsNodes */);
 })();
 
 (() => {
     jsTest.log("Test that the donorForgetMigration command can be retried on stepup");
-    testDonorForgetMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
+    testDonorForgetMigrationInterrupt((donorRst, migrationId, tenantId) => {
         let donorPrimary = donorRst.getPrimary();
 
         // Use a short replSetStepDown seconds to make it more likely for the old primary to
@@ -230,13 +230,13 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
             donorPrimary.host, extractUUIDFromObject(migrationId)));
 
         TenantMigrationUtil.waitForMigrationGarbageCollection(
-            donorRst.nodes, migrationId, dbPrefix);
+            donorRst.nodes, migrationId, tenantId);
     }, assertCmdSucceededOrInterruptedDueToStepDown, 3 /* numDonorRsNodes */);
 })();
 
 (() => {
     jsTest.log("Test that the donorForgetMigration command can be retried after restart");
-    testDonorForgetMigrationInterrupt((donorRst, migrationId, dbPrefix) => {
+    testDonorForgetMigrationInterrupt((donorRst, migrationId, tenantId) => {
         donorRst.stopSet(null /* signal */, true /*forRestart */);
         donorRst.startSet({restart: true, setParameter: {enableTenantMigrations: true}});
 
@@ -245,7 +245,7 @@ function testMigrationCommitsIfDurableStateExists(donorRst, migrationId, dbPrefi
             donorPrimary.host, extractUUIDFromObject(migrationId)));
 
         TenantMigrationUtil.waitForMigrationGarbageCollection(
-            donorRst.nodes, migrationId, dbPrefix);
+            donorRst.nodes, migrationId, tenantId);
     }, assertCmdSucceededOrInterruptedDueToShutDown, 3 /* numDonorRsNodes */);
 })();
 })();

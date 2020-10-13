@@ -35,29 +35,29 @@
 
 namespace mongo {
 
-class TenantMigrationAccessBlockerByPrefix {
-    TenantMigrationAccessBlockerByPrefix(const TenantMigrationAccessBlockerByPrefix&) = delete;
-    TenantMigrationAccessBlockerByPrefix& operator=(const TenantMigrationAccessBlockerByPrefix&) =
+class TenantMigrationAccessBlockerRegistry {
+    TenantMigrationAccessBlockerRegistry(const TenantMigrationAccessBlockerRegistry&) = delete;
+    TenantMigrationAccessBlockerRegistry& operator=(const TenantMigrationAccessBlockerRegistry&) =
         delete;
 
 public:
-    TenantMigrationAccessBlockerByPrefix() = default;
-    static const ServiceContext::Decoration<TenantMigrationAccessBlockerByPrefix> get;
+    TenantMigrationAccessBlockerRegistry() = default;
+    static const ServiceContext::Decoration<TenantMigrationAccessBlockerRegistry> get;
 
     /**
-     * Adds an entry for (dbPrefix, mtab). Throws ConflictingOperationInProgress if an entry for
-     * dbPrefix already exists.
+     * Adds an entry for (tenantId, mtab). Throws ConflictingOperationInProgress if an entry for
+     * tenantId already exists.
      */
-    void add(StringData dbPrefix, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
+    void add(StringData tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
 
     /**
-     * Invariants that an entry for dbPrefix exists, and then removes the entry for (dbPrefix, mtab)
+     * Invariants that an entry for tenantId exists, and then removes the entry for (tenantId, mtab)
      */
-    void remove(StringData dbPrefix);
+    void remove(StringData tenantId);
 
     /**
      * Iterates through each of the TenantMigrationAccessBlockers and
-     * returns the first TenantMigrationAccessBlocker it finds whose dbPrefix is a prefix for
+     * returns the first TenantMigrationAccessBlocker it finds whose tenantId is a prefix for
      * dbName.
      */
     std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForDbName(
@@ -65,10 +65,10 @@ public:
 
     /**
      * Searches through TenantMigrationAccessBlockers and
-     * returns the TenantMigrationAccessBlocker that matches dbPrefix.
+     * returns the TenantMigrationAccessBlocker that matches tenantId.
      */
-    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForDbPrefix(
-        StringData dbPrefix);
+    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForTenantId(
+        StringData tenantId);
 
     /**
      * Shuts down each of the TenantMigrationAccessBlockers and releases the shared_ptrs to the
@@ -86,7 +86,7 @@ private:
     using TenantMigrationAccessBlockersMap =
         StringMap<std::shared_ptr<TenantMigrationAccessBlocker>>;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerByPrefix::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
     TenantMigrationAccessBlockersMap _tenantMigrationAccessBlockers;
 };
 

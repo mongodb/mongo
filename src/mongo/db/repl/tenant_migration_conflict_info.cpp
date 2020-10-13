@@ -39,7 +39,7 @@ namespace {
 
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TenantMigrationConflictInfo);
 
-constexpr StringData kDatabasePrefixFieldName = "databasePrefix"_sd;
+constexpr StringData kTenantIdFieldName = "tenantId"_sd;
 
 }  // namespace
 
@@ -50,11 +50,11 @@ BSONObj TenantMigrationConflictInfo::toBSON() const {
 }
 
 void TenantMigrationConflictInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append(kDatabasePrefixFieldName, _dbPrefix);
+    bob->append(kTenantIdFieldName, _tenantId);
 }
 
 std::shared_ptr<const ErrorExtraInfo> TenantMigrationConflictInfo::parse(const BSONObj& obj) {
-    return std::make_shared<TenantMigrationConflictInfo>(obj[kDatabasePrefixFieldName].String());
+    return std::make_shared<TenantMigrationConflictInfo>(obj[kTenantIdFieldName].String());
 }
 
 }  // namespace mongo

@@ -75,9 +75,9 @@ structs:
                 description: >-
                     The read preference setting that the recipient will use to determine
                     which node in the donor replica set to clone from.
-            databasePrefix:
+            tenantId:
                 type: string
-                description: "The database prefix for the migration."
+                description: "The tenantId for the migration."
             state:
                 type: TenantMigrationDonorState
                 description: "The state of the tenant migration."
@@ -118,11 +118,11 @@ structs:
                 description: >-
                     The URI string that the recipient will utilize to create a connection
                     with the donor.
-            databasePrefix:
+            tenantId:
                 type: string
-                description: "The database prefix for the migration."
+                description: "The tenantId for the migration."
                 validator:
-                    callback: "validateDbPrefix"
+                    callback: "validateDatabasePrefix"
             readPreference:
                 type: readPreference
                 description: >-
