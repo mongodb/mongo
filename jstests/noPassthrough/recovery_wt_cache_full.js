@@ -94,7 +94,6 @@ jsTestLog('Applying updates on secondary ' + secondary.host + ' during recovery.
 
 // Log ID 21536 - Completed oplog application for recovery.
 checkLog.containsJson(secondary, 21536, {
-    numBatches: 1,
     numOpsApplied: function(numOpsApplied) {
         return numOpsApplied >= numDocs * numUpdates;
     }
