@@ -20,14 +20,14 @@ var testDB = st.s.getDB('test');
 assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
 assert.commandWorked(testDB.adminCommand({shardCollection: 'test.user', key: {_id: 1}}));
 
-// Ensures that all metadata writes thus far have been replicated to all nodes
-st.configRS.awaitReplication();
-
 var configSecondaryList = st.configRS.getSecondaries();
 var configSecondaryToKill = configSecondaryList[0];
 var delayedConfigSecondary = configSecondaryList[1];
 
 assert.commandWorked(testDB.user.insert({_id: 1}));
+
+// Ensures that all metadata writes thus far have been replicated to all nodes
+st.configRS.awaitReplication();
 
 stopServerReplication(delayedConfigSecondary);
 
