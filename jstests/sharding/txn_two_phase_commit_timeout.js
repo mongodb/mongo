@@ -2,7 +2,7 @@
  * Exercises transaction timing out at various stages of the two-phase commit.
  * TODO SERVER-51325: this test can use more scenarios.
  *
- * @tags: [uses_transactions, uses_multi_shard_transaction]
+ * @tags: [uses_transactions, uses_multi_shard_transaction, multiversion_incompatible]
  */
 
 (function() {
