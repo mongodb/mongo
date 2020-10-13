@@ -655,9 +655,9 @@ void ProgramRunner::launchProcess(int child_stdout) {
             ss << _argv[i];
         else {
             ss << '"';
-            // escape all embedded quotes
+            // Escape all embedded quotes and backslashes.
             for (size_t j = 0; j < _argv[i].size(); ++j) {
-                if (_argv[i][j] == '"')
+                if (_argv[i][j] == '"' || _argv[i][j] == '\\')
                     ss << '\\';
                 ss << _argv[i][j];
             }

@@ -34,7 +34,7 @@ rst.nodes.forEach((node) => {
 // All the certificates' DNs share this base
 const dnBase = "C=US, ST=New York, L=New York,";
 // This is the DN of the rollover certificate.
-const rolloverDN = dnBase + " O=MongoDB\\, Inc. (Rollover), OU=Kernel (Rollover), CN=server";
+const rolloverDN = dnBase + " O=MongoDB Inc. (Rollover), OU=Kernel (Rollover), CN=server";
 // This is the DN of the original certificate
 const originalDN = dnBase + " O=MongoDB, OU=Kernel, CN=server";
 
