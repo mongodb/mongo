@@ -73,16 +73,8 @@ const auto _registryRegisterer =
 const Status kExecutorShutdownStatus(ErrorCodes::InterruptedDueToReplStateChange,
                                      "PrimaryOnlyService executor shut down due to stepDown");
 
-/**
- * Client decoration used by Clients that are a part of a PrimaryOnlyService.
- */
-struct PrimaryOnlyServiceClientState {
-    PrimaryOnlyService* primaryOnlyService = nullptr;
-    bool allowOpCtxWhenServiceRebuilding = false;
-};
-
 const auto primaryOnlyServiceStateForClient =
-    Client::declareDecoration<PrimaryOnlyServiceClientState>();
+    Client::declareDecoration<PrimaryOnlyService::PrimaryOnlyServiceClientState>();
 
 /**
  * A ClientObserver that adds hooks for every time an OpCtx is created on a thread that is part of a
@@ -136,31 +128,6 @@ ServiceContext::ConstructorActionRegisterer primaryOnlyServiceClientObserverRegi
     "PrimaryOnlyServiceClientObserver", [](ServiceContext* service) {
         service->registerClientObserver(std::make_unique<PrimaryOnlyServiceClientObserver>());
     }};
-
-/**
- * Allows OpCtxs created on PrimaryOnlyService threads to remain uninterrupted, even if the service
- * they are associated with aren't in state kRunning, so long as the state is kRebuilding instead.
- * Used during the stepUp process to allow the database read required to rebuild a service and get
- * it running in the first place. Does not prevent other forms of OpCtx interruption, such as from
- * stepDown or calls to killOp.
- */
-class AllowOpCtxWhenServiceRebuildingBlock {
-public:
-    explicit AllowOpCtxWhenServiceRebuildingBlock(Client* client)
-        : _client(client), _clientState(&primaryOnlyServiceStateForClient(_client)) {
-        invariant(_clientState->primaryOnlyService);
-        invariant(_clientState->allowOpCtxWhenServiceRebuilding == false);
-        _clientState->allowOpCtxWhenServiceRebuilding = true;
-    }
-    ~AllowOpCtxWhenServiceRebuildingBlock() {
-        invariant(_clientState->allowOpCtxWhenServiceRebuilding == true);
-        _clientState->allowOpCtxWhenServiceRebuilding = false;
-    }
-
-private:
-    Client* _client;
-    PrimaryOnlyServiceClientState* _clientState;
-};
 
 }  // namespace
 
@@ -387,6 +354,13 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(stepUpOpTime)
         .thenRunOn(**_scopedExecutor)
+        .then([this] {
+            if (MONGO_unlikely(PrimaryOnlyServiceSkipRebuildingInstances.shouldFail())) {
+                return ExecutorFuture<void>(**_scopedExecutor, Status::OK());
+            }
+
+            return _rebuildService(_scopedExecutor);
+        })
         .then([this, term] { _rebuildInstances(term); })
         .getAsync([](auto&&) {});  // Ignore the result Future
 }
@@ -683,6 +657,19 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl,
                 "instanceID"_attr = instanceID);
             instance->run(std::move(scopedExecutor));
         });
+}
+
+PrimaryOnlyService::AllowOpCtxWhenServiceRebuildingBlock::AllowOpCtxWhenServiceRebuildingBlock(
+    Client* client)
+    : _client(client), _clientState(&primaryOnlyServiceStateForClient(_client)) {
+    invariant(_clientState->primaryOnlyService);
+    invariant(_clientState->allowOpCtxWhenServiceRebuilding == false);
+    _clientState->allowOpCtxWhenServiceRebuilding = true;
+}
+
+PrimaryOnlyService::AllowOpCtxWhenServiceRebuildingBlock::~AllowOpCtxWhenServiceRebuildingBlock() {
+    invariant(_clientState->allowOpCtxWhenServiceRebuilding == true);
+    _clientState->allowOpCtxWhenServiceRebuilding = false;
 }
 
 }  // namespace repl

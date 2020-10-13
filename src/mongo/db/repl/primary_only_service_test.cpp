@@ -42,6 +42,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -252,6 +253,29 @@ public:
         // set only if doing a write to the state document throws an exception.
         SharedPromise<void> _documentWriteException;
         Mutex _mutex = MONGO_MAKE_LATCH("PrimaryOnlyServiceTest::TestService::_mutex");
+    };
+
+private:
+    ExecutorFuture<void> _rebuildService(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor) override {
+        auto nss = getStateDocumentsNS();
+
+        AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+        auto opCtxHolder = cc().makeOperationContext();
+        auto opCtx = opCtxHolder.get();
+        DBDirectClient client(opCtx);
+
+        BSONObj result;
+        client.runCommand(nss.db().toString(),
+                          BSON("createIndexes"
+                               << nss.coll().toString() << "indexes"
+                               << BSON_ARRAY(BSON("key" << BSON("x" << 1) << "name"
+                                                        << "TestTTLIndex"
+                                                        << "expireAfterSeconds" << 100000))),
+                          result);
+        uassertStatusOK(getStatusFromCommandResult(result));
+
+        return ExecutorFuture<void>(**executor, Status::OK());
     };
 };
 

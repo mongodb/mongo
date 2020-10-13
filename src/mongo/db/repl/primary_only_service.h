@@ -69,6 +69,14 @@ extern FailPoint PrimaryOnlyServiceFailRebuildingInstances;
 class PrimaryOnlyService {
 public:
     /**
+     * Client decoration used by Clients that are a part of a PrimaryOnlyService.
+     */
+    struct PrimaryOnlyServiceClientState {
+        PrimaryOnlyService* primaryOnlyService = nullptr;
+        bool allowOpCtxWhenServiceRebuilding = false;
+    };
+
+    /**
      * Every instance must have an ID that is unique among instances of that service. The
      * InstanceID will be the _id of the state document corresponding to that instance.
      */
@@ -270,6 +278,23 @@ public:
 
 protected:
     /**
+     * Allows OpCtxs created on PrimaryOnlyService threads to remain uninterrupted, even if the
+     * service they are associated with aren't in state kRunning, so long as the state is
+     * kRebuilding instead. Used during the stepUp process to allow the database read or write
+     * required to rebuild a service and get it running in the first place. Does not prevent other
+     * forms of OpCtx interruption, such as from stepDown or calls to killOp.
+     */
+    class AllowOpCtxWhenServiceRebuildingBlock {
+    public:
+        explicit AllowOpCtxWhenServiceRebuildingBlock(Client* client);
+        ~AllowOpCtxWhenServiceRebuildingBlock();
+
+    private:
+        Client* _client;
+        PrimaryOnlyServiceClientState* _clientState;
+    };
+
+    /**
      * Constructs a new Instance object with the given initial state.
      */
     virtual std::shared_ptr<Instance> constructInstance(BSONObj initialState) const = 0;
@@ -293,6 +318,16 @@ protected:
     std::shared_ptr<Instance> getOrCreateInstance(OperationContext* opCtx, BSONObj initialState);
 
 private:
+    /**
+     * Called as part of onSetUp before rebuilding instances. This function should do any additional
+     * work required to rebuild the service on stepup, for example, creating a TTL index for the
+     * state machine collection.
+     */
+    virtual ExecutorFuture<void> _rebuildService(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+        return ExecutorFuture<void>(**executor, Status::OK());
+    };
+
     /**
      * Called as part of onStepUp.  Queries the state document collection for this
      * PrimaryOnlyService, constructs Instance objects for each document found, and schedules work
