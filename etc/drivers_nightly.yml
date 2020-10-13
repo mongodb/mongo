@@ -21,6 +21,28 @@
 # Add your Driver-specific AXES and variables
 # Add your Driver-specific Matrix at the bottom of this file
 # Update the Driver-specific variables in the 'run driver tests' function if needed
+#
+### Instructions for updating for future branches
+# 1. File a BUILD ticket to add permissions to the project's AWS keys so they
+# can write to the mciuploads bucket, at the root folder that has the same
+# name as the drivers-nightly project for the branch you are adding.
+# ex: drivers-nightly-4.4
+#
+# 2. Make a git branch off a known good commit, where compile and unittests are
+# green
+#
+# 2. Synchronize this file with etc/evergreen.yml
+#    - venv and pip setup (&setup_venv)
+#    - compile
+#      - Make sure the compile_flags and extra_flags are synchronized, and that
+#      you are performing a release build
+#    - "run mongo tests"
+#
+# 3. Run patch builds, ensuring that issues with compile are resolved
+#    - Inspect the drivers tests failures, and make sure that the errors are
+#    caused by drivers tests, and not by setup or s3 failures
+#
+# 4. Update this block with any pain points for the next person here
 
 stepback: true
 command_type: system
@@ -85,9 +107,14 @@ variables:
         MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
       fi
 
+      ${activate_venv}
+
       # This script converts the generated version string into a sanitized version string for
       # use by scons and uploading artifacts as well as information about for the scons cache.
-      MONGO_VERSION=$MONGO_VERSION SCONS_CACHE_MODE=${scons_cache_mode|nolinked} USE_SCONS_CACHE=${use_scons_cache|false} ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+      MONGO_VERSION=$MONGO_VERSION                    \
+        SCONS_CACHE_MODE=${scons_cache_mode|nolinked} \
+        USE_SCONS_CACHE=${use_scons_cache|false}      \
+          $python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
 
 - &apply_compile_expansions
   command: expansions.update
@@ -101,8 +128,46 @@ variables:
 ### MONGODB COMPILE & TEST FUNCTIONS ###
 
 functions:
+  "set task expansion macros": &set_task_expansion_macros
+    command: expansions.update
+    params:
+      updates:
+      - key: activate_venv
+        value: |
+          # check if virtualenv is set up
+          if [ -d "${workdir}/venv" ]; then
+            if [ "Windows_NT" = "$OS" ]; then
+              # Need to quote the path on Windows to preserve the separator.
+              . "${workdir}/venv/Scripts/activate" 2> /tmp/activate_error.log
+            else
+              . ${workdir}/venv/bin/activate 2> /tmp/activate_error.log
+            fi
+            if [ $? -ne 0 ]; then
+              echo "Failed to activate venv: $(cat /tmp/activate_error.log)"
+            fi
+            python=python
+          else
+            python=${python|/opt/mongodbtoolchain/v3/bin/python3}
+          fi
 
-  "fetch and extract binaries": &fetch_extract_binaries
+          if [ "Windows_NT" = "$OS" ]; then
+            export PYTHONPATH="$PYTHONPATH;$(cygpath -w ${workdir}/src)"
+          else
+            export PYTHONPATH="$PYTHONPATH:${workdir}/src"
+          fi
+
+          echo "python set to $(which $python)"
+
+  "fetch binaries": &fetch_binaries
+    command: s3.get
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: drivers-nightly/${platform}/${revision}/binaries/mongo-${revision}.${ext|tgz}
+      bucket: mciuploads
+      local_file: src/mongodb-binaries.${ext|tgz}
+
+  "extract binaries": &extract_binaries
     command: shell.exec
     params:
       working_dir: src
@@ -110,12 +175,7 @@ functions:
         set -o errexit
         set -o verbose
 
-        curl -s https://s3.amazonaws.com/mciuploads/drivers-nightly/${platform}/${revision}/binaries/mongo-${revision}.${ext} --output mongodb-binaries.${ext}
-        # When we call git_get_project and check out our source code, it creates a directory called 'mongo',
-        # this isn't needed and interferes with our shell binary 'mongo' when we try to copy it.
-        # To prevent this, we just remove the 'mongo' directory first, then we do our copy.
-        mv mongo mongo-old || true
-        ${decompress} mongodb-binaries.${ext|tgz}
+        ${decompress|tar xzvf} mongodb-binaries.${ext|tgz}
         chmod +x mongodb*/bin/*
         mv mongodb*/bin/* .
 
@@ -141,13 +201,15 @@ functions:
 
   "do setup":
   - *git_get_project
-  - *fetch_extract_binaries
+  - *setup_venv
+  - *fetch_binaries
+  - *extract_binaries
   - *get_buildnumber
   - *setup_credentials
 
 
   ### FOR MONGODB TESTS ###
-  "set up virtualenv":
+  "set up venv": &setup_venv
     command: shell.exec
     type: test
     params:
@@ -155,9 +217,34 @@ functions:
         script: |
           # exit immediately if virtualenv is not found
           set -o errexit
-          set -o verbose
 
-          virtualenv --system-site-packages ./venv
+          python_loc=$(which ${python|/opt/mongodbtoolchain/v3/bin/python3})
+          venv_dir="${workdir}/venv"
+          "$python_loc" -m venv --system-site-packages "$venv_dir"
+
+          # venv creates its Scripts/activate file with CLRF endings, which
+          # cygwin bash does not like. dos2unix it
+          # (See https://bugs.python.org/issue32451)
+          if [ "Windows_NT" = "$OS" ]; then
+            dos2unix "${workdir}/venv/Scripts/activate"
+          fi
+
+          export VIRTUAL_ENV_DISABLE_PROMPT=yes
+
+          # Not all git get project calls clone into ${workdir}/src so we allow
+          # callers to tell us where the pip requirements files are.
+          pip_dir="${pip_dir}"
+          if [[ -z $pip_dir ]]; then
+            # Default to most common location
+            pip_dir="${workdir}/src/etc/pip"
+          fi
+
+          # Same as above we have to use quotes to preserve the
+          # Windows path separator
+          toolchain_txt="$pip_dir/toolchain-requirements.txt"
+          ${activate_venv}
+          python -m pip install -r "$toolchain_txt" -q
+          python -m pip freeze > pip-requirements.txt
 
   "run mongo tests":
     command: shell.exec
@@ -168,14 +255,7 @@ functions:
         set -o errexit
         set -o verbose
 
-        # check if virtualenv is set up
-        if [ -d "venv" ]; then
-          if [ "Windows_NT" = "$OS" ]; then
-            . ./venv/Scripts/activate
-          else
-            . ./venv/bin/activate
-          fi
-        fi
+        ${activate_venv}
 
         extra_args=""
         processor_architecture=$(uname -m)
@@ -188,7 +268,7 @@ functions:
         fi
 
         ${rlp_environment}   \
-        ${python|/opt/mongodbtoolchain/v2/bin/python2} buildscripts/resmoke.py ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
+        $python buildscripts/resmoke.py run ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "cleanup environment":
     command: shell.exec
@@ -317,6 +397,7 @@ functions:
         display_name: "orchestration.log"
 
   "setup drivers environment":
+    - *set_task_expansion_macros
     - command: shell.exec
       params:
         working_dir: "src"
@@ -393,9 +474,10 @@ post:
         # removes files from the (local) scons cache when it's over a
         # threshold, to the $prune_ratio percentage. Ideally override
         # these default values in the distro config in evergreen.
+        ${activate_venv}
 
         if [ -d "${scons_cache_path}" ]; then
-            ${python|python} buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+            $python buildscripts/scons_cache_prune.py --cache-dir '${scons_cache_path}' --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
         fi
   - func: "cleanup environment"
 
@@ -410,8 +492,10 @@ tasks:
 - name: compile
   depends_on: []
   commands:
+    - *set_task_expansion_macros
     - command: manifest.load
     - *git_get_project
+    - *setup_venv
     - func: "get buildnumber"
     - func: "setup credentials"
     - *generate_compile_expansions
@@ -426,17 +510,52 @@ tasks:
           set -o errexit
           set -o verbose
 
+          # extra_args from etc/evergreen.yml
+          # Only allow hygienic builds in Evergreen, and use hardlinks to
+          # reduce the disk space impact of installing all of the binaries and
+          # associated debug info.
+
+          # The expansion here is a workaround to let us set a different install-action
+          # for tasks that don't support the one we set here. A better plan would be
+          # to support install-action for Ninja builds directly.
+          # TODO: https://jira.mongodb.org/browse/SERVER-48203
+          extra_args="--install-mode=hygienic --install-action=${task_install_action|hardlink}"
+
+          # By default, limit link jobs to one quarter of our overall -j
+          # concurrency unless locally overridden. We do this because in
+          # static link environments, the memory consumption of each
+          # link job is so high that without constraining the number of
+          # links we are likely to OOM or thrash the machine. Dynamic
+          # builds, where htis is not a concern, override this value.
+          echo "Changing SCons to run with --jlink=${num_scons_link_jobs_available|0.25}"
+          extra_args="$extra_args --jlink=${num_scons_link_jobs_available|0.25}"
+
+          if [ "${scons_cache_scope|}" = "shared" ]; then
+            extra_args="$extra_args --cache-debug=scons_cache.log"
+          fi
+
+          # Enable performance debugging
+          extra_args="$extra_args --debug=time"
+
+          # Build packages where the upload tasks expect them
+          extra_args="$extra_args PKGDIR=${workdir}/src"
+          extra_args="$extra_args --release --detect-odr-violations --separate-debug"
+
           rm -rf ${install_directory|/data/mongo-install-directory}
 
-          ${compile_env|} ${python|/opt/mongodbtoolchain/v2/bin/python2} ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} core unittests MONGO_VERSION=${version}
+          ${activate_venv}
 
+          ${compile_env|} $python ./buildscripts/scons.py                                     \
+              ${compile_flags|} ${scons_cache_args|} $extra_args                              \
+              install-core install-unittests install-unittests-debug                          \
+              MONGO_VERSION=${version}
+
+          # Note to next reader: mongo drivers tests expect the binaries to be
+          # packed differently than archive-dist-test. Don't try and use
+          # it for this purpose
           # Pack up the binaries
           mkdir -p mongodb-binaries/bin
-          if [ `which strip` ]; then
-            echo "found strip"
-            find . -maxdepth 1 -type f -iname "mongo*" -exec strip {} \;
-          fi
-          find . -maxdepth 1 -type f -iname "mongo*" -exec mv {} ./mongodb-binaries/bin/ \;
+          find build/install/bin -maxdepth 1 -type f -iname "mongo*" -exec mv {} ./mongodb-binaries/bin/ \;
           ${compress} mongodb-binaries.${ext|tgz} mongodb-binaries/
 
     ### Run the unittests after the compile
@@ -444,6 +563,7 @@ tasks:
       vars:
         resmoke_args: --suites=unittests
         run_multiple_jobs: true
+
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -458,6 +578,7 @@ tasks:
 - <<: *task_template
   name: jsCore_WT
   commands:
+  - *set_task_expansion_macros
   - func: "do setup"
   - func: "run mongo tests"
     vars:
@@ -535,7 +656,7 @@ axes:
           FILE_EXT: "tgz"
       - id: "windows64"
         display_name: "Windows 64"
-        run_on: windows-64-vs2015-test
+        run_on: windows-64-vs2019-small
         variables:
           PLATFORM: "windows64"
           FILE_EXT: "zip"
@@ -584,6 +705,7 @@ axes:
         variables:
            PYTHON_BINARY: "/opt/python/2.7/bin/python"
            DRIVER_WORKING_DIRECTORY: "mongo-python-driver"
+           DRIVER_TEST_UPLOAD_DIRECTORY: "src/mongo-python-driver/xunit-results/TEST-*.xml"
   - id: python-windows
     display_name: "Windows Visual Studio 2010 Python"
     values:
@@ -640,7 +762,7 @@ buildvariants:
   expansions:
     rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     platform: linux
-    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars CPPPATH="/opt/basis/rlp/rlp/include /opt/basis/rlp/utilities/include"
+    compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
@@ -660,21 +782,22 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - windows-64-vs2015-compile
+  - windows-64-vs2019-small
   expansions:
     platform: "windows64"
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows-64 --release CPPPATH="c:/openssl/include c:/sasl/include c:/snmp/include c:/curl/include" LIBPATH="c:/openssl/lib c:/sasl/lib c:/snmp/lib c:/curl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 4 )) --dynamic-windows --win-version-min=ws08r2 VARIANT_DIR=win32
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     ext: zip
     use_scons_cache: true
-    python: python
+    python: '/cygdrive/c/python/Python37/python.exe'
+    compress: 7z a
   tags: ["compile-variant"]
   tasks:
   - name: compile
     distros:
-    - windows-64-vs2015-large
+    - windows-64-vs2019-large
   - name: jsCore_WT
 
 ### DRIVER Test Variants
