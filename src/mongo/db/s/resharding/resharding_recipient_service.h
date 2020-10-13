@@ -137,6 +137,9 @@ private:
     // Transitions the state on-disk and in-memory to kError.
     void _transitionStateToError(const Status& status);
 
+    // Inserts 'doc' on-disk and sets '_replacementDoc' in-memory.
+    void _insertRecipientDocument(const ReshardingRecipientDocument& doc);
+
     // Updates the recipient document on-disk and in-memory with the 'replacementDoc.'
     void _updateRecipientDocument(ReshardingRecipientDocument&& replacementDoc);
 

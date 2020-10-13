@@ -211,6 +211,11 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
     DonorStateEnum endState, boost::optional<Timestamp> minFetchTimestamp) {
     ReshardingDonorDocument replacementDoc(_donorDoc);
     replacementDoc.setState(endState);
+    if (endState == DonorStateEnum::kPreparingToDonate) {
+        _insertDonorDocument(std::move(replacementDoc));
+        return;
+    }
+
     if (minFetchTimestamp) {
         auto& minFetchTimestampStruct = replacementDoc.getMinFetchTimestampStruct();
         if (minFetchTimestampStruct.getMinFetchTimestamp())
@@ -227,6 +232,16 @@ void ReshardingDonorService::DonorStateMachine::_transitionStateToError(const St
     ReshardingDonorDocument replacementDoc(_donorDoc);
     replacementDoc.setState(DonorStateEnum::kError);
     _updateDonorDocument(std::move(replacementDoc));
+}
+
+void ReshardingDonorService::DonorStateMachine::_insertDonorDocument(
+    const ReshardingDonorDocument& doc) {
+    auto opCtx = cc().makeOperationContext();
+    PersistentTaskStore<ReshardingDonorDocument> store(
+        NamespaceString::kDonorReshardingOperationsNamespace);
+    store.add(opCtx.get(), doc, WriteConcerns::kMajorityWriteConcern);
+
+    _donorDoc = doc;
 }
 
 void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(

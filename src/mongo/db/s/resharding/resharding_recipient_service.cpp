@@ -290,6 +290,11 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     RecipientStateEnum endState, boost::optional<Timestamp> fetchTimestamp) {
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(endState);
+    if (endState == RecipientStateEnum::kInitialized) {
+        _insertRecipientDocument(replacementDoc);
+        return;
+    }
+
     if (fetchTimestamp) {
         auto& fetchTimestampStruct = replacementDoc.getFetchTimestampStruct();
 
@@ -308,6 +313,16 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionStateToError(
     ReshardingRecipientDocument replacementDoc(_recipientDoc);
     replacementDoc.setState(RecipientStateEnum::kError);
     _updateRecipientDocument(std::move(replacementDoc));
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_insertRecipientDocument(
+    const ReshardingRecipientDocument& doc) {
+    auto opCtx = cc().makeOperationContext();
+    PersistentTaskStore<ReshardingRecipientDocument> store(
+        NamespaceString::kRecipientReshardingOperationsNamespace);
+    store.add(opCtx.get(), doc, WriteConcerns::kMajorityWriteConcern);
+
+    _recipientDoc = doc;
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument(
