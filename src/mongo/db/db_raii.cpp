@@ -51,6 +51,16 @@ const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
     OperationContext::declareDecoration<boost::optional<bool>>();
 
+/**
+ * Performs some checks to determine whether the operation is compatible with a lock-free read.
+ * The DBDirectClient and multi-doc transactions are not supported.
+ */
+bool supportsLockFreeRead(OperationContext* opCtx) {
+    // Lock-free reads are only supported for external queries, not internal via DBDirectClient.
+    // Lock-free reads are not supported in multi-document transactions.
+    return !opCtx->getClient()->isInDirectClient() && !opCtx->inMultiDocumentTransaction();
+}
+
 }  // namespace
 
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
@@ -98,7 +108,10 @@ AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBas
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
     }
+
+    // Multi-document transactions need MODE_IX locks, otherwise MODE_IS.
     const auto collectionLockMode = getLockModeForQuery(opCtx, nsOrUUID.nss());
+
     _autoColl.emplace(opCtx, nsOrUUID, collectionLockMode, viewMode, deadline);
 
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -243,6 +256,93 @@ AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBas
     }
 }
 
+AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline) {
+    // Supported lock-free reads should never have an open storage snapshot prior to calling
+    // this helper. The storage snapshot and in-memory state fetched here must be consistent.
+    invariant(supportsLockFreeRead(opCtx) && !opCtx->recoveryUnit()->inActiveTxn());
+
+    while (true) {
+        // AutoGetCollectionForReadBase can choose a read source based on the current replication
+        // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
+        long long replTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+        _autoGetCollectionForReadBase.emplace(opCtx, nsOrUUID, viewMode, deadline);
+
+        // A lock request does not always find a collection to lock.
+        if (!_autoGetCollectionForReadBase.get()) {
+            break;
+        }
+
+        // We must open a storage snapshot consistent with the fetched in-memory Collection instance
+        // and chosen read source based on replication state. The Collection instance and
+        // replication state after opening a snapshot will be compared with the previously acquired
+        // state. If either does not match, then this loop will retry lock acquisition and read
+        // source selection until there is a match.
+        //
+        // Note: AutoGetCollectionForReadBase may open a snapshot for PIT reads, so
+        // preallocateSnapshot() may be a no-op, but that is OK because the snapshot is established
+        // by _autoGetCollectionForReadBase after it fetches a Collection instance.
+
+        opCtx->recoveryUnit()->preallocateSnapshot();
+
+        auto newCollection = CollectionCatalog::get(opCtx).lookupCollectionByUUIDForRead(
+            opCtx, _autoGetCollectionForReadBase.get()->uuid());
+
+        if (_autoGetCollectionForReadBase.get()->getMinimumVisibleSnapshot() ==
+                newCollection->getMinimumVisibleSnapshot() &&
+            replTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm()) {
+            break;
+        }
+
+        LOGV2_DEBUG(5067701,
+                    3,
+                    "Retrying acquiring state for lock-free read because collection or replication "
+                    "state changed.");
+        _autoGetCollectionForReadBase.reset();
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+}
+
+AutoGetCollectionForReadMaybeLockFree::AutoGetCollectionForReadMaybeLockFree(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline) {
+    if (supportsLockFreeRead(opCtx)) {
+        _autoGetLockFree.emplace(opCtx, nsOrUUID, viewMode, deadline);
+    } else {
+        _autoGet.emplace(opCtx, nsOrUUID, viewMode, deadline);
+    }
+}
+
+ViewDefinition* AutoGetCollectionForReadMaybeLockFree::getView() const {
+    if (_autoGet) {
+        return _autoGet->getView();
+    } else {
+        return _autoGetLockFree->getView();
+    }
+}
+
+const NamespaceString& AutoGetCollectionForReadMaybeLockFree::getNss() const {
+    if (_autoGet) {
+        return _autoGet->getNss();
+    } else {
+        return _autoGetLockFree->getNss();
+    }
+}
+
+const CollectionPtr& AutoGetCollectionForReadMaybeLockFree::getCollection() const {
+    if (_autoGet) {
+        return _autoGet->getCollection();
+    } else {
+        return _autoGetLockFree->getCollection();
+    }
+}
+
 template <typename AutoGetCollectionForReadType>
 AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
     AutoGetCollectionForReadCommandBase(OperationContext* opCtx,
@@ -291,6 +391,43 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
     currentOp->enter_inlock(ns.c_str(),
                             CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_db->name()));
+}
+
+AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline,
+    AutoStatsTracker::LogMode logMode) {
+    if (supportsLockFreeRead(opCtx)) {
+        _autoGetLockFree.emplace(opCtx, nsOrUUID, viewMode, deadline, logMode);
+    } else {
+        _autoGet.emplace(opCtx, nsOrUUID, viewMode, deadline, logMode);
+    }
+}
+
+const CollectionPtr& AutoGetCollectionForReadCommandMaybeLockFree::getCollection() const {
+    if (_autoGet) {
+        return _autoGet->getCollection();
+    } else {
+        return _autoGetLockFree->getCollection();
+    }
+}
+
+ViewDefinition* AutoGetCollectionForReadCommandMaybeLockFree::getView() const {
+    if (_autoGet) {
+        return _autoGet->getView();
+    } else {
+        return _autoGetLockFree->getView();
+    }
+}
+
+const NamespaceString& AutoGetCollectionForReadCommandMaybeLockFree::getNss() const {
+    if (_autoGet) {
+        return _autoGet->getNss();
+    } else {
+        return _autoGetLockFree->getNss();
+    }
 }
 
 OldClientContext::~OldClientContext() {
@@ -342,5 +479,7 @@ BlockSecondaryReadsDuringBatchApplication_DONT_USE::
 
 template class AutoGetCollectionForReadBase<AutoGetCollection>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;
+template class AutoGetCollectionForReadBase<AutoGetCollectionLockFree>;
+template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadLockFree>;
 
 }  // namespace mongo

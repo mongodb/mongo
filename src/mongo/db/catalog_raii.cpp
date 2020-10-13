@@ -95,8 +95,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     Database* const db = _autoDb.getDb();
     invariant(!nsOrUUID.uuid() || db,
               str::stream() << "Database for " << _resolvedNss.ns()
-                            << " disappeared after successufully resolving "
-                            << nsOrUUID.toString());
+                            << " disappeared after successfully resolving " << nsOrUUID.toString());
 
     // In most cases we expect modifications for system.views to upgrade MODE_IX to MODE_X before
     // taking the lock. One exception is a query by UUID of system.views in a transaction. Usual

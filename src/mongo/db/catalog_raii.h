@@ -123,11 +123,8 @@ public:
         return getCollection().get();
     }
 
-    /**
-     * Dereference operator, returns a lvalue reference to the collection.
-     */
-    const Collection& operator*() const {
-        return *getCollection().get();
+    const CollectionPtr& operator*() const {
+        return getCollection();
     }
 
     /**
@@ -146,6 +143,8 @@ public:
 
     /**
      * Returns nullptr if the collection didn't exist.
+     *
+     * Deprecated in favor of the new ->(), *() and bool() accessors above!
      */
     const CollectionPtr& getCollection() const {
         return _coll;
@@ -218,14 +217,39 @@ public:
         Date_t deadline = Date_t::max());
 
     /**
+     * Same constructor as above except it accepts a fifth unused LockMode parameter in order to
+     * parallel AutoGetCollection and meet the templated AutoGetCollectionForReadBase class'
+     * type structure expectations.
+     */
+    AutoGetCollectionLockFree(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        LockMode unused,  // unused
+        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        Date_t deadline = Date_t::max())
+        : AutoGetCollectionLockFree(opCtx, nsOrUUID, viewMode, deadline) {}
+
+    explicit operator bool() const {
+        // Use the CollectionPtr because it is updated if it yields whereas _collection is not until
+        // restore.
+        return static_cast<bool>(_collectionPtr);
+    }
+
+    /**
      * AutoGetCollectionLockFree can be used as a Collection pointer with the -> operator.
      */
     const Collection* operator->() const {
         return getCollection().get();
     }
 
+    const CollectionPtr& operator*() const {
+        return getCollection();
+    }
+
     /**
      * Returns nullptr if the collection didn't exist.
+     *
+     * Deprecated in favor of the new ->(), *() and bool() accessors above!
      */
     const CollectionPtr& getCollection() const {
         return _collectionPtr;

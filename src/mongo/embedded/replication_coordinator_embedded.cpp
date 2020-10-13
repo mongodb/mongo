@@ -459,7 +459,7 @@ Status ReplicationCoordinatorEmbedded::processHeartbeatV1(const ReplSetHeartbeat
 }
 
 long long ReplicationCoordinatorEmbedded::getTerm() const {
-    UASSERT_NOT_IMPLEMENTED;
+    return 3;  // arbitrary constant number
 }
 
 Status ReplicationCoordinatorEmbedded::updateTerm(OperationContext*, long long) {
