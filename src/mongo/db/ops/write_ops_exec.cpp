@@ -665,8 +665,11 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, ns);
 
-    auto exec = uassertStatusOK(getExecutorUpdate(
-        &curOp.debug(), &collection->getCollection(), &parsedUpdate, boost::none /* verbosity */));
+    auto exec = uassertStatusOK(
+        getExecutorUpdate(&curOp.debug(),
+                          collection ? &collection->getCollection() : &CollectionPtr::null,
+                          &parsedUpdate,
+                          boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
