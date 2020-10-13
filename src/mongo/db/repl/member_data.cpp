@@ -152,12 +152,14 @@ void MemberData::setLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_
     invariant(opTime.opTime.isNull() || opTime.wallTime > Date_t());
     _lastUpdate = now;
     _lastUpdateStale = false;
+
     // Since _lastDurableOpTime is set asynchronously from _lastAppliedOpTime, it is possible that
-    // 'opTime' is ahead of _lastAppliedOpTime.
-    if (_lastAppliedOpTime >= opTime.opTime) {
-        _lastDurableOpTime = opTime.opTime;
-        _lastDurableWallTime = opTime.wallTime;
-    }
+    // 'opTime' is ahead of _lastAppliedOpTime. When we attempt to advance _lastDurableOpTime beyond
+    // _lastAppliedOpTime, we should also _lastAppliedOpTime.
+    advanceLastAppliedOpTimeAndWallTime(opTime, now);
+
+    _lastDurableOpTime = opTime.opTime;
+    _lastDurableWallTime = opTime.wallTime;
 }
 
 bool MemberData::advanceLastAppliedOpTimeAndWallTime(OpTimeAndWallTime opTime, Date_t now) {
@@ -176,8 +178,7 @@ bool MemberData::advanceLastDurableOpTimeAndWallTime(OpTimeAndWallTime opTime, D
     _lastUpdate = now;
     _lastUpdateStale = false;
     if (_lastDurableOpTime < opTime.opTime) {
-        _lastDurableOpTime = opTime.opTime;
-        _lastDurableWallTime = opTime.wallTime;
+        setLastDurableOpTimeAndWallTime(opTime, now);
         return true;
     }
     return false;
