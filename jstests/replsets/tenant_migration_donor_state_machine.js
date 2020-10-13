@@ -98,7 +98,6 @@ const kTenantId = "testDb";
 const kConfigDonorsNS = "config.tenantMigrationDonors";
 
 let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
-configDonorsColl.createIndex({expireAt: 1}, {expireAfterSeconds: 0});
 
 (() => {
     jsTest.log("Test the case where the migration commits");

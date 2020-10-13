@@ -155,8 +155,6 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         readPreference: {mode: "primary"},
     };
 
-    donorPrimary.getCollection(kConfigDonorsNS).createIndex({expireAt: 1}, {expireAfterSeconds: 0});
-
     assert.commandWorked(TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts));
     let forgetMigrationThread =
         new Thread(TenantMigrationUtil.forgetMigrationRetryOnRetryableErrors,

@@ -56,6 +56,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterBlockingStarts);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterDataSync);
 MONGO_FAIL_POINT_DEFINE(skipSendingRecipientSyncDataCommand);
 
+const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const Seconds kRecipientSyncDataTimeout(30);
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
@@ -63,6 +64,11 @@ std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlocker(
     ServiceContext* serviceContext, StringData tenantId) {
     return TenantMigrationAccessBlockerRegistry::get(serviceContext)
         .getTenantMigrationAccessBlockerForTenantId(tenantId);
+}
+
+bool shouldStopCreatingTTLIndex(Status status) {
+    return status.isOK() || ErrorCodes::isShutdownError(status) ||
+        ErrorCodes::isNotPrimaryError(status);
 }
 
 bool shouldStopInsertingDonorStateDoc(Status status) {
@@ -81,6 +87,31 @@ bool shouldStopSendingRecipientCommand(Status status) {
 }
 
 }  // namespace
+
+ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    return AsyncTry([this] {
+               auto nss = getStateDocumentsNS();
+
+               AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+               DBDirectClient client(opCtx);
+
+               BSONObj result;
+               client.runCommand(
+                   nss.db().toString(),
+                   BSON("createIndexes"
+                        << nss.coll().toString() << "indexes"
+                        << BSON_ARRAY(BSON("key" << BSON("expireAt" << 1) << "name" << kTTLIndexName
+                                                 << "expireAfterSeconds" << 0))),
+                   result);
+               uassertStatusOK(getStatusFromCommandResult(result));
+           })
+        .until([](Status status) { return shouldStopCreatingTTLIndex(status); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor);
+}
 
 TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
                                                 const BSONObj& initialState)
@@ -191,9 +222,9 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
     return AsyncTry([this, self = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
-               DBDirectClient dbClient(opCtx);
+               DBDirectClient client(opCtx);
 
-               auto commandResponse = dbClient.runCommand([&] {
+               auto commandResponse = client.runCommand([&] {
                    write_ops::Update updateOp(_stateDocumentsNS);
                    auto updateModification =
                        write_ops::UpdateModification::parseFromClassicUpdate(_stateDoc.toBSON());
@@ -320,13 +351,13 @@ TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
     return AsyncTry([this, self = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
-               DBDirectClient dbClient(opCtx);
+               DBDirectClient client(opCtx);
 
                _stateDoc.setExpireAt(
                    _serviceContext->getFastClockSource()->now() +
                    Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
 
-               auto commandResponse = dbClient.runCommand([&] {
+               auto commandResponse = client.runCommand([&] {
                    write_ops::Update updateOp(_stateDocumentsNS);
                    auto updateModification =
                        write_ops::UpdateModification::parseFromClassicUpdate(_stateDoc.toBSON());

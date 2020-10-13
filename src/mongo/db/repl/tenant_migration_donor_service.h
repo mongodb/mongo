@@ -188,6 +188,9 @@ public:
     };
 
 private:
+    ExecutorFuture<void> _rebuildService(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor) override;
+
     ServiceContext* _serviceContext;
 };
 }  // namespace mongo

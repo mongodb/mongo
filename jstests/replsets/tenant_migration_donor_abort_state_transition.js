@@ -40,10 +40,6 @@ recipientRst.initiate();
 function testAbortInitialState(donorRst) {
     const donorPrimary = donorRst.getPrimary();
 
-    // Create the config.tenantMigrationDonors collection so the first storage transaction after
-    // the migration starts corresponds to the donor's state doc insert.
-    assert.commandWorked(donorPrimary.getDB("config").createCollection("tenantMigrationDonors"));
-
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),

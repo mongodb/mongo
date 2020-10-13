@@ -9,10 +9,10 @@ load("jstests/libs/curop_helpers.js");
 const rst = new ReplSetTest({
     nodes: [
         {
-            // Each PrimaryOnlyService rebuilds its instances on stepup by doing a read against the
-            // state machine collection. The read operation is interruptible on stepdown so we need
-            // to disable PrimaryOnlyService rebuild to make the userOperationsKilled check below
-            // work reliably.
+            // Each PrimaryOnlyService rebuilds its instances on stepup, and that may involve doing
+            // read and write operations which are interruptible on stepdown so we need to disable
+            // PrimaryOnlyService rebuild to make the userOperationsKilled check below work
+            // reliably.
             setParameter:
                 {"failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})}
         },

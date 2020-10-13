@@ -689,6 +689,8 @@ MongoRunner.mongodOptions = function(opts = {}) {
     _removeSetParameterIfBeforeVersion(opts, "numInitialSyncConnectAttempts", "3.3.12");
     _removeSetParameterIfBeforeVersion(opts, "migrationLockAcquisitionMaxWaitMS", "4.1.7");
     _removeSetParameterIfBeforeVersion(opts, "shutdownTimeoutMillisForSignaledShutdown", "4.5.0");
+    _removeSetParameterIfBeforeVersion(
+        opts, "failpoint.PrimaryOnlyServiceSkipRebuildingInstances", "4.8.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";

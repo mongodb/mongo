@@ -2,7 +2,7 @@
  * Test to check that the Initial Sync Test Fixture properly pauses initial sync.
  *
  * The test checks that both the collection cloning and oplog application stages of initial sync
- * pause after exactly one commad is run when the test fixture's step function is called. The test
+ * pause after exactly one command is run when the test fixture's step function is called. The test
  * issues the same listDatabases and listCollections commands that collection cloning does so we
  * know all the commands that will be run on the sync source and can verify that only one is run per
  * call to step(). Similarly for oplog application, we can check the log messages to make sure that
@@ -84,7 +84,24 @@ function checkLogForOplogApplicationMsg(node, size) {
 }
 
 // Set up Initial Sync Test.
-const initialSyncTest = new InitialSyncTest();
+const rst = new ReplSetTest({
+    name: "InitialSyncTest",
+    nodes: [
+        {
+            // Each PrimaryOnlyService rebuilds its instances on stepup, and that may involve
+            // doing writes. So we need to disable PrimaryOnlyService rebuild to make the number
+            // of oplog batches check below work reliably.
+            setParameter: {
+                "failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"}),
+            }
+        },
+        {rsConfig: {priority: 0, votes: 0}}
+    ]
+});
+rst.startSet();
+rst.initiate();
+
+const initialSyncTest = new InitialSyncTest("InitialSyncTest", rst);
 const primary = initialSyncTest.getPrimary();
 let secondary = initialSyncTest.getSecondary();
 const db = primary.getDB("test");

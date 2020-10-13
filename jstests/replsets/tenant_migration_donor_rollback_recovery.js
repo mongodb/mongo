@@ -81,7 +81,6 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
     };
 
     let donorPrimary = donorRollbackTest.getPrimary();
-    donorPrimary.getCollection(kConfigDonorsNS).createIndex({expireAt: 1}, {expireAfterSeconds: 0});
 
     setUpFunc(donorRstArgs, donorPrimary);
     donorRollbackTest.awaitLastOpCommitted();
