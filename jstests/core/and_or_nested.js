@@ -35,7 +35,7 @@ assert.commandWorked(coll.insert([
     {_id: 13, a: 9, b: 1, d: 1}
 ]));
 
-runWithDifferentIndexes([[], [{a: 1}], [{b: 1}], [{a: 1}, {c: 1}]], () => {
+runWithDifferentIndexes([[], [{a: 1}], [{b: 1}], [{a: 1}, {b: 1}], [{a: 1}, {c: 1}]], () => {
     assert(arrayEq(coll.find({$and: [{a: {$gt: 5}}, {c: {$gt: 4}}]}, {_id: 1}).toArray(),
                    [{_id: 5}, {_id: 9}, {_id: 12}]));
 

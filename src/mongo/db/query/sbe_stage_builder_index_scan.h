@@ -35,6 +35,10 @@
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo::stage_builder {
+
+class PlanStageReqs;
+class PlanStageSlots;
+
 /**
  * This method generates an SBE plan stage tree implementing an index scan. It returns a tuple
  * containing: (1) a slot procued by the index scan that holds the record ID ('recordIdSlot');
@@ -45,16 +49,15 @@ namespace mongo::stage_builder {
  * If the caller provides a slot ID for the 'returnKeySlot' parameter, this method will populate
  * the specified slot with the rehydrated index key for each record.
  */
-std::tuple<sbe::value::SlotId, sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>>
-generateIndexScan(OperationContext* opCtx,
-                  const CollectionPtr& collection,
-                  const IndexScanNode* ixn,
-                  boost::optional<sbe::value::SlotId> returnKeySlot,
-                  sbe::IndexKeysInclusionSet indexKeysToInclude,
-                  sbe::value::SlotIdGenerator* slotIdGenerator,
-                  sbe::value::SpoolIdGenerator* spoolIdGenerator,
-                  PlanYieldPolicy* yieldPolicy,
-                  TrialRunProgressTracker* tracker);
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexScanNode* ixn,
+    PlanStageReqs reqs,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::SpoolIdGenerator* spoolIdGenerator,
+    PlanYieldPolicy* yieldPolicy,
+    TrialRunProgressTracker* tracker);
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds. The
@@ -87,4 +90,5 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     PlanYieldPolicy* yieldPolicy,
     TrialRunProgressTracker* tracker,
     PlanNodeId nodeId);
+
 }  // namespace mongo::stage_builder

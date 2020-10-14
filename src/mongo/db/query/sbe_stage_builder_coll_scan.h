@@ -36,6 +36,9 @@
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo::stage_builder {
+
+class PlanStageSlots;
+
 /**
  * Generates an SBE plan stage sub-tree implementing an collection scan.
  *
@@ -48,17 +51,15 @@ namespace mongo::stage_builder {
  *
  * In cases of an error, throws.
  */
-std::tuple<sbe::value::SlotId,
-           sbe::value::SlotId,
-           boost::optional<sbe::value::SlotId>,
-           std::unique_ptr<sbe::PlanStage>>
-generateCollScan(OperationContext* opCtx,
-                 const CollectionPtr& collection,
-                 const CollectionScanNode* csn,
-                 sbe::value::SlotIdGenerator* slotIdGenerator,
-                 sbe::value::FrameIdGenerator* frameIdGenerator,
-                 PlanYieldPolicy* yieldPolicy,
-                 sbe::RuntimeEnvironment* env,
-                 bool isTailableResumeBranch,
-                 TrialRunProgressTracker* tracker);
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const CollectionScanNode* csn,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    PlanYieldPolicy* yieldPolicy,
+    sbe::RuntimeEnvironment* env,
+    bool isTailableResumeBranch,
+    TrialRunProgressTracker* tracker);
+
 }  // namespace mongo::stage_builder

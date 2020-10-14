@@ -50,6 +50,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -192,7 +193,7 @@ std::vector<std::pair<BSONObj, BSONObj>> decomposeIntoSingleIntervals(
 }
 
 /**
- * Constructs low/high key values from the given index 'bounds if they can be represented either as
+ * Constructs low/high key values from the given index 'bounds' if they can be represented either as
  * a single interval between the low and high keys, or multiple single intervals. If index bounds
  * for some interval cannot be expressed as valid low/high keys, then an empty vector is returned.
  */
@@ -540,17 +541,12 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
     // straight away - this index scan won't emit any results.
     if (!checker.getStartSeekPoint(&seekPoint)) {
         return {resultSlot,
-                sbe::makeS<sbe::MakeObjStage>(
+                sbe::makeProjectStage(
                     sbe::makeS<sbe::LimitSkipStage>(
                         sbe::makeS<sbe::CoScanStage>(ixn->nodeId()), 0, boost::none, ixn->nodeId()),
+                    ixn->nodeId(),
                     resultSlot,
-                    boost::none,
-                    std::vector<std::string>{},
-                    std::vector<std::string>{},
-                    sbe::makeSV(),
-                    true,
-                    false,
-                    ixn->nodeId())};
+                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0))};
     }
 
     // Build the anchor branch of the union.
@@ -674,17 +670,15 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
                                            planNodeId)};
 }
 
-std::tuple<sbe::value::SlotId, sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>>
-generateIndexScan(OperationContext* opCtx,
-                  const CollectionPtr& collection,
-                  const IndexScanNode* ixn,
-                  boost::optional<sbe::value::SlotId> returnKeySlot,
-                  sbe::IndexKeysInclusionSet indexKeysToInclude,
-                  sbe::value::SlotIdGenerator* slotIdGenerator,
-                  sbe::value::SpoolIdGenerator* spoolIdGenerator,
-                  PlanYieldPolicy* yieldPolicy,
-                  TrialRunProgressTracker* tracker) {
-    invariant(returnKeySlot || !ixn->addKeyMetadata);
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const IndexScanNode* ixn,
+    PlanStageReqs reqs,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::SpoolIdGenerator* spoolIdGenerator,
+    PlanYieldPolicy* yieldPolicy,
+    TrialRunProgressTracker* tracker) {
     uassert(4822864, "Index scans with a filter are not supported in SBE", !ixn->filter);
 
     auto descriptor =
@@ -696,104 +690,141 @@ generateIndexScan(OperationContext* opCtx,
                                      accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                                      accessMethod->getSortedDataInterface()->getOrdering());
 
-    std::unique_ptr<sbe::EExpression> returnKeyExpr;
+    std::unique_ptr<sbe::PlanStage> stage;
     sbe::value::SlotVector indexKeySlots;
-    auto indexKeyBitset = indexKeysToInclude;
+    sbe::IndexKeysInclusionSet indexKeyBitset;
+    std::unique_ptr<sbe::EExpression> keyExpr;
 
-    if (returnKeySlot) {
+    PlanStageSlots outputs;
+
+    if (reqs.has(PlanStageSlots::kResult) || reqs.has(PlanStageSlots::kReturnKey)) {
+        // If either 'reqs.result' or 'reqs.returnKey' is true, we need to get all parts of the
+        // index key (regardless of what was requested by 'reqs.indexKeyBitset') so that we can
+        // create the inflated index key (keyExpr).
         std::vector<std::unique_ptr<sbe::EExpression>> mkObjArgs;
+        size_t keyIndex = 0;
 
         for (auto&& elem : ixn->index.keyPattern) {
             auto fieldName = elem.fieldNameStringData();
             auto slot = slotIdGenerator->generate();
 
-            indexKeySlots.emplace_back(slot);
-
             mkObjArgs.emplace_back(sbe::makeE<sbe::EConstant>(
                 std::string_view{fieldName.rawData(), fieldName.size()}));
             mkObjArgs.emplace_back(sbe::makeE<sbe::EVariable>(slot));
+
+            indexKeySlots.emplace_back(slot);
+            indexKeyBitset.set(keyIndex++);
         }
 
-        returnKeyExpr = sbe::makeE<sbe::EFunction>("newObj", std::move(mkObjArgs));
-
-        invariant(indexKeySlots.size() <= indexKeyBitset.size());
-
-        indexKeyBitset.reset();
-        for (size_t i = 0; i < indexKeySlots.size(); ++i) {
-            indexKeyBitset.set(i);
-        }
-    } else {
-        for (size_t i = 0, n = indexKeyBitset.count(); i < n; ++i) {
-            indexKeySlots.emplace_back(slotIdGenerator->generate());
-        }
+        keyExpr = sbe::makeE<sbe::EFunction>("newObj", std::move(mkObjArgs));
+    } else if (reqs.getIndexKeyBitset()) {
+        // If both 'reqs.result' and 'reqs.returnKey' are false, we should only get the
+        // parts of the index key that were requested by 'reqs.indexKeyBitset'.
+        indexKeySlots = slotIdGenerator->generateMultiple(reqs.getIndexKeyBitset()->count());
+        indexKeyBitset = *reqs.getIndexKeyBitset();
     }
 
-    auto [recordIdSlot, stage] = [&]() {
-        if (intervals.size() == 1) {
-            // If we have just a single interval, we can construct a simplified sub-tree.
-            auto&& [lowKey, highKey] = intervals[0];
-            return generateSingleIntervalIndexScan(collection,
-                                                   ixn->index.identifier.catalogName,
-                                                   ixn->direction == 1,
-                                                   std::move(lowKey),
-                                                   std::move(highKey),
-                                                   indexKeyBitset,
-                                                   indexKeySlots,
-                                                   boost::none,  // recordSlot
-                                                   slotIdGenerator,
-                                                   yieldPolicy,
-                                                   tracker,
-                                                   ixn->nodeId());
-        } else if (intervals.size() > 1) {
-            // Or, if we were able to decompose multi-interval index bounds into a number of
-            // single-interval bounds, we can also built an optimized sub-tree to perform an index
-            // scan.
-            return generateOptimizedMultiIntervalIndexScan(collection,
-                                                           ixn->index.identifier.catalogName,
-                                                           ixn->direction == 1,
-                                                           std::move(intervals),
-                                                           indexKeyBitset,
-                                                           indexKeySlots,
-                                                           slotIdGenerator,
-                                                           yieldPolicy,
-                                                           tracker,
-                                                           ixn->nodeId());
-        } else {
-            // Otherwise, build a generic index scan for multi-interval index bounds.
-            return generateGenericMultiIntervalIndexScan(
-                collection,
-                ixn,
-                accessMethod->getSortedDataInterface()->getKeyStringVersion(),
-                accessMethod->getSortedDataInterface()->getOrdering(),
-                indexKeyBitset,
-                indexKeySlots,
-                slotIdGenerator,
-                spoolIdGenerator,
-                yieldPolicy,
-                tracker);
-        }
-    }();
+    if (intervals.size() == 1) {
+        // If we have just a single interval, we can construct a simplified sub-tree.
+        auto&& [lowKey, highKey] = intervals[0];
+        sbe::value::SlotId recordIdSlot;
+
+        std::tie(recordIdSlot, stage) =
+            generateSingleIntervalIndexScan(collection,
+                                            ixn->index.identifier.catalogName,
+                                            ixn->direction == 1,
+                                            std::move(lowKey),
+                                            std::move(highKey),
+                                            indexKeyBitset,
+                                            indexKeySlots,
+                                            boost::none,  // recordSlot
+                                            slotIdGenerator,
+                                            yieldPolicy,
+                                            tracker,
+                                            ixn->nodeId());
+
+        outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+    } else if (intervals.size() > 1) {
+        // If we were able to decompose multi-interval index bounds into a number of single-interval
+        // bounds, we can also built an optimized sub-tree to perform an index scan.
+        sbe::value::SlotId recordIdSlot;
+        std::tie(recordIdSlot, stage) =
+            generateOptimizedMultiIntervalIndexScan(collection,
+                                                    ixn->index.identifier.catalogName,
+                                                    ixn->direction == 1,
+                                                    std::move(intervals),
+                                                    indexKeyBitset,
+                                                    indexKeySlots,
+                                                    slotIdGenerator,
+                                                    yieldPolicy,
+                                                    tracker,
+                                                    ixn->nodeId());
+
+        outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+    } else {
+        // Generate a generic index scan for multi-interval index bounds.
+        sbe::value::SlotId recordIdSlot;
+        std::tie(recordIdSlot, stage) = generateGenericMultiIntervalIndexScan(
+            collection,
+            ixn,
+            accessMethod->getSortedDataInterface()->getKeyStringVersion(),
+            accessMethod->getSortedDataInterface()->getOrdering(),
+            indexKeyBitset,
+            indexKeySlots,
+            slotIdGenerator,
+            spoolIdGenerator,
+            yieldPolicy,
+            tracker);
+
+        outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+    }
 
     if (ixn->shouldDedup) {
         stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(recordIdSlot), ixn->nodeId());
+            std::move(stage), sbe::makeSV(outputs.get(PlanStageSlots::kRecordId)), ixn->nodeId());
     }
 
-    if (returnKeySlot) {
-        stage = sbe::makeProjectStage(
-            std::move(stage), ixn->nodeId(), *returnKeySlot, std::move(returnKeyExpr));
+    if (reqs.has(PlanStageSlots::kResult) || reqs.has(PlanStageSlots::kReturnKey)) {
+        if (reqs.has(PlanStageSlots::kResult)) {
+            outputs.set(PlanStageSlots::kResult, slotIdGenerator->generate());
+            stage = sbe::makeProjectStage(std::move(stage),
+                                          ixn->nodeId(),
+                                          outputs.get(PlanStageSlots::kResult),
+                                          std::move(keyExpr));
 
-        // At this point, 'indexKeySlots' holds slots for all parts of the index key. We only want
-        // to return slots for the parts of the index key specified by 'indexKeysToInclude'.
-        auto allIndexKeySlots = std::move(indexKeySlots);
-        indexKeySlots = {};
-        for (size_t keyIndex = 0; keyIndex < allIndexKeySlots.size(); ++keyIndex) {
-            if (indexKeysToInclude[keyIndex]) {
-                indexKeySlots.push_back(allIndexKeySlots[keyIndex]);
+            if (reqs.has(PlanStageSlots::kReturnKey)) {
+                outputs.set(PlanStageSlots::kReturnKey, slotIdGenerator->generate());
+                stage = sbe::makeProjectStage(
+                    std::move(stage),
+                    ixn->nodeId(),
+                    outputs.get(PlanStageSlots::kReturnKey),
+                    sbe::makeE<sbe::EVariable>(outputs.get(PlanStageSlots::kResult)));
             }
+        } else {
+            outputs.set(PlanStageSlots::kReturnKey, slotIdGenerator->generate());
+            stage = sbe::makeProjectStage(std::move(stage),
+                                          ixn->nodeId(),
+                                          outputs.get(PlanStageSlots::kReturnKey),
+                                          std::move(keyExpr));
         }
+
+        // If either 'reqs.result' or 'reqs.returnKey' is true, then at this point 'indexKeySlots'
+        // contain slots for _all_ parts of the index key. However, we only want to return the slots
+        // that were explicitly requested as given by 'reqs.indexKeyBitset'.
+        if (reqs.getIndexKeyBitset()) {
+            sbe::value::SlotVector outputIndexKeySlots;
+            for (size_t keyIndex = 0; keyIndex < indexKeySlots.size(); ++keyIndex) {
+                if ((*reqs.getIndexKeyBitset())[keyIndex]) {
+                    outputIndexKeySlots.push_back(indexKeySlots[keyIndex]);
+                }
+            }
+
+            outputs.setIndexKeySlots(std::move(outputIndexKeySlots));
+        }
+    } else if (reqs.getIndexKeyBitset()) {
+        outputs.setIndexKeySlots(std::move(indexKeySlots));
     }
 
-    return {recordIdSlot, std::move(indexKeySlots), std::move(stage)};
+    return {std::move(stage), std::move(outputs)};
 }
 }  // namespace mongo::stage_builder

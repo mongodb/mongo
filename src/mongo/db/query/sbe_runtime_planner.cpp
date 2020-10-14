@@ -88,14 +88,14 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
     root->prepare(data->ctx);
 
     sbe::value::SlotAccessor* resultSlot{nullptr};
-    if (data->resultSlot) {
-        resultSlot = root->getAccessor(data->ctx, *data->resultSlot);
+    if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
+        resultSlot = root->getAccessor(data->ctx, *slot);
         uassert(4822871, "Query does not have result slot.", resultSlot);
     }
 
     sbe::value::SlotAccessor* recordIdSlot{nullptr};
-    if (data->recordIdSlot) {
-        recordIdSlot = root->getAccessor(data->ctx, *data->recordIdSlot);
+    if (auto slot = data->outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId); slot) {
+        recordIdSlot = root->getAccessor(data->ctx, *slot);
         uassert(4822872, "Query does not have record ID slot.", recordIdSlot);
     }
 

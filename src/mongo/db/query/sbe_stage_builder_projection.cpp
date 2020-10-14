@@ -407,7 +407,6 @@ std::pair<sbe::value::SlotId, PlanStageType> generateProjection(
                                               std::move(stage),
                                               inputVar,
                                               env};
-    context.relevantSlots.push_back(inputVar);
     ProjectionTraversalPreVisitor preVisitor{&context};
     ProjectionTraversalPostVisitor postVisitor{&context};
     ProjectionTraversalWalker walker{&preVisitor, &postVisitor};

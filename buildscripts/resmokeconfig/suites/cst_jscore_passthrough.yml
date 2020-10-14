@@ -44,6 +44,7 @@ selector:
   - jstests/core/all3.js
   - jstests/core/and.js
   - jstests/core/and.js
+  - jstests/core/and_or_index_sort.js
   - jstests/core/and_or_nested.js
   - jstests/core/andor.js
   - jstests/core/array1.js

@@ -62,18 +62,20 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     invariant(_root);
     _solution = std::move(winner.solution);
 
-    if (winner.data.resultSlot) {
-        _result = _root->getAccessor(winner.data.ctx, *winner.data.resultSlot);
+    if (auto slot = winner.data.outputs.getIfExists(stage_builder::PlanStageSlots::kResult); slot) {
+        _result = _root->getAccessor(_ctx, *slot);
         uassert(4822865, "Query does not have result slot.", _result);
     }
 
-    if (winner.data.recordIdSlot) {
-        _resultRecordId = _root->getAccessor(winner.data.ctx, *winner.data.recordIdSlot);
+    if (auto slot = winner.data.outputs.getIfExists(stage_builder::PlanStageSlots::kRecordId);
+        slot) {
+        _resultRecordId = _root->getAccessor(_ctx, *slot);
         uassert(4822866, "Query does not have recordId slot.", _resultRecordId);
     }
 
-    if (winner.data.oplogTsSlot) {
-        _oplogTs = _root->getAccessor(winner.data.ctx, *winner.data.oplogTsSlot);
+    if (auto slot = winner.data.outputs.getIfExists(stage_builder::PlanStageSlots::kOplogTs);
+        slot) {
+        _oplogTs = _root->getAccessor(_ctx, *slot);
         uassert(4822867, "Query does not have oplogTs slot.", _oplogTs);
     }
 

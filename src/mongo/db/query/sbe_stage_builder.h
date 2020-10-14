@@ -45,42 +45,199 @@ namespace mongo::stage_builder {
 std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     OperationContext* opCtx, sbe::value::SlotIdGenerator* slotIdGenerator);
 
+class PlanStageReqs;
+
+/**
+ * The PlanStageSlots class is used by SlotBasedStageBuilder to return the output slots produced
+ * after building a stage.
+ */
+class PlanStageSlots {
+public:
+    static constexpr StringData kResult = "result"_sd;
+    static constexpr StringData kRecordId = "recordId"_sd;
+    static constexpr StringData kReturnKey = "returnKey"_sd;
+    static constexpr StringData kOplogTs = "oplogTs"_sd;
+
+    PlanStageSlots() = default;
+
+    PlanStageSlots(const PlanStageReqs& reqs, sbe::value::SlotIdGenerator* slotIdGenerator);
+
+    bool has(StringData str) const {
+        return _slots.count(str);
+    }
+
+    sbe::value::SlotId get(StringData str) const {
+        auto it = _slots.find(str);
+        invariant(it != _slots.end());
+        return it->second;
+    }
+
+    boost::optional<sbe::value::SlotId> getIfExists(StringData str) const {
+        if (auto it = _slots.find(str); it != _slots.end()) {
+            return it->second;
+        }
+        return boost::none;
+    }
+
+    void set(StringData str, sbe::value::SlotId slot) {
+        _slots[str] = slot;
+    }
+
+    void clear(StringData str) {
+        _slots.erase(str);
+    }
+
+    const boost::optional<sbe::value::SlotVector>& getIndexKeySlots() const {
+        return _indexKeySlots;
+    }
+
+    boost::optional<sbe::value::SlotVector> extractIndexKeySlots() {
+        ON_BLOCK_EXIT([this] { _indexKeySlots = boost::none; });
+        return std::move(_indexKeySlots);
+    }
+
+    void setIndexKeySlots(sbe::value::SlotVector iks) {
+        _indexKeySlots = std::move(iks);
+    }
+
+    void setIndexKeySlots(boost::optional<sbe::value::SlotVector> iks) {
+        _indexKeySlots = std::move(iks);
+    }
+
+    /**
+     * This method applies an action to some/all of the slots within this struct (excluding index
+     * key slots). For each slot in this struct, the action is will be applied to the slot if (and
+     * only if) the corresponding flag in 'reqs' is true.
+     */
+    inline void forEachSlot(const PlanStageReqs& reqs,
+                            const std::function<void(sbe::value::SlotId)>& fn);
+
+private:
+    StringMap<sbe::value::SlotId> _slots;
+
+    // When an index scan produces parts of an index key for a covered projection, this is where
+    // the slots for the produced values are stored.
+    boost::optional<sbe::value::SlotVector> _indexKeySlots;
+};
+
+/**
+ * The PlanStageReqs class is used by SlotBasedStageBuilder to represent the incoming requirements
+ * and context when building a stage.
+ */
+class PlanStageReqs {
+public:
+    PlanStageReqs copy() const {
+        return *this;
+    }
+
+    bool has(StringData str) const {
+        auto it = _slots.find(str);
+        return it != _slots.end() && it->second;
+    }
+
+    PlanStageReqs& set(StringData str) {
+        _slots[str] = true;
+        return *this;
+    }
+
+    PlanStageReqs& setIf(StringData str, bool condition) {
+        if (condition) {
+            _slots[str] = true;
+        }
+        return *this;
+    }
+
+    PlanStageReqs& clear(StringData str) {
+        _slots.erase(str);
+        return *this;
+    }
+
+    boost::optional<sbe::IndexKeysInclusionSet>& getIndexKeyBitset() {
+        return _indexKeyBitset;
+    }
+
+    const boost::optional<sbe::IndexKeysInclusionSet>& getIndexKeyBitset() const {
+        return _indexKeyBitset;
+    }
+
+    bool getIsBuildingUnionForTailableCollScan() const {
+        return _isBuildingUnionForTailableCollScan;
+    }
+
+    void setIsBuildingUnionForTailableCollScan(bool b) {
+        _isBuildingUnionForTailableCollScan = b;
+    }
+
+    bool getIsTailableCollScanResumeBranch() const {
+        return _isTailableCollScanResumeBranch;
+    }
+
+    void setIsTailableCollScanResumeBranch(bool b) {
+        _isTailableCollScanResumeBranch = b;
+    }
+
+    friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
+                                          sbe::value::SlotIdGenerator* slotIdGenerator);
+
+    friend void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
+                                            const std::function<void(sbe::value::SlotId)>& fn);
+
+private:
+    StringMap<bool> _slots;
+
+    // A bitset here indicates that we have a covered projection that is expecting to parts of the
+    // index key from an index scan.
+    boost::optional<sbe::IndexKeysInclusionSet> _indexKeyBitset;
+
+    // When we're in the middle of building a special union sub-tree implementing a tailable cursor
+    // collection scan, this flag will be set to true. Otherwise this flag will be false.
+    bool _isBuildingUnionForTailableCollScan{false};
+
+    // When we're in the middle of building a special union sub-tree implementing a tailable cursor
+    // collection scan, this flag indicates whether we're currently building an anchor or resume
+    // branch. At all other times, this flag will be false.
+    bool _isTailableCollScanResumeBranch{false};
+};
+
+void PlanStageSlots::forEachSlot(const PlanStageReqs& reqs,
+                                 const std::function<void(sbe::value::SlotId)>& fn) {
+    for (auto&& [slotName, isRequired] : reqs._slots) {
+        if (isRequired) {
+            auto it = _slots.find(slotName);
+            invariant(it != _slots.end());
+            fn(it->second);
+        }
+    }
+}
+
 /**
  * Some auxiliary data returned by a 'SlotBasedStageBuilder' along with a PlanStage tree root, which
  * is needed to execute the PlanStage tree.
  */
 struct PlanStageData {
-    PlanStageData(std::unique_ptr<sbe::RuntimeEnvironment> env)
-        : env{env.get()}, ctx{std::move(env)} {}
+    PlanStageData() = default;
 
-    std::string debugString() const {
-        StringBuilder builder;
+    explicit PlanStageData(std::unique_ptr<sbe::RuntimeEnvironment> env)
+        : env(env.get()), ctx(std::move(env)) {}
 
-        if (resultSlot) {
-            builder << "$$RESULT=s" << *resultSlot << " ";
-        }
-        if (recordIdSlot) {
-            builder << "$$RID=s" << *recordIdSlot << " ";
-        }
-        if (oplogTsSlot) {
-            builder << "$$OPLOGTS=s" << *oplogTsSlot << " ";
-        }
+    std::string debugString() const;
 
-        env->debugString(&builder);
+    // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
+    PlanStageSlots outputs;
 
-        return builder.str();
-    }
-
-    boost::optional<sbe::value::SlotId> resultSlot;
-    boost::optional<sbe::value::SlotId> recordIdSlot;
-    boost::optional<sbe::value::SlotId> oplogTsSlot;
+    // The CompileCtx object owns the RuntimeEnvironment. The RuntimeEnvironment owns various
+    // SlotAccessors which are accessed when the SBE plan is executed.
     sbe::RuntimeEnvironment* env{nullptr};
     sbe::CompileCtx ctx;
+
+    // Used during the trial run of the runtime planner to track progress of the work done so far.
+    // Some PlanStages hold pointers to the TrialRunProgressTracker object and call methods on it
+    // when the SBE plan is executed.
+    std::unique_ptr<TrialRunProgressTracker> trialRunProgressTracker;
+
     bool shouldTrackLatestOplogTimestamp{false};
     bool shouldTrackResumeToken{false};
     bool shouldUseTailableScan{false};
-    // Used during the trial run of the runtime planner to track progress of the work done so far.
-    std::unique_ptr<TrialRunProgressTracker> trialRunProgressTracker;
 };
 
 /**
@@ -88,20 +245,17 @@ struct PlanStageData {
  */
 class SlotBasedStageBuilder final : public StageBuilder<sbe::PlanStage> {
 public:
+    static constexpr StringData kResult = PlanStageSlots::kResult;
+    static constexpr StringData kRecordId = PlanStageSlots::kRecordId;
+    static constexpr StringData kReturnKey = PlanStageSlots::kReturnKey;
+    static constexpr StringData kOplogTs = PlanStageSlots::kOplogTs;
+
     SlotBasedStageBuilder(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const CanonicalQuery& cq,
                           const QuerySolution& solution,
                           PlanYieldPolicySBE* yieldPolicy,
-                          bool needsTrialRunProgressTracker)
-        : StageBuilder(opCtx, collection, cq, solution), _yieldPolicy(yieldPolicy) {
-        if (needsTrialRunProgressTracker) {
-            const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
-            const auto maxNumReads{trial_period::getTrialPeriodMaxWorks(_opCtx, _collection)};
-            _data.trialRunProgressTracker =
-                std::make_unique<TrialRunProgressTracker>(maxNumResults, maxNumReads);
-        }
-    }
+                          bool needsTrialRunProgressTracker);
 
     std::unique_ptr<sbe::PlanStage> build(const QuerySolutionNode* root) final;
 
@@ -110,62 +264,76 @@ public:
     }
 
 private:
-    std::unique_ptr<sbe::PlanStage> buildCollScan(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildVirtualScan(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildIndexScan(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildFetch(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildLimit(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildSkip(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildSort(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildSortKeyGeneraror(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildSortMerge(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildProjectionSimple(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildProjectionCovered(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildProjectionDefault(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildOr(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildText(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildReturnKey(const QuerySolutionNode* root);
-    std::unique_ptr<sbe::PlanStage> buildEof(const QuerySolutionNode* root);
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> build(const QuerySolutionNode* node,
+                                                                     const PlanStageReqs& reqs);
 
-    std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(
-        std::unique_ptr<sbe::PlanStage> inputStage,
-        sbe::value::SlotId recordIdKeySlot,
-        PlanNodeId planNodeId,
-        const sbe::value::SlotVector& slotsToForward = {});
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildCollScan(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
-    std::unique_ptr<sbe::PlanStage> makeUnionForTailableCollScan(const QuerySolutionNode* root);
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildVirtualScan(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildIndexScan(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildFetch(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildLimit(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSkip(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSort(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortKeyGeneraror(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildSortMerge(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionSimple(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionCovered(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildProjectionDefault(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildOr(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildText(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildReturnKey(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> buildEof(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
+
+    std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
+    makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
+                         sbe::value::SlotId recordIdSlot,
+                         PlanNodeId planNodeId,
+                         sbe::value::SlotVector slotsToForward = {});
+
+    std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> makeUnionForTailableCollScan(
+        const QuerySolutionNode* root, const PlanStageReqs& reqs);
 
     sbe::value::SlotIdGenerator _slotIdGenerator;
     sbe::value::FrameIdGenerator _frameIdGenerator;
     sbe::value::SpoolIdGenerator _spoolIdGenerator;
 
-    // If we have both limit and skip stages and the skip stage is beneath the limit, then we can
-    // combine these two stages into one. So, while processing the LIMIT stage we will save the
-    // limit value in this member and will handle it while processing the SKIP stage.
-    boost::optional<long long> _limit;
-
-    // A slot here indicates that the plan has a ReturnKeyStage at its root and that any index scans
-    // should inflate each index entry into an object and bind it to this slot.
-    boost::optional<sbe::value::SlotId> _returnKeySlot;
-
-    // A bitset here indicates that we have a covered projection that is expecting to read values
-    // from an index scan.
-    boost::optional<sbe::IndexKeysInclusionSet> _indexKeysToInclude;
-
-    // When an index scan produces values for a covered projection, this is where the slots for the
-    // produced values are stored.
-    boost::optional<sbe::value::SlotVector> _indexKeySlots;
-
-    // These two flags control whether we're in the middle of the process of building a special
-    // union sub-tree implementing a tailable cursor collection scan, and if so, whether we're
-    // building an anchor or resume branch.
-    bool _isBuildingUnionForTailableCollScan{false};
-    bool _isTailableCollScanResumeBranch{false};
-
-    PlanYieldPolicySBE* const _yieldPolicy;
+    PlanYieldPolicySBE* const _yieldPolicy{nullptr};
 
     // Apart from generating just an execution tree, this builder will also produce some auxiliary
-    // data which is needed to execute the tree, such as a result slot, or a recordId slot.
-    PlanStageData _data{makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)};
+    // data which is needed to execute the tree.
+    PlanStageData _data;
+
+    bool _buildHasStarted{false};
 };
 }  // namespace mongo::stage_builder

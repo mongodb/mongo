@@ -71,39 +71,137 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     return env;
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildCollScan(
-    const QuerySolutionNode* root) {
-    auto csn = static_cast<const CollectionScanNode*>(root);
-    auto [resultSlot, recordIdSlot, oplogTsSlot, stage] =
-        generateCollScan(_opCtx,
-                         _collection,
-                         csn,
-                         &_slotIdGenerator,
-                         &_frameIdGenerator,
-                         _yieldPolicy,
-                         _data.env,
-                         _isTailableCollScanResumeBranch,
-                         _data.trialRunProgressTracker.get());
-    _data.resultSlot = resultSlot;
-    _data.recordIdSlot = recordIdSlot;
-    _data.oplogTsSlot = oplogTsSlot;
-    _data.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
-    _data.shouldTrackResumeToken = csn->requestResumeToken;
-    _data.shouldUseTailableScan = csn->tailable;
-
-    if (_returnKeySlot) {
-        // Assign the '_returnKeySlot' to be the empty object.
-        stage = sbe::makeProjectStage(std::move(stage),
-                                      root->nodeId(),
-                                      *_returnKeySlot,
-                                      sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
+PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,
+                               sbe::value::SlotIdGenerator* slotIdGenerator) {
+    for (auto&& [slotName, isRequired] : reqs._slots) {
+        if (isRequired) {
+            _slots[slotName] = slotIdGenerator->generate();
+        }
     }
+}
+
+std::string PlanStageData::debugString() const {
+    StringBuilder builder;
+
+    if (auto slot = outputs.getIfExists(PlanStageSlots::kResult); slot) {
+        builder << "$$RESULT=s" << *slot << " ";
+    }
+    if (auto slot = outputs.getIfExists(PlanStageSlots::kRecordId); slot) {
+        builder << "$$RID=s" << *slot << " ";
+    }
+    if (auto slot = outputs.getIfExists(PlanStageSlots::kOplogTs); slot) {
+        builder << "$$OPLOGTS=s" << *slot << " ";
+    }
+
+    env->debugString(&builder);
+
+    return builder.str();
+}
+
+namespace {
+const QuerySolutionNode* getNodeByType(const QuerySolutionNode* root, StageType type) {
+    if (root->getType() == type) {
+        return root;
+    }
+
+    for (auto&& child : root->children) {
+        if (auto result = getNodeByType(child, type)) {
+            return result;
+        }
+    }
+
+    return nullptr;
+}
+}  // namespace
+
+SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
+                                             const CollectionPtr& collection,
+                                             const CanonicalQuery& cq,
+                                             const QuerySolution& solution,
+                                             PlanYieldPolicySBE* yieldPolicy,
+                                             bool needsTrialRunProgressTracker)
+    : StageBuilder(opCtx, collection, cq, solution),
+      _yieldPolicy(yieldPolicy),
+      _data(makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)) {
+
+    if (needsTrialRunProgressTracker) {
+        const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
+        const auto maxNumReads{trial_period::getTrialPeriodMaxWorks(_opCtx, _collection)};
+        _data.trialRunProgressTracker =
+            std::make_unique<TrialRunProgressTracker>(maxNumResults, maxNumReads);
+    }
+
+    // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
+    // tree, rather than doing one-off scans for each piece of information, we should add a formal
+    // analysis pass here.
+    if (auto node = getNodeByType(solution.root(), STAGE_COLLSCAN)) {
+        auto csn = static_cast<const CollectionScanNode*>(node);
+        _data.shouldTrackLatestOplogTimestamp = csn->shouldTrackLatestOplogTimestamp;
+        _data.shouldTrackResumeToken = csn->requestResumeToken;
+        _data.shouldUseTailableScan = csn->tailable;
+    }
+}
+
+std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
+    // For a given SlotBasedStageBuilder instance, this build() method can only be called once.
+    invariant(!_buildHasStarted);
+    _buildHasStarted = true;
+
+    // We always produce a 'resultSlot' and a 'recordIdSlot'. If the solution contains a
+    // CollectionScanNode with the 'shouldTrackLatestOplogTimestamp' flag set to true, then we
+    // will also produce an 'oplogTsSlot'.
+    PlanStageReqs reqs;
+    reqs.set(kResult);
+    reqs.set(kRecordId);
+    reqs.setIf(kOplogTs, _data.shouldTrackLatestOplogTimestamp);
+
+    // Build the SBE plan stage tree.
+    auto [stage, outputs] = build(root, reqs);
+
+    // Assert that we produced a 'resultSlot' and a 'recordIdSlot'. Also assert that we produced
+    // an 'oplogTsSlot' if it's needed.
+    invariant(outputs.has(kResult));
+    invariant(outputs.has(kRecordId));
+    invariant(!_data.shouldTrackLatestOplogTimestamp || outputs.has(kOplogTs));
+
+    _data.outputs = std::move(outputs);
 
     return std::move(stage);
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildVirtualScan(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildCollScan(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    invariant(!reqs.getIndexKeyBitset());
+
+    auto csn = static_cast<const CollectionScanNode*>(root);
+
+    auto [stage, outputs] = generateCollScan(_opCtx,
+                                             _collection,
+                                             csn,
+                                             &_slotIdGenerator,
+                                             &_frameIdGenerator,
+                                             _yieldPolicy,
+                                             _data.env,
+                                             reqs.getIsTailableCollScanResumeBranch(),
+                                             _data.trialRunProgressTracker.get());
+
+    if (reqs.has(kReturnKey)) {
+        // Assign the 'returnKeySlot' to be the empty object.
+        outputs.set(kReturnKey, _slotIdGenerator.generate());
+        stage = sbe::makeProjectStage(std::move(stage),
+                                      root->nodeId(),
+                                      outputs.get(kReturnKey),
+                                      sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
+    }
+
+    // Assert that generateCollScan() generated an oplogTsSlot if it's needed.
+    invariant(!reqs.has(kOplogTs) || outputs.has(kOplogTs));
+
+    return {std::move(stage), std::move(outputs)};
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto vsn = static_cast<const VirtualScanNode*>(root);
 
     auto [inputTag, inputVal] = sbe::value::makeNewArray();
@@ -119,136 +217,177 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildVirtualScan(
     auto [scanSlots, scanStage] =
         generateVirtualScanMulti(&_slotIdGenerator, vsn->hasRecordId ? 2 : 1, inputTag, inputVal);
 
+    PlanStageSlots outputs;
+
     if (vsn->hasRecordId) {
         invariant(scanSlots.size() == 2);
-        _data.recordIdSlot = scanSlots[0];
-        _data.resultSlot = scanSlots[1];
+        outputs.set(PlanStageSlots::kRecordId, scanSlots[0]);
+        outputs.set(PlanStageSlots::kResult, scanSlots[1]);
     } else {
         invariant(scanSlots.size() == 1);
-        _data.resultSlot = scanSlots[0];
+        outputs.set(PlanStageSlots::kResult, scanSlots[0]);
     }
-    return std::move(scanStage);
+
+    return {std::move(scanStage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildIndexScan(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildIndexScan(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto ixn = static_cast<const IndexScanNode*>(root);
-    auto [recordIdSlot, indexKeySlots, stage] =
-        generateIndexScan(_opCtx,
-                          _collection,
-                          ixn,
-                          _returnKeySlot,
-                          _indexKeysToInclude.value_or(sbe::IndexKeysInclusionSet{}),
-                          &_slotIdGenerator,
-                          &_spoolIdGenerator,
-                          _yieldPolicy,
-                          _data.trialRunProgressTracker.get());
+    invariant(reqs.has(kReturnKey) || !ixn->addKeyMetadata);
 
-    _data.recordIdSlot = recordIdSlot;
+    // Index scans cannot produce an oplogTsSlot, so assert that the caller doesn't need it.
+    invariant(!reqs.has(kOplogTs));
 
-    if (_indexKeysToInclude) {
-        _indexKeySlots = std::move(indexKeySlots);
-    }
-
-    return std::move(stage);
+    return generateIndexScan(_opCtx,
+                             _collection,
+                             ixn,
+                             reqs,
+                             &_slotIdGenerator,
+                             &_spoolIdGenerator,
+                             _yieldPolicy,
+                             _data.trialRunProgressTracker.get());
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeLoopJoinForFetch(
-    std::unique_ptr<sbe::PlanStage> inputStage,
-    sbe::value::SlotId recordIdKeySlot,
-    PlanNodeId planNodeId,
-    const sbe::value::SlotVector& slotsToForward) {
-    _data.resultSlot = _slotIdGenerator.generate();
-    _data.recordIdSlot = _slotIdGenerator.generate();
+std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
+SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
+                                            sbe::value::SlotId seekKeySlot,
+                                            PlanNodeId planNodeId,
+                                            sbe::value::SlotVector slotsToForward) {
+    auto resultSlot = _slotIdGenerator.generate();
+    auto recordIdSlot = _slotIdGenerator.generate();
 
-    // Scan the collection in the range [recordIdKeySlot, Inf).
+    // Scan the collection in the range [seekKeySlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(
         NamespaceStringOrUUID{_collection->ns().db().toString(), _collection->uuid()},
-        _data.resultSlot,
-        _data.recordIdSlot,
+        resultSlot,
+        recordIdSlot,
         std::vector<std::string>{},
         sbe::makeSV(),
-        recordIdKeySlot,
+        seekKeySlot,
         true,
         nullptr,
         _data.trialRunProgressTracker.get(),
         planNodeId);
 
-    // Get the recordIdKeySlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
+    // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
     // limiting the result set to 1 row.
-    return sbe::makeS<sbe::LoopJoinStage>(
+    auto stage = sbe::makeS<sbe::LoopJoinStage>(
         std::move(inputStage),
         sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
         std::move(slotsToForward),
-        sbe::makeSV(recordIdKeySlot),
+        sbe::makeSV(seekKeySlot),
         nullptr,
         planNodeId);
+
+    return {resultSlot, recordIdSlot, std::move(stage)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildFetch(const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildFetch(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     auto fn = static_cast<const FetchNode*>(root);
-    auto inputStage = build(fn->children[0]);
+    invariant(!reqs.getIndexKeyBitset());
 
-    uassert(4822880, "RecordId slot is not defined", _data.recordIdSlot);
+    // At present, makeLoopJoinForFetch() doesn't have the necessary logic for producing an
+    // oplogTsSlot, so assert that the caller doesn't need oplogTsSlot.
+    invariant(!reqs.has(kOplogTs));
 
-    auto stage =
-        makeLoopJoinForFetch(std::move(inputStage),
-                             *_data.recordIdSlot,
-                             root->nodeId(),
-                             _returnKeySlot ? sbe::makeSV(*_returnKeySlot) : sbe::makeSV());
+    // The child must produce all of the slots required by the parent of this FetchNode, except for
+    // 'resultSlot' which will be produced by the call to makeLoopJoinForFetch() below. In addition
+    // to that, the child must always produce a 'recordIdSlot' because it's needed for the call to
+    // makeLoopJoinForFetch() below.
+    auto childReqs = reqs.copy().clear(kResult).set(kRecordId);
+
+    auto [stage, outputs] = build(fn->children[0], childReqs);
+
+    uassert(4822880, "RecordId slot is not defined", outputs.has(kRecordId));
+    uassert(
+        4953600, "ReturnKey slot is not defined", !reqs.has(kReturnKey) || outputs.has(kReturnKey));
+
+    auto forwardingReqs = reqs.copy().clear(kResult).clear(kRecordId);
+
+    auto relevantSlots = sbe::makeSV();
+    outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+
+    sbe::value::SlotId fetchResultSlot, fetchRecordIdSlot;
+    std::tie(fetchResultSlot, fetchRecordIdSlot, stage) = makeLoopJoinForFetch(
+        std::move(stage), outputs.get(kRecordId), root->nodeId(), std::move(relevantSlots));
+
+    outputs.set(kResult, fetchResultSlot);
+    outputs.set(kRecordId, fetchRecordIdSlot);
 
     if (fn->filter) {
-        auto relevantSlots = sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot);
-        if (_returnKeySlot) {
-            relevantSlots.push_back(*_returnKeySlot);
-        }
+        forwardingReqs = reqs.copy().set(kResult).set(kRecordId);
+
+        relevantSlots = sbe::makeSV();
+        outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
 
         stage = generateFilter(_opCtx,
                                fn->filter.get(),
                                std::move(stage),
                                &_slotIdGenerator,
                                &_frameIdGenerator,
-                               *_data.resultSlot,
+                               outputs.get(kResult),
                                _data.env,
                                std::move(relevantSlots),
                                root->nodeId());
     }
 
-    return stage;
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildLimit(const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildLimit(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     const auto ln = static_cast<const LimitNode*>(root);
-    // If we have both limit and skip stages and the skip stage is beneath the limit, then we
-    // can combine these two stages into one. So, save the _limit value and let the skip stage
-    // builder handle it.
-    if (ln->children[0]->getType() == StageType::STAGE_SKIP) {
-        _limit = ln->limit;
+    boost::optional<long long> skip;
+
+    auto [stage, outputs] = [&]() {
+        if (ln->children[0]->getType() == StageType::STAGE_SKIP) {
+            // If we have both limit and skip stages and the skip stage is beneath the limit, then
+            // we can combine these two stages into one.
+            const auto sn = static_cast<const SkipNode*>(ln->children[0]);
+            skip = sn->skip;
+            return build(sn->children[0], reqs);
+        } else {
+            return build(ln->children[0], reqs);
+        }
+    }();
+
+    if (!reqs.getIsTailableCollScanResumeBranch()) {
+        stage = std::make_unique<sbe::LimitSkipStage>(
+            std::move(stage), ln->limit, skip, root->nodeId());
     }
 
-    auto inputStage = build(ln->children[0]);
-    return _limit || _isTailableCollScanResumeBranch
-        ? std::move(inputStage)
-        : std::make_unique<sbe::LimitSkipStage>(
-              std::move(inputStage), ln->limit, boost::none, root->nodeId());
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSkip(const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSkip(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     const auto sn = static_cast<const SkipNode*>(root);
-    auto inputStage = build(sn->children[0]);
-    return _isTailableCollScanResumeBranch
-        ? std::move(inputStage)
-        : std::make_unique<sbe::LimitSkipStage>(
-              std::move(inputStage), _limit, sn->skip, root->nodeId());
+    auto [stage, outputs] = build(sn->children[0], reqs);
+
+    if (!reqs.getIsTailableCollScanResumeBranch()) {
+        stage = std::make_unique<sbe::LimitSkipStage>(
+            std::move(stage), boost::none, sn->skip, root->nodeId());
+    }
+
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolutionNode* root) {
-    // TODO SERVER-48470: Replace std::string_view with StringData.
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSort(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     using namespace std::literals;
+    invariant(!reqs.getIndexKeyBitset());
 
     const auto sn = static_cast<const SortNode*>(root);
     auto sortPattern = SortPattern{sn->pattern, _cq.getExpCtx()};
-    auto inputStage = build(sn->children[0]);
+
+    // The child must produce all of the slots required by the parent of this SortNode. In addition
+    // to that, the child must always produce a 'resultSlot' because it's needed by the sort logic
+    // below.
+    auto childReqs = reqs.copy().set(kResult);
+    auto [inputStage, outputs] = build(sn->children[0], childReqs);
+
     sbe::value::SlotVector orderBy;
     std::vector<sbe::value::SortDirection> direction;
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
@@ -272,7 +411,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolu
         projectMap.emplace(
             sortFieldVar,
             sbe::makeE<sbe::EFunction>("getField"sv,
-                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(*_data.resultSlot),
+                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
                                                    sbe::makeE<sbe::EConstant>(fieldNameSV))));
     }
 
@@ -318,46 +457,43 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolu
         orderBy[idx] = resultVar;
     }
 
-    sbe::value::SlotVector values;
-    values.push_back(*_data.resultSlot);
-    if (_data.recordIdSlot) {
+    if (auto recordIdSlot = outputs.getIfExists(kRecordId); recordIdSlot) {
         // Break ties with record id if available.
-        orderBy.push_back(*_data.recordIdSlot);
+        orderBy.push_back(*recordIdSlot);
         // This is arbitrary.
         direction.push_back(sbe::value::SortDirection::Ascending);
     }
 
-    // A sort stage is a binding reflector, so we need to plumb through the 'oplogTsSlot' to make
-    // it visible at the root stage.
-    if (_data.oplogTsSlot) {
-        values.push_back(*_data.oplogTsSlot);
-    }
+    auto forwardingReqs = reqs.copy().set(kResult).clear(kRecordId);
 
-    // The '_returnKeySlot' likewise needs to be visible at the root stage.
-    if (_returnKeySlot) {
-        values.push_back(*_returnKeySlot);
-    }
+    auto values = sbe::makeSV();
+    outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { values.push_back(slot); });
 
-    return sbe::makeS<sbe::SortStage>(std::move(inputStage),
-                                      std::move(orderBy),
-                                      std::move(direction),
-                                      std::move(values),
-                                      sn->limit ? sn->limit
-                                                : std::numeric_limits<std::size_t>::max(),
-                                      sn->maxMemoryUsageBytes,
-                                      _cq.getExpCtx()->allowDiskUse,
-                                      _data.trialRunProgressTracker.get(),
-                                      root->nodeId());
+    inputStage =
+        sbe::makeS<sbe::SortStage>(std::move(inputStage),
+                                   std::move(orderBy),
+                                   std::move(direction),
+                                   std::move(values),
+                                   sn->limit ? sn->limit : std::numeric_limits<std::size_t>::max(),
+                                   sn->maxMemoryUsageBytes,
+                                   _cq.getExpCtx()->allowDiskUse,
+                                   _data.trialRunProgressTracker.get(),
+                                   root->nodeId());
+
+    return {std::move(inputStage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSortKeyGeneraror(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
+SlotBasedStageBuilder::buildSortKeyGeneraror(const QuerySolutionNode* root,
+                                             const PlanStageReqs& reqs) {
     uasserted(4822883, "Sort key generator in not supported in SBE yet");
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSortMerge(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildSortMerge(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     using namespace std::literals;
+    invariant(!reqs.getIndexKeyBitset());
+
     auto mergeSortNode = static_cast<const MergeSortNode*>(root);
 
     uassert(5073803,
@@ -381,8 +517,13 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSortMerge(
     std::vector<sbe::value::SlotVector> inputKeys;
     std::vector<sbe::value::SlotVector> inputVals;
 
+    // Children must produce all of the slots required by the parent of this SortMergeNode. In
+    // addition to that, children must always produce a 'recordIdSlot' if the 'dedup' flag is true,
+    // and children must always produce a 'resultSlot' because it's needed by the sort logic below.
+    auto childReqs = reqs.copy().set(kResult).setIf(kRecordId, mergeSortNode->dedup);
+
     for (auto&& child : mergeSortNode->children) {
-        auto childExecTree = build(child);
+        auto [stage, outputs] = build(child, childReqs);
 
         sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
         sbe::value::SlotVector inputKeysForChild;
@@ -397,77 +538,94 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSortMerge(
             projectMap.emplace(sortFieldSlot,
                                sbe::makeE<sbe::EFunction>(
                                    "getField"sv,
-                                   sbe::makeEs(sbe::makeE<sbe::EVariable>(*_data.resultSlot),
+                                   sbe::makeEs(sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
                                                sbe::makeE<sbe::EConstant>(fieldNameSV))));
         }
 
-        childExecTree = sbe::makeS<sbe::ProjectStage>(
-            std::move(childExecTree), std::move(projectMap), root->nodeId());
+        stage =
+            sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projectMap), root->nodeId());
 
-        inputStages.push_back(std::move(childExecTree));
+        inputStages.push_back(std::move(stage));
 
-        invariant(_data.resultSlot);
-        invariant(_data.recordIdSlot);
+        invariant(outputs.has(kResult));
+        invariant(!mergeSortNode->dedup || outputs.has(kRecordId));
 
         inputKeys.push_back(std::move(inputKeysForChild));
-        inputVals.push_back(sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot));
+
+        auto sv = sbe::makeSV();
+        outputs.forEachSlot(childReqs, [&](auto&& slot) { sv.push_back(slot); });
+
+        inputVals.push_back(std::move(sv));
     }
 
-    _data.resultSlot = _slotIdGenerator.generate();
-    _data.recordIdSlot = _slotIdGenerator.generate();
-    auto stage =
-        sbe::makeS<sbe::SortedMergeStage>(std::move(inputStages),
-                                          std::move(inputKeys),
-                                          std::move(direction),
-                                          std::move(inputVals),
-                                          sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot),
-                                          root->nodeId());
+    auto outputVals = sbe::makeSV();
+
+    PlanStageSlots outputs(childReqs, &_slotIdGenerator);
+    outputs.forEachSlot(childReqs, [&](auto&& slot) { outputVals.push_back(slot); });
+
+    auto stage = sbe::makeS<sbe::SortedMergeStage>(std::move(inputStages),
+                                                   std::move(inputKeys),
+                                                   std::move(direction),
+                                                   std::move(inputVals),
+                                                   std::move(outputVals),
+                                                   root->nodeId());
 
     if (mergeSortNode->dedup) {
         stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(*_data.recordIdSlot), root->nodeId());
+            std::move(stage), sbe::makeSV(outputs.get(kRecordId)), root->nodeId());
     }
 
-    return stage;
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildProjectionSimple(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
+SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
+                                             const PlanStageReqs& reqs) {
     using namespace std::literals;
+    invariant(!reqs.getIndexKeyBitset());
 
     auto pn = static_cast<const ProjectionNodeSimple*>(root);
-    auto inputStage = build(pn->children[0]);
+
+    // The child must produce all of the slots required by the parent of this ProjectionNodeSimple.
+    // In addition to that, the child must always produce a 'resultSlot' because it's needed by the
+    // projection logic below.
+    auto childReqs = reqs.copy().set(kResult);
+    auto [inputStage, outputs] = build(pn->children[0], childReqs);
+
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
     sbe::value::SlotVector fieldSlots;
-
-    invariant(_data.resultSlot);
 
     for (const auto& field : pn->proj.getRequiredFields()) {
         fieldSlots.push_back(_slotIdGenerator.generate());
         projections.emplace(
             fieldSlots.back(),
             sbe::makeE<sbe::EFunction>("getField"sv,
-                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(*_data.resultSlot),
+                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
                                                    sbe::makeE<sbe::EConstant>(std::string_view{
                                                        field.c_str(), field.size()}))));
     }
 
-    return sbe::makeS<sbe::MakeObjStage>(sbe::makeS<sbe::ProjectStage>(std::move(inputStage),
-                                                                       std::move(projections),
-                                                                       root->nodeId()),
-                                         *_data.resultSlot,
-                                         boost::none,
-                                         std::vector<std::string>{},
-                                         pn->proj.getRequiredFields(),
-                                         fieldSlots,
-                                         true,
-                                         false,
-                                         root->nodeId());
+    outputs.set(kResult, _slotIdGenerator.generate());
+    inputStage = sbe::makeS<sbe::MakeObjStage>(sbe::makeS<sbe::ProjectStage>(std::move(inputStage),
+                                                                             std::move(projections),
+                                                                             root->nodeId()),
+                                               outputs.get(kResult),
+                                               boost::none,
+                                               std::vector<std::string>{},
+                                               pn->proj.getRequiredFields(),
+                                               fieldSlots,
+                                               true,
+                                               false,
+                                               root->nodeId());
+
+    return {std::move(inputStage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildProjectionCovered(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
+SlotBasedStageBuilder::buildProjectionCovered(const QuerySolutionNode* root,
+                                              const PlanStageReqs& reqs) {
     using namespace std::literals;
+    invariant(!reqs.getIndexKeyBitset());
 
     auto pn = static_cast<const ProjectionNodeCovered*>(root);
     invariant(pn->proj.isSimple());
@@ -477,118 +635,151 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildProjectionCovered(
             str::stream() << "Can't build exec tree for node: " << root->toString(),
             pn->children[0]->getType() == STAGE_IXSCAN);
 
-    // If we're pulling data out of one index we can pre-compute the indices of the fields
-    // in the key that we pull data from and avoid looking up the field name each time.
-    invariant(!_indexKeysToInclude);
-    _indexKeysToInclude.emplace();
-    ON_BLOCK_EXIT([&] { _indexKeysToInclude.reset(); });
-
+    // This is a ProjectionCoveredNode, so we will be pulling all the data we need from one index.
+    // Prepare a bitset to indicate which parts of the index key we need for the projection.
     std::vector<std::string> keyFieldNames;
     StringSet requiredFields = {pn->proj.getRequiredFields().begin(),
                                 pn->proj.getRequiredFields().end()};
 
-    // pn->coveredKeyObj is the "index.keyPattern" from the IndexScanNode or DistinctNode. This
-    // lists all the fields that the index can provide, not the fields that the projection wants.
-    // requiredFields lists all of the fields that the projection wants. Since this is a covered
-    // projection, we're guaranteed that pn->coveredKeyObj contains all of the fields that the
-    // projection wants.
+    // The child must produce all of the slots required by the parent of this ProjectionNodeSimple,
+    // except for 'resultSlot' which will be produced by the MakeObjStage below. In addition to
+    // that, the child must produce the index key slots that are needed by this covered projection.
+    //
+    // pn->coveredKeyObj is the "index.keyPattern" from the child (which is either an IndexScanNode
+    // or DistinctNode). pn->coveredKeyObj lists all the fields that the index can provide, not the
+    // fields that the projection wants. requiredFields lists all of the fields that the projection
+    // needs. Since this is a covered projection, we're guaranteed that pn->coveredKeyObj contains
+    // all of the fields that the projection needs.
+    auto childReqs = reqs.copy().clear(kResult);
+
+    sbe::IndexKeysInclusionSet indexKeyBitset;
     size_t i = 0;
     for (auto&& elt : pn->coveredKeyObj) {
         if (requiredFields.count(elt.fieldNameStringData())) {
-            _indexKeysToInclude->set(i);
+            indexKeyBitset.set(i);
             keyFieldNames.push_back(elt.fieldName());
         }
 
         ++i;
     }
 
-    auto inputStage = build(pn->children[0]);
+    childReqs.getIndexKeyBitset() = std::move(indexKeyBitset);
 
-    // Assert that the index scan produced values for this covered projection
-    invariant(_indexKeySlots);
-    ON_BLOCK_EXIT([&] { _indexKeySlots.reset(); });
+    auto [inputStage, outputs] = build(pn->children[0], childReqs);
 
-    _data.resultSlot = _slotIdGenerator.generate();
+    // Assert that the index scan produced index key slots for this covered projection.
+    auto indexKeySlots = *outputs.extractIndexKeySlots();
 
-    return sbe::makeS<sbe::MakeObjStage>(std::move(inputStage),
-                                         *_data.resultSlot,
-                                         boost::none,
-                                         std::vector<std::string>{},
-                                         std::move(keyFieldNames),
-                                         std::move(*_indexKeySlots),
-                                         true,
-                                         false,
-                                         root->nodeId());
+    outputs.set(kResult, _slotIdGenerator.generate());
+    inputStage = sbe::makeS<sbe::MakeObjStage>(std::move(inputStage),
+                                               outputs.get(kResult),
+                                               boost::none,
+                                               std::vector<std::string>{},
+                                               std::move(keyFieldNames),
+                                               std::move(indexKeySlots),
+                                               true,
+                                               false,
+                                               root->nodeId());
+
+    return {std::move(inputStage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildProjectionDefault(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
+SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
+                                              const PlanStageReqs& reqs) {
     using namespace std::literals;
+    invariant(!reqs.getIndexKeyBitset());
 
     auto pn = static_cast<const ProjectionNodeDefault*>(root);
-    auto inputStage = build(pn->children[0]);
-    invariant(_data.resultSlot);
+
+    // The child must produce all of the slots required by the parent of this ProjectionNodeDefault.
+    // In addition to that, the child must always produce a 'resultSlot' because it's needed by the
+    // projection logic below.
+    auto childReqs = reqs.copy().set(kResult);
+    auto [inputStage, outputs] = build(pn->children[0], childReqs);
+
     auto [slot, stage] = generateProjection(_opCtx,
                                             &pn->proj,
                                             std::move(inputStage),
                                             &_slotIdGenerator,
                                             &_frameIdGenerator,
-                                            *_data.resultSlot,
+                                            outputs.get(kResult),
                                             _data.env,
                                             root->nodeId());
-    _data.resultSlot = slot;
-    return std::move(stage);
+    outputs.set(kResult, slot);
+
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildOr(const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildOr(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    invariant(!reqs.getIndexKeyBitset());
+
     std::vector<std::unique_ptr<sbe::PlanStage>> inputStages;
     std::vector<sbe::value::SlotVector> inputSlots;
 
     auto orn = static_cast<const OrNode*>(root);
 
-    // Translate each child of the 'Or' node. Each child may produce new 'resultSlot' and
-    // recordIdSlot' stored in the _data member. We need to add these slots into the 'inputSlots'
-    // vector which is used as input to the union statge below.
+    // Children must produce all of the slots required by the parent of this OrNode. In addition
+    // to that, children must always produce a 'recordIdSlot' if the 'dedup' flag is true, and
+    // children must always produce a 'resultSlot' if 'filter' is non-null.
+    auto childReqs = reqs.copy().setIf(kResult, orn->filter.get()).setIf(kRecordId, orn->dedup);
+
     for (auto&& child : orn->children) {
-        inputStages.push_back(build(child));
-        invariant(_data.resultSlot);
-        invariant(_data.recordIdSlot);
-        inputSlots.push_back({*_data.resultSlot, *_data.recordIdSlot});
+        auto [stage, outputs] = build(child, childReqs);
+
+        auto sv = sbe::makeSV();
+        outputs.forEachSlot(childReqs, [&](auto&& slot) { sv.push_back(slot); });
+
+        inputStages.push_back(std::move(stage));
+        inputSlots.emplace_back(std::move(sv));
     }
 
     // Construct a union stage whose branches are translated children of the 'Or' node.
-    _data.resultSlot = _slotIdGenerator.generate();
-    _data.recordIdSlot = _slotIdGenerator.generate();
-    auto stage = sbe::makeS<sbe::UnionStage>(std::move(inputStages),
-                                             std::move(inputSlots),
-                                             sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot),
-                                             root->nodeId());
+    auto unionOutputSlots = sbe::makeSV();
+
+    PlanStageSlots outputs(childReqs, &_slotIdGenerator);
+    outputs.forEachSlot(childReqs, [&](auto&& slot) { unionOutputSlots.push_back(slot); });
+
+    auto stage = sbe::makeS<sbe::UnionStage>(
+        std::move(inputStages), std::move(inputSlots), std::move(unionOutputSlots), root->nodeId());
 
     if (orn->dedup) {
         stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(*_data.recordIdSlot), root->nodeId());
+            std::move(stage), sbe::makeSV(outputs.get(kRecordId)), root->nodeId());
     }
 
     if (orn->filter) {
-        auto relevantSlots = sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot);
+        auto relevantSlots = sbe::makeSV(outputs.get(kResult));
+
+        auto forwardingReqs = reqs.copy().clear(kResult);
+        outputs.forEachSlot(forwardingReqs, [&](auto&& slot) { relevantSlots.push_back(slot); });
+
         stage = generateFilter(_opCtx,
                                orn->filter.get(),
                                std::move(stage),
                                &_slotIdGenerator,
                                &_frameIdGenerator,
-                               *_data.resultSlot,
+                               outputs.get(kResult),
                                _data.env,
                                std::move(relevantSlots),
                                root->nodeId());
     }
 
-    return stage;
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildText(const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildText(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    invariant(_collection);
+    invariant(!reqs.getIndexKeyBitset());
+
+    // At present, makeLoopJoinForFetch() doesn't have the necessary logic for producing an
+    // oplogTsSlot, so assert that the caller doesn't need oplogTsSlot.
+    invariant(!reqs.has(kOplogTs));
+
     auto textNode = static_cast<const TextNode*>(root);
 
-    invariant(_collection);
     auto&& indexName = textNode->index.identifier.catalogName;
     const auto desc = _collection->getIndexCatalog()->findIndexByName(_opCtx, indexName);
     invariant(desc);
@@ -626,7 +817,6 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildText(const QuerySolu
         auto endKeyBson = fts::FTSIndexFormat::getIndexKey(
             fts::MAX_WEIGHT, term, textNode->indexPrefix, ftsSpec.getTextIndexVersion());
 
-        auto recordSlot = _slotIdGenerator.generate();
         auto&& [recordIdSlot, ixscan] =
             generateSingleIntervalIndexScan(_collection,
                                             indexName,
@@ -635,79 +825,108 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildText(const QuerySolu
                                             makeKeyString(endKeyBson),
                                             sbe::IndexKeysInclusionSet{},
                                             sbe::makeSV(),
-                                            recordSlot,
+                                            boost::none,  // recordSlot
                                             &_slotIdGenerator,
                                             _yieldPolicy,
                                             _data.trialRunProgressTracker.get(),
                                             root->nodeId());
         indexScanList.push_back(std::move(ixscan));
-        ixscanOutputSlots.push_back(sbe::makeSV(recordIdSlot, recordSlot));
+        ixscanOutputSlots.push_back(sbe::makeSV(recordIdSlot));
     }
 
+    PlanStageSlots outputs;
+
     // Union will output a slot for the record id and another for the record.
-    _data.recordIdSlot = _slotIdGenerator.generate();
-    auto unionRecordOutputSlot = _slotIdGenerator.generate();
-    auto unionOutputSlots = sbe::makeSV(*_data.recordIdSlot, unionRecordOutputSlot);
+    auto recordIdSlot = _slotIdGenerator.generate();
+    auto unionOutputSlots = sbe::makeSV(recordIdSlot);
 
     // Index scan output slots become the input slots to the union.
-    auto unionStage = sbe::makeS<sbe::UnionStage>(
+    auto stage = sbe::makeS<sbe::UnionStage>(
         std::move(indexScanList), ixscanOutputSlots, unionOutputSlots, root->nodeId());
 
     // TODO: If text score metadata is requested, then we should sum over the text scores inside the
     // index keys for a given document. This will require expression evaluation to be able to
     // extract the score directly from the key string.
-    auto uniqueStage = sbe::makeS<sbe::UniqueStage>(
-        std::move(unionStage), sbe::makeSV(*_data.recordIdSlot), root->nodeId());
+    stage =
+        sbe::makeS<sbe::UniqueStage>(std::move(stage), sbe::makeSV(recordIdSlot), root->nodeId());
 
-    auto nljStage =
-        makeLoopJoinForFetch(std::move(uniqueStage), *_data.recordIdSlot, root->nodeId());
+    sbe::value::SlotId resultSlot;
+    std::tie(resultSlot, recordIdSlot, stage) =
+        makeLoopJoinForFetch(std::move(stage), recordIdSlot, root->nodeId());
 
     // Add a special stage to apply 'ftsQuery' to matching documents, and then add a FilterStage to
     // discard documents which do not match.
     auto textMatchResultSlot = _slotIdGenerator.generate();
-    auto textMatchStage = sbe::makeS<sbe::TextMatchStage>(std::move(nljStage),
-                                                          ftsQuery,
-                                                          ftsSpec,
-                                                          *_data.resultSlot,
-                                                          textMatchResultSlot,
-                                                          root->nodeId());
+    stage = sbe::makeS<sbe::TextMatchStage>(
+        std::move(stage), ftsQuery, ftsSpec, resultSlot, textMatchResultSlot, root->nodeId());
 
     // Filter based on the contents of the slot filled out by the TextMatchStage.
-    auto filteredStage = sbe::makeS<sbe::FilterStage<false>>(
-        std::move(textMatchStage), sbe::makeE<sbe::EVariable>(textMatchResultSlot), root->nodeId());
+    stage = sbe::makeS<sbe::FilterStage<false>>(
+        std::move(stage), sbe::makeE<sbe::EVariable>(textMatchResultSlot), root->nodeId());
 
-    if (_returnKeySlot) {
-        // Assign the '_returnKeySlot' to be the empty object.
-        return sbe::makeProjectStage(std::move(filteredStage),
-                                     root->nodeId(),
-                                     *_returnKeySlot,
-                                     sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
-    } else {
-        return filteredStage;
+    outputs.set(kResult, resultSlot);
+    outputs.set(kRecordId, recordIdSlot);
+
+    if (reqs.has(kReturnKey)) {
+        // Assign the 'returnKeySlot' to be the empty object.
+        outputs.set(kReturnKey, _slotIdGenerator.generate());
+        stage = sbe::makeProjectStage(std::move(stage),
+                                      root->nodeId(),
+                                      outputs.get(kReturnKey),
+                                      sbe::makeE<sbe::EFunction>("newObj", sbe::makeEs()));
     }
+
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildReturnKey(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildReturnKey(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    invariant(!reqs.getIndexKeyBitset());
+
     // TODO SERVER-49509: If the projection includes {$meta: "sortKey"}, the result of this stage
     // should also include the sort key. Everything else in the projection is ignored.
     auto returnKeyNode = static_cast<const ReturnKeyNode*>(root);
 
-    auto resultSlot = _slotIdGenerator.generate();
-    invariant(!_data.resultSlot);
-    _data.resultSlot = resultSlot;
+    // The child must produce all of the slots required by the parent of this ReturnKeyNode except
+    // for 'resultSlot'. In addition to that, the child must always produce a 'returnKeySlot'.
+    // After build() returns, we take the 'returnKeySlot' produced by the child and store it into
+    // 'resultSlot' for the parent of this ReturnKeyNode to consume.
+    auto childReqs = reqs.copy().clear(kResult).set(kReturnKey);
+    auto [stage, outputs] = build(returnKeyNode->children[0], childReqs);
 
-    invariant(!_returnKeySlot);
-    _returnKeySlot = _slotIdGenerator.generate();
+    outputs.set(kResult, outputs.get(kReturnKey));
+    outputs.clear(kReturnKey);
 
-    auto stage = build(returnKeyNode->children[0]);
-    _data.resultSlot = *_returnKeySlot;
-    return stage;
+    return {std::move(stage), std::move(outputs)};
 }
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollScan(
-    const QuerySolutionNode* root) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildEof(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+
+    PlanStageSlots outputs(reqs, &_slotIdGenerator);
+    outputs.forEachSlot(reqs, [&](auto&& slot) {
+        projects.insert({slot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0)});
+    });
+
+    auto stage = sbe::makeS<sbe::LimitSkipStage>(
+        sbe::makeS<sbe::CoScanStage>(root->nodeId()), 0, boost::none, root->nodeId());
+
+    if (!projects.empty()) {
+        // Even though this SBE tree will produce zero documents, we still need a ProjectStage to
+        // define the slots in 'outputSlots' so that calls to getAccessor() won't fail.
+        stage =
+            sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), root->nodeId());
+    }
+
+    return {std::move(stage), std::move(outputs)};
+}
+
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
+SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* root,
+                                                    const PlanStageReqs& reqs) {
     using namespace std::literals;
+    invariant(!reqs.getIndexKeyBitset());
 
     // Register a SlotId in the global environment which would contain a recordId to resume a
     // tailable collection scan from. A PlanStage executor will track the last seen recordId and
@@ -724,21 +943,16 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollS
     // The 'makeStage' parameter is used to build a PlanStage tree which is served as a root stage
     // for each of the union branches. The same machanism is used to build each union branch, and
     // the special logic which needs to be triggered depending on which branch we build is
-    // controlled by setting the _isTailableCollScanResumeBranch flag.
-
-    _isBuildingUnionForTailableCollScan = true;
-
+    // controlled by setting the isTailableCollScanResumeBranch flag in PlanStageReqs.
     auto makeUnionBranch = [&](bool isTailableCollScanResumeBranch)
         -> std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> {
-        _isTailableCollScanResumeBranch = isTailableCollScanResumeBranch;
-        auto branch = build(root);
-        auto branchSlots = sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot);
-        if (_data.oplogTsSlot) {
-            branchSlots.push_back(*_data.oplogTsSlot);
-        }
-        if (_returnKeySlot) {
-            branchSlots.push_back(*_returnKeySlot);
-        }
+        auto childReqs = reqs;
+        childReqs.setIsTailableCollScanResumeBranch(isTailableCollScanResumeBranch);
+        auto [branch, outputs] = build(root, childReqs);
+
+        auto branchSlots = sbe::makeSV();
+        outputs.forEachSlot(reqs, [&](auto&& slot) { branchSlots.push_back(slot); });
+
         return {std::move(branchSlots), std::move(branch)};
     };
 
@@ -769,13 +983,10 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollS
     auto branchSlots = makeVector<sbe::value::SlotVector>(std::move(anchorBranchSlots),
                                                           std::move(resumeBranchSlots));
 
-    _data.resultSlot = _slotIdGenerator.generate();
-    _data.recordIdSlot = _slotIdGenerator.generate();
-    auto unionOutputSlots = sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot);
-    if (_data.oplogTsSlot) {
-        _data.oplogTsSlot = _slotIdGenerator.generate();
-        unionOutputSlots.push_back(*_data.oplogTsSlot);
-    }
+    auto unionOutputSlots = sbe::makeSV();
+
+    PlanStageSlots outputs(reqs, &_slotIdGenerator);
+    outputs.forEachSlot(reqs, [&](auto&& slot) { unionOutputSlots.push_back(slot); });
 
     // Branch output slots become the input slots to the union.
     auto unionStage =
@@ -784,40 +995,36 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollS
                                     branchSlots,
                                     unionOutputSlots,
                                     root->nodeId());
-    _isBuildingUnionForTailableCollScan = false;
-    return unionStage;
-}
 
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildEof(const QuerySolutionNode* root) {
-    return sbe::makeS<sbe::LimitSkipStage>(
-        sbe::makeS<sbe::CoScanStage>(root->nodeId()), 0, boost::none, root->nodeId());
+    return {std::move(unionStage), std::move(outputs)};
 }
 
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
-    static const stdx::unordered_map<StageType,
-                                     std::function<std::unique_ptr<sbe::PlanStage>(
-                                         SlotBasedStageBuilder&, const QuerySolutionNode* root)>>
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::build(
+    const QuerySolutionNode* root, const PlanStageReqs& reqs) {
+    static const stdx::unordered_map<
+        StageType,
+        std::function<std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>(
+            SlotBasedStageBuilder&, const QuerySolutionNode* root, const PlanStageReqs& reqs)>>
         kStageBuilders = {
-            {STAGE_COLLSCAN, std::mem_fn(&SlotBasedStageBuilder::buildCollScan)},
-            {STAGE_VIRTUAL_SCAN, std::mem_fn(&SlotBasedStageBuilder::buildVirtualScan)},
-            {STAGE_IXSCAN, std::mem_fn(&SlotBasedStageBuilder::buildIndexScan)},
-            {STAGE_FETCH, std::mem_fn(&SlotBasedStageBuilder::buildFetch)},
-            {STAGE_LIMIT, std::mem_fn(&SlotBasedStageBuilder::buildLimit)},
-            {STAGE_SKIP, std::mem_fn(&SlotBasedStageBuilder::buildSkip)},
-            {STAGE_SORT_SIMPLE, std::mem_fn(&SlotBasedStageBuilder::buildSort)},
-            {STAGE_SORT_DEFAULT, std::mem_fn(&SlotBasedStageBuilder::buildSort)},
-            {STAGE_SORT_KEY_GENERATOR, std::mem_fn(&SlotBasedStageBuilder::buildSortKeyGeneraror)},
-            {STAGE_PROJECTION_SIMPLE, std::mem_fn(&SlotBasedStageBuilder::buildProjectionSimple)},
-            {STAGE_PROJECTION_DEFAULT, std::mem_fn(&SlotBasedStageBuilder::buildProjectionDefault)},
-            {STAGE_PROJECTION_COVERED, std::mem_fn(&SlotBasedStageBuilder::buildProjectionCovered)},
+            {STAGE_COLLSCAN, &SlotBasedStageBuilder::buildCollScan},
+            {STAGE_VIRTUAL_SCAN, &SlotBasedStageBuilder::buildVirtualScan},
+            {STAGE_IXSCAN, &SlotBasedStageBuilder::buildIndexScan},
+            {STAGE_FETCH, &SlotBasedStageBuilder::buildFetch},
+            {STAGE_LIMIT, &SlotBasedStageBuilder::buildLimit},
+            {STAGE_SKIP, &SlotBasedStageBuilder::buildSkip},
+            {STAGE_SORT_SIMPLE, &SlotBasedStageBuilder::buildSort},
+            {STAGE_SORT_DEFAULT, &SlotBasedStageBuilder::buildSort},
+            {STAGE_SORT_KEY_GENERATOR, &SlotBasedStageBuilder::buildSortKeyGeneraror},
+            {STAGE_PROJECTION_SIMPLE, &SlotBasedStageBuilder::buildProjectionSimple},
+            {STAGE_PROJECTION_DEFAULT, &SlotBasedStageBuilder::buildProjectionDefault},
+            {STAGE_PROJECTION_COVERED, &SlotBasedStageBuilder::buildProjectionCovered},
             {STAGE_OR, &SlotBasedStageBuilder::buildOr},
             {STAGE_TEXT, &SlotBasedStageBuilder::buildText},
             {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey},
             {STAGE_EOF, &SlotBasedStageBuilder::buildEof},
-            {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
-            {STAGE_VIRTUAL_SCAN, &SlotBasedStageBuilder::buildVirtualScan}};
+            {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge}};
 
     uassert(4822884,
             str::stream() << "Can't build exec tree for node: " << root->toString(),
@@ -832,13 +1039,16 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
         case STAGE_COLLSCAN:
         case STAGE_LIMIT:
         case STAGE_SKIP:
-            if (_cq.getQueryRequest().isTailable() && !_isBuildingUnionForTailableCollScan) {
-                return makeUnionForTailableCollScan(root);
+            if (_cq.getQueryRequest().isTailable() &&
+                !reqs.getIsBuildingUnionForTailableCollScan()) {
+                auto childReqs = reqs;
+                childReqs.setIsBuildingUnionForTailableCollScan(true);
+                return makeUnionForTailableCollScan(root, childReqs);
             }
         default:
             break;
     }
 
-    return std::invoke(kStageBuilders.at(root->getType()), *this, root);
+    return std::invoke(kStageBuilders.at(root->getType()), *this, root, reqs);
 }
 }  // namespace mongo::stage_builder

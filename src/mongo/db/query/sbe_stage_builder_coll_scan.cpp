@@ -42,6 +42,7 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/db/storage/oplog_hack.h"
@@ -113,19 +114,16 @@ makeOplogTimestampSlotsIfNeeded(const CollectionPtr& collection,
  *      time it fetches a document that does not pass the filter and has 'ts' greater than the upper
  *      bound.
  */
-std::tuple<sbe::value::SlotId,
-           sbe::value::SlotId,
-           boost::optional<sbe::value::SlotId>,
-           std::unique_ptr<sbe::PlanStage>>
-generateOptimizedOplogScan(OperationContext* opCtx,
-                           const CollectionPtr& collection,
-                           const CollectionScanNode* csn,
-                           sbe::value::SlotIdGenerator* slotIdGenerator,
-                           sbe::value::FrameIdGenerator* frameIdGenerator,
-                           PlanYieldPolicy* yieldPolicy,
-                           sbe::RuntimeEnvironment* env,
-                           bool isTailableResumeBranch,
-                           TrialRunProgressTracker* tracker) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplogScan(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const CollectionScanNode* csn,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    PlanYieldPolicy* yieldPolicy,
+    sbe::RuntimeEnvironment* env,
+    bool isTailableResumeBranch,
+    TrialRunProgressTracker* tracker) {
     invariant(collection->ns().isOplog());
     // The minTs and maxTs optimizations are not compatible with resumeAfterRecordId and can only
     // be done for a forward scan.
@@ -218,6 +216,9 @@ generateOptimizedOplogScan(OperationContext* opCtx,
             csn->nodeId());
     }
 
+    // If csn->stopApplyingFilterAfterFirstMatch is true, assert that csn has a filter.
+    invariant(!csn->stopApplyingFilterAfterFirstMatch || csn->filter);
+
     if (csn->filter) {
         auto relevantSlots = sbe::makeSV(resultSlot, recordIdSlot);
         if (tsSlot) {
@@ -257,7 +258,7 @@ generateOptimizedOplogScan(OperationContext* opCtx,
         // inner branch, and the execution will continue from this point further on, without
         // applying the filter.
         if (csn->stopApplyingFilterAfterFirstMatch) {
-            invariant(csn->minTs || csn->maxTs);
+            invariant(csn->minTs);
             invariant(csn->direction == CollectionScanParams::FORWARD);
 
             std::tie(fields, slots, tsSlot) = makeOplogTimestampSlotsIfNeeded(
@@ -286,10 +287,18 @@ generateOptimizedOplogScan(OperationContext* opCtx,
         }
     }
 
-    return {resultSlot,
-            recordIdSlot,
-            csn->shouldTrackLatestOplogTimestamp ? tsSlot : boost::none,
-            std::move(stage)};
+    // If csn->shouldTrackLatestOplogTimestamp is true, assert that we generated tsSlot.
+    invariant(!csn->shouldTrackLatestOplogTimestamp || tsSlot);
+
+    PlanStageSlots outputs;
+    outputs.set(PlanStageSlots::kResult, resultSlot);
+    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+
+    if (csn->shouldTrackLatestOplogTimestamp) {
+        outputs.set(PlanStageSlots::kOplogTs, *tsSlot);
+    }
+
+    return {std::move(stage), std::move(outputs)};
 }
 
 /**
@@ -297,19 +306,16 @@ generateOptimizedOplogScan(OperationContext* opCtx,
  * start from a RecordId contained within this token, otherwise from the beginning of the
  * collection.
  */
-std::tuple<sbe::value::SlotId,
-           sbe::value::SlotId,
-           boost::optional<sbe::value::SlotId>,
-           std::unique_ptr<sbe::PlanStage>>
-generateGenericCollScan(OperationContext* opCtx,
-                        const CollectionPtr& collection,
-                        const CollectionScanNode* csn,
-                        sbe::value::SlotIdGenerator* slotIdGenerator,
-                        sbe::value::FrameIdGenerator* frameIdGenerator,
-                        PlanYieldPolicy* yieldPolicy,
-                        sbe::RuntimeEnvironment* env,
-                        bool isTailableResumeBranch,
-                        TrialRunProgressTracker* tracker) {
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollScan(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const CollectionScanNode* csn,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    PlanYieldPolicy* yieldPolicy,
+    sbe::RuntimeEnvironment* env,
+    bool isTailableResumeBranch,
+    TrialRunProgressTracker* tracker) {
     const auto forward = csn->direction == CollectionScanParams::FORWARD;
 
     invariant(!csn->shouldTrackLatestOplogTimestamp || collection->ns().isOplog());
@@ -441,48 +447,48 @@ generateGenericCollScan(OperationContext* opCtx,
                                csn->nodeId());
     }
 
-    return {resultSlot, recordIdSlot, tsSlot, std::move(stage)};
+    PlanStageSlots outputs;
+    outputs.set(PlanStageSlots::kResult, resultSlot);
+    outputs.set(PlanStageSlots::kRecordId, recordIdSlot);
+
+    if (tsSlot) {
+        outputs.set(PlanStageSlots::kOplogTs, *tsSlot);
+    }
+
+    return {std::move(stage), std::move(outputs)};
 }
 }  // namespace
 
-std::tuple<sbe::value::SlotId,
-           sbe::value::SlotId,
-           boost::optional<sbe::value::SlotId>,
-           std::unique_ptr<sbe::PlanStage>>
-generateCollScan(OperationContext* opCtx,
-                 const CollectionPtr& collection,
-                 const CollectionScanNode* csn,
-                 sbe::value::SlotIdGenerator* slotIdGenerator,
-                 sbe::value::FrameIdGenerator* frameIdGenerator,
-                 PlanYieldPolicy* yieldPolicy,
-                 sbe::RuntimeEnvironment* env,
-                 bool isTailableResumeBranch,
-                 TrialRunProgressTracker* tracker) {
-
-    auto [resultSlot, recordIdSlot, oplogTsSlot, stage] = [&]() {
-        if (csn->minTs || csn->maxTs) {
-            return generateOptimizedOplogScan(opCtx,
-                                              collection,
-                                              csn,
-                                              slotIdGenerator,
-                                              frameIdGenerator,
-                                              yieldPolicy,
-                                              env,
-                                              isTailableResumeBranch,
-                                              tracker);
-        } else {
-            return generateGenericCollScan(opCtx,
-                                           collection,
-                                           csn,
-                                           slotIdGenerator,
-                                           frameIdGenerator,
-                                           yieldPolicy,
-                                           env,
-                                           isTailableResumeBranch,
-                                           tracker);
-        }
-    }();
-
-    return {resultSlot, recordIdSlot, oplogTsSlot, std::move(stage)};
+std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const CollectionScanNode* csn,
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::FrameIdGenerator* frameIdGenerator,
+    PlanYieldPolicy* yieldPolicy,
+    sbe::RuntimeEnvironment* env,
+    bool isTailableResumeBranch,
+    TrialRunProgressTracker* tracker) {
+    if (csn->minTs || csn->maxTs) {
+        return generateOptimizedOplogScan(opCtx,
+                                          collection,
+                                          csn,
+                                          slotIdGenerator,
+                                          frameIdGenerator,
+                                          yieldPolicy,
+                                          env,
+                                          isTailableResumeBranch,
+                                          tracker);
+    } else {
+        return generateGenericCollScan(opCtx,
+                                       collection,
+                                       csn,
+                                       slotIdGenerator,
+                                       frameIdGenerator,
+                                       yieldPolicy,
+                                       env,
+                                       isTailableResumeBranch,
+                                       tracker);
+    }
 }
 }  // namespace mongo::stage_builder

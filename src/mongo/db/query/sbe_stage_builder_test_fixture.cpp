@@ -64,9 +64,9 @@ SBEStageBuilderTestFixture::buildPlanStage(std::unique_ptr<QuerySolution> queryS
 
     auto slots = sbe::makeSV();
     if (hasRecordId) {
-        slots.push_back(*data.recordIdSlot);
+        slots.push_back(data.outputs.get(stage_builder::PlanStageSlots::kRecordId));
     }
-    slots.push_back(*data.resultSlot);
+    slots.push_back(data.outputs.get(stage_builder::PlanStageSlots::kResult));
 
     return {slots, std::move(stage), std::move(data)};
 }

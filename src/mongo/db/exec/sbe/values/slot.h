@@ -426,12 +426,15 @@ public:
             _data = nullptr;
             _count = 0;
         }
-
         if (count) {
             _data = new char[sizeInBytes(count)];
             _count = count;
+            auto valuePtr = values();
+            auto tagPtr = tags();
             auto ownedPtr = owned();
             while (count--) {
+                *valuePtr++ = 0;
+                *tagPtr++ = TypeTags::Nothing;
                 *ownedPtr++ = false;
             }
         }
