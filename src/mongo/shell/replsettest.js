@@ -1779,6 +1779,8 @@ var ReplSetTest = function(opts) {
                 " failed to be committed on all secondaries",
             timeout);
 
+        print("Op with OpTime " + tojson(primaryOpTime) +
+              " successfully committed on all secondaries");
         return primaryOpTime;
     };
 
