@@ -405,6 +405,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"indexOfCP",
      BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfCP, false}},
     {"isTimezone", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isTimezone, false}},
+    {"setUnion", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::setUnion, false}},
 };
 
 /**

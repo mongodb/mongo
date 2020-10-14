@@ -952,6 +952,12 @@ private:
     const char* _arrayEnd{nullptr};
 };
 
+/**
+ * Copies the content of the input array into an ArraySet. If the input has duplicate elements, they
+ * will be removed.
+ */
+std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val);
+
 }  // namespace value
 }  // namespace sbe
 }  // namespace mongo

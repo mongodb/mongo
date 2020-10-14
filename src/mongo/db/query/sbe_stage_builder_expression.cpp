@@ -2274,8 +2274,9 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSetUnion* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateNarySetExpression(expr, "setUnion");
     }
+
     void visit(ExpressionSize* expr) final {
         unsupportedExpression(expr->getOpName());
     }
@@ -2776,6 +2777,67 @@ private:
             std::move(exprIndexOfFunction));
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(operands), std::move(totalExprIndexOfFunction)));
+    }
+
+    /**
+     * Generic logic for building N-ary set expressions: setUnion, setIntersection, etc.
+     */
+    void generateNarySetExpression(Expression* expr, const std::string& setFunction) {
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+        auto frameId = _context->frameIdGenerator->generate();
+
+        auto generateNotArray = [frameId](const sbe::value::SlotId slotId) {
+            sbe::EVariable var{frameId, slotId};
+            return makeNot(sbe::makeE<sbe::EFunction>("isArray", sbe::makeEs(var.clone())));
+        };
+
+        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        std::vector<std::unique_ptr<sbe::EExpression>> argVars;
+        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNull;
+        std::vector<std::unique_ptr<sbe::EExpression>> checkExprsNotArray;
+        binds.reserve(arity);
+        argVars.reserve(arity);
+        checkExprsNull.reserve(arity);
+        checkExprsNotArray.reserve(arity);
+        for (size_t idx = 0; idx < arity; ++idx) {
+            binds.push_back(_context->popExpr());
+            argVars.push_back(sbe::makeE<sbe::EVariable>(frameId, idx));
+
+            checkExprsNull.push_back(generateNullOrMissing(frameId, idx));
+            checkExprsNotArray.push_back(generateNotArray(idx));
+        }
+        // Reverse the binds array to preserve the original order of the arguments, since some set
+        // operations, such as $setDifference, are not commutative.
+        std::reverse(std::begin(binds), std::end(binds));
+
+        using iter_t = std::vector<std::unique_ptr<sbe::EExpression>>::iterator;
+        auto checkNullAnyArgument =
+            std::accumulate(std::move_iterator<iter_t>(checkExprsNull.begin() + 1),
+                            std::move_iterator<iter_t>(checkExprsNull.end()),
+                            std::move(checkExprsNull.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                            });
+        auto checkNotArrayAnyArgument =
+            std::accumulate(std::move_iterator<iter_t>(checkExprsNotArray.begin() + 1),
+                            std::move_iterator<iter_t>(checkExprsNotArray.end()),
+                            std::move(checkExprsNotArray.front()),
+                            [](auto&& acc, auto&& ex) {
+                                return sbe::makeE<sbe::EPrimBinary>(
+                                    sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
+                            });
+        auto setExpr = buildMultiBranchConditional(
+            CaseValuePair{std::move(checkNullAnyArgument),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{std::move(checkNotArrayAnyArgument),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5126900},
+                                                 str::stream() << "All operands of $" << setFunction
+                                                               << " must be arrays.")},
+            sbe::makeE<sbe::EFunction>(setFunction, std::move(argVars)));
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(setExpr)));
     }
 
     void unsupportedExpression(const char* op) const {

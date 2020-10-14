@@ -840,6 +840,35 @@ void readKeyStringValueIntoAccessors(const KeyString::Value& keyString,
     valBuilder.readValues(accessors);
 }
 
+std::pair<TypeTags, Value> arrayToSet(TypeTags tag, Value val) {
+    if (!isArray(tag)) {
+        return {value::TypeTags::Nothing, 0};
+    }
+    switch (tag) {
+        case TypeTags::ArraySet: {
+            return makeCopyArraySet(*getArraySetView(val));
+        }
+        case TypeTags::Array:
+        case TypeTags::bsonArray: {
+            auto [setTag, setVal] = makeNewArraySet();
+            ValueGuard guard{setTag, setVal};
+            auto setView = getArraySetView(setVal);
+
+            auto arrIter = ArrayEnumerator{tag, val};
+            while (!arrIter.atEnd()) {
+                auto [elTag, elVal] = arrIter.getViewOfValue();
+                auto [copyTag, copyVal] = copyValue(elTag, elVal);
+                setView->push_back(copyTag, copyVal);
+                arrIter.advance();
+            }
+            guard.reset();
+            return {setTag, setVal};
+        }
+
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 }  // namespace value
 }  // namespace sbe
 }  // namespace mongo

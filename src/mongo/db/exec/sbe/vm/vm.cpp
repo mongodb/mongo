@@ -1773,6 +1773,38 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(uint
     return {false, value::TypeTags::Boolean, false};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(uint8_t arity) {
+    auto [_, tag, val] = getFromStack(0);
+    if (!value::isArray(tag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [resTag, resVal] = arrayToSet(tag, val);
+    if (arity == 1) {
+        return {true, resTag, resVal};
+    }
+    value::ValueGuard resGuard{resTag, resVal};
+    auto resView = value::getArraySetView(resVal);
+
+    for (size_t idx = 1; idx < arity; ++idx) {
+        auto [argOwned, argTag, argVal] = getFromStack(idx);
+        if (!value::isArray(argTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        auto arrIter = value::ArrayEnumerator{argTag, argVal};
+        while (!arrIter.atEnd()) {
+            auto [elTag, elVal] = arrIter.getViewOfValue();
+            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
+            resView->push_back(copyTag, copyVal);
+            arrIter.advance();
+        }
+    }
+
+    resGuard.reset();
+    return {true, resTag, resVal};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
     switch (f) {
@@ -1870,6 +1902,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinIndexOfCP(arity);
         case Builtin::isTimezone:
             return builtinIsTimezone(arity);
+        case Builtin::setUnion:
+            return builtinSetUnion(arity);
     }
 
     MONGO_UNREACHABLE;
