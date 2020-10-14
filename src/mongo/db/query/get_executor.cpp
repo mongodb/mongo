@@ -305,7 +305,21 @@ void fillOutPlannerParams(OperationContext* opCtx,
         auto collDesc = CollectionShardingState::get(opCtx, canonicalQuery->nss())
                             ->getCollectionDescription(opCtx);
         if (collDesc.isSharded()) {
-            plannerParams->shardKey = collDesc.getKeyPattern();
+            const auto& keyPattern = collDesc.getKeyPattern();
+            ShardKeyPattern shardKeyPattern(keyPattern);
+
+            // If the shard key is specified exactly, the query is guaranteed to only target one
+            // shard. Shards cannot own orphans for the key ranges they own, so there is no need
+            // to include a shard filtering stage. By omitting the shard filter, it may be possible
+            // to get a more efficient plan (for example, a COUNT_SCAN may be used if the query is
+            // eligible).
+            const BSONObj extractedKey = shardKeyPattern.extractShardKeyFromQuery(*canonicalQuery);
+
+            if (extractedKey.isEmpty()) {
+                plannerParams->shardKey = keyPattern;
+            } else {
+                plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
+            }
         } else {
             // If there's no metadata don't bother w/the shard filter since we won't know what
             // the key pattern is anyway...
