@@ -27,9 +27,14 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/db/operation_cpu_timer.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
@@ -157,6 +162,53 @@ DEATH_TEST_F(OperationCPUTimerTest, GetElapsedForPausedTimer, "Not attached to c
     timer->start();
     auto client = Client::releaseCurrent();
     timer->getElapsed();
+}
+
+TEST_F(OperationCPUTimerTest, TimerPausesOnBlockingSleep) {
+    // This test checks if the time measured by `OperationCPUTimer` does not include the period of
+    // time the operation was blocked (e.g., waiting on a condition variable). The idea is to have
+    // the operation block for `kSomeDelay`, ensure the elapsed time observed by the timer is always
+    // less than `kSomeDelay`, and repeat the test `kRepeats` times. To account for the sporadic
+    // wake ups, the test does not fail unless the number of failures exceeds `kMaxFailures`. This
+    // is just a best-effort, and the number of failures is not guaranteed to not exceed the upper
+    // bound (i.e., `kMaxFailures`).
+    const auto kSomeDelay = Milliseconds(1);
+    const auto kRepeats = 1000;
+    const auto kMaxFailureRate = 0.1;
+    const auto kMaxFailures = kMaxFailureRate * kRepeats;
+
+    auto timer = getTimer();
+
+    auto checkTimer = [&] {
+        auto elapsed = timer->getElapsed();
+        if (elapsed < kSomeDelay)
+            return true;
+        LOGV2_WARNING(5160101,
+                      "Elapsed operation time exceeded the upper bound",
+                      "elapsed"_attr = elapsed,
+                      "delay"_attr = kSomeDelay);
+        return false;
+    };
+
+    auto failures = 0;
+    for (auto i = 0; i < kRepeats; i++) {
+        timer->start();
+        sleepFor(kSomeDelay);
+        if (!checkTimer())
+            failures++;
+        timer->stop();
+
+        stdx::condition_variable cv;
+        auto mutex = MONGO_MAKE_LATCH("TimerPausesOnBlockingSleep");
+        timer->start();
+        stdx::unique_lock lk(mutex);
+        cv.wait_for(lk, kSomeDelay.toSystemDuration(), [] { return false; });
+        if (!checkTimer())
+            failures++;
+        timer->stop();
+    }
+
+    ASSERT_LTE(failures, kMaxFailures);
 }
 
 #else

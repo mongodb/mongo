@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 #include <boost/optional.hpp>
 #include <fmt/format.h>
 
@@ -39,6 +41,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
@@ -46,11 +49,22 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 #if defined(__linux__)
 
 namespace {
 
-using namespace fmt::literals;
+// Reads the thread timer, and throws with `InternalError` if that fails.
+Nanoseconds getThreadCPUTime() {
+    struct timespec t;
+    if (auto ret = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t); ret != 0) {
+        int ec = errno;
+        internalAssert(Status(ErrorCodes::InternalError,
+                              "Unable to get time: {}"_format(errnoWithDescription(ec))));
+    }
+    return Seconds(t.tv_sec) + Nanoseconds(t.tv_nsec);
+}
 
 MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadAttach);
 MONGO_FAIL_POINT_DEFINE(hangCPUTimerAfterOnThreadDetach);
@@ -132,14 +146,13 @@ void PosixTimer::onThreadDetach() {
     hangCPUTimerAfterOnThreadDetach.pauseWhileSet();
 }
 
-Nanoseconds PosixTimer::_getThreadTime() const {
-    struct timespec t;
-    if (auto ret = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t); ret != 0) {
-        int ec = errno;
-        internalAssert(Status(ErrorCodes::InternalError,
-                              "Unable to get time: {}"_format(errnoWithDescription(ec))));
-    }
-    return Seconds(t.tv_sec) + Nanoseconds(t.tv_nsec);
+Nanoseconds PosixTimer::_getThreadTime() const try {
+    return getThreadCPUTime();
+} catch (const ExceptionFor<ErrorCodes::InternalError>& ex) {
+    // Abort the process as the timer cannot account for the elapsed time. This path is only
+    // reachable if the platform supports CPU time measurement at startup, but returns an error
+    // for a subsequent attempt to get thread-specific CPU consumption.
+    LOGV2_FATAL(4744601, "Failed to read the CPU time for the current thread", "error"_attr = ex);
 }
 
 static auto getCPUTimer = OperationContext::declareDecoration<PosixTimer>();
@@ -154,7 +167,17 @@ OperationCPUTimer* OperationCPUTimer::get(OperationContext* opCtx) {
     // of SMP systems.
     static bool isTimeSupported = [] {
         clockid_t cid;
-        return clock_getcpuclockid(0, &cid) == 0;
+        if (clock_getcpuclockid(0, &cid) != 0)
+            return false;
+
+        try {
+            getThreadCPUTime();
+        } catch (const ExceptionFor<ErrorCodes::InternalError>&) {
+            // Unable to collect the CPU time for the current thread.
+            return false;
+        }
+
+        return true;
     }();
 
     if (!isTimeSupported)
