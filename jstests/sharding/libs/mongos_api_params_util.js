@@ -599,12 +599,18 @@ let MongosAPIParametersUtil = (function() {
                     inAPIVersion1: true,
                     shardCommandName: "killCursors",
                     permittedInTxn: false,
+                    // Global setup puts one doc on shard 0, we need several.
                     setUp: () => assert.commandWorked(st.s0.getDB("db").runCommand(
-                        {insert: "collection", documents: [{}, {}, {}]})),
+                        {insert: "collection", documents: [{_id: 1}, {_id: 2}, {_id: 3}]})),
                     command:
                         () => {
+                            // Some extra logging should this test case ever fail.
+                            setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                            {"command": {"verbosity": 2}});
                             const res = assert.commandWorked(
                                 st.s0.getDB("db").runCommand({find: "collection", batchSize: 1}));
+                            setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                            {"command": {"verbosity": 0}});
                             jsTestLog(`"find" reply: ${tojson(res)}`);
                             const cursorId = res.cursor.id;
                             return {killCursors: "collection", cursors: [cursorId]};
@@ -639,28 +645,43 @@ let MongosAPIParametersUtil = (function() {
                 permittedInTxn: false,
                 runsAgainstAdminDb: true,
                 setUp: (context) => {
-                    function threadRoutine({connStr}) {
+                    function threadRoutine(connStr, uuidStr) {
                         const client = new Mongo(connStr);
-                        jsTestLog(`Calling find on "${connStr}" from thread`);
+                        jsTestLog(`Calling find on "${connStr}" from thread,` +
+                                  ` with comment ${uuidStr}`);
+                        // Target shard 0 with an _id filter.
                         const res = client.getDB("db").runCommand({
                             find: "collection",
-                            filter: {$where: "sleep(99999999); return true;"},
-                            comment: "foo"
+                            filter: {_id: {$lt: 10}, $where: "sleep(99999999); return true;"},
+                            comment: uuidStr
                         });
                         jsTestLog(`Called find command: ${tojson(res)}`);
                     }
 
-                    context.thread = new Thread(threadRoutine, {connStr: st.s0.host});
+                    // Some extra logging should this test case ever fail.
+                    setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                    {"command": {"verbosity": 2}});
+
+                    const uuidStr = UUID().toString();
+                    context.thread = new Thread(threadRoutine, st.s0.host, uuidStr);
                     context.thread.start();
                     const adminDb = st.s0.getDB("admin");
 
+                    jsTestLog(`Waiting for "find" with comment ${uuidStr} in currentOp`);
                     assert.soon(() => {
-                        const inprog = adminDb.currentOp({"command.comment": "foo"}).inprog;
+                        const inprog = adminDb.currentOp({"command.comment": uuidStr}).inprog;
                         if (inprog.length === 1) {
+                            jsTestLog(`Found it! findOpId ${inprog[0].opid}`);
                             context.findOpId = inprog[0].opid;
                             return true;
                         }
+
+                        assert.lt(inprog.length,
+                                  2,
+                                  `More than one command found in currentOp: ${tojson(inprog)}`);
                     });
+                    setLogVerbosity([st.s0, st.rs0.getPrimary(), st.rs1.getPrimary()],
+                                    {"command": {"verbosity": 0}});
                 },
                 command: (context) => ({killOp: 1, op: context.findOpId}),
                 cleanUp: (context) => {
@@ -1293,38 +1314,47 @@ let MongosAPIParametersUtil = (function() {
     })();
 
     function checkPrimaryLog(conn, commandName, apiVersion, apiStrict, apiDeprecationErrors) {
-        const logs = checkLog.getGlobalLog(conn);
-        let lastCommandInvocation;
+        let msg;
+        assert.soon(
+            () => {
+                const logs = checkLog.getGlobalLog(conn);
+                let lastCommandInvocation;
 
-        for (let logMsg of logs) {
-            const obj = JSON.parse(logMsg);
-            // Search for "About to run the command" logs.
-            if (obj.id !== 21965)
-                continue;
+                for (let logMsg of logs) {
+                    const obj = JSON.parse(logMsg);
+                    // Search for "About to run the command" logs.
+                    if (obj.id !== 21965)
+                        continue;
 
-            const args = obj.attr.commandArgs;
-            if (commandName !== Object.keys(args)[0])
-                continue;
+                    const args = obj.attr.commandArgs;
+                    if (commandName !== Object.keys(args)[0])
+                        continue;
 
-            lastCommandInvocation = args;
-            if (args.apiVersion !== apiVersion || args.apiStrict !== apiStrict ||
-                args.apiDeprecationErrors !== apiDeprecationErrors)
-                continue;
+                    lastCommandInvocation = args;
+                    if (args.apiVersion !== apiVersion || args.apiStrict !== apiStrict ||
+                        args.apiDeprecationErrors !== apiDeprecationErrors)
+                        continue;
 
-            // Found a match.
-            return;
-        }
+                    // Found a match.
+                    return true;
+                }
 
-        if (lastCommandInvocation === undefined) {
-            doassert(`Primary didn't log ${commandName}`);
-            return;
-        }
+                if (lastCommandInvocation === undefined) {
+                    msg = `Primary didn't log ${commandName}`;
+                    return false;
+                }
 
-        doassert(`Primary didn't log ${commandName} with apiVersion ${apiVersion},` +
-                 ` apiStrict ${apiStrict},` +
-                 ` apiDeprecationErrors ${apiDeprecationErrors}.` +
-                 ` Last invocation of ${commandName} was` +
-                 ` ${tojson(lastCommandInvocation)}`);
+                msg = `Primary didn't log ${commandName} with apiVersion ${apiVersion},` +
+                    ` apiStrict ${apiStrict},` +
+                    ` apiDeprecationErrors ${apiDeprecationErrors}.` +
+                    ` Last invocation of ${commandName} was` +
+                    ` ${tojson(lastCommandInvocation)}`;
+                return false;
+            },
+            // assert.soon message function.
+            () => {
+                return msg;
+            });
     }
 
     function runTests({inTransaction, shardedCollection}) {
@@ -1392,7 +1422,7 @@ let MongosAPIParametersUtil = (function() {
                 assert.commandWorked(
                     st.s.adminCommand({shardCollection: "db.collection", key: {_id: 1}}));
 
-                // The chunk with _id 1 is on shard 0.
+                // The chunk with _id 0 is on shard 0.
                 assert.commandWorked(
                     st.s.adminCommand({split: "db.collection", middle: {_id: 10}}));
                 assert.commandWorked(st.s.adminCommand({
@@ -1445,20 +1475,23 @@ let MongosAPIParametersUtil = (function() {
             flushRoutersAndRefreshShardMetadata(st, {ns: "db.collection"});
 
             jsTestLog(`Running ${message}`);
-            setLogVerbosity([configPrimary, shardZeroPrimary], {"command": {"verbosity": 2}});
+            setLogVerbosity([configPrimary, shardZeroPrimary, st.rs1.getPrimary()],
+                            {"command": {"verbosity": 2}});
 
             if (inTransaction) {
                 const session = st.s0.startSession();
                 const sessionDb = session.getDatabase(commandDbName);
                 session.startTransaction();
-                assert.commandWorked(sessionDb.runCommand(commandWithAPIParams));
+                const res = sessionDb.runCommand(commandWithAPIParams);
+                jsTestLog(`Command result: ${tojson(res)}`);
+                assert.commandWorked(res);
                 assert.commandWorked(session.commitTransaction_forTesting());
             } else {
                 const db = st.s0.getDB(commandDbName);
-                assert.commandWorked(db.runCommand(commandWithAPIParams));
+                const res = db.runCommand(commandWithAPIParams);
+                jsTestLog(`Command result: ${tojson(res)}`);
+                assert.commandWorked(res);
             }
-
-            setLogVerbosity([configPrimary, shardZeroPrimary], {"command": {"verbosity": 0}});
 
             const configServerCommandName = runOrExplain.configServerCommandName;
             const shardCommandName = runOrExplain.shardCommandName;
@@ -1480,6 +1513,9 @@ let MongosAPIParametersUtil = (function() {
                                 apiStrict,
                                 apiDeprecationErrors);
             }
+
+            setLogVerbosity([configPrimary, shardZeroPrimary, st.rs1.getPrimary()],
+                            {"command": {"verbosity": 0}});
 
             st.s0.getDB("db").runCommand({dropDatabase: 1});
             if (runOrExplain.cleanUp) {
