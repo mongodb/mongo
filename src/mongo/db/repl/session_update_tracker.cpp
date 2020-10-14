@@ -69,7 +69,8 @@ OplogEntry createOplogEntryForTransactionTableUpdate(repl::OpTime opTime,
                             boost::none,   // prevWriteOpTime
                             boost::none,   // preImageOpTime
                             boost::none,   // postImageOpTime
-                            boost::none);  // destinedRecipient
+                            boost::none,   // destinedRecipient
+                            boost::none);  // _id
 }
 
 /**

@@ -387,7 +387,8 @@ public:
                                 prevOpTime,      // optime of previous write within same transaction
                                 preImageOpTime,  // pre-image optime
                                 boost::none,     // post-image optime
-                                boost::none);    // ShardId of resharding recipient
+                                boost::none,     // ShardId of resharding recipient
+                                boost::none);    // _id
     }
 
     /**
@@ -1223,7 +1224,8 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
                          applyOpsOpTime,  // optime of previous write within same transaction
                          boost::none,     // pre-image optime
                          boost::none,     // post-image optime
-                         boost::none);    // ShardId of resharding recipient
+                         boost::none,     // ShardId of resharding recipient
+                         boost::none);    // _id
 
     // When the DocumentSourceChangeStreamTransform sees the "commitTransaction" oplog entry, we
     // expect it to return the insert op within our 'preparedApplyOps' oplog entry.
@@ -1421,7 +1423,8 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
                          applyOpsOpTime2,  // optime of previous write within same transaction
                          boost::none,      // pre-image optime
                          boost::none,      // post-image optime
-                         boost::none);     // ShardId of resharding recipient
+                         boost::none,      // ShardId of resharding recipient
+                         boost::none);     // _id
 
     // We do not use the checkTransformation() pattern that other tests use since we expect multiple
     // documents to be returned from one applyOps.

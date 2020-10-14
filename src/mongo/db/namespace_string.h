@@ -139,6 +139,9 @@ public:
     // Namespace for vector clock state.
     static const NamespaceString kVectorClockNamespace;
 
+    // Namespace for storing oplog applier progress for resharding.
+    static const NamespaceString kReshardingApplierProgressNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

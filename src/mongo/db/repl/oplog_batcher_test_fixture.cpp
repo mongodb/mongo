@@ -186,7 +186,8 @@ OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::option
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
                       boost::none,   // post-image optime
-                      boost::none);  // ShardId of resharding recipient
+                      boost::none,   // ShardId of resharding recipient
+                      boost::none);  // _id
 }
 
 /**
@@ -219,7 +220,8 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
                       boost::none,   // post-image optime
-                      boost::none);  // ShardId of resharding recipient
+                      boost::none,   // ShardId of resharding recipient
+                      boost::none);  // _id
 }
 
 /**
@@ -252,7 +254,8 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
                       boost::none,   // post-image optime
-                      boost::none);  // ShardId of resharding recipient
+                      boost::none,   // ShardId of resharding recipient
+                      boost::none);  // _id
 }
 
 /**
@@ -312,7 +315,8 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
                       prevWriteOpTime,  // optime of previous write within same transaction
                       boost::none,      // pre-image optime
                       boost::none,      // post-image optime
-                      boost::none);     // ShardId of resharding recipient
+                      boost::none,      // ShardId of resharding recipient
+                      boost::none);     // _id
 }
 
 /**

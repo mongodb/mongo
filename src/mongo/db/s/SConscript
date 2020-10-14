@@ -95,6 +95,7 @@ env.Library(
         'start_chunk_clone_request.cpp',
         env.Idlc('migration_coordinator_document.idl')[0],
         env.Idlc('range_deletion_task.idl')[0],
+        env.Idlc('resharding/resharding_oplog_applier_progress.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',

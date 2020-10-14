@@ -2444,7 +2444,8 @@ public:
                                 boost::none,    // optime of previous write within same transaction
                                 boost::none,    // pre-image optime
                                 boost::none,    // post-image optime
-                                boost::none);   // ShardId of resharding recipient
+                                boost::none,    // ShardId of resharding recipient
+                                boost::none);   // _id
     }
 
     /**
@@ -2473,7 +2474,8 @@ public:
                                 boost::none,    // optime of previous write within same transaction
                                 boost::none,    // pre-image optime
                                 boost::none,    // post-image optime
-                                boost::none);   // ShardId of resharding recipient
+                                boost::none,    // ShardId of resharding recipient
+                                boost::none);   // _id
     }
 
     void checkTxnTable(const OperationSessionInfo& sessionInfo,

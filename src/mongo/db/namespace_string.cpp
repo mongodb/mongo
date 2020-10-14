@@ -102,6 +102,8 @@ const NamespaceString NamespaceString::kConfigSettingsNamespace(NamespaceString:
 const NamespaceString NamespaceString::kVectorClockNamespace(NamespaceString::kConfigDb,
                                                              "vectorClock");
 
+const NamespaceString NamespaceString::kReshardingApplierProgressNamespace(
+    NamespaceString::kConfigDb, "localReshardingOperations.recipient.progress_applier");
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;

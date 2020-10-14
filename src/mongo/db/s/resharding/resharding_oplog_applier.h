@@ -34,6 +34,7 @@
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
+#include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -50,6 +51,7 @@ class ThreadPool;
 class ReshardingOplogApplier {
 public:
     ReshardingOplogApplier(ServiceContext* service,
+                           ReshardingOplogSourceId sourceId,
                            NamespaceString oplogNs,
                            NamespaceString nsBeingResharded,
                            UUID collUUIDBeingResharded,
@@ -74,6 +76,9 @@ public:
      * It is undefined to call applyUntilDone more than once.
      */
     Future<void> applyUntilDone();
+
+    static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
+        OperationContext* opCtx, const ReshardingOplogSourceId& id);
 
 private:
     using OplogBatch = std::vector<repl::OplogEntry>;
@@ -130,7 +135,16 @@ private:
      */
     void _onError(Status status);
 
+    /**
+     * Records the progress made by this applier to storage. Returns the timestamp of the progress
+     * recorded.
+     */
+    Timestamp _clearAppliedOpsAndStoreProgress(OperationContext* opCtx);
+
     static constexpr auto kClientName = "ReshardingOplogApplier"_sd;
+
+    // Identifier for the oplog source.
+    const ReshardingOplogSourceId _sourceId;
 
     // Namespace that contains the oplog from a source shard that this is going to apply.
     const NamespaceString _oplogNs;

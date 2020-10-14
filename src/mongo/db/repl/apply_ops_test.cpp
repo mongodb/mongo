@@ -354,7 +354,8 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, const BSONObj& oField) {
                       boost::none,   // optime of previous write within same transaction
                       boost::none,   // pre-image optime
                       boost::none,   // post-image optime
-                      boost::none);  // ShardId of resharding recipient
+                      boost::none,   // ShardId of resharding recipient
+                      boost::none);  // _id
 }
 
 TEST_F(ApplyOpsTest, ExtractOperationsReturnsTypeMismatchIfNotCommand) {

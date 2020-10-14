@@ -75,7 +75,8 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             boost::none,      // optime of previous write within same transaction
                             preImageOpTime,   // pre-image optime
                             postImageOpTime,  // post-image optime
-                            boost::none);     // ShardId of resharding recipient
+                            boost::none,      // ShardId of resharding recipient
+                            boost::none);     // _id
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {

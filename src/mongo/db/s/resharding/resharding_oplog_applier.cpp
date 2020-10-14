@@ -36,6 +36,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator_interface.h"
 #include "mongo/logv2/log.h"
@@ -51,6 +52,7 @@ using namespace fmt::literals;
 
 ReshardingOplogApplier::ReshardingOplogApplier(
     ServiceContext* service,
+    ReshardingOplogSourceId sourceId,
     NamespaceString oplogNs,
     NamespaceString nsBeingResharded,
     UUID collUUIDBeingResharded,
@@ -59,7 +61,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     size_t batchSize,
     OutOfLineExecutor* executor,
     ThreadPool* writerPool)
-    : _oplogNs(std::move(oplogNs)),
+    : _sourceId(std::move(sourceId)),
+      _oplogNs(std::move(oplogNs)),
       _nsBeingResharded(std::move(nsBeingResharded)),
       _uuidBeingResharded(std::move(collUUIDBeingResharded)),
       _outputNs(_nsBeingResharded.db(),
@@ -142,8 +145,6 @@ void ReshardingOplogApplier::_scheduleNextBatch() {
         }
     }
 
-    _currentBatchToApply.clear();
-
     auto scheduleBatchClient = _service->makeClient(kClientName.toString());
     AlternativeClientRegion acr(scheduleBatchClient);
     auto opCtx = cc().makeOperationContext();
@@ -177,14 +178,22 @@ void ReshardingOplogApplier::_scheduleNextBatch() {
             return _applyBatch(applyBatchOpCtx.get());
         })
         .then([this]() {
-            auto lastApplied = _currentBatchToApply.back();
+            if (!_currentBatchToApply.empty()) {
+                auto lastApplied = _currentBatchToApply.back();
 
-            if (_stage == ReshardingOplogApplier::Stage::kStarted &&
-                lastApplied.getTimestamp() >= _reshardingCloneFinishedTs) {
-                _stage = ReshardingOplogApplier::Stage::kReachedCloningTS;
-                // TODO: SERVER-51741 preemptively schedule next batch
-                _appliedCloneFinishTsPromise.emplaceValue();
-                return;
+                auto scheduleBatchClient = _service->makeClient(kClientName.toString());
+                AlternativeClientRegion acr(scheduleBatchClient);
+                auto opCtx = cc().makeOperationContext();
+
+                auto lastAppliedTs = _clearAppliedOpsAndStoreProgress(opCtx.get());
+
+                if (_stage == ReshardingOplogApplier::Stage::kStarted &&
+                    lastAppliedTs >= _reshardingCloneFinishedTs) {
+                    _stage = ReshardingOplogApplier::Stage::kReachedCloningTS;
+                    // TODO: SERVER-51741 preemptively schedule next batch
+                    _appliedCloneFinishTsPromise.emplaceValue();
+                    return;
+                }
             }
 
             _executor->schedule([this](Status scheduleNextBatchStatus) {
@@ -336,7 +345,8 @@ void ReshardingOplogApplier::_preProcessAndPushOpsToBuffer(repl::OplogEntry oplo
                                      oplog.getPrevWriteOpTimeInTransaction(),
                                      oplog.getPreImageOpTime(),
                                      oplog.getPostImageOpTime(),
-                                     oplog.getDestinedRecipient());
+                                     oplog.getDestinedRecipient(),
+                                     oplog.get_id());
 
     _currentBatchToApply.push_back(std::move(newOplog));
 }
@@ -381,6 +391,45 @@ void ReshardingOplogApplier::_onWriterVectorDone(Status status) {
             _currentApplyBatchPromise.setError(*finalStatus);
         }
     }
+}
+
+boost::optional<ReshardingOplogApplierProgress> ReshardingOplogApplier::checkStoredProgress(
+    OperationContext* opCtx, const ReshardingOplogSourceId& id) {
+    DBDirectClient client(opCtx);
+    auto doc = client.findOne(
+        NamespaceString::kReshardingApplierProgressNamespace.ns(),
+        BSON(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << id.toBSON()));
+
+    if (doc.isEmpty()) {
+        return boost::none;
+    }
+
+    IDLParserErrorContext ctx("ReshardingOplogApplierProgress");
+    return ReshardingOplogApplierProgress::parse(ctx, doc);
+}
+
+Timestamp ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* opCtx) {
+    const auto& lastOplog = _currentBatchToApply.back();
+
+    auto oplogId =
+        ReshardingDonorOplogId::parse(IDLParserErrorContext("ReshardingOplogApplierStoreProgress"),
+                                      lastOplog.get_id()->getDocument().toBson());
+
+    // TODO: take multi statement transactions into account.
+
+    auto lastAppliedTs = lastOplog.getTimestamp();
+
+    PersistentTaskStore<ReshardingOplogApplierProgress> store(
+        NamespaceString::kReshardingApplierProgressNamespace);
+    store.upsert(
+        opCtx,
+        QUERY(ReshardingOplogApplierProgress::kOplogSourceIdFieldName << _sourceId.toBSON()),
+        BSON("$set" << BSON(ReshardingOplogApplierProgress::kProgressFieldName
+                            << oplogId.toBSON())));
+
+    _currentBatchToApply.clear();
+
+    return lastAppliedTs;
 }
 
 }  // namespace mongo

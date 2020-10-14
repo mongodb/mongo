@@ -71,7 +71,7 @@ public:
     }
 
     /**
-     * Makes this iterator throw an error when calling getNext with only single item left in the
+     * Makes this iterator throw an error when calling getNext with only a single item left in the
      * buffer. This allows simulating an exception being thrown at different points in time.
      */
     void setThrowWhenSingleItem() {
@@ -113,6 +113,7 @@ public:
                                repl::OpTypeEnum opType,
                                const BSONObj& obj1,
                                const boost::optional<BSONObj> obj2) {
+        ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
         return repl::OplogEntry(opTime,
                                 boost::none /* hash */,
                                 opType,
@@ -129,7 +130,8 @@ public:
                                 boost::none /* prevWrite */,
                                 boost::none /* preImage */,
                                 boost::none /* postImage */,
-                                kMyShardId);
+                                kMyShardId,
+                                Value(id.toBSON()));
     }
 
     const NamespaceString& oplogNs() {
@@ -152,6 +154,10 @@ public:
         return _executor.get();
     }
 
+    const ReshardingOplogSourceId& sourceId() {
+        return _sourceId;
+    }
+
 private:
     static constexpr int kWriterPoolSize = 4;
     const NamespaceString kOplogNs{"config.localReshardingOplogBuffer.xxx.yyy"};
@@ -160,6 +166,8 @@ private:
     const NamespaceString kAppliedToNs{"foo", "system.resharding.{}"_format(kCrudUUID.toString())};
     const ShardId kMyShardId{"shard1"};
     UUID _crudNsUuid = UUID::gen();
+
+    const ReshardingOplogSourceId _sourceId{UUID::gen(), kMyShardId};
 
     std::unique_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::unique_ptr<ThreadPool> _writerPool;
@@ -170,12 +178,13 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
 
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -207,12 +216,13 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -234,6 +244,11 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "x" << 1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
@@ -248,6 +263,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
@@ -270,6 +286,11 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 9));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
 
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+
     future = applier.applyUntilDone();
     future.get();
 
@@ -277,6 +298,11 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
         doc = client.findOne(appliedToNs().ns(), BSON("_id" << x));
         ASSERT_BSONOBJ_EQ(BSON("_id" << x), doc);
     }
+
+    progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(19, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(19, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
@@ -292,12 +318,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(7, 3),
                                    std::move(iterator),
-                                   4,
+                                   4 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -308,6 +335,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_FALSE(progressDoc);
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
@@ -331,12 +361,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -356,6 +387,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSON("_id" << 3), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
@@ -369,12 +405,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
     iterator->setThrowWhenSingleItem();
 
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -385,6 +422,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_FALSE(progressDoc);
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
@@ -406,12 +446,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
     iterator->setThrowWhenSingleItem();
 
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -424,6 +465,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
@@ -441,12 +487,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
     iterator->setThrowWhenSingleItem();
 
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(8, 3),
                                    std::move(iterator),
-                                   4,
+                                   4 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -457,6 +504,9 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_FALSE(progressDoc);
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
@@ -482,12 +532,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
     iterator->setThrowWhenSingleItem();
 
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -501,6 +552,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
@@ -522,12 +578,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
     iterator->setThrowWhenSingleItem();
 
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(7, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -544,6 +601,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
@@ -573,12 +635,13 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
     iterator->setThrowWhenSingleItem();
 
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -604,6 +667,11 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
 
     doc = client.findOne(appliedToNs().ns(), BSON("_id" << 5));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
@@ -615,12 +683,13 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
-                                   4,
+                                   4 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -632,6 +701,9 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_FALSE(progressDoc);
 }
 
 TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
@@ -651,12 +723,13 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -671,6 +744,11 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
 }
 
 TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
@@ -682,12 +760,13 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
-                                   4,
+                                   4 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -699,6 +778,9 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_FALSE(progressDoc);
 }
 
 TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
@@ -718,12 +800,13 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
     ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
-                                   2,
+                                   2 /* batchSize */,
                                    getExecutor(),
                                    writerPool());
 
@@ -739,6 +822,11 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
 }
 
 }  // unnamed namespace
