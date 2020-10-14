@@ -554,6 +554,9 @@ function RollbackTest(name = "RollbackTest", replSet) {
         const start = new Date();
         transitionIfAllowed(State.kSyncSourceOpsDuringRollback);
 
+        // Wait for expected states in case the secondary is starting up.
+        rst.awaitSecondaryNodes(null, [curSecondary]);
+
         log(`Reconnecting the secondary ${curSecondary.host} so it'll go into rollback`);
         // Reconnect the rollback node to the current primary, which is the node we want to sync
         // from. If we reconnect to both the current primary and the tiebreaker node, the rollback
