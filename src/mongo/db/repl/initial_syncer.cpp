@@ -1802,6 +1802,11 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
     // Complete.
     _retryingOperation = boost::none;
 
+    // Canceling an attempt sometimes results in a ShutdownInProgress code, which callers don't
+    // expect.  Convert that to CallbackCanceled.
+    if (!lastApplied.isOK() && lastApplied.getStatus().code() == ErrorCodes::ShutdownInProgress) {
+        lastApplied = Status(ErrorCodes::CallbackCanceled, lastApplied.getStatus().reason());
+    }
     // Completion callback must be invoked outside mutex.
     try {
         onCompletion(lastApplied);
