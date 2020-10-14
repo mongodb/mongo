@@ -846,7 +846,6 @@ functions:
   "upload debugsymbols": &upload_debugsymbols
     command: s3.put
     params:
-      optional: true
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/mongo-debugsymbols.${ext|tgz}
