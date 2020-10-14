@@ -403,7 +403,7 @@ void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Names
 
     // Mark the collection as dropped
     CollectionType coll;
-    coll.setNs(nss);
+    coll.setNss(nss);
     coll.setDropped(true);
     coll.setEpoch(ChunkVersion::DROPPED().epoch());
     coll.setUpdatedAt(Grid::get(opCtx)->getNetwork()->now());
@@ -486,13 +486,13 @@ void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(Operatio
         collType.setUUID(uuid);
 
         uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
-            opCtx, collType.getNs(), collType, false /* upsert */));
+            opCtx, collType.getNss(), collType, false /* upsert */));
         LOGV2_DEBUG(21932,
                     2,
                     "Updated entry in config.collections for sharded collection {namespace} "
                     "with UUID {generatedUUID}",
                     "Updated entry in config.collections for sharded collection",
-                    "namespace"_attr = collType.getNs(),
+                    "namespace"_attr = collType.getNss(),
                     "generatedUUID"_attr = uuid);
     }
 }
@@ -760,7 +760,7 @@ void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
         writeToConfigDocumentInTxn(opCtx,
                                    CollectionType::ConfigNS,
                                    buildUpdateOp(CollectionType::ConfigNS,
-                                                 BSON(CollectionType::fullNs(nss.ns())),
+                                                 BSON(CollectionType::kNssFieldName << nss.ns()),
                                                  coll.toBSON(),
                                                  upsert,
                                                  false /* multi */

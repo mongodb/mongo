@@ -35,7 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -88,12 +88,11 @@ using ReshardingFields = TypeCollectionReshardingFields;
  *   }
  *
  */
-class CollectionType {
+class CollectionType : public CollectionTypeBase {
 public:
     // Name of the collections collection in the config server.
     static const NamespaceString ConfigNS;
 
-    static const BSONField<std::string> fullNs;
     static const BSONField<OID> epoch;
     static const BSONField<Date_t> updatedAt;
     static const BSONField<BSONObj> keyPattern;
@@ -102,6 +101,10 @@ public:
     static const BSONField<UUID> uuid;
     static const BSONField<std::string> distributionMode;
     static const BSONField<ReshardingFields> reshardingFields;
+
+    explicit CollectionType(const BSONObj& obj);
+
+    CollectionType() = default;
 
     /**
      * Constructs a new CollectionType object from BSON. Also does validation of the contents.
@@ -132,11 +135,6 @@ public:
      * Returns a std::string representation of the current internal state.
      */
     std::string toString() const;
-
-    const NamespaceString& getNs() const {
-        return _fullNs.get();
-    }
-    void setNs(const NamespaceString& fullNs);
 
     OID getEpoch() const {
         return _epoch.get();
@@ -203,9 +201,6 @@ public:
     bool hasSameOptions(const CollectionType& other) const;
 
 private:
-    // Required full namespace (with the database prefix).
-    boost::optional<NamespaceString> _fullNs;
-
     // Required to disambiguate collection namespace incarnations.
     boost::optional<OID> _epoch;
 

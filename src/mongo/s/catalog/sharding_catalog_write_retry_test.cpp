@@ -409,7 +409,7 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryOnceSuccessAfterRetry) {
     configTargeter()->setFindHostReturnValue(host1);
 
     CollectionType collection;
-    collection.setNs(NamespaceString("db.coll"));
+    collection.setNss(NamespaceString("db.coll"));
     collection.setUpdatedAt(network()->now());
     collection.setUnique(true);
     collection.setEpoch(OID::gen());

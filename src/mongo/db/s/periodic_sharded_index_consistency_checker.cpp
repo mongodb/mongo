@@ -129,12 +129,11 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         opCtx, nullptr, nullptr, repl::ReadConcernLevel::kLocalReadConcern));
 
                 for (const auto& coll : collections) {
-
                     if (coll.getDropped()) {
                         continue;
                     }
 
-                    auto nss = coll.getNs();
+                    auto nss = coll.getNss();
 
                     // The only sharded collection in the config database with indexes is
                     // config.system.sessions. Unfortunately, the code path to run aggregation

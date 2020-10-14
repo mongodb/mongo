@@ -80,7 +80,7 @@ public:
         ASSERT_OK(_db.validate());
 
         // Set up the collections collection
-        _coll.setNs(_nss);
+        _coll.setNss(_nss);
         _coll.setEpoch(_epoch);
         _coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(ChunkVersion(1, 3, _epoch).toLong()));
         _coll.setKeyPattern(BSON("_id" << 1));

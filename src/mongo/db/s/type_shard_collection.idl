@@ -76,8 +76,8 @@ imports:
 
 structs:
     ShardCollectionTypeBase:
-        description: "Represents the layout and contents of documents contained in the shard
-                      server's config.collections collection."
+        description: "Represents the layout and contents of documents contained in the shard 
+                      server's config.cache.collections collection."
         fields:
             _id:
                 cpp_name: nss
@@ -133,4 +133,3 @@ structs:
                               collection is the temporary resharding collection."
                 type: TypeCollectionReshardingFields
                 optional: true
-

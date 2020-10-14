@@ -91,7 +91,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType expectedColl;
-    expectedColl.setNs(NamespaceString("TestDB.TestNS"));
+    expectedColl.setNss(NamespaceString("TestDB.TestNS"));
     expectedColl.setKeyPattern(BSON("KeyName" << 1));
     expectedColl.setUpdatedAt(Date_t());
     expectedColl.setEpoch(OID::gen());
@@ -99,7 +99,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
     auto future = launchAsync([this, &expectedColl] {
-        return assertGet(catalogClient()->getCollection(operationContext(), expectedColl.getNs()));
+        return assertGet(catalogClient()->getCollection(operationContext(), expectedColl.getNss()));
     });
 
     onFindWithMetadataCommand(
@@ -115,7 +115,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             // Ensure the query is correct
             ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(),
-                              BSON(CollectionType::fullNs(expectedColl.getNs().ns())));
+                              BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns()));
             ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
             ASSERT_EQ(query->getLimit().get(), 1);
 
@@ -773,7 +773,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1;
-    coll1.setNs(NamespaceString{"test.coll1"});
+    coll1.setNss(NamespaceString{"test.coll1"});
     coll1.setUpdatedAt(network()->now());
     coll1.setUnique(false);
     coll1.setEpoch(OID::gen());
@@ -781,7 +781,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     ASSERT_OK(coll1.validate());
 
     CollectionType coll2;
-    coll2.setNs(NamespaceString{"anotherdb.coll1"});
+    coll2.setNss(NamespaceString{"anotherdb.coll1"});
     coll2.setUpdatedAt(network()->now());
     coll2.setUnique(false);
     coll2.setEpoch(OID::gen());
@@ -839,14 +839,14 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
     CollectionType coll1;
-    coll1.setNs(NamespaceString{"test.coll1"});
+    coll1.setNss(NamespaceString{"test.coll1"});
     coll1.setUpdatedAt(network()->now());
     coll1.setUnique(true);
     coll1.setEpoch(OID::gen());
     coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
 
     CollectionType coll2;
-    coll2.setNs(NamespaceString{"test.coll2"});
+    coll2.setNss(NamespaceString{"test.coll2"});
     coll2.setUpdatedAt(network()->now());
     coll2.setUnique(false);
     coll2.setEpoch(OID::gen());
@@ -869,7 +869,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
-            b.appendRegex(CollectionType::fullNs(), "^test\\.");
+            b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
             ASSERT_BSONOBJ_EQ(query->getFilter(), b.obj());
         }
 
@@ -896,7 +896,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     });
 
     CollectionType validColl;
-    validColl.setNs(NamespaceString{"test.coll1"});
+    validColl.setNss(NamespaceString{"test.coll1"});
     validColl.setUpdatedAt(network()->now());
     validColl.setUnique(true);
     validColl.setEpoch(OID::gen());
@@ -915,7 +915,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
-            b.appendRegex(CollectionType::fullNs(), "^test\\.");
+            b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
             ASSERT_BSONOBJ_EQ(query->getFilter(), b.obj());
         }
 

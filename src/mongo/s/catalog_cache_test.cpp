@@ -134,7 +134,7 @@ protected:
         const auto scopedChunksProv = scopedChunksProvider(makeChunks(version));
 
         const auto swChunkManager =
-            _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNs());
+            _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
         ASSERT_OK(swChunkManager.getStatus());
     }
 
@@ -159,7 +159,7 @@ protected:
 
     CollectionType makeCollectionType(const ChunkVersion& collVersion) {
         CollectionType coll;
-        coll.setNs(kNss);
+        coll.setNss(kNss);
         coll.setEpoch(collVersion.epoch());
         coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
         coll.setUnique(false);

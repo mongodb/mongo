@@ -36,9 +36,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/type_shard_collection.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_shard_collection.h"
 
 namespace mongo {
 namespace {
@@ -67,8 +67,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
         builder.append(ShardCollectionType::kDefaultCollationFieldName, defaultCollation);
         builder.append(ShardCollectionType::kUniqueFieldName, kUnique);
 
-        ShardCollectionType shardCollectionType =
-            assertGet(ShardCollectionType::fromBSON(builder.obj()));
+        ShardCollectionType shardCollectionType(builder.obj());
         shardCollectionType.setUuid(uuid);
         shardCollectionType.setRefreshing(true);
 

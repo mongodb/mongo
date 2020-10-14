@@ -29,9 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/type_shard_collection.h"
-
 #include "mongo/bson/oid.h"
+#include "mongo/db/s/type_shard_collection.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
 
@@ -52,8 +51,8 @@ TEST(ShardCollectionType, FromBSONEmptyShardKeyFails) {
     builder.append(ShardCollectionType::kKeyPatternFieldName, BSONObj());
     builder.append(ShardCollectionType::kUniqueFieldName, true);
 
-    StatusWith<ShardCollectionType> status = ShardCollectionType::fromBSON(builder.obj());
-    ASSERT_EQ(status.getStatus().code(), ErrorCodes::ShardKeyNotFound);
+    ASSERT_THROWS_CODE(
+        ShardCollectionType(builder.obj()), DBException, ErrorCodes::ShardKeyNotFound);
 }
 
 TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhenBSONTimestamp) {
@@ -66,8 +65,7 @@ TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhen
     builder.append(ShardCollectionType::kUniqueFieldName, true);
     builder.append(ShardCollectionType::kLastRefreshedCollectionVersionFieldName, Timestamp());
 
-    ShardCollectionType shardCollType = assertGet(ShardCollectionType::fromBSON(builder.obj()));
-
+    ShardCollectionType shardCollType(builder.obj());
     ASSERT_EQ(epoch, shardCollType.getLastRefreshedCollectionVersion()->epoch());
 }
 
@@ -81,8 +79,7 @@ TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhen
     builder.append(ShardCollectionType::kUniqueFieldName, true);
     builder.append(ShardCollectionType::kLastRefreshedCollectionVersionFieldName, Date_t());
 
-    ShardCollectionType shardCollType = assertGet(ShardCollectionType::fromBSON(builder.obj()));
-
+    ShardCollectionType shardCollType(builder.obj());
     ASSERT_EQ(epoch, shardCollType.getLastRefreshedCollectionVersion()->epoch());
 }
 
@@ -119,7 +116,7 @@ TEST(ShardCollectionType, ReshardingFieldsIncluded) {
     BSONObj obj = shardCollType.toBSON();
     ASSERT(obj.hasField(ShardCollectionType::kReshardingFieldsFieldName));
 
-    auto shardCollTypeFromBSON = assertGet(ShardCollectionType::fromBSON(obj));
+    ShardCollectionType shardCollTypeFromBSON(obj);
     ASSERT(shardCollType.getReshardingFields());
     ASSERT_EQ(reshardingUuid, shardCollType.getReshardingFields()->getUuid());
 }

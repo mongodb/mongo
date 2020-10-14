@@ -139,7 +139,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
 
     const BSONObj collectionBSON = [&]() {
         CollectionType coll;
-        coll.setNs(nss);
+        coll.setNss(nss);
         coll.setEpoch(version.epoch());
         coll.setKeyPattern(shardKeyPattern.getKeyPattern());
         coll.setUnique(unique);
@@ -201,7 +201,7 @@ void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
                                                   boost::optional<UUID> uuid) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         CollectionType collType;
-        collType.setNs(nss);
+        collType.setNss(nss);
         collType.setEpoch(epoch);
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);

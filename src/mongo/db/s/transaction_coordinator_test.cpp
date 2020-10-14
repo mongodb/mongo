@@ -537,7 +537,6 @@ TEST_F(TransactionCoordinatorDriverTest,
     ASSERT_EQ(ErrorCodes::ReadConcernMajorityNotEnabled, decision.getAbortStatus()->code());
 }
 
-
 class TransactionCoordinatorDriverPersistenceTest : public TransactionCoordinatorDriverTest {
 protected:
     void setUp() override {

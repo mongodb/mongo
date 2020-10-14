@@ -97,7 +97,7 @@ protected:
         OID epoch,
         Date_t lastUpdated) {
         CollectionType collType;
-        collType.setNs(coordinatorDoc.getNss());
+        collType.setNss(coordinatorDoc.getNss());
 
         if (coordinatorDoc.getState() >= CoordinatorStateEnum::kCommitted &&
             coordinatorDoc.getState() != CoordinatorStateEnum::kError) {
@@ -266,7 +266,7 @@ protected:
             (expectedReshardingFields &&
              expectedReshardingFields->getState() >= CoordinatorStateEnum::kCommitted &&
              expectedReshardingFields->getState() != CoordinatorStateEnum::kError)) {
-            ASSERT_EQUALS(onDiskEntry.getNs(), _originalNss);
+            ASSERT_EQUALS(onDiskEntry.getNss(), _originalNss);
             ASSERT(onDiskEntry.getUUID().get() == _reshardingUUID);
             ASSERT_EQUALS(onDiskEntry.getKeyPattern().toBSON().woCompare(_newShardKey.toBSON()), 0);
             ASSERT_NOT_EQUALS(onDiskEntry.getEpoch(), _originalEpoch);

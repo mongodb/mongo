@@ -87,7 +87,7 @@ protected:
     CollectionType getDefaultCollectionType(OID epoch, const ShardKeyPattern& shardKeyPattern) {
         CollectionType collType;
 
-        collType.setNs(kNss);
+        collType.setNss(kNss);
         collType.setEpoch(epoch);
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);
@@ -232,7 +232,8 @@ TEST_F(CatalogCacheRefreshTest, CollectionBSONCorrupted) {
         FAIL(str::stream() << "Returning corrupted collection entry did not fail and returned "
                            << cm.toString());
     } catch (const DBException& ex) {
-        ASSERT_EQ(ErrorCodes::NoSuchKey, ex.code());
+        constexpr int kParseError = 40414;
+        ASSERT_EQ(ErrorCodes::Error(kParseError), ex.code());
     }
 }
 

@@ -37,13 +37,13 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/s/type_shard_collection.h"
+#include "mongo/db/s/type_shard_database.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/catalog/type_shard_collection.h"
-#include "mongo/s/catalog/type_shard_database.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -158,7 +158,7 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
         }
 
         BSONObj document = cursor->nextSafe();
-        return ShardCollectionType::fromBSON(document);
+        return ShardCollectionType(document);
     } catch (const DBException& ex) {
         return ex.toStatus(str::stream() << "Failed to read the '" << nss.ns()
                                          << "' entry locally from config.collections");

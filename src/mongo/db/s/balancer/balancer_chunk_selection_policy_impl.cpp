@@ -307,7 +307,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
             continue;
         }
 
-        const NamespaceString nss(coll.getNs());
+        const NamespaceString& nss(coll.getNss());
 
         auto candidatesStatus = _getSplitCandidatesForCollection(opCtx, nss, shardStats);
         if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
@@ -386,7 +386,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             continue;
         }
 
-        const NamespaceString nss(coll.getNs());
+        const NamespaceString& nss(coll.getNss());
 
         if (!coll.getAllowBalance()) {
             LOGV2_DEBUG(21851,

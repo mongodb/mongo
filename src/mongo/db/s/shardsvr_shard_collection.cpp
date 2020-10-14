@@ -116,30 +116,30 @@ boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
         return boost::none;
     }
 
-    const auto existingOptions = uassertStatusOK(std::move(swCollStatus)).value;
+    const auto existingColl = uassertStatusOK(std::move(swCollStatus)).value;
 
-    CollectionType requestedOptions;
-    requestedOptions.setNs(*request.get_shardsvrShardCollection());
-    requestedOptions.setKeyPattern(KeyPattern(request.getKey()));
-    requestedOptions.setDefaultCollation(*request.getCollation());
-    requestedOptions.setUnique(request.getUnique());
+    CollectionType newColl;
+    newColl.setNss(*request.get_shardsvrShardCollection());
+    newColl.setKeyPattern(KeyPattern(request.getKey()));
+    newColl.setDefaultCollation(*request.getCollation());
+    newColl.setUnique(request.getUnique());
 
     // Set the distributionMode to "sharded" because this CollectionType represents the requested
     // target state for the collection after shardCollection. The requested CollectionType will be
     // compared with the existing CollectionType below, and if the existing CollectionType either
     // does not have a distributionMode (FCV 4.2) or has distributionMode "sharded" (FCV 4.4), the
     // collection will be considered to already be in its target state.
-    requestedOptions.setDistributionMode(CollectionType::DistributionMode::kSharded);
+    newColl.setDistributionMode(CollectionType::DistributionMode::kSharded);
 
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,
             str::stream() << "sharding already enabled for collection "
                           << *request.get_shardsvrShardCollection() << " with options "
-                          << existingOptions.toString(),
-            requestedOptions.hasSameOptions(existingOptions));
+                          << existingColl.toString(),
+            newColl.hasSameOptions(existingColl));
 
-    return existingOptions;
+    return existingColl;
 }
 
 void checkForExistingChunks(OperationContext* opCtx, const NamespaceString& nss) {
@@ -479,7 +479,7 @@ void updateShardingCatalogEntryForCollection(
     }
 
     CollectionType coll;
-    coll.setNs(nss);
+    coll.setNss(nss);
     coll.setUUID(prerequisites.uuid);
     coll.setEpoch(initialChunks.collVersion().epoch());
     coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(initialChunks.collVersion().toLong()));

@@ -123,7 +123,7 @@ StatusWith<ChunkRange> includeFullShardKey(OperationContext* opCtx,
                                              kConfigPrimarySelector,
                                              repl::ReadConcernLevel::kLocalReadConcern,
                                              CollectionType::ConfigNS,
-                                             BSON(CollectionType::fullNs(nss.ns())),
+                                             BSON(CollectionType::kNssFieldName << nss.ns()),
                                              BSONObj(),
                                              1);
 

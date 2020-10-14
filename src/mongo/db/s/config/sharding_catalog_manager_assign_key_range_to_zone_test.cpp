@@ -43,8 +43,6 @@
 namespace mongo {
 namespace {
 
-using std::string;
-
 ReadPreferenceSetting kReadPref(ReadPreference::PrimaryOnly);
 
 /**
@@ -63,7 +61,7 @@ public:
         setupShards({shard});
 
         CollectionType shardedCollection;
-        shardedCollection.setNs(shardedNS());
+        shardedCollection.setNss(shardedNS());
         shardedCollection.setEpoch(OID::gen());
         shardedCollection.setKeyPattern(BSON("x" << 1));
 
@@ -95,7 +93,7 @@ public:
      */
     void assertOnlyZone(const NamespaceString& ns,
                         const ChunkRange& range,
-                        const string& zoneName) {
+                        const std::string& zoneName) {
         auto findStatus =
             getConfigShard()->exhaustiveFindOnConfig(operationContext(),
                                                      kReadPref,
@@ -127,7 +125,7 @@ public:
         return NamespaceString("unsharded.coll");
     }
 
-    string zoneName() const {
+    std::string zoneName() const {
         return "z";
     }
 };
@@ -150,7 +148,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, BasicAssignKeyRangeOnUnshardedColl) {
 
 TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnDroppedShardedColl) {
     CollectionType unshardedCollection;
-    unshardedCollection.setNs(unshardedNS());
+    unshardedCollection.setNss(unshardedNS());
     unshardedCollection.setEpoch(OID::gen());
     unshardedCollection.setKeyPattern(BSON("x" << 1));
     unshardedCollection.setDropped(true);
@@ -276,7 +274,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysSho
 TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToFullShardKey) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
-    shardedCollection.setNs(ns);
+    shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
@@ -295,7 +293,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToF
 TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToFullShardKey) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
-    shardedCollection.setNs(ns);
+    shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
@@ -349,7 +347,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsNotAShardKeyPrefixShouldFail
 TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
-    shardedCollection.setNs(ns);
+    shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
@@ -488,7 +486,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingInsideExistingShoul
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShouldSucceed) {
     CollectionType shardedCollection;
-    shardedCollection.setNs(NamespaceString("other.coll"));
+    shardedCollection.setNss(NamespaceString("other.coll"));
     shardedCollection.setEpoch(OID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1));
 
@@ -497,7 +495,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->assignKeyRangeToZone(operationContext(),
-                                         shardedCollection.getNs(),
+                                         shardedCollection.getNss(),
                                          ChunkRange(BSON("x" << 5), BSON("x" << 7)),
                                          zoneName()));
 
@@ -525,7 +523,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
         ASSERT_OK(tagDocStatus.getStatus());
 
         auto tagDoc = tagDocStatus.getValue();
-        ASSERT_EQ(shardedCollection.getNs(), tagDoc.getNS());
+        ASSERT_EQ(shardedCollection.getNss(), tagDoc.getNS());
         ASSERT_BSONOBJ_EQ(BSON("x" << 5), tagDoc.getMinKey());
         ASSERT_BSONOBJ_EQ(BSON("x" << 7), tagDoc.getMaxKey());
         ASSERT_EQ(zoneName(), tagDoc.getTag());
@@ -687,7 +685,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, BasicRemoveKeyRangeOnUnshardedColl) {
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnDroppedShardedColl) {
     CollectionType unshardedCollection;
-    unshardedCollection.setNs(unshardedNS());
+    unshardedCollection.setNss(unshardedNS());
     unshardedCollection.setEpoch(OID::gen());
     unshardedCollection.setKeyPattern(BSON("x" << 1));
     unshardedCollection.setDropped(true);
@@ -725,7 +723,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithInvalidMaxShardKeyShouldFail
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
-    shardedCollection.setNs(ns);
+    shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
@@ -751,7 +749,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemove
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMaxPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
     CollectionType shardedCollection;
-    shardedCollection.setNs(ns);
+    shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 

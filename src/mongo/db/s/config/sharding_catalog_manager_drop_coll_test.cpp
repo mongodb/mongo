@@ -49,8 +49,6 @@ namespace {
 
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
-using std::string;
-using std::vector;
 using unittest::assertGet;
 
 class DropColl2ShardTest : public ConfigServerTestFixture {
@@ -83,7 +81,7 @@ public:
 
         // insert documents into the config database
         CollectionType shardedCollection;
-        shardedCollection.setNs(dropNS());
+        shardedCollection.setNss(dropNS());
         shardedCollection.setEpoch(OID::gen());
         shardedCollection.setKeyPattern(BSON(_shardKey << 1));
         ASSERT_OK(insertToConfigCollection(
@@ -199,8 +197,8 @@ private:
     const NamespaceString _dropNS{"test.user"};
     ShardType _shard1;
     ShardType _shard2;
-    string _zoneName;
-    string _shardKey;
+    std::string _zoneName;
+    std::string _shardKey;
     BSONObj _min;
     BSONObj _max;
 };

@@ -333,7 +333,8 @@ void ShardingTestFixture::expectUpdateCollection(const HostAndPort& expectedHost
         const auto& update = updates.front();
         ASSERT_EQ(expectUpsert, update.getUpsert());
         ASSERT(!update.getMulti());
-        ASSERT_BSONOBJ_EQ(BSON(CollectionType::fullNs(coll.getNs().toString())), update.getQ());
+        ASSERT_BSONOBJ_EQ(BSON(CollectionType::kNssFieldName << coll.getNss().toString()),
+                          update.getQ());
         ASSERT_BSONOBJ_EQ(coll.toBSON(), update.getU().getUpdateClassic());
 
         BatchedCommandResponse response;

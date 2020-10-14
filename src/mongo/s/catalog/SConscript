@@ -128,7 +128,7 @@ env.CppUnitTest(
     source=[
         'dist_lock_catalog_impl_test.cpp',
         'replset_dist_lock_manager_test.cpp',
-        'sharding_catalog_test.cpp',
+        'sharding_catalog_client_test.cpp',
         'sharding_catalog_write_retry_test.cpp',
     ],
     LIBDEPS=[

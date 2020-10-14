@@ -29,8 +29,7 @@
 
 #pragma once
 
-#include "mongo/s/catalog/type_shard_collection_gen.h"
-#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/db/s/type_shard_collection_gen.h"
 
 namespace mongo {
 
@@ -70,17 +69,13 @@ public:
     using ShardCollectionTypeBase::setUnique;
     using ShardCollectionTypeBase::setUuid;
 
-    ShardCollectionType() : ShardCollectionTypeBase() {}
-
     ShardCollectionType(NamespaceString nss, OID epoch, KeyPattern keyPattern, bool unique)
         : ShardCollectionTypeBase(std::move(nss), std::move(epoch), std::move(keyPattern), unique) {
     }
 
     explicit ShardCollectionType(const BSONObj& obj);
 
-    // A wrapper around the IDL generated 'ShardCollectionTypeBase::parse' to ensure backwards
-    // compatibility.
-    static StatusWith<ShardCollectionType> fromBSON(const BSONObj& obj);
+    ShardCollectionType() = default;
 
     // A wrapper around the IDL generated 'ShardCollectionTypeBase::toBSON' to ensure backwards
     // compatibility.

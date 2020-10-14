@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/s/catalog/type_shard_database.h"
+#include "mongo/db/s/type_shard_database.h"
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"

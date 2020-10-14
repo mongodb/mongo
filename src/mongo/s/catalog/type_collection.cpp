@@ -48,7 +48,6 @@ const BSONField<bool> kDropped("dropped");
 
 const NamespaceString CollectionType::ConfigNS("config.collections");
 
-const BSONField<std::string> CollectionType::fullNs("_id");
 const BSONField<OID> CollectionType::epoch("lastmodEpoch");
 const BSONField<Date_t> CollectionType::updatedAt("lastmod");
 const BSONField<BSONObj> CollectionType::keyPattern("key");
@@ -58,17 +57,26 @@ const BSONField<UUID> CollectionType::uuid("uuid");
 const BSONField<std::string> CollectionType::distributionMode("distributionMode");
 const BSONField<ReshardingFields> CollectionType::reshardingFields("reshardingFields");
 
+CollectionType::CollectionType(const BSONObj& obj) {
+    CollectionType::parseProtected(IDLParserErrorContext("CollectionType"), obj);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "invalid namespace " << getNss(),
+            getNss().isValid());
+}
+
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
-    CollectionType coll;
+    auto swColl = [&] {
+        try {
+            return StatusWith<CollectionType>(CollectionType(source));
+        } catch (const DBException& ex) {
+            return StatusWith<CollectionType>(ex.toStatus());
+        }
+    }();
 
-    {
-        std::string collFullNs;
-        Status status = bsonExtractStringField(source, fullNs.name(), &collFullNs);
-        if (!status.isOK())
-            return status;
+    if (!swColl.isOK())
+        return swColl;
 
-        coll._fullNs = NamespaceString{collFullNs};
-    }
+    CollectionType coll = std::move(swColl.getValue());
 
     {
         OID collEpoch;
@@ -134,10 +142,7 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
             // Sharding key can only be missing if the collection is dropped
             if (!coll.getDropped()) {
                 return {ErrorCodes::NoSuchKey,
-                        str::stream() << "Shard key for collection " << coll._fullNs->ns()
-                                      << " is missing, but the collection is not marked as "
-                                         "dropped. This is an indication of corrupted sharding "
-                                         "metadata."};
+                        str::stream() << "Empty shard key. Failed to parse: " << source.toString()};
             }
         } else {
             return status;
@@ -214,15 +219,6 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
 }
 
 Status CollectionType::validate() const {
-    // These fields must always be set
-    if (!_fullNs.is_initialized()) {
-        return Status(ErrorCodes::NoSuchKey, "missing ns");
-    }
-
-    if (!_fullNs->isValid()) {
-        return Status(ErrorCodes::BadValue, "invalid namespace " + _fullNs->toString());
-    }
-
     if (!_epoch.is_initialized()) {
         return Status(ErrorCodes::NoSuchKey, "missing epoch");
     }
@@ -252,10 +248,8 @@ Status CollectionType::validate() const {
 
 BSONObj CollectionType::toBSON() const {
     BSONObjBuilder builder;
+    serialize(&builder);
 
-    if (_fullNs) {
-        builder.append(fullNs.name(), _fullNs->toString());
-    }
     builder.append(epoch.name(), _epoch.get_value_or(OID()));
     builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
     builder.append(kDropped.name(), _dropped.get_value_or(false));
@@ -304,11 +298,6 @@ std::string CollectionType::toString() const {
     return toBSON().toString();
 }
 
-void CollectionType::setNs(const NamespaceString& fullNs) {
-    invariant(fullNs.isValid());
-    _fullNs = fullNs;
-}
-
 void CollectionType::setEpoch(OID epoch) {
     _epoch = epoch;
 }
@@ -328,9 +317,9 @@ void CollectionType::setReshardingFields(boost::optional<ReshardingFields> resha
 
 bool CollectionType::hasSameOptions(const CollectionType& other) const {
     // The relevant options must have been set on this CollectionType.
-    invariant(_fullNs && _keyPattern && _unique);
+    invariant(_keyPattern && _unique);
 
-    return *_fullNs == other.getNs() &&
+    return getNss() == other.getNss() &&
         SimpleBSONObjComparator::kInstance.evaluate(_keyPattern->toBSON() ==
                                                     other.getKeyPattern().toBSON()) &&
         SimpleBSONObjComparator::kInstance.evaluate(_defaultCollation ==

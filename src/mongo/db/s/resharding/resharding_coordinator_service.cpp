@@ -188,7 +188,7 @@ void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
         opCtx,
         CollectionType::ConfigNS,
         buildUpdateOp(CollectionType::ConfigNS,
-                      BSON(CollectionType::fullNs(coordinatorDoc.getNss().ns())),  // query
+                      BSON(CollectionType::kNssFieldName << coordinatorDoc.getNss().ns()),  // query
                       writeOp,
                       false,  // upsert
                       false   // multi
@@ -218,7 +218,8 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 // 'reshardingFields.recipient' section
                 return buildUpdateOp(
                     CollectionType::ConfigNS,
-                    BSON(CollectionType::fullNs(coordinatorDoc.getTempReshardingNss().ns())),
+                    BSON(CollectionType::kNssFieldName
+                         << coordinatorDoc.getTempReshardingNss().ns()),
                     BSON("$set" << BSON(
                              "reshardingFields.state"
                              << CoordinatorState_serializer(nextState).toString()
@@ -230,16 +231,17 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                 );
             case CoordinatorStateEnum::kCommitted:
                 // Remove the entry for the temporary nss
-                return buildDeleteOp(
-                    CollectionType::ConfigNS,
-                    BSON(CollectionType::fullNs(coordinatorDoc.getTempReshardingNss().ns())),
-                    false  // multi
+                return buildDeleteOp(CollectionType::ConfigNS,
+                                     BSON(CollectionType::kNssFieldName
+                                          << coordinatorDoc.getTempReshardingNss().ns()),
+                                     false  // multi
                 );
             default:
                 // Update the 'state' field in the 'reshardingFields' section
                 return buildUpdateOp(
                     CollectionType::ConfigNS,
-                    BSON(CollectionType::fullNs(coordinatorDoc.getTempReshardingNss().ns())),
+                    BSON(CollectionType::kNssFieldName
+                         << coordinatorDoc.getTempReshardingNss().ns()),
                     BSON("$set" << BSON(
                              "reshardingFields.state"
                              << CoordinatorState_serializer(nextState).toString() << "lastmod"
@@ -381,7 +383,7 @@ CollectionType createTempReshardingCollectionType(
     const ChunkVersion& chunkVersion,
     const BSONObj& collation) {
     CollectionType collType;
-    collType.setNs(coordinatorDoc.getTempReshardingNss());
+    collType.setNss(coordinatorDoc.getTempReshardingNss());
     collType.setUUID(coordinatorDoc.get_id());
     collType.setEpoch(chunkVersion.epoch());
     collType.setUpdatedAt(opCtx->getServiceContext()->getPreciseClockSource()->now());

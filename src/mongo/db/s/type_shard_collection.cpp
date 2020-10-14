@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/s/catalog/type_shard_collection.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/s/type_shard_collection.h"
 
 namespace mongo {
 
@@ -45,14 +47,6 @@ ShardCollectionType::ShardCollectionType(const BSONObj& obj) {
         ChunkVersion version = *getLastRefreshedCollectionVersion();
         setLastRefreshedCollectionVersion(
             ChunkVersion(version.majorVersion(), version.minorVersion(), getEpoch()));
-    }
-}
-
-StatusWith<ShardCollectionType> ShardCollectionType::fromBSON(const BSONObj& obj) {
-    try {
-        return ShardCollectionType(obj);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
     }
 }
 

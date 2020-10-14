@@ -159,7 +159,7 @@ protected:
     CollectionType createCollection(const OID& epoch) {
         CollectionType coll;
 
-        coll.setNs(kNss);
+        coll.setNss(kNss);
         coll.setEpoch(epoch);
         coll.setKeyPattern(BSON(kShardKey << 1));
         coll.setUnique(false);

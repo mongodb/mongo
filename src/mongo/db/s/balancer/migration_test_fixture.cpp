@@ -55,7 +55,7 @@ void MigrationTestFixture::setUpDatabase(const std::string& dbName, const ShardI
 
 void MigrationTestFixture::setUpCollection(const NamespaceString& collName, ChunkVersion version) {
     CollectionType coll;
-    coll.setNs(collName);
+    coll.setNss(collName);
     coll.setEpoch(version.epoch());
     coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(version.toLong()));
     coll.setKeyPattern(kKeyPattern);
