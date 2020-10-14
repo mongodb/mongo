@@ -346,6 +346,11 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 }
 
 TEST_F(WiredTigerKVEngineTest, IdentDrop) {
+#ifdef _WIN32
+    // TODO SERVER-51595: to re-enable this test on Windows.
+    return;
+#endif
+
     auto opCtxPtr = makeOperationContext();
 
     NamespaceString nss("a.b");
