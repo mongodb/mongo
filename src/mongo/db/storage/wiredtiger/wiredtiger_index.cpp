@@ -45,6 +45,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
@@ -106,7 +107,7 @@ void WiredTigerIndex::setKey(WT_CURSOR* cursor, const WT_ITEM* item) {
     }
 }
 
-void WiredTigerIndex::getKey(WT_CURSOR* cursor, WT_ITEM* key) {
+void WiredTigerIndex::getKey(OperationContext* opCtx, WT_CURSOR* cursor, WT_ITEM* key) {
     if (_prefix == KVPrefix::kNotPrefixed) {
         invariantWTOK(cursor->get_key(cursor, key));
     } else {
@@ -114,6 +115,9 @@ void WiredTigerIndex::getKey(WT_CURSOR* cursor, WT_ITEM* key) {
         invariantWTOK(cursor->get_key(cursor, &prefix, key));
         invariant(_prefix.repr() == prefix);
     }
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementIdxEntriesRead(opCtx, 1);
 }
 
 // static
@@ -1035,6 +1039,9 @@ protected:
             invariantWTOK(cursor->get_key(cursor, &prefix, key));
             invariant(_prefix.repr() == prefix);
         }
+
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+        metricsCollector.incrementIdxEntriesRead(_opCtx, 1);
     }
 
     bool hasWrongPrefix(WT_CURSOR* cursor) {
@@ -1430,7 +1437,7 @@ bool WiredTigerIndexUnique::_keyExists(OperationContext* opCtx,
 
     WT_ITEM item;
     // Obtain the key from the record returned by search near.
-    getKey(c, &item);
+    getKey(opCtx, c, &item);
     if (std::memcmp(buffer, item.data, std::min(size, item.size)) == 0) {
         return true;
     }
@@ -1449,7 +1456,7 @@ bool WiredTigerIndexUnique::_keyExists(OperationContext* opCtx,
     }
     invariantWTOK(ret);
 
-    getKey(c, &item);
+    getKey(opCtx, c, &item);
     return std::memcmp(buffer, item.data, std::min(size, item.size)) == 0;
 }
 
@@ -1473,7 +1480,7 @@ bool WiredTigerIndexUnique::isDup(OperationContext* opCtx,
 
     WT_ITEM item;
     if (ret == 0) {
-        getKey(c, &item);
+        getKey(opCtx, c, &item);
         return std::memcmp(
                    prefixKey.getBuffer(), item.data, std::min(prefixKey.getSize(), item.size)) == 0;
     }

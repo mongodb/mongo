@@ -62,6 +62,7 @@ const operations = [
             // The size of the collection document in the _mdb_catalog may not be the same every
             // test run, so only assert this is non-zero.
             assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -76,6 +77,7 @@ const operations = [
             // TODO (SERVER-50865): This does not collect metrics for all documents read. Collect
             // metrics for index builds.
             assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -87,10 +89,11 @@ const operations = [
         profileAssert: (profileDoc) => {
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
-        name: 'find',
+        name: 'findIxScanAndFetch',
         command: (db) => {
             assert.eq(db[collName].find({_id: 1}).itcount(), 1);
 
@@ -105,10 +108,23 @@ const operations = [
                 },
             });
         },
-        profileFilter: {op: 'query', 'command.find': collName},
+        profileFilter: {op: 'query', 'command.find': collName, 'command.filter': {_id: 1}},
         profileAssert: (profileDoc) => {
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
+            assert.eq(profileDoc.idxEntriesRead, 1);
+        }
+    },
+    {
+        name: 'findCollScan',
+        command: (db) => {
+            assert.eq(db[collName].find().itcount(), 1);
+        },
+        profileFilter: {op: 'query', 'command.find': collName, 'command.filter': {}},
+        profileAssert: (profileDoc) => {
+            // Should read exactly as many bytes are in the document.
+            assert.eq(profileDoc.docBytesRead, 29);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -120,6 +136,7 @@ const operations = [
         profileAssert: (profileDoc) => {
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -131,6 +148,7 @@ const operations = [
         profileAssert: (profileDoc) => {
             // Does not read from the collection.
             assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 1);
         }
     },
     {
@@ -147,6 +165,7 @@ const operations = [
             } else {
                 assert.gte(profileDoc.docBytesRead, 29);
             }
+            assert.eq(profileDoc.idxEntriesRead, 1);
         }
     },
     {
@@ -163,6 +182,7 @@ const operations = [
             } else {
                 assert.gte(profileDoc.docBytesRead, 29);
             }
+            assert.eq(profileDoc.idxEntriesRead, 1);
         }
     },
     {
@@ -174,6 +194,7 @@ const operations = [
         profileAssert: (profileDoc) => {
             // Reads from the fast-count, not the collection.
             assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -185,6 +206,7 @@ const operations = [
         profileAssert: (profileDoc) => {
             // Should not read from the collection.
             assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     // Clear the profile collection so we can easily identify new operations with similar filters as
@@ -199,6 +221,7 @@ const operations = [
         profileAssert: (profileDoc) => {
             // Should read from the collection.
             assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -210,6 +233,7 @@ const operations = [
         profileAssert: (profileDoc) => {
             // This reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -221,23 +245,33 @@ const operations = [
         profileAssert: (profileDoc) => {
             // This reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     resetProfileColl,
     {
         name: 'getMore',
         command: (db) => {
-            db[collName].insert({_id: 2});
+            db[collName].insert({_id: 2, a: 2});
             let cursor = db[collName].find().batchSize(1);
             cursor.next();
             assert.eq(cursor.objsLeftInBatch(), 0);
             // Trigger a getMore
             cursor.next();
         },
-        profileFilter: {op: 'getmore', 'command.collection': collName}
+        profileFilter: {op: 'getmore', 'command.collection': collName},
+        profileAssert: (profileDoc) => {
+            // Debug builds may perform extra reads of the _mdb_catalog.
+            if (!debugBuild) {
+                assert.eq(profileDoc.docBytesRead, 29);
+            } else {
+                assert.gte(profileDoc.docBytesRead, 29);
+            }
+            assert.eq(profileDoc.idxEntriesRead, 0);
+        }
     },
     {
-        name: 'delete',
+        name: 'deleteIxScan',
         command: (db) => {
             assert.commandWorked(db[collName].remove({_id: 1}));
         },
@@ -250,6 +284,24 @@ const operations = [
             } else {
                 assert.gte(profileDoc.docBytesRead, 58);
             }
+            assert.eq(profileDoc.idxEntriesRead, 1);
+        }
+    },
+    {
+        name: 'deleteCollScan',
+        command: (db) => {
+            assert.commandWorked(db[collName].remove({}));
+        },
+        profileFilter: {op: 'remove', 'command.q': {}},
+        profileAssert: (profileDoc) => {
+            // Due to a deficiency in the delete path, we read the same document twice.
+            // TODO: SERVER-51420
+            if (!debugBuild) {
+                assert.eq(profileDoc.docBytesRead, 58);
+            } else {
+                assert.gte(profileDoc.docBytesRead, 58);
+            }
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     {
@@ -261,6 +313,7 @@ const operations = [
         profileAssert: (profileDoc) => {
             // Reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
         }
     },
     resetProfileColl,
@@ -270,7 +323,7 @@ const operations = [
             // For $sample to use a random cursor, we must have at least 100 documents and a sample
             // size less than 5%.
             for (let i = 0; i < 150; i++) {
-                assert.commandWorked(db[collName].insert({_id: i}));
+                assert.commandWorked(db[collName].insert({_id: i, a: i}));
             }
             assert.eq(db[collName].aggregate([{$sample: {size: 5}}]).itcount(), 5);
         },
@@ -278,6 +331,49 @@ const operations = [
         profileAssert: (profileDoc) => {
             // The exact amount of data read is not easily calculable.
             assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
+        }
+    },
+    {
+        name: 'createIndexUnique',
+        command: (db) => {
+            assert.commandWorked(db[collName].createIndex({a: 1}, {unique: true}));
+        },
+        profileFilter: {op: 'command', 'command.createIndexes': collName},
+        profileAssert: (profileDoc) => {
+            // The size of the collection document in the _mdb_catalog may not be the same every
+            // test run, so only assert this is non-zero.
+            // TODO (SERVER-50865): This does not collect metrics for all documents read. Collect
+            // metrics for index builds.
+            assert.gt(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 0);
+        }
+    },
+    resetProfileColl,
+    {
+        name: 'insertUnique',
+        command: (db) => {
+            assert.commandWorked(db[collName].insert({a: 200}));
+        },
+        profileFilter: {op: 'insert', 'command.insert': collName},
+        profileAssert: (profileDoc) => {
+            // Insert should not perform any reads.
+            assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.idxEntriesRead, 1);
+        }
+    },
+    resetProfileColl,
+    {
+        name: 'insertDup',
+        command: (db) => {
+            assert.commandFailedWithCode(db[collName].insert({a: 0}), ErrorCodes.DuplicateKey);
+        },
+        profileFilter: {op: 'insert', 'command.insert': collName},
+        profileAssert: (profileDoc) => {
+            // Insert should not perform any reads.
+            assert.eq(profileDoc.docBytesRead, 0);
+            // Inserting into a unique index requires reading one key.
+            assert.eq(profileDoc.idxEntriesRead, 1);
         }
     },
 ];
