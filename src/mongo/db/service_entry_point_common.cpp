@@ -735,7 +735,7 @@ public:
 private:
     class SessionCheckoutPath;
 
-    Future<void> _runInvocation();
+    Future<void> _runInvocation() noexcept;
 
     const std::shared_ptr<ExecCommandDatabase> _ecd;
 };
@@ -911,22 +911,13 @@ Future<void> InvokeCommand::SessionCheckoutPath::_checkOutSession() {
     return Status::OK();
 }
 
-Future<void> InvokeCommand::_runInvocation() try {
+Future<void> InvokeCommand::_runInvocation() noexcept {
     auto execContext = _ecd->getExecutionContext();
-    OperationContext* opCtx = execContext->getOpCtx();
-    const OpMsgRequest& request = execContext->getRequest();
-    CommandInvocation* invocation = _ecd->getInvocation().get();
-    rpc::ReplyBuilderInterface* replyBuilder = execContext->getReplyBuilder();
-
-    tenant_migration_donor::migrationConflictHandler(
-        opCtx,
-        request.getDatabase(),
-        [&] { CommandHelpers::runCommandInvocation(opCtx, request, invocation, replyBuilder); },
-        replyBuilder);
-
-    return Status::OK();
-} catch (const DBException& ex) {
-    return ex.toStatus();
+    return tenant_migration_donor::migrationConflictHandler(
+        execContext, [execContext, invocation = _ecd->getInvocation()] {
+            return CommandHelpers::runCommandInvocationAsync(std::move(execContext),
+                                                             std::move(invocation));
+        });
 }
 
 void InvokeCommand::SessionCheckoutPath::_tapError(Status status) {

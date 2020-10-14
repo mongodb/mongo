@@ -35,9 +35,12 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_by_prefix.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/request_execution_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -73,46 +76,13 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
 void onWriteToDatabase(OperationContext* opCtx, StringData dbName);
 
 /**
- * Runs the argument function 'callable'. If it throws a TenantMigrationConflict error (as indicated
- * in 'replyBuilder'), clears 'replyBuilder' and blocks until the migration commits or aborts, then
- * throws TenantMigrationCommitted or TenantMigrationAborted.
+ * Returns a future that asynchronously schedules and runs the argument function 'callable'. If it
+ * throws a TenantMigrationConflict error (as indicated in 'replyBuilder'), clears 'replyBuilder'
+ * and blocks until the migration commits or aborts, then returns TenantMigrationCommitted or
+ * TenantMigrationAborted.
  */
-template <typename Callable>
-void migrationConflictHandler(OperationContext* opCtx,
-                              StringData dbName,
-                              Callable&& callable,
-                              rpc::ReplyBuilderInterface* replyBuilder) {
-    checkIfCanReadOrBlock(opCtx, dbName);
-
-    auto& mtabByPrefix = TenantMigrationAccessBlockerByPrefix::get(opCtx->getServiceContext());
-
-    try {
-        // callable will modify replyBuilder.
-        callable();
-        auto replyBodyBuilder = replyBuilder->getBodyBuilder();
-
-        // getStatusFromWriteCommandReply expects an 'ok' field.
-        CommandHelpers::extractOrAppendOk(replyBodyBuilder);
-
-        // Commands such as insert, update, delete, and applyOps return the result as a status
-        // rather than throwing.
-        const auto status = getStatusFromWriteCommandReply(replyBodyBuilder.asTempObj());
-
-        if (status == ErrorCodes::TenantMigrationConflict) {
-            uassertStatusOK(status);
-        }
-        return;
-    } catch (const TenantMigrationConflictException& ex) {
-        auto migrationConflictInfo = ex.extraInfo<TenantMigrationConflictInfo>();
-        invariant(migrationConflictInfo);
-
-        if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlockerForDbPrefix(
-                migrationConflictInfo->getDatabasePrefix())) {
-            replyBuilder->getBodyBuilder().resetToEmpty();
-            mtab->checkIfCanWriteOrBlock(opCtx);
-        }
-    }
-}
+Future<void> migrationConflictHandler(std::shared_ptr<RequestExecutionContext> rec,
+                                      unique_function<Future<void>()> callable);
 
 }  // namespace tenant_migration_donor
 

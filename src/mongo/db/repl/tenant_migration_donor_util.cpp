@@ -41,6 +41,7 @@
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
 
@@ -207,6 +208,64 @@ void onWriteToDatabase(OperationContext* opCtx, StringData dbName) {
     if (mtab) {
         mtab->checkIfCanWriteOrThrow();
     }
+}
+
+class MigrationConflictHandler : public std::enable_shared_from_this<MigrationConflictHandler> {
+public:
+    MigrationConflictHandler(std::shared_ptr<RequestExecutionContext> rec,
+                             unique_function<Future<void>()> callable)
+        : _rec(std::move(rec)), _callable(std::move(callable)) {}
+
+    Future<void> run() try {
+        checkIfCanReadOrBlock(_rec->getOpCtx(), _rec->getRequest().getDatabase());
+        // callable will modify replyBuilder.
+        return _callable()
+            .then([this, anchor = shared_from_this()] { _checkReplyForTenantMigrationConflict(); })
+            .onError<ErrorCodes::TenantMigrationConflict>(
+                [this, anchor = shared_from_this()](Status status) {
+                    _handleTenantMigrationConflict(std::move(status));
+                    return Status::OK();
+                });
+    } catch (const DBException& e) {
+        return e.toStatus();
+    }
+
+private:
+    void _checkReplyForTenantMigrationConflict() {
+        auto replyBodyBuilder = _rec->getReplyBuilder()->getBodyBuilder();
+
+        // getStatusFromWriteCommandReply expects an 'ok' field.
+        CommandHelpers::extractOrAppendOk(replyBodyBuilder);
+
+        // Commands such as insert, update, delete, and applyOps return the result as a status
+        // rather than throwing.
+        const auto status = getStatusFromWriteCommandReply(replyBodyBuilder.asTempObj());
+
+        // Only throw `TenantMigrationConflict` exceptions.
+        if (status == ErrorCodes::TenantMigrationConflict)
+            internalAssert(status);
+    }
+
+    void _handleTenantMigrationConflict(Status status) {
+        auto migrationConflictInfo = status.extraInfo<TenantMigrationConflictInfo>();
+        invariant(migrationConflictInfo);
+
+        auto& mtabByPrefix =
+            TenantMigrationAccessBlockerByPrefix::get(_rec->getOpCtx()->getServiceContext());
+        if (auto mtab = mtabByPrefix.getTenantMigrationAccessBlockerForDbPrefix(
+                migrationConflictInfo->getDatabasePrefix())) {
+            _rec->getReplyBuilder()->getBodyBuilder().resetToEmpty();
+            mtab->checkIfCanWriteOrBlock(_rec->getOpCtx());
+        }
+    }
+
+    const std::shared_ptr<RequestExecutionContext> _rec;
+    const unique_function<Future<void>()> _callable;
+};
+
+Future<void> migrationConflictHandler(std::shared_ptr<RequestExecutionContext> rec,
+                                      unique_function<Future<void>()> callable) {
+    return std::make_shared<MigrationConflictHandler>(std::move(rec), std::move(callable))->run();
 }
 
 }  // namespace tenant_migration_donor

@@ -403,6 +403,8 @@ error_codes:
 
     - {code: 328, name: SkipCommandExecution}
 
+    - {code: 329, name: FailedToRunWithReplyBuilder}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
