@@ -247,8 +247,8 @@ variables:
   - func: "get all modified patch files"
   - func: "set task expansion macros"
   # The python virtual environment is installed in ${workdir}, which is created in
-  # "set up virtualenv".
-  - func: "set up virtualenv"
+  # "set up venv".
+  - func: "set up venv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - func: "get buildnumber"
@@ -322,7 +322,7 @@ variables:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get buildnumber"
     - func: "set up win mount script"
@@ -1187,7 +1187,7 @@ functions:
       - key: skip_tests
         value: skip_test-${build_id}
 
-  "set up virtualenv": &set_up_virtualenv
+  "set up venv": &set_up_venv
     command: shell.exec
     params:
         shell: bash
@@ -1199,17 +1199,13 @@ functions:
 
           python_loc=$(which ${python|/opt/mongodbtoolchain/v3/bin/python3})
           venv_dir="${workdir}/venv"
-          if which cygpath; then
-            # Sad note: We have to use the Windows path instead of the posix path here.
-            # Otherwise, virtualenv may mistakenly resolve paths relative to c:\cygdrive.
-            # Creating a virtualenv in cygwin with 'python -m venv', will not work correctly
-            # since the paths will be wrong.  We need to use virtualenv and specify the
-            # python path as 'C:\python\python_version'
-            python_loc=$(cygpath -w $python_loc)
-            venv_dir="$(cygpath -w "$venv_dir")"
-            "$virtualenv_loc" --python "$python_loc" --system-site-packages "$venv_dir"
-          else
-            "$python_loc" -m venv --system-site-packages "$venv_dir"
+          "$python_loc" -m venv --system-site-packages "$venv_dir"
+
+          # venv creates its Scripts/activate file with CLRF endings, which
+          # cygwin bash does not like. dos2unix it
+          # (See https://bugs.python.org/issue32451)
+          if [ "Windows_NT" = "$OS" ]; then
+            dos2unix "${workdir}/venv/Scripts/activate"
           fi
 
           export VIRTUAL_ENV_DISABLE_PROMPT=yes
@@ -1274,7 +1270,7 @@ functions:
   - *fetch_binaries
   - *fetch_debugsymbols_archive
   - *extract_binaries
-  - *set_up_virtualenv
+  - *set_up_venv
   - *upload_pip_requirements
   - *check_binary_version
   - *get_buildnumber
@@ -1287,7 +1283,7 @@ functions:
   - command: manifest.load
   - *git_get_project
   - *set_task_expansion_macros
-  - *set_up_virtualenv
+  - *set_up_venv
   - *upload_pip_requirements
   - *get_buildnumber
   - *set_up_credentials
@@ -1296,7 +1292,7 @@ functions:
   - command: manifest.load
   - *git_get_project
   - *set_task_expansion_macros
-  - *set_up_virtualenv
+  - *set_up_venv
   - *upload_pip_requirements
   - *update_bypass_expansions
   - *get_buildnumber
@@ -1680,7 +1676,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *set_task_expansion_macros
-    - *set_up_virtualenv
+    - *set_up_venv
     - *upload_pip_requirements
     - *configure_evergreen_api_credentials
     - command: expansions.write
@@ -1736,7 +1732,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *set_task_expansion_macros
-    - *set_up_virtualenv
+    - *set_up_venv
     - *upload_pip_requirements
     - *configure_evergreen_api_credentials
     - command: expansions.write
@@ -2158,7 +2154,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *set_task_expansion_macros
-    - *set_up_virtualenv
+    - *set_up_venv
     - *upload_pip_requirements
     - *configure_evergreen_api_credentials
     - *do_multiversion_setup
@@ -2206,7 +2202,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *set_task_expansion_macros
-    - *set_up_virtualenv
+    - *set_up_venv
     - *configure_evergreen_api_credentials
     - command: expansions.write
       params:
@@ -2254,7 +2250,7 @@ functions:
     - command: manifest.load
     - *git_get_project
     - *set_task_expansion_macros
-    - *set_up_virtualenv
+    - *set_up_venv
     - *upload_pip_requirements
 
     - command: expansions.write
@@ -4023,7 +4019,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "get buildnumber"
     - func: "set up credentials"
@@ -4068,7 +4064,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
       vars:
@@ -4083,7 +4079,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
       vars:
@@ -4098,7 +4094,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
       vars:
@@ -4113,7 +4109,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
       vars:
@@ -4125,7 +4121,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "set task expansion macros"
-  - func: "set up virtualenv"
+  - func: "set up venv"
   - func: "upload pip requirements"
   - command: shell.exec
     type: test
@@ -4143,7 +4139,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "scons lint"
       vars:
@@ -4156,7 +4152,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "do setup"
     - command: shell.exec
@@ -4177,7 +4173,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "set task expansion macros"
-  - func: "set up virtualenv"
+  - func: "set up venv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - *do_multiversion_setup
@@ -4231,7 +4227,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "set task expansion macros"
-  - func: "set up virtualenv"
+  - func: "set up venv"
   - func: "upload pip requirements"
   - func: "configure evergreen api credentials"
   - func: "do multiversion setup"
@@ -5283,7 +5279,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "set task expansion macros"
-  - func: "set up virtualenv"
+  - func: "set up venv"
     vars:
       pip_dir: ${workdir}/src/etc/pip
   - func: "upload pip requirements"
@@ -5301,7 +5297,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "set task expansion macros"
-  - func: "set up virtualenv"
+  - func: "set up venv"
     vars:
       pip_dir: ${workdir}/src/etc/pip
   - func: "upload pip requirements"
@@ -7534,7 +7530,7 @@ tasks:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "configure evergreen api credentials"
     - func: "do multiversion setup"
@@ -8597,7 +8593,7 @@ tasks:
   - command: manifest.load
   - func: "git get project"
   - func: "set task expansion macros"
-  - func: "set up virtualenv"
+  - func: "set up venv"
   - command: shell.exec
     type: test
     params:
@@ -8746,7 +8742,7 @@ task_groups:
     - func: "cleanup environment"
     - func: "git get project"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "configure evergreen api credentials"
     - func: "get buildnumber"
     - func: "set up credentials"
@@ -8771,7 +8767,7 @@ task_groups:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "set up win mount script"
     - func: "generate compile expansions"
@@ -8794,7 +8790,7 @@ task_groups:
     - func: "get buildnumber"
     - func: "set up credentials"
     - func: "set task expansion macros"
-    - func: "set up virtualenv"
+    - func: "set up venv"
     - func: "upload pip requirements"
     - func: "set up win mount script"
     - func: "generate compile expansions"
