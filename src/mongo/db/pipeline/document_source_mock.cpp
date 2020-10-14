@@ -55,7 +55,7 @@ const char* DocumentSourceMock::getSourceName() const {
     return "mock";
 }
 
-const size_t DocumentSourceMock::size() const {
+size_t DocumentSourceMock::size() const {
     return _queue.size();
 }
 
