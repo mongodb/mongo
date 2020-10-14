@@ -230,7 +230,7 @@ std::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
     std::vector<std::shared_ptr<IWIterator>> vec;
     for (int i = 0; i < N; i++)
         vec.push_back(std::shared_ptr<IWIterator>(array[i]));
-    return std::shared_ptr<IWIterator>(IWIterator::merge(vec, "", opts, IWComparator(Dir)));
+    return std::shared_ptr<IWIterator>(IWIterator::merge(vec, opts, IWComparator(Dir)));
 }
 
 //
@@ -317,7 +317,7 @@ public:
         {  // test empty (no inputs)
             std::vector<std::shared_ptr<IWIterator>> vec;
             std::shared_ptr<IWIterator> mergeIter(
-                IWIterator::merge(vec, "", SortOptions(), IWComparator()));
+                IWIterator::merge(vec, SortOptions(), IWComparator()));
             ASSERT_ITERATORS_EQUIVALENT(mergeIter, std::make_shared<EmptyIterator>());
         }
         {  // test empty (only empty inputs)
@@ -383,53 +383,79 @@ public:
                                         std::make_shared<EmptyIterator>());
         }
 
-        {  // test all data ASC
-            std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
-            addData(sorter);
-            ASSERT_ITERATORS_EQUIVALENT(done(sorter), correct());
-            assertRangeInfo(sorter, opts);
-        }
-        {  // test all data DESC
-            std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
-            addData(sorter);
-            ASSERT_ITERATORS_EQUIVALENT(done(sorter), correctReverse());
-            assertRangeInfo(sorter, opts);
-        }
+        const auto runTests = [this, &opts](bool assertRanges) {
+            {  // test all data ASC
+                std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
+                addData(sorter);
+                ASSERT_ITERATORS_EQUIVALENT(done(sorter), correct());
+                if (assertRanges) {
+                    assertRangeInfo(sorter, opts);
+                }
+            }
+            {  // test all data DESC
+                std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
+                addData(sorter);
+                ASSERT_ITERATORS_EQUIVALENT(done(sorter), correctReverse());
+                if (assertRanges) {
+                    assertRangeInfo(sorter, opts);
+                }
+            }
 
 // The debug builds are too slow to run these tests.
 // Among other things, MSVC++ makes all heap functions O(N) not O(logN).
 #if !defined(MONGO_CONFIG_DEBUG_BUILD)
-        {  // merge all data ASC
-            std::shared_ptr<IWSorter> sorters[] = {makeSorter(opts, IWComparator(ASC)),
-                                                   makeSorter(opts, IWComparator(ASC))};
+            {  // merge all data ASC
+                std::shared_ptr<IWSorter> sorters[] = {makeSorter(opts, IWComparator(ASC)),
+                                                       makeSorter(opts, IWComparator(ASC))};
 
-            addData(sorters[0]);
-            addData(sorters[1]);
+                addData(sorters[0]);
+                addData(sorters[1]);
 
-            std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
-            std::shared_ptr<IWIterator> iters2[] = {correct(), correct()};
-            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, ASC), mergeIterators(iters2, ASC));
+                std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
+                std::shared_ptr<IWIterator> iters2[] = {correct(), correct()};
+                ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, ASC),
+                                            mergeIterators(iters2, ASC));
 
-            assertRangeInfo(sorters[0], opts);
-            assertRangeInfo(sorters[1], opts);
-        }
-        {  // merge all data DESC and use multiple threads to insert
-            std::shared_ptr<IWSorter> sorters[] = {makeSorter(opts, IWComparator(DESC)),
-                                                   makeSorter(opts, IWComparator(DESC))};
+                if (assertRanges) {
+                    assertRangeInfo(sorters[0], opts);
+                    assertRangeInfo(sorters[1], opts);
+                }
+            }
+            {  // merge all data DESC and use multiple threads to insert
+                std::shared_ptr<IWSorter> sorters[] = {makeSorter(opts, IWComparator(DESC)),
+                                                       makeSorter(opts, IWComparator(DESC))};
 
-            stdx::thread inBackground(&Basic::addData, this, sorters[0]);
-            addData(sorters[1]);
-            inBackground.join();
+                stdx::thread inBackground(&Basic::addData, this, sorters[0]);
+                addData(sorters[1]);
+                inBackground.join();
 
-            std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
-            std::shared_ptr<IWIterator> iters2[] = {correctReverse(), correctReverse()};
-            ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, DESC), mergeIterators(iters2, DESC));
+                std::shared_ptr<IWIterator> iters1[] = {done(sorters[0]), done(sorters[1])};
+                std::shared_ptr<IWIterator> iters2[] = {correctReverse(), correctReverse()};
+                ASSERT_ITERATORS_EQUIVALENT(mergeIterators(iters1, DESC),
+                                            mergeIterators(iters2, DESC));
 
-            assertRangeInfo(sorters[0], opts);
-            assertRangeInfo(sorters[1], opts);
-        }
+                if (assertRanges) {
+                    assertRangeInfo(sorters[0], opts);
+                    assertRangeInfo(sorters[1], opts);
+                }
+            }
 #endif
+        };
+
+        // Run the tests without checking the Sorter ranges. This means that
+        // Sorter::persistDataForShutdown() will not be called, so we can verify that the Sorter
+        // properly cleans up its files upon destruction.
+        runTests(false);
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
+
+        // Run the tests checking the Sorter ranges. This allows us to verify that
+        // Sorter::persistDataForShutdown() correctly persists the Sorter data.
+        runTests(true);
+        if (correctNumRanges() == 0) {
+            ASSERT(boost::filesystem::is_empty(tempDir.path()));
+        } else {
+            ASSERT(!boost::filesystem::is_empty(tempDir.path()));
+        }
     }
 
     // add data to the sorter

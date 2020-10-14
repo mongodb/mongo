@@ -169,8 +169,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
     _buildIsCleanedUp = false;
 
-    WriteUnitOfWork wunit(opCtx);
-
     invariant(_indexes.empty());
 
     if (resumeInfo) {
@@ -180,6 +178,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     // Guarantees that exceptions cannot be returned from index builder initialization except for
     // WriteConflictExceptions, which should be dealt with by the caller.
     try {
+        WriteUnitOfWork wunit(opCtx);
+
         // On rollback in init(), cleans up _indexes so that ~MultiIndexBlock doesn't try to clean
         // up _indexes manually (since the changes were already rolled back). Due to this, it is
         // thus legal to call init() again after it fails.
@@ -192,13 +192,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             _buildIsCleanedUp = true;
         });
 
-        const auto& ns = collection->ns().ns();
-
         for (const auto& info : indexSpecs) {
             if (info["background"].isBoolean() && !info["background"].Bool()) {
                 LOGV2(20383,
-                      "Ignoring obsolete {{ background: false }} index build option because all "
-                      "indexes are built in the background with the hybrid method",
                       "Ignoring obsolete { background: false } index build option because all "
                       "indexes are built in the background with the hybrid method");
             }
@@ -236,8 +232,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 // start the build while holding a lock throughout.
                 if (status == ErrorCodes::IndexBuildAlreadyInProgress) {
                     invariant(indexSpecs.size() > 1,
-                              str::stream() << "Collection: " << ns << " (" << _collectionUUID
-                                            << "), Index spec: " << indexSpecs.front());
+                              str::stream()
+                                  << "Collection: " << collection->ns() << " (" << _collectionUUID
+                                  << "), Index spec: " << indexSpecs.front());
                     return {
                         ErrorCodes::OperationFailed,
                         "Cannot build two identical indexes. Try again without duplicate indexes."};
@@ -248,7 +245,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             indexInfoObjs.push_back(info);
 
             boost::optional<IndexStateInfo> stateInfo;
-            IndexToBuild index;
+            auto& index = _indexes.emplace_back();
             index.block =
                 std::make_unique<IndexBuildBlock>(collection->ns(), info, _method, _buildUUID);
             if (resumeInfo) {
@@ -262,7 +259,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 uassert(ErrorCodes::NoSuchKey,
                         str::stream() << "Unable to locate resume information for " << info
                                       << " due to inconsistent resume information for index build "
-                                      << _buildUUID << " in collection " << ns << "("
+                                      << _buildUUID << " on namespace " << collection->ns() << "("
                                       << _collectionUUID << ")",
                         stateInfoIt != resumeInfoIndexes.end());
 
@@ -274,11 +271,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             }
             if (!status.isOK())
                 return status;
-
-            auto indexCleanupGuard = makeGuard([opCtx, &index] {
-                index.block->finalizeTemporaryTables(
-                    opCtx, TemporaryRecordStore::FinalizationAction::kDelete);
-            });
 
             auto indexCatalogEntry =
                 index.block->getEntry(opCtx, collection.getWritableCollection());
@@ -300,10 +292,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             index.options.fromIndexBuilder = true;
 
             LOGV2(20384,
-                  "Index build: starting on {namespace} properties: {properties} using method: "
-                  "{method}",
                   "Index build: starting",
-                  "namespace"_attr = ns,
+                  logAttrs(collection->ns()),
                   "buildUUID"_attr = _buildUUID,
                   "properties"_attr = *descriptor,
                   "method"_attr = _method,
@@ -314,24 +304,20 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             if (!resumeInfo) {
                 // TODO SERVER-14888 Suppress this in cases we don't want to audit.
-                audit::logCreateIndex(opCtx->getClient(), &info, descriptor->indexName(), ns);
+                audit::logCreateIndex(
+                    opCtx->getClient(), &info, descriptor->indexName(), collection->ns().ns());
             }
-
-            indexCleanupGuard.dismiss();
-            _indexes.push_back(std::move(index));
         }
 
-        opCtx->recoveryUnit()->onCommit([ns, this](auto commitTs) {
+        opCtx->recoveryUnit()->onCommit([ns = collection->ns(), this](auto commitTs) {
             if (!_buildUUID) {
                 return;
             }
 
             LOGV2(20346,
-                  "Index build initialized: {buildUUID}: {nss} ({collection_uuid}): indexes: "
-                  "{indexes_size}",
                   "Index build: initialized",
                   "buildUUID"_attr = _buildUUID,
-                  "namespace"_attr = ns,
+                  logAttrs(ns),
                   "collectionUUID"_attr = _collectionUUID,
                   "initializationTimestamp"_attr = commitTs);
         });
@@ -348,13 +334,12 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // Avoid converting TenantMigrationCommittedException to Status.
         throw;
     } catch (...) {
-        auto status = exceptionToStatus();
-        return {status.code(),
-                str::stream() << "Caught exception during index builder initialization "
-                              << collection->ns() << " (" << collection->uuid()
-                              << "): " << status.reason() << ". " << indexSpecs.size()
-                              << " provided. First index spec: "
-                              << (indexSpecs.empty() ? BSONObj() : indexSpecs[0])};
+        return exceptionToStatus().withContext(
+            str::stream() << "Caught exception during index builder (" << _buildUUID
+                          << ") initialization on namespace" << collection->ns() << " ("
+                          << _collectionUUID << "). " << indexSpecs.size()
+                          << " index specs provided. First index spec: "
+                          << (indexSpecs.empty() ? BSONObj() : indexSpecs[0]));
     }
 }
 

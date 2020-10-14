@@ -740,6 +740,9 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
               logAttrs(collection->ns()),
               "collectionUUID"_attr = collectionUUID,
               "error"_attr = status);
+
+        stdx::lock_guard<Latch> lk(_mutex);
+        _unregisterIndexBuild(lk, replIndexBuildState);
     }
 
     return status;

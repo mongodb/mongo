@@ -35,13 +35,26 @@ ResumableIndexBuildTest.runFailToResume(rst,
                                         dbName,
                                         collName,
                                         {a: 1},
-                                        "failToParseResumeIndexInfo",
+                                        {failPointAfterStartup: "failToParseResumeIndexInfo"},
                                         [{a: 2}, {a: 3}],
                                         [{a: 4}, {a: 5}],
                                         true /* failWhileParsing */);
 
-ResumableIndexBuildTest.runFailToResume(
-    rst, dbName, collName, {a: 1}, "failSetUpResumeIndexBuild", [{a: 6}, {a: 7}], [{a: 8}, {a: 9}]);
+ResumableIndexBuildTest.runFailToResume(rst,
+                                        dbName,
+                                        collName,
+                                        {a: 1},
+                                        {failPointAfterStartup: "failSetUpResumeIndexBuild"},
+                                        [{a: 6}, {a: 7}],
+                                        [{a: 8}, {a: 9}]);
+
+ResumableIndexBuildTest.runFailToResume(rst,
+                                        dbName,
+                                        collName,
+                                        {a: 1},
+                                        {removeTempFilesBeforeStartup: true},
+                                        [{a: 10}, {a: 11}],
+                                        [{a: 12}, {a: 13}]);
 
 rst.stopSet();
 })();

@@ -404,14 +404,12 @@ public:
     typedef std::pair<Key, Value> Data;
 
     MergeIterator(const std::vector<std::shared_ptr<Input>>& iters,
-                  const std::string& itersSourceFileFullPath,
                   const SortOptions& opts,
                   const Comparator& comp)
         : _opts(opts),
           _remaining(opts.limit ? opts.limit : std::numeric_limits<unsigned long long>::max()),
           _first(true),
-          _greater(comp),
-          _itersSourceFileFullPath(itersSourceFileFullPath) {
+          _greater(comp) {
         for (size_t i = 0; i < iters.size(); i++) {
             iters[i]->openSource();
             if (iters[i]->more()) {
@@ -433,11 +431,10 @@ public:
     }
 
     ~MergeIterator() {
-        // Clear the remaining Stream objects first, to close the file handles before deleting the
-        // file. Some systems will error closing the file if any file handles are still open.
+        // Clear the remaining Stream objects to close the file handles. Some systems will error
+        // closing the file if any file handles are still open.
         _current.reset();
         _heap.clear();
-        DESTRUCTOR_GUARD(boost::filesystem::remove(_itersSourceFileFullPath));
     }
 
     void openSource() {}
@@ -538,7 +535,6 @@ private:
     std::shared_ptr<Stream> _current;
     std::vector<std::shared_ptr<Stream>> _heap;  // MinHeap
     STLComparator _greater;                      // named so calls make sense
-    std::string _itersSourceFileFullPath;
 };
 
 template <typename Key, typename Value, typename Comparator>
@@ -584,9 +580,8 @@ public:
     }
 
     ~NoLimitSorter() {
-        if (!_done && !this->_shouldKeepFilesOnDestruction) {
-            // If done() was never called to return a MergeIterator, then this Sorter still owns
-            // file deletion.
+        // This Sorter is responsible for file deletion, even if done() was called.
+        if (!this->_shouldKeepFilesOnDestruction) {
             DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileFullPath));
         }
     }
@@ -624,7 +619,7 @@ public:
         }
 
         spill();
-        return Iterator::merge(this->_iters, this->_fileFullPath, this->_opts, _comp);
+        return Iterator::merge(this->_iters, this->_opts, _comp);
     }
 
 private:
@@ -765,9 +760,8 @@ public:
     }
 
     ~TopKSorter() {
-        if (!_done && !this->_shouldKeepFilesOnDestruction) {
-            // If done() was never called to return a MergeIterator, then this Sorter still owns
-            // file deletion.
+        // This Sorter is responsible for file deletion, even if done() was called.
+        if (!this->_shouldKeepFilesOnDestruction) {
             DESTRUCTOR_GUARD(boost::filesystem::remove(this->_fileFullPath));
         }
     }
@@ -824,7 +818,7 @@ public:
         }
 
         spill();
-        Iterator* iterator = Iterator::merge(this->_iters, this->_fileFullPath, this->_opts, _comp);
+        Iterator* iterator = Iterator::merge(this->_iters, this->_opts, _comp);
         _done = true;
         return iterator;
     }
@@ -1151,10 +1145,9 @@ template <typename Key, typename Value>
 template <typename Comparator>
 SortIteratorInterface<Key, Value>* SortIteratorInterface<Key, Value>::merge(
     const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,
-    const std::string& fileFullPath,
     const SortOptions& opts,
     const Comparator& comp) {
-    return new sorter::MergeIterator<Key, Value, Comparator>(iters, fileFullPath, opts, comp);
+    return new sorter::MergeIterator<Key, Value, Comparator>(iters, opts, comp);
 }
 
 template <typename Key, typename Value>

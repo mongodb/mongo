@@ -340,7 +340,8 @@ const ResumableIndexBuildTest = class {
                    failPoints,
                    failPointsIteration,
                    shouldComplete = true,
-                   failPointAfterStartup) {
+                   failPointAfterStartup,
+                   runBeforeStartup) {
         clearRawMongoProgramOutput();
 
         const indexNamesFlat = ResumableIndexBuildTest.flatten(indexNames);
@@ -435,7 +436,10 @@ const ResumableIndexBuildTest = class {
             assert(RegExp("4841502.*" + buildUUID).test(rawMongoProgramOutput()));
         }
 
-        const setParameter = {logComponentVerbosity: tojson({index: 1})};
+        if (runBeforeStartup)
+            runBeforeStartup();
+
+        const setParameter = {logComponentVerbosity: tojson({index: 1, storage: 1})};
         if (failPointAfterStartup) {
             Object.extend(setParameter, {
                 ["failpoint." + failPointAfterStartup]: tojson({mode: "alwaysOn"}),
@@ -754,19 +758,13 @@ const ResumableIndexBuildTest = class {
                            dbName,
                            collName,
                            indexSpec,
-                           failpointAfterStartup,
+                           {failPointAfterStartup, removeTempFilesBeforeStartup},
                            sideWrites,
                            postIndexBuildInserts,
                            failWhileParsing = false) {
         const primary = rst.getPrimary();
         const coll = primary.getDB(dbName).getCollection(collName);
         const indexName = "resumable_index_build";
-
-        // Create and drop an index so that the Sorter file name used by the index build
-        // interrupted for shutdown is not the same as the Sorter file name used when the index
-        // build is restarted.
-        assert.commandWorked(coll.createIndex({unused: 1}));
-        assert.commandWorked(coll.dropIndex({unused: 1}));
 
         const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
             rst, function(collName, indexSpec, indexName) {
@@ -783,16 +781,24 @@ const ResumableIndexBuildTest = class {
             [{name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}],
             0,
             false /* shouldComplete */,
-            failpointAfterStartup)[0];
+            failPointAfterStartup,
+            function() {
+                if (removeTempFilesBeforeStartup)
+                    removeFile(primary.dbpath + "/_tmp");
+            })[0];
 
         awaitCreateIndex();
 
         // Ensure that the resumable index build failed as expected.
         if (failWhileParsing) {
-            assert(RegExp("4916300.*").test(rawMongoProgramOutput()));
-            assert(RegExp("22257.*").test(rawMongoProgramOutput()));
+            checkLog.containsJson(primary, 4916300);
+            checkLog.containsJson(primary, 22257);
         } else {
-            assert(RegExp("4841701.*" + buildUUID).test(rawMongoProgramOutput()));
+            checkLog.containsJson(primary, 4841701, {
+                buildUUID: function(uuid) {
+                    return uuid["uuid"]["$uuid"] === buildUUID;
+                }
+            });
         }
 
         // Ensure that the index build was completed after it was restarted.
@@ -812,6 +818,10 @@ const ResumableIndexBuildTest = class {
             // another restart.
             checkLogIdAfterRestart(primary, 5071100);
             ResumableIndexBuildTest.checkTempDirectoryCleared(primary);
+        } else if (removeTempFilesBeforeStartup) {
+            // If we fail to resume due to the temp files being missing, the internal idents will
+            // be cleaned up right away.
+            checkLog.containsJson(primary, 22396);
         } else {
             ResumableIndexBuildTest.checkTempDirectoryCleared(primary);
 

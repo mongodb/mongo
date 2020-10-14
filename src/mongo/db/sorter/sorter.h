@@ -178,7 +178,6 @@ public:
     template <typename Comparator>
     static SortIteratorInterface* merge(
         const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,
-        const std::string& fileFullPath,
         const SortOptions& opts,
         const Comparator& comp);
 
@@ -364,7 +363,6 @@ private:
     template ::mongo::SortIteratorInterface<Key, Value>* ::mongo::                             \
         SortIteratorInterface<Key, Value>::merge<Comparator>(                                  \
             const std::vector<std::shared_ptr<SortIteratorInterface>>& iters,                  \
-            const std::string& fileFullPath,                                                   \
             const SortOptions& opts,                                                           \
             const Comparator& comp);                                                           \
     template ::mongo::Sorter<Key, Value>* ::mongo::Sorter<Key, Value>::make<Comparator>(       \

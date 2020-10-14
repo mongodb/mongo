@@ -595,10 +595,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 _groups = pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>();
 
                 _sorterIterator.reset(Sorter<Value, Value>::Iterator::merge(
-                    _sortedFiles,
-                    _fileName,
-                    SortOptions(),
-                    SorterComparator(pExpCtx->getValueComparator())));
+                    _sortedFiles, SortOptions(), SorterComparator(pExpCtx->getValueComparator())));
                 _ownsFileDeletion = false;
 
                 // prepare current to accumulate data
