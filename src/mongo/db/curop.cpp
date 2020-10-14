@@ -50,7 +50,6 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/client_metadata_ismaster.h"
@@ -560,14 +559,18 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 
-        logv2::DynamicAttributes attr;
-        _debug.report(opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), &attr);
+        auto operationMetricsPtr = [&]() -> ResourceConsumption::Metrics* {
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            if (metricsCollector.hasCollectedMetrics()) {
+                return &metricsCollector.getMetrics();
+            }
+            return nullptr;
+        }();
 
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-        if (ResourceConsumption::get(opCtx).isMetricsCollectionEnabled() &&
-            !metricsCollector.getDbName().empty()) {
-            metricsCollector.getMetrics().report(&attr);
-        }
+        logv2::DynamicAttributes attr;
+        _debug.report(
+            opCtx, (lockerInfo ? &lockerInfo->stats : nullptr), operationMetricsPtr, &attr);
+
         LOGV2_OPTIONS(51803, {component}, "Slow query", attr);
     }
 
@@ -939,6 +942,7 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
 
 void OpDebug::report(OperationContext* opCtx,
                      const SingleThreadedLockStats* lockStats,
+                     const ResourceConsumption::Metrics* operationMetrics,
                      logv2::DynamicAttributes* pAttrs) const {
     Client* client = opCtx->getClient();
     auto& curop = *CurOp::get(opCtx);
@@ -1078,6 +1082,12 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (storageStats) {
         pAttrs->add("storage", storageStats->toBSON());
+    }
+
+    if (operationMetrics) {
+        BSONObjBuilder builder;
+        operationMetrics->toFlatBsonNonZeroFields(&builder);
+        pAttrs->add("operationMetrics", builder.obj());
     }
 
     if (iscommand) {
@@ -1511,10 +1521,9 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 
     addIfNeeded("operationMetrics", [](auto field, auto args, auto& b) {
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(args.opCtx);
-        if (ResourceConsumption::isMetricsCollectionEnabled() &&
-            !metricsCollector.getDbName().empty()) {
-            BSONObjBuilder metricsBuilder(b.subobjStart("operationMetrics"));
-            metricsCollector.getMetrics().toBson(&metricsBuilder);
+        if (metricsCollector.hasCollectedMetrics()) {
+            BSONObjBuilder metricsBuilder(b.subobjStart(field));
+            metricsCollector.getMetrics().toFlatBsonAllFields(&metricsBuilder);
         }
     });
 

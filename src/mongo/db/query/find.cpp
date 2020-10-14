@@ -232,11 +232,7 @@ Message getMore(OperationContext* opCtx,
 
     const NamespaceString nss(ns);
 
-    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx);
-    if (ResourceConsumption::shouldCollectMetricsForDatabase(nss.db())) {
-        auto& opMetrics = ResourceConsumption::MetricsCollector::get(opCtx);
-        opMetrics.setDbName(nss.db().toString());
-    }
+    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss.db().toString());
 
     // Cursors come in one of two flavors:
     //
@@ -580,11 +576,7 @@ bool runQuery(OperationContext* opCtx,
             nss.isValid());
     invariant(!nss.isCommand());
 
-    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx);
-    if (ResourceConsumption::shouldCollectMetricsForDatabase(nss.db())) {
-        auto& opMetrics = ResourceConsumption::MetricsCollector::get(opCtx);
-        opMetrics.setDbName(nss.db().toString());
-    }
+    ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss.db().toString());
 
     // Set CurOp information.
     const auto upconvertedQuery = upconvertQueryEntry(q.query, nss, q.ntoreturn, q.ntoskip);

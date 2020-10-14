@@ -31,6 +31,7 @@
 
 #include "mongo/db/stats/resource_consumption_metrics.h"
 
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/logv2/log.h"
 
@@ -52,12 +53,9 @@ static const char kDocBytesWritten[] = "docBytesWritten";
 static const char kDocUnitsWritten[] = "docUnitsWritten";
 static const char kDocUnitsReturned[] = "docUnitsReturned";
 
-template <size_t N>
-inline void reportNonZeroMetric(logv2::DynamicAttributes* attrs,
-                                const char (&name)[N],
-                                long long value) {
+inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long long value) {
     if (value != 0) {
-        attrs->add(name, value);
+        builder->append(name, value);
     }
 }
 }  // namespace
@@ -109,22 +107,76 @@ void ResourceConsumption::Metrics::toBson(BSONObjBuilder* builder) const {
     builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
 }
 
-
-void ResourceConsumption::Metrics::report(logv2::DynamicAttributes* attrs) const {
-    // Report all read metrics together.
+void ResourceConsumption::Metrics::toFlatBsonAllFields(BSONObjBuilder* builder) const {
+    // Report all read metrics together to generate a flat object.
     auto readMetrics = primaryMetrics + secondaryMetrics;
-    reportNonZeroMetric(attrs, kDocBytesRead, readMetrics.docBytesRead);
-    reportNonZeroMetric(attrs, kDocUnitsRead, readMetrics.docUnitsRead);
-    reportNonZeroMetric(attrs, kIdxEntriesRead, readMetrics.idxEntriesRead);
-    reportNonZeroMetric(attrs, kKeysSorted, readMetrics.keysSorted);
+    builder->appendNumber(kDocBytesRead, readMetrics.docBytesRead);
+    builder->appendNumber(kDocUnitsRead, readMetrics.docUnitsRead);
+    builder->appendNumber(kIdxEntriesRead, readMetrics.idxEntriesRead);
+    builder->appendNumber(kKeysSorted, readMetrics.keysSorted);
 
-    reportNonZeroMetric(attrs, kCpuMillis, cpuMillis);
-    reportNonZeroMetric(attrs, kDocBytesWritten, docBytesWritten);
-    reportNonZeroMetric(attrs, kDocUnitsWritten, docUnitsWritten);
-    reportNonZeroMetric(attrs, kDocUnitsReturned, docUnitsReturned);
+    builder->appendNumber(kCpuMillis, cpuMillis);
+    builder->appendNumber(kDocBytesWritten, docBytesWritten);
+    builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
+    builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
+}
+
+void ResourceConsumption::Metrics::toFlatBsonNonZeroFields(BSONObjBuilder* builder) const {
+    // Report all read metrics together to generate a flat object.
+    auto readMetrics = primaryMetrics + secondaryMetrics;
+    appendNonZeroMetric(builder, kDocBytesRead, readMetrics.docBytesRead);
+    appendNonZeroMetric(builder, kDocUnitsRead, readMetrics.docUnitsRead);
+    appendNonZeroMetric(builder, kIdxEntriesRead, readMetrics.idxEntriesRead);
+    appendNonZeroMetric(builder, kKeysSorted, readMetrics.keysSorted);
+
+    appendNonZeroMetric(builder, kCpuMillis, cpuMillis);
+    appendNonZeroMetric(builder, kDocBytesWritten, docBytesWritten);
+    appendNonZeroMetric(builder, kDocUnitsWritten, docUnitsWritten);
+    appendNonZeroMetric(builder, kDocUnitsReturned, docUnitsReturned);
+}
+
+
+void ResourceConsumption::MetricsCollector::_updateReadMetrics(OperationContext* opCtx,
+                                                               ReadMetricsFunc&& updateFunc) {
+    if (!isCollecting()) {
+        return;
+    }
+
+    // The RSTL is normally required to check the replication state, but callers may not always be
+    // holding it. Since we need to attribute this metric to some replication state, and an
+    // inconsistent state is not impactful for the purposes of metrics collection, perform a
+    // best-effort check so that we can record metrics for this operation.
+    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
+            opCtx, NamespaceString::kAdminDb)) {
+        updateFunc(_metrics.primaryMetrics);
+    } else {
+        updateFunc(_metrics.secondaryMetrics);
+    }
+}
+
+void ResourceConsumption::MetricsCollector::incrementDocBytesRead(OperationContext* opCtx,
+                                                                  size_t docBytesRead) {
+    _updateReadMetrics(opCtx,
+                       [&](ReadMetrics& readMetrics) { readMetrics.docBytesRead += docBytesRead; });
+}
+void ResourceConsumption::MetricsCollector::incrementDocUnitsRead(OperationContext* opCtx,
+                                                                  size_t docUnitsRead) {
+    _updateReadMetrics(opCtx,
+                       [&](ReadMetrics& readMetrics) { readMetrics.docUnitsRead += docUnitsRead; });
+}
+void ResourceConsumption::MetricsCollector::incrementIdxEntriesRead(OperationContext* opCtx,
+                                                                    size_t idxEntriesRead) {
+    _updateReadMetrics(
+        opCtx, [&](ReadMetrics& readMetrics) { readMetrics.idxEntriesRead += idxEntriesRead; });
+}
+void ResourceConsumption::MetricsCollector::incrementKeysSorted(OperationContext* opCtx,
+                                                                size_t keysSorted) {
+    _updateReadMetrics(opCtx,
+                       [&](ReadMetrics& readMetrics) { readMetrics.keysSorted += keysSorted; });
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,
+                                                                    const std::string& dbName,
                                                                     bool commandCollectsMetrics)
     : _opCtx(opCtx) {
 
@@ -136,12 +188,13 @@ ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationCon
         return;
     }
 
-    if (!commandCollectsMetrics || !isMetricsCollectionEnabled()) {
+    if (!commandCollectsMetrics || !shouldCollectMetricsForDatabase(dbName) ||
+        !isMetricsCollectionEnabled()) {
         metrics.beginScopedNotCollecting();
         return;
     }
 
-    metrics.beginScopedCollecting();
+    metrics.beginScopedCollecting(dbName);
 }
 
 ResourceConsumption::ScopedMetricsCollector::~ScopedMetricsCollector() {

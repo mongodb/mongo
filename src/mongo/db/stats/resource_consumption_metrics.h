@@ -35,7 +35,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/logv2/attribute_storage.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -115,14 +114,24 @@ public:
         long long docUnitsReturned;
 
         /**
-         * Reports all metrics on a BSONObjectBuilder.
+         * Reports all metrics on a BSONObjectBuilder. The generated object has nested fields to
+         * represent the stucture of the data members on this class.
          */
         void toBson(BSONObjBuilder* builder) const;
 
         /**
-         * Reports all non-zero metrics for logging purposes.
+         * Reports metrics on a BSONObjectBuilder. This forms a flat object by merging
+         * primaryMetrics and secondaryMetrics and promotes their members to top-level fields. All
+         * fields are reported.
          */
-        void report(logv2::DynamicAttributes* pAttrs) const;
+        void toFlatBsonAllFields(BSONObjBuilder* builder) const;
+
+        /**
+         * Reports metrics on a BSONObjectBuilder. This forms a flat object by merging
+         * primaryMetrics and secondaryMetrics and promotes their members to top-level fields. Only
+         * non-zero fields are reported.
+         */
+        void toFlatBsonNonZeroFields(BSONObjBuilder* builder) const;
     };
 
     /**
@@ -134,12 +143,13 @@ public:
         static MetricsCollector& get(OperationContext* opCtx);
 
         /**
-         * When called, resource consumption metrics should be recorded and added to the global
-         * structure.
+         * When called, resource consumption metrics should be recorded for this operation.
          */
-        void beginScopedCollecting() {
+        void beginScopedCollecting(const std::string& dbName) {
             invariant(!isInScope());
+            _dbName = dbName;
             _collecting = ScopedCollectionState::kInScopeCollecting;
+            _hasCollectedMetrics = true;
         }
 
         /**
@@ -172,10 +182,11 @@ public:
         }
 
         /**
-         * Set the database name associated with these metrics.
+         * Returns whether or not a ScopedMetricsCollector is currently collecting or was collecting
+         * metrics at any point for this operation.
          */
-        void setDbName(const std::string& dbName) {
-            _dbName = dbName;
+        bool hasCollectedMetrics() const {
+            return _hasCollectedMetrics;
         }
 
         const std::string& getDbName() const {
@@ -196,7 +207,31 @@ public:
             return _metrics;
         }
 
+        void reset() {
+            invariant(!isInScope());
+            _metrics = {};
+            _dbName = {};
+            _hasCollectedMetrics = false;
+        }
+
+        /**
+         * These setters are replication-state aware and increment the desired metrics based on the
+         * current replication state. This is a no-op when metrics collection is disabled on this
+         * operation.
+         */
+        void incrementDocBytesRead(OperationContext* opCtx, size_t docBytesRead);
+        void incrementDocUnitsRead(OperationContext* opCtx, size_t docUnitsRead);
+        void incrementIdxEntriesRead(OperationContext* opCtx, size_t idxEntriesRead);
+        void incrementKeysSorted(OperationContext* opCtx, size_t keysSorted);
+
     private:
+        /**
+         * Update the current replication state's ReadMetrics if this operation is currently
+         * collecting metrics.
+         */
+        using ReadMetricsFunc = std::function<void(ReadMetrics& readMetrics)>;
+        void _updateReadMetrics(OperationContext* opCtx, ReadMetricsFunc&& updateFunc);
+
         /**
          * Represents the ScopedMetricsCollector state.
          */
@@ -209,18 +244,23 @@ public:
             kInScopeCollecting
         };
         ScopedCollectionState _collecting = ScopedCollectionState::kInactive;
+        bool _hasCollectedMetrics = false;
         std::string _dbName;
         Metrics _metrics;
     };
 
     /**
      * When instantiated with commandCollectsMetrics=true, enables operation resource consumption
-     * collection. When destructed, appends collected metrics to the global structure.
+     * collection. When destructed, appends collected metrics to the global structure, if metrics
+     * aggregation is enabled.
      */
     class ScopedMetricsCollector {
     public:
-        ScopedMetricsCollector(OperationContext* opCtx, bool commandCollectsMetrics);
-        ScopedMetricsCollector(OperationContext* opCtx) : ScopedMetricsCollector(opCtx, true) {}
+        ScopedMetricsCollector(OperationContext* opCtx,
+                               const std::string& dbName,
+                               bool commandCollectsMetrics);
+        ScopedMetricsCollector(OperationContext* opCtx, const std::string& dbName)
+            : ScopedMetricsCollector(opCtx, dbName, true) {}
         ~ScopedMetricsCollector();
 
     private:

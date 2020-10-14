@@ -36,6 +36,19 @@ let assertMetricsExist = function(metrics) {
     assert.gte(metrics.docUnitsReturned, 0);
 };
 
+let getDBMetrics = (adminDB) => {
+    let cursor = adminDB.aggregate([{$operationMetrics: {}}]);
+
+    // Merge all returned documents into a single object keyed by database name.
+    let allMetrics = {};
+    while (cursor.hasNext()) {
+        let doc = cursor.next();
+        allMetrics[doc.db] = doc;
+    }
+
+    return allMetrics;
+};
+
 // Perform very basic reads and writes on two different databases.
 const db1Name = 'db1';
 const primary = rst.getPrimary();
@@ -83,6 +96,26 @@ const secondary = rst.getSecondary();
     assertMetricsExist(allMetrics[db1Name]);
     assertMetricsExist(allMetrics[db2Name]);
 
+    // Ensure read metrics are attributed to the correct replication state.
+    let lastDocBytesRead;
+    if (node === primary) {
+        [db1Name, db2Name].forEach((db) => {
+            assert.gt(allMetrics[db].primaryMetrics.docBytesRead, 0);
+            assert.eq(allMetrics[db].secondaryMetrics.docBytesRead, 0);
+        });
+        assert.eq(allMetrics[db1Name].primaryMetrics.docBytesRead,
+                  allMetrics[db2Name].primaryMetrics.docBytesRead);
+        lastDocBytesRead = allMetrics[db1Name].primaryMetrics.docBytesRead;
+    } else {
+        [db1Name, db2Name].forEach((db) => {
+            assert.gt(allMetrics[db].secondaryMetrics.docBytesRead, 0);
+            assert.eq(allMetrics[db].primaryMetrics.docBytesRead, 0);
+        });
+        assert.eq(allMetrics[db1Name].secondaryMetrics.docBytesRead,
+                  allMetrics[db2Name].secondaryMetrics.docBytesRead);
+        lastDocBytesRead = allMetrics[db1Name].secondaryMetrics.docBytesRead;
+    }
+
     // Metrics for these databases should not be collected or reported.
     assert.eq(allMetrics['admin'], undefined);
     assert.eq(allMetrics['local'], undefined);
@@ -104,6 +137,16 @@ const secondary = rst.getSecondary();
     // This new database should appear with metrics, but it does not.
     cursor = adminDB.aggregate([{$operationMetrics: {}}]);
     assert.eq(cursor.itcount(), 2);
+
+    // Metrics should not have changed.
+    allMetrics = getDBMetrics(adminDB);
+    if (node === primary) {
+        assert.eq(allMetrics[db1Name].primaryMetrics.docBytesRead, lastDocBytesRead);
+        assert.eq(allMetrics[db2Name].primaryMetrics.docBytesRead, lastDocBytesRead);
+    } else {
+        assert.eq(allMetrics[db1Name].secondaryMetrics.docBytesRead, lastDocBytesRead);
+        assert.eq(allMetrics[db2Name].secondaryMetrics.docBytesRead, lastDocBytesRead);
+    }
 
     // Ensure the output collection has the 2 databases that existed at the start of the operation.
     rst.awaitReplication();

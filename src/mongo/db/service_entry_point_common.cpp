@@ -1038,11 +1038,7 @@ void execCommandDatabase(OperationContext* opCtx,
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(
-            opCtx, command->collectsResourceConsumptionMetrics());
-        if (ResourceConsumption::shouldCollectMetricsForDatabase(dbname)) {
-            auto& opMetrics = ResourceConsumption::MetricsCollector::get(opCtx);
-            opMetrics.setDbName(dbname);
-        }
+            opCtx, dbname, command->collectsResourceConsumptionMetrics());
 
         const auto allowTransactionsOnConfigDatabase =
             (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||

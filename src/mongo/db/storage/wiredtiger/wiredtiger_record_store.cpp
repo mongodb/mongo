@@ -53,6 +53,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/oplog_hack.h"
 #include "mongo/db/storage/wiredtiger/oplog_stone_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
@@ -669,6 +670,9 @@ public:
         WT_ITEM value;
         invariantWTOK(_cursor->get_value(_cursor, &value));
 
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+        metricsCollector.incrementDocBytesRead(_opCtx, value.size);
+
         return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
 
@@ -1009,7 +1013,6 @@ int64_t WiredTigerRecordStore::freeStorageSize(OperationContext* opCtx) const {
 RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const {
     WT_ITEM value;
     invariantWTOK(cursor->get_value(cursor.get(), &value));
-
     return RecordData(static_cast<const char*>(value.data), value.size).getOwned();
 }
 
@@ -1028,6 +1031,10 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
     }
     invariantWTOK(ret);
     *out = _getData(curwrap);
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementDocBytesRead(opCtx, out->size());
+
     return true;
 }
 
@@ -2196,6 +2203,9 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));
 
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+    metricsCollector.incrementDocBytesRead(_opCtx, value.size);
+
     _lastReturnedId = id;
     return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
 }
@@ -2226,6 +2236,9 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
 
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+    metricsCollector.incrementDocBytesRead(_opCtx, value.size);
 
     _lastReturnedId = id;
     _eof = false;

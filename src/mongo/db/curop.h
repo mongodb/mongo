@@ -39,6 +39,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log_component.h"
@@ -166,6 +167,7 @@ public:
 
     void report(OperationContext* opCtx,
                 const SingleThreadedLockStats* lockStats,
+                const ResourceConsumption::Metrics* operationMetrics,
                 logv2::DynamicAttributes* pAttrs) const;
 
     /**

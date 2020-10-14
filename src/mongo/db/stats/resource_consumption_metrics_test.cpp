@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
@@ -42,6 +43,11 @@ public:
         _opCtx = makeOperationContext();
         gMeasureOperationResourceConsumption = true;
         gAggregateOperationResourceConsumptionMetrics = true;
+
+        auto svcCtx = getServiceContext();
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx);
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(svcCtx, std::move(replCoord));
     }
 
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
@@ -64,10 +70,8 @@ TEST_F(ResourceConsumptionMetricsTest, Add) {
     auto& operationMetrics1 = ResourceConsumption::MetricsCollector::get(_opCtx.get());
     auto& operationMetrics2 = ResourceConsumption::MetricsCollector::get(opCtx2.get());
 
-    operationMetrics1.beginScopedCollecting();
-    operationMetrics1.setDbName("db1");
-    operationMetrics2.beginScopedCollecting();
-    operationMetrics2.setDbName("db2");
+    operationMetrics1.beginScopedCollecting("db1");
+    operationMetrics2.beginScopedCollecting("db2");
     globalResourceConsumption.add(operationMetrics1);
     globalResourceConsumption.add(operationMetrics1);
     globalResourceConsumption.add(operationMetrics2);
@@ -83,23 +87,22 @@ TEST_F(ResourceConsumptionMetricsTest, ScopedMetricsCollector) {
     auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
     auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
 
-    // Collect, but don't set a dbName
+    // Collect
     {
         const bool collectMetrics = true;
-        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1", collectMetrics);
         ASSERT_TRUE(operationMetrics.isCollecting());
     }
 
     ASSERT_FALSE(operationMetrics.isCollecting());
 
-    auto metricsCopy = globalResourceConsumption.getMetrics();
-    ASSERT_EQ(metricsCopy.size(), 0);
+    auto metricsCopy = globalResourceConsumption.getAndClearMetrics();
+    ASSERT_EQ(metricsCopy.size(), 1);
 
     // Don't collect
     {
         const bool collectMetrics = false;
-        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
-        operationMetrics.setDbName("db1");
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1", collectMetrics);
         ASSERT_FALSE(operationMetrics.isCollecting());
     }
 
@@ -109,19 +112,13 @@ TEST_F(ResourceConsumptionMetricsTest, ScopedMetricsCollector) {
     ASSERT_EQ(metricsCopy.count("db1"), 0);
 
     // Collect
-    {
-        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
-        operationMetrics.setDbName("db1");
-    }
+    { ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1"); }
 
     metricsCopy = globalResourceConsumption.getMetrics();
     ASSERT_EQ(metricsCopy.count("db1"), 1);
 
     // Collect on a different database
-    {
-        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
-        operationMetrics.setDbName("db2");
-    }
+    { ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db2"); }
 
     metricsCopy = globalResourceConsumption.getMetrics();
     ASSERT_EQ(metricsCopy.count("db1"), 1);
@@ -141,18 +138,18 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
     auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
     auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
 
-    // Collect, nesting does not override that behavior.
+    // Collect, nesting does not override that behavior or change the collection database.
     {
-        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
-        operationMetrics.setDbName("db1");
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
 
+        ASSERT(operationMetrics.hasCollectedMetrics());
         {
             const bool collectMetrics = false;
-            ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+            ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db2", collectMetrics);
             ASSERT_TRUE(operationMetrics.isCollecting());
 
             {
-                ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
+                ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db3");
                 ASSERT_TRUE(operationMetrics.isCollecting());
             }
         }
@@ -160,19 +157,25 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
 
     auto metricsCopy = globalResourceConsumption.getMetrics();
     ASSERT_EQ(metricsCopy.count("db1"), 1);
+    ASSERT_EQ(metricsCopy.count("db2"), 0);
+    ASSERT_EQ(metricsCopy.count("db3"), 0);
+
+    operationMetrics.reset();
 
     // Don't collect, nesting does not override that behavior.
     {
         const bool collectMetrics = false;
-        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
-        operationMetrics.setDbName("db2");
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db2", collectMetrics);
+
+        ASSERT_FALSE(operationMetrics.hasCollectedMetrics());
 
         {
-            ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get());
+            ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db3");
             ASSERT_FALSE(operationMetrics.isCollecting());
 
             {
-                ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), collectMetrics);
+                ResourceConsumption::ScopedMetricsCollector scope(
+                    _opCtx.get(), "db4", collectMetrics);
                 ASSERT_FALSE(operationMetrics.isCollecting());
             }
         }
@@ -180,6 +183,8 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
 
     metricsCopy = globalResourceConsumption.getMetrics();
     ASSERT_EQ(metricsCopy.count("db2"), 0);
+    ASSERT_EQ(metricsCopy.count("db3"), 0);
+    ASSERT_EQ(metricsCopy.count("db4"), 0);
 
     // Ensure fetch and clear works.
     auto metrics = globalResourceConsumption.getAndClearMetrics();
@@ -190,4 +195,86 @@ TEST_F(ResourceConsumptionMetricsTest, NestedScopedMetricsCollector) {
     ASSERT_EQ(metricsCopy.count("db1"), 0);
     ASSERT_EQ(metricsCopy.count("db2"), 0);
 }
+
+TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetrics) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+
+        operationMetrics.incrementDocBytesRead(_opCtx.get(), 2);
+        operationMetrics.incrementDocUnitsRead(_opCtx.get(), 4);
+        operationMetrics.incrementIdxEntriesRead(_opCtx.get(), 8);
+        operationMetrics.incrementKeysSorted(_opCtx.get(), 16);
+    }
+
+    ASSERT(operationMetrics.hasCollectedMetrics());
+
+    auto metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.docBytesRead, 2);
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.docUnitsRead, 4);
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.idxEntriesRead, 8);
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.keysSorted, 16);
+
+    // Clear metrics so we do not double-count.
+    operationMetrics.reset();
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+
+        operationMetrics.incrementDocBytesRead(_opCtx.get(), 32);
+        operationMetrics.incrementDocUnitsRead(_opCtx.get(), 64);
+        operationMetrics.incrementIdxEntriesRead(_opCtx.get(), 128);
+        operationMetrics.incrementKeysSorted(_opCtx.get(), 256);
+    }
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.docBytesRead, 2 + 32);
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.docUnitsRead, 4 + 64);
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.idxEntriesRead, 8 + 128);
+    ASSERT_EQ(metricsCopy["db1"].primaryMetrics.keysSorted, 16 + 256);
+}
+
+TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    ASSERT_OK(repl::ReplicationCoordinator::get(_opCtx.get())
+                  ->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+
+        operationMetrics.incrementDocBytesRead(_opCtx.get(), 2);
+        operationMetrics.incrementDocUnitsRead(_opCtx.get(), 4);
+        operationMetrics.incrementIdxEntriesRead(_opCtx.get(), 8);
+        operationMetrics.incrementKeysSorted(_opCtx.get(), 16);
+    }
+
+    auto metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.docBytesRead, 2);
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.docUnitsRead, 4);
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.idxEntriesRead, 8);
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.keysSorted, 16);
+
+    // Clear metrics so we do not double-count.
+    operationMetrics.reset();
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+
+        operationMetrics.incrementDocBytesRead(_opCtx.get(), 32);
+        operationMetrics.incrementDocUnitsRead(_opCtx.get(), 64);
+        operationMetrics.incrementIdxEntriesRead(_opCtx.get(), 128);
+        operationMetrics.incrementKeysSorted(_opCtx.get(), 256);
+    }
+
+    metricsCopy = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.docBytesRead, 2 + 32);
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.docUnitsRead, 4 + 64);
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.idxEntriesRead, 8 + 128);
+    ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.keysSorted, 16 + 256);
+}
+
 }  // namespace mongo

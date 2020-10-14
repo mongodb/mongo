@@ -69,11 +69,10 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     }
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    if (ResourceConsumption::isMetricsCollectionEnabled() &&
-        !metricsCollector.getDbName().empty()) {
+    if (metricsCollector.hasCollectedMetrics()) {
         BSONObjBuilder metricsBuilder = b.subobjStart("operationMetrics");
         const auto& metrics = metricsCollector.getMetrics();
-        metrics.toBson(&metricsBuilder);
+        metrics.toFlatBsonAllFields(&metricsBuilder);
         metricsBuilder.done();
     }
 
