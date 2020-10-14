@@ -512,7 +512,8 @@ boost::optional<std::shared_ptr<PrimaryOnlyService::Instance>> PrimaryOnlyServic
     OperationContext* opCtx, const InstanceID& id) {
     // If this operation is holding any database locks, then it must have opted into getting
     // interrupted at stepdown to prevent deadlocks.
-    invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+    invariant(!opCtx->lockState()->isLocked() || opCtx->shouldAlwaysInterruptAtStepDownOrUp() ||
+              opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
 
     stdx::unique_lock lk(_mutex);
     opCtx->waitForConditionOrInterrupt(

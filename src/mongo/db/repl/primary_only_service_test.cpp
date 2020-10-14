@@ -439,6 +439,75 @@ TEST_F(PrimaryOnlyServiceTest, LookupInstanceInterruptible) {
                        ErrorCodes::Interrupted);
 }
 
+TEST_F(PrimaryOnlyServiceTest, LookupInstanceHoldingISLock) {
+    // Make sure the instance doesn't complete before we try to look it up.
+    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getID());
+
+    {
+        Lock::GlobalLock lk(opCtx.get(), MODE_IS);
+
+        // The RstlKillOpThread would only interrupt a read operation if the OperationContext opted
+        // into always being interrupted.
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
+        ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+
+        auto instance2 =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
+        ASSERT_EQ(instance.get(), instance2.get());
+    }
+
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+    instance->getCompletionFuture().get();
+}
+
+TEST_F(PrimaryOnlyServiceTest, LookupInstanceHoldingIXLock) {
+    // Make sure the instance doesn't complete before we try to look it up.
+    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getID());
+
+    {
+        Lock::GlobalLock lk(opCtx.get(), MODE_IX);
+        ASSERT_FALSE(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+        auto instance2 =
+            TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0)).get();
+        ASSERT_EQ(instance.get(), instance2.get());
+    }
+
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+    instance->getCompletionFuture().get();
+}
+
+DEATH_TEST_F(PrimaryOnlyServiceTest,
+             LookupInstanceHoldingISLockWithoutAlwaysBeingInterruptible,
+             "invariant") {
+    // Make sure the instance doesn't complete before we try to look it up.
+    TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+    auto opCtx = makeOperationContext();
+    auto instance =
+        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+    ASSERT(instance.get());
+    ASSERT_EQ(0, instance->getID());
+
+    {
+        Lock::GlobalLock lk(opCtx.get(), MODE_IS);
+        ASSERT_FALSE(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
+        ASSERT_FALSE(opCtx->lockState()->wasGlobalLockTakenInModeConflictingWithWrites());
+        TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+    }
+}
+
 TEST_F(PrimaryOnlyServiceTest, GetOrCreateInstanceInterruptible) {
     stepDown();
     // Make sure the service stays in state kRebuilding so that getOrCreate() has to try to wait on
