@@ -494,6 +494,7 @@ int
 __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
     WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
     WT_TXN *txn;
     wt_timestamp_t read_ts;
 
@@ -502,14 +503,14 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
     if (cfg == NULL)
         return (0);
 
-    WT_RET(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
+    WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
     if (cval.len != 0)
         txn->isolation = WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
           WT_ISO_SNAPSHOT :
           WT_STRING_MATCH("read-committed", cval.str, cval.len) ? WT_ISO_READ_COMMITTED :
                                                                   WT_ISO_READ_UNCOMMITTED;
 
-    WT_RET(__txn_config_operation_timeout(session, cfg, false));
+    WT_ERR(__txn_config_operation_timeout(session, cfg, false));
 
     /*
      * The default sync setting is inherited from the connection, but can be overridden by an
@@ -518,7 +519,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
      * We want to distinguish between inheriting implicitly and explicitly.
      */
     F_CLR(txn, WT_TXN_SYNC_SET);
-    WT_RET(__wt_config_gets_def(session, cfg, "sync", (int)UINT_MAX, &cval));
+    WT_ERR(__wt_config_gets_def(session, cfg, "sync", (int)UINT_MAX, &cval));
     if (cval.val == 0 || cval.val == 1)
         /*
          * This is an explicit setting of sync. Set the flag so that we know not to overwrite it in
@@ -533,7 +534,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
         txn->txn_logsync = 0;
 
     /* Check if prepared updates should be ignored during reads. */
-    WT_RET(__wt_config_gets_def(session, cfg, "ignore_prepare", 0, &cval));
+    WT_ERR(__wt_config_gets_def(session, cfg, "ignore_prepare", 0, &cval));
     if (cval.len > 0 && WT_STRING_MATCH("force", cval.str, cval.len))
         F_SET(txn, WT_TXN_IGNORE_PREPARE);
     else if (cval.val)
@@ -543,22 +544,39 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
      * Check if the prepare timestamp and the commit timestamp of a prepared transaction need to be
      * rounded up.
      */
-    WT_RET(__wt_config_gets_def(session, cfg, "roundup_timestamps.prepared", 0, &cval));
+    WT_ERR(__wt_config_gets_def(session, cfg, "roundup_timestamps.prepared", 0, &cval));
     if (cval.val)
         F_SET(txn, WT_TXN_TS_ROUND_PREPARED);
 
     /* Check if read timestamp needs to be rounded up. */
-    WT_RET(__wt_config_gets_def(session, cfg, "roundup_timestamps.read", 0, &cval));
+    WT_ERR(__wt_config_gets_def(session, cfg, "roundup_timestamps.read", 0, &cval));
     if (cval.val)
         F_SET(txn, WT_TXN_TS_ROUND_READ);
 
-    WT_RET(__wt_config_gets_def(session, cfg, "read_timestamp", 0, &cval));
-    if (cval.len != 0) {
-        WT_RET(__wt_txn_parse_timestamp(session, "read", &read_ts, &cval));
-        WT_RET(__wt_txn_set_read_timestamp(session, read_ts));
+    /* Check if the read timestamp is allowed to be before the oldest timestamp. */
+    WT_ERR(__wt_config_gets_def(session, cfg, "read_before_oldest", 0, &cval));
+    if (cval.val) {
+        if (F_ISSET(txn, WT_TXN_TS_ROUND_READ))
+            WT_ERR_MSG(session, EINVAL,
+              "cannot specify roundup_timestamps.read and "
+              "read_before_oldest on the same transaction");
+        F_SET(txn, WT_TXN_TS_READ_BEFORE_OLDEST);
     }
 
-    return (0);
+    WT_ERR(__wt_config_gets_def(session, cfg, "read_timestamp", 0, &cval));
+    if (cval.len != 0) {
+        WT_ERR(__wt_txn_parse_timestamp(session, "read", &read_ts, &cval));
+        WT_ERR(__wt_txn_set_read_timestamp(session, read_ts));
+    }
+
+err:
+    if (ret != 0)
+        /*
+         * In the event that we error during configuration we should clear the flags on the
+         * transaction so they are not set in a subsequent call to transaction begin.
+         */
+        txn->flags = 0;
+    return (ret);
 }
 
 /*

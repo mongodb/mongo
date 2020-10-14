@@ -639,8 +639,8 @@ struct __wt_connection_stats {
     int64_t rec_time_aggr_newest_stop_durable_ts;
     int64_t rec_time_aggr_newest_stop_ts;
     int64_t rec_time_aggr_newest_stop_txn;
+    int64_t rec_time_aggr_newest_txn;
     int64_t rec_time_aggr_oldest_start_ts;
-    int64_t rec_time_aggr_oldest_start_txn;
     int64_t rec_time_aggr_prepared;
     int64_t rec_time_window_pages_prepared;
     int64_t rec_time_window_pages_durable_start_ts;
@@ -669,8 +669,6 @@ struct __wt_connection_stats {
     int64_t session_table_create_success;
     int64_t session_table_drop_fail;
     int64_t session_table_drop_success;
-    int64_t session_table_import_fail;
-    int64_t session_table_import_success;
     int64_t session_table_rename_fail;
     int64_t session_table_rename_success;
     int64_t session_table_salvage_fail;
@@ -939,8 +937,8 @@ struct __wt_dsrc_stats {
     int64_t rec_time_aggr_newest_stop_durable_ts;
     int64_t rec_time_aggr_newest_stop_ts;
     int64_t rec_time_aggr_newest_stop_txn;
+    int64_t rec_time_aggr_newest_txn;
     int64_t rec_time_aggr_oldest_start_ts;
-    int64_t rec_time_aggr_oldest_start_txn;
     int64_t rec_time_aggr_prepared;
     int64_t rec_time_window_pages_prepared;
     int64_t rec_time_window_pages_durable_start_ts;

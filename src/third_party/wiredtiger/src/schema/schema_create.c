@@ -219,7 +219,8 @@ __create_file(
             WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
             WT_ERR(__wt_metadata_insert(session, uri, fileconf));
         } else {
-            /* TO-DO: WT-6691 */
+            /* Read the data file's descriptor block and try to recreate the associated metadata. */
+            WT_ERR(__wt_import_repair(session, uri, &fileconf));
         }
 
         /*

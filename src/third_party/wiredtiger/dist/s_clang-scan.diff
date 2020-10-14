@@ -1,22 +1,22 @@
 In file included from src/block/block_write.c:9:
 In file included from ./src/include/wt_internal.h:420:
-./src/include/intpack.i:193:7: warning: Assigned value is garbage or undefined
+./src/include/intpack_inline.h:193:7: warning: Assigned value is garbage or undefined
     p = *pp;
       ^ ~~~
 1 warning generated
 In file included from src/btree/col_modify.c:9:
 In file included from ./src/include/wt_internal.h:425:
-./src/include/mutex.i:158:13: warning: Null pointer passed as an argument to a 'nonnull' parameter
+./src/include/mutex_inline.h:158:13: warning: Null pointer passed as an argument to a 'nonnull' parameter
     return (pthread_mutex_trylock(&t->lock));
             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.
-src/conn/conn_capacity.c:291:5: warning: Value stored to 'capacity' is never read
+src/conn/conn_capacity.c:288:5: warning: Value stored to 'capacity' is never read
     capacity = steal_capacity = 0;
     ^          ~~~~~~~~~~~~~~~~~~
 1 warning generated.
 In file included from src/reconcile/rec_write.c:9:
 In file included from ./src/include/wt_internal.h:425:
-./src/include/mutex.i:184:16: warning: Null pointer passed as an argument to a 'nonnull' parameter
+./src/include/mutex_inline.h:184:16: warning: Null pointer passed as an argument to a 'nonnull' parameter
     if ((ret = pthread_mutex_unlock(&t->lock)) != 0)
                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 1 warning generated.

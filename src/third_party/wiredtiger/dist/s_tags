@@ -29,12 +29,12 @@ done
 # Generate a tags file for the standard build directory.
 (cd ../build_posix &&
 rm -f tags &&
-ctags $flags ../src/include/*.in `find ../src -name '*.[chi]'` 2>/dev/null)
+ctags $flags ../src/include/*.in `find ../src -name '*.[ch]'` 2>/dev/null)
 
 # Generate a tags file for the src/include directory.
 (cd ../src/include &&
 rm -f tags &&
-ctags $flags ../include/*.in `find .. -name '*.[chi]'` 2>/dev/null)
+ctags $flags ../include/*.in `find .. -name '*.[ch]'` 2>/dev/null)
 
 # Link the tags file into place in the standard source directories, if we're
 # at the right level.

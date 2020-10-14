@@ -7,9 +7,6 @@ AM_LDFLAGS = -static
 all_TESTS=
 noinst_PROGRAMS=
 
-# The import test is only a shell script
-all_TESTS += import/smoke.sh
-
 test_incr_backup_SOURCES = incr_backup/main.c
 noinst_PROGRAMS += test_incr_backup
 all_TESTS += incr_backup/smoke.sh

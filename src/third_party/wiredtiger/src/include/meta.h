@@ -38,6 +38,8 @@
 #define WT_SYSTEM_CKPT_URI "system:checkpoint"   /* Checkpoint timestamp URI */
 #define WT_SYSTEM_OLDEST_TS "oldest_timestamp"   /* Oldest timestamp name */
 #define WT_SYSTEM_OLDEST_URI "system:oldest"     /* Oldest timestamp URI */
+#define WT_SYSTEM_BASE_WRITE_GEN_URI "system:checkpoint_base_write_gen" /* Base write gen URI */
+#define WT_SYSTEM_BASE_WRITE_GEN "base_write_gen"                       /* Base write gen name */
 
 /*
  * Optimize comparisons against the metafile URI, flag handles that reference the metadata file.

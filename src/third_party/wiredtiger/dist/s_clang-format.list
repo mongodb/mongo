@@ -3,7 +3,7 @@ bench/workgen/workgen_int.h
 bench/workgen/workgen_time.h
 src/config/config_def.c
 src/conn/api_strerror.c
-src/include/bitstring.i
+src/include/bitstring_inline.h
 src/include/config.h
 src/include/extern.h
 src/include/extern_posix.h

@@ -311,6 +311,9 @@ struct __wt_connection_impl {
     /* Connection's base write generation. */
     uint64_t base_write_gen;
 
+    /* Last checkpoint connection's base write generation */
+    uint64_t last_ckpt_base_write_gen;
+
     uint32_t stat_flags; /* Options declared in flags.py */
 
     /* Connection statistics */

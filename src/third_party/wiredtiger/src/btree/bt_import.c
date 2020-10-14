@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_import --
- *     Import a WiredTiger file into the database.
+ * __wt_import_repair --
+ *     Import a WiredTiger file into the database and reconstruct its metadata.
  */
 int
-__wt_import(WT_SESSION_IMPL *session, const char *uri)
+__wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **fileconfp)
 {
     WT_BM *bm;
     WT_CKPT *ckpt, *ckptbase;
@@ -23,8 +23,10 @@ __wt_import(WT_SESSION_IMPL *session, const char *uri)
     WT_DECL_ITEM(checkpoint);
     WT_DECL_RET;
     WT_KEYED_ENCRYPTOR *kencryptor;
+    uint32_t allocsize;
     char *checkpoint_list, *fileconf, *metadata, fileid[64];
-    const char *filecfg[] = {WT_CONFIG_BASE(session, file_meta), NULL, NULL, NULL, NULL, NULL};
+    const char *filecfg[] = {
+      WT_CONFIG_BASE(session, file_meta), NULL, NULL, NULL, NULL, NULL, NULL};
     const char *filename;
 
     ckptbase = NULL;
@@ -42,9 +44,11 @@ __wt_import(WT_SESSION_IMPL *session, const char *uri)
      * Open the file, request block manager checkpoint information. We don't know the allocation
      * size, but 512B allows us to read the descriptor block and that's all we care about.
      */
+    F_SET(session, WT_SESSION_IMPORT_REPAIR);
     WT_ERR(__wt_block_manager_open(session, filename, filecfg, false, true, 512, &bm));
     ret = bm->checkpoint_last(bm, session, &metadata, &checkpoint_list, checkpoint);
     WT_TRET(bm->close(bm, session));
+    F_CLR(session, WT_SESSION_IMPORT_REPAIR);
     WT_ERR(ret);
     __wt_verbose(session, WT_VERB_CHECKPOINT, "import metadata: %s", metadata);
     __wt_verbose(session, WT_VERB_CHECKPOINT, "import checkpoint-list: %s", checkpoint_list);
@@ -102,10 +106,23 @@ __wt_import(WT_SESSION_IMPL *session, const char *uri)
     WT_WITH_SCHEMA_LOCK(session,
       ret = __wt_snprintf(fileid, sizeof(fileid), "id=%" PRIu32, ++S2C(session)->next_file_id));
     WT_ERR(ret);
-    filecfg[4] = fileid;
+    filecfg[5] = fileid;
     WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
     WT_ERR(__wt_metadata_insert(session, uri, fileconf));
     __wt_verbose(session, WT_VERB_CHECKPOINT, "import configuration: %s/%s", uri, fileconf);
+
+    /* Now that we've retrieved the configuration, let's get the real allocation size. */
+    WT_ERR(__wt_config_getones(session, fileconf, "allocation_size", &v));
+    allocsize = (uint32_t)v.val;
+
+    /*
+     * Now we need to retrieve the last checkpoint again but this time, with the correct allocation
+     * size. When we did this earlier, we were able to read the descriptor block properly but the
+     * checkpoint's byte representation was wrong because it was using the wrong allocation size.
+     */
+    WT_ERR(__wt_block_manager_open(session, filename, filecfg, false, true, allocsize, &bm));
+    ret = bm->checkpoint_last(bm, session, &metadata, &checkpoint_list, checkpoint);
+    WT_TRET(bm->close(bm, session));
 
     /*
      * The just inserted metadata was correct as of immediately before the final checkpoint, but
@@ -138,10 +155,16 @@ __wt_import(WT_SESSION_IMPL *session, const char *uri)
     WT_ERR(__wt_buf_set(session, &ckpt->raw, checkpoint->data, checkpoint->size));
     WT_ERR(__wt_meta_ckptlist_set(session, uri, ckptbase, NULL));
 
+    WT_ASSERT(session, fileconfp != NULL);
+    *fileconfp = fileconf;
+
 err:
+    F_CLR(session, WT_SESSION_IMPORT_REPAIR);
+
     __wt_meta_ckptlist_free(session, &ckptbase);
 
-    __wt_free(session, fileconf);
+    if (ret != 0)
+        __wt_free(session, fileconf);
     __wt_free(session, metadata);
     __wt_free(session, checkpoint_list);
 

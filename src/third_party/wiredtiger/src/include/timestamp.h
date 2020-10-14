@@ -40,13 +40,24 @@ struct __wt_time_window {
     uint8_t prepare;
 };
 
-/* The time points that define an aggregated time window and associated prepare information. */
+/*
+ * The time points that define an aggregated time window and associated prepare information.
+ *
+ * - newest_start_durable_ts - Newest valid start durable/commit timestamp
+ * - newest_stop_durable_ts  - Newest valid stop durable/commit timestamp doesn't include WT_TS_MAX
+ * - oldest_start_ts         - Oldest start commit timestamp
+ * - newest_txn              - Newest valid start/stop commit transaction doesn't include
+ *                             WT_TXN_MAX
+ * - newest_stop_ts          - Newest stop commit timestamp include WT_TS_MAX
+ * - newest_stop_txn         - Newest stop commit transaction include WT_TXN_MAX
+ * - prepare                 - Prepared updates
+ */
 struct __wt_time_aggregate {
     wt_timestamp_t newest_start_durable_ts; /* default value: WT_TS_NONE */
     wt_timestamp_t newest_stop_durable_ts;  /* default value: WT_TS_NONE */
 
     wt_timestamp_t oldest_start_ts; /* default value: WT_TS_NONE */
-    uint64_t oldest_start_txn;      /* default value: WT_TXN_NONE */
+    uint64_t newest_txn;            /* default value: WT_TXN_NONE */
     wt_timestamp_t newest_stop_ts;  /* default value: WT_TS_MAX */
     uint64_t newest_stop_txn;       /* default value: WT_TXN_MAX */
 

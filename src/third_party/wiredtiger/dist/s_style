@@ -17,7 +17,7 @@ if [ $# -ne 1 ]; then
 	cd ..
 
 	find bench examples ext src test \
-	    -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
+	    -name '*.[chsy]' -o -name '*.in' -o -name '*.dox' |
 	sed -e '/Makefile.in/d' \
 	    -e '/build_win\/wiredtiger_config.h/d' \
 	    -e '/checksum\/power8/d' \

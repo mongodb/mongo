@@ -21,7 +21,7 @@ file_parse()
 
 # Returns in functions after a jump to the error label, or an infinite loop
 # where there's a jump to the error label after the error label.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.c' -o -name '*_inline.h'`; do
 	file_parse $f |
 	egrep '(WT_ERR[_A-Z]*)\(.*(WT_RET[_A-Z]*)\(.*err:|[^a-z_]err:.*(WT_ERR)\(' |
 	sed 's/:.*//' > $t
@@ -34,14 +34,14 @@ done
 
 # Returns before jumps to an error label within the same loop.
 # Jumps before returns have already been detected above.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; do
 	file_parse $f | sed "s=^=$f:="
 done | python dist/s_function_loop.py |
     egrep '\{@[^@]*(WT_RET[_A-Z]*)\([^@]*(WT_ERR[_A-Z]*)\(.*err:' |
     sed -e 's/^\([^:]*\): *\([^:]*\):.*/\1:\2: mix of returns and jump to the error label within a loop/'
 
 # Return of 0 in functions after a jump to the error label.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; do
 	file_parse $f |
 	egrep -v '[^a-z_]err:.*return \(ret|[^a-z_]err:.*WT_RET' |
 	egrep '[^a-z_]err:.*return \(0\);' |
@@ -54,7 +54,7 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 done
 
 # Early exits from critical loops.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; do
 	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
 	       -e '/LSM_.*ENTER*;$/,/LSM_.*LEAVE*;/{=;p;}' \
 	       -e '/WT_TRACK_OP_INIT/,/WT_TRACK_OP_END/{=;p;}' \
@@ -66,7 +66,7 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 done
 
 # API_END with a return
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; do
 	file_parse $f |
 	egrep '[^A-Z_]API_END.*return' |
 	sed 's/:.*//' > $t
@@ -77,7 +77,7 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 done
 
 # S2C with a local WT_CONNECTION_IMPL variable.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; do
 	file_parse $f |
 	egrep 'conn = S2C.*S2C' |
 	sed 's/:.*//' > $t
@@ -88,7 +88,7 @@ for f in `find bench examples ext src test -name '*.[ci]'`; do
 done
 
 # S2B with a local WT_BTREE variable.
-for f in `find bench examples ext src test -name '*.[ci]'`; do
+for f in `find bench examples ext src test -name '*.c' -o -name '*._inline.h'`; do
 	file_parse $f |
 	egrep 'btree = S2B.*S2B' |
 	sed 's/:.*//' > $t

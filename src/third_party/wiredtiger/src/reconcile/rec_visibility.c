@@ -235,7 +235,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
     WT_UPDATE *first_txn_upd, *first_upd, *upd, *last_upd, *same_txn_valid_upd, *tombstone;
     wt_timestamp_t max_ts;
     size_t upd_memsize;
-    uint64_t max_txn, txnid;
+    uint64_t max_txn, session_txnid, txnid;
     char time_string[WT_TIME_STRING_SIZE];
     bool has_newer_updates, is_hs_page, supd_restore, upd_saved;
 
@@ -255,6 +255,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
     max_txn = WT_TXN_NONE;
     has_newer_updates = upd_saved = false;
     is_hs_page = F_ISSET(S2BT(session), WT_BTREE_HS);
+    session_txnid = WT_SESSION_TXN_SHARED(session)->id;
 
     /*
      * If called with a WT_INSERT item, use its WT_UPDATE list (which must exist), otherwise check
@@ -281,6 +282,13 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, v
         if (WT_TXNID_LT(max_txn, txnid))
             max_txn = txnid;
 
+        /*
+         * Special handling for application threads evicting their own updates.
+         */
+        if (!is_hs_page && F_ISSET(r, WT_REC_APP_EVICTION_SNAPSHOT) && txnid == session_txnid) {
+            has_newer_updates = true;
+            continue;
+        }
         /*
          * Check whether the update was committed before reconciliation started. The global commit
          * point can move forward during reconciliation so we use a cached copy to avoid races when

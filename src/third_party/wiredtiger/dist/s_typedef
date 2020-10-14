@@ -18,7 +18,7 @@ build() {
 	    -e 'q' \
 	    -e '}' < $f
 
-	l=`ls ../src/include/*.[hi] ../src/include/*.in |
+	l=`ls ../src/include/*.h ../src/include/*.in |
 	    sed -e '/wiredtiger.*/d' -e '/queue.h/d'`
 	egrep -h \
 	    '^\s*(((struct|union)\s.*__wt_.*{)|WT_PACKED_STRUCT_BEGIN)' \

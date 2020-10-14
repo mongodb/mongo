@@ -38,12 +38,7 @@ usage(void)
     static const char *commands[] = {"alter", "alter an object", "backup", "database backup",
       "compact", "compact an object", "copyright", "display copyright information", "create",
       "create an object", "downgrade", "downgrade a database", "drop", "drop an object", "dump",
-      "dump an object",
-      /*
-       * Import is not documented.
-       * "import", "import an object"
-       */
-      "list", "list database objects", "load", "load an object", "loadtext",
+      "dump an object", "list", "list database objects", "load", "load an object", "loadtext",
       "load an object from a text file", "printlog", "display the database log", "read",
       "read values from an object", "rename", "rename an object", "salvage", "salvage a file",
       "stat", "display statistics for an object", "truncate",
@@ -197,10 +192,6 @@ main(int argc, char *argv[])
             func = util_drop;
         else if (strcmp(command, "dump") == 0)
             func = util_dump;
-        break;
-    case 'i':
-        if (strcmp(command, "import") == 0)
-            func = util_import;
         break;
     case 'l':
         if (strcmp(command, "list") == 0)

@@ -32,8 +32,8 @@ __rec_cell_addr_stats(WT_RECONCILE *r, WT_TIME_AGGREGATE *ta)
         FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_DURABLE_TS);
     if (ta->oldest_start_ts != WT_TS_NONE)
         FLD_SET(r->ts_usage_flags, WT_REC_TIME_OLDEST_START_TS);
-    if (ta->oldest_start_txn != WT_TXN_NONE)
-        FLD_SET(r->ts_usage_flags, WT_REC_TIME_OLDEST_START_TXN);
+    if (ta->newest_txn != WT_TXN_NONE)
+        FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_TXN);
     if (ta->newest_stop_ts != WT_TS_MAX)
         FLD_SET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_TS);
     if (ta->newest_stop_txn != WT_TXN_MAX)
@@ -179,9 +179,9 @@ __rec_page_time_stats(WT_SESSION_IMPL *session, WT_RECONCILE *r)
         WT_STAT_CONN_INCR(session, rec_time_aggr_oldest_start_ts);
         WT_STAT_DATA_INCR(session, rec_time_aggr_oldest_start_ts);
     }
-    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_OLDEST_START_TXN)) {
-        WT_STAT_CONN_INCR(session, rec_time_aggr_oldest_start_txn);
-        WT_STAT_DATA_INCR(session, rec_time_aggr_oldest_start_txn);
+    if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_NEWEST_TXN)) {
+        WT_STAT_CONN_INCR(session, rec_time_aggr_newest_txn);
+        WT_STAT_DATA_INCR(session, rec_time_aggr_newest_txn);
     }
     if (FLD_ISSET(r->ts_usage_flags, WT_REC_TIME_NEWEST_STOP_TS)) {
         WT_STAT_CONN_INCR(session, rec_time_aggr_newest_stop_ts);

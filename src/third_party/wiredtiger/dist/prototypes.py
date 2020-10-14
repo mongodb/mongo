@@ -54,7 +54,7 @@ def output(p, f):
 def prototypes_extern():
     p = []
     for name in source_files():
-        if not fnmatch.fnmatch(name, '*.[ci]'):
+        if not fnmatch.fnmatch(name, '*.c') + fnmatch.fnmatch(name, '*_inline.h'):
                 continue;
         if fnmatch.fnmatch(name, '*/checksum/arm64/*'):
             continue
@@ -76,7 +76,7 @@ def prototypes_extern():
 def prototypes_posix():
     p = []
     for name in source_files():
-        if not fnmatch.fnmatch(name, '*.[ci]'):
+        if not fnmatch.fnmatch(name, '*.c') + fnmatch.fnmatch(name, '*_inline.h'):
                 continue;
         if not fnmatch.fnmatch(name, '*/os_posix/*'):
             continue
@@ -88,7 +88,7 @@ def prototypes_posix():
 def prototypes_win():
     p = []
     for name in source_files():
-        if not fnmatch.fnmatch(name, '*.[ci]'):
+        if not fnmatch.fnmatch(name, '*.c') + fnmatch.fnmatch(name, '*_inline.h'):
                 continue;
         if not fnmatch.fnmatch(name, '*/os_win/*'):
             continue

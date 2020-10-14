@@ -827,21 +827,6 @@ tasks:
 
   # Start of csuite test tasks
 
-  - name: csuite-import-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/build_posix"
-          script: |
-            set -o errexit
-            set -o verbose
-
-            ${test_env_vars|} $(pwd)/../test/csuite/import/smoke.sh 2>&1
-
   - name: csuite-incr-backup-test
     tags: ["pull_request"]
     depends_on:
@@ -2364,7 +2349,7 @@ tasks:
   - <<: *recovery-stress-test
     name: recovery-stress-test-3
     tags: ["stress-test-3", "stress-test-zseries-3"]
-  
+
   - name: cyclomatic-complexity
     tags: ["pull_request"]
     commands:
@@ -2383,9 +2368,9 @@ tasks:
             # Set the cyclomatic complexity limit to 20
             python "metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:20
 
-            # Fail if there are functions with cyclomatic complexity larger than 92
+            # Fail if there are functions with cyclomatic complexity larger than 95
             set -o errexit
-            python "metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:92
+            python "metrixplusplus/metrix++.py" limit --max-limit=std.code.complexity:cyclomatic:95
 
 buildvariants:
 
