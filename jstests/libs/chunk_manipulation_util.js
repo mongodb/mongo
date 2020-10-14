@@ -144,9 +144,7 @@ function waitForMoveChunkStep(shardConnection, stepNumber) {
             let op = in_progress.next();
             inProgressStr += tojson(op);
 
-            // TODO (SERVER-45993): Remove the 4.2 and prior branch once 4.4 becomes last-lts.
-            if ((op.desc && op.desc === "MoveChunk") ||
-                (op.command && op.command.moveChunk /* required for v4.2 and prior */)) {
+            if (op.desc && op.desc === "MoveChunk") {
                 // Note: moveChunk in join mode will not have the "step" message. So keep on
                 // looking if searchString is not found.
                 if (op.msg && op.msg.startsWith(searchString)) {
@@ -269,19 +267,10 @@ function killRunningMoveChunk(admin) {
         if (op.desc && op.desc === "MoveChunk") {
             opIdsToKill["MoveChunk"] = op.opid;
         }
-        // TODO (SERVER-45993): Remove this branch once 4.4 becomes last-lts.
-        // For 4.2 binaries and prior.
-        if (op.command && op.command.moveChunk) {
-            opIdsToKill["moveChunkCommand"] = op.opid;
-        }
     }
 
     if (opIdsToKill.MoveChunk) {
         admin.killOp(opIdsToKill.MoveChunk);
-        abortedMigration = true;
-    } else if (opIdsToKill.moveChunkCommand) {
-        // TODO (SERVER-45993): Remove this branch once 4.4 becomes last-lts.
-        admin.killOp(opIdsToKill.moveChunkCommand);
         abortedMigration = true;
     }
 
