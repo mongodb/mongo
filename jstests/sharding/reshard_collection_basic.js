@@ -12,15 +12,26 @@ const collName = '.foo';
 const ns = kDbName + collName;
 const mongos = st.s0;
 
+let removeAllReshardingCollections = () => {
+    mongos.getDB(kDbName).foo.drop();
+    mongos.getDB('config').reshardingOperations.remove({nss: ns});
+    mongos.getDB('config').collections.remove({reshardingFields: {$exists: true}});
+    st.rs0.getPrimary().getDB('config').localReshardingOperations.donor.remove({nss: ns});
+    st.rs0.getPrimary().getDB('config').localReshardingOperations.recipient.remove({nss: ns});
+    st.rs1.getPrimary().getDB('config').localReshardingOperations.donor.remove({nss: ns});
+    st.rs1.getPrimary().getDB('config').localReshardingOperations.recipient.remove({nss: ns});
+};
+
 // Fail if sharding is disabled.
 assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {_id: 1}}),
                              ErrorCodes.NamespaceNotFound);
 
+assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
+
 // Fail if collection is unsharded.
 assert.commandFailedWithCode(mongos.adminCommand({reshardCollection: ns, key: {_id: 1}}),
-                             ErrorCodes.NamespaceNotFound);
+                             ErrorCodes.NamespaceNotSharded);
 
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
 // Fail if missing required key.
@@ -35,7 +46,7 @@ assert.commandFailedWithCode(
 assert.commandWorked(
     mongos.adminCommand({reshardCollection: ns, key: {_id: 1}, collation: {locale: 'simple'}}));
 
-mongos.getDB(kDbName).foo.drop();
+removeAllReshardingCollections();
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
@@ -44,7 +55,8 @@ assert.commandFailedWithCode(
     mongos.adminCommand({reshardCollection: ns, key: {_id: 1}, unique: true}), ErrorCodes.BadValue);
 // Succeed if unique is specified and is false.
 assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {_id: 1}, unique: false}));
-mongos.getDB(kDbName).foo.drop();
+
+removeAllReshardingCollections();
 
 // Succeed if _presetReshardedChunks is provided and test commands are enabled (default).
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
@@ -54,7 +66,8 @@ assert.commandWorked(mongos.adminCommand({
     _presetReshardedChunks:
         [{recipientShardId: st.shard1.shardName, min: {_id: MinKey}, max: {_id: MaxKey}}]
 }));
-mongos.getDB(kDbName).foo.drop();
+
+removeAllReshardingCollections();
 
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
 
@@ -80,7 +93,8 @@ assert.commandWorked(mongos.adminCommand({
     collation: {locale: 'simple'},
     numInitialChunks: 2,
 }));
-mongos.getDB(kDbName).foo.drop();
+
+removeAllReshardingCollections();
 
 // Succeed if all optional fields and _presetReshardedChunks are provided with correct values and
 // test commands are enabled (default).
@@ -95,7 +109,8 @@ assert.commandWorked(mongos.adminCommand({
         {recipientShardId: st.shard0.shardName, min: {_id: MinKey}, max: {_id: 0}}
     ]
 }));
-mongos.getDB(kDbName).foo.drop();
+
+removeAllReshardingCollections();
 
 const existingZoneName = 'x1';
 
@@ -141,28 +156,7 @@ assert.commandWorked(mongos.adminCommand({
     ]
 }));
 
-assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
+removeAllReshardingCollections();
 
-// TODO remove test case below once the resharding command actually writes to config.collections
-// itself Test that shards correctly cache 'reshardingFields' in config.cache.collections
-assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
-st.ensurePrimaryShard(kDbName, st.shard0.shardName);
-assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {_id: 1}}));
-
-let donorReshardingFields = {
-    "uuid": UUID(),
-    "state": "initializing",
-    "donorFields": {"reshardingKey": {x: 1}}
-};
-assert.commandWorked(st.configRS.getPrimary().getDB("config").collections.update(
-    {_id: ns}, {"$set": {"reshardingFields": donorReshardingFields}}));
-
-// Run moveChunk to force shard0 to pick up the new info in config.collections
-assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
-
-let cachedEntry = st.rs0.getPrimary().getDB('config').cache.collections.findOne({_id: ns});
-assert.docEq(cachedEntry.reshardingFields, donorReshardingFields);
-
-assert.commandWorked(mongos.getDB(kDbName).dropDatabase());
 st.stop();
 })();

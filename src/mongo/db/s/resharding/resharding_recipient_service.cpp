@@ -38,6 +38,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -234,7 +235,8 @@ void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSt
         return;
     }
 
-    _transitionState(RecipientStateEnum::kSteadyState);
+    _transitionStateAndUpdateCoordinator(RecipientStateEnum::kSteadyState);
+    interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
 }
 
 ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
@@ -282,6 +284,29 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
     emplaceFetchTimestampIfExists(replacementDoc, std::move(fetchTimestamp));
 
     _updateRecipientDocument(std::move(replacementDoc));
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_transitionStateAndUpdateCoordinator(
+    RecipientStateEnum endState) {
+    _transitionState(endState, boost::none);
+
+    auto opCtx = cc().makeOperationContext();
+
+    auto shardId = ShardingState::get(opCtx.get())->shardId();
+
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append("recipientShards.$.state", RecipientState_serializer(endState));
+
+    uassertStatusOK(
+        Grid::get(opCtx.get())
+            ->catalogClient()
+            ->updateConfigDocument(
+                opCtx.get(),
+                NamespaceString::kConfigReshardingOperationsNamespace,
+                BSON("_id" << _recipientDoc.get_id() << "recipientShards.id" << shardId),
+                BSON("$set" << updateBuilder.done()),
+                false /* upsert */,
+                ShardingCatalogClient::kMajorityWriteConcern));
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionStateToError(

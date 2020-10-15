@@ -37,7 +37,10 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -103,7 +106,6 @@ ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
 void ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
-        .then([this] { _transitionToPreparingToDonate(); })
         .then(
             [this] { _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(); })
         .then([this, executor] {
@@ -166,14 +168,6 @@ void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
 void ReshardingDonorService::DonorStateMachine::onReshardingFieldsChanges(
     boost::optional<TypeCollectionReshardingFields> reshardingFields) {}
 
-void ReshardingDonorService::DonorStateMachine::_transitionToPreparingToDonate() {
-    if (_donorDoc.getState() > DonorStateEnum::kUnused) {
-        return;
-    }
-
-    _transitionState(DonorStateEnum::kPreparingToDonate);
-}
-
 void ReshardingDonorService::DonorStateMachine::
     _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData() {
     if (_donorDoc.getState() > DonorStateEnum::kPreparingToDonate) {
@@ -181,8 +175,13 @@ void ReshardingDonorService::DonorStateMachine::
         return;
     }
 
+    _insertDonorDocument(_donorDoc);
+
     auto minFetchTimestamp = generateMinFetchTimestamp(_donorDoc);
-    _transitionState(DonorStateEnum::kDonatingInitialData, minFetchTimestamp);
+    _transitionStateAndUpdateCoordinator(DonorStateEnum::kDonatingInitialData, minFetchTimestamp);
+
+    // TODO SERVER-XXXXX Remove this line.
+    interrupt({ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
@@ -193,7 +192,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
     }
 
     return _allRecipientsDoneCloning.getFuture().thenRunOn(**executor).then([this]() {
-        _transitionState(DonorStateEnum::kDonatingOplogEntries);
+        _transitionStateAndUpdateCoordinator(DonorStateEnum::kDonatingOplogEntries);
     });
 }
 
@@ -235,18 +234,13 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenDelet
         return;
     }
 
-    _transitionState(DonorStateEnum::kDone);
+    _transitionStateAndUpdateCoordinator(DonorStateEnum::kDone);
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(
     DonorStateEnum endState, boost::optional<Timestamp> minFetchTimestamp) {
     ReshardingDonorDocument replacementDoc(_donorDoc);
     replacementDoc.setState(endState);
-    if (endState == DonorStateEnum::kPreparingToDonate) {
-        _insertDonorDocument(std::move(replacementDoc));
-        return;
-    }
-
     if (minFetchTimestamp) {
         auto& minFetchTimestampStruct = replacementDoc.getMinFetchTimestampStruct();
         if (minFetchTimestampStruct.getMinFetchTimestamp())
@@ -257,6 +251,31 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(
     }
 
     _updateDonorDocument(std::move(replacementDoc));
+}
+
+void ReshardingDonorService::DonorStateMachine::_transitionStateAndUpdateCoordinator(
+    DonorStateEnum endState, boost::optional<Timestamp> minFetchTimestamp) {
+    _transitionState(endState, minFetchTimestamp);
+
+    auto opCtx = cc().makeOperationContext();
+    auto shardId = ShardingState::get(opCtx.get())->shardId();
+
+    BSONObjBuilder updateBuilder;
+    updateBuilder.append("donorShards.$.state", DonorState_serializer(endState));
+
+    if (minFetchTimestamp) {
+        updateBuilder.append("donorShards.$.minFetchTimestamp", minFetchTimestamp.get());
+    }
+
+    uassertStatusOK(
+        Grid::get(opCtx.get())
+            ->catalogClient()
+            ->updateConfigDocument(opCtx.get(),
+                                   NamespaceString::kConfigReshardingOperationsNamespace,
+                                   BSON("_id" << _donorDoc.get_id() << "donorShards.id" << shardId),
+                                   BSON("$set" << updateBuilder.done()),
+                                   false /* upsert */,
+                                   ShardingCatalogClient::kMajorityWriteConcern));
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionStateToError(const Status& status) {

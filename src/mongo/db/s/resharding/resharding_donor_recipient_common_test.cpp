@@ -181,7 +181,7 @@ protected:
             metadata.getShardKeyPattern().toBSON(),
             recipientDoc);
 
-        ASSERT(recipientDoc.getState() == RecipientStateEnum::kCloning);
+        ASSERT(recipientDoc.getState() == RecipientStateEnum::kCreatingCollection);
         ASSERT(recipientDoc.getFetchTimestamp() ==
                reshardingFields.getRecipientFields()->getFetchTimestamp());
 
@@ -294,6 +294,8 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateDonorServiceInstance) {
                                                  ReshardingDonorDocument>(opCtx, kReshardingUUID);
 
     ASSERT(donorStateMachine != boost::none);
+
+    donorStateMachine.get()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
@@ -315,6 +317,8 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
                                                                               kReshardingUUID);
 
     ASSERT(recipientStateMachine != boost::none);
+
+    recipientStateMachine.get()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,

@@ -120,6 +120,9 @@ private:
     void _transitionState(DonorStateEnum endState,
                           boost::optional<Timestamp> minFetchTimestamp = boost::none);
 
+    void _transitionStateAndUpdateCoordinator(
+        DonorStateEnum endState, boost::optional<Timestamp> minFetchTimestamp = boost::none);
+
     // Transitions the state on-disk and in-memory to kError.
     void _transitionStateToError(const Status& status);
 

@@ -135,6 +135,8 @@ private:
     void _transitionState(RecipientStateEnum endState,
                           boost::optional<Timestamp> fetchTimestamp = boost::none);
 
+    void _transitionStateAndUpdateCoordinator(RecipientStateEnum endState);
+
     // Transitions the state on-disk and in-memory to kError.
     void _transitionStateToError(const Status& status);
 

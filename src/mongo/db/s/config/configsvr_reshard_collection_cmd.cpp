@@ -209,11 +209,15 @@ public:
 
             instance->setInitialChunksAndZones(std::move(initialChunks), std::move(newZones));
 
-            // This promise will currently be falsely fulfilled by a call to interrupt() inside
-            // the ReshardingCoordinatorService. This is to enable jsTests to pass while code
-            // is still being committed.
-            // TODO SERVER-51398 Change this comment and assess the current call to .wait().
             instance->getObserver()->awaitAllDonorsReadyToDonate().wait();
+            // This promise is currently automatically filled by recipient shards after creating
+            // their ReshardingRecipientStateMachines.
+            // TODO SERVER-51217 Update this comment to reflect that the temporary collection
+            // has been created.
+            instance->getObserver()->awaitAllRecipientsFinishedApplying().wait();
+
+            instance->interrupt(
+                {ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});
         }
 
     private:

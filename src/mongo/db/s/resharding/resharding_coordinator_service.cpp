@@ -407,6 +407,7 @@ stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNofityEnum> notifyForSta
     {CoordinatorStateEnum::kInitializing, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kPreparingToDonate, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kCloning, ParticipantsToNofityEnum::kRecipients},
+    {CoordinatorStateEnum::kApplying, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kMirroring, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kCommitted, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kRenaming, ParticipantsToNofityEnum::kRecipients},
@@ -766,9 +767,6 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsReadyToDonat
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kPreparingToDonate) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
-
-    // TODO SERVER-51398 Remove this call.
-    interrupt({ErrorCodes::InternalError, "Early exit to support jsTesting"});
 
     return _reshardingCoordinatorObserver->awaitAllDonorsReadyToDonate()
         .thenRunOn(**executor)

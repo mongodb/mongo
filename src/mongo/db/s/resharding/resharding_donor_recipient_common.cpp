@@ -144,8 +144,8 @@ ReshardingRecipientDocument constructRecipientDocumentFromReshardingFields(
         createDonorShardMirroringEntriesFromDonorShardIds(
             reshardingFields.getRecipientFields()->getDonorShardIds());
 
-    auto recipientDoc =
-        ReshardingRecipientDocument(RecipientStateEnum::kCloning, std::move(donorShards));
+    auto recipientDoc = ReshardingRecipientDocument(RecipientStateEnum::kCreatingCollection,
+                                                    std::move(donorShards));
 
     auto commonMetadata =
         CommonReshardingMetadata(reshardingFields.getUuid(),
