@@ -33,7 +33,7 @@ testDB.dropDatabase();
 
 testDB.setProfilingLevel(2, 0);
 
-let assertMetricsExist = (profilerEntry) => {
+const assertMetricsExist = (profilerEntry) => {
     let metrics = profilerEntry.operationMetrics;
     assert.neq(metrics, undefined);
 
@@ -48,6 +48,19 @@ let assertMetricsExist = (profilerEntry) => {
     assert.gte(metrics.docUnitsReturned, 0);
 };
 
+const runInLegacyQueryMode = (db, func) => {
+    const readMode = db.getMongo().readMode();
+    const writeMode = db.getMongo().writeMode();
+    try {
+        db.getMongo().forceReadMode("legacy");
+        db.getMongo().forceWriteMode("legacy");
+        func();
+    } finally {
+        db.getMongo().forceReadMode(readMode);
+        db.getMongo().forceWriteMode(writeMode);
+    }
+};
+
 const resetProfileColl = {
     name: 'resetProfileColl',
     command: (db) => {
@@ -56,6 +69,15 @@ const resetProfileColl = {
         db.setProfilingLevel(2, 0);
     },
 };
+
+const resetTestColl = {
+    name: 'resetTestColl',
+    command: (db) => {
+        assert(db[collName].drop());
+        assert.commandWorked(db.createCollection(collName));
+    },
+};
+
 const operations = [
     {
         name: 'create',
@@ -319,7 +341,7 @@ const operations = [
         profileFilter: {op: 'remove', 'command.q': {_id: 1}},
         profileAssert: (profileDoc) => {
             // Due to a deficiency in the delete path, we read the same document twice.
-            // TODO: SERVER-51420
+            // TODO (SERVER-51420): Deletes should not read documents twice before deleting.
             if (!debugBuild) {
                 assert.eq(profileDoc.docBytesRead, 58);
             } else {
@@ -540,20 +562,109 @@ const operations = [
             }
         }
     },
+    resetProfileColl,
+    resetTestColl,
+    {
+        name: 'insertLegacy',
+        command: (db) => {
+            runInLegacyQueryMode(db, () => {
+                db[collName].insert({_id: 1, a: 0});
+            });
+        },
+        profileFilter: {op: 'insert'},
+        profileAssert: (profileDoc) => {
+            // Insert should not perform any reads.
+            assert.eq(profileDoc.docBytesRead, 0);
+        }
+    },
+    {
+        name: 'findLegacy',
+        command: (db) => {
+            runInLegacyQueryMode(db, () => {
+                assert.eq(db[collName].find({_id: 1}).itcount(), 1);
+            });
+        },
+        profileFilter: {op: 'query', 'command.find': collName},
+        profileAssert: (profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29);
+        }
+    },
+    resetProfileColl,
+    {
+        name: 'getMoreLegacy',
+        command: (db) => {
+            runInLegacyQueryMode(db, () => {
+                db[collName].insert({_id: 2});
+                db[collName].insert({_id: 3});
+                // The value '1' is not a valid batch size for legacy queries, and will actually
+                // return more than 1 document per batch.
+                let cursor = db[collName].find().batchSize(2);
+                cursor.next();
+                cursor.next();
+                assert.eq(cursor.objsLeftInBatch(), 0);
+                // Trigger a getMore.
+                cursor.next();
+            });
+        },
+        profileFilter: {op: 'getmore'},
+        profileAssert: (profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 18);
+        }
+    },
+    {
+        name: 'updateLegacy',
+        command: (db) => {
+            runInLegacyQueryMode(db, () => {
+                db[collName].update({_id: 1}, {$set: {a: 1}});
+            });
+        },
+        profileFilter: {op: 'update'},
+        profileAssert: (profileDoc) => {
+            if (!debugBuild) {
+                assert.eq(profileDoc.docBytesRead, 29);
+            } else {
+                assert.gte(profileDoc.docBytesRead, 29);
+            }
+        }
+    },
+    {
+        name: 'deleteLegacy',
+        command: (db) => {
+            runInLegacyQueryMode(db, () => {
+                db[collName].remove({_id: 1});
+            });
+        },
+        profileFilter: {op: 'remove'},
+        profileAssert: (profileDoc) => {
+            // Due to a deficiency in the delete path, we read the same document twice.
+            // TODO (SERVER-51420): Deletes should not read documents twice before deleting.
+            if (!debugBuild) {
+                assert.eq(profileDoc.docBytesRead, 58);
+            } else {
+                assert.gte(profileDoc.docBytesRead, 58);
+            }
+        }
+    },
 ];
 
-let profileColl = testDB.system.profile;
-let testOperation = (operation) => {
+const profileColl = testDB.system.profile;
+const testOperation = (operation) => {
     jsTestLog("Testing operation: " + operation.name);
     operation.command(testDB);
     if (!operation.profileFilter) {
         return;
     }
 
-    let cursor = profileColl.find(operation.profileFilter);
-    assert(cursor.hasNext(),
-           "Could not find operation in profiler with filter: " + tojson(operation.profileFilter));
-    let entry = cursor.next();
+    const cursor = profileColl.find(operation.profileFilter);
+    assert(cursor.hasNext(), () => {
+        // Get the last operation that was not a find on the profile collection.
+        const lastOp =
+            profileColl.find({'command.find': {$ne: 'system.profile'}}).sort({$natural: -1}).next();
+        return "Could not find operation in profiler with filter: " +
+            tojson(operation.profileFilter) +
+            ". Last operation in profile collection is: " + tojson(lastOp);
+    });
+    const entry = cursor.next();
     assert(!cursor.hasNext(), () => {
         return "Filter for profiler matched more than one entry: filter: " +
             tojson(operation.profileFilter) + ", first entry: " + tojson(entry) +
