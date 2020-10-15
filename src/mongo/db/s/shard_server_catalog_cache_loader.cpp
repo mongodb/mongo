@@ -1379,6 +1379,8 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
                     collAndChunks.changedChunks.end(),
                     taskCollectionAndChangedChunksIt,
                     task.collectionAndChangedChunks->changedChunks.end());
+
+                collAndChunks.reshardingFields = task.collectionAndChangedChunks->reshardingFields;
             }
         }
     }
