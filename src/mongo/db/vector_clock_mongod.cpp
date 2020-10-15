@@ -367,7 +367,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
                     auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
                         opCtx,
                         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        NamespaceString::kVectorClockNamespace.toString(),
+                        NamespaceString::kVectorClockNamespace.db().toString(),
                         BSON("_vectorClockPersist" << 1),
                         Seconds{30},
                         Shard::RetryPolicy::kIdempotent));

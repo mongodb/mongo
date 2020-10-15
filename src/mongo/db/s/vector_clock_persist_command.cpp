@@ -31,6 +31,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -44,6 +46,18 @@ namespace {
 class VectorClockPersistCommand : public BasicCommand {
 public:
     VectorClockPersistCommand() : BasicCommand("_vectorClockPersist") {}
+
+    Status checkAuthForCommand(Client* client,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj) const override {
+        uassert(ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(
+                        NamespaceString::kVectorClockNamespace.db().toString()),
+                    ActionType::internal));
+        return Status::OK();
+    }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
