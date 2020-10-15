@@ -96,6 +96,9 @@ void OplogBufferCollection::startup(OperationContext* opCtx) {
         return;
     }
 
+    // If the collection doesn't already exist, create it.
+    _createCollection(opCtx);
+
     stdx::lock_guard<Latch> lk(_mutex);
     // If we are starting from an existing collection, we must populate the in memory state of the
     // buffer.
@@ -387,9 +390,12 @@ BSONObj OplogBufferCollection::_peek_inlock(OperationContext* opCtx, PeekMode pe
 
 void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
     CollectionOptions options;
-    options.temp = true;
+    options.temp = _options.useTemporaryCollection;
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    fassert(40154, _storageInterface->createCollection(opCtx, _nss, options));
+    auto status = _storageInterface->createCollection(opCtx, _nss, options);
+    if (status.code() == ErrorCodes::NamespaceExists)
+        return;
+    fassert(40154, status);
 }
 
 void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {

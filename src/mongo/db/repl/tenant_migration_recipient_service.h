@@ -135,6 +135,14 @@ public:
             _createOplogFetcherFn = std::move(createOplogFetcherFn);
         }
 
+        /**
+         * Stops the oplog applier without going through tenantForgetMigration.
+         */
+        void stopOplogApplier_forTest() {
+            stdx::lock_guard lk(_mutex);
+            _tenantOplogApplier->shutdown();
+        }
+
     private:
         friend class TenantMigrationRecipientServiceTest;
 

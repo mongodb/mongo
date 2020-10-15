@@ -93,7 +93,8 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
         return SemiFuture<OpTimePair>::makeReady(_finalStatus);
     }
     // If this optime has already passed, just return a ready future.
-    if (_lastBatchCompletedOpTimes.donorOpTime >= donorOpTime) {
+    if (_lastBatchCompletedOpTimes.donorOpTime >= donorOpTime ||
+        _beginApplyingAfterOpTime >= donorOpTime) {
         return SemiFuture<OpTimePair>::makeReady(_lastBatchCompletedOpTimes);
     }
 

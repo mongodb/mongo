@@ -43,6 +43,19 @@ AbstractAsyncComponent::AbstractAsyncComponent(executor::TaskExecutor* executor,
     uassert(ErrorCodes::BadValue, "task executor cannot be null", executor);
 }
 
+AbstractAsyncComponent::~AbstractAsyncComponent() {
+    // This is required because it's illegal to destroy a promise that has not been set,
+    // which can happen if a component is created and then destroyed without being started.
+    // (e.g. if system shutdown happens between creation and start)
+    // Note we _cannot_ use the mutex here; it belongs to the subclass, which has already
+    // been destroyed.
+    if (_state != State::kComplete) {
+        _statePromise.setError(
+            {ErrorCodes::CallbackCanceled,
+             str::stream() << "Component " << _componentName << " destroyed when not finished"});
+    }
+}
+
 executor::TaskExecutor* AbstractAsyncComponent::_getExecutor() {
     return _executor;
 }
@@ -116,8 +129,19 @@ void AbstractAsyncComponent::shutdown() noexcept {
 }
 
 void AbstractAsyncComponent::join() noexcept {
+    // Right now the only possible error value is due to destruction.
+    joinAsync().getNoThrow().ignore();
+}
+
+SemiFuture<void> AbstractAsyncComponent::joinAsync() noexcept {
     stdx::unique_lock<Latch> lk(*_getMutex());
-    _stateCondition.wait(lk, [this]() { return !_isActive_inlock(); });
+    // If the component has never been started or is already shut down, just return a ready future.
+    if (!_isActive_inlock()) {
+        return SemiFuture<void>::makeReady();
+    }
+
+    // Otherwise, we are running and the future will be set when shutdown is complete.
+    return _statePromise.getFuture().semi();
 }
 
 AbstractAsyncComponent::State AbstractAsyncComponent::getState_forTest() noexcept {
@@ -133,7 +157,7 @@ void AbstractAsyncComponent::_transitionToComplete() noexcept {
 void AbstractAsyncComponent::_transitionToComplete_inlock() noexcept {
     invariant(State::kComplete != _state);
     _state = State::kComplete;
-    _stateCondition.notify_all();
+    _statePromise.emplaceValue();
 }
 
 Status AbstractAsyncComponent::_checkForShutdownAndConvertStatus(

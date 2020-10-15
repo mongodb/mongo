@@ -43,8 +43,9 @@ namespace repl {
 class StorageInterface;
 
 /**
- * Oplog buffer backed by a temporary collection. This collection is created in startup() and
- * removed in shutdown(). The documents will be popped and peeked in timestamp order.
+ * Oplog buffer backed by an optionally temporary collection. This collection is optionally created
+ * in startup() and removed in shutdown(). The documents will be popped and peeked in timestamp
+ * order.
  */
 class OplogBufferCollection : public RandomAccessOplogBuffer {
 public:
@@ -56,11 +57,12 @@ public:
         std::size_t peekCacheSize = 0;
         bool dropCollectionAtStartup = true;
         bool dropCollectionAtShutdown = true;
+        bool useTemporaryCollection = true;
         Options() {}
     };
 
     /**
-     * Returns default namespace for temporary collection used to hold data in oplog buffer.
+     * Returns default namespace for collection used to hold data in oplog buffer.
      */
     static NamespaceString getDefaultNamespace();
 
@@ -129,7 +131,7 @@ public:
 
 private:
     /*
-     * Creates a temporary collection with the _nss namespace.
+     * Creates an (optionally temporary) collection with the _nss namespace.
      */
     void _createCollection(OperationContext* opCtx);
 
