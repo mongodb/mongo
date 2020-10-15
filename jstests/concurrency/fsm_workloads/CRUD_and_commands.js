@@ -94,11 +94,7 @@ var $config = (function() {
                             e.code,
                             [
                                 // dropIndex can cause queries to throw if these queries yield.
-                                ErrorCodes.QueryPlanKilled,
-                                // findAndModify may not automatically handle a DuplicateKey error.
-                                // TODO (SERVER-47212): Remove this error code once findAndModify
-                                // retries on DuplicateKey errors automatically.
-                                ErrorCodes.DuplicateKey
+                                ErrorCodes.QueryPlanKilled
                             ],
                             'unexpected error code: ' + e.code + ': ' + e.message);
                     }
