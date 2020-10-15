@@ -739,10 +739,11 @@ public:
             appendErrorDetails(*expr);
             appendErrorReason(kNormalReason, kInvertedReason);
             BSONObjBuilder& bob = _context->getCurrentObjBuilder();
-            // Append the result of $expr's aggregate expression. The result of the
-            // aggregate expression can be determined from the current inversion.
-            bob.append("expressionResult",
-                       _context->getCurrentInversion() == InvertError::kInverted);
+
+            // Append the result of $expr's aggregation expression evaluation.
+            BSONMatchableDocument document{_context->getCurrentDocument()};
+            auto expressionResult = expr->evaluateExpression(&document);
+            expressionResult.addToBsonObj(&bob, "expressionResult"_sd);
         }
     }
     void visit(const GTEMatchExpression* expr) final {

@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -74,6 +75,10 @@ public:
     bool matches(const BSONObj& doc) {
         invariant(_matchExpression);
         return _matchExpression->matchesBSON(doc);
+    }
+
+    ExprMatchExpression* getExprMatchExpression() {
+        return checked_cast<ExprMatchExpression*>(_matchExpression.get());
     }
 
 private:
@@ -720,6 +725,14 @@ TEST(ExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {
         "{$and: [{$expr: {$and: [{$eq: ['$a', {$const: 1}]}, {$eq: ['$b', {$const: 2}]}]}},"
         "{a: {$_internalExprEq: 1}}, {b: {$_internalExprEq: 2}}]}");
     ASSERT_BSONOBJ_EQ(serialized, expectedSerialization);
+}
+
+TEST_F(ExprMatchTest, ExpressionEvaluationReturnsResultsCorrectly) {
+    createMatcher(fromjson("{$expr: -2}"));
+    BSONMatchableDocument document{BSONObj{}};
+    auto expressionResult = getExprMatchExpression()->evaluateExpression(&document);
+    ASSERT_TRUE(expressionResult.integral());
+    ASSERT_EQUALS(-2, expressionResult.coerceToInt());
 }
 
 }  // namespace

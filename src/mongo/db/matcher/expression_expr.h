@@ -60,6 +60,12 @@ public:
 
     bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
 
+    /**
+     * Evaluates the aggregation expression of this match expression on document 'doc' and returns
+     * the result.
+     */
+    Value evaluateExpression(const MatchableDocument* doc) const;
+
     std::unique_ptr<MatchExpression> shallowClone() const final;
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {

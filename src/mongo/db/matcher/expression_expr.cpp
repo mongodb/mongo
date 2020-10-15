@@ -56,16 +56,8 @@ bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* de
         !_rewriteResult->matchExpression()->matches(doc, details)) {
         return false;
     }
-
-    Document document(doc->toBSON());
-
-    // 'Variables' is not thread safe, and ExprMatchExpression may be used in a validator which
-    // processes documents from multiple threads simultaneously. Hence we make a copy of the
-    // 'Variables' object per-caller.
-    Variables variables = _expCtx->variables;
     try {
-        auto value = _expression->evaluate(document, &variables);
-        return value.coerceToBool();
+        return evaluateExpression(doc).coerceToBool();
     } catch (const DBException&) {
         if (MONGO_unlikely(ExprMatchExpressionMatchesReturnsFalseOnException.shouldFail())) {
             return false;
@@ -73,6 +65,16 @@ bool ExprMatchExpression::matches(const MatchableDocument* doc, MatchDetails* de
 
         throw;
     }
+}
+
+Value ExprMatchExpression::evaluateExpression(const MatchableDocument* doc) const {
+    Document document(doc->toBSON());
+
+    // 'Variables' is not thread safe, and ExprMatchExpression may be used in a validator which
+    // processes documents from multiple threads simultaneously. Hence we make a copy of the
+    // 'Variables' object per-caller.
+    Variables variables = _expCtx->variables;
+    return _expression->evaluate(document, &variables);
 }
 
 void ExprMatchExpression::serialize(BSONObjBuilder* out, bool includePath) const {

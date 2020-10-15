@@ -956,6 +956,33 @@ TEST(MiscellaneousMatchExpression, SampleRateAlwaysTrue) {
         "       expressionResult: true}}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
+TEST(MiscellaneousMatchExpression, ExprExpressionResultNumeric) {
+    BSONObj query = BSON("$expr" << 0);
+    BSONObj document = BSON("a" << 1);
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$expr"
+                                 << "specifiedAs" << query << "reason"
+                                 << "expression did not match"
+                                 << "expressionResult" << 0);
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, NorExprExpressionResultObject) {
+    BSONObj failingExpression = BSON("$expr" << BSON("$literal" << BSON("b" << 1)));
+    BSONObj query = BSON("$nor" << BSON_ARRAY(failingExpression));
+    BSONObj document = BSON("a" << 1);
+    BSONObj expectedError =
+        BSON("operatorName"
+             << "$nor"
+             << "clausesSatisfied"
+             << BSON_ARRAY(BSON("index" << 0 << "details"
+                                        << BSON("operatorName"
+                                                << "$expr"
+                                                << "specifiedAs" << failingExpression << "reason"
+                                                << "expression did match"
+                                                << "expressionResult" << BSON("b" << 1)))));
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
 // $mod
 TEST(MiscellaneousMatchExpression, BasicMod) {
     BSONObj query = BSON("a" << BSON("$mod" << BSON_ARRAY(2 << 1)));
