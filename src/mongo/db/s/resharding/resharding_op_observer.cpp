@@ -46,6 +46,7 @@ std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
     auto service = registry->lookupServiceByName(kReshardingCoordinatorServiceName);
     auto instance =
         ReshardingCoordinatorService::ReshardingCoordinator::lookup(opCtx, service, reshardingId);
+    invariant(instance);
     return (*instance)->getObserver();
 }
 
@@ -56,6 +57,12 @@ ReshardingOpObserver::ReshardingOpObserver() = default;
 ReshardingOpObserver::~ReshardingOpObserver() = default;
 
 void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+    // This is a no-op if either replication is not enabled or this node is a secondary
+    if (!repl::ReplicationCoordinator::get(opCtx)->isReplEnabled() ||
+        !opCtx->writesAreReplicated()) {
+        return;
+    }
+
     if (args.nss == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto newCoordinatorDoc = ReshardingCoordinatorDocument::parse(
             IDLParserErrorContext("reshardingCoordinatorDoc"), args.updateArgs.updatedDoc);
