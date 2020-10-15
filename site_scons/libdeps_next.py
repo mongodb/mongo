@@ -732,10 +732,11 @@ def make_get_syslibdeps_callable(shared):
                         continue
 
                     if isinstance(syslib, str) and syslib.startswith(Constants.MissingLibdep):
-                        MissingSyslibdepError(textwrap.dedent(f"""\
-                            Target '{str(target[0])}' depends on the availability of a
-                            system provided library for '{syslib[len(Constants.MissingLibdep):]}',
-                            but no suitable library was found during configuration."""
+                        raise MissingSyslibdepError(textwrap.dedent(f"""\
+                            LibdepsError:
+                                Target '{str(target[0])}' depends on the availability of a
+                                system provided library for '{syslib[len(Constants.MissingLibdep):]}',
+                                but no suitable library was found during configuration."""
                         ))
 
                     deps.append(syslib)

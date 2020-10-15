@@ -3685,6 +3685,10 @@ def doConfigure(myenv):
     if use_system_version_of_library("libunwind"):
         conf.FindSysLibDep("unwind", ["unwind"])
 
+    if use_libunwind:
+        if not conf.CheckLib("lzma"):
+            myenv.ConfError("Cannot find system library 'lzma' required for use with libunwind")
+
     if use_system_version_of_library("intel_decimal128"):
         conf.FindSysLibDep("intel_decimal128", ["bid"])
 
