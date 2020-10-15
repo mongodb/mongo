@@ -1856,6 +1856,39 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection
     return {true, resTag, resVal};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetDifference(uint8_t arity) {
+    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
+    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(1);
+
+    if (!value::isArray(lhsTag) || !value::isArray(rhsTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto [resTag, resVal] = value::makeNewArraySet();
+    value::ValueGuard resGuard{resTag, resVal};
+    auto resView = value::getArraySetView(resVal);
+
+    value::ValueSetType setValuesSecondArg;
+    auto rhsIter = value::ArrayEnumerator(rhsTag, rhsVal);
+    while (!rhsIter.atEnd()) {
+        auto [elTag, elVal] = rhsIter.getViewOfValue();
+        setValuesSecondArg.insert({elTag, elVal});
+        rhsIter.advance();
+    }
+
+    auto lhsIter = value::ArrayEnumerator(lhsTag, lhsVal);
+    while (!lhsIter.atEnd()) {
+        auto [elTag, elVal] = lhsIter.getViewOfValue();
+        if (setValuesSecondArg.count({elTag, elVal}) == 0) {
+            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
+            resView->push_back(copyTag, copyVal);
+        }
+        lhsIter.advance();
+    }
+
+    resGuard.reset();
+    return {true, resTag, resVal};
+}
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
@@ -1958,6 +1991,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinSetUnion(arity);
         case Builtin::setIntersection:
             return builtinSetIntersection(arity);
+        case Builtin::setDifference:
+            return builtinSetDifference(arity);
     }
 
     MONGO_UNREACHABLE;

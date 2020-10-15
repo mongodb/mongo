@@ -1938,20 +1938,21 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSetDifference* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 2);
+        generateSetExpression(expr, "setDifference");
     }
     void visit(ExpressionSetEquals* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSetIntersection* expr) final {
-        generateNarySetExpression(expr, "setIntersection");
+        generateSetExpression(expr, "setIntersection");
     }
 
     void visit(ExpressionSetIsSubset* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSetUnion* expr) final {
-        generateNarySetExpression(expr, "setUnion");
+        generateSetExpression(expr, "setUnion");
     }
 
     void visit(ExpressionSize* expr) final {
@@ -2496,9 +2497,9 @@ private:
     }
 
     /**
-     * Generic logic for building N-ary set expressions: setUnion, setIntersection, etc.
+     * Generic logic for building set expressions: setUnion, setIntersection, etc.
      */
-    void generateNarySetExpression(Expression* expr, const std::string& setFunction) {
+    void generateSetExpression(Expression* expr, const std::string& setFunction) {
         size_t arity = expr->getChildren().size();
         _context->ensureArity(arity);
         auto frameId = _context->frameIdGenerator->generate();

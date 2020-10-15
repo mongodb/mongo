@@ -132,4 +132,51 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
     slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(21));
     runAndAssertNothing(compiledExpr.get());
 }
+
+TEST_F(SBEBuiltinSetOpTest, ComputesSetDifference) {
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setDiffExpr = sbe::makeE<sbe::EFunction>(
+        "setDifference", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto compiledExpr = compileExpression(*setDiffExpr);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 7));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(1 << 3));
+    value::ValueGuard resGuard(resArrTag, resArrVal);
+    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3 << 1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = makeArray(BSON_ARRAY(2 << 5 << 7));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = value::makeNewArray();
+    slotAccessor2.reset(arrTag2, arrVal2);
+    auto [resArrTag1, resArrVal1] = makeArraySet(BSON_ARRAY(1 << 2 << 3));
+    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
+    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+}
+
+TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetDifference) {
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setDiffExpr = sbe::makeE<sbe::EFunction>(
+        "setDifference", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto compiledExpr = compileExpression(*setDiffExpr);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(125));
+    runAndAssertNothing(compiledExpr.get());
+}
 }  // namespace mongo::sbe
