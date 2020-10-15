@@ -106,8 +106,10 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 
             ON_BLOCK_EXIT([&] {
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                // A view can potentially be created after spawning a thread to recover nss's shard
+                // version. It is then ok to lock also views in order to clear filtering metadata.
                 AutoGetCollection autoColl(
-                    opCtx, nss, MODE_IX, AutoGetCollectionViewMode::kViewsForbidden);
+                    opCtx, nss, MODE_IX, AutoGetCollectionViewMode::kViewsPermitted);
 
                 auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
