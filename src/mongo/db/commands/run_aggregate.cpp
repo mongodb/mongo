@@ -39,6 +39,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -334,10 +335,11 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
  * 'collator'. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
  */
 Status collatorCompatibleWithPipeline(OperationContext* opCtx,
-                                      Database* db,
+                                      StringData dbName,
                                       const CollatorInterface* collator,
                                       const LiteParsedPipeline& liteParsedPipeline) {
-    if (!db) {
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, dbName);
+    if (!viewCatalog) {
         return Status::OK();
     }
     for (auto&& potentialViewNs : liteParsedPipeline.getInvolvedNamespaces()) {
@@ -345,7 +347,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
             continue;
         }
 
-        auto view = ViewCatalog::get(db)->lookup(opCtx, potentialViewNs.ns());
+        auto view = viewCatalog->lookup(opCtx, potentialViewNs.ns());
         if (!view) {
             continue;
         }
@@ -594,8 +596,10 @@ Status runAggregate(OperationContext* opCtx,
                 }
             }
 
-            auto resolvedView =
-                uassertStatusOK(ViewCatalog::get(ctx->getDb())->resolveView(opCtx, nss));
+
+            auto resolvedView = uassertStatusOK(DatabaseHolder::get(opCtx)
+                                                    ->getSharedViewCatalog(opCtx, nss.db())
+                                                    ->resolveView(opCtx, nss));
             uassert(std::move(resolvedView),
                     "On sharded systems, resolved views must be executed by mongos",
                     !ShardingState::get(opCtx)->enabled());
@@ -635,9 +639,8 @@ Status runAggregate(OperationContext* opCtx,
         // Check that the view's collation matches the collation of any views involved in the
         // pipeline.
         if (!pipelineInvolvedNamespaces.empty()) {
-            invariant(ctx);
             auto pipelineCollationStatus = collatorCompatibleWithPipeline(
-                opCtx, ctx->getDb(), expCtx->getCollator(), liteParsedPipeline);
+                opCtx, nss.db(), expCtx->getCollator(), liteParsedPipeline);
             if (!pipelineCollationStatus.isOK()) {
                 return pipelineCollationStatus;
             }
