@@ -403,6 +403,7 @@ DurableCatalogImpl::DurableCatalogImpl(RecordStore* rs,
       _directoryPerDb(directoryPerDb),
       _directoryForIndexes(directoryForIndexes),
       _rand(_newRand()),
+      _next(0),
       _engine(engine) {}
 
 DurableCatalogImpl::~DurableCatalogImpl() {
@@ -413,8 +414,7 @@ std::string DurableCatalogImpl::_newRand() {
     return str::stream() << SecureRandom().nextInt64();
 }
 
-bool DurableCatalogImpl::_hasEntryCollidingWithRand() const {
-    // Only called from init() so don't need to lock.
+bool DurableCatalogImpl::_hasEntryCollidingWithRand(WithLock) const {
     for (auto it = _catalogIdToEntryMap.begin(); it != _catalogIdToEntryMap.end(); ++it) {
         if (StringData(it->second.ident).endsWith(_rand))
             return true;
@@ -431,10 +431,11 @@ std::string DurableCatalogImpl::newInternalResumableIndexBuildIdent() {
 }
 
 std::string DurableCatalogImpl::_newInternalIdent(StringData identStem) {
+    stdx::lock_guard<Latch> lk(_randLock);
     StringBuilder buf;
     buf << kInternalIdentPrefix;
     buf << identStem;
-    buf << _next.fetchAndAdd(1) << '-' << _rand;
+    buf << _next++ << '-' << _rand;
     return buf.str();
 }
 
@@ -448,13 +449,14 @@ std::string DurableCatalogImpl::getFilesystemPathForDb(const std::string& dbName
 
 std::string DurableCatalogImpl::_newUniqueIdent(NamespaceString nss, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
+    stdx::lock_guard<Latch> lk(_randLock);
     StringBuilder buf;
     if (_directoryPerDb) {
         buf << escapeDbName(nss.db()) << '/';
     }
     buf << kind;
     buf << (_directoryForIndexes ? '/' : '-');
-    buf << _next.fetchAndAdd(1) << '-' << _rand;
+    buf << _next++ << '-' << _rand;
     return buf.str();
 }
 
@@ -491,7 +493,8 @@ void DurableCatalogImpl::init(OperationContext* opCtx) {
     }
 
     // In the unlikely event that we have used this _rand before generate a new one.
-    while (_hasEntryCollidingWithRand()) {
+    stdx::lock_guard<Latch> lk(_randLock);
+    while (_hasEntryCollidingWithRand(lk)) {
         _rand = _newRand();
     }
 }
@@ -565,9 +568,6 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_importEntry(OperationCont
                                                                    const BSONObj& metadata) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
 
-    uassert(ErrorCodes::BadValue,
-            "Attempted to import catalog entry without an ident",
-            metadata.hasField("ident"));
     const string ident = metadata["ident"].String();
     StatusWith<RecordId> res =
         _rs->insertRecord(opCtx, metadata.objdata(), metadata.objsize(), Timestamp());
@@ -913,7 +913,10 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     md.parse(mdElement.Obj());
 
     uassert(ErrorCodes::BadValue,
-            "Attemped to import collection without idxIdent",
+            "Attempted to import catalog entry without an ident",
+            metadata.hasField("ident"));
+    uassert(ErrorCodes::BadValue,
+            "Attempted to import collection without idxIdent",
             metadata.hasField("idxIdent"));
 
     const auto& catalogEntry = [&] {
@@ -930,6 +933,36 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
         return metadata;
     }();
 
+    // Before importing the idents belonging to the collection and indexes, change '_rand' if there
+    // will be a conflict.
+    std::set<std::string> indexIdents;
+    {
+        const std::string collectionIdent = catalogEntry["ident"].String();
+
+        // TODO SERVER-51144: Additional sanity checks to validate the metadata for indexes.
+        for (const auto& indexIdent : catalogEntry["idxIdent"].Obj()) {
+            indexIdents.insert(indexIdent.String());
+        }
+
+        auto identsToImportConflict = [&](WithLock) -> bool {
+            if (StringData(collectionIdent).endsWith(_rand)) {
+                return true;
+            }
+
+            for (const std::string& ident : indexIdents) {
+                if (StringData(ident).endsWith(_rand)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        stdx::lock_guard<Latch> lk(_randLock);
+        while (_hasEntryCollidingWithRand(lk) || identsToImportConflict(lk)) {
+            _rand = _newRand();
+        }
+    }
+
     StatusWith<Entry> swEntry = _importEntry(opCtx, nss, catalogEntry);
     if (!swEntry.isOK())
         return swEntry.getStatus();
@@ -940,25 +973,12 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     if (!status.isOK())
         return status;
 
-    std::vector<std::string> indexIdents;
-    {
-        // TODO SERVER-51144: Additional sanity checks to validate the metadata for indexes.
-        const auto idxIdent = metadata["idxIdent"].Obj();
-        for (unsigned i = 0; i < md.indexes.size(); i++) {
-            auto spec = md.indexes[i].spec;
-            auto keyPattern = spec.getObjectField("key");
-            auto idxName = spec["name"].String();
-            auto ident = idxIdent[idxName].String();
-            status = kvEngine->importSortedDataInterface(opCtx, ident, storageMetadata);
-            if (!status.isOK()) {
-                return status;
-            }
-            indexIdents.push_back(ident);
+    for (const std::string& indexIdent : indexIdents) {
+        status = kvEngine->importSortedDataInterface(opCtx, indexIdent, storageMetadata);
+        if (!status.isOK()) {
+            return status;
         }
     }
-
-    // TODO SERVER-51145: Make sure we do not have ident collision in the future by using a new
-    // _rand if necessary.
 
     // Mark collation feature as in use if the collection has a non-simple default collation.
     if (!md.options.collation.isEmpty()) {
@@ -1339,4 +1359,15 @@ KVPrefix DurableCatalogImpl::getIndexPrefix(OperationContext* opCtx,
                             << " : " << md.toBSON());
     return md.indexes[offset].prefix;
 }
+
+void DurableCatalogImpl::setRand_forTest(const std::string& rand) {
+    stdx::lock_guard<Latch> lk(_randLock);
+    _rand = rand;
+}
+
+std::string DurableCatalogImpl::getRand_forTest() const {
+    stdx::lock_guard<Latch> lk(_randLock);
+    return _rand;
+}
+
 }  // namespace mongo

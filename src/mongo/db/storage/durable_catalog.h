@@ -339,5 +339,9 @@ public:
     virtual KVPrefix getIndexPrefix(OperationContext* opCtx,
                                     RecordId catalogId,
                                     StringData indexName) const = 0;
+
+    virtual void setRand_forTest(const std::string& rand) = 0;
+
+    virtual std::string getRand_forTest() const = 0;
 };
 }  // namespace mongo
