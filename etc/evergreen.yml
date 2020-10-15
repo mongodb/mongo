@@ -1227,7 +1227,6 @@ functions:
           # Windows path separator
           toolchain_txt="$pip_dir/toolchain-requirements.txt"
           ${activate_virtualenv}
-          python -m pip install --upgrade pip
           python -m pip install -r "$toolchain_txt" -q
           python -m pip freeze > pip-requirements.txt
 
@@ -1366,10 +1365,6 @@ functions:
       working_dir: src
       shell: bash
       script: |
-        # export these before verbose is set to avoid sharing sensitive info
-        export CEDAR_USERNAME=${cedar_user}
-        export CEDAR_API_KEY=${cedar_api_key}
-
         set -o errexit
         set -o verbose
 
@@ -1470,8 +1465,6 @@ functions:
         # this list of expansions.
         set +o errexit
         PATH="$path_value"                                \
-            CEDAR_USERNAME=${cedar_user}                  \
-            CEDAR_PASSWORD
             AWS_PROFILE=${aws_profile_remote}             \
             ${gcov_environment}                           \
             ${lang_environment}                           \
