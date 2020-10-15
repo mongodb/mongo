@@ -416,6 +416,7 @@ void ReplicationCoordinatorImpl::appendConnectionStats(executor::ConnectionPoolS
 
 bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     OperationContext* opCtx, LastStorageEngineShutdownState lastStorageEngineShutdownState) {
+    LOGV2_DEBUG(4280500, 1, "Attempting to create internal replication collections");
     // Create necessary replication collections to guarantee that if a checkpoint sees data after
     // initial sync has completed, it also sees these collections.
     fassert(50708, _replicationProcess->getConsistencyMarkers()->createInternalCollections(opCtx));
@@ -428,6 +429,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
 
     fassert(51240, _externalState->createLocalLastVoteCollection(opCtx));
 
+    LOGV2_DEBUG(4280501, 1, "Attempting to load local voted for document");
     StatusWith<LastVote> lastVote = _externalState->loadLocalLastVoteDocument(opCtx);
     if (!lastVote.isOK()) {
         LOGV2_FATAL_NOTRACE(40367,
@@ -444,6 +446,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
         _topCoord->loadLastVote(lastVote.getValue());
     }
 
+    LOGV2_DEBUG(4280502, 1, "Searching for local Rollback ID document");
     // Check that we have a local Rollback ID. If we do not have one, create one.
     auto status = _replicationProcess->refreshRollbackID(opCtx);
     if (!status.isOK()) {
@@ -462,6 +465,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
         fassert(501402, _replicationProcess->incrementRollbackID(opCtx));
     }
 
+    LOGV2_DEBUG(4280503, 1, "Attempting to load local replica set configuration document");
     StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(opCtx);
     if (!cfg.isOK()) {
         LOGV2(21313,
@@ -498,10 +502,16 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
             "config"_attr = cfg.getValue());
     }
 
+    LOGV2_DEBUG(
+        4280504, 1, "Cleaning up any partially applied oplog batches & reading last op from oplog");
     // Read the last op from the oplog after cleaning up any partially applied batches.
     const auto stableTimestamp = boost::none;
     _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
+    LOGV2_DEBUG(4280505,
+                1,
+                "Creating any necessary TenantMigrationAccessBlockers for unfinished migrations");
     tenant_migration_donor::recoverTenantMigrationAccessBlockers(opCtx);
+    LOGV2_DEBUG(4280506, 1, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
     const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
@@ -520,6 +530,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     stdx::lock_guard<Latch> lk(_mutex);
     _finishLoadLocalConfigCbh = std::move(handle.getValue());
 
+    LOGV2_DEBUG(4280507, 1, "Loaded replica set config, scheduled callback to set local config");
     return false;
 }
 
@@ -548,6 +559,8 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         return;
     }
 
+    LOGV2_DEBUG(
+        4280508, 1, "Attempting to set local replica set config; validating config for startup");
     StatusWith<int> myIndex =
         validateConfigForStartUp(_externalState.get(), localConfig, getServiceContext());
     if (!myIndex.isOK()) {
@@ -588,6 +601,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
                       "commandLineSetName"_attr = _settings.ourSetName());
         myIndex = StatusWith<int>(-1);
     }
+    LOGV2_DEBUG(4280509, 1, "Local configuration validated for startup");
 
     if (serverGlobalParams.enableMajorityReadConcern && localConfig.getNumMembers() == 3 &&
         localConfig.getNumDataBearingMembers() == 2) {
@@ -672,6 +686,9 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
 
     // Set our last applied and durable optimes to the top of the oplog, if we have one.
     if (!lastOpTime.isNull()) {
+        LOGV2_DEBUG(4280510,
+                    1,
+                    "Setting this node's last applied and durable opTimes to the top of the oplog");
         bool isRollbackAllowed = false;
         _setMyLastAppliedOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
         _setMyLastDurableOpTimeAndWallTime(lock, lastOpTimeAndWallTime, isRollbackAllowed);
@@ -692,6 +709,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
         _externalState->startThreads();
         _startDataReplication(opCtx.get());
     }
+    LOGV2_DEBUG(4280511, 1, "Set local replica set config");
 }
 
 void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
@@ -729,6 +747,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
     const auto needsInitialSync =
         lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(opCtx);
     if (!needsInitialSync) {
+        LOGV2_DEBUG(4280512, 1, "No initial sync required. Attempting to begin steady replication");
         // Start steady replication, since we already have data.
         // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
         auto memberState = getMemberState();
@@ -741,6 +760,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         return;
     }
 
+    LOGV2_DEBUG(4280513, 1, "Initial sync required. Attempting to start initial sync...");
     // Do initial sync.
     if (!_externalState->getTaskExecutor()) {
         LOGV2(21323, "Not running initial sync during test");
@@ -817,6 +837,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         // InitialSyncer::startup() must be called outside lock because it uses features (eg.
         // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
         uassertStatusOK(initialSyncerCopy->startup(opCtx, numInitialSyncAttempts.load()));
+        LOGV2_DEBUG(4280514, 1, "Initial sync started");
     } catch (const DBException& e) {
         auto status = e.toStatus();
         LOGV2(21327,
