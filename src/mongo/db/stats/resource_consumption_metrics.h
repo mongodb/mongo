@@ -224,6 +224,15 @@ public:
         void incrementIdxEntriesRead(OperationContext* opCtx, size_t idxEntriesRead);
         void incrementKeysSorted(OperationContext* opCtx, size_t keysSorted);
 
+        /**
+         * These setters increment the desired metrics independent of replication state, and only
+         * when metrics collection is enabled for this operation.
+         */
+        void incrementDocBytesWritten(size_t docBytesWritten);
+        void incrementDocUnitsWritten(size_t docUnitsWitten);
+        void incrementCpuMillis(size_t cpuMillis);
+        void incrementDocUnitsReturned(size_t docUnitsReturned);
+
     private:
         /**
          * Update the current replication state's ReadMetrics if this operation is currently
@@ -231,6 +240,12 @@ public:
          */
         using ReadMetricsFunc = std::function<void(ReadMetrics& readMetrics)>;
         void _updateReadMetrics(OperationContext* opCtx, ReadMetricsFunc&& updateFunc);
+
+        /**
+         * Helper function that calls the Func when this collector is currently collecting metrics.
+         */
+        template <typename Func>
+        void _doIfCollecting(Func&& func);
 
         /**
          * Represents the ScopedMetricsCollector state.

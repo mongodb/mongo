@@ -135,23 +135,28 @@ void ResourceConsumption::Metrics::toFlatBsonNonZeroFields(BSONObjBuilder* build
     appendNonZeroMetric(builder, kDocUnitsReturned, docUnitsReturned);
 }
 
-
-void ResourceConsumption::MetricsCollector::_updateReadMetrics(OperationContext* opCtx,
-                                                               ReadMetricsFunc&& updateFunc) {
+template <typename Func>
+inline void ResourceConsumption::MetricsCollector::_doIfCollecting(Func&& func) {
     if (!isCollecting()) {
         return;
     }
+    func();
+}
 
-    // The RSTL is normally required to check the replication state, but callers may not always be
-    // holding it. Since we need to attribute this metric to some replication state, and an
-    // inconsistent state is not impactful for the purposes of metrics collection, perform a
-    // best-effort check so that we can record metrics for this operation.
-    if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
-            opCtx, NamespaceString::kAdminDb)) {
-        updateFunc(_metrics.primaryMetrics);
-    } else {
-        updateFunc(_metrics.secondaryMetrics);
-    }
+void ResourceConsumption::MetricsCollector::_updateReadMetrics(OperationContext* opCtx,
+                                                               ReadMetricsFunc&& updateFunc) {
+    _doIfCollecting([&] {
+        // The RSTL is normally required to check the replication state, but callers may not always
+        // be holding it. Since we need to attribute this metric to some replication state, and an
+        // inconsistent state is not impactful for the purposes of metrics collection, perform a
+        // best-effort check so that we can record metrics for this operation.
+        if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
+                opCtx, NamespaceString::kAdminDb)) {
+            updateFunc(_metrics.primaryMetrics);
+        } else {
+            updateFunc(_metrics.secondaryMetrics);
+        }
+    });
 }
 
 void ResourceConsumption::MetricsCollector::incrementDocBytesRead(OperationContext* opCtx,
@@ -173,6 +178,22 @@ void ResourceConsumption::MetricsCollector::incrementKeysSorted(OperationContext
                                                                 size_t keysSorted) {
     _updateReadMetrics(opCtx,
                        [&](ReadMetrics& readMetrics) { readMetrics.keysSorted += keysSorted; });
+}
+
+void ResourceConsumption::MetricsCollector::incrementDocBytesWritten(size_t bytesWritten) {
+    _doIfCollecting([&] { _metrics.docBytesWritten += bytesWritten; });
+}
+
+void ResourceConsumption::MetricsCollector::incrementDocUnitsWritten(size_t unitsWritten) {
+    _doIfCollecting([&] { _metrics.docUnitsWritten += unitsWritten; });
+}
+
+void ResourceConsumption::MetricsCollector::incrementCpuMillis(size_t cpuMillis) {
+    _doIfCollecting([&] { _metrics.cpuMillis += cpuMillis; });
+}
+
+void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(size_t returned) {
+    _doIfCollecting([&] { _metrics.docUnitsReturned += returned; });
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,
