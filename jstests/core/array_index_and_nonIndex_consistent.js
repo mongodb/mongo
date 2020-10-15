@@ -48,8 +48,7 @@ collList.forEach(function(collObj) {
         {val: [true, 1]},
         {val: [1, 4]},
         {val: [null]},
-        // TODO SERVER-49766 Enable this test once the bug is found and fixed.
-        // {val: null},
+        {val: null},
         {val: MinKey},
         {val: [MinKey]},
         {val: [MinKey, 3]},
@@ -66,9 +65,7 @@ const queryList = [
     [2, 2],      [0, 3],      [3, 0],      [1, 3],      [3, 1],       [1, 5],      [5, 1], [1],
     [3],         [5],         {"test": 2}, {"test": 6}, [true, true], [true],      true,   1,
     3,           5,           [],          [MinKey],    [MinKey, 2],  [MinKey, 4], MinKey, [MaxKey],
-    [MaxKey, 2], [MaxKey, 4], MaxKey,      [],          false,
-    // TODO: SERVER-49766 Enable these queries.
-    // null,        [null],
+    [MaxKey, 2], [MaxKey, 4], MaxKey,      [],          false,        null,        [null],
 ];
 
 queryList.forEach(function(q) {
