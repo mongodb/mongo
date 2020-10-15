@@ -155,18 +155,24 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
 
         auto collEntryFuture = _collectionCache.acquireAsync(nss, cacheConsistency);
 
-        // If the entry is in the cache return inmediately.
-        if (collEntryFuture.isReady()) {
-            setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
-            return ChunkManager(dbInfo.primaryId(),
-                                dbInfo.databaseVersion(),
-                                collEntryFuture.get(opCtx),
-                                atClusterTime);
+        if (allowLocks) {
+            // When allowLocks is true we may be holding a lock, so we don't
+            // want to block the current thread: if the future is ready let's
+            // use it, otherwise return an error
+
+            if (collEntryFuture.isReady()) {
+                setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, false);
+                return ChunkManager(dbInfo.primaryId(),
+                                    dbInfo.databaseVersion(),
+                                    collEntryFuture.get(opCtx),
+                                    atClusterTime);
+            } else {
+                return Status{ErrorCodes::StaleShardVersion,
+                              "Routing info refresh did not complete"};
+            }
         }
 
-        if (allowLocks) {
-            return Status{ErrorCodes::StaleShardVersion, "Routing info refresh did not complete"};
-        }
+        // From this point we can guarantee that allowLocks is false
 
         operationBlockedBehindCatalogCacheRefresh(opCtx) = true;
 
