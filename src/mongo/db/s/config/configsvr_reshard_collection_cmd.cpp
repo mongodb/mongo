@@ -211,9 +211,7 @@ public:
 
             instance->getObserver()->awaitAllDonorsReadyToDonate().wait();
             // This promise is currently automatically filled by recipient shards after creating
-            // their ReshardingRecipientStateMachines.
-            // TODO SERVER-51217 Update this comment to reflect that the temporary collection
-            // has been created.
+            // the temporary resharding collection.
             instance->getObserver()->awaitAllRecipientsFinishedApplying().wait();
 
             instance->interrupt(
