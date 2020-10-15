@@ -65,8 +65,6 @@ assert(profileObj.hasOwnProperty("millis"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("numYield"), tojson(profileObj));
 assert(profileObj.hasOwnProperty("locks"), tojson(profileObj));
 assert(profileObj.locks.hasOwnProperty("Global"), tojson(profileObj));
-assert(profileObj.locks.hasOwnProperty("Database"), tojson(profileObj));
-assert(profileObj.locks.hasOwnProperty("Collection"), tojson(profileObj));
 assert.eq(profileObj.appName, "MongoDB Shell", tojson(profileObj));
 
 //

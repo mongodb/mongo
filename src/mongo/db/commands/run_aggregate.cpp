@@ -501,7 +501,7 @@ Status runAggregate(OperationContext* opCtx,
     // If emplaced, AutoGetCollectionForReadCommand will throw if the sharding version for this
     // connection is out of date. If the namespace is a view, the lock will be released before
     // re-running the expanded aggregation.
-    boost::optional<AutoGetCollectionForReadCommand> ctx;
+    boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
 
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;

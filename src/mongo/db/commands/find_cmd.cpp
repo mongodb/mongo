@@ -237,7 +237,7 @@ public:
                      rpc::ReplyBuilderInterface* result) override {
             // Acquire locks. The RAII object is optional, because in the case of a view, the locks
             // need to be released.
-            boost::optional<AutoGetCollectionForReadCommand> ctx;
+            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsCollectionRequired(_dbName, _request.body),
                         AutoGetCollectionViewMode::kViewsPermitted);
@@ -360,7 +360,7 @@ public:
 
             // Acquire locks. If the query is on a view, we release our locks and convert the query
             // request into an aggregation command.
-            boost::optional<AutoGetCollectionForReadCommand> ctx;
+            boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsOrUUID(_dbName, _request.body),
                         AutoGetCollectionViewMode::kViewsPermitted);

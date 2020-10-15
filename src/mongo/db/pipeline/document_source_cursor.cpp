@@ -135,7 +135,7 @@ void DocumentSourceCursor::loadBatch() {
     PlanExecutor::ExecState state;
     Document resultObj;
 
-    boost::optional<AutoGetCollectionForRead> autoColl;
+    boost::optional<AutoGetCollectionForReadMaybeLockFree> autoColl;
     if (_exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally) {
         autoColl.emplace(pExpCtx->opCtx, _exec->nss());
         uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)

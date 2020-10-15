@@ -58,7 +58,8 @@ const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
 bool supportsLockFreeRead(OperationContext* opCtx) {
     // Lock-free reads are only supported for external queries, not internal via DBDirectClient.
     // Lock-free reads are not supported in multi-document transactions.
-    return !opCtx->getClient()->isInDirectClient() && !opCtx->inMultiDocumentTransaction();
+    return !storageGlobalParams.disableLockFreeReads && !opCtx->getClient()->isInDirectClient() &&
+        !opCtx->inMultiDocumentTransaction();
 }
 
 }  // namespace

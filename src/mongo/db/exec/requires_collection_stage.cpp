@@ -38,10 +38,6 @@ void RequiresCollectionStage::doSaveState() {
 }
 
 void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
-    // We should be holding a lock associated with the name of the collection prior to yielding,
-    // even if the collection was renamed during yield.
-    dassert(opCtx()->lockState()->isCollectionLockedForMode(_nss, MODE_IS));
-
     auto collectionDropped = [this]() {
         uasserted(ErrorCodes::QueryPlanKilled,
                   str::stream() << "collection dropped. UUID " << _collectionUUID);

@@ -251,7 +251,7 @@ Message getMore(OperationContext* opCtx,
     // Top. We avoid using AutoGetCollectionForReadCommand because we may need to drop and reacquire
     // locks when the cursor is awaitData, but we don't want to update the stats twice.
     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-    boost::optional<AutoGetCollectionForRead> readLock;
+    boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock;
     boost::optional<AutoStatsTracker> statsTracker;
 
     // These are set in the QueryResult msg we return.
@@ -604,7 +604,7 @@ bool runQuery(OperationContext* opCtx,
     LOGV2_DEBUG(20914, 2, "Running query", "query"_attr = redact(cq->toStringShort()));
 
     // Parse, canonicalize, plan, transcribe, and get a plan executor.
-    AutoGetCollectionForReadCommand collection(
+    AutoGetCollectionForReadCommandMaybeLockFree collection(
         opCtx, nss, AutoGetCollectionViewMode::kViewsForbidden);
     const QueryRequest& qr = cq->getQueryRequest();
 
