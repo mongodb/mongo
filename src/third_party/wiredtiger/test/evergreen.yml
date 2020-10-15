@@ -2351,7 +2351,6 @@ tasks:
     tags: ["stress-test-3", "stress-test-zseries-3"]
 
   - name: cyclomatic-complexity
-    tags: ["pull_request"]
     commands:
       - func: "get project"
       - command: shell.exec
@@ -2395,7 +2394,6 @@ buildvariants:
     - name: make-check-asan-test
     - name: configure-combinations
     - name: checkpoint-filetypes-test
-    - name: coverage-report
     - name: unit-test-long
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
@@ -2405,7 +2403,6 @@ buildvariants:
     - name: long-test
     - name: static-wt-build-test
     - name: format-failure-configs-test
-    - name: cyclomatic-complexity
 
 - name: ubuntu1804-compilers
   display_name: "! Ubuntu 18.04 Compilers"
@@ -2508,7 +2505,6 @@ buildvariants:
     - name: ftruncate-test
     - name: long-test
     - name: configure-combinations
-    - name: coverage-report
 
 - name: large-scale-tests
   display_name: "~ Large scale tests"
@@ -2517,6 +2513,17 @@ buildvariants:
   - rhel80-build
   tasks:
     - name: million-collection-test
+
+- name: code-statistics
+  display_name: "Code statistics"
+  batchtime: 1440 # 1 day
+  run_on:
+  - ubuntu1804-test
+  expansions:
+    test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
+  tasks:
+    - name: coverage-report
+    - name: cyclomatic-complexity
 
 - name: compatibility-tests-less-frequent
   display_name: Compatibility tests (less frequent)

@@ -947,13 +947,16 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
 {
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
+    WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t oldest_timestamp;
+    uint32_t snap_count;
     char hex_timestamp[WT_TS_HEX_STRING_SIZE];
 
     txn_global = &S2C(session)->txn_global;
 
-    WT_ERR(__wt_scr_alloc(session, 0, &buf));
+    txn = session->txn;
+    WT_ERR(__wt_scr_alloc(session, 1024, &buf));
     /*
      * We need to record the timestamp of the checkpoint in the metadata. The timestamp value is set
      * at a higher level, either in checkpoint or in recovery.
@@ -989,6 +992,21 @@ __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
     else {
         WT_ERR(__wt_buf_fmt(session, buf, WT_SYSTEM_OLDEST_TS "=\"%s\"", hex_timestamp));
         WT_ERR(__wt_metadata_update(session, WT_SYSTEM_OLDEST_URI, buf->data));
+    }
+
+    /* Record snapshot information in metadata for checkpoint. */
+    if (txn->snapshot_count > 0) {
+        WT_ERR(__wt_buf_fmt(session, buf,
+          WT_SYSTEM_CKPT_SNAPSHOT_MIN "=%" PRIu64 "," WT_SYSTEM_CKPT_SNAPSHOT_MAX "=%" PRIu64
+                                      "," WT_SYSTEM_CKPT_SNAPSHOT_COUNT "=%" PRIu32
+                                      "," WT_SYSTEM_CKPT_SNAPSHOT "=[",
+          txn->snap_min, txn->snap_max, txn->snapshot_count));
+
+        for (snap_count = 0; snap_count < txn->snapshot_count - 1; ++snap_count)
+            WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], ","));
+
+        WT_ERR(__wt_buf_catfmt(session, buf, "%" PRIu64 "%s", txn->snapshot[snap_count], "]"));
+        WT_ERR(__wt_metadata_update(session, WT_SYSTEM_CKPT_SNAPSHOT_URI, buf->data));
     }
 
     /* Record the base write gen in metadata as part of checkpoint */
