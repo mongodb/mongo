@@ -1,0 +1,50 @@
+test_kind: fsm_workload_test
+
+# This suite connects to a running mongod replica set to test live exports and imports.
+# It must specify resmoke.py options '--shellConnPort' or '--shellConnString'.
+
+selector:
+  roots:
+  - jstests/concurrency/fsm_workloads/**/*.js
+  exclude_files:
+  # These workloads use up to 100MB of memory, which can overwhelm test hosts.
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort.js
+  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+
+  # The findAndModify_update_grow.js workload can cause OOM kills on test hosts.
+  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+
+  # These workloads run the reIndex command, which is only allowed on a standalone node.
+  - jstests/concurrency/fsm_workloads/reindex.js
+  - jstests/concurrency/fsm_workloads/reindex_background.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+
+  # These kill sessions.
+  - jstests/concurrency/fsm_workloads/snapshot_read_kill_operations.js
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_kill_sessions_atomicity_isolation.js
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_simple_kill_sessions.js
+
+  exclude_with_any_tags:
+  # Workloads that use a write concern will fail since the workload only connects to the primary.
+  - uses_write_concern
+  # Sharding is not supported for live exports and imports.
+  - requires_sharding
+
+executor:
+  config:
+    shell_options:
+      readMode: commands
+      global_vars:
+        TestData:
+          # The live export and import tests are expected to run the FSM workloads directly against
+          # the primary of the replica set without being aware of the other members.
+          discoverTopology: False
+  hooks:
+  - class: WaitForReplication
+  - class: CleanupConcurrencyWorkloads
+    exclude_dbs:
+      - crud
+  fixture:
+    class: ExternalFixture
