@@ -1777,6 +1777,10 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
         }
     }
 
+    // Any _retryingOperation is no longer active.  This must be done before signalling state
+    // Complete.
+    _retryingOperation = boost::none;
+
     // Completion callback must be invoked outside mutex.
     try {
         onCompletion(lastApplied);
