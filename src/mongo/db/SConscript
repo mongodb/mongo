@@ -1823,7 +1823,7 @@ envWithAsio = env.Clone()
 envWithAsio.InjectThirdParty(libraries=['asio'])
 
 envWithAsio.CppUnitTest(
-    target='db_unittests',
+    target='db_unittest_test',
     source=[
         'catalog_raii_test.cpp',
         'collection_index_usage_tracker_test.cpp',
@@ -1948,7 +1948,7 @@ envWithAsio.CppUnitTest(
 # globally alters the state of the system to be in config server
 # mode. The other tests are not compatible with that setting.
 envWithAsio.CppUnitTest(
-    target='db_unittests_with_config_server_test_fixture',
+    target='db_unittest_with_config_server_test_fixture_test',
     source=[
         'key_generator_update_test.cpp',
         'keys_collection_cache_test.cpp',
