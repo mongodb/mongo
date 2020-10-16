@@ -325,6 +325,24 @@ public:
     void clearVoteRequestCbk();
 
     /**
+     * (Re-)initializes promise for next action.
+     */
+    void resetNextActionPromise();
+
+
+    /**
+     * Returns a future that can be used to wait on 'waitForNextAction' for the next action to be
+     * available.
+     */
+    SharedSemiFuture<IndexBuildAction> getNextActionFuture() const;
+
+    /**
+     * Gets next action from future if available.
+     * Returns boost::none if future is not ready.
+     */
+    boost::optional<IndexBuildAction> getNextActionNoWait() const;
+
+    /**
      * Accessor and mutator for last optime in the oplog before the interceptors were installed.
      * This supports resumable index builds.
      */

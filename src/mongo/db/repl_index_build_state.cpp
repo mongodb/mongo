@@ -359,6 +359,26 @@ void ReplIndexBuildState::clearVoteRequestCbk() {
     voteCmdCbkHandle = executor::TaskExecutor::CallbackHandle();
 }
 
+void ReplIndexBuildState::resetNextActionPromise() {
+    stdx::unique_lock<Latch> lk(mutex);
+    waitForNextAction = std::make_unique<SharedPromise<IndexBuildAction>>();
+}
+
+SharedSemiFuture<IndexBuildAction> ReplIndexBuildState::getNextActionFuture() const {
+    stdx::unique_lock<Latch> lk(mutex);
+    invariant(waitForNextAction, str::stream() << buildUUID);
+    return waitForNextAction->getFuture();
+}
+
+boost::optional<IndexBuildAction> ReplIndexBuildState::getNextActionNoWait() const {
+    stdx::unique_lock<Latch> lk(mutex);
+    auto future = waitForNextAction->getFuture();
+    if (!future.isReady()) {
+        return boost::none;
+    }
+    return future.get();
+}
+
 bool ReplIndexBuildState::isResumable() const {
     stdx::unique_lock<Latch> lk(mutex);
     return !_lastOpTimeBeforeInterceptors.isNull();

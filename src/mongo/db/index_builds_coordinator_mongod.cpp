@@ -522,10 +522,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
         replState->clearVoteRequestCbk();
     };
 
-    auto needToVote = [replState]() -> bool {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        return !replState->waitForNextAction->getFuture().isReady() ? true : false;
-    };
+    auto needToVote = [replState]() -> bool { return !replState->getNextActionNoWait(); };
 
     // Retry 'voteCommitIndexBuild' command on error until we have been signaled either with commit
     // or abort. This way, we can make sure majority of nodes will never stop voting and wait for
@@ -590,11 +587,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
 
 IndexBuildAction IndexBuildsCoordinatorMongod::_drainSideWritesUntilNextActionIsAvailable(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    auto future = [&] {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        invariant(replState->waitForNextAction);
-        return replState->waitForNextAction->getFuture();
-    }();
+    auto future = replState->getNextActionFuture();
 
     // Waits until the promise is fulfilled or the deadline expires.
     IndexBuildAction nextAction;
@@ -696,11 +689,7 @@ void IndexBuildsCoordinatorMongod::_waitForNextIndexBuildActionAndCommit(
                       "No longer primary while attempting to commit. Waiting again for next action "
                       "before completing final phase",
                       "buildUUID"_attr = replState->buildUUID);
-                {
-                    stdx::unique_lock<Latch> lk(replState->mutex);
-                    replState->waitForNextAction =
-                        std::make_unique<SharedPromise<IndexBuildAction>>();
-                }
+                replState->resetNextActionPromise();
                 needsToRetryWait = true;
                 break;
             case CommitResult::kLockTimeout:
@@ -802,11 +791,11 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     // satisfied with the stale read commit quorum value.
     Lock::ExclusiveLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
     {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (replState->waitForNextAction->getFuture().isReady()) {
+        if (auto action = replState->getNextActionNoWait()) {
             return Status(ErrorCodes::CommandFailed,
                           str::stream() << "Commit quorum can't be changed as index build is "
-                                           "ready to commit or abort");
+                                           "ready to commit or abort: "
+                                        << indexBuildActionToString(*action));
         }
     }
 
@@ -817,10 +806,8 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     {
         // Check to see the index build hasn't received commit index build signal while updating
         // the commit quorum value on-disk.
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (replState->waitForNextAction->getFuture().isReady()) {
-            auto action = replState->waitForNextAction->getFuture().get();
-            invariant(action != IndexBuildAction::kCommitQuorumSatisfied);
+        if (auto action = replState->getNextActionNoWait()) {
+            invariant(*action != IndexBuildAction::kCommitQuorumSatisfied);
         }
     }
     return status;
