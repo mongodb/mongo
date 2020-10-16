@@ -24,7 +24,7 @@ code/zone.tab: tzdb
 	@make -C code
 	@echo "Compiling tzdata files..."
 	@for i in africa antarctica australasia asia etcetera europe factory northamerica pacificnew southamerica backward; do \
-		cat code/$$i | ./code/zic -d code/data -; \
+		cat code/$$i | ./code/zic -b fat -d code/data -; \
 		echo "- $$i"; \
 	done;
 
