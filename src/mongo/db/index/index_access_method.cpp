@@ -486,6 +486,10 @@ public:
                   const RecordId& loc,
                   const InsertDeleteOptions& options) final;
 
+    void addToSorter(const KeyString::Value& keyString) final {
+        _sorter->add(keyString, mongo::NullValue());
+    }
+
     const MultikeyPaths& getMultikeyPaths() const final;
 
     bool isMultikey() const final;
@@ -839,6 +843,12 @@ bool AbstractIndexAccessMethod::shouldMarkIndexAsMultikey(
     const KeyStringSet& multikeyMetadataKeys,
     const MultikeyPaths& multikeyPaths) const {
     return numberOfKeys > 1 || isMultikeyFromPaths(multikeyPaths);
+}
+
+std::unique_ptr<SortedDataBuilderInterface> AbstractIndexAccessMethod::makeBulkBuilder(
+    OperationContext* opCtx, bool dupsAllowed) {
+    return std::unique_ptr<SortedDataBuilderInterface>(
+        _newInterface->getBulkBuilder(opCtx, dupsAllowed));
 }
 
 SortedDataInterface* AbstractIndexAccessMethod::getSortedDataInterface() const {

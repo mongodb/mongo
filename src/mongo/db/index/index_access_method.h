@@ -160,6 +160,10 @@ public:
                           int64_t* numInserted,
                           int64_t* numDeleted) = 0;
 
+    virtual std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                        bool dupsAllowed) = 0;
+
+
     /**
      * Returns an unpositioned cursor over 'this' index.
      */
@@ -241,6 +245,12 @@ public:
                               const BSONObj& obj,
                               const RecordId& loc,
                               const InsertDeleteOptions& options) = 0;
+
+        /**
+         * Inserts the keyString directly into the sorter. No additional logic (related to multikey
+         * paths, etc.) is performed.
+         */
+        virtual void addToSorter(const KeyString::Value& keyString) = 0;
 
         virtual const MultikeyPaths& getMultikeyPaths() const = 0;
 
@@ -507,6 +517,9 @@ public:
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                            bool isForward) const final;
     std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx) const final;
+
+    std::unique_ptr<SortedDataBuilderInterface> makeBulkBuilder(OperationContext* opCtx,
+                                                                bool dupsAllowed) final;
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
 

@@ -52,3 +52,11 @@ server_parameters:
     default: 200
     validator:
       gte: 50
+
+  useReferenceIndexForIndexBuild:
+    description: "When true, attempts to utilize an existing index to build a new index instead of performing a collection scan"
+    set_at:
+      - startup
+    cpp_varname: gUseReferenceIndexForIndexBuild
+    cpp_vartype: bool
+    default: false
