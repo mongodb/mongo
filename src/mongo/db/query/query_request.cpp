@@ -65,15 +65,9 @@ Status checkFieldType(const BSONElement& el, BSONType type) {
 QueryRequest::QueryRequest(NamespaceStringOrUUID nssOrUuid)
     : _nss(nssOrUuid.nss() ? *nssOrUuid.nss() : NamespaceString()), _uuid(nssOrUuid.uuid()) {}
 
-void QueryRequest::refreshNSS(OperationContext* opCtx) {
+void QueryRequest::refreshNSS(const NamespaceString& nss) {
     if (_uuid) {
-        const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
-        auto foundColl = catalog.lookupCollectionByUUID(opCtx, _uuid.get());
-        uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "UUID " << _uuid.get() << " specified in query request not found",
-                foundColl);
-        dassert(opCtx->lockState()->isDbLockedForMode(foundColl->ns().db(), MODE_IS));
-        _nss = foundColl->ns();
+        _nss = nss;
     }
     invariant(!_nss.isEmpty());
 }

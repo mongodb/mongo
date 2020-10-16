@@ -111,11 +111,9 @@ public:
                                                                          bool isExplain);
 
     /**
-     * If _uuid exists for this QueryRequest, use it to update the value of _nss via the
-     * CollectionCatalog associated with opCtx. This should only be called when we hold a DBLock
-     * on the database to which _uuid belongs, if the _uuid is present in the CollectionCatalog.
+     * If _uuid exists for this QueryRequest, update the value of _nss.
      */
-    void refreshNSS(OperationContext* opCtx);
+    void refreshNSS(const NamespaceString& nss);
 
     /**
      * Converts this QR into a find command.
@@ -183,6 +181,10 @@ public:
 
     const NamespaceString& nss() const {
         return _nss;
+    }
+
+    boost::optional<UUID> uuid() const {
+        return _uuid;
     }
 
     const BSONObj& getFilter() const {

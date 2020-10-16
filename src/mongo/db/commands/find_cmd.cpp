@@ -366,7 +366,15 @@ public:
                         AutoGetCollectionViewMode::kViewsPermitted);
             const auto& nss = ctx->getNss();
 
-            qr->refreshNSS(opCtx);
+            uassert(ErrorCodes::NamespaceNotFound,
+                    str::stream() << "UUID " << qr->uuid().get()
+                                  << " specified in query request not found",
+                    ctx || !qr->uuid());
+
+            // Set the namespace if a collection was found, as opposed to nothing or a view.
+            if (ctx) {
+                qr->refreshNSS(ctx->getNss());
+            }
 
             // Check whether we are allowed to read from this node after acquiring our locks.
             uassertStatusOK(replCoord->checkCanServeReadsFor(

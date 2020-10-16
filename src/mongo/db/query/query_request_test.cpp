@@ -1640,20 +1640,14 @@ TEST(QueryRequestTest, ParseFromLegacyQueryTooNegativeNToReturn) {
 class QueryRequestTest : public ServiceContextTest {};
 
 TEST_F(QueryRequestTest, ParseFromUUID) {
-    auto opCtx = makeOperationContext();
-    // Register a UUID/Collection pair in the CollectionCatalog.
     const CollectionUUID uuid = UUID::gen();
     const NamespaceString nss("test.testns");
-    std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss);
-    CollectionCatalog& catalog = CollectionCatalog::get(opCtx.get());
-    catalog.registerCollection(uuid, std::move(collection));
 
     NamespaceStringOrUUID nssOrUUID("test", uuid);
     QueryRequest qr(nssOrUUID);
 
     // Ensure a call to refreshNSS succeeds.
-    Lock::DBLock dbLk(opCtx.get(), nssOrUUID.db(), MODE_IS);
-    qr.refreshNSS(opCtx.get());
+    qr.refreshNSS(nss);
     ASSERT_EQ(nss, qr.nss());
 }
 
