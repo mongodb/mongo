@@ -342,6 +342,23 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
     return TryAbortResult::kContinueAbort;
 }
 
+void ReplIndexBuildState::onVoteRequestScheduled(OperationContext* opCtx,
+                                                 executor::TaskExecutor::CallbackHandle handle) {
+    stdx::unique_lock<Latch> lk(mutex);
+    if (waitForNextAction->getFuture().isReady()) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        replCoord->cancelCbkHandle(handle);
+    } else {
+        invariant(!voteCmdCbkHandle.isValid(), str::stream() << buildUUID);
+        voteCmdCbkHandle = handle;
+    }
+}
+
+void ReplIndexBuildState::clearVoteRequestCbk() {
+    stdx::unique_lock<Latch> lk(mutex);
+    voteCmdCbkHandle = executor::TaskExecutor::CallbackHandle();
+}
+
 bool ReplIndexBuildState::isResumable() const {
     stdx::unique_lock<Latch> lk(mutex);
     return !_lastOpTimeBeforeInterceptors.isNull();

@@ -313,6 +313,18 @@ public:
                             std::string reason);
 
     /**
+     * Called when the vote request command is scheduled by the task executor.
+     * Skips voting if we have already received commit or abort signal.
+     */
+    void onVoteRequestScheduled(OperationContext* opCtx,
+                                executor::TaskExecutor::CallbackHandle handle);
+
+    /**
+     * Clears vote request callback handle set in onVoteRequestScheduled().
+     */
+    void clearVoteRequestCbk();
+
+    /**
      * Accessor and mutator for last optime in the oplog before the interceptors were installed.
      * This supports resumable index builds.
      */

@@ -514,21 +514,12 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
 
     Backoff exponentialBackoff(Seconds(1), Seconds(2));
 
-    auto onRemoteCmdScheduled = [replState,
-                                 replCoord](executor::TaskExecutor::CallbackHandle handle) {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        // We have already received commit or abort signal, So skip voting.
-        if (replState->waitForNextAction->getFuture().isReady()) {
-            replCoord->cancelCbkHandle(handle);
-        } else {
-            invariant(!replState->voteCmdCbkHandle.isValid());
-            replState->voteCmdCbkHandle = handle;
-        }
+    auto onRemoteCmdScheduled = [opCtx, replState](executor::TaskExecutor::CallbackHandle handle) {
+        replState->onVoteRequestScheduled(opCtx, handle);
     };
 
     auto onRemoteCmdComplete = [replState](executor::TaskExecutor::CallbackHandle) {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        replState->voteCmdCbkHandle = executor::TaskExecutor::CallbackHandle();
+        replState->clearVoteRequestCbk();
     };
 
     auto needToVote = [replState]() -> bool {
