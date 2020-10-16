@@ -290,10 +290,11 @@ public:
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23797,
                           "Plan executor error during distinct command: {error}, "
-                          "stats: {stats}",
+                          "stats: {stats}, cmd: {cmd}",
                           "Plan executor error during distinct command",
                           "error"_attr = exception.toStatus(),
-                          "stats"_attr = redact(stats));
+                          "stats"_attr = redact(stats),
+                          "cmd"_attr = cmdObj);
 
             exception.addContext("Executor error during distinct command");
             throw;

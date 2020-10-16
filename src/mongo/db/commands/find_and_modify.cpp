@@ -89,6 +89,7 @@ namespace {
  * boost::none if no matching document to update/remove was found. If the operation failed, throws.
  */
 boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
+                                         const BSONObj& cmdObj,
                                          PlanExecutor* exec,
                                          bool isRemove) {
     BSONObj value;
@@ -98,11 +99,13 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
     } catch (DBException& exception) {
         auto&& explainer = exec->getPlanExplainer();
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-        LOGV2_WARNING(23802,
-                      "Plan executor error during findAndModify: {error}, stats: {stats}",
-                      "Plan executor error during findAndModify",
-                      "error"_attr = exception.toStatus(),
-                      "stats"_attr = redact(stats));
+        LOGV2_WARNING(
+            23802,
+            "Plan executor error during findAndModify: {error}, stats: {stats}, cmd: {cmd}",
+            "Plan executor error during findAndModify",
+            "error"_attr = exception.toStatus(),
+            "stats"_attr = redact(stats),
+            "cmd"_attr = cmdObj);
 
         exception.addContext("Plan executor error during findAndModify");
         throw;
@@ -382,7 +385,7 @@ public:
         return writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
             if (args.isRemove()) {
                 return writeConflictRetryRemove(
-                    opCtx, nsString, args, stmtId, curOp, opDebug, inTransaction, result);
+                    opCtx, nsString, args, stmtId, curOp, opDebug, inTransaction, cmdObj, result);
             } else {
                 if (MONGO_unlikely(hangBeforeFindAndModifyPerformsUpdate.shouldFail())) {
                     CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -416,6 +419,7 @@ public:
                                                         opDebug,
                                                         inTransaction,
                                                         &parsedUpdate,
+                                                        cmdObj,
                                                         result);
                     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                         if (!parsedUpdate.hasParsedQuery()) {
@@ -449,6 +453,7 @@ public:
                                          CurOp* const curOp,
                                          OpDebug* const opDebug,
                                          const bool inTransaction,
+                                         const BSONObj& cmdObj,
                                          BSONObjBuilder& result) {
         auto request = DeleteRequest{};
         request.setNsString(nsString);
@@ -483,7 +488,7 @@ public:
             CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
         }
 
-        auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
+        auto docFound = advanceExecutor(opCtx, cmdObj, exec.get(), args.isRemove());
         // Nothing after advancing the plan executor should throw a WriteConflictException,
         // so the following bookkeeping with execution stats won't end up being done
         // multiple times.
@@ -518,6 +523,7 @@ public:
                                          OpDebug* const opDebug,
                                          const bool inTransaction,
                                          ParsedUpdate* parsedUpdate,
+                                         const BSONObj& cmdObj,
                                          BSONObjBuilder& result) {
         AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
         Database* db = autoColl.ensureDbExists();
@@ -570,7 +576,7 @@ public:
             CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
         }
 
-        auto docFound = advanceExecutor(opCtx, exec.get(), args.isRemove());
+        auto docFound = advanceExecutor(opCtx, cmdObj, exec.get(), args.isRemove());
         // Nothing after advancing the plan executor should throw a WriteConflictException,
         // so the following bookkeeping with execution stats won't end up being done
         // multiple times.

@@ -315,14 +315,14 @@ public:
             // Although it is a command, a find command gets counted as a query.
             globalOpCounters.gotQuery();
 
-            // Parse the command BSON to a QueryRequest. Pass in the parsedNss in case _request.body
-            // does not have a UUID.
-            auto parsedNss =
-                NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, _request.body)};
+            const BSONObj& cmdObj = _request.body;
+
+            // Parse the command BSON to a QueryRequest. Pass in the parsedNss in case cmdObj does
+            // not have a UUID.
+            auto parsedNss = NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, cmdObj)};
             const bool isExplain = false;
             const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
-            auto qr =
-                parseCmdObjectToQueryRequest(opCtx, std::move(parsedNss), _request.body, isExplain);
+            auto qr = parseCmdObjectToQueryRequest(opCtx, std::move(parsedNss), cmdObj, isExplain);
 
             // Only allow speculative majority for internal commands that specify the correct flag.
             uassert(ErrorCodes::ReadConcernMajorityNotEnabled,
@@ -491,10 +491,11 @@ public:
                     explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
                 LOGV2_WARNING(23798,
                               "Plan executor error during find command: {error}, "
-                              "stats: {stats}",
+                              "stats: {stats}, cmd: {cmd}",
                               "Plan executor error during find command",
                               "error"_attr = exception.toStatus(),
-                              "stats"_attr = redact(stats));
+                              "stats"_attr = redact(stats),
+                              "cmd"_attr = cmdObj);
 
                 exception.addContext("Executor error during find command");
                 throw;

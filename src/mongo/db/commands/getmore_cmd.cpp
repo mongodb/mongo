@@ -340,10 +340,11 @@ public:
                 auto&& [stats, _] =
                     explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
                 LOGV2_WARNING(20478,
-                              "getMore command executor error: {error}, stats: {stats}",
+                              "getMore command executor error: {error}, stats: {stats}, cmd: {cmd}",
                               "getMore command executor error",
                               "error"_attr = exception.toStatus(),
-                              "stats"_attr = redact(stats));
+                              "stats"_attr = redact(stats),
+                              "cmd"_attr = request.toBSON());
 
                 exception.addContext("Executor error during getMore");
                 throw;

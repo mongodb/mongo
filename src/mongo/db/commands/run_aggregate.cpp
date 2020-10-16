@@ -117,6 +117,7 @@ bool handleCursorCommand(OperationContext* opCtx,
                          const NamespaceString& nsForCursor,
                          std::vector<ClientCursor*> cursors,
                          const AggregationRequest& request,
+                         const BSONObj& cmdObj,
                          rpc::ReplyBuilderInterface* result) {
     invariant(!cursors.empty());
     long long batchSize = request.getBatchSize();
@@ -186,10 +187,11 @@ bool handleCursorCommand(OperationContext* opCtx,
             auto&& [stats, _] =
                 explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
             LOGV2_WARNING(23799,
-                          "Aggregate command executor error: {error}, stats: {stats}",
+                          "Aggregate command executor error: {error}, stats: {stats}, cmd: {cmd}",
                           "Aggregate command executor error",
                           "error"_attr = exception.toStatus(),
-                          "stats"_attr = redact(stats));
+                          "stats"_attr = redact(stats),
+                          "cmd"_attr = cmdObj);
 
             exception.addContext("PlanExecutor error during aggregation");
             throw;
@@ -772,8 +774,8 @@ Status runAggregate(OperationContext* opCtx,
         }
     } else {
         // Cursor must be specified, if explain is not.
-        const bool keepCursor =
-            handleCursorCommand(opCtx, expCtx, origNss, std::move(cursors), request, result);
+        const bool keepCursor = handleCursorCommand(
+            opCtx, expCtx, origNss, std::move(cursors), request, cmdObj, result);
         if (keepCursor) {
             cursorFreer.dismiss();
         }
