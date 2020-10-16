@@ -7523,9 +7523,7 @@ tasks:
         # activate the virtualenv if it has been set up
         ${activate_virtualenv}
 
-        if [ "${is_patch}" = "false" ]; then
-          python buildscripts/blackduck_hub.py -v scan_and_report --build_logger=mci.buildlogger --build_logger_task_id=${task_id} --report_file=report.json
-        fi
+        python buildscripts/blackduck_hub.py -v scan_and_report --build_logger=mci.buildlogger --build_logger_task_id=${task_id} --report_file=report.json
 
 - name: tla_plus
   commands:
