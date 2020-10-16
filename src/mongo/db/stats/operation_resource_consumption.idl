@@ -36,7 +36,7 @@ feature_flags:
     default: false
 
 server_parameters:
- aggregateOperationResourceConsumptionMetrics:
+  aggregateOperationResourceConsumptionMetrics:
     description: "When true, globally aggregates per-operation resource consumption metrics.
                   Requires measureOperationResourceConsumption to also be set"
     set_at:
@@ -44,3 +44,13 @@ server_parameters:
     cpp_varname: gAggregateOperationResourceConsumptionMetrics
     cpp_vartype: bool
     default: false
+
+  documentUnitSizeBytes:
+    description: "The size of a document unit in bytes for resource consumption metrics collection"
+    set_at:
+      - startup
+    cpp_varname: gDocumentUnitSizeBytes
+    cpp_vartype: int32_t
+    default: 128
+    validator:
+      gte: 1

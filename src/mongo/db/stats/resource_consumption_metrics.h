@@ -215,21 +215,22 @@ public:
         }
 
         /**
-         * These setters are replication-state aware and increment the desired metrics based on the
-         * current replication state. This is a no-op when metrics collection is disabled on this
-         * operation.
+         * This should be called once per document read with the number of bytes read for that
+         * document. This is replication-state aware and increments the metric based on the current
+         * replication state. This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementDocBytesRead(OperationContext* opCtx, size_t docBytesRead);
-        void incrementDocUnitsRead(OperationContext* opCtx, size_t docUnitsRead);
+        void incrementOneDocRead(OperationContext* opCtx, size_t docBytesRead);
+
         void incrementIdxEntriesRead(OperationContext* opCtx, size_t idxEntriesRead);
         void incrementKeysSorted(OperationContext* opCtx, size_t keysSorted);
 
         /**
-         * These setters increment the desired metrics independent of replication state, and only
-         * when metrics collection is enabled for this operation.
+         * This should be called once per document written with the number of bytes written for that
+         * document. This increments the metric independent of replication state, and only when
+         * metrics collection is enabled for this operation.
          */
-        void incrementDocBytesWritten(size_t docBytesWritten);
-        void incrementDocUnitsWritten(size_t docUnitsWitten);
+        void incrementOneDocWritten(size_t docBytesWritten);
+
         void incrementCpuMillis(size_t cpuMillis);
         void incrementDocUnitsReturned(size_t docUnitsReturned);
 

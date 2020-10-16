@@ -671,7 +671,7 @@ public:
         invariantWTOK(_cursor->get_value(_cursor, &value));
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementDocBytesRead(_opCtx, value.size);
+        metricsCollector.incrementOneDocRead(_opCtx, value.size);
 
         return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
@@ -1033,7 +1033,7 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
     *out = _getData(curwrap);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementDocBytesRead(opCtx, out->size());
+    metricsCollector.incrementOneDocRead(opCtx, out->size());
 
     return true;
 }
@@ -1066,7 +1066,7 @@ void WiredTigerRecordStore::deleteRecord(OperationContext* opCtx, const RecordId
     invariantWTOK(ret);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementDocBytesWritten(old_length);
+    metricsCollector.incrementOneDocWritten(old_length);
 
     _changeNumRecords(opCtx, -1);
     _increaseDataSize(opCtx, -old_length);
@@ -1509,13 +1509,15 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
         int ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
         if (ret)
             return wtRCToStatus(ret, "WiredTigerRecordStore::insertRecord");
+
+        // Increment metrics for each insert separately, as opposed to outside of the loop. The API
+        // requires that each record be accounted for separately.
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+        metricsCollector.incrementOneDocWritten(value.size);
     }
 
     _changeNumRecords(opCtx, nRecords);
     _increaseDataSize(opCtx, totalLength);
-
-    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementDocBytesWritten(totalLength);
 
     if (_oplogStones) {
         _oplogStones->updateCurrentStoneAfterInsertOnCommit(
@@ -1654,7 +1656,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
                 // are inserting (data.size).
                 modifiedDataSize += entries[i].size + entries[i].data.size;
             };
-            metricsCollector.incrementDocBytesWritten(modifiedDataSize);
+            metricsCollector.incrementOneDocWritten(modifiedDataSize);
 
             WT_ITEM new_value;
             dassert(nentries == 0 ||
@@ -1669,7 +1671,7 @@ Status WiredTigerRecordStore::updateRecord(OperationContext* opCtx,
     if (!skip_update) {
         c->set_value(c, value.Get());
         ret = WT_OP_CHECK(wiredTigerCursorInsert(opCtx, c));
-        metricsCollector.incrementDocBytesWritten(value.size);
+        metricsCollector.incrementOneDocWritten(value.size);
     }
     invariantWTOK(ret);
 
@@ -1721,7 +1723,7 @@ StatusWith<RecordData> WiredTigerRecordStore::updateWithDamages(
         invariantWTOK(WT_OP_CHECK(wiredTigerCursorModify(opCtx, c, entries.data(), nentries)));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementDocBytesWritten(modifiedDataSize);
+    metricsCollector.incrementOneDocWritten(modifiedDataSize);
 
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));
@@ -2231,7 +2233,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     invariantWTOK(c->get_value(c, &value));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementDocBytesRead(_opCtx, value.size);
+    metricsCollector.incrementOneDocRead(_opCtx, value.size);
 
     _lastReturnedId = id;
     return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
@@ -2265,7 +2267,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     invariantWTOK(c->get_value(c, &value));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementDocBytesRead(_opCtx, value.size);
+    metricsCollector.incrementOneDocRead(_opCtx, value.size);
 
     _lastReturnedId = id;
     _eof = false;

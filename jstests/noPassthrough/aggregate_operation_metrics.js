@@ -101,7 +101,9 @@ const secondary = rst.getSecondary();
     if (node === primary) {
         [db1Name, db2Name].forEach((db) => {
             assert.gt(allMetrics[db].primaryMetrics.docBytesRead, 0);
+            assert.gt(allMetrics[db].primaryMetrics.docUnitsRead, 0);
             assert.eq(allMetrics[db].secondaryMetrics.docBytesRead, 0);
+            assert.eq(allMetrics[db].secondaryMetrics.docUnitsRead, 0);
         });
         assert.eq(allMetrics[db1Name].primaryMetrics.docBytesRead,
                   allMetrics[db2Name].primaryMetrics.docBytesRead);
@@ -109,7 +111,9 @@ const secondary = rst.getSecondary();
     } else {
         [db1Name, db2Name].forEach((db) => {
             assert.gt(allMetrics[db].secondaryMetrics.docBytesRead, 0);
+            assert.gt(allMetrics[db].secondaryMetrics.docUnitsRead, 0);
             assert.eq(allMetrics[db].primaryMetrics.docBytesRead, 0);
+            assert.eq(allMetrics[db].primaryMetrics.docUnitsRead, 0);
         });
         assert.eq(allMetrics[db1Name].secondaryMetrics.docBytesRead,
                   allMetrics[db2Name].secondaryMetrics.docBytesRead);

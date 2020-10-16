@@ -29,6 +29,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
+#include <cmath>
+
 #include "mongo/db/stats/resource_consumption_metrics.h"
 
 #include "mongo/db/repl/replication_coordinator.h"
@@ -160,16 +162,15 @@ void ResourceConsumption::MetricsCollector::_updateReadMetrics(OperationContext*
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementDocBytesRead(OperationContext* opCtx,
-                                                                  size_t docBytesRead) {
-    _updateReadMetrics(opCtx,
-                       [&](ReadMetrics& readMetrics) { readMetrics.docBytesRead += docBytesRead; });
+void ResourceConsumption::MetricsCollector::incrementOneDocRead(OperationContext* opCtx,
+                                                                size_t docBytesRead) {
+    _updateReadMetrics(opCtx, [&](ReadMetrics& readMetrics) {
+        size_t docUnits = std::ceil(docBytesRead / static_cast<float>(gDocumentUnitSizeBytes));
+        readMetrics.docBytesRead += docBytesRead;
+        readMetrics.docUnitsRead += docUnits;
+    });
 }
-void ResourceConsumption::MetricsCollector::incrementDocUnitsRead(OperationContext* opCtx,
-                                                                  size_t docUnitsRead) {
-    _updateReadMetrics(opCtx,
-                       [&](ReadMetrics& readMetrics) { readMetrics.docUnitsRead += docUnitsRead; });
-}
+
 void ResourceConsumption::MetricsCollector::incrementIdxEntriesRead(OperationContext* opCtx,
                                                                     size_t idxEntriesRead) {
     _updateReadMetrics(
@@ -181,12 +182,12 @@ void ResourceConsumption::MetricsCollector::incrementKeysSorted(OperationContext
                        [&](ReadMetrics& readMetrics) { readMetrics.keysSorted += keysSorted; });
 }
 
-void ResourceConsumption::MetricsCollector::incrementDocBytesWritten(size_t bytesWritten) {
-    _doIfCollecting([&] { _metrics.docBytesWritten += bytesWritten; });
-}
-
-void ResourceConsumption::MetricsCollector::incrementDocUnitsWritten(size_t unitsWritten) {
-    _doIfCollecting([&] { _metrics.docUnitsWritten += unitsWritten; });
+void ResourceConsumption::MetricsCollector::incrementOneDocWritten(size_t bytesWritten) {
+    _doIfCollecting([&] {
+        size_t docUnits = std::ceil(bytesWritten / static_cast<float>(gDocumentUnitSizeBytes));
+        _metrics.docBytesWritten += bytesWritten;
+        _metrics.docUnitsWritten += docUnits;
+    });
 }
 
 void ResourceConsumption::MetricsCollector::incrementCpuMillis(size_t cpuMillis) {
