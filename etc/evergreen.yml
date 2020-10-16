@@ -1303,7 +1303,32 @@ functions:
           --edition $edition                                 \
           --platform $platform                               \
           --architecture $architecture                       \
-          --useLatest 4.2 4.2.1 4.4.1
+          --useLatest 4.2 4.2.1
+
+        # The platform and architecture for how some of the binaries are reported in
+        # https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.
+        # Certain build variants define additional multiversion_*_44_or_later expansions in order to
+        # be able to fetch a complete set of versions.
+
+        if [ ! -z "${multiversion_edition_44_or_later}" ]; then
+          edition="${multiversion_edition_44_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_platform_44_or_later}" ]; then
+          platform="${multiversion_platform_44_or_later}"
+        fi
+
+        if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
+          architecture="${multiversion_architecture_44_or_later}"
+        fi
+
+        $python buildscripts/setup_multiversion_mongodb.py   \
+          --installDir /data/install                         \
+          --linkDir /data/multiversion                       \
+          --edition $edition                                 \
+          --platform $platform                               \
+          --architecture $architecture                       \
+          --useLatest 4.4.1
 
   "execute resmoke tests": &execute_resmoke_tests
     command: shell.exec
@@ -9857,6 +9882,7 @@ buildvariants:
     push_arch: x86_64
     multiversion_platform: windows_x86_64-2008plus-ssl
     multiversion_platform_42_or_later: windows_x86_64-2012plus
+    multiversion_platform_44_or_later: windows
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     num_scons_link_jobs_available: 0.5
