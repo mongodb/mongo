@@ -1,26 +1,31 @@
-// @tags: [
-//   # Can't set the 'failOnPoisonedFieldLookup' failpoint on mongos.
-//   assumes_against_mongod_not_mongos,
-// ]
-
 (function() {
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For arrayEq and orderedArrayEq.
 
-if (assert
-        .commandWorked(
-            db.adminCommand({getParameter: 1, internalQueryEnableSlotBasedExecutionEngine: 1}))
-        .internalQueryEnableSlotBasedExecutionEngine) {
+// Note that the "getParameter" command is expected to fail in versions of mongod that do not yet
+// include the slot-based execution engine. When that happens, however, 'isSBEEnabled' still
+// correctly evaluates to false.
+const isSBEEnabled = db.adminCommand({
+                           getParameter: 1,
+                           internalQueryEnableSlotBasedExecutionEngine: 1
+                       }).internalQueryEnableSlotBasedExecutionEngine;
+if (isSBEEnabled) {
     // Override error-code-checking APIs. We only load this when SBE is explicitly enabled, because
     // it causes failures in the parallel suites.
     load("jstests/libs/sbe_assert_error_override.js");
 }
 
 // It is safe for other tests to run while this failpoint is active, so long as those tests do not
-// use documents containing a field with "POISON" as their name.
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "failOnPoisonedFieldLookup", mode: "alwaysOn"}));
+// use documents containing a field with "POISON" as their name. Note that this command can fail.
+// This failpoint does not exist on mongos and on older version of mongod, which we may be talking
+// to in sharding and/or multi-version passthrough suites. The test still functions but with reduced
+// coverage.
+const isPoisonFailPointEnabled =
+    db.adminCommand({configureFailPoint: "failOnPoisonedFieldLookup", mode: "alwaysOn"}).ok;
+if (!isPoisonFailPointEnabled) {
+    print("Unable to set 'failOnPoisonedFieldLookup' failpoint.");
+}
 
 const coll = db.computed_projection;
 coll.drop();
@@ -1100,6 +1105,7 @@ testCases.forEach(function(test) {
     }
 });
 
-assert.commandWorked(
-    db.adminCommand({configureFailPoint: "failOnPoisonedFieldLookup", mode: "off"}));
+if (isPoisonFailPointEnabled) {
+    db.adminCommand({configureFailPoint: "failOnPoisonedFieldLookup", mode: "off"});
+}
 }());
