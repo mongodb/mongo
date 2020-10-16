@@ -7493,6 +7493,7 @@ tasks:
   - func: "run idl tests"
 
 - name: blackduck_scanner
+  patchable: false
   commands:
   - func: "do non-compile setup"
   - command: shell.exec
@@ -7522,7 +7523,9 @@ tasks:
         # activate the virtualenv if it has been set up
         ${activate_virtualenv}
 
-        python buildscripts/blackduck_hub.py -v scan
+        if [ "${is_patch}" = "false" ]; then
+          python buildscripts/blackduck_hub.py -v scan_and_report --build_logger=mci.buildlogger --build_logger_task_id=${task_id} --report_file=report.json
+        fi
 
 - name: tla_plus
   commands:

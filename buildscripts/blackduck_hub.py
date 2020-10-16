@@ -11,7 +11,6 @@ import os
 import subprocess
 import sys
 import tempfile
-import textwrap
 import time
 import warnings
 
@@ -53,6 +52,9 @@ BLACKDUCK_WIKI_PAGE = "https://wiki.corp.mongodb.com/display/KERNEL/Black+Duck"
 # Black Duck failed report prefix
 BLACKDUCK_FAILED_PREFIX = "A Black Duck scan was run and failed"
 
+# Black Duck default teaam
+BLACKDUCK_DEFAULT_TEAM = "Service Development Platform"
+
 ############################################################################
 
 # Globals
@@ -73,6 +75,11 @@ BUILD_LOGGER_TIMEOUT_SECS = 65
 LOCAL_REPORTS_DIR = "bd_reports"
 
 ############################################################################
+
+THIRD_PARTY_DIRECTORIES = [
+    'src/third_party/wiredtiger/test/3rdparty',
+    'src/third_party',
+]
 
 THIRD_PARTY_COMPONENTS_FILE = "etc/third_party_components.yml"
 
@@ -450,9 +457,6 @@ class Component:
         # Blackduck's newerReleases is based on "releasedOn" date. This means that if a upstream component releases a beta or rc,
         # it counts as newer but we do not consider those newer for our purposes
         # Missing newerReleases means we do not have to upgrade
-        # TODO - remove skip of FireFox since it has soooo many versions
-        #if newer_releases > 0 and name not in ("Mozilla Firefox", "Boost C++ Libraries - boost"):
-
         if newer_releases > 0:
             limit = newer_releases + 1
             versions_url = component["component"] + f"/versions?sort=releasedon%20desc&limit={limit}"
@@ -773,6 +777,7 @@ class ThirdPartyComponent:
         self.team_owner = team_owner
 
         # optional fields
+        self.is_test_only = False
         self.vulnerability_suppression = None
         self.upgrade_suppression = None
 
@@ -782,6 +787,20 @@ def _get_field(name, ymap, field: str):
         raise ValueError("Missing field %s for component %s" % (field, name))
 
     return ymap[field]
+
+
+def _get_supression_field(ymap, field: str):
+    if field not in ymap:
+        return None
+
+    value = ymap[field].lower()
+
+    if not "todo" in value:
+        raise ValueError(
+            "Invalid suppression, a suppression must include the word 'TODO' so that the TODO scanner finds resolved tickets."
+        )
+
+    return value
 
 
 def _read_third_party_components():
@@ -797,12 +816,100 @@ def _read_third_party_components():
                                  _get_field(comp, cmap, 'local_directory_path'),
                                  _get_field(comp, cmap, 'team_owner'))
 
-        tp.vulnerability_suppression = cmap.get("vulnerability_suppression", None)
-        tp.upgrade_suppression = cmap.get("upgrade_suppression", None)
+        tp.is_test_only = cmap.get("is_test_only", False)
+        tp.vulnerability_suppression = _get_supression_field(cmap, "vulnerability_suppression")
+        tp.upgrade_suppression = _get_supression_field(cmap, "upgrade_suppression")
 
         third_party.append(tp)
 
     return third_party
+
+
+def _generate_report_missing_blackduck_component(mgr: ReportManager, mcomp: ThirdPartyComponent):
+    mgr.write_report(
+        mcomp.name, "missing_blackduck_component", "fail", f"""{BLACKDUCK_FAILED_PREFIX}
+
+The {mcomp.name} library was found in {THIRD_PARTY_COMPONENTS_FILE} but not detected by Black Duck.
+
+This is caused by one of two issues:
+1. The {THIRD_PARTY_COMPONENTS_FILE} file is out of date and the entry needs to be removed for "{mcomp.name}".
+or
+2. A entry to the component needs to be manually added to Black Duck.
+
+Next Steps:
+
+Build Baron:
+A BF ticket should be generated and assigned to "{BLACKDUCK_DEFAULT_TEAM}" with
+this text.
+
+Developer:
+To address this build failure, the next steps are as follows:
+1. Verify that the component is correct in {THIRD_PARTY_COMPONENTS_FILE}.
+
+2. If the component is incorrect, add a comment to the component in Black Duck and mark it as "Ignored".
+or
+2. If the component is correct, add the correct information to {THIRD_PARTY_COMPONENTS_FILE}.
+
+If the "{BLACKDUCK_DEFAULT_TEAM}" cannot do this work for any reason, the BF should be assigned to
+the component owner team "{mcomp.team_owner}".
+
+For more information, see {BLACKDUCK_WIKI_PAGE}.
+""")
+
+
+def _generate_report_blackduck_missing_directory(mgr: ReportManager, directory: str):
+    mgr.write_report(
+        directory, "missing_directory", "fail", f"""{BLACKDUCK_FAILED_PREFIX}
+
+The directory "{directory}" was found in a known MongoDB third_party directory but is not known to
+Black Duck or {THIRD_PARTY_COMPONENTS_FILE}. This directory likely needs to be added to Black Duck
+manually.
+
+Next Steps:
+
+Build Baron:
+A BF ticket should be generated and assigned to "{BLACKDUCK_DEFAULT_TEAM}" with
+this text.
+
+Developer:
+To address this build failure, the next steps are as follows:
+1. Verify that the component is correct.
+2. Add the component manually to the Black Duck project at
+   {BLACKDUCK_PROJECT_URL}.
+3. Once the component has been accepted by Black Duck, add the correct information to
+   {THIRD_PARTY_COMPONENTS_FILE}.
+
+For more information, see {BLACKDUCK_WIKI_PAGE}.
+""")
+
+
+def _generate_report_missing_yaml_component(mgr: ReportManager, comp: Component):
+    mgr.write_report(
+        comp.name, "missing_yaml_component", "fail", f"""{BLACKDUCK_FAILED_PREFIX}
+
+The {comp.name} library with version "{comp.version}" was detected by Black Duck but not found in
+{THIRD_PARTY_COMPONENTS_FILE}.
+
+This is caused by one of two issues:
+1. Black Duck has made an error and the software is not being vendored by MongoDB.
+2. Black Duck is correct and {THIRD_PARTY_COMPONENTS_FILE} must be updated.
+
+Next Steps:
+
+Build Baron:
+A BF ticket should be generated and assigned to "{BLACKDUCK_DEFAULT_TEAM}" with
+this text.
+
+Developer:
+To address this build failure, the next steps are as follows:
+1. Verify that the component is correct at {BLACKDUCK_PROJECT_URL}.
+
+2. If the component is incorrect, add a comment to the component and mark it as "Ignored".
+or
+3. If the component is correct, add the correct information to {THIRD_PARTY_COMPONENTS_FILE}.
+
+For more information, see {BLACKDUCK_WIKI_PAGE}.
+""")
 
 
 def _generate_report_upgrade(mgr: ReportManager, comp: Component, mcomp: ThirdPartyComponent,
@@ -821,9 +928,12 @@ branch.
 
 Next Steps:
 
-Build Baron: A BF ticket should be generated and assigned to "Service Development Platform" with this text.
+Build Baron:
+A BF ticket should be generated and assigned to "{BLACKDUCK_DEFAULT_TEAM}" with
+this text.
 
-Developer: To address this build failure, the next steps are as follows:
+Developer:
+To address this build failure, the next steps are as follows:
 1. File a SERVER ticket to update the software if one already does not exist.
 2. Add a “upgrade_supression” to {THIRD_PARTY_COMPONENTS_FILE} with the SERVER ticket to acknowledge
    this report. Note that you do not need to immediately update the library, just file a ticket.
@@ -831,7 +941,10 @@ Developer: To address this build failure, the next steps are as follows:
 If you believe the library is already up-to-date but Black Duck has the wrong version, please update
 version information for this component at {BLACKDUCK_PROJECT_URL}.
 
-For more information, {BLACKDUCK_WIKI_PAGE}.
+If the "{BLACKDUCK_DEFAULT_TEAM}" cannot do this work for any reason, the BF should be assigned to
+the component owner team "{mcomp.team_owner}".
+
+For more information, see {BLACKDUCK_WIKI_PAGE}.
 """)
 
     mgr.add_report_metric(comp.name, str(comp.version))
@@ -855,9 +968,12 @@ CRITICAL vulnerabilities on the master branch.
 
 Next Steps:
 
-Build Baron: A BF ticket should be generated and assigned to "Service Development Platform" with this text.
+Build Baron:
+A BF ticket should be generated and assigned to "{BLACKDUCK_DEFAULT_TEAM}" with
+this text.
 
-Developer: To address this build failure, the next steps are as follows:
+Developer:
+To address this build failure, the next steps are as follows:
 1. File a SERVER ticket to update the software if one already does not exist. Note that you do not
    need to immediately update the library, just file a ticket.
 2. Add a “vulnerability_supression” to {THIRD_PARTY_COMPONENTS_FILE} with the SERVER ticket to
@@ -866,8 +982,21 @@ Developer: To address this build failure, the next steps are as follows:
 If you believe the library is already up-to-date but Black Duck has the wrong version, please update
 version information for this component at {BLACKDUCK_PROJECT_URL}.
 
- For more information, {BLACKDUCK_WIKI_PAGE}.
+If the "{BLACKDUCK_DEFAULT_TEAM}" cannot do this work for any reason, the BF should be assigned to
+the component owner team "{mcomp.team_owner}".
+
+For more information, see {BLACKDUCK_WIKI_PAGE}.
 """)
+
+
+def _get_third_party_directories():
+    third_party = []
+    for tp in THIRD_PARTY_DIRECTORIES:
+        for entry in os.scandir(tp):
+            if entry.name not in ["scripts"] and entry.is_dir():
+                third_party.append(entry.path)
+
+    return sorted(third_party)
 
 
 class Analyzer:
@@ -887,16 +1016,59 @@ class Analyzer:
 
     def _do_reports(self):
         for comp in self.black_duck_components:
-            # 1. Validate there are no security issues
-            self._verify_vulnerability_status(comp)
+            # 1. Validate if this is in the YAML file
+            if self._verify_yaml_contains_component(comp):
 
-            # 2. Check for upgrade issues
-            self._verify_upgrade_status(comp)
+                # 2. Validate there are no security issues
+                self._verify_vulnerability_status(comp)
+
+                # 3. Check for upgrade issues
+                self._verify_upgrade_status(comp)
+
+        # 4. Validate that each third_party directory is in the YAML file
+        self._verify_directories_in_yaml()
+
+        # 5. Verify the YAML file has all the entries in Black Duck
+        self._verify_components_in_yaml()
+
+    def _verify_yaml_contains_component(self, comp: Component):
+        # It should be rare that Black Duck detects something that is not in the YAML file
+        # As a result, we do not generate a "pass" report for simply be consistent between Black Duck and the yaml file
+        if comp.name not in [c.name for c in self.third_party_components]:
+            _generate_report_missing_yaml_component(self.mgr, comp)
+            return False
+
+        return True
+
+    def _verify_directories_in_yaml(self):
+
+        comp_dirs = [c.local_path for c in self.third_party_components]
+        for cdir in self.third_party_directories:
+            # Ignore WiredTiger since it is not a third-party library but made by MongoDB, Inc.
+            if cdir in ["src/third_party/wiredtiger"]:
+                continue
+
+            if cdir not in comp_dirs:
+                _generate_report_blackduck_missing_directory(self.mgr, cdir)
+
+    def _verify_components_in_yaml(self):
+
+        comp_names = [c.name for c in self.black_duck_components]
+        for mcomp in self.third_party_components:
+            # These components are known to be missing from Black Duck
+            # Aladdin MD5 is a pair of C files for MD5 computation
+            # timelib is simply missing
+            # Unicode is not code
+            if mcomp.name in ["Aladdin MD5", "timelib", "unicode"]:
+                continue
+
+            if mcomp.name not in comp_names:
+                _generate_report_missing_blackduck_component(self.mgr, mcomp)
 
     def _verify_upgrade_status(self, comp: Component):
         mcomp = self._get_mongo_component(comp)
 
-        if comp.newest_release and not mcomp.upgrade_suppression:
+        if comp.newest_release and not mcomp.upgrade_suppression and not mcomp.is_test_only:
             _generate_report_upgrade(self.mgr, comp, mcomp, True)
         else:
             _generate_report_upgrade(self.mgr, comp, mcomp, False)
@@ -904,7 +1076,9 @@ class Analyzer:
     def _verify_vulnerability_status(self, comp: Component):
         mcomp = self._get_mongo_component(comp)
 
-        if comp.security_risk in ["HIGH", "CRITICAL"] and not mcomp.vulnerability_suppression:
+        if comp.security_risk in [
+                "HIGH", "CRITICAL"
+        ] and not mcomp.vulnerability_suppression and not mcomp.is_test_only:
             _generate_report_vulnerability(self.mgr, comp, mcomp, True)
         else:
             _generate_report_vulnerability(self.mgr, comp, mcomp, False)
@@ -922,6 +1096,10 @@ class Analyzer:
     def run(self, logger: ReportLogger, report_file: Optional[str]):
         """Run analysis of Black Duck scan and local files."""
 
+        self.third_party_directories = _get_third_party_directories()
+
+        LOGGER.info("Found the following third party directories: %s", self.third_party_directories)
+
         self.third_party_components = _read_third_party_components()
 
         self.black_duck_components = _query_blackduck()
@@ -932,6 +1110,23 @@ class Analyzer:
         self.black_duck_components = [
             comp for comp in self.black_duck_components if not comp.name == "MongoDB"
         ]
+
+        # Remove duplicate Black Duck components. We only care about the component with highest version number
+        # Black Duck can detect different versions of the same component for instance if an upgrade of a component happens
+        bd_names = {comp.name for comp in self.black_duck_components}
+        if len(bd_names) != len(self.black_duck_components):
+            LOGGER.warning("Found duplicate Black Duck components")
+            bd_unique = {}
+            for comp in self.black_duck_components:
+                if comp.name in bd_unique:
+                    LOGGER.warning("Found duplicate Black Duck component: %s", comp.name)
+                    first = bd_unique[comp.name]
+                    if comp.version > first.version:
+                        bd_unique[comp.name] = comp
+                else:
+                    bd_unique[comp.name] = comp
+
+            self.black_duck_components = list(bd_unique.values())
 
         self.mgr = ReportManager(logger)
 
