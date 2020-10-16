@@ -469,9 +469,8 @@ bool isIndexBuildResumable(OperationContext* opCtx,
  */
 RecoveryUnit::ReadSource getReadSourceForDrainBeforeCommitQuorum(
     const ReplIndexBuildState& replState) {
-    return replState.lastOpTimeBeforeInterceptors.isNull()
-        ? RecoveryUnit::ReadSource::kNoTimestamp
-        : RecoveryUnit::ReadSource::kMajorityCommitted;
+    return replState.isResumable() ? RecoveryUnit::ReadSource::kMajorityCommitted
+                                   : RecoveryUnit::ReadSource::kNoTimestamp;
 }
 
 }  // namespace
@@ -1342,9 +1341,8 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
             // No locks are required when aborting due to rollback. This performs no storage engine
             // writes, only cleans up the remaining in-memory state.
             CollectionWriter coll(opCtx, replState->collectionUUID);
-            auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
             _indexBuildsManager.abortIndexBuildWithoutCleanup(
-                opCtx, coll.get(), replState->buildUUID, isResumable);
+                opCtx, coll.get(), replState->buildUUID, replState->isResumable());
         }
 
         {
@@ -1466,9 +1464,8 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
     std::shared_ptr<ReplIndexBuildState> replState,
     const CollectionPtr& collection) {
     // Leave it as-if kill -9 happened. Startup recovery will restart the index build.
-    auto isResumable = !replState->lastOpTimeBeforeInterceptors.isNull();
     _indexBuildsManager.abortIndexBuildWithoutCleanup(
-        opCtx, collection, replState->buildUUID, isResumable);
+        opCtx, collection, replState->buildUUID, replState->isResumable());
 
     {
         // Promise should be set at least once before it's getting destroyed.
@@ -2218,7 +2215,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
         // After the interceptors are set, get the latest optime in the oplog that could have
         // contained a write to this collection. We need to be holding the collection lock in X mode
         // so that we ensure that there are not any uncommitted transactions on this collection.
-        replState->lastOpTimeBeforeInterceptors = getLatestOplogOpTime(opCtx);
+        replState->setLastOpTimeBeforeInterceptors(getLatestOplogOpTime(opCtx));
     }
 
     return PostSetupAction::kContinueIndexBuild;
@@ -2522,15 +2519,15 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
-    // The last optime could be null if the node is in initial sync while building the index.
-    if (replState->lastOpTimeBeforeInterceptors.isNull()) {
+    // The index build is not resumable if the node is in initial sync while building the index.
+    if (!replState->isResumable()) {
         return;
     }
 
     auto timeoutMillis = gResumableIndexBuildMajorityOpTimeTimeoutMillis;
     if (timeoutMillis == 0) {
         // Disable resumable index build.
-        replState->lastOpTimeBeforeInterceptors = {};
+        replState->clearLastOpTimeBeforeInterceptors();
         return;
     }
 
@@ -2549,12 +2546,13 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
         deadline = Date_t::max();
     }
 
+    auto lastOpTimeBeforeInterceptors = replState->getLastOpTimeBeforeInterceptors();
     LOGV2(4847600,
           "Index build: waiting for last optime before interceptors to be majority committed",
           "buildUUID"_attr = replState->buildUUID,
           "deadline"_attr = deadline,
           "timeout"_attr = timeout,
-          "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors);
+          "lastOpTime"_attr = lastOpTimeBeforeInterceptors);
 
     hangIndexBuildBeforeWaitingUntilMajorityOpTime.executeIf(
         [opCtx, buildUUID = replState->buildUUID](const BSONObj& data) {
@@ -2574,17 +2572,16 @@ void IndexBuildsCoordinator::_awaitLastOpTimeBeforeInterceptorsMajorityCommitted
             });
         });
 
-    auto status = replCoord->waitUntilMajorityOpTime(
-        opCtx, replState->lastOpTimeBeforeInterceptors, deadline);
+    auto status = replCoord->waitUntilMajorityOpTime(opCtx, lastOpTimeBeforeInterceptors, deadline);
     if (!status.isOK()) {
-        replState->lastOpTimeBeforeInterceptors = {};
+        replState->clearLastOpTimeBeforeInterceptors();
         LOGV2(5053900,
               "Index build: timed out waiting for the last optime before interceptors to be "
               "majority committed. Continuing as a non-resumable index build.",
               "buildUUID"_attr = replState->buildUUID,
               "deadline"_attr = deadline,
               "timeout"_attr = timeout,
-              "lastOpTime"_attr = replState->lastOpTimeBeforeInterceptors,
+              "lastOpTime"_attr = lastOpTimeBeforeInterceptors,
               "waitStatus"_attr = status);
         return;
     }
