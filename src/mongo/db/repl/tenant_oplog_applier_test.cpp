@@ -148,6 +148,11 @@ public:
         ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
     }
 
+    void tearDown() override {
+        _executor->shutdown();
+        _executor->join();
+    }
+
     void assertNoOpMatches(const OplogEntry& op, const MutableOplogEntry& noOp) {
         ASSERT_BSONOBJ_EQ(op.toBSON(), noOp.getObject());
         ASSERT_EQ(op.getNss(), noOp.getNss());
