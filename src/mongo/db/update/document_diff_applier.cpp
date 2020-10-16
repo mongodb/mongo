@@ -121,6 +121,7 @@ public:
             auto it = tables.fieldMap.find(elt.fieldNameStringData());
             if (it == tables.fieldMap.end()) {
                 // Field is not modified, so we append it as is.
+                invariant(!elt.eoo());
                 builder->append(elt);
                 continue;
             }
@@ -200,6 +201,7 @@ private:
         stdx::visit(
             visit_helper::Overloaded{
                 [this, &path, builder](const BSONElement& update) {
+                    invariant(!update.eoo());
                     builder->append(update);
                     updateIndexesAffected(path);
                 },
@@ -260,6 +262,7 @@ private:
                 appendNewValueForArrayIndex(*preImageIt, path, nextMod->second, builder);
                 nextMod = reader->next();
             } else {
+                invariant(!(*preImageIt).eoo());
                 // This index is not in the diff so we keep the value in the pre image.
                 builder->append(*preImageIt);
             }
