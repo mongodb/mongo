@@ -1746,42 +1746,7 @@ Status IndexBuildsCoordinator::_registerIndexBuild(
                 std::find(existingIndexBuild->indexNames.begin(),
                           existingIndexBuild->indexNames.end(),
                           name)) {
-
-                str::stream ss;
-                ss << "Index build conflict: " << replIndexBuildState->buildUUID
-                   << ": There's already an index with name '" << name
-                   << "' being built on the collection "
-                   << " ( " << replIndexBuildState->collectionUUID
-                   << " ) under an existing index build: " << existingIndexBuild->buildUUID;
-                auto aborted = false;
-                IndexBuildState existingIndexBuildState;
-                {
-                    // We have to lock the mutex in order to read the committed/aborted state.
-                    stdx::unique_lock<Latch> lkExisting(existingIndexBuild->mutex);
-                    existingIndexBuildState = existingIndexBuild->indexBuildState;
-                }
-                ss << " index build state: " << existingIndexBuildState.toString();
-                if (auto ts = existingIndexBuildState.getTimestamp()) {
-                    ss << ", timestamp: " << ts->toString();
-                }
-                if (existingIndexBuildState.isAborted()) {
-                    if (auto abortReason = existingIndexBuildState.getAbortReason()) {
-                        ss << ", abort reason: " << abortReason.get();
-                    }
-                    aborted = true;
-                }
-                std::string msg = ss;
-                LOGV2(20661,
-                      "Index build conflict. There's already an index with the same name being "
-                      "built under an existing index build",
-                      "buildUUID"_attr = replIndexBuildState->buildUUID,
-                      "existingBuildUUID"_attr = existingIndexBuild->buildUUID,
-                      "index"_attr = name,
-                      "collectionUUID"_attr = replIndexBuildState->collectionUUID);
-                if (aborted) {
-                    return {ErrorCodes::IndexBuildAborted, msg};
-                }
-                return Status(ErrorCodes::IndexBuildAlreadyInProgress, msg);
+                return existingIndexBuild->onConflictWithNewIndexBuild(*replIndexBuildState, name);
             }
         }
     }

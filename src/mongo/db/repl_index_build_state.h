@@ -343,6 +343,13 @@ public:
     boost::optional<IndexBuildAction> getNextActionNoWait() const;
 
     /**
+     * Called when we are trying to add a new index build 'other' that conflicts with this one.
+     * Returns a status that reflects whether this index build has been aborted or still active.
+     */
+    Status onConflictWithNewIndexBuild(const ReplIndexBuildState& otherIndexBuild,
+                                       const std::string& otherIndexName) const;
+
+    /**
      * Accessor and mutator for last optime in the oplog before the interceptors were installed.
      * This supports resumable index builds.
      */

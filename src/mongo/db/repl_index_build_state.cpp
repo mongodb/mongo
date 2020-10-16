@@ -379,6 +379,45 @@ boost::optional<IndexBuildAction> ReplIndexBuildState::getNextActionNoWait() con
     return future.get();
 }
 
+Status ReplIndexBuildState::onConflictWithNewIndexBuild(const ReplIndexBuildState& otherIndexBuild,
+                                                        const std::string& otherIndexName) const {
+    str::stream ss;
+    ss << "Index build conflict: " << otherIndexBuild.buildUUID
+       << ": There's already an index with name '" << otherIndexName
+       << "' being built on the collection "
+       << " ( " << otherIndexBuild.collectionUUID
+       << " ) under an existing index build: " << buildUUID;
+    auto aborted = false;
+    IndexBuildState existingIndexBuildState;
+    {
+        // We have to lock the mutex in order to read the committed/aborted state.
+        stdx::unique_lock<Latch> lk(mutex);
+        existingIndexBuildState = indexBuildState;
+    }
+    ss << " index build state: " << existingIndexBuildState.toString();
+    if (auto ts = existingIndexBuildState.getTimestamp()) {
+        ss << ", timestamp: " << ts->toString();
+    }
+    if (existingIndexBuildState.isAborted()) {
+        if (auto abortReason = existingIndexBuildState.getAbortReason()) {
+            ss << ", abort reason: " << abortReason.get();
+        }
+        aborted = true;
+    }
+    std::string msg = ss;
+    LOGV2(20661,
+          "Index build conflict. There's already an index with the same name being "
+          "built under an existing index build",
+          "buildUUID"_attr = otherIndexBuild.buildUUID,
+          "existingBuildUUID"_attr = buildUUID,
+          "index"_attr = otherIndexName,
+          "collectionUUID"_attr = otherIndexBuild.collectionUUID);
+    if (aborted) {
+        return {ErrorCodes::IndexBuildAborted, msg};
+    }
+    return Status(ErrorCodes::IndexBuildAlreadyInProgress, msg);
+}
+
 bool ReplIndexBuildState::isResumable() const {
     stdx::unique_lock<Latch> lk(mutex);
     return !_lastOpTimeBeforeInterceptors.isNull();
