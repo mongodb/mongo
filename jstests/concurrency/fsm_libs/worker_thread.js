@@ -52,6 +52,10 @@ var workerThread = (function() {
                 mongo = new Mongo(connectionString);
             }
 
+            // Retry operations that fail due to in-progress background operations. Load this early
+            // so that later overrides can be retried.
+            load('jstests/libs/override_methods/implicitly_retry_on_background_op_in_progress.js');
+
             if (typeof args.sessionOptions !== 'undefined') {
                 let initialClusterTime;
                 let initialOperationTime;
