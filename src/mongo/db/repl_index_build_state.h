@@ -407,6 +407,7 @@ public:
     // SharedSemiFuture(s).
     SharedPromise<IndexCatalogStats> sharedPromise;
 
+private:
     /*
      * Determines whether to skip the index build state transition check.
      * Index builder not using ReplIndexBuildState::waitForNextAction to signal primary and
@@ -424,22 +425,21 @@ public:
                                                    IndexBuildAction signal);
 
     // Protects the state below.
-    mutable Mutex mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::_mutex");
 
     // Primary and secondaries gets their commit or abort signal via this promise future pair.
-    std::unique_ptr<SharedPromise<IndexBuildAction>> waitForNextAction;
+    std::unique_ptr<SharedPromise<IndexBuildAction>> _waitForNextAction;
 
     // Maintains the state of the index build.
-    IndexBuildState indexBuildState;
+    IndexBuildState _indexBuildState;
 
     // Represents the callback handle for scheduled remote command "voteCommitIndexBuild".
-    executor::TaskExecutor::CallbackHandle voteCmdCbkHandle;
+    executor::TaskExecutor::CallbackHandle _voteCmdCbkHandle;
 
     // The OperationId of the index build. This allows external callers to interrupt the index build
     // thread. Initialized in start() as we transition from setup to in-progress.
     boost::optional<OperationId> _opId;
 
-private:
     // The last optime in the oplog before the interceptors were installed. If this is a single
     // phase index build, isn't running a hybrid index build, or isn't running during oplog
     // application, this will be null.
