@@ -120,12 +120,16 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
                "retrying on killed session error codes isn't supported with prepareProbability");
 
         let hasTransientError;
-
+        let iterations = 0;
         do {
             session.startTransaction_forTesting(txnOptions, {ignoreActiveTxn: true});
             let hasCommitTxnError = false;
             hasTransientError = false;
 
+            iterations += 1;
+            if (iterations % 10 === 0) {
+                print("withTxnAndAutoRetry has iterated " + iterations + " times.");
+            }
             try {
                 func();
 
@@ -156,6 +160,7 @@ var {withTxnAndAutoRetry, isKilledSessionCode} = (function() {
                 }
 
                 if (shouldRetryEntireTxnOnError(e, hasCommitTxnError, retryOnKilledSession)) {
+                    print("Retrying transaction due to transient error.");
                     hasTransientError = true;
                     continue;
                 }
