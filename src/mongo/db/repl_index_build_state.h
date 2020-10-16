@@ -238,6 +238,41 @@ public:
     void start(OperationContext* opCtx);
 
     /**
+     * This index build has completed successfully and there is no further work to be done.
+     */
+    void commit(OperationContext* opCtx);
+
+    /**
+     * Returns timestamp for committing this index build.
+     * Returns null timestamp if not set.
+     */
+    Timestamp getCommitTimestamp() const;
+
+    /**
+     * Called when handling a commitIndexIndexBuild oplog entry.
+     * This signal can be received during primary (drain phase), secondary,
+     * startup (startup recovery) and startup2 (initial sync).
+     */
+    void onOplogCommit(bool isPrimary) const;
+
+    /**
+     * This index build has failed while running in the builder thread due to a non-shutdown reason.
+     */
+    void abortSelf(OperationContext* opCtx);
+
+    /**
+     * This index build was interrupted because the server is shutting down.
+     */
+    void abortForShutdown(OperationContext* opCtx);
+
+    /**
+     * Called when handling an abortIndexIndexBuild oplog entry.
+     * This signal can be received during primary (drain phase), secondary,
+     * startup (startup recovery) and startup2 (initial sync).
+     */
+    void onOplogAbort(OperationContext* opCtx, const NamespaceString& nss) const;
+
+    /**
      * Returns true if this index build has been aborted.
      */
     bool isAborted() const;
@@ -253,6 +288,13 @@ public:
      * satisfied.
      */
     void setCommitQuorumSatisfied(OperationContext* opCtx);
+
+    /**
+     * Called when we are about to complete a single-phased index build.
+     * Single-phase builds don't support commit quorum, but they must go through the process of
+     * updating their state to synchronize with concurrent abort operations
+     */
+    void setSinglePhaseCommit(OperationContext* opCtx);
 
     /**
      * Attempt to signal the index build to commit and advance the index build to the kPrepareCommit

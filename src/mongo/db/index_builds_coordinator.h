@@ -710,9 +710,6 @@ protected:
         std::shared_ptr<ReplIndexBuildState> replState,
         const IndexBuildOptions& indexBuildOptions) = 0;
 
-    std::string _indexBuildActionToString(IndexBuildAction action);
-
-
     /**
      * Third phase is catching up on all the writes that occurred during the first two phases.
      * Accepts a commit timestamp for the index, which could be null. See

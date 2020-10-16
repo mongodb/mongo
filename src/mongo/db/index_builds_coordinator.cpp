@@ -159,21 +159,6 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
     return collection->isEmpty(opCtx);
 }
 
-/*
- * Determines whether to skip the index build state transition check.
- * Index builder not using ReplIndexBuildState::waitForNextAction to signal primary and secondaries
- * to commit or abort signal will violate index build state transition. So, we should skip state
- * transition verification. Otherwise, we would invariant.
- */
-bool shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx,
-                                              IndexBuildProtocol protocol) {
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getSettings().usingReplSets() && protocol == IndexBuildProtocol::kTwoPhase) {
-        return false;
-    }
-    return true;
-}
-
 /**
  * Removes the index build from the config.system.indexBuilds collection after the primary has
  * written the commitIndexBuild or abortIndexBuild oplog entry.
@@ -214,11 +199,8 @@ void onCommitIndexBuild(OperationContext* opCtx,
                         std::shared_ptr<ReplIndexBuildState> replState) {
     const auto& buildUUID = replState->buildUUID;
 
-    auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState->protocol);
-    opCtx->recoveryUnit()->onCommit([replState, skipCheck](boost::optional<Timestamp> commitTime) {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        replState->indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
-    });
+    replState->commit(opCtx);
+
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         return;
     }
@@ -745,27 +727,6 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     }
 
     return status;
-}
-
-std::string IndexBuildsCoordinator::_indexBuildActionToString(IndexBuildAction action) {
-    if (action == IndexBuildAction::kNoAction) {
-        return "No action";
-    } else if (action == IndexBuildAction::kOplogCommit) {
-        return "Oplog commit";
-    } else if (action == IndexBuildAction::kOplogAbort) {
-        return "Oplog abort";
-    } else if (action == IndexBuildAction::kInitialSyncAbort) {
-        return "Initial sync abort";
-    } else if (action == IndexBuildAction::kRollbackAbort) {
-        return "Rollback abort";
-    } else if (action == IndexBuildAction::kPrimaryAbort) {
-        return "Primary abort";
-    } else if (action == IndexBuildAction::kSinglePhaseCommit) {
-        return "Single-phase commit";
-    } else if (action == IndexBuildAction::kCommitQuorumSatisfied) {
-        return "Commit quorum Satisfied";
-    }
-    MONGO_UNREACHABLE;
 }
 
 void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown(OperationContext* opCtx) {
@@ -1300,24 +1261,7 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
         // Deletes the index from the durable catalog.
         case IndexBuildAction::kOplogAbort: {
             invariant(IndexBuildProtocol::kTwoPhase == replState->protocol);
-            // This signal can be received during primary (drain phase), secondary,
-            // startup (startup recovery) and startup2 (initial sync).
-            bool isMaster = replCoord->canAcceptWritesFor(opCtx, nss);
-            invariant(!isMaster, str::stream() << "Index build: " << replState->buildUUID);
-            invariant(replState->indexBuildState.isAborted(),
-                      str::stream()
-                          << "Index build: " << replState->buildUUID
-                          << ",  index build state: " << replState->indexBuildState.toString());
-            invariant(replState->indexBuildState.getTimestamp() &&
-                          replState->indexBuildState.getAbortReason(),
-                      replState->buildUUID.toString());
-            LOGV2(3856206,
-                  "Aborting index build from oplog entry",
-                  "buildUUID"_attr = replState->buildUUID,
-                  "abortTimestamp"_attr = replState->indexBuildState.getTimestamp().get(),
-                  "abortReason"_attr = replState->indexBuildState.getAbortReason().get(),
-                  "collectionUUID"_attr = replState->collectionUUID);
-
+            replState->onOplogAbort(opCtx, nss);
             _indexBuildsManager.abortIndexBuild(
                 opCtx, coll, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
             break;
@@ -1342,11 +1286,7 @@ void IndexBuildsCoordinator::_completeSelfAbort(OperationContext* opCtx,
                                                 std::shared_ptr<ReplIndexBuildState> replState,
                                                 Status reason) {
     _completeAbort(opCtx, replState, IndexBuildAction::kPrimaryAbort, reason);
-    {
-        auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState->protocol);
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        replState->indexBuildState.setState(IndexBuildState::kAborted, skipCheck);
-    }
+    replState->abortSelf(opCtx);
     {
         stdx::unique_lock<Latch> lk(_mutex);
         _unregisterIndexBuild(lk, replState);
@@ -1361,15 +1301,8 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
     _indexBuildsManager.abortIndexBuildWithoutCleanup(
         opCtx, collection, replState->buildUUID, replState->isResumable());
 
-    {
-        // Promise should be set at least once before it's getting destroyed.
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (!replState->waitForNextAction->getFuture().isReady()) {
-            replState->waitForNextAction->emplaceValue(IndexBuildAction::kNoAction);
-        }
-        auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState->protocol);
-        replState->indexBuildState.setState(IndexBuildState::kAborted, skipCheck);
-    }
+    replState->abortForShutdown(opCtx);
+
     {
         // This allows the builder thread to exit.
         stdx::unique_lock<Latch> lk(_mutex);
@@ -2688,12 +2621,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     }
 
     if (IndexBuildAction::kOplogCommit == action) {
-        // This signal can be received during primary (drain phase), secondary, startup (startup
-        // recovery) and startup2 (initial sync).
-        invariant(!isMaster && replState->indexBuildState.isCommitPrepared(),
-                  str::stream() << "Index build: " << replState->buildUUID
-                                << ",  index build state: "
-                                << replState->indexBuildState.toString());
+        replState->onOplogCommit(isMaster);
     }
 
     // The collection object should always exist while an index build is registered.

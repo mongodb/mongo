@@ -134,6 +134,61 @@ void ReplIndexBuildState::start(OperationContext* opCtx) {
     indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
 }
 
+void ReplIndexBuildState::commit(OperationContext* opCtx) {
+    auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
+    opCtx->recoveryUnit()->onCommit([this, skipCheck](boost::optional<Timestamp> commitTime) {
+        stdx::unique_lock<Latch> lk(mutex);
+        indexBuildState.setState(IndexBuildState::kCommitted, skipCheck);
+    });
+}
+
+Timestamp ReplIndexBuildState::getCommitTimestamp() const {
+    stdx::unique_lock<Latch> lk(mutex);
+    return indexBuildState.getTimestamp().value_or(Timestamp());
+}
+
+void ReplIndexBuildState::onOplogCommit(bool isPrimary) const {
+    stdx::unique_lock<Latch> lk(mutex);
+    invariant(!isPrimary && indexBuildState.isCommitPrepared(),
+              str::stream() << "Index build: " << buildUUID
+                            << ",  index build state: " << indexBuildState.toString());
+}
+
+void ReplIndexBuildState::abortSelf(OperationContext* opCtx) {
+    auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
+    stdx::unique_lock<Latch> lk(mutex);
+    indexBuildState.setState(IndexBuildState::kAborted, skipCheck);
+}
+
+void ReplIndexBuildState::abortForShutdown(OperationContext* opCtx) {
+    // Promise should be set at least once before it's getting destroyed.
+    stdx::unique_lock<Latch> lk(mutex);
+    if (!waitForNextAction->getFuture().isReady()) {
+        waitForNextAction->emplaceValue(IndexBuildAction::kNoAction);
+    }
+    auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
+    indexBuildState.setState(IndexBuildState::kAborted, skipCheck);
+}
+
+void ReplIndexBuildState::onOplogAbort(OperationContext* opCtx, const NamespaceString& nss) const {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isPrimary = replCoord->canAcceptWritesFor(opCtx, nss);
+    invariant(!isPrimary, str::stream() << "Index build: " << buildUUID);
+
+    stdx::unique_lock<Latch> lk(mutex);
+    invariant(indexBuildState.isAborted(),
+              str::stream() << "Index build: " << buildUUID
+                            << ",  index build state: " << indexBuildState.toString());
+    invariant(indexBuildState.getTimestamp() && indexBuildState.getAbortReason(),
+              buildUUID.toString());
+    LOGV2(3856206,
+          "Aborting index build from oplog entry",
+          "buildUUID"_attr = buildUUID,
+          "abortTimestamp"_attr = indexBuildState.getTimestamp().get(),
+          "abortReason"_attr = indexBuildState.getAbortReason().get(),
+          "collectionUUID"_attr = collectionUUID);
+}
+
 bool ReplIndexBuildState::isAborted() const {
     stdx::unique_lock<Latch> lk(mutex);
     return indexBuildState.isAborted();
@@ -170,6 +225,23 @@ void ReplIndexBuildState::setCommitQuorumSatisfied(OperationContext* opCtx) {
               "previousAction"_attr = indexBuildActionToString(action),
               "buildUUID"_attr = buildUUID);
     }
+}
+
+void ReplIndexBuildState::setSinglePhaseCommit(OperationContext* opCtx) {
+    stdx::unique_lock<Latch> lk(mutex);
+    if (waitForNextAction->getFuture().isReady()) {
+        // If the signal action has been set, it should only be because a concurrent operation
+        // already aborted the index build.
+        auto action = waitForNextAction->getFuture().get(opCtx);
+        invariant(action == IndexBuildAction::kPrimaryAbort,
+                  str::stream() << "action: " << indexBuildActionToString(action)
+                                << ", buildUUID: " << buildUUID);
+        LOGV2(4639700,
+              "Not committing single-phase build because it has already been aborted",
+              "buildUUID"_attr = buildUUID);
+        return;
+    }
+    waitForNextAction->emplaceValue(IndexBuildAction::kSinglePhaseCommit);
 }
 
 bool ReplIndexBuildState::tryCommit(OperationContext* opCtx) {
