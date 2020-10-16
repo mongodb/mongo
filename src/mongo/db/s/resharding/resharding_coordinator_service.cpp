@@ -422,7 +422,8 @@ void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
             opCtx, coordinatorDoc, chunkVersion, collation, txnNumber);
 
         // Insert new initial chunk and tag documents
-        insertChunkAndTagDocsForTempNss(opCtx, initialChunks, newZones, txnNumber);
+        insertChunkAndTagDocsForTempNss(
+            opCtx, std::move(initialChunks), std::move(newZones), txnNumber);
 
         // Commit the transaction
         ShardingCatalogManager::get(opCtx)->commitTxnForConfigDocument(opCtx, txnNumber);
@@ -623,9 +624,9 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_init(
 
     return _initialChunksAndZonesPromise.getFuture()
         .thenRunOn(**executor)
-        .then([this](const ChunksAndZones& initialChunksAndZones) {
-            auto initialChunks = initialChunksAndZones.initialChunks;
-            auto newZones = initialChunksAndZones.newZones;
+        .then([this](ChunksAndZones initialChunksAndZones) {
+            auto initialChunks = std::move(initialChunksAndZones.initialChunks);
+            auto newZones = std::move(initialChunksAndZones.newZones);
 
             // Create state document that will be written to disk and afterward set to the in-memory
             // _coordinatorDoc
@@ -634,7 +635,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::_init(
 
             auto opCtx = cc().makeOperationContext();
             resharding::persistInitialStateAndCatalogUpdates(
-                opCtx.get(), updatedCoordinatorDoc, initialChunks, newZones);
+                opCtx.get(), updatedCoordinatorDoc, std::move(initialChunks), std::move(newZones));
 
             invariant(_coordinatorDoc.getState() == CoordinatorStateEnum::kInitializing);
             _coordinatorDoc = updatedCoordinatorDoc;

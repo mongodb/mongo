@@ -207,7 +207,7 @@ public:
             auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
                 opCtx, service, coordinatorDoc.toBSON());
 
-            instance->setInitialChunksAndZones(initialChunks, newZones);
+            instance->setInitialChunksAndZones(std::move(initialChunks), std::move(newZones));
 
             // This promise will currently be falsely fulfilled by a call to interrupt() inside
             // the ReshardingCoordinatorService. This is to enable jsTests to pass while code
