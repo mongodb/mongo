@@ -1,5 +1,5 @@
 /**
- * Tests current op command during a tenant migration.
+ * Tests currentOp command during a tenant migration.
  *
  * Tenant migrations are not expected to be run on servers with ephemeralForTest.
  *
@@ -29,110 +29,150 @@ const donorRst = new ReplSetTest(
 const recipientRst = new ReplSetTest(
     {nodes: 1, name: 'recipient', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
 
+const kRecipientConnString = recipientRst.getURL();
 const kTenantId = 'testTenantId';
 
 recipientRst.startSet();
 recipientRst.initiate();
 
-function testCurrentOpOutputForInProgressMigration(testParams) {
-    jsTestLog("Testing current op output for in progress migration.");
-
+(() => {
+    jsTestLog("Testing currentOp output for migration in data sync state");
     donorRst.startSet();
     donorRst.initiate();
+    const donorPrimary = donorRst.getPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: recipientRst.getURL(),
+        recipientConnString: kRecipientConnString,
         tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
-
-    const donorPrimary = donorRst.getPrimary();
+    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterDataSync");
     let migrationThread =
         new Thread(TenantMigrationUtil.startMigration, donorPrimary.host, migrationOpts);
-    let fp = configureFailPoint(donorPrimary, testParams.failpoint);
 
     migrationThread.start();
     fp.wait();
 
-    const currOp = assert.commandWorked(
+    const res = assert.commandWorked(
         donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
-    assert.eq(currOp.inprog.length, 1);
-    assert.eq(currOp.inprog[0].lastDurableState, testParams.expectedState);
-    assert.eq(currOp.inprog[0].migrationCompleted, false);
+    assert.eq(res.inprog.length, 1);
+    assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].lastDurableState, migrationStates.kDataSync);
+    assert.eq(res.inprog[0].migrationCompleted, false);
 
     fp.off();
     migrationThread.join();
     donorRst.stopSet();
-}
+})();
 
-function testCurrentOpOutputForCommittedMigration(testParams) {
-    jsTestLog("Testing current op output for s committed migration.");
-
+(() => {
+    jsTestLog("Testing currentOp output for migration in blocking state");
     donorRst.startSet();
     donorRst.initiate();
+    const donorPrimary = donorRst.getPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: recipientRst.getURL(),
+        recipientConnString: kRecipientConnString,
         tenantId: kTenantId,
         readPreference: {mode: "primary"},
     };
+    let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    let migrationThread =
+        new Thread(TenantMigrationUtil.startMigration, donorPrimary.host, migrationOpts);
 
+    migrationThread.start();
+    fp.wait();
+
+    const res = assert.commandWorked(
+        donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
+    assert.eq(res.inprog.length, 1);
+    assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].lastDurableState, migrationStates.kBlocking);
+    assert(res.inprog[0].blockTimestamp);
+    assert.eq(res.inprog[0].migrationCompleted, false);
+
+    fp.off();
+    migrationThread.join();
+    donorRst.stopSet();
+})();
+
+(() => {
+    jsTestLog("Testing currentOp output for aborted migration");
+    donorRst.startSet();
+    donorRst.initiate();
     const donorPrimary = donorRst.getPrimary();
 
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        recipientConnString: kRecipientConnString,
+        tenantId: kTenantId,
+        readPreference: {mode: "primary"},
+    };
+    configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
     assert.commandWorked(TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts));
 
-    let currOp = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
-    assert.eq(currOp.inprog.length, 1);
-    assert.eq(currOp.inprog[0].lastDurableState, testParams.expectedState);
-    assert.eq(currOp.inprog[0].migrationCompleted, false);
+    const res = assert.commandWorked(
+        donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
+    assert.eq(res.inprog.length, 1);
+    assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].lastDurableState, migrationStates.kAborted);
+    assert(res.inprog[0].blockTimestamp);
+    assert(res.inprog[0].commitOrAbortOpTime);
+    assert(res.inprog[0].abortReason);
+    assert.eq(res.inprog[0].migrationCompleted, false);
 
-    jsTestLog("Migration has successfully committed.");
+    donorRst.stopSet();
+})();
+
+// Check currentOp while in committed state before and after a migration has completed.
+(() => {
+    jsTestLog("Testing currentOp output for committed migration");
+    donorRst.startSet();
+    donorRst.initiate();
+    const donorPrimary = donorRst.getPrimary();
+
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        recipientConnString: kRecipientConnString,
+        tenantId: kTenantId,
+        readPreference: {mode: "primary"},
+    };
+    assert.commandWorked(TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts));
+
+    let res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
+    assert.eq(res.inprog.length, 1);
+    assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].lastDurableState, migrationStates.kCommitted);
+    assert(res.inprog[0].blockTimestamp);
+    assert(res.inprog[0].commitOrAbortOpTime);
+    assert.eq(res.inprog[0].migrationCompleted, false);
+
+    jsTestLog("Testing currentOp output for a committed migration after donorForgetMigration");
 
     assert.commandWorked(
         TenantMigrationUtil.forgetMigration(donorPrimary.host, migrationOpts.migrationIdString));
-    currOp = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
-    assert.eq(currOp.inprog.length, 1);
-    assert.eq(currOp.inprog[0].lastDurableState, testParams.expectedState);
-    assert.eq(currOp.inprog[0].migrationCompleted, true);
+
+    res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
+    assert.eq(res.inprog.length, 1);
+    assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].lastDurableState, migrationStates.kCommitted);
+    assert(res.inprog[0].blockTimestamp);
+    assert(res.inprog[0].commitOrAbortOpTime);
+    assert(res.inprog[0].expireAt);
+    assert.eq(res.inprog[0].migrationCompleted, true);
 
     donorRst.stopSet();
-}
-
-// Check current op while in data sync state.
-(() => {
-    let testParams = {
-        failpoint: "pauseTenantMigrationAfterDataSync",
-        expectedState: migrationStates.kDataSync
-    };
-    testCurrentOpOutputForInProgressMigration(testParams);
-})();
-
-// Check current op while in blocking state.
-(() => {
-    let testParams = {
-        failpoint: "pauseTenantMigrationAfterBlockingStarts",
-        expectedState: migrationStates.kBlocking
-    };
-    testCurrentOpOutputForInProgressMigration(testParams);
-})();
-
-// Check current op while in aborted state.
-(() => {
-    let testParams = {
-        failpoint: "abortTenantMigrationAfterBlockingStarts",
-        expectedState: migrationStates.kAborted
-    };
-    testCurrentOpOutputForInProgressMigration(testParams);
-})();
-
-// Check current op while in committed state before and after a migration has completed.
-(() => {
-    let testParams = {expectedState: migrationStates.kCommitted};
-    testCurrentOpOutputForCommittedMigration(testParams);
 })();
 
 recipientRst.stopSet();
