@@ -18,7 +18,7 @@ load("jstests/libs/fixture_helpers.js");  // For isReplSet().
 
 let res = assert.commandWorked(
     db.adminCommand({getParameter: 1, measureOperationResourceConsumption: 1}));
-if (!res.measureOperationResourceConsumption) {
+if (!res.measureOperationResourceConsumption.value) {
     jsTestLog("Skipping test because the 'measureOperationResourceConsumption' flag is disabled");
     return;
 }

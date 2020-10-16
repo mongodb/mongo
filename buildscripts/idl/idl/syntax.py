@@ -540,6 +540,7 @@ class FeatureFlag(common.SourceLocation):
         self.description = None  # type: str
         self.cpp_varname = None  # type: str
         self.default = None  # type: Expression
+        self.version = None  # type: str
 
         super(FeatureFlag, self).__init__(file_name, line, column)
 

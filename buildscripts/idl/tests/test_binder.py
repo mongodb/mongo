@@ -1985,6 +1985,52 @@ class TestBinder(testcase.IDLTestcase):
                     source: cli
             """), idl.errors.ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME)
 
+    def test_feature_flag(self):
+        # type: () -> None
+        """Test feature flag checks around version."""
+
+        # feature flag can default to false without a version
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+            """))
+
+        # feature flag can default to true with a version
+        self.assert_bind(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+                    version: 123
+            """))
+
+        # true is only allowed with a version
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: true
+            """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION)
+
+        # false is not allowed with a version
+        self.assert_bind_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+                    default: false
+                    version: 123
+            """), idl.errors.ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION)
+
 
 if __name__ == '__main__':
 

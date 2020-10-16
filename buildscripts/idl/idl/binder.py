@@ -1005,8 +1005,8 @@ def _bind_server_parameter(ctxt, param):
         return None
 
 
-def _bind_feature_flags(param):
-    # type: (syntax.FeatureFlag) -> ast.ServerParameter
+def _bind_feature_flags(ctxt, param):
+    # type: (errors.ParserContext, syntax.FeatureFlag) -> ast.ServerParameter
     """Bind a FeatureFlag as a serverParameter setting."""
     ast_param = ast.ServerParameter(param.file_name, param.line, param.column)
     ast_param.name = param.name
@@ -1014,9 +1014,25 @@ def _bind_feature_flags(param):
 
     ast_param.set_at = "ServerParameterType::kStartupOnly"
 
-    ast_param.cpp_vartype = "bool"
-    ast_param.default = _bind_expression(param.default)
+    ast_param.cpp_vartype = "::mongo::FeatureFlag"
+
+    # Feature flags that default to false must not have a version
+    if param.default.literal == "false" and param.version:
+        ctxt.add_feature_flag_default_false_has_version(param)
+        return None
+
+    # Feature flags that default to true are required to have a version
+    if param.default.literal == "true" and not param.version:
+        ctxt.add_feature_flag_default_true_missing_version(param)
+        return None
+
+    expr = syntax.Expression(param.default.file_name, param.default.line, param.default.column)
+    expr.expr = '%s, "%s"_sd' % (param.default.literal, param.version if param.version else '')
+
+    ast_param.default = _bind_expression(expr)
+    ast_param.default.export = False
     ast_param.cpp_varname = param.cpp_varname
+    ast_param.feature_flag = True
 
     return ast_param
 
@@ -1185,7 +1201,7 @@ def bind(parsed_spec):
             bound_spec.structs.append(_bind_struct(ctxt, parsed_spec, struct))
 
     for feature_flag in parsed_spec.feature_flags:
-        bound_spec.server_parameters.append(_bind_feature_flags(feature_flag))
+        bound_spec.server_parameters.append(_bind_feature_flags(ctxt, feature_flag))
 
     for server_parameter in parsed_spec.server_parameters:
         bound_spec.server_parameters.append(_bind_server_parameter(ctxt, server_parameter))

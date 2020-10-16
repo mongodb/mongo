@@ -296,6 +296,7 @@ class ServerParameter(common.SourceLocation):
         self.test_only = False  # type: bool
         self.deprecated_name = []  # type: List[str]
         self.default = None  # type: Expression
+        self.feature_flag = False  # type : bool
 
         # Only valid if cpp_varname is specified.
         self.validator = None  # type: Validator

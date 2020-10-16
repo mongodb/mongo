@@ -61,7 +61,7 @@ inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long 
 }  // namespace
 
 bool ResourceConsumption::isMetricsCollectionEnabled() {
-    return gMeasureOperationResourceConsumption;
+    return gMeasureOperationResourceConsumption.isEnabledAndIgnoreFCV();
 }
 
 bool ResourceConsumption::isMetricsAggregationEnabled() {
@@ -69,7 +69,8 @@ bool ResourceConsumption::isMetricsAggregationEnabled() {
 }
 
 ResourceConsumption::ResourceConsumption() {
-    if (gAggregateOperationResourceConsumptionMetrics && !gMeasureOperationResourceConsumption) {
+    if (gAggregateOperationResourceConsumptionMetrics &&
+        !gMeasureOperationResourceConsumption.isEnabledAndIgnoreFCV()) {
         LOGV2_FATAL_NOTRACE(
             5091600,
             "measureOperationResourceConsumption feature flag must be enabled to use "

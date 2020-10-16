@@ -1123,6 +1123,19 @@ class TestParser(testcase.IDLTestcase):
                 - two
             """), idl.errors.ERROR_ID_IS_NODE_TYPE_SCALAR_OR_MAPPING)
 
+    def test_feature_flag(self):
+        # type: () -> None
+        """Test feature flag."""
+
+        # Missing default
+        self.assert_parse_fail(
+            textwrap.dedent("""
+            feature_flags:
+                featureFlagToaster:
+                    description: "Make toast"
+                    cpp_varname: gToaster
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
 
 if __name__ == '__main__':
 

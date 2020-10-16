@@ -944,6 +944,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 header_list.append('mongo/util/options_parser/environment.h')
 
         if spec.server_parameters:
+            if [param for param in spec.server_parameters if param.feature_flag]:
+                header_list.append('mongo/idl/feature_flag.h')
             header_list.append('mongo/idl/server_parameter.h')
             header_list.append('mongo/idl/server_parameter_with_storage.h')
 
@@ -1963,10 +1965,16 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_server_parameter_with_storage(self, param):
         # type: (ast.ServerParameter) -> None
         """Generate a single IDLServerParameterWithStorage."""
-        self._writer.write_line(
-            common.template_args(
-                'auto* ret = makeIDLServerParameterWithStorage<${spt}>(${name}, ${storage});',
-                storage=param.cpp_varname, spt=param.set_at, name=_encaps(param.name)))
+        if param.feature_flag:
+            self._writer.write_line(
+                common.template_args(
+                    'auto* ret = new FeatureFlagServerParameter(${name}, ${storage});',
+                    storage=param.cpp_varname, name=_encaps(param.name)))
+        else:
+            self._writer.write_line(
+                common.template_args(
+                    'auto* ret = makeIDLServerParameterWithStorage<${spt}>(${name}, ${storage});',
+                    storage=param.cpp_varname, spt=param.set_at, name=_encaps(param.name)))
 
         if param.on_update is not None:
             self._writer.write_line('ret->setOnUpdate(%s);' % (param.on_update))

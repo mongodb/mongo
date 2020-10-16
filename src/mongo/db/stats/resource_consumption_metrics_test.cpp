@@ -36,12 +36,24 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace {
+
+ServerParameter* getServerParameter(const std::string& name) {
+    const auto& spMap = ServerParameterSet::getGlobal()->getMap();
+    const auto& spIt = spMap.find(name);
+    ASSERT(spIt != spMap.end());
+
+    auto* sp = spIt->second;
+    ASSERT(sp);
+    return sp;
+}
+
 
 class ResourceConsumptionMetricsTest : public ServiceContextTest {
 public:
     void setUp() {
         _opCtx = makeOperationContext();
-        gMeasureOperationResourceConsumption = true;
+        ASSERT_OK(getServerParameter("measureOperationResourceConsumption")->setFromString("true"));
         gAggregateOperationResourceConsumptionMetrics = true;
 
         auto svcCtx = getServiceContext();
@@ -277,4 +289,5 @@ TEST_F(ResourceConsumptionMetricsTest, IncrementReadMetricsSecondary) {
     ASSERT_EQ(metricsCopy["db1"].secondaryMetrics.keysSorted, 16 + 256);
 }
 
+}  // namespace
 }  // namespace mongo

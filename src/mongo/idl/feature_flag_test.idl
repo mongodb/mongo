@@ -33,4 +33,18 @@ feature_flags:
     featureFlagToaster:
       description: "Create a feature flag"
       cpp_varname: gFeatureFlagToaster
+      default: false
+
+    featureFlagBlender:
+      description: "Create a feature flag"
+      cpp_varname: gFeatureFlagBlender
       default: true
+      # The version should be a valid FCV not equal to kLastLTS in src/mongo/db/commands/feature_compatibility_version_parser.h
+      version: 4.9
+      
+    featureFlagSpoon:
+      description: "Create a feature flag"
+      cpp_varname: gFeatureFlagSpoon
+      default: true
+      # The version should match kLastLTS in src/mongo/db/commands/feature_compatibility_version_parser.h
+      version: 4.4

@@ -28,6 +28,22 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='feature_flag',
+    source=[
+        'feature_flag.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'server_parameter',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ],
+)
+
+
 env.CppUnitTest(
     target='idl_test',
     source=[
@@ -47,9 +63,11 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'feature_flag',
         'server_parameter',
     ],
 )

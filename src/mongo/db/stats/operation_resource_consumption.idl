@@ -31,7 +31,7 @@ global:
 
 feature_flags:
   measureOperationResourceConsumption:
-    description: "When true, records and reports per-operation resource consumption"
+    description: "When enabled, records and reports per-operation resource consumption"
     cpp_varname: gMeasureOperationResourceConsumption
     default: false
 
