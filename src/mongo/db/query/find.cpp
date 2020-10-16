@@ -364,7 +364,7 @@ Message getMore(OperationContext* opCtx,
         cursorPin->getReadConcernArgs().getLevel() ==
             repl::ReadConcernLevel::kMajorityReadConcern) {
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
+        uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
     }
 
     uassert(40548,

@@ -115,7 +115,7 @@ public:
     void preallocateSnapshot() override;
     void preallocateSnapshotForOplogRead() override;
 
-    Status obtainMajorityCommittedSnapshot() override;
+    Status majorityCommittedSnapshotAvailable() const override;
 
     boost::optional<Timestamp> getPointInTimeReadTimestamp() override;
 
@@ -297,7 +297,6 @@ private:
     Timestamp _durableTimestamp;
     Timestamp _prepareTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
-    Timestamp _majorityCommittedSnapshot;
     Timestamp _readAtTimestamp;
     Timestamp _catalogConflictTimestamp;
     std::unique_ptr<Timer> _timer;

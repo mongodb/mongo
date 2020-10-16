@@ -98,7 +98,7 @@ bool RecoveryUnit::waitUntilDurable(OperationContext* opCtx) {
     return true;  // This is an in-memory storage engine.
 }
 
-Status RecoveryUnit::obtainMajorityCommittedSnapshot() {
+Status RecoveryUnit::majorityCommittedSnapshotAvailable() const {
     return Status::OK();
 }
 

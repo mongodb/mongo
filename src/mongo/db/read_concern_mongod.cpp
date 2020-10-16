@@ -421,13 +421,13 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
             "readConcernArgs"_attr = readConcernArgs);
 
         ru->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        Status status = ru->obtainMajorityCommittedSnapshot();
+        Status status = ru->majorityCommittedSnapshotAvailable();
 
         // Wait until a snapshot is available.
         while (status == ErrorCodes::ReadConcernMajorityNotAvailableYet) {
             LOGV2_DEBUG(20992, debugLevel, "Snapshot not available yet.");
             replCoord->waitUntilSnapshotCommitted(opCtx, Timestamp());
-            status = ru->obtainMajorityCommittedSnapshot();
+            status = ru->majorityCommittedSnapshotAvailable();
         }
 
         if (!status.isOK()) {
@@ -436,11 +436,8 @@ Status waitForReadConcernImpl(OperationContext* opCtx,
 
         LOGV2_DEBUG(20993,
                     debugLevel,
-                    "Using 'committed' snapshot: {CurOp_get_opCtx_opDescription} with readTs: "
-                    "{opCtx_recoveryUnit_getPointInTimeReadTimestamp}",
-                    "CurOp_get_opCtx_opDescription"_attr = CurOp::get(opCtx)->opDescription(),
-                    "opCtx_recoveryUnit_getPointInTimeReadTimestamp"_attr =
-                        ru->getPointInTimeReadTimestamp());
+                    "Using 'committed' snapshot",
+                    "operation_description"_attr = CurOp::get(opCtx)->opDescription());
     }
     return Status::OK();
 }

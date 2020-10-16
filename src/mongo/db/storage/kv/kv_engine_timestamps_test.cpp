@@ -152,7 +152,7 @@ public:
     int itCountCommitted() {
         auto op = makeOperation();
         op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
+        ASSERT_OK(op->recoveryUnit()->majorityCommittedSnapshotAvailable());
         return itCountOn(op);
     }
 
@@ -174,7 +174,7 @@ public:
         auto op = makeOperation();
         Lock::GlobalLock globalLock(op, MODE_IS);
         op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-        ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
+        ASSERT_OK(op->recoveryUnit()->majorityCommittedSnapshotAvailable());
         return readRecordOn(op, id);
     }
 
@@ -241,21 +241,21 @@ TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {
     op->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
 
     // Before first snapshot is created.
-    ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
+    ASSERT_EQ(ru->majorityCommittedSnapshotAvailable(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 
     // There is a snapshot but it isn't committed.
     auto snap = fetchAndIncrementTimestamp();
-    ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
+    ASSERT_EQ(ru->majorityCommittedSnapshotAvailable(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 
     // Now there is a committed snapshot.
     snapshotManager->setCommittedSnapshot(snap);
-    ASSERT_OK(ru->obtainMajorityCommittedSnapshot());
+    ASSERT_OK(ru->majorityCommittedSnapshotAvailable());
 
     // Not anymore!
     snapshotManager->clearCommittedSnapshot();
-    ASSERT_EQ(ru->obtainMajorityCommittedSnapshot(),
+    ASSERT_EQ(ru->majorityCommittedSnapshotAvailable(),
               ErrorCodes::ReadConcernMajorityNotAvailableYet);
 }
 
@@ -273,7 +273,7 @@ TEST_F(SnapshotManagerTests, FailsAfterDropAllSnapshotsWhileYielded) {
     // Start an operation using a committed snapshot.
     auto snap = fetchAndIncrementTimestamp();
     snapshotManager->setCommittedSnapshot(snap);
-    ASSERT_OK(op->recoveryUnit()->obtainMajorityCommittedSnapshot());
+    ASSERT_OK(op->recoveryUnit()->majorityCommittedSnapshotAvailable());
     ASSERT_EQ(itCountOn(op), 0);  // acquires a snapshot.
 
     // Everything still works until we abandon our snapshot.
@@ -328,7 +328,7 @@ TEST_F(SnapshotManagerTests, BasicFunctionality) {
     auto longOp = makeOperation();
     Lock::GlobalLock globalLock(longOp, MODE_IS);
     longOp->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kMajorityCommitted);
-    ASSERT_OK(longOp->recoveryUnit()->obtainMajorityCommittedSnapshot());
+    ASSERT_OK(longOp->recoveryUnit()->majorityCommittedSnapshotAvailable());
     ASSERT_EQ(itCountOn(longOp), 3);
 
     // If this fails, the snapshot contains writes that were rolled back.

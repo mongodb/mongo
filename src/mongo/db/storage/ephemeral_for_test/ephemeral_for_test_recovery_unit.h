@@ -51,7 +51,7 @@ public:
 
     virtual void setOrderedCommit(bool orderedCommit) override;
 
-    Status obtainMajorityCommittedSnapshot() final;
+    Status majorityCommittedSnapshotAvailable() const final;
 
     void prepareUnitOfWork() override;
 

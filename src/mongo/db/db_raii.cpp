@@ -244,7 +244,7 @@ AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBas
 
         if (readSource == RecoveryUnit::ReadSource::kMajorityCommitted) {
             replCoord->waitUntilSnapshotCommitted(opCtx, *minSnapshot);
-            uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
+            uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
         }
 
         {

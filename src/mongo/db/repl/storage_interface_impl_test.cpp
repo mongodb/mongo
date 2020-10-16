@@ -384,7 +384,7 @@ TEST_F(StorageInterfaceImplTest, GetRollbackIDReturnsBadStatusIfRollbackIDIsNotI
 
 TEST_F(StorageInterfaceImplTest, SnapshotSupported) {
     auto opCtx = getOperationContext();
-    Status status = opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot();
+    Status status = opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable();
     ASSERT(status.isOK());
 }
 

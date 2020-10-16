@@ -151,7 +151,7 @@ void applyCursorReadConcern(OperationContext* opCtx, repl::ReadConcernArgs rcArg
                 opCtx->recoveryUnit()->abandonSnapshot();
                 opCtx->recoveryUnit()->setTimestampReadSource(
                     RecoveryUnit::ReadSource::kMajorityCommitted);
-                uassertStatusOK(opCtx->recoveryUnit()->obtainMajorityCommittedSnapshot());
+                uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
                 break;
             }
             case repl::ReadConcernArgs::MajorityReadMechanism::kSpeculative: {
