@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/stdx/condition_variable.h"
@@ -98,6 +99,11 @@ enum class IndexBuildAction {
      */
     kCommitQuorumSatisfied
 };
+
+/**
+ * Returns string representation of IndexBuildAction.
+ */
+std::string indexBuildActionToString(IndexBuildAction action);
 
 /**
  * Represents the index build state.
@@ -225,6 +231,46 @@ public:
                         IndexBuildProtocol protocol);
 
     /**
+     * The index build is now past the setup stage and in progress. This makes it eligible to be
+     * aborted. Use the current OperationContext's opId as the means for interrupting the index
+     * build.
+     */
+    void start(OperationContext* opCtx);
+
+    /**
+     * Returns true if this index build has been aborted.
+     */
+    bool isAborted() const;
+
+    /**
+     * Returns abort reason. Invariants if not in aborted state.
+     */
+    std::string getAbortReason() const;
+
+    /**
+     * Called when commit quorum is satisfied.
+     * Invokes 'onCommitQuorumSatisfied' if state is successfully transitioned to commit quorum
+     * satisfied.
+     */
+    void setCommitQuorumSatisfied(OperationContext* opCtx);
+
+    /**
+     * Attempt to signal the index build to commit and advance the index build to the kPrepareCommit
+     * state.
+     * Returns true if successful and false if the attempt was unnecessful and the caller should
+     * retry.
+     */
+    bool tryCommit(OperationContext* opCtx);
+
+    /**
+     * Attempt to abort an index build. Returns a flag indicating how the caller should proceed.
+     */
+    enum class TryAbortResult { kRetry, kAlreadyAborted, kNotAborted, kContinueAbort };
+    TryAbortResult tryAbort(OperationContext* opCtx,
+                            IndexBuildAction signalAction,
+                            std::string reason);
+
+    /**
      * Accessor and mutator for last optime in the oplog before the interceptors were installed.
      * This supports resumable index builds.
      */
@@ -232,7 +278,6 @@ public:
     repl::OpTime getLastOpTimeBeforeInterceptors() const;
     void setLastOpTimeBeforeInterceptors(repl::OpTime opTime);
     void clearLastOpTimeBeforeInterceptors();
-
 
     // Uniquely identifies this index build across replica set members.
     const UUID buildUUID;
@@ -283,6 +328,22 @@ public:
     // SharedSemiFuture(s).
     SharedPromise<IndexCatalogStats> sharedPromise;
 
+    /*
+     * Determines whether to skip the index build state transition check.
+     * Index builder not using ReplIndexBuildState::waitForNextAction to signal primary and
+     * secondaries to commit or abort signal will violate index build state transition. So, we
+     * should skip state transition verification. Otherwise, we would invariant.
+     */
+    bool _shouldSkipIndexBuildStateTransitionCheck(OperationContext* opCtx) const;
+
+    /**
+     * Updates the next action signal and cancels the vote request under lock.
+     * Used by IndexBuildsCoordinatorMongod only.
+     */
+    void _setSignalAndCancelVoteRequestCbkIfActive(WithLock lk,
+                                                   OperationContext* opCtx,
+                                                   IndexBuildAction signal);
+
     // Protects the state below.
     mutable Mutex mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::mutex");
 
@@ -296,8 +357,8 @@ public:
     executor::TaskExecutor::CallbackHandle voteCmdCbkHandle;
 
     // The OperationId of the index build. This allows external callers to interrupt the index build
-    // thread.
-    OperationId opId = 0;
+    // thread. Initialized in start() as we transition from setup to in-progress.
+    boost::optional<OperationId> _opId;
 
 private:
     // The last optime in the oplog before the interceptors were installed. If this is a single

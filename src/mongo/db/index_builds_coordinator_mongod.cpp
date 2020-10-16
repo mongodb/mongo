@@ -411,41 +411,9 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
     return persistStatus;
 }
 
-void IndexBuildsCoordinatorMongod::setSignalAndCancelVoteRequestCbkIfActive(
-    WithLock ReplIndexBuildStateLk,
-    OperationContext* opCtx,
-    std::shared_ptr<ReplIndexBuildState> replState,
-    IndexBuildAction signal) {
-    // set the signal
-    replState->waitForNextAction->emplaceValue(signal);
-    // Cancel the callback.
-    if (replState->voteCmdCbkHandle.isValid()) {
-        repl::ReplicationCoordinator::get(opCtx)->cancelCbkHandle(replState->voteCmdCbkHandle);
-    }
-}
-
 void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
-    stdx::unique_lock<Latch> ReplIndexBuildStateLk(replState->mutex);
-    if (!replState->waitForNextAction->getFuture().isReady()) {
-        setSignalAndCancelVoteRequestCbkIfActive(
-            ReplIndexBuildStateLk, opCtx, replState, IndexBuildAction::kCommitQuorumSatisfied);
-    } else {
-        // This implies we already got a commit or abort signal by other ways. This might have
-        // been signaled earlier with kPrimaryAbort or kCommitQuorumSatisfied. Or, it's also
-        // possible the node got stepped down and received kOplogCommit/koplogAbort or got
-        // kRollbackAbort. So, it's ok to skip signaling.
-        auto action = replState->waitForNextAction->getFuture().get(opCtx);
-
-        LOGV2(3856200,
-              "Not signaling \"{skippedAction}\" as it was previously signaled with "
-              "\"{previousAction}\" for index build: {buildUUID}",
-              "Skipping signaling as it was previously signaled for index build",
-              "skippedAction"_attr =
-                  _indexBuildActionToString(IndexBuildAction::kCommitQuorumSatisfied),
-              "previousAction"_attr = _indexBuildActionToString(action),
-              "buildUUID"_attr = replState->buildUUID);
-    }
+    replState->setCommitQuorumSatisfied(opCtx);
 }
 
 void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(

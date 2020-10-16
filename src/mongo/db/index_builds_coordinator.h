@@ -463,18 +463,6 @@ public:
      */
     static int getNumIndexesTotal(OperationContext* opCtx, const CollectionPtr& collection);
 
-
-    /**
-     * Sets the index build action 'signal' for the index build pointed by 'replState'. Also, it
-     * cancels if there is any active remote 'voteCommitIndexBuild' command request callback handle
-     * for this index build.
-     */
-    virtual void setSignalAndCancelVoteRequestCbkIfActive(
-        WithLock ReplIndexBuildStateLk,
-        OperationContext* opCtx,
-        std::shared_ptr<ReplIndexBuildState> replState,
-        IndexBuildAction signal) = 0;
-
     bool supportsResumableIndexBuilds() const;
 
 private:
@@ -611,14 +599,6 @@ protected:
                                       const IndexBuildOptions& indexBuildOptions,
                                       const Status& status);
 
-    /**
-     * Attempt to abort an index build. Returns a flag indicating how the caller should proceed.
-     */
-    enum class TryAbortResult { kRetry, kAlreadyAborted, kNotAborted, kContinueAbort };
-    TryAbortResult _tryAbort(OperationContext* opCtx,
-                             std::shared_ptr<ReplIndexBuildState> replState,
-                             IndexBuildAction signalAction,
-                             std::string reason);
     /**
      * Performs last steps of aborting an index build.
      */

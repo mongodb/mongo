@@ -1015,30 +1015,7 @@ void IndexBuildsCoordinator::applyCommitIndexBuild(OperationContext* opCtx,
 
 bool IndexBuildsCoordinator::_tryCommit(OperationContext* opCtx,
                                         std::shared_ptr<ReplIndexBuildState> replState) {
-    stdx::unique_lock<Latch> lk(replState->mutex);
-    if (replState->indexBuildState.isSettingUp()) {
-        // It's possible that the index build thread has not reached the point where it can be
-        // committed yet.
-        return false;
-    }
-    if (replState->waitForNextAction->getFuture().isReady()) {
-        // If the future wait were uninterruptible, then shutdown could hang.  If the
-        // IndexBuildsCoordinator thread gets interrupted on shutdown, the oplog applier will hang
-        // waiting for the promise applying the commitIndexBuild oplog entry.
-        const auto nextAction = replState->waitForNextAction->getFuture().get(opCtx);
-        invariant(nextAction == IndexBuildAction::kCommitQuorumSatisfied);
-        // Retry until the current promise result is consumed by the index builder thread and
-        // a new empty promise got created by the indexBuildscoordinator thread.
-        return false;
-    }
-    auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState->protocol);
-    replState->indexBuildState.setState(
-        IndexBuildState::kPrepareCommit, skipCheck, opCtx->recoveryUnit()->getCommitTimestamp());
-    // Promise can be set only once.
-    // We can't skip signaling here if a signal is already set because the previous commit or
-    // abort signal might have been sent to handle for primary case.
-    setSignalAndCancelVoteRequestCbkIfActive(lk, opCtx, replState, IndexBuildAction::kOplogCommit);
-    return true;
+    return replState->tryCommit(opCtx);
 }
 
 void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
@@ -1132,85 +1109,6 @@ bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
     return foundIndexBuilder;
 }
 
-IndexBuildsCoordinator::TryAbortResult IndexBuildsCoordinator::_tryAbort(
-    OperationContext* opCtx,
-    std::shared_ptr<ReplIndexBuildState> replState,
-    IndexBuildAction signalAction,
-    std::string reason) {
-
-    {
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        // Wait until the build is done setting up. This indicates that all required state is
-        // initialized to attempt an abort.
-        if (replState->indexBuildState.isSettingUp()) {
-            LOGV2_DEBUG(465605,
-                        2,
-                        "waiting until index build is done setting up before attempting to abort",
-                        "buildUUID"_attr = replState->buildUUID);
-            return TryAbortResult::kRetry;
-        }
-        if (replState->waitForNextAction->getFuture().isReady()) {
-            const auto nextAction = replState->waitForNextAction->getFuture().get(opCtx);
-            invariant(nextAction == IndexBuildAction::kSinglePhaseCommit ||
-                      nextAction == IndexBuildAction::kCommitQuorumSatisfied ||
-                      nextAction == IndexBuildAction::kPrimaryAbort);
-
-            // Index build coordinator already received a signal to commit or abort. So, it's ok
-            // to return and wait for the index build to complete if we are trying to signal
-            // 'kPrimaryAbort'. The index build coordinator will not perform the signaled action
-            // (i.e, will not commit or abort the index build) only when the node steps down.
-            // When the node steps down, the caller of this function, dropIndexes/createIndexes
-            // command (user operation) will also get interrupted. So, we no longer need to
-            // abort the index build on step down.
-            if (signalAction == IndexBuildAction::kPrimaryAbort) {
-                // Indicate if the index build is already being committed or aborted.
-                if (nextAction == IndexBuildAction::kPrimaryAbort) {
-                    return TryAbortResult::kAlreadyAborted;
-                } else {
-                    return TryAbortResult::kNotAborted;
-                }
-            }
-
-            // Retry until the current promise result is consumed by the index builder thread
-            // and a new empty promise got created by the indexBuildscoordinator thread. Or,
-            // until the index build got torn down after index build commit.
-            return TryAbortResult::kRetry;
-        }
-
-        LOGV2(4656003,
-              "Aborting index build",
-              "buildUUID"_attr = replState->buildUUID,
-              "error"_attr = reason);
-
-        // Set the state on replState. Once set, the calling thread must complete the abort process.
-        auto abortTimestamp =
-            boost::make_optional<Timestamp>(!opCtx->recoveryUnit()->getCommitTimestamp().isNull(),
-                                            opCtx->recoveryUnit()->getCommitTimestamp());
-        auto skipCheck = shouldSkipIndexBuildStateTransitionCheck(opCtx, replState->protocol);
-        replState->indexBuildState.setState(
-            IndexBuildState::kAborted, skipCheck, abortTimestamp, reason);
-
-        // Interrupt the builder thread so that it can no longer acquire locks or make progress.
-        // It is possible that the index build thread may have completed its operation and removed
-        // itself from the ServiceContext. This may happen in the case of an explicit db.killOp()
-        // operation or during shutdown.
-        // During normal operation, the abort logic, initiated through external means such as
-        // dropIndexes or internally through an indexing error, should have set the state in
-        // ReplIndexBuildState so that this code would not be reachable as it is no longer necessary
-        // to interrupt the builder thread here.
-        auto serviceContext = opCtx->getServiceContext();
-        if (auto target = serviceContext->getLockedClient(replState->opId)) {
-            auto targetOpCtx = target->getOperationContext();
-            serviceContext->killOperation(target, targetOpCtx, ErrorCodes::IndexBuildAborted);
-        }
-
-        // Set the signal. Because we have already interrupted the index build, it will not observe
-        // this signal. We do this so that other observers do not also try to abort the index build.
-        setSignalAndCancelVoteRequestCbkIfActive(lk, opCtx, replState, signalAction);
-    }
-    return TryAbortResult::kContinueAbort;
-}
-
 bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
                                                         const UUID& buildUUID,
                                                         IndexBuildAction signalAction,
@@ -1282,23 +1180,23 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
             }
         }
 
-        auto tryAbortResult = _tryAbort(opCtx, replState, signalAction, reason);
+        auto tryAbortResult = replState->tryAbort(opCtx, signalAction, reason);
         switch (tryAbortResult) {
-            case TryAbortResult::kNotAborted:
+            case ReplIndexBuildState::TryAbortResult::kNotAborted:
                 return false;
-            case TryAbortResult::kAlreadyAborted:
+            case ReplIndexBuildState::TryAbortResult::kAlreadyAborted:
                 return true;
-            case TryAbortResult::kRetry:
-            case TryAbortResult::kContinueAbort:
+            case ReplIndexBuildState::TryAbortResult::kRetry:
+            case ReplIndexBuildState::TryAbortResult::kContinueAbort:
                 break;
         }
 
-        if (TryAbortResult::kRetry == tryAbortResult) {
+        if (ReplIndexBuildState::TryAbortResult::kRetry == tryAbortResult) {
             retry = true;
             continue;
         }
 
-        invariant(TryAbortResult::kContinueAbort == tryAbortResult);
+        invariant(ReplIndexBuildState::TryAbortResult::kContinueAbort == tryAbortResult);
 
         if (MONGO_unlikely(hangBeforeCompletingAbort.shouldFail())) {
             LOGV2(4806200, "Hanging before completing index build abort");
@@ -1388,17 +1286,13 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
 
             bool isMaster = replCoord->canAcceptWritesFor(opCtx, nss);
             invariant(!isMaster, str::stream() << "Index build: " << replState->buildUUID);
-            invariant(replState->indexBuildState.isAborted(),
-                      str::stream()
-                          << "Index build: " << replState->buildUUID
-                          << ",  index build state: " << replState->indexBuildState.toString());
-            invariant(replState->indexBuildState.getAbortReason(), replState->buildUUID.toString());
+
+            auto abortReason = replState->getAbortReason();
             LOGV2(4665903,
                   "Aborting index build during initial sync",
                   "buildUUID"_attr = replState->buildUUID,
-                  "abortReason"_attr = replState->indexBuildState.getAbortReason().get(),
+                  "abortReason"_attr = abortReason,
                   "collectionUUID"_attr = replState->collectionUUID);
-
             _indexBuildsManager.abortIndexBuild(
                 opCtx, coll, replState->buildUUID, MultiIndexBlock::kNoopOnCleanUpFn);
             break;
@@ -2285,14 +2179,9 @@ void IndexBuildsCoordinator::_runIndexBuild(
         return;
     }
     auto replState = invariant(swReplState);
-    {
-        // The index build is now past the setup stage and in progress. This makes it eligible to be
-        // aborted. Use the current OperationContext's opId as the means for interrupting the index
-        // build.
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        replState->opId = opCtx->getOpID();
-        replState->indexBuildState.setState(IndexBuildState::kInProgress, false /* skipCheck */);
-    }
+
+    // Set index build state to in-progress and save OperationContext's opId.
+    replState->start(opCtx);
 
     // Add build UUID to lock manager diagnostic output.
     auto locker = opCtx->lockState();
@@ -2440,8 +2329,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         // If the index build has already been cleaned-up because it encountered an error at
         // commit-time, there is no work to do. This is the most routine case, since index
         // constraint checking happens at commit-time for index builds.
-        stdx::unique_lock<Latch> lk(replState->mutex);
-        if (replState->indexBuildState.isAborted()) {
+        if (replState->isAborted()) {
             uassertStatusOK(status);
         }
     }
