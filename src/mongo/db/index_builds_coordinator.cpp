@@ -1245,8 +1245,8 @@ void IndexBuildsCoordinator::_completeAbort(OperationContext* opCtx,
             invariant(replState->protocol == IndexBuildProtocol::kTwoPhase);
             invariant(replCoord->getMemberState().startup2());
 
-            bool isMaster = replCoord->canAcceptWritesFor(opCtx, nss);
-            invariant(!isMaster, str::stream() << "Index build: " << replState->buildUUID);
+            bool isPrimary = replCoord->canAcceptWritesFor(opCtx, nss);
+            invariant(!isPrimary, str::stream() << "Index build: " << replState->buildUUID);
 
             auto abortReason = replState->getAbortReason();
             LOGV2(4665903,
@@ -2579,14 +2579,14 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
     // new signal from a new primary because we cannot commit. Note that two-phase index builds can
     // retry because a new signal should be received. Single-phase builds will be unable to commit
     // and will self-abort.
-    bool isMaster = replCoord->canAcceptWritesFor(opCtx, dbAndUUID) &&
+    bool isPrimary = replCoord->canAcceptWritesFor(opCtx, dbAndUUID) &&
         !replCoord->getSettings().shouldRecoverFromOplogAsStandalone();
-    if (!isMaster && IndexBuildAction::kCommitQuorumSatisfied == action) {
+    if (!isPrimary && IndexBuildAction::kCommitQuorumSatisfied == action) {
         return CommitResult::kNoLongerPrimary;
     }
 
     if (IndexBuildAction::kOplogCommit == action) {
-        replState->onOplogCommit(isMaster);
+        replState->onOplogCommit(isPrimary);
     }
 
     // The collection object should always exist while an index build is registered.
@@ -2616,7 +2616,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
         // If we are no longer primary and a single phase index build started as primary attempts to
         // commit, trigger a self-abort.
-        if (!isMaster && IndexBuildAction::kSinglePhaseCommit == action) {
+        if (!isPrimary && IndexBuildAction::kSinglePhaseCommit == action) {
             uassertStatusOK(
                 {ErrorCodes::NotWritablePrimary,
                  str::stream() << "Unable to commit index build because we are no longer primary: "
@@ -2626,7 +2626,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // Retry indexing records that failed key generation, but only if we are primary.
         // Secondaries rely on the primary's decision to commit as assurance that it has checked all
         // key generation errors on its behalf.
-        if (isMaster) {
+        if (isPrimary) {
             uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
                 opCtx, replState->buildUUID, collection.get()));
         }
@@ -2662,7 +2662,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         // entry, then this index build should have been interrupted before committing with an
         // IndexBuildAborted error code.
         const bool twoPhaseAndNotPrimary =
-            IndexBuildProtocol::kTwoPhase == replState->protocol && !isMaster;
+            IndexBuildProtocol::kTwoPhase == replState->protocol && !isPrimary;
         if (twoPhaseAndNotPrimary) {
             LOGV2_FATAL(4698902,
                         "Index build failed while not primary",
