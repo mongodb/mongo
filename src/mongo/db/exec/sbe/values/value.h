@@ -69,6 +69,10 @@ using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
 
+static constexpr std::int32_t kStringMaxDisplayLength = 160;
+static constexpr std::int32_t kBinDataMaxDisplayLength = 80;
+static constexpr std::int32_t kNewUUIDLength = 16;
+
 /**
  * Type dispatch tags.
  */

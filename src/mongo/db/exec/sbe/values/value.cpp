@@ -194,9 +194,18 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case value::TypeTags::StringSmall:
             stream << '"' << getSmallStringView(val) << '"';
             break;
-        case value::TypeTags::StringBig:
-            stream << '"' << getBigStringView(val) << '"';
+        case value::TypeTags::StringBig: {
+            auto sb = getBigStringView(val);
+            if (strlen(sb) <= kStringMaxDisplayLength) {
+                stream << '"' << sb << '"';
+            } else {
+                char truncated[kStringMaxDisplayLength + 1];
+                strncpy(truncated, sb, kStringMaxDisplayLength);
+                truncated[kStringMaxDisplayLength] = '\0';
+                stream << '"' << truncated << '"' << "...";
+            }
             break;
+        }
         case value::TypeTags::Array: {
             auto arr = getArrayView(val);
             stream << '[';
@@ -295,15 +304,50 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << '}';
             break;
         }
-        case value::TypeTags::bsonString:
-            stream << '"' << std::string(getStringView(value::TypeTags::bsonString, val)) << '"';
+        case value::TypeTags::bsonString: {
+            auto bs = std::string(getStringView(value::TypeTags::bsonString, val));
+            if (bs.length() <= kStringMaxDisplayLength) {
+                stream << '"' << bs << '"';
+            } else {
+                stream << '"' << bs.substr(0, kStringMaxDisplayLength) << '"' << "...";
+            }
             break;
+        }
         case value::TypeTags::bsonObjectId:
             stream << "---===*** bsonObjectId ***===---";
             break;
-        case value::TypeTags::bsonBinData:
-            stream << "---===*** bsonBinData ***===---";
+        case value::TypeTags::bsonBinData: {
+            auto data =
+                reinterpret_cast<const char*>(getBSONBinData(value::TypeTags::bsonBinData, val));
+            auto len = getBSONBinDataSize(value::TypeTags::bsonBinData, val);
+            auto type = getBSONBinDataSubtype(value::TypeTags::bsonBinData, val);
+
+            if (type == ByteArrayDeprecated) {
+                // Skip extra size
+                len -= 4;
+                data += 4;
+            }
+
+            // If the BinData is a correctly sized newUUID, display it as such.
+            if (type == newUUID && len == kNewUUIDLength) {
+                using namespace fmt::literals;
+                StringData sd(data, len);
+                // 4 Octets - 2 Octets - 2 Octets - 2 Octets - 6 Octets
+                stream << "UUID(\"{}-{}-{}-{}-{}\")"_format(hexblob::encodeLower(sd.substr(0, 4)),
+                                                            hexblob::encodeLower(sd.substr(4, 2)),
+                                                            hexblob::encodeLower(sd.substr(6, 2)),
+                                                            hexblob::encodeLower(sd.substr(8, 2)),
+                                                            hexblob::encodeLower(sd.substr(10, 6)));
+                break;
+            }
+            stream << "BinData(" << type << ", ";
+            if (len > kBinDataMaxDisplayLength) {
+                stream << hexblob::encode(data, kBinDataMaxDisplayLength) << "...)";
+            } else {
+                stream << hexblob::encode(data, len) << ")";
+            }
             break;
+        }
         case value::TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             stream << "KS(" << ks->toString() << ")";
