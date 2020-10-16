@@ -193,7 +193,7 @@ variables:
   - func: "apply compile expansions"
   - func: "set task expansion macros"
   teardown_task:
-  - func: "attach scons config log"
+  - func: "attach scons logs"
   - func: "attach report"
   - func: "attach artifacts"
   - func: "kill processes"
@@ -313,6 +313,7 @@ variables:
     - func: "apply compile expansions"
     - func: "set task expansion macros"
   teardown_task:
+  - func: "attach scons logs"
   setup_group_can_fail_task: true
   setup_group:
     - func: "kill processes"
@@ -1846,10 +1847,6 @@ functions:
             ${targets} MONGO_VERSION=${version} || exit_status=$?
         # If compile fails we do not run any tests
         if [[ $exit_status -ne 0 ]]; then
-          if [[ "${dump_scons_config_on_failure}" == true ]]; then
-            echo "Dumping build/scons/config.log"
-            cat build/scons/config.log
-          fi
           touch ${skip_tests}
         fi
         exit $exit_status
@@ -3712,18 +3709,30 @@ functions:
   - *archive_system_resource_information
 
   ### Attach report & artifacts ###
-  "attach scons config log":
-    command: s3.put
-    params:
-      optional: true
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/build/scons/config.log
-      remote_file: ${project}/${build_variant}/${revision}/artifacts/config-${build_id}.log
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
-      display_name: config.log
+  "attach scons logs":
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/build/scons/config.log
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-config.log.${build_id}-${task_name}-${execution}
+        bucket: mciuploads
+        permissions: public-read
+        content_type: text/plain
+        display_name: SCons configure log
+
+    - command: s3.put
+      params:
+        optional: true
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/scons_cache.log
+        content_type: text/plain
+        remote_file: ${project}/${build_variant}/${revision}/artifacts/scons-cache.log.${build_id}-${task_name}.${execution}
+        bucket: mciuploads
+        permissions: public-read
+        display_name: SCons cache debug log
 
   "attach report":
     command: attach.results
@@ -3866,17 +3875,7 @@ tasks:
         permissions: public-read
         content_type: application/tar
         display_name: Artifacts
-    - command: s3.put
-      params:
-        optional: true
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        local_file: src/scons_cache.log
-        content_type: text/plain
-        remote_file: ${project}/${build_variant}/${revision}/scons-cache-${build_id}-${execution}.log
-        bucket: mciuploads
-        permissions: public-read
-        display_name: SCons cache debug log
+
     # For patch builds that bypass compile, we upload links to pre-existing tarballs, except for the
     # artifacts.tgz.
     - command: attach.artifacts
@@ -4355,6 +4354,7 @@ tasks:
       vars:
         targets: install-benchmarks
         compiling_for_test: true
+    - func: "attach scons logs"
     - command: archive.targz_pack
       params:
         target: "benchmarks.tgz"
@@ -5801,6 +5801,7 @@ tasks:
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
+  - func: "attach scons logs"
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_standalone --storageEngine=wiredTiger
@@ -5822,6 +5823,7 @@ tasks:
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
+  - func: "attach scons logs"
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_standalone_audit --storageEngine=wiredTiger
@@ -5843,6 +5845,7 @@ tasks:
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
+  - func: "attach scons logs"
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_replset --storageEngine=wiredTiger
@@ -5864,6 +5867,7 @@ tasks:
       bypass_compile: false
       task_compile_flags: >-
         --detect-odr-violations
+  - func: "attach scons logs"
   - func: "run tests"
     vars:
       resmoke_args: --suites=integration_tests_sharded --storageEngine=wiredTiger
@@ -8654,6 +8658,7 @@ task_groups:
     - func: "set task expansion macros"
     - func: "apply compile expansions"
   teardown_task:
+      - func: "attach scons logs"
   tasks:
   - "embedded_sdk_build_cdriver"
   - "embedded_sdk_install_dev"
@@ -10077,7 +10082,6 @@ buildvariants:
         -DENABLE_ZLIB=BUNDLED
         -DCMAKE_C_FLAGS="-Wunguarded-availability"
     disable_unit_tests: true
-    dump_scons_config_on_failure: true
   tasks:
   - name: embedded_sdk_build_and_test
 
@@ -10099,7 +10103,6 @@ buildvariants:
         -DCMAKE_C_FLAGS="-flto"
         -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
     disable_unit_tests: true
-    dump_scons_config_on_failure: true
   tasks:
   - name: embedded_sdk_build_and_test
 
