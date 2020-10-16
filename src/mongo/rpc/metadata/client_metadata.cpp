@@ -472,7 +472,8 @@ bool ClientMetadata::tryFinalize(Client* client) {
 
 const ClientMetadata* ClientMetadata::getForClient(Client* client) noexcept {
     auto& state = getClientState(client);
-    if (!state.isFinalized || !state.meta) {
+    if (!state.meta) {
+        // If we haven't finalized, it's still okay to return our existing value.
         return nullptr;
     }
     return &state.meta.get();
@@ -514,7 +515,7 @@ void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, BSONEl
     auto wasFinalized = std::exchange(state.isFinalized, true);
     uassert(ErrorCodes::ClientMetadataCannotBeMutated,
             "The client metadata document may only be set once per operation",
-            !wasFinalized);
+            !state.meta && !wasFinalized);
 
     state.meta = ClientMetadata::readFromMetadata(elem);
 }
@@ -541,6 +542,7 @@ void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
     }
 
     auto lk = stdx::lock_guard(*client);
+    invariant(!state.meta, "ClientMetadata was previously set, it should be set precisely once");
     state.meta = std::move(meta);
 }
 

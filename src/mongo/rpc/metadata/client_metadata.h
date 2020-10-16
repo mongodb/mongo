@@ -90,9 +90,8 @@ public:
     /**
      * Get the ClientMetadata for the Client.
      *
-     * This function may return nullptr for either of two reasons:
-     * - The ClientMetadata hasn't been finalized yet via tryFinalize().
-     * - The ClientMetadata wasn't provided at all.
+     * This function may return nullptr if there was no ClientMetadata provided for the
+     * Client.
      *
      * The pointer to ClientMetadata is valid to use if:
      * - You hold the Client lock.
