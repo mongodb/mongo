@@ -120,7 +120,7 @@ auto printValue(const T& payload) {
             [](const UserString& userString) { return "<UserString "s + userString + ">"; },
             [](const UserBinary& userBinary) {
                 return "<UserBinary "s + typeName(userBinary.type) + ", " +
-                    hexblob::encode(userBinary.data, userBinary.length) + ">";
+                    hexblob::encode(userBinary.data, std::max(userBinary.length, 0)) + ">";
             },
             [](const UserUndefined& userUndefined) { return "<UserUndefined>"s; },
             [](const UserObjectId& userObjectId) {

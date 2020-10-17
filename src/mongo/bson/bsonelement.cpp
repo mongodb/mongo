@@ -873,7 +873,7 @@ void BSONElement::toString(
             if (!full && len > 80) {
                 s << hexblob::encode(data, 70) << "...)";
             } else {
-                s << hexblob::encode(data, len) << ")";
+                s << hexblob::encode(data, std::max(len, 0)) << ")";
             }
         } break;
 
