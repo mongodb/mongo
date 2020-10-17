@@ -29,6 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <array>
+#include <fmt/format.h>
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -37,6 +40,8 @@
 
 namespace mongo {
 namespace {
+
+using namespace fmt::literals;
 
 TEST(BSONElement, BinDataToString) {
     BSONObjBuilder builder;
@@ -83,6 +88,44 @@ TEST(BSONElement, BinDataToString) {
     ASSERT_EQ(obj["unknownType"].toString(),
               "unknownType: BinData(42, "
               "62696E6172792064617461007769746820616E20756E6B6E6F776E2074797065)");
+}
+
+std::string vecStr(std::vector<uint8_t> v) {
+    std::string r = "[";
+    StringData sep;
+    for (const uint8_t& b : v) {
+        r += "{}{:02x}"_format(sep, (unsigned)b);
+        sep = ","_sd;
+    }
+    r += "]";
+    return r;
+}
+
+TEST(BSONElement, BinDataVectorWithByteArrayDeprecated) {
+    // ByteArrayDeprecated has a nonsense 4-byte redundant length field
+    // that _binDataVector should ignore.
+    std::vector<uint8_t> payload{'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+    std::vector<uint8_t> input = payload;
+
+    // Insert a 4-byte prefix for the ignored ByteArrayDeprecated "length"
+    std::array<uint8_t, 4> ignoredPrefix{0xcc, 0xdd, 0xee, 0xff};
+    input.insert(input.begin(), ignoredPrefix.begin(), ignoredPrefix.end());
+
+    ASSERT_EQ(vecStr(BSONObjBuilder{}
+                         .appendBinData("f", input.size(), ByteArrayDeprecated, input.data())
+                         .obj()["f"]
+                         ._binDataVector()),
+              vecStr(payload));
+}
+
+TEST(BSONElement, BinDataVectorWithBinDataGeneral) {
+    std::vector<uint8_t> payload{'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+    std::vector<uint8_t> input = payload;
+    ASSERT_EQ(vecStr(BSONObjBuilder{}
+                         .appendBinData("f", input.size(), BinDataGeneral, input.data())
+                         .obj()["f"]
+                         ._binDataVector()),
+              vecStr(payload));
 }
 
 
