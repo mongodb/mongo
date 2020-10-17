@@ -315,7 +315,7 @@ TEST(StringUtilsTest, UTF8SafeTruncation) {
 TEST(StringUtilsTest, GetCodePointLength) {
     for (int i = 0x0; i < 0x100; ++i) {
         size_t n = 0;
-        for (std::bitset<8> bs(i); bs[7 - n]; ++n) {
+        for (std::bitset<8> bs(i); n < bs.size() && bs[7 - n]; ++n) {
         }
         if (n == 1)
             continue;  // Avoid the invariant on 0b10xx'xxxx continuation bytes.
