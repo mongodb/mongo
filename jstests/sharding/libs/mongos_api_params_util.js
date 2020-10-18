@@ -652,7 +652,7 @@ let MongosAPIParametersUtil = (function() {
                         // Target shard 0 with an _id filter.
                         const res = client.getDB("db").runCommand({
                             find: "collection",
-                            filter: {_id: {$lt: 10}, $where: "sleep(99999999); return true;"},
+                            filter: {_id: {$lt: 9}, $where: "sleep(99999999); return true;"},
                             comment: uuidStr
                         });
                         jsTestLog(`Called find command: ${tojson(res)}`);
@@ -667,9 +667,11 @@ let MongosAPIParametersUtil = (function() {
                     context.thread.start();
                     const adminDb = st.s0.getDB("admin");
 
-                    jsTestLog(`Waiting for "find" with comment ${uuidStr} in currentOp`);
+                    jsTestLog(`Waiting for "find" on "${st.rs0.name}" ` +
+                              `with comment ${uuidStr} in currentOp`);
                     assert.soon(() => {
-                        const inprog = adminDb.currentOp({"command.comment": uuidStr}).inprog;
+                        const filter = {"command.comment": uuidStr, shard: st.rs0.name};
+                        const inprog = adminDb.currentOp(filter).inprog;
                         if (inprog.length === 1) {
                             jsTestLog(`Found it! findOpId ${inprog[0].opid}`);
                             context.findOpId = inprog[0].opid;
