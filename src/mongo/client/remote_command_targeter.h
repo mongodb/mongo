@@ -81,11 +81,11 @@ public:
         const ReadPreferenceSetting& readPref, Milliseconds maxWait) = 0;
 
     /**
-     * Reports to the targeter that a 'status' indicating a not master error was received when
+     * Reports to the targeter that a 'status' indicating a not primary error was received when
      * communicating with 'host', and so it should update its bookkeeping to avoid giving out the
      * host again on a subsequent request for the primary.
      */
-    virtual void markHostNotMaster(const HostAndPort& host, const Status& status) = 0;
+    virtual void markHostNotPrimary(const HostAndPort& host, const Status& status) = 0;
 
     /**
      * Reports to the targeter that a 'status' indicating a network error was received when trying

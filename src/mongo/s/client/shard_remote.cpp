@@ -130,7 +130,7 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
         return;
 
     if (ErrorCodes::isNotPrimaryError(remoteCommandStatus.code())) {
-        _targeter->markHostNotMaster(remoteHost, remoteCommandStatus);
+        _targeter->markHostNotPrimary(remoteHost, remoteCommandStatus);
     } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
         _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
     } else if (remoteCommandStatus == ErrorCodes::NetworkInterfaceExceededTimeLimit) {

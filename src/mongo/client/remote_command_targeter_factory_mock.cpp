@@ -57,8 +57,8 @@ public:
         return _mock->findHostsWithMaxWait(readPref, maxWait);
     }
 
-    void markHostNotMaster(const HostAndPort& host, const Status& status) override {
-        _mock->markHostNotMaster(host, status);
+    void markHostNotPrimary(const HostAndPort& host, const Status& status) override {
+        _mock->markHostNotPrimary(host, status);
     }
 
     void markHostUnreachable(const HostAndPort& host, const Status& status) override {

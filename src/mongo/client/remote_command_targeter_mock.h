@@ -67,7 +67,7 @@ public:
     /**
      * Adds host to a set of hosts marked down, otherwise a no-op.
      */
-    void markHostNotMaster(const HostAndPort& host, const Status& status) override;
+    void markHostNotPrimary(const HostAndPort& host, const Status& status) override;
 
     /**
      * Adds host to a set of hosts marked down, otherwise a no-op.
@@ -104,7 +104,7 @@ private:
     // Protects _hostsMarkedDown.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("RemoteCommandTargeterMock::_mutex");
 
-    // HostAndPorts marked not master or unreachable. Meant to verify a code path updates the
+    // HostAndPorts marked not primary or unreachable. Meant to verify a code path updates the
     // RemoteCommandTargeterMock.
     std::set<HostAndPort> _hostsMarkedDown;
 };

@@ -54,7 +54,7 @@ public:
     SemiFuture<std::vector<HostAndPort>> findHostsWithMaxWait(const ReadPreferenceSetting& readPref,
                                                               Milliseconds maxWait) override;
 
-    void markHostNotMaster(const HostAndPort& host, const Status& status) override;
+    void markHostNotPrimary(const HostAndPort& host, const Status& status) override;
 
     void markHostUnreachable(const HostAndPort& host, const Status& status) override;
 

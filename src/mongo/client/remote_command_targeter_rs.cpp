@@ -98,7 +98,7 @@ StatusWith<HostAndPort> RemoteCommandTargeterRS::findHost(OperationContext* opCt
     return swHostAndPort;
 }
 
-void RemoteCommandTargeterRS::markHostNotMaster(const HostAndPort& host, const Status& status) {
+void RemoteCommandTargeterRS::markHostNotPrimary(const HostAndPort& host, const Status& status) {
     invariant(_rsMonitor);
 
     _rsMonitor->failedHost(host, status);

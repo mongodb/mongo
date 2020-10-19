@@ -74,7 +74,7 @@ SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterMock::findHostsWithMax
     return _findHostReturnValue;
 }
 
-void RemoteCommandTargeterMock::markHostNotMaster(const HostAndPort& host, const Status& status) {
+void RemoteCommandTargeterMock::markHostNotPrimary(const HostAndPort& host, const Status& status) {
     stdx::lock_guard<Latch> lg(_mutex);
     _hostsMarkedDown.insert(host);
 }
