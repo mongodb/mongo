@@ -407,7 +407,7 @@ DB.prototype.dropDatabase = function(writeConcern) {
  * Shuts down the database.  Must be run while using the admin database.
  * @param opts Options for shutdown. Possible options are:
  *   - force: (boolean) if the server should shut down, even if there is no
- *     up-to-date slave
+ *     up-to-date secondary
  *   - timeoutSecs: (number) the server will continue checking over timeoutSecs
  *     if any other servers have caught up enough for it to shut down.
  */
@@ -485,19 +485,19 @@ DB.prototype.cloneDatabase = function(from) {
   * See also: db.clone()
 */
 DB.prototype.copyDatabase = function(
-    fromdb, todb, fromhost, username, password, mechanism, slaveOk) {
+    fromdb, todb, fromhost, username, password, mechanism, secondaryOk) {
     print(
         "WARNING: db.copyDatabase will only function with MongoDB 4.0 and below. See http://dochub.mongodb.org/core/4.2-copydb-clone");
     assert(isString(fromdb) && fromdb.length);
     assert(isString(todb) && todb.length);
     fromhost = fromhost || "";
     if ((typeof username === "boolean") && (typeof password === "undefined") &&
-        (typeof mechanism === "undefined") && (typeof slaveOk === "undefined")) {
-        slaveOk = username;
+        (typeof mechanism === "undefined") && (typeof secondaryOk === "undefined")) {
+        secondaryOk = username;
         username = undefined;
     }
-    if (typeof slaveOk !== "boolean") {
-        slaveOk = false;
+    if (typeof secondaryOk !== "boolean") {
+        secondaryOk = false;
     }
 
     if (!mechanism) {
@@ -508,14 +508,14 @@ DB.prototype.copyDatabase = function(
     // Check for no auth or copying from localhost
     if (!username || !password || fromhost == "") {
         return this._adminCommand(
-            {copydb: 1, fromhost: fromhost, fromdb: fromdb, todb: todb, slaveOk: slaveOk});
+            {copydb: 1, fromhost: fromhost, fromdb: fromdb, todb: todb, slaveOk: secondaryOk});
     }
 
     // Use the copyDatabase native helper for SCRAM-SHA-1/256
     if (mechanism != "MONGODB-CR") {
         // TODO SERVER-30886: Add session support for Mongo.prototype.copyDatabaseWithSCRAM().
         return this.getMongo().copyDatabaseWithSCRAM(
-            fromdb, todb, fromhost, username, password, slaveOk);
+            fromdb, todb, fromhost, username, password, secondaryOk);
     }
 
     // Fall back to MONGODB-CR
@@ -528,7 +528,7 @@ DB.prototype.copyDatabase = function(
         username: username,
         nonce: n.nonce,
         key: this.__pwHash(n.nonce, username, password),
-        slaveOk: slaveOk,
+        slaveOk: secondaryOk,
     });
 };
 
@@ -976,7 +976,7 @@ DB.tsToSeconds = function(x) {
        use local
        db.getReplicationInfo();
   </pre>
-  * @return Object timeSpan: time span of the oplog from start to end  if slave is more out
+  * @return Object timeSpan: time span of the oplog from start to end  if secondary is more out
   *                          of date than that, it can't recover without a complete resync
 */
 DB.prototype.getReplicationInfo = function() {
@@ -1199,8 +1199,8 @@ DB.prototype.listCommands = function() {
 
         if (c.adminOnly)
             s += " adminOnly ";
-        if (c.slaveOk)
-            s += " slaveOk ";
+        if (c.secondaryOk)
+            s += " secondaryOk ";
 
         s += "\n  ";
         s += c.help.replace(/\n/g, '\n  ');
