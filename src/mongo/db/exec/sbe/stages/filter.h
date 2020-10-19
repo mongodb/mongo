@@ -138,14 +138,7 @@ public:
     }
 
     std::vector<DebugPrinter::Block> debugPrint() const final {
-        std::vector<DebugPrinter::Block> ret;
-        if constexpr (IsConst) {
-            DebugPrinter::addKeyword(ret, "cfilter");
-        } else if constexpr (IsEof) {
-            DebugPrinter::addKeyword(ret, "efilter");
-        } else {
-            DebugPrinter::addKeyword(ret, "filter");
-        }
+        auto ret = PlanStage::debugPrint();
 
         ret.emplace_back("{`");
         DebugPrinter::addBlocks(ret, _filter->debugPrint());

@@ -166,8 +166,7 @@ const SpecificStats* UnwindStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> UnwindStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "unwind");
+    auto ret = PlanStage::debugPrint();
 
     DebugPrinter::addIdentifier(ret, _outField);
     DebugPrinter::addIdentifier(ret, _outIndex);

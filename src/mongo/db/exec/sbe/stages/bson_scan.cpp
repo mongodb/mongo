@@ -143,10 +143,7 @@ const SpecificStats* BSONScanStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> BSONScanStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-
-    DebugPrinter::addKeyword(ret, "bsonscan");
-
+    auto ret = PlanStage::debugPrint();
 
     if (_recordSlot) {
         DebugPrinter::addIdentifier(ret, _recordSlot.get());

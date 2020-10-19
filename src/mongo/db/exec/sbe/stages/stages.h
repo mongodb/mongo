@@ -36,6 +36,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace sbe {
@@ -273,7 +274,11 @@ public:
      */
     virtual void close() = 0;
 
-    virtual std::vector<DebugPrinter::Block> debugPrint() const = 0;
+    virtual std::vector<DebugPrinter::Block> debugPrint() const {
+        auto stats = getCommonStats();
+        std::string str = str::stream() << '[' << stats->nodeId << "] " << stats->stageType;
+        return {DebugPrinter::Block(str)};
+    }
 
     friend class CanSwitchOperationContext;
     friend class CanChangeState;

@@ -32,6 +32,8 @@
 
 #include "mongo/db/exec/sbe/parser/parser.h"
 
+#include <charconv>
+
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/exchange.h"
@@ -60,10 +62,13 @@ static std::string format_error_message(size_t ln, size_t col, const std::string
 
 static constexpr auto kSyntax = R"(
                 ROOT <- OPERATOR
-                OPERATOR <- SCAN / PSCAN / SEEK / IXSCAN / IXSEEK / PROJECT / FILTER / CFILTER /
+
+                PLAN_NODE_ID <- ('['([0-9])+']')
+
+                OPERATOR <- PLAN_NODE_ID? (SCAN / PSCAN / SEEK / IXSCAN / IXSEEK / PROJECT / FILTER / CFILTER /
                             MKOBJ / GROUP / HJOIN / NLJOIN / LIMIT / SKIP / COSCAN / TRAVERSE /
                             EXCHANGE / SORT / UNWIND / UNION / BRANCH / SIMPLE_PROJ / PFO /
-                            ESPOOL / LSPOOL / CSPOOL / SSPOOL
+                            ESPOOL / LSPOOL / CSPOOL / SSPOOL)
 
                 FORWARD_FLAG <- <'true'> / <'false'>
 
@@ -98,7 +103,7 @@ static constexpr auto kSyntax = R"(
                                    IX_KEY_LIST_WITH_RENAMES  # list of projected fields (may be empty)
                                    IDENT # collection name
                                    IDENT # index name to scan
-                                   FORWARD_FLAG # forward scan or not
+                                   FORWARD_FLAG # forward seek or not
 
                 PROJECT <- 'project' PROJECT_LIST OPERATOR
                 SIMPLE_PROJ <- '$p' IDENT # output
@@ -508,7 +513,6 @@ void Parser::walkScan(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
-    std::string dbName = _defaultDb;
     std::string collName;
     int projectsPos;
     int forwardPos;
@@ -532,13 +536,9 @@ void Parser::walkScan(AstQuery& ast) {
         MONGO_UNREACHABLE;
     }
 
-    NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead collection(_opCtx, nssColl);
-    NamespaceStringOrUUID name =
-        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
 
-    ast.stage = makeS<ScanStage>(name,
+    ast.stage = makeS<ScanStage>(getCollectionUuid(collName),
                                  lookupSlot(recordName),
                                  lookupSlot(recordIdName),
                                  ast.nodes[projectsPos]->identifiers,
@@ -547,7 +547,7 @@ void Parser::walkScan(AstQuery& ast) {
                                  forward,
                                  nullptr,
                                  nullptr,
-                                 kEmptyPlanNodeId);
+                                 getCurrentPlanNodeId());
 }
 
 void Parser::walkParallelScan(AstQuery& ast) {
@@ -555,7 +555,6 @@ void Parser::walkParallelScan(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
-    std::string dbName = _defaultDb;
     std::string collName;
     int projectsPos;
 
@@ -575,18 +574,13 @@ void Parser::walkParallelScan(AstQuery& ast) {
         MONGO_UNREACHABLE;
     }
 
-    NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead collection(_opCtx, nssColl);
-    NamespaceStringOrUUID name =
-        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
-
-    ast.stage = makeS<ParallelScanStage>(name,
+    ast.stage = makeS<ParallelScanStage>(getCollectionUuid(collName),
                                          lookupSlot(recordName),
                                          lookupSlot(recordIdName),
                                          ast.nodes[projectsPos]->identifiers,
                                          lookupSlots(ast.nodes[projectsPos]->renames),
                                          nullptr,
-                                         kEmptyPlanNodeId);
+                                         getCurrentPlanNodeId());
 }
 
 void Parser::walkSeek(AstQuery& ast) {
@@ -594,7 +588,6 @@ void Parser::walkSeek(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
-    std::string dbName = _defaultDb;
     std::string collName;
     int projectsPos;
 
@@ -614,12 +607,7 @@ void Parser::walkSeek(AstQuery& ast) {
         MONGO_UNREACHABLE;
     }
 
-    NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead collection(_opCtx, nssColl);
-    NamespaceStringOrUUID name =
-        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
-
-    ast.stage = makeS<ScanStage>(name,
+    ast.stage = makeS<ScanStage>(getCollectionUuid(collName),
                                  lookupSlot(recordName),
                                  lookupSlot(recordIdName),
                                  ast.nodes[projectsPos]->identifiers,
@@ -628,7 +616,7 @@ void Parser::walkSeek(AstQuery& ast) {
                                  true /* forward */,
                                  nullptr,
                                  nullptr,
-                                 kEmptyPlanNodeId);
+                                 getCurrentPlanNodeId());
 }
 
 void Parser::walkIndexScan(AstQuery& ast) {
@@ -636,7 +624,6 @@ void Parser::walkIndexScan(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
-    std::string dbName = _defaultDb;
     std::string collName;
     std::string indexName;
     int projectsPos;
@@ -664,16 +651,12 @@ void Parser::walkIndexScan(AstQuery& ast) {
         MONGO_UNREACHABLE;
     }
 
-    NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead collection(_opCtx, nssColl);
-    NamespaceStringOrUUID name =
-        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
 
     auto [indexKeysInclusion, vars] =
         lookupIndexKeyRenames(ast.nodes[projectsPos]->renames, ast.nodes[projectsPos]->indexKeys);
 
-    ast.stage = makeS<IndexScanStage>(name,
+    ast.stage = makeS<IndexScanStage>(getCollectionUuid(collName),
                                       indexName,
                                       forward,
                                       lookupSlot(recordName),
@@ -684,7 +667,7 @@ void Parser::walkIndexScan(AstQuery& ast) {
                                       boost::none,
                                       nullptr,
                                       nullptr,
-                                      kEmptyPlanNodeId);
+                                      getCurrentPlanNodeId());
 }
 
 void Parser::walkIndexSeek(AstQuery& ast) {
@@ -692,7 +675,6 @@ void Parser::walkIndexSeek(AstQuery& ast) {
 
     std::string recordName;
     std::string recordIdName;
-    std::string dbName = _defaultDb;
     std::string collName;
     std::string indexName;
     int projectsPos;
@@ -720,16 +702,12 @@ void Parser::walkIndexSeek(AstQuery& ast) {
         MONGO_UNREACHABLE;
     }
 
-    NamespaceString nssColl{dbName, collName};
-    AutoGetCollectionForRead collection(_opCtx, nssColl);
-    NamespaceStringOrUUID name =
-        collection ? NamespaceStringOrUUID{dbName, collection->uuid()} : nssColl;
     const auto forward = (ast.nodes[forwardPos]->token == "true") ? true : false;
 
     auto [indexKeysInclusion, vars] =
         lookupIndexKeyRenames(ast.nodes[projectsPos]->renames, ast.nodes[projectsPos]->indexKeys);
 
-    ast.stage = makeS<IndexScanStage>(name,
+    ast.stage = makeS<IndexScanStage>(getCollectionUuid(collName),
                                       indexName,
                                       forward,
                                       lookupSlot(recordName),
@@ -740,7 +718,7 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       lookupSlot(ast.nodes[1]->identifier),
                                       nullptr,
                                       nullptr,
-                                      kEmptyPlanNodeId);
+                                      getCurrentPlanNodeId());
 }
 
 void Parser::walkProject(AstQuery& ast) {
@@ -748,21 +726,21 @@ void Parser::walkProject(AstQuery& ast) {
 
     ast.stage = makeS<ProjectStage>(std::move(ast.nodes[1]->stage),
                                     lookupSlots(std::move(ast.nodes[0]->projects)),
-                                    kEmptyPlanNodeId);
+                                    getCurrentPlanNodeId());
 }
 
 void Parser::walkFilter(AstQuery& ast) {
     walkChildren(ast);
 
     ast.stage = makeS<FilterStage<false>>(
-        std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr), kEmptyPlanNodeId);
+        std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr), getCurrentPlanNodeId());
 }
 
 void Parser::walkCFilter(AstQuery& ast) {
     walkChildren(ast);
 
     ast.stage = makeS<FilterStage<true>>(
-        std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr), kEmptyPlanNodeId);
+        std::move(ast.nodes[1]->stage), std::move(ast.nodes[0]->expr), getCurrentPlanNodeId());
 }
 
 void Parser::walkSort(AstQuery& ast) {
@@ -780,7 +758,7 @@ void Parser::walkSort(AstQuery& ast) {
                                  std::numeric_limits<std::size_t>::max(),
                                  true /* allowDiskUse */,
                                  nullptr,
-                                 kEmptyPlanNodeId);
+                                 getCurrentPlanNodeId());
 }
 
 void Parser::walkUnion(AstQuery& ast) {
@@ -802,8 +780,10 @@ void Parser::walkUnion(AstQuery& ast) {
                     return slots.size() == size;
                 }));
 
-    ast.stage = makeS<UnionStage>(
-        std::move(inputStages), std::move(inputVals), std::move(outputVals), kEmptyPlanNodeId);
+    ast.stage = makeS<UnionStage>(std::move(inputStages),
+                                  std::move(inputVals),
+                                  std::move(outputVals),
+                                  getCurrentPlanNodeId());
 }
 
 void Parser::walkUnionBranch(AstQuery& ast) {
@@ -822,7 +802,7 @@ void Parser::walkUnwind(AstQuery& ast) {
                                    lookupSlotStrict(ast.nodes[0]->identifier),
                                    lookupSlotStrict(ast.nodes[1]->identifier),
                                    preserveNullAndEmptyArrays,
-                                   kEmptyPlanNodeId);
+                                   getCurrentPlanNodeId());
 }
 
 void Parser::walkMkObj(AstQuery& ast) {
@@ -852,7 +832,7 @@ void Parser::walkMkObj(AstQuery& ast) {
                                     lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
                                     false,
                                     true,
-                                    kEmptyPlanNodeId);
+                                    getCurrentPlanNodeId());
 }
 
 void Parser::walkGroup(AstQuery& ast) {
@@ -861,7 +841,7 @@ void Parser::walkGroup(AstQuery& ast) {
     ast.stage = makeS<HashAggStage>(std::move(ast.nodes[2]->stage),
                                     lookupSlots(std::move(ast.nodes[0]->identifiers)),
                                     lookupSlots(std::move(ast.nodes[1]->projects)),
-                                    kEmptyPlanNodeId);
+                                    getCurrentPlanNodeId());
 }
 
 void Parser::walkHashJoin(AstQuery& ast) {
@@ -873,7 +853,7 @@ void Parser::walkHashJoin(AstQuery& ast) {
                              lookupSlots(ast.nodes[0]->nodes[1]->identifiers),  // outer projections
                              lookupSlots(ast.nodes[1]->nodes[0]->identifiers),  // inner conditions
                              lookupSlots(ast.nodes[1]->nodes[1]->identifiers),  // inner projections
-                             kEmptyPlanNodeId);
+                             getCurrentPlanNodeId());
 }
 
 void Parser::walkNLJoin(AstQuery& ast) {
@@ -896,7 +876,7 @@ void Parser::walkNLJoin(AstQuery& ast) {
                                      lookupSlots(ast.nodes[0]->identifiers),
                                      lookupSlots(ast.nodes[1]->identifiers),
                                      std::move(predicate),
-                                     kEmptyPlanNodeId);
+                                     getCurrentPlanNodeId());
 }
 
 void Parser::walkLimit(AstQuery& ast) {
@@ -905,7 +885,7 @@ void Parser::walkLimit(AstQuery& ast) {
     ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[1]->stage),
                                       std::stoi(ast.nodes[0]->token),
                                       boost::none,
-                                      kEmptyPlanNodeId);
+                                      getCurrentPlanNodeId());
 }
 
 void Parser::walkSkip(AstQuery& ast) {
@@ -915,19 +895,19 @@ void Parser::walkSkip(AstQuery& ast) {
         ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[2]->stage),
                                           std::stoi(ast.nodes[1]->token),
                                           std::stoi(ast.nodes[0]->token),
-                                          kEmptyPlanNodeId);
+                                          getCurrentPlanNodeId());
     } else {
         ast.stage = makeS<LimitSkipStage>(std::move(ast.nodes[1]->stage),
                                           boost::none,
                                           std::stoi(ast.nodes[0]->token),
-                                          kEmptyPlanNodeId);
+                                          getCurrentPlanNodeId());
     }
 }
 
 void Parser::walkCoScan(AstQuery& ast) {
     walkChildren(ast);
 
-    ast.stage = makeS<CoScanStage>(kEmptyPlanNodeId);
+    ast.stage = makeS<CoScanStage>(getCurrentPlanNodeId());
 }
 
 void Parser::walkTraverse(AstQuery& ast) {
@@ -958,7 +938,7 @@ void Parser::walkTraverse(AstQuery& ast) {
                                      sbe::makeSV(),
                                      foldPos ? std::move(ast.nodes[foldPos]->expr) : nullptr,
                                      finalPos ? std::move(ast.nodes[finalPos]->expr) : nullptr,
-                                     kEmptyPlanNodeId,
+                                     getCurrentPlanNodeId(),
                                      boost::none);
 }
 
@@ -980,7 +960,7 @@ void Parser::walkExchange(AstQuery& ast) {
                                         policy,
                                         nullptr,
                                         nullptr,
-                                        kEmptyPlanNodeId);
+                                        getCurrentPlanNodeId());
 }
 
 void Parser::walkBranch(AstQuery& ast) {
@@ -996,7 +976,7 @@ void Parser::walkBranch(AstQuery& ast) {
                                    std::move(inputThenVals),
                                    std::move(inputElseVals),
                                    std::move(outputVals),
-                                   kEmptyPlanNodeId);
+                                   getCurrentPlanNodeId());
 }
 
 std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
@@ -1013,13 +993,15 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
             invariant(inserted);
             walk(*ast.nodes[0]);
             _symbolsLookupTable.erase(it);
-            return makeProjectStage(
-                std::move(inputStage), kEmptyPlanNodeId, outputSlot, std::move(ast.nodes[0]->expr));
+            return makeProjectStage(std::move(inputStage),
+                                    getCurrentPlanNodeId(),
+                                    outputSlot,
+                                    std::move(ast.nodes[0]->expr));
         } else {
             walk(*ast.nodes[0]);
             return makeProjectStage(
                 std::move(inputStage),
-                kEmptyPlanNodeId,
+                getCurrentPlanNodeId(),
                 outputSlot,
                 makeE<EFunction>("getField"sv,
                                  makeEs(makeE<EVariable>(inputSlot),
@@ -1030,13 +1012,13 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
         auto traverseIn = _slotIdGenerator.generate();
         auto from =
             makeProjectStage(std::move(inputStage),
-                             kEmptyPlanNodeId,
+                             getCurrentPlanNodeId(),
                              traverseIn,
                              makeE<EFunction>("getField"sv,
                                               makeEs(makeE<EVariable>(inputSlot),
                                                      makeE<EConstant>(ast.nodes[0]->identifier))));
         auto in = makeS<LimitSkipStage>(
-            makeS<CoScanStage>(kEmptyPlanNodeId), 1, boost::none, kEmptyPlanNodeId);
+            makeS<CoScanStage>(getCurrentPlanNodeId()), 1, boost::none, getCurrentPlanNodeId());
         auto stage = makeS<TraverseStage>(
             std::move(from),
             walkPathValue(*ast.nodes[1], traverseIn, std::move(in), {}, outputSlot),
@@ -1046,7 +1028,7 @@ std::unique_ptr<PlanStage> Parser::walkPathValue(AstQuery& ast,
             std::move(correlated),
             nullptr,
             nullptr,
-            kEmptyPlanNodeId,
+            getCurrentPlanNodeId(),
             boost::none);
 
         return stage;
@@ -1171,7 +1153,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
     std::vector<std::string> fieldRestrictNames;
     value::SlotVector fieldVars;
     std::unique_ptr<PlanStage> stage = makeS<LimitSkipStage>(
-        makeS<CoScanStage>(kEmptyPlanNodeId), 1, boost::none, kEmptyPlanNodeId);
+        makeS<CoScanStage>(getCurrentPlanNodeId()), 1, boost::none, getCurrentPlanNodeId());
 
     for (size_t idx = ast.nodes.size(); idx-- > 0;) {
         const auto& pf = ast.nodes[idx];
@@ -1192,7 +1174,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
                     stage = makeProjectStage(
                         std::move(stage),
-                        kEmptyPlanNodeId,
+                        getCurrentPlanNodeId(),
                         fieldVars.front(),
                         makeE<EFunction>("getField",
                                          makeEs(makeE<EVariable>(inputSlot),
@@ -1204,7 +1186,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     walk(*action.nodes[0]);
                     fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
                     stage = makeProjectStage(std::move(stage),
-                                             kEmptyPlanNodeId,
+                                             getCurrentPlanNodeId(),
                                              fieldVars.front(),
                                              std::move(action.nodes[0]->nodes[0]->expr));
                     break;
@@ -1217,7 +1199,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     walk(*action.nodes[0]);
                     fieldVars.emplace(fieldVars.begin(), _slotIdGenerator.generate());
                     stage = makeProjectStage(std::move(stage),
-                                             kEmptyPlanNodeId,
+                                             getCurrentPlanNodeId(),
                                              fieldVars.front(),
                                              std::move(action.nodes[0]->nodes[0]->expr));
 
@@ -1231,7 +1213,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                     auto traverseIn = _slotIdGenerator.generate();
                     stage = makeProjectStage(
                         std::move(stage),
-                        kEmptyPlanNodeId,
+                        getCurrentPlanNodeId(),
                         traverseIn,
                         makeE<EFunction>("getField",
                                          makeEs(makeE<EVariable>(inputSlot),
@@ -1246,7 +1228,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                                              sbe::makeSV(),
                                              nullptr,
                                              nullptr,
-                                             kEmptyPlanNodeId,
+                                             getCurrentPlanNodeId(),
                                              boost::none);
                     break;
                 }
@@ -1266,7 +1248,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
                                 std::move(fieldVars),
                                 newObj,
                                 retOldObj,
-                                kEmptyPlanNodeId);
+                                getCurrentPlanNodeId());
 
     return stage;
 }
@@ -1288,7 +1270,7 @@ void Parser::walkPFO(AstQuery& ast) {
                                      lookupSlots(ast.nodes[2]->identifiers),
                                      nullptr,
                                      nullptr,
-                                     kEmptyPlanNodeId,
+                                     getCurrentPlanNodeId(),
                                      boost::none);
 }
 
@@ -1309,7 +1291,7 @@ void Parser::walkLazyProducerSpool(AstQuery& ast) {
                                               lookupSpoolBuffer(ast.nodes[0]->identifier),
                                               lookupSlots(ast.nodes[1]->identifiers),
                                               std::move(predicate),
-                                              kEmptyPlanNodeId);
+                                              getCurrentPlanNodeId());
 }
 
 void Parser::walkEagerProducerSpool(AstQuery& ast) {
@@ -1318,7 +1300,7 @@ void Parser::walkEagerProducerSpool(AstQuery& ast) {
     ast.stage = makeS<SpoolEagerProducerStage>(std::move(ast.nodes[2]->stage),
                                                lookupSpoolBuffer(ast.nodes[0]->identifier),
                                                lookupSlots(ast.nodes[1]->identifiers),
-                                               kEmptyPlanNodeId);
+                                               getCurrentPlanNodeId());
 }
 
 void Parser::walkConsumerSpool(AstQuery& ast) {
@@ -1326,7 +1308,7 @@ void Parser::walkConsumerSpool(AstQuery& ast) {
 
     ast.stage = makeS<SpoolConsumerStage<false>>(lookupSpoolBuffer(ast.nodes[0]->identifier),
                                                  lookupSlots(ast.nodes[1]->identifiers),
-                                                 kEmptyPlanNodeId);
+                                                 getCurrentPlanNodeId());
 }
 
 void Parser::walkStackConsumerSpool(AstQuery& ast) {
@@ -1334,17 +1316,35 @@ void Parser::walkStackConsumerSpool(AstQuery& ast) {
 
     ast.stage = makeS<SpoolConsumerStage<true>>(lookupSpoolBuffer(ast.nodes[0]->identifier),
                                                 lookupSlots(ast.nodes[1]->identifiers),
-                                                kEmptyPlanNodeId);
+                                                getCurrentPlanNodeId());
+}
+
+void Parser::walkPlanNodeId(AstQuery& ast) {
+    auto& str = ast.token;
+    auto idBegin = str.data() + 1;
+    auto idEnd = str.data() + str.length();
+    PlanNodeId id = 0;
+    auto [ptr, ec] = std::from_chars(idBegin, idEnd, id);
+    uassert(5107701, "Invalid plan node id literal.", ec == std::errc());
+    planNodeIdStack.push(id);
 }
 
 void Parser::walk(AstQuery& ast) {
     using namespace peg::udl;
 
     switch (ast.tag) {
-        case "OPERATOR"_:
+        case "OPERATOR"_: {
             walkChildren(ast);
-            ast.stage = std::move(ast.nodes[0]->stage);
+            size_t stageIndex = 0;
+            if (ast.nodes.size() == 2) {
+                // First child contains plan node id. Stage is stored in the second child.
+                stageIndex = 1;
+                // Remove current plan node id because it was only relevant to the parsed stage.
+                planNodeIdStack.pop();
+            }
+            ast.stage = std::move(ast.nodes[stageIndex]->stage);
             break;
+        }
         case "ROOT"_:
             walkChildren(ast);
             ast.stage = std::move(ast.nodes[0]->stage);
@@ -1490,6 +1490,9 @@ void Parser::walk(AstQuery& ast) {
         case "SSPOOL"_:
             walkStackConsumerSpool(ast);
             break;
+        case "PLAN_NODE_ID"_:
+            walkPlanNodeId(ast);
+            break;
         default:
             walkChildren(ast);
     }
@@ -1525,5 +1528,25 @@ std::unique_ptr<PlanStage> Parser::parse(OperationContext* opCtx,
 
     return std::move(ast->stage);
 }
+
+NamespaceStringOrUUID Parser::getCollectionUuid(const std::string& collName) {
+    const auto ns = collName.find('.') == std::string::npos ? NamespaceString(_defaultDb, collName)
+                                                            : NamespaceString(collName);
+    if (_opCtx) {
+        AutoGetCollectionForRead collection(_opCtx, ns);
+        if (collection) {
+            return NamespaceStringOrUUID{ns.db().toString(), collection->uuid()};
+        }
+    }
+    return ns;
+}
+
+PlanNodeId Parser::getCurrentPlanNodeId() {
+    if (planNodeIdStack.empty()) {
+        return kEmptyPlanNodeId;
+    }
+    return planNodeIdStack.top();
+}
+
 }  // namespace sbe
 }  // namespace mongo

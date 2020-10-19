@@ -69,9 +69,4 @@ void CoScanStage::close() {
     _commonStats.closes++;
 }
 
-std::vector<DebugPrinter::Block> CoScanStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "coscan");
-    return ret;
-}
 }  // namespace mongo::sbe

@@ -372,8 +372,7 @@ const SpecificStats* ExchangeConsumer::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> ExchangeConsumer::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "exchange");
+    auto ret = PlanStage::debugPrint();
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _state->fields().size(); ++idx) {
         if (idx) {
@@ -571,9 +570,6 @@ const SpecificStats* ExchangeProducer::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> ExchangeProducer::debugPrint() const {
-    return std::vector<DebugPrinter::Block>();
-}
 bool ExchangeBuffer::appendData(std::vector<value::SlotAccessor*>& data) {
     ++_count;
     for (auto accesor : data) {

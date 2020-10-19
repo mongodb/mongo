@@ -314,19 +314,15 @@ const SpecificStats* IndexScanStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
+    auto ret = PlanStage::debugPrint();
 
     if (_seekKeySlotLow) {
-        DebugPrinter::addKeyword(ret, "ixseek");
 
         DebugPrinter::addIdentifier(ret, _seekKeySlotLow.get());
         if (_seekKeySlotHi) {
             DebugPrinter::addIdentifier(ret, _seekKeySlotHi.get());
         }
-    } else {
-        DebugPrinter::addKeyword(ret, "ixscan");
     }
-
     if (_recordSlot) {
         DebugPrinter::addIdentifier(ret, _recordSlot.get());
     }

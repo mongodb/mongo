@@ -94,9 +94,8 @@ void TextMatchStage::close() {
 std::vector<DebugPrinter::Block> TextMatchStage::debugPrint() const {
     // TODO: Add 'textmatch' to the parser so that the debug output can be parsed back to an
     // execution plan.
-    std::vector<DebugPrinter::Block> ret;
+    auto ret = PlanStage::debugPrint();
 
-    DebugPrinter::addKeyword(ret, "textmatch");
     DebugPrinter::addIdentifier(ret, _inputSlot);
     DebugPrinter::addIdentifier(ret, _outputSlot);
 

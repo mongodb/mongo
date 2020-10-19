@@ -96,13 +96,10 @@ const SpecificStats* LimitSkipStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> LimitSkipStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-
+    auto ret = PlanStage::debugPrint();
     if (!_skip) {
-        DebugPrinter::addKeyword(ret, "limit");
         ret.emplace_back(std::to_string(*_limit));
     } else {
-        DebugPrinter::addKeyword(ret, "limitskip");
         ret.emplace_back(_limit ? std::to_string(*_limit) : "none");
         ret.emplace_back(std::to_string(*_skip));
     }

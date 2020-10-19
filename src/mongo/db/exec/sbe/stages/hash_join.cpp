@@ -199,8 +199,7 @@ const SpecificStats* HashJoinStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> HashJoinStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "hj");
+    auto ret = PlanStage::debugPrint();
 
     ret.emplace_back(DebugPrinter::Block::cmdIncIndent);
 

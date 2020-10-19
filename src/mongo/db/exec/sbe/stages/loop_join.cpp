@@ -166,8 +166,7 @@ const SpecificStats* LoopJoinStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "nlj");
+    auto ret = PlanStage::debugPrint();
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _outerProjects.size(); ++idx) {

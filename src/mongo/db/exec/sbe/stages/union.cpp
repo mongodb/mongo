@@ -158,8 +158,7 @@ const SpecificStats* UnionStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> UnionStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "union");
+    auto ret = PlanStage::debugPrint();
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _outputVals.size(); idx++) {

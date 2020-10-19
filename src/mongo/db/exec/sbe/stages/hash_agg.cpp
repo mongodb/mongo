@@ -164,8 +164,7 @@ void HashAggStage::close() {
 }
 
 std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "group");
+    auto ret = PlanStage::debugPrint();
 
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _gbs.size(); ++idx) {

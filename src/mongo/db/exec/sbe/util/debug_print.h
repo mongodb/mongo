@@ -100,7 +100,7 @@ public:
     }
 
     static void addSpoolIdentifier(std::vector<Block>& ret, SpoolId spool) {
-        std::string name{str::stream() << spool};
+        std::string name{str::stream() << "sp" << spool};
         ret.emplace_back(Block::cmdColorGreen);
         ret.emplace_back(Block{Block::cmdNoneNoSpace, name});
         ret.emplace_back(Block::cmdColorNone);

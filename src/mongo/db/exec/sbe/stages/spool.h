@@ -224,8 +224,7 @@ public:
     }
 
     std::vector<DebugPrinter::Block> debugPrint() const {
-        std::vector<DebugPrinter::Block> ret;
-        DebugPrinter::addKeyword(ret, IsStack ? "sspool" : "cspool");
+        auto ret = PlanStage::debugPrint();
 
         DebugPrinter::addSpoolIdentifier(ret, _spoolId);
 

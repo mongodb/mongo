@@ -126,8 +126,7 @@ const SpecificStats* SpoolEagerProducerStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> SpoolEagerProducerStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "espool");
+    auto ret = PlanStage::debugPrint();
 
     DebugPrinter::addSpoolIdentifier(ret, _spoolId);
 
@@ -260,8 +259,7 @@ const SpecificStats* SpoolLazyProducerStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> SpoolLazyProducerStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "lspool");
+    auto ret = PlanStage::debugPrint();
 
     DebugPrinter::addSpoolIdentifier(ret, _spoolId);
 

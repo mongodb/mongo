@@ -105,9 +105,7 @@ const SpecificStats* ProjectStage::getSpecificStats() const {
 }
 
 std::vector<DebugPrinter::Block> ProjectStage::debugPrint() const {
-    std::vector<DebugPrinter::Block> ret;
-    DebugPrinter::addKeyword(ret, "project");
-
+    auto ret = PlanStage::debugPrint();
     ret.emplace_back("[`");
     bool first = true;
     for (auto& p : _projects) {
@@ -121,9 +119,7 @@ std::vector<DebugPrinter::Block> ProjectStage::debugPrint() const {
         first = false;
     }
     ret.emplace_back("`]");
-
     DebugPrinter::addNewLine(ret);
-
     DebugPrinter::addBlocks(ret, _children[0]->debugPrint());
     return ret;
 }

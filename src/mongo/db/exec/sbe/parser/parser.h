@@ -32,6 +32,8 @@
 #define PEGLIB_USE_STD_ANY 0
 #include <third_party/peglib/peglib.h>
 
+#include <stack>
+
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/ix_scan.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
@@ -91,6 +93,7 @@ private:
     std::vector<std::unique_ptr<FrameSymbolTable>> _frameLookupTable;
     boost::optional<value::SlotId> _resultSlot;
     boost::optional<value::SlotId> _recordIdSlot;
+    std::stack<PlanNodeId> planNodeIdStack;
 
     FrameSymbolTable* newFrameSymbolTable() {
         auto table = std::make_unique<FrameSymbolTable>();
@@ -215,6 +218,7 @@ private:
     void walkEagerProducerSpool(AstQuery& ast);
     void walkConsumerSpool(AstQuery& ast);
     void walkStackConsumerSpool(AstQuery& ast);
+    void walkPlanNodeId(AstQuery& ast);
 
     void walk(AstQuery& ast);
 
@@ -226,6 +230,10 @@ private:
                                              std::unique_ptr<PlanStage> inputStage,
                                              value::SlotVector correlated,
                                              value::SlotId outputSlot);
+
+    NamespaceStringOrUUID getCollectionUuid(const std::string& collName);
+
+    PlanNodeId getCurrentPlanNodeId();
 };
 }  // namespace sbe
 }  // namespace mongo
