@@ -148,6 +148,11 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                         opCtx, nullptr, nullptr, repl::ReadConcernLevel::kLocalReadConcern));
 
                 for (const auto& coll : collections) {
+
+                    if (coll.getDropped()) {
+                        continue;
+                    }
+
                     auto nss = coll.getNs();
 
                     // The only sharded collection in the config database with indexes is
