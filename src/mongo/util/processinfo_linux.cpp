@@ -315,7 +315,7 @@ void appendMountInfo(BSONObjBuilder& bob) {
 class CpuInfoParser {
 public:
     struct LineProcessor {
-        std::string key;
+        pcrecpp::RE regex;
         std::function<void(const std::string&)> f;
     };
     std::vector<LineProcessor> lineProcessors;
@@ -336,9 +336,9 @@ public:
                 std::string value;
                 if (!lineRegex->FullMatch(fstr, &key, &value))
                     continue;
-                for (auto&& [pk, pf] : lineProcessors) {
-                    if (pk == key)
-                        pf(value);
+                for (auto&& [lpr, lpf] : lineProcessors) {
+                    if (lpr.FullMatch(key))
+                        lpf(value);
                 }
                 unprocessed = true;
             } else if (unprocessed) {
@@ -414,9 +414,15 @@ public:
 
         CpuInfoParser cpuInfoParser{
             {
+#ifdef __s390x__
+                {R"re(processor\s+\d+)re", [&](const std::string& value) { procCount++; }},
+                {"cpu MHz static", [&](const std::string& value) { freq = value; }},
+                {"features", [&](const std::string& value) { features = value; }},
+#else
                 {"processor", [&](const std::string& value) { procCount++; }},
                 {"cpu MHz", [&](const std::string& value) { freq = value; }},
                 {"flags", [&](const std::string& value) { features = value; }},
+#endif
             },
             []() {}};
         cpuInfoParser.run();
