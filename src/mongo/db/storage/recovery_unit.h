@@ -230,6 +230,16 @@ public:
     virtual void preallocateSnapshot() {}
 
     /**
+     * Like preallocateSnapshot() above but also indicates that the snapshot will be used for
+     * reading the oplog.
+     *
+     * StorageEngines may not implement this in which case it works like preallocateSnapshot.
+     */
+    virtual void preallocateSnapshotForOplogRead() {
+        preallocateSnapshot();
+    }
+
+    /**
      * Obtains a majority committed snapshot. Snapshots should still be separately acquired and
      * newer committed snapshots should be used if available whenever implementations would normally
      * change snapshots.

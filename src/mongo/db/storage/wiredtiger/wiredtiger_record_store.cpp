@@ -2208,7 +2208,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         id = getKey(c);
     }
 
-    if (_oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
+    if (_forward && _oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
         _eof = true;
         return {};
     }
@@ -2241,7 +2241,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
     invariant(_hasRestored);
-    if (_oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
+    if (_forward && _oplogVisibleTs && id.repr() > *_oplogVisibleTs) {
         _eof = true;
         return {};
     }

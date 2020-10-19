@@ -345,6 +345,12 @@ void WiredTigerRecoveryUnit::preallocateSnapshot() {
     getSession();
 }
 
+void WiredTigerRecoveryUnit::preallocateSnapshotForOplogRead() {
+    // Indicate that we are an oplog reader before opening the snapshot
+    setIsOplogReader();
+    preallocateSnapshot();
+}
+
 void WiredTigerRecoveryUnit::refreshSnapshot() {
     // First, start a new transaction at the same timestamp as the current one.  Then end the
     // current transaction.  This overlap will prevent WT from cleaning up history required to serve
