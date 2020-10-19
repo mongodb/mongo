@@ -230,9 +230,11 @@ thread_ckpt_run(void *arg)
         fflush(stdout);
         /*
          * Create the checkpoint file so that the parent process knows at least one checkpoint has
-         * finished and can start its timer.
+         * finished and can start its timer. If running with timestamps, wait until the stable
+         * timestamp has moved past WT_TS_NONE to give writer threads a chance to add something to
+         * the database.
          */
-        if (first_ckpt) {
+        if (first_ckpt && (!use_ts || stable != WT_TS_NONE)) {
             testutil_checksys((fp = fopen(ckpt_file, "w")) == NULL);
             first_ckpt = false;
             testutil_checksys(fclose(fp) != 0);

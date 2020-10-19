@@ -266,6 +266,12 @@ dump_config(WT_SESSION *session, const char *uri, WT_CURSOR *cursor, bool hex, b
             ret = 1;
     } else if (ret == WT_NOTFOUND)
         ret = util_err(session, 0, "%s: No such object exists", uri);
+    else if (ret == ENOTSUP)
+        /*
+         * Ignore ENOTSUP error. We return that for getting the creation metadata for a complex
+         * table because the meaning of that is undefined. It does mean the table exists.
+         */
+        ret = 0;
     else
         ret = util_err(session, ret, "%s", uri);
 

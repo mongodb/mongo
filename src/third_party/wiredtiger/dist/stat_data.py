@@ -244,6 +244,7 @@ connection_stats = [
     CacheStat('cache_eviction_pages_queued_urgent', 'pages queued for urgent eviction'),
     CacheStat('cache_eviction_pages_seen', 'pages seen by eviction walk'),
     CacheStat('cache_eviction_pages_already_queued', 'pages seen by eviction walk that are already queued'),
+    CacheStat('cache_eviction_pages_in_parallel_with_checkpoint', 'pages evicted in parallel with checkpoint'),
     CacheStat('cache_eviction_queue_empty', 'eviction server candidate queue empty when topping up'),
     CacheStat('cache_eviction_queue_not_empty', 'eviction server candidate queue not empty when topping up'),
     CacheStat('cache_eviction_server_evicting', 'eviction server evicting pages'),
