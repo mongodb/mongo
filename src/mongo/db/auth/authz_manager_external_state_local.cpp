@@ -516,13 +516,36 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
     for (const RoleName& role : roleNames) {
         try {
             BSONObj roleDoc;
-            auto status = findOne(
-                opCtx, AuthorizationManager::rolesCollectionNamespace, role.toBSON(), &roleDoc);
-            if (!status.isOK()) {
-                if (status.code() == ErrorCodes::NoMatchingDocument) {
-                    continue;
+
+            if (auth::isBuiltinRole(role)) {
+                // Synthesize builtin role from definition.
+                PrivilegeVector privs;
+                uassert(ErrorCodes::OperationFailed,
+                        "Failed generating builtin role privileges",
+                        auth::addPrivilegesForBuiltinRole(role, &privs));
+
+                BSONObjBuilder builtinBuilder;
+                builtinBuilder.append("_id",
+                                      str::stream() << role.getDB() << '.' << role.getRole());
+                builtinBuilder.append("db", role.getDB());
+                builtinBuilder.append("role", role.getRole());
+                builtinBuilder.append("roles", BSONArray());
+                BSONArrayBuilder builtinPrivs(builtinBuilder.subarrayStart("privileges"));
+                for (const auto& priv : privs) {
+                    builtinPrivs.append(priv.toBSON());
                 }
-                uassertStatusOK(status);  // throws
+                builtinPrivs.doneFast();
+
+                roleDoc = builtinBuilder.obj();
+            } else {
+                auto status = findOne(
+                    opCtx, AuthorizationManager::rolesCollectionNamespace, role.toBSON(), &roleDoc);
+                if (!status.isOK()) {
+                    if (status.code() == ErrorCodes::NoMatchingDocument) {
+                        continue;
+                    }
+                    uassertStatusOK(status);  // throws
+                }
             }
 
             BSONObjBuilder roleBuilder(rolesBuilder.subobjStart());
