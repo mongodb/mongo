@@ -37,18 +37,13 @@
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {
-namespace {
-
-constexpr auto kOperationTime = "operationTime"_sd;
-
-}  // namespace
 
 const LogicalTime LogicalTime::kUninitialized = LogicalTime();
 
 LogicalTime::LogicalTime(Timestamp ts) : _time(ts.asULL()) {}
 
 LogicalTime LogicalTime::fromOperationTime(const BSONObj& obj) {
-    const auto opTimeElem(obj[kOperationTime]);
+    const auto opTimeElem(obj[kOperationTimeFieldName]);
     uassert(ErrorCodes::FailedToParse, "No operationTime found", !opTimeElem.eoo());
     uassert(ErrorCodes::BadValue,
             "Operation time is of the wrong value",
@@ -57,7 +52,7 @@ LogicalTime LogicalTime::fromOperationTime(const BSONObj& obj) {
 }
 
 void LogicalTime::appendAsOperationTime(BSONObjBuilder* builder) const {
-    builder->append(kOperationTime, asTimestamp());
+    builder->append(kOperationTimeFieldName, asTimestamp());
 }
 
 void LogicalTime::addTicks(uint64_t ticks) {

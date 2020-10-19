@@ -256,6 +256,13 @@ public:
         return _postBatchResumeToken;
     }
 
+    /**
+     * Returns the operation time for the latest batch, if set.
+     */
+    virtual boost::optional<Timestamp> getOperationTime() const {
+        return _operationTime;
+    }
+
 protected:
     struct Batch {
         // TODO remove constructors after c++17 toolchain upgrade
@@ -313,6 +320,7 @@ private:
     boost::optional<repl::OpTime> _lastKnownCommittedOpTime;
     boost::optional<BSONObj> _postBatchResumeToken;
     boost::optional<BSONObj> _readConcernObj;
+    boost::optional<Timestamp> _operationTime;
 
     void dataReceived(const Message& reply) {
         bool retry;

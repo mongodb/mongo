@@ -42,6 +42,8 @@ class BSONObjBuilder;
  */
 class LogicalTime {
 public:
+    static constexpr StringData kOperationTimeFieldName = "operationTime"_sd;
+
     LogicalTime() = default;
     explicit LogicalTime(Timestamp ts);
 

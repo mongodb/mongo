@@ -639,6 +639,10 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
             infos.push_back(e.Obj().getOwned());
         }
 
+        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
+            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
+        }
+
         const long long id = cursorObj["id"].Long();
 
         if (id != 0) {
@@ -646,6 +650,10 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
             unique_ptr<DBClientCursor> cursor = getMore(ns, id, 0, 0);
             while (cursor->more()) {
                 infos.push_back(cursor->nextSafe().getOwned());
+            }
+
+            if (cursor->getOperationTime()) {
+                setOperationTime(*(cursor->getOperationTime()));
             }
         }
 
@@ -682,6 +690,10 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
         while (it.more()) {
             BSONElement e = it.next();
             infos.push_back(e.Obj().getOwned());
+        }
+
+        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
+            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
         }
 
         return infos;
@@ -997,6 +1009,10 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
             specs.push_back(i.next().Obj().getOwned());
         }
 
+        if (res.hasField(LogicalTime::kOperationTimeFieldName)) {
+            setOperationTime(LogicalTime::fromOperationTime(res).asTimestamp());
+        }
+
         const long long id = cursorObj["id"].Long();
 
         if (id != 0) {
@@ -1007,6 +1023,10 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
             unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id, 0, 0);
             while (cursor->more()) {
                 specs.push_back(cursor->nextSafe().getOwned());
+            }
+
+            if (cursor->getOperationTime()) {
+                setOperationTime(*(cursor->getOperationTime()));
             }
         }
 

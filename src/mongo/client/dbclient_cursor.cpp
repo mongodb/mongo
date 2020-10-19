@@ -341,8 +341,9 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
     }
 
     if (_useFindCommand) {
+        const auto replyObj = commandDataReceived(reply);
         cursorId = 0;  // Don't try to kill cursor if we get back an error.
-        auto cr = uassertStatusOK(CursorResponse::parseFromBSON(commandDataReceived(reply)));
+        auto cr = uassertStatusOK(CursorResponse::parseFromBSON(replyObj));
         cursorId = cr.getCursorId();
         uassert(50935,
                 "Received a getMore response with a cursor id of 0 and the moreToCome flag set.",
@@ -352,6 +353,10 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
         // Store the resume token, if we got one.
         _postBatchResumeToken = cr.getPostBatchResumeToken();
         batch.objs = cr.releaseBatch();
+
+        if (replyObj.hasField(LogicalTime::kOperationTimeFieldName)) {
+            _operationTime = LogicalTime::fromOperationTime(replyObj).asTimestamp();
+        }
         return;
     }
 
