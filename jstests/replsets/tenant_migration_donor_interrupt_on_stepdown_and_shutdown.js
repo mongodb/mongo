@@ -15,6 +15,12 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const kMaxSleepTimeMS = 100;
 const kTenantId = "testTenantId";
 
+let recipientStartupParams = {};
+recipientStartupParams["enableTenantMigrations"] = true;
+// TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+recipientStartupParams["failpoint.returnResponseOkForRecipientSyncDataCmd"] =
+    tojson({mode: 'alwaysOn'});
+
 /**
  * Runs the donorStartMigration command to start a migration, and interrupts the migration on the
  * donor using the 'interruptFunc', and verifies the command response using the
@@ -23,11 +29,8 @@ const kTenantId = "testTenantId";
 function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) {
     const donorRst = new ReplSetTest(
         {nodes: 1, name: "donorRst", nodeOptions: {setParameter: {enableTenantMigrations: true}}});
-    const recipientRst = new ReplSetTest({
-        nodes: 1,
-        name: "recipientRst",
-        nodeOptions: {setParameter: {enableTenantMigrations: true}}
-    });
+    const recipientRst = new ReplSetTest(
+        {nodes: 1, name: "recipientRst", nodeOptions: {setParameter: recipientStartupParams}});
 
     donorRst.startSet();
     donorRst.initiate();
@@ -76,15 +79,8 @@ function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc)
             }
         }
     });
-    const recipientRst = new ReplSetTest({
-        nodes: 1,
-        name: "recipientRst",
-        nodeOptions: {
-            setParameter: {
-                enableTenantMigrations: true,
-            }
-        }
-    });
+    const recipientRst = new ReplSetTest(
+        {nodes: 1, name: "recipientRst", nodeOptions: {setParameter: recipientStartupParams}});
 
     donorRst.startSet();
     donorRst.initiate();

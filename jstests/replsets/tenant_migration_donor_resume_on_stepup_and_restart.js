@@ -45,7 +45,14 @@ function testDonorStartMigrationInterrupt(interruptFunc) {
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipientRst",
-        nodeOptions: {setParameter: {enableTenantMigrations: true}}
+        nodeOptions: {
+            setParameter: {
+                enableTenantMigrations: true,
+                // TODO SERVER-51734: Remove the failpoint
+                // 'returnResponseOkForRecipientSyncDataCmd'.
+                'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
+            }
+        }
     });
 
     donorRst.startSet();
@@ -114,6 +121,9 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         nodeOptions: {
             setParameter: {
                 enableTenantMigrations: true,
+                // TODO SERVER-51734: Remove the failpoint
+                // 'returnResponseOkForRecipientSyncDataCmd'.
+                'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
             }

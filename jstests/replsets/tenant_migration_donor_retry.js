@@ -119,8 +119,17 @@ function testMigrationAbortsOnRecipientForgetMigrationCmdError(donorRst, recipie
 
 const donorRst = new ReplSetTest(
     {nodes: 1, name: "donorRst", nodeOptions: {setParameter: {enableTenantMigrations: true}}});
-const recipientRst = new ReplSetTest(
-    {nodes: 1, name: "recipientRst", nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+const recipientRst = new ReplSetTest({
+    nodes: 1,
+    name: "recipientRst",
+    nodeOptions: {
+        setParameter: {
+            enableTenantMigrations: true,
+            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
+        }
+    }
+});
 
 donorRst.startSet();
 donorRst.initiate();

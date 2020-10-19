@@ -95,6 +95,9 @@ executor:
       set_parameters:
         enableTestCommands: 1
         enableTenantMigrations: true
+        # TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+        failpoint.returnResponseOkForRecipientSyncDataCmd:
+            mode: alwaysOn
     num_replica_sets: 2
     num_nodes_per_replica_set: 3
     use_replica_set_connection_string: true

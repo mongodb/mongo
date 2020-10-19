@@ -54,7 +54,13 @@ const donorRst = new ReplSetTest(
 const recipientRst = new ReplSetTest({
     name: `${name}_recipient`,
     nodes: 1,
-    nodeOptions: {setParameter: {enableTenantMigrations: true}}
+    nodeOptions: {
+        setParameter: {
+            enableTenantMigrations: true,
+            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
+        }
+    }
 });
 
 donorRst.startSet();
@@ -93,7 +99,7 @@ assert.eq(res.state, "committed");
 
 for (const coll of collNames) {
     for (const db of tenantDBs) {
-        // TODO (SERVER-50528): Change shouldMigrate to true.
+        // TODO (SERVER-51734): Change shouldMigrate to true.
         verifyReceipientDB(recipientPrimary, db, coll, false /* shouldMigrate */);
     }
 

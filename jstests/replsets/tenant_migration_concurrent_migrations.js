@@ -17,12 +17,14 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const rst0 = new ReplSetTest(
-    {nodes: 1, name: 'rst0', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
-const rst1 = new ReplSetTest(
-    {nodes: 1, name: 'rst1', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
-const rst2 = new ReplSetTest(
-    {nodes: 1, name: 'rst2', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+let startupParams = {};
+startupParams["enableTenantMigrations"] = true;
+// TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+startupParams["failpoint.returnResponseOkForRecipientSyncDataCmd"] = tojson({mode: 'alwaysOn'});
+
+const rst0 = new ReplSetTest({nodes: 1, name: 'rst0', nodeOptions: {setParameter: startupParams}});
+const rst1 = new ReplSetTest({nodes: 1, name: 'rst1', nodeOptions: {setParameter: startupParams}});
+const rst2 = new ReplSetTest({nodes: 1, name: 'rst2', nodeOptions: {setParameter: startupParams}});
 
 rst0.startSet();
 rst0.initiate();

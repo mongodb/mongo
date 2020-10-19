@@ -26,8 +26,17 @@ const migrationStates = {
 
 const donorRst = new ReplSetTest(
     {nodes: 1, name: 'donor', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
-const recipientRst = new ReplSetTest(
-    {nodes: 1, name: 'recipient', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+const recipientRst = new ReplSetTest({
+    nodes: 1,
+    name: 'recipient',
+    nodeOptions: {
+        setParameter: {
+            enableTenantMigrations: true,
+            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
+        }
+    }
+});
 
 const kRecipientConnString = recipientRst.getURL();
 const kTenantId = 'testTenantId';

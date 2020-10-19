@@ -18,8 +18,17 @@ const kTenantId = "testTenantId";
 const kMaxSleepTimeMS = 250;
 const kGarbageCollectionDelayMS = 5 * 1000;
 
-const recipientRst = new ReplSetTest(
-    {name: "recipientRst", nodes: 1, nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+const recipientRst = new ReplSetTest({
+    name: "recipientRst",
+    nodes: 1,
+    nodeOptions: {
+        setParameter: {
+            enableTenantMigrations: true,
+            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
+        }
+    }
+});
 recipientRst.startSet();
 recipientRst.initiate();
 
