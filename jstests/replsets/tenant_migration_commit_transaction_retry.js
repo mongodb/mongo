@@ -10,6 +10,7 @@
 // Direct writes to config.transactions cannot be part of a session.
 TestData.disableImplicitSessions = true;
 
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
@@ -48,9 +49,10 @@ donorRst.initiate();
 recipientRst.startSet();
 recipientRst.initiate();
 
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
 const kTenantId = "testTenantId";
-const kDbName = kTenantId + "_" +
-    "testDb";
+const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
 const kCollName = "testColl";
 const kNs = `${kDbName}.${kCollName}`;
 
@@ -80,18 +82,15 @@ jsTest.log("Run a migration to completion");
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
-    recipientConnString: recipientRst.getURL(),
     tenantId: kTenantId,
-    readPreference: {mode: "primary"},
 };
-assert.commandWorked(TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts));
+assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
 const donorDoc =
     donorPrimary.getCollection("config.tenantMigrationDonors").findOne({tenantId: kTenantId});
 
-assert.commandWorked(
-    donorPrimary.adminCommand({donorForgetMigration: 1, migrationId: migrationId}));
-TenantMigrationUtil.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, kTenantId);
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+tenantMigrationTest.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, kTenantId);
 
 {
     jsTest.log("Run another transaction after the migration");

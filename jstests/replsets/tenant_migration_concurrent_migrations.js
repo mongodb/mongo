@@ -15,7 +15,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 let startupParams = {};
 startupParams["enableTenantMigrations"] = true;
@@ -35,81 +35,64 @@ rst1.initiate();
 rst2.startSet();
 rst2.initiate();
 
-const rst0Primary = rst0.getPrimary();
-const rst1Primary = rst1.getPrimary();
-
-const kConfigDonorsNS = "config.tenantMigrationDonors";
-const kTenantId = "testTenantId";
+const kTenantIdPrefix = "testTenantId";
 
 // Test concurrent outgoing migrations to different recipients.
 (() => {
-    const tenantId = kTenantId + "ConcurrentOutgoingMigrationsToDifferentRecipient";
-    const donorsColl = rst0Primary.getCollection(kConfigDonorsNS);
+    const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
+    const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
+    const tenantId0 = `${kTenantIdPrefix}_ConcurrentOutgoingMigrationsToDifferentRecipient0`;
+    const tenantId1 = `${kTenantIdPrefix}_ConcurrentOutgoingMigrationsToDifferentRecipient1`;
 
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: rst1.getURL(),
-        tenantId: tenantId + "0",
-        readPreference: {mode: "primary"}
+        tenantId: tenantId0,
     };
     const migrationOpts1 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: rst2.getURL(),
-        tenantId: tenantId + "1",
-        readPreference: {mode: "primary"}
+        tenantId: tenantId1,
     };
 
-    let migrationThread0 =
-        new Thread(TenantMigrationUtil.startMigration, rst0Primary.host, migrationOpts0);
-    let migrationThread1 =
-        new Thread(TenantMigrationUtil.startMigration, rst0Primary.host, migrationOpts1);
+    assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts0));
+    assert.commandWorked(tenantMigrationTest1.startMigration(migrationOpts1));
 
-    migrationThread0.start();
-    migrationThread1.start();
-    migrationThread0.join();
-    migrationThread1.join();
+    const stateRes0 =
+        assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
+    const stateRes1 =
+        assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Verify that both migrations succeeded.
-    assert.commandWorked(migrationThread0.returnData());
-    assert.commandWorked(migrationThread1.returnData());
-    assert(donorsColl.findOne({tenantId: migrationOpts0.tenantId, state: "committed"}));
-    assert(donorsColl.findOne({tenantId: migrationOpts1.tenantId, state: "committed"}));
+    assert(stateRes0.state, TenantMigrationTest.State.kCommitted);
+    assert(stateRes1.state, TenantMigrationTest.State.kCommitted);
 })();
 
 // Test concurrent incoming migrations from different donors.
 (() => {
-    const tenantId = kTenantId + "ConcurrentIncomingMigrations";
-    const donorsColl0 = rst0Primary.getCollection(kConfigDonorsNS);
-    const donorsColl1 = rst1Primary.getCollection(kConfigDonorsNS);
+    const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
+    const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst1, recipientRst: rst2});
+    const tenantId0 = `${kTenantIdPrefix}_ConcurrentIncomingMigrations0`;
+    const tenantId1 = `${kTenantIdPrefix}_ConcurrentIncomingMigrations1`;
 
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: rst2.getURL(),
-        tenantId: tenantId + "0",
-        readPreference: {mode: "primary"}
+        tenantId: tenantId0,
     };
     const migrationOpts1 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: rst2.getURL(),
-        tenantId: tenantId + "1",
-        readPreference: {mode: "primary"}
+        tenantId: tenantId1,
     };
 
-    let migrationThread0 =
-        new Thread(TenantMigrationUtil.startMigration, rst0Primary.host, migrationOpts0);
-    let migrationThread1 =
-        new Thread(TenantMigrationUtil.startMigration, rst1Primary.host, migrationOpts1);
+    assert.commandWorked(tenantMigrationTest0.startMigration(migrationOpts0));
+    assert.commandWorked(tenantMigrationTest1.startMigration(migrationOpts1));
 
-    migrationThread0.start();
-    migrationThread1.start();
-    migrationThread0.join();
-    migrationThread1.join();
+    const stateRes0 =
+        assert.commandWorked(tenantMigrationTest0.waitForMigrationToComplete(migrationOpts0));
+    const stateRes1 =
+        assert.commandWorked(tenantMigrationTest1.waitForMigrationToComplete(migrationOpts1));
 
     // Verify that both migrations succeeded.
-    assert.commandWorked(migrationThread0.returnData());
-    assert.commandWorked(migrationThread1.returnData());
-    assert(donorsColl0.findOne({tenantId: migrationOpts0.tenantId, state: "committed"}));
-    assert(donorsColl1.findOne({tenantId: migrationOpts1.tenantId, state: "committed"}));
+    assert(stateRes0.state, TenantMigrationTest.State.kCommitted);
+    assert(stateRes1.state, TenantMigrationTest.State.kCommitted);
 })();
 
 // TODO (SERVER-50467): Ensure that tenant migration donor only removes a ReplicaSetMonitor for

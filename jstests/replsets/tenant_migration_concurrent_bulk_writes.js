@@ -12,6 +12,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kMaxBatchSize = 2;
@@ -123,36 +124,37 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     recipientRst.startSet();
     recipientRst.initiate();
 
-    let dbName = "bulkUnorderedInserts-committed_" + kTenantDefinedDbName;
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
+    const tenantId = "bulkUnorderedInserts-committed";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        tenantId,
+    };
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let writeFp = configureFailPoint(
+    const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
-    let bulkWriteThread =
+    const bulkWriteThread =
         new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
     bulkWriteThread.start();
     writeFp.wait();
 
-    let migrationRes =
-        assert.commandWorked(TenantMigrationUtil.startMigration(primary.host, migrationOpts));
-    assert.eq(migrationRes.state, "committed");
+    const migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
 
     writeFp.off();
     bulkWriteThread.join();
 
-    let bulkWriteRes = bulkWriteThread.returnData();
-    let writeErrors = bulkWriteRes.res.writeErrors;
+    const bulkWriteRes = bulkWriteThread.returnData();
+    const writeErrors = bulkWriteRes.res.writeErrors;
 
     assert.eq(primaryDB[kCollName].count(), bulkWriteRes.res.nInserted);
     assert.eq(writeErrors.length,
@@ -166,10 +168,12 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
             assert(!err.errmsg);
         }
 
-        assert.eq(err.errInfo.recipientConnectionString, migrationOpts.recipientConnString);
-        assert.eq(err.errInfo.tenantId, migrationOpts.tenantId);
+        assert.eq(err.errInfo.recipientConnectionString,
+                  tenantMigrationTest.getRecipientConnString());
+        assert.eq(err.errInfo.tenantId, tenantId);
     });
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
     recipientRst.stopSet();
 })();
@@ -183,27 +187,31 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     recipientRst.startSet();
     recipientRst.initiate();
 
-    let dbName = "bulkUnorderedInserts-committed_" + kTenantDefinedDbName;
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
+    const tenantId = "bulkUnorderedInserts-committed";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: kRecipientConnString,
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let writeFp = configureFailPoint(
+    const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
-    let bulkWriteThread =
+    const bulkWriteThread =
         new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    let blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
     bulkWriteThread.start();
     writeFp.wait();
@@ -218,8 +226,8 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     bulkWriteThread.join();
     migrationThread.join();
 
-    let migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, "committed");
+    const migrationRes = assert.commandWorked(migrationThread.returnData());
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
 
     let bulkWriteRes = bulkWriteThread.returnData();
     let writeErrors = bulkWriteRes.res.writeErrors;
@@ -236,10 +244,12 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
             assert.eq(err.errmsg, "");
         }
 
-        assert.eq(err.errInfo.recipientConnectionString, migrationOpts.recipientConnString);
-        assert.eq(err.errInfo.tenantId, migrationOpts.tenantId);
+        assert.eq(err.errInfo.recipientConnectionString,
+                  tenantMigrationTest.getRecipientConnString());
+        assert.eq(err.errInfo.tenantId, tenantId);
     });
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
     recipientRst.stopSet();
 })();
@@ -252,32 +262,36 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     recipientRst.startSet();
     recipientRst.initiate();
 
-    let dbName = "bulkUnorderedInserts-aborted_" + kTenantDefinedDbName;
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
+    const tenantId = "bulkUnorderedInserts-aborted";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let writeFp = configureFailPoint(
+    const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
-    let bulkWriteThread =
+    const bulkWriteThread =
         new Thread(bulkWriteDocsUnordered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    let abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
 
     // The failpoint below is used to ensure that a write to throw TenantMigrationConflict in the op
     // observer. Without this failpoint, the migration could have already aborted by the time the
     // write gets to the op observer.
-    let blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
     bulkWriteThread.start();
     writeFp.wait();
@@ -294,11 +308,11 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     abortFp.off();
 
-    let migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, "aborted");
+    const migrationRes = assert.commandWorked(migrationThread.returnData());
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kAborted);
 
-    let bulkWriteRes = bulkWriteThread.returnData();
-    let writeErrors = bulkWriteRes.res.writeErrors;
+    const bulkWriteRes = bulkWriteThread.returnData();
+    const writeErrors = bulkWriteRes.res.writeErrors;
 
     assert.eq(primaryDB[kCollName].count(), bulkWriteRes.res.nInserted);
     assert.eq(writeErrors.length,
@@ -313,6 +327,7 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
         }
     });
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
     recipientRst.stopSet();
 })();
@@ -325,36 +340,37 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     recipientRst.startSet();
     recipientRst.initiate();
 
-    let dbName = "bulkOrderedInserts-committed_" + kTenantDefinedDbName;
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
+    const tenantId = "bulkOrderedInserts-committed";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        tenantId,
+    };
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let writeFp = configureFailPoint(
+    const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
-    let bulkWriteThread =
+    const bulkWriteThread =
         new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
     bulkWriteThread.start();
     writeFp.wait();
 
-    let migrationRes =
-        assert.commandWorked(TenantMigrationUtil.startMigration(primary.host, migrationOpts));
-    assert.eq(migrationRes.state, "committed");
+    const migrationRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
 
     writeFp.off();
     bulkWriteThread.join();
 
-    let bulkWriteRes = bulkWriteThread.returnData();
-    let writeErrors = bulkWriteRes.res.writeErrors;
+    const bulkWriteRes = bulkWriteThread.returnData();
+    const writeErrors = bulkWriteRes.res.writeErrors;
 
     assert.eq(primaryDB[kCollName].count(), bulkWriteRes.res.nInserted);
     assert.eq(writeErrors.length, 1);
@@ -364,9 +380,11 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     // blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
-    assert.eq(writeErrors[0].errInfo.recipientConnectionString, migrationOpts.recipientConnString);
-    assert.eq(writeErrors[0].errInfo.tenantId, migrationOpts.tenantId);
+    assert.eq(writeErrors[0].errInfo.recipientConnectionString,
+              tenantMigrationTest.getRecipientConnString());
+    assert.eq(writeErrors[0].errInfo.tenantId, tenantId);
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
     recipientRst.stopSet();
 })();
@@ -380,27 +398,31 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     recipientRst.startSet();
     recipientRst.initiate();
 
-    let dbName = "bulkOrderedInserts-committed_" + kTenantDefinedDbName;
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
+    const tenantId = "bulkOrderedInserts-committed";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let writeFp = configureFailPoint(
+    const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
-    let bulkWriteThread =
+    const bulkWriteThread =
         new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    let blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
     bulkWriteThread.start();
     writeFp.wait();
@@ -415,11 +437,11 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     bulkWriteThread.join();
     migrationThread.join();
 
-    let migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, "committed");
+    const migrationRes = assert.commandWorked(migrationThread.returnData());
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
 
-    let bulkWriteRes = bulkWriteThread.returnData();
-    let writeErrors = bulkWriteRes.res.writeErrors;
+    const bulkWriteRes = bulkWriteThread.returnData();
+    const writeErrors = bulkWriteRes.res.writeErrors;
 
     assert.eq(primaryDB[kCollName].count(), bulkWriteRes.res.nInserted);
     assert.eq(writeErrors.length, 1);
@@ -429,9 +451,11 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     // blocking writes.
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationCommitted);
-    assert.eq(writeErrors[0].errInfo.recipientConnectionString, migrationOpts.recipientConnString);
-    assert.eq(writeErrors[0].errInfo.tenantId, migrationOpts.tenantId);
+    assert.eq(writeErrors[0].errInfo.recipientConnectionString,
+              tenantMigrationTest.getRecipientConnString());
+    assert.eq(writeErrors[0].errInfo.tenantId, tenantId);
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
     recipientRst.stopSet();
 })();
@@ -444,32 +468,36 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     recipientRst.startSet();
     recipientRst.initiate();
 
-    let dbName = "bulkOrderedInserts-aborted_" + kTenantDefinedDbName;
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+
+    const tenantId = "bulkOrderedInserts-aborted";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(UUID()),
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let writeFp = configureFailPoint(
+    const writeFp = configureFailPoint(
         primaryDB, "hangDuringBatchInsert", {}, {skip: kNumWriteBatchesWithoutMigrationConflict});
-    let bulkWriteThread =
+    const bulkWriteThread =
         new Thread(bulkWriteDocsOrdered, primary.host, dbName, kCollName, kNumWriteOps);
 
-    let abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
 
     // The failpoint below is used to ensure that a write to throw TenantMigrationConflict in the op
     // observer. Without this failpoint, the migration could have already aborted by the time the
     // write gets to the op observer.
-    let blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
     bulkWriteThread.start();
     writeFp.wait();
@@ -486,11 +514,11 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     abortFp.off();
 
-    let migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, "aborted");
+    const migrationRes = assert.commandWorked(migrationThread.returnData());
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kAborted);
 
-    let bulkWriteRes = bulkWriteThread.returnData();
-    let writeErrors = bulkWriteRes.res.writeErrors;
+    const bulkWriteRes = bulkWriteThread.returnData();
+    const writeErrors = bulkWriteRes.res.writeErrors;
 
     assert.eq(primaryDB[kCollName].count(), bulkWriteRes.res.nInserted);
     assert.eq(writeErrors.length, 1);
@@ -501,6 +529,7 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
     assert.eq(writeErrors[0].index, kNumWriteBatchesWithoutMigrationConflict * kMaxBatchSize);
     assert.eq(writeErrors[0].code, ErrorCodes.TenantMigrationAborted);
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
     recipientRst.stopSet();
 })();

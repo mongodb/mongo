@@ -12,6 +12,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 // Set the delay before a donor state doc is garbage collected to be short to speed up the test.
@@ -33,18 +34,6 @@ const donorRst = new ReplSetTest({
         }
     }
 });
-const recipientRst = new ReplSetTest({
-    nodes: 1,
-    name: 'recipient',
-    nodeOptions: {
-        setParameter: {
-            enableTenantMigrations: true,
-            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
-            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
-        },
-    }
-});
-const kRecipientConnString = recipientRst.getURL();
 
 function insertDocument(primaryHost, dbName, collName) {
     const primary = new Mongo(primaryHost);
@@ -59,29 +48,30 @@ function insertDocument(primaryHost, dbName, collName) {
 
     donorRst.startSet();
     donorRst.initiate();
-    recipientRst.startSet();
-    recipientRst.initiate();
 
-    let dbName = "migrationOutcome-committed_" + kTenantDefinedDbName;
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+
+    const migrationId = UUID();
+    const tenantId = "migrationOutcome-committed";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
-    let writeFp = configureFailPoint(primaryDB, "hangWriteBeforeWaitingForMigrationDecision");
-    let writeThread = new Thread(insertDocument, primary.host, dbName, kCollName);
+    const writeFp = configureFailPoint(primaryDB, "hangWriteBeforeWaitingForMigrationDecision");
+    const writeThread = new Thread(insertDocument, primary.host, dbName, kCollName);
 
-    const migrationId = UUID();
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
     migrationThread.start();
     blockFp.wait();
@@ -93,21 +83,20 @@ function insertDocument(primaryHost, dbName, collName) {
 
     migrationThread.join();
 
-    let migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, "committed");
+    const migrationRes = assert.commandWorked(migrationThread.returnData());
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kCommitted);
 
-    assert.commandWorked(
-        TenantMigrationUtil.forgetMigration(primary.host, migrationOpts.migrationIdString));
-    TenantMigrationUtil.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, tenantId);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, tenantId);
 
     writeFp.off();
     writeThread.join();
-    let writeRes = writeThread.returnData();
+    const writeRes = writeThread.returnData();
 
     assert.commandFailedWithCode(writeRes, ErrorCodes.TenantMigrationCommitted);
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
-    recipientRst.stopSet();
 })();
 
 (() => {
@@ -116,30 +105,31 @@ function insertDocument(primaryHost, dbName, collName) {
 
     donorRst.startSet();
     donorRst.initiate();
-    recipientRst.startSet();
-    recipientRst.initiate();
 
-    let dbName = "migrationOutcome-aborted_" + kTenantDefinedDbName;
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+
+    const migrationId = UUID();
+    const tenantId = "migrationOutcome-aborted";
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        recipientConnString: tenantMigrationTest.getRecipientConnString(),
+        tenantId,
+    };
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+
+    const dbName = tenantMigrationTest.tenantDB(tenantId, kTenantDefinedDbName);
     const primary = donorRst.getPrimary();
     const primaryDB = primary.getDB(dbName);
 
-    let writeFp = configureFailPoint(primaryDB, "hangWriteBeforeWaitingForMigrationDecision");
-    let writeThread = new Thread(insertDocument, primary.host, dbName, kCollName);
+    const writeFp = configureFailPoint(primaryDB, "hangWriteBeforeWaitingForMigrationDecision");
+    const writeThread = new Thread(insertDocument, primary.host, dbName, kCollName);
 
-    const migrationId = UUID();
     assert.commandWorked(primaryDB.runCommand({create: kCollName}));
-    const tenantId = dbName.split('_')[0];
-    const migrationOpts = {
-        migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
-    };
 
-    let abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
-    let blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    const abortFp = configureFailPoint(primaryDB, "abortTenantMigrationAfterBlockingStarts");
+    const blockFp = configureFailPoint(primaryDB, "pauseTenantMigrationAfterBlockingStarts");
+    const migrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 
     migrationThread.start();
     blockFp.wait();
@@ -151,21 +141,20 @@ function insertDocument(primaryHost, dbName, collName) {
 
     migrationThread.join();
 
-    let migrationRes = assert.commandWorked(migrationThread.returnData());
-    assert.eq(migrationRes.state, "aborted");
+    const migrationRes = assert.commandWorked(migrationThread.returnData());
+    assert.eq(migrationRes.state, TenantMigrationTest.State.kAborted);
     abortFp.off();
 
-    assert.commandWorked(
-        TenantMigrationUtil.forgetMigration(primary.host, migrationOpts.migrationIdString));
-    TenantMigrationUtil.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, tenantId);
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+    tenantMigrationTest.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, tenantId);
 
     writeFp.off();
     writeThread.join();
-    let writeRes = writeThread.returnData();
+    const writeRes = writeThread.returnData();
 
     assert.commandFailedWithCode(writeRes, ErrorCodes.TenantMigrationAborted);
 
+    tenantMigrationTest.stop();
     donorRst.stopSet();
-    recipientRst.stopSet();
 })();
 })();

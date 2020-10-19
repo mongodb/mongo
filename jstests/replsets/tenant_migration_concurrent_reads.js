@@ -14,36 +14,14 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
-const donorRst = new ReplSetTest({
-    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
-    name: 'donor',
-    nodeOptions: {setParameter: {enableTenantMigrations: true}}
-});
-const recipientRst = new ReplSetTest({
-    nodes: 1,
-    name: 'recipient',
-    nodeOptions: {
-        setParameter: {
-            enableTenantMigrations: true,
-            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
-            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
-        }
-    }
-});
-
-donorRst.startSet();
-donorRst.initiate();
-recipientRst.startSet();
-recipientRst.initiate();
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
-const kRecipientConnString = recipientRst.getURL();
 
 const kMaxTimeMS = 5 * 1000;
-const kConfigDonorsNS = "config.tenantMigrationDonors";
 
 /**
  * To be used to resume a migration that is paused after entering the blocking state. Waits for the
@@ -80,29 +58,29 @@ function runCommand(db, cmd, expectedError) {
 /**
  * Tests that the donor rejects causal reads after the migration commits.
  */
-function testReadIsRejectedIfSentAfterMigrationHasCommitted(rst, testCase, dbName, collName) {
+function testReadIsRejectedIfSentAfterMigrationHasCommitted(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
+        tenantId,
     };
 
-    const primary = rst.getPrimary();
+    const donorRst = tenantMigrationTest.getDonorRst();
+    const donorPrimary = donorRst.getPrimary();
 
-    const res =
-        assert.commandWorked(TenantMigrationUtil.startMigration(primary.host, migrationOpts));
-    assert.eq(res.state, "committed");
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all the secondaries. This is to ensure that the write to put the migration into
     // "committed" is majority-committed and that snapshot reads on the secondaries with unspecified
     // atClusterTime have read timestamp >= commitTimestamp.
-    rst.awaitLastOpCommitted();
+    donorRst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
-    const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
+    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
+        tenantId: tenantId
+    });
+    const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
     nodes.forEach(node => {
         const db = node.getDB(dbName);
         if (testCase.requiresReadTimestamp) {
@@ -121,31 +99,31 @@ function testReadIsRejectedIfSentAfterMigrationHasCommitted(rst, testCase, dbNam
 /**
  * Tests that the donor does not reject reads after the migration aborts.
  */
-function testReadIsAcceptedIfSentAfterMigrationHasAborted(rst, testCase, dbName, collName) {
+function testReadIsAcceptedIfSentAfterMigrationHasAborted(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
+        tenantId,
     };
 
-    const primary = rst.getPrimary();
+    const donorRst = tenantMigrationTest.getDonorRst();
+    const donorPrimary = donorRst.getPrimary();
 
-    let abortFp = configureFailPoint(primary, "abortTenantMigrationAfterBlockingStarts");
-    const res =
-        assert.commandWorked(TenantMigrationUtil.startMigration(primary.host, migrationOpts));
-    assert.eq(res.state, "aborted");
+    let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
     abortFp.off();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all the secondaries. This is to ensure that the write to put the migration into
     // "aborted" is majority-committed and that snapshot reads on the secondaries with unspecified
     // atClusterTime have read timestamp >= abortTimestamp.
-    rst.awaitLastOpCommitted();
+    donorRst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
-    const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
+    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
+        tenantId: tenantId
+    });
+    const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
     nodes.forEach(node => {
         const db = node.getDB(dbName);
         if (testCase.requiresReadTimestamp) {
@@ -161,54 +139,52 @@ function testReadIsAcceptedIfSentAfterMigrationHasAborted(rst, testCase, dbName,
  * Tests that the donor blocks clusterTime reads in the blocking state with readTimestamp >=
  * blockingTimestamp but does not block linearizable reads.
  */
-function testReadBlocksIfMigrationIsInBlocking(rst, testCase, dbName, collName) {
+function testReadBlocksIfMigrationIsInBlocking(testCase, dbName, collName) {
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
+        tenantId,
     };
 
-    const primary = rst.getPrimary();
+    const donorRst = tenantMigrationTest.getDonorRst();
+    const donorPrimary = donorRst.getPrimary();
 
-    let blockingFp = configureFailPoint(primary, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    let blockingFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
     // Wait for the migration to enter the blocking state.
-    migrationThread.start();
     blockingFp.wait();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all secondaries to ensure that snapshot reads on the secondaries with
     // unspecified atClusterTime have read timestamp >= blockTimestamp.
-    rst.awaitLastOpCommitted();
+    donorRst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
+    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
+        tenantId: tenantId
+    });
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
         : testCase.command(collName);
     command.maxTimeMS = kMaxTimeMS;
 
-    const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
+    const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
     nodes.forEach(node => {
         const db = node.getDB(dbName);
         runCommand(db, command, testCase.isLinearizableRead ? null : ErrorCodes.MaxTimeMSExpired);
     });
 
     blockingFp.off();
-    migrationThread.join();
-    const res = assert.commandWorked(migrationThread.returnData());
-    assert.eq(res.state, "committed");
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 }
 
 /**
  * Tests that the donor blocks clusterTime reads in the blocking state with readTimestamp >=
  * blockingTimestamp, and unblocks the reads once the migration aborts.
  */
-function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(
-    rst, testCase, dbName, collName) {
+function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(testCase, dbName, collName) {
     if (testCase.isLinearizableRead) {
         // Linearizable reads are not blocked.
         return;
@@ -217,41 +193,40 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
+        tenantId,
     };
 
-    const primary = rst.getPrimary();
+    const donorRst = tenantMigrationTest.getDonorRst();
+    const donorPrimary = donorRst.getPrimary();
 
-    let blockingFp = configureFailPoint(primary, "pauseTenantMigrationAfterBlockingStarts");
+    let blockingFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
     const targetBlockedReads =
         assert
-            .commandWorked(primary.adminCommand(
+            .commandWorked(donorPrimary.adminCommand(
                 {configureFailPoint: "tenantMigrationBlockRead", mode: "alwaysOn"}))
             .count +
         1;
 
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     let resumeMigrationThread =
-        new Thread(resumeMigrationAfterBlockingRead, primary.host, targetBlockedReads);
+        new Thread(resumeMigrationAfterBlockingRead, donorPrimary.host, targetBlockedReads);
 
     // Run the commands after the migration enters the blocking state.
     resumeMigrationThread.start();
-    migrationThread.start();
     blockingFp.wait();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all secondaries to ensure that snapshot reads on the secondaries with
     // unspecified atClusterTime have read timestamp >= blockTimestamp.
-    rst.awaitLastOpCommitted();
+    donorRst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
+    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
+        tenantId: tenantId
+    });
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
         : testCase.command(collName);
-    const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
+    const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
 
     // The migration should unpause and commit after the read is blocked. Verify that the read
     // is rejected.
@@ -262,16 +237,16 @@ function testBlockedReadGetsUnblockedAndRejectedIfMigrationCommits(
 
     // Verify that the migration succeeded.
     resumeMigrationThread.join();
-    migrationThread.join();
-    const res = assert.commandWorked(migrationThread.returnData());
-    assert.eq(res.state, "committed");
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 }
 
 /**
  * Tests that the donor blocks clusterTime reads in the blocking state with readTimestamp >=
  * blockingTimestamp, and rejects the reads once the migration commits.
  */
-function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(rst, testCase, dbName, collName) {
+function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(testCase, dbName, collName) {
     if (testCase.isLinearizableRead) {
         // Linearizable reads are not blocked.
         return;
@@ -280,42 +255,41 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(rst, testCase,
     const tenantId = dbName.split('_')[0];
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        recipientConnString: kRecipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"},
+        tenantId,
     };
 
-    const primary = rst.getPrimary();
+    const donorRst = tenantMigrationTest.getDonorRst();
+    const donorPrimary = donorRst.getPrimary();
 
-    let blockingFp = configureFailPoint(primary, "pauseTenantMigrationAfterBlockingStarts");
-    let abortFp = configureFailPoint(primary, "abortTenantMigrationAfterBlockingStarts");
+    let blockingFp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
+    let abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
     const targetBlockedReads =
         assert
-            .commandWorked(primary.adminCommand(
+            .commandWorked(donorPrimary.adminCommand(
                 {configureFailPoint: "tenantMigrationBlockRead", mode: "alwaysOn"}))
             .count +
         1;
 
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, primary.host, migrationOpts);
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     let resumeMigrationThread =
-        new Thread(resumeMigrationAfterBlockingRead, primary.host, targetBlockedReads);
+        new Thread(resumeMigrationAfterBlockingRead, donorPrimary.host, targetBlockedReads);
 
     // Run the commands after the migration enters the blocking state.
     resumeMigrationThread.start();
-    migrationThread.start();
     blockingFp.wait();
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all secondaries to ensure that snapshot reads on the secondaries with
     // unspecified atClusterTime have read timestamp >= blockTimestamp.
-    rst.awaitLastOpCommitted();
+    donorRst.awaitLastOpCommitted();
 
-    const donorDoc = primary.getCollection(kConfigDonorsNS).findOne({tenantId: tenantId});
+    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
+        tenantId: tenantId
+    });
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
         : testCase.command(collName);
-    const nodes = testCase.isSupportedOnSecondaries ? rst.nodes : [primary];
+    const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
 
     // The migration should unpause and abort after the read is blocked. Verify that the read
     // unblocks.
@@ -326,10 +300,10 @@ function testBlockedReadGetsUnblockedAndSucceedsIfMigrationAborts(rst, testCase,
 
     // Verify that the migration failed due to the simulated error.
     resumeMigrationThread.join();
-    migrationThread.join();
     abortFp.off();
-    const res = assert.commandWorked(migrationThread.returnData());
-    assert.eq(res.state, "aborted");
+    const stateRes =
+        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
 }
 
 const testCases = {
@@ -419,10 +393,9 @@ const testFuncs = {
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
         let dbName = testCaseName + "-" + testName + "_" + kTenantDefinedDbName;
-        testFunc(donorRst, testCase, dbName, kCollName);
+        testFunc(testCase, dbName, kCollName);
     }
 }
 
-donorRst.stopSet();
-recipientRst.stopSet();
+tenantMigrationTest.stop();
 })();

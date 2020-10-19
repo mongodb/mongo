@@ -11,9 +11,8 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 // An object that mirrors the donor migration states.
 const migrationStates = {
@@ -24,11 +23,9 @@ const migrationStates = {
     kAborted: 4
 };
 
-const donorRst = new ReplSetTest(
-    {nodes: 1, name: 'donor', nodeOptions: {setParameter: {enableTenantMigrations: true}}});
 const recipientRst = new ReplSetTest({
     nodes: 1,
-    name: 'recipient',
+    name: 'donor',
     nodeOptions: {
         setParameter: {
             enableTenantMigrations: true,
@@ -37,31 +34,24 @@ const recipientRst = new ReplSetTest({
         }
     }
 });
+recipientRst.startSet();
+recipientRst.initiate();
 
 const kRecipientConnString = recipientRst.getURL();
 const kTenantId = 'testTenantId';
 
-recipientRst.startSet();
-recipientRst.initiate();
-
 (() => {
     jsTestLog("Testing currentOp output for migration in data sync state");
-    donorRst.startSet();
-    donorRst.initiate();
-    const donorPrimary = donorRst.getPrimary();
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: kRecipientConnString,
         tenantId: kTenantId,
-        readPreference: {mode: "primary"},
     };
     let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterDataSync");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, donorPrimary.host, migrationOpts);
-
-    migrationThread.start();
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     fp.wait();
 
     const res = assert.commandWorked(
@@ -73,28 +63,22 @@ recipientRst.initiate();
     assert.eq(res.inprog[0].migrationCompleted, false);
 
     fp.off();
-    migrationThread.join();
-    donorRst.stopSet();
+    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    tenantMigrationTest.stop();
 })();
 
 (() => {
     jsTestLog("Testing currentOp output for migration in blocking state");
-    donorRst.startSet();
-    donorRst.initiate();
-    const donorPrimary = donorRst.getPrimary();
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: kRecipientConnString,
         tenantId: kTenantId,
-        readPreference: {mode: "primary"},
     };
     let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
-    let migrationThread =
-        new Thread(TenantMigrationUtil.startMigration, donorPrimary.host, migrationOpts);
-
-    migrationThread.start();
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     fp.wait();
 
     const res = assert.commandWorked(
@@ -107,25 +91,22 @@ recipientRst.initiate();
     assert.eq(res.inprog[0].migrationCompleted, false);
 
     fp.off();
-    migrationThread.join();
-    donorRst.stopSet();
+    assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    tenantMigrationTest.stop();
 })();
 
 (() => {
     jsTestLog("Testing currentOp output for aborted migration");
-    donorRst.startSet();
-    donorRst.initiate();
-    const donorPrimary = donorRst.getPrimary();
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: kRecipientConnString,
         tenantId: kTenantId,
-        readPreference: {mode: "primary"},
     };
     configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
-    assert.commandWorked(TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts));
+    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
     const res = assert.commandWorked(
         donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
@@ -137,25 +118,21 @@ recipientRst.initiate();
     assert(res.inprog[0].commitOrAbortOpTime);
     assert(res.inprog[0].abortReason);
     assert.eq(res.inprog[0].migrationCompleted, false);
-
-    donorRst.stopSet();
+    tenantMigrationTest.stop();
 })();
 
 // Check currentOp while in committed state before and after a migration has completed.
 (() => {
     jsTestLog("Testing currentOp output for committed migration");
-    donorRst.startSet();
-    donorRst.initiate();
-    const donorPrimary = donorRst.getPrimary();
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        recipientConnString: kRecipientConnString,
         tenantId: kTenantId,
-        readPreference: {mode: "primary"},
     };
-    assert.commandWorked(TenantMigrationUtil.startMigration(donorPrimary.host, migrationOpts));
+    assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
     let res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
     assert.eq(res.inprog.length, 1);
@@ -168,8 +145,7 @@ recipientRst.initiate();
 
     jsTestLog("Testing currentOp output for a committed migration after donorForgetMigration");
 
-    assert.commandWorked(
-        TenantMigrationUtil.forgetMigration(donorPrimary.host, migrationOpts.migrationIdString));
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
     assert.eq(res.inprog.length, 1);
@@ -180,8 +156,7 @@ recipientRst.initiate();
     assert(res.inprog[0].commitOrAbortOpTime);
     assert(res.inprog[0].expireAt);
     assert.eq(res.inprog[0].migrationCompleted, true);
-
-    donorRst.stopSet();
+    tenantMigrationTest.stop();
 })();
 
 recipientRst.stopSet();
