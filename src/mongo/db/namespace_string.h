@@ -162,10 +162,10 @@ public:
     NamespaceString(StringData dbName, StringData collectionName)
         : _ns(dbName.size() + collectionName.size() + 1, '\0') {
         uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in a database name",
+                "'.' is an invalid character in the database name: " + dbName,
                 dbName.find('.') == std::string::npos);
         uassert(ErrorCodes::InvalidNamespace,
-                "Collection names cannot start with '.'",
+                "Collection names cannot start with '.': " + collectionName,
                 collectionName.empty() || collectionName[0] != '.');
 
         std::string::iterator it = std::copy(dbName.begin(), dbName.end(), _ns.begin());
