@@ -135,7 +135,6 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
       _rollbackIdAtInit(repl::ReplicationProcess::get(opCtx)->getRollbackID()),
       _chunkRange(std::move(chunk)),
       _keyPattern(shardKey) {
-    // Exclude entries for transaction.
     Query query;
     // Sort is not needed for correctness. This is just for making it easier to write deterministic
     // tests.
