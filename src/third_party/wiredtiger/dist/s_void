@@ -136,7 +136,7 @@ func_ok()
 	    -e '/int zstd_terminate$/d'
 }
 
-for f in `find bench ext src test -name '*.[ci]'`; do
+for f in `find bench ext src test -name '*.c' -o -name '*_inline.h'`; do
 	if expr "$f" : '.*/windows_shim.c' > /dev/null; then
 		continue
 	fi

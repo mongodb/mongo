@@ -101,7 +101,8 @@ err:
  *     Create a new 'file:' object.
  */
 static int
-__create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
+__create_file(
+  WT_SESSION_IMPL *session, const char *uri, bool exclusive, bool import, const char *config)
 {
     WT_CONFIG_ITEM cval;
     WT_DECL_ITEM(val);
@@ -110,11 +111,10 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
       *filecfg[] = {WT_CONFIG_BASE(session, file_meta), config, NULL, NULL, NULL};
     char *fileconf;
     uint32_t allocsize;
-    bool exists, import, import_repair, is_metadata;
+    bool exists, import_repair, is_metadata;
 
     fileconf = NULL;
 
-    import = __wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0;
     import_repair = false;
     is_metadata = strcmp(uri, WT_METAFILE_URI) == 0;
 
@@ -219,7 +219,8 @@ __create_file(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const c
             WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
             WT_ERR(__wt_metadata_insert(session, uri, fileconf));
         } else {
-            /* TO-DO: WT-6691 */
+            /* Read the data file's descriptor block and try to recreate the associated metadata. */
+            WT_ERR(__wt_import_repair(session, uri, &fileconf));
         }
 
         /*
@@ -653,7 +654,8 @@ err:
  *     Create a table.
  */
 static int
-__create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
+__create_table(
+  WT_SESSION_IMPL *session, const char *uri, bool exclusive, bool import, const char *config)
 {
     WT_CONFIG conf;
     WT_CONFIG_ITEM cgkey, cgval, ckey, cval;
@@ -664,7 +666,7 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
     char *tableconf, *cgname;
     const char *cfg[4] = {WT_CONFIG_BASE(session, table_meta), config, NULL, NULL};
     const char *tablename;
-    bool import, import_repair;
+    bool import_repair;
 
     cgname = NULL;
     table = NULL;
@@ -674,7 +676,6 @@ __create_table(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const 
 
     tablename = uri;
     WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
-    import = __wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0;
 
     /* Check if the table already exists. */
     if ((ret = __wt_metadata_search(session, uri, &tableconf)) != WT_NOTFOUND) {
@@ -781,9 +782,14 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
     WT_CONFIG_ITEM cval;
     WT_DATA_SOURCE *dsrc;
     WT_DECL_RET;
-    bool exclusive;
+    bool exclusive, import;
 
     exclusive = __wt_config_getones(session, config, "exclusive", &cval) == 0 && cval.val != 0;
+    import = __wt_config_getones(session, config, "import.enabled", &cval) == 0 && cval.val != 0;
+
+    if (import && !WT_PREFIX_MATCH(uri, "file:") && !WT_PREFIX_MATCH(uri, "table:"))
+        WT_RET_MSG(session, ENOTSUP,
+          "%s: import is only supported for 'file' and 'table' data sources", uri);
 
     /*
      * We track create operations: if we fail in the middle of creating a complex object, we want to
@@ -794,13 +800,13 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
     if (WT_PREFIX_MATCH(uri, "colgroup:"))
         ret = __create_colgroup(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "file:"))
-        ret = __create_file(session, uri, exclusive, config);
+        ret = __create_file(session, uri, exclusive, import, config);
     else if (WT_PREFIX_MATCH(uri, "lsm:"))
         ret = __wt_lsm_tree_create(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "index:"))
         ret = __create_index(session, uri, exclusive, config);
     else if (WT_PREFIX_MATCH(uri, "table:"))
-        ret = __create_table(session, uri, exclusive, config);
+        ret = __create_table(session, uri, exclusive, import, config);
     else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
         ret = dsrc->create == NULL ? __wt_object_unsupported(session, uri) :
                                      __create_data_source(session, uri, config, dsrc);

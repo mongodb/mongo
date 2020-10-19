@@ -68,7 +68,7 @@ __wt_time_aggregate_to_string(WT_TIME_AGGREGATE *ta, char *ta_string)
       "newest durable: %s/%s oldest start: %s/%" PRIu64 " newest stop %s/%" PRIu64 "%s",
       __wt_timestamp_to_string(ta->newest_start_durable_ts, ts_string[0]),
       __wt_timestamp_to_string(ta->newest_stop_durable_ts, ts_string[1]),
-      __wt_timestamp_to_string(ta->oldest_start_ts, ts_string[2]), ta->oldest_start_txn,
+      __wt_timestamp_to_string(ta->oldest_start_ts, ts_string[2]), ta->newest_txn,
       __wt_timestamp_to_string(ta->newest_stop_ts, ts_string[3]), ta->newest_stop_txn,
       ta->prepare ? ", prepared" : ""));
     return (ta_string);
@@ -205,9 +205,9 @@ __time_aggregate_validate_parent(
           __wt_time_aggregate_to_string(ta, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (ta->oldest_start_txn < parent->oldest_start_txn)
+    if (ta->newest_txn > parent->newest_txn)
         WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has an oldest start transaction before its parent's; time "
+          "aggregate time window has a newest transaction after its parent's; time "
           "aggregate %s, parent %s",
           __wt_time_aggregate_to_string(ta, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
@@ -251,9 +251,9 @@ __wt_time_aggregate_validate(
           "aggregate %s",
           __wt_time_aggregate_to_string(ta, time_string[0]));
 
-    if (ta->oldest_start_txn > ta->newest_stop_txn)
+    if (ta->newest_txn > ta->newest_stop_txn)
         WT_TIME_VALIDATE_RET(session,
-          "aggregate time window has an oldest start transaction after its newest stop "
+          "aggregate time window has a newest transaction after its newest stop "
           "transaction; time aggregate %s",
           __wt_time_aggregate_to_string(ta, time_string[0]));
 
@@ -360,9 +360,9 @@ __time_value_validate_parent(
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
-    if (tw->start_txn < parent->oldest_start_txn)
+    if (tw->start_txn > parent->newest_txn)
         WT_TIME_VALIDATE_RET(session,
-          "value time window has a start transaction before its parent's oldest start transaction; "
+          "value time window has a start transaction after its parent's newest transaction; "
           "time window %s, parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));

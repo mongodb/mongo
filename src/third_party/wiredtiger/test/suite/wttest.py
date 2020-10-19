@@ -89,25 +89,31 @@ class CapturedFd(object):
         self.file.close()
         self.file = None
 
+    def hasUnexpectedOutput(self, testcase):
+        """
+        Check to see that there is no unexpected output in the captured output
+        file.
+        """
+        if WiredTigerTestCase._ignoreStdout:
+            return
+        if self.file != None:
+            self.file.flush()
+        return self.expectpos < os.path.getsize(self.filename)
+
     def check(self, testcase):
         """
         Check to see that there is no unexpected output in the captured output
         file.  If there is, raise it as a test failure.
         This is generally called after 'release' is called.
         """
-        if WiredTigerTestCase._ignoreStdout:
-            return
-        if self.file != None:
-            self.file.flush()
-        filesize = os.path.getsize(self.filename)
-        if filesize > self.expectpos:
+        if self.hasUnexpectedOutput(testcase):
             contents = self.readFileFrom(self.filename, self.expectpos, 10000)
             WiredTigerTestCase.prout('ERROR: ' + self.filename +
                                      ' unexpected ' + self.desc +
                                      ', contains:\n"' + contents + '"')
             testcase.fail('unexpected ' + self.desc + ', contains: "' +
                       contents + '"')
-        self.expectpos = filesize
+        self.expectpos = os.path.getsize(self.filename)
 
     def checkAdditional(self, testcase, expect):
         """
@@ -518,6 +524,10 @@ class WiredTigerTestCase(unittest.TestCase):
         self.captureerr.check(self)
         yield
         self.captureerr.checkAdditionalPattern(self, pat)
+
+    def ignoreStdoutPatternIfExists(self, pat):
+        if self.captureout.hasUnexpectedOutput(self):
+            self.captureout.checkAdditionalPattern(self, pat)
 
     def assertRaisesWithMessage(self, exceptionType, expr, message):
         """

@@ -363,5 +363,8 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.assertGreaterEqual(hs_removed, 0)
         self.assertGreater(hs_sweep, 0)
 
+        # The test may output the following message in eviction under cache pressure. Ignore that.
+        self.ignoreStdoutPatternIfExists("oldest pinned transaction ID rolled back for eviction")
+
 if __name__ == '__main__':
     wttest.run()

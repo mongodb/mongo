@@ -1269,6 +1269,7 @@ struct
 structs
 su
 subdirectory
+subget
 subgetraw
 subgets
 subinit

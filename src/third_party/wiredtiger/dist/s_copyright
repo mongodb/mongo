@@ -106,7 +106,7 @@ if test $? -eq 0; then
 fi
 
 # Search for files, skipping some well-known 3rd party directories.
-(cd .. && find [a-z]* -name '*.[chi]' \
+(cd .. && find [a-z]* -name '*.[ch]' \
 	-o -name '*.cxx' \
 	-o -name '*.in' \
 	-o -name '*.java' \

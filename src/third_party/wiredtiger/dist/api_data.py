@@ -1189,8 +1189,6 @@ methods = {
         type='boolean'),
 ]),
 
-'WT_SESSION.import' : Method([]),
-
 'WT_SESSION.join' : Method([
     Config('compare', '"eq"', r'''
         modifies the set of items to be returned so that the index key
@@ -1455,6 +1453,10 @@ methods = {
         priority of the transaction for resolving conflicts.
         Transactions with higher values are less likely to abort''',
         min='-100', max='100'),
+    Config('read_before_oldest', 'false', r'''
+        allows the caller to specify a read timestamp less than the oldest timestamp but newer
+        than or equal to the pinned timestamp. Cannot be set to true while also rounding up the read
+        timestamp. See @ref transaction_timestamps''', type='boolean'),
     Config('read_timestamp', '', r'''
         read using the specified timestamp.  The supplied value must not be
         older than the current oldest timestamp.  See

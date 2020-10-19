@@ -33,11 +33,18 @@
 #define WT_HS_FILE "WiredTigerHS.wt"     /* History store table */
 #define WT_HS_URI "file:WiredTigerHS.wt" /* History store table URI */
 
-#define WT_SYSTEM_PREFIX "system:"               /* System URI prefix */
-#define WT_SYSTEM_CKPT_TS "checkpoint_timestamp" /* Checkpoint timestamp name */
-#define WT_SYSTEM_CKPT_URI "system:checkpoint"   /* Checkpoint timestamp URI */
-#define WT_SYSTEM_OLDEST_TS "oldest_timestamp"   /* Oldest timestamp name */
-#define WT_SYSTEM_OLDEST_URI "system:oldest"     /* Oldest timestamp URI */
+#define WT_SYSTEM_PREFIX "system:"                               /* System URI prefix */
+#define WT_SYSTEM_CKPT_TS "checkpoint_timestamp"                 /* Checkpoint timestamp name */
+#define WT_SYSTEM_CKPT_URI "system:checkpoint"                   /* Checkpoint timestamp URI */
+#define WT_SYSTEM_OLDEST_TS "oldest_timestamp"                   /* Oldest timestamp name */
+#define WT_SYSTEM_OLDEST_URI "system:oldest"                     /* Oldest timestamp URI */
+#define WT_SYSTEM_CKPT_SNAPSHOT "snapshots"                      /* List of snapshots */
+#define WT_SYSTEM_CKPT_SNAPSHOT_MIN "snapshot_min"               /* Snapshot minimum */
+#define WT_SYSTEM_CKPT_SNAPSHOT_MAX "snapshot_max"               /* Snapshot maximum */
+#define WT_SYSTEM_CKPT_SNAPSHOT_COUNT "snapshot_count"           /* Snapshot count */
+#define WT_SYSTEM_CKPT_SNAPSHOT_URI "system:checkpoint_snapshot" /* Checkpoint snapshot URI */
+#define WT_SYSTEM_BASE_WRITE_GEN_URI "system:checkpoint_base_write_gen" /* Base write gen URI */
+#define WT_SYSTEM_BASE_WRITE_GEN "base_write_gen"                       /* Base write gen name */
 
 /*
  * Optimize comparisons against the metafile URI, flag handles that reference the metadata file.

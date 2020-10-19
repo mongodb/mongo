@@ -139,8 +139,8 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_AGGREG
         WT_IGNORE_RET(__wt_vpack_uint(pp, 0, ta->oldest_start_ts));
         LF_SET(WT_CELL_TS_START);
     }
-    if (ta->oldest_start_txn != WT_TXN_NONE) {
-        WT_IGNORE_RET(__wt_vpack_uint(pp, 0, ta->oldest_start_txn));
+    if (ta->newest_txn != WT_TXN_NONE) {
+        WT_IGNORE_RET(__wt_vpack_uint(pp, 0, ta->newest_txn));
         LF_SET(WT_CELL_TXN_START);
     }
     if (ta->newest_start_durable_ts != WT_TS_NONE) {
@@ -164,7 +164,7 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_AGGREG
     }
     if (ta->newest_stop_txn != WT_TXN_MAX) {
         /* Store differences, not absolutes. */
-        WT_IGNORE_RET(__wt_vpack_uint(pp, 0, ta->newest_stop_txn - ta->oldest_start_txn));
+        WT_IGNORE_RET(__wt_vpack_uint(pp, 0, ta->newest_stop_txn - ta->newest_txn));
         LF_SET(WT_CELL_TXN_STOP);
     }
     if (ta->newest_stop_durable_ts != WT_TS_NONE) {
@@ -626,7 +626,7 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
      * This line of code is really a call to __wt_off_page, but we know the
      * cell we're given will either be on the page or past the end of page,
      * so it's a simpler check.  (I wouldn't bother, but the real problem is
-     * we can't call __wt_off_page directly, it's in btree.i which requires
+     * we can't call __wt_off_page directly, it's in btree_inline.h which requires
      * this file be included first.)
      */
     if (cell >= (WT_CELL *)((uint8_t *)page->dsk + page->dsk->mem_size))
@@ -775,8 +775,7 @@ copy_cell_restart:
             WT_RET(
               __wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ta->oldest_start_ts));
         if (LF_ISSET(WT_CELL_TXN_START))
-            WT_RET(
-              __wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ta->oldest_start_txn));
+            WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ta->newest_txn));
         if (LF_ISSET(WT_CELL_TS_DURABLE_START)) {
             WT_RET(__wt_vunpack_uint(
               &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ta->newest_start_durable_ts));
@@ -791,7 +790,7 @@ copy_cell_restart:
         if (LF_ISSET(WT_CELL_TXN_STOP)) {
             WT_RET(
               __wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &ta->newest_stop_txn));
-            ta->newest_stop_txn += ta->oldest_start_txn;
+            ta->newest_stop_txn += ta->newest_txn;
         }
         if (LF_ISSET(WT_CELL_TS_DURABLE_STOP)) {
             WT_RET(__wt_vunpack_uint(
@@ -977,8 +976,8 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
     /* Tell reconciliation we cleared the transaction ids and the cell needs to be rebuilt. */
     if (unpack_addr != NULL) {
         ta = &unpack_addr->ta;
-        if (ta->oldest_start_txn != WT_TXN_NONE) {
-            ta->oldest_start_txn = WT_TXN_NONE;
+        if (ta->newest_txn != WT_TXN_NONE) {
+            ta->newest_txn = WT_TXN_NONE;
             F_SET(unpack_addr, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
         }
         if (ta->newest_stop_txn != WT_TXN_MAX) {

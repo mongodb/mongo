@@ -790,16 +790,18 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
 int
 __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
 {
+    WT_DECL_RET;
     WT_TXN *txn;
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *txn_shared;
     wt_timestamp_t ts_oldest;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
-    bool did_roundup_to_oldest;
+    bool did_roundup_to_oldest, use_pinned_ts;
 
     txn = session->txn;
     txn_global = &S2C(session)->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
+    use_pinned_ts = false;
 
     WT_RET(__wt_txn_context_prepare_check(session));
 
@@ -819,7 +821,16 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
      * setting transaction timestamp.
      */
     __wt_readlock(session, &txn_global->rwlock);
-    ts_oldest = txn_global->oldest_timestamp;
+
+    if (F_ISSET(txn, WT_TXN_TS_READ_BEFORE_OLDEST)) {
+        use_pinned_ts = true;
+        /* Set a flag on the transaction to prevent re-acquiring the read lock. */
+        F_SET(txn, WT_TXN_TS_ALREADY_LOCKED);
+        ret = __wt_txn_get_pinned_timestamp(session, &ts_oldest, txn->flags);
+        F_CLR(txn, WT_TXN_TS_ALREADY_LOCKED);
+        WT_RET(ret);
+    } else
+        ts_oldest = txn_global->oldest_timestamp;
     did_roundup_to_oldest = false;
     if (read_ts < ts_oldest) {
         /*
@@ -839,8 +850,8 @@ __wt_txn_set_read_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t read_ts)
              * error message because that logs a MongoDB error, use an informational message to
              * provide the context instead.
              */
-            WT_RET(__wt_msg(session, "read timestamp %s less than the oldest timestamp %s",
-              __wt_timestamp_to_string(read_ts, ts_string[0]),
+            WT_RET(__wt_msg(session, "read timestamp %s less than the %s timestamp %s",
+              __wt_timestamp_to_string(read_ts, ts_string[0]), use_pinned_ts ? "pinned" : "oldest",
               __wt_timestamp_to_string(ts_oldest, ts_string[1])));
             return (EINVAL);
         }

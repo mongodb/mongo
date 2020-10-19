@@ -55,21 +55,29 @@ class test_bug019(wttest.WiredTigerTestCase):
         stat_cursor.close()
         return prealloc
 
-    def populate(self, nentries):
+    def populate(self, nentries, count):
         c = self.session.open_cursor(self.uri, None, None)
+        min_entries = nentries // 10
         for i in range(0, nentries):
             # Make the values about 2000 bytes. When called with 5000 records
             # that's about 10MB of data, generating 100 log files used plus more for overhead.
             # Typically the huge traffic causes the preallocation statistic to
             # increase.  We'll quit when it does, as that's our goal here.
+            # We wait for a minimum of 10% of the inserts before quitting because
+            # we want to make sure this function consumes some log files. We
+            # don't know when the internal log server thread will run and update
+            # the statistic and we don't want to short-circuit without enough work.
             # For the initial populate, we'll insert up to 10x as many records,
             # so up to 1000 log files.
-            c[i] = "abcde" * 400
-            if i % 50 == 0:
+            #
+            # Make the keys unique for each pass.
+            key = str(count) + " I:" + str(i)
+            c[key] = "abcde" * 400
+            if i > min_entries and i % 50 == 0:
                 prealloc = self.get_prealloc_stat()
                 if prealloc > self.max_prealloc:
-                    self.pr("Updating max_prealloc from {} to {} after {} inserts".
-                            format(self.max_prealloc, prealloc, i))
+                    self.pr("Iter {}: Updating max_prealloc from {} to {} after {} inserts".
+                            format(count, self.max_prealloc, prealloc, i))
                     self.max_prealloc = prealloc
                     break
         c.close()
@@ -93,8 +101,8 @@ class test_bug019(wttest.WiredTigerTestCase):
         # Populate a new table to generate log traffic.  This typically
         # increase the max number of log files preallocated, as indicated by
         # the statistic.
-        self.session.create(self.uri, 'key_format=i,value_format=S')
-        self.populate(self.max_initial_entries)
+        self.session.create(self.uri, 'key_format=S,value_format=S')
+        self.populate(self.max_initial_entries, 0)
         self.session.checkpoint()
         if self.max_prealloc <= start_prealloc:
             self.pr("FAILURE: max_prealloc " + str(self.max_prealloc))
@@ -107,7 +115,7 @@ class test_bug019(wttest.WiredTigerTestCase):
         self.prepfiles()
         used = self.get_prealloc_used()
         for i in range(1, 10):
-            self.populate(self.entries)
+            self.populate(self.entries, i)
             newused = self.get_prealloc_used()
             self.pr("Iteration " + str(i))
             self.pr("previous used " + str(used) + " now " + str(newused))

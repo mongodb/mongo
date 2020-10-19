@@ -266,6 +266,11 @@ struct __wt_connection_impl {
 
     WT_TXN_GLOBAL txn_global; /* Global transaction state */
 
+    /* Recovery checkpoint snapshot details saved in the metadata file */
+    uint64_t recovery_ckpt_snap_min, recovery_ckpt_snap_max;
+    uint64_t *recovery_ckpt_snapshot;
+    uint32_t recovery_ckpt_snapshot_count;
+
     WT_RWLOCK hot_backup_lock; /* Hot backup serialization */
     uint64_t hot_backup_start; /* Clock value of most recent checkpoint needed by hot backup */
     char **hot_backup_list;    /* Hot backup file list */
@@ -310,6 +315,9 @@ struct __wt_connection_impl {
 
     /* Connection's base write generation. */
     uint64_t base_write_gen;
+
+    /* Last checkpoint connection's base write generation */
+    uint64_t last_ckpt_base_write_gen;
 
     uint32_t stat_flags; /* Options declared in flags.py */
 

@@ -54,14 +54,14 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
     size_t ins_size, upd_size;
     uint32_t ins_slot;
     u_int i, skipdepth;
-    bool logged;
+    bool inserted_to_update_chain, logged;
 
     ins = NULL;
     page = cbt->ref->page;
     session = CUR2S(cbt);
     last_upd = NULL;
     upd = upd_arg;
-    logged = false;
+    inserted_to_update_chain = logged = false;
 
     /*
      * We should have one of the following:
@@ -206,6 +206,8 @@ __wt_row_modify(WT_CURSOR_BTREE *cbt, const WT_ITEM *key, const WT_ITEM *value, 
           session, page, cbt->ins_head, cbt->ins_stack, &ins, ins_size, skipdepth, exclusive));
     }
 
+    inserted_to_update_chain = true;
+
     if (logged && modify_type != WT_UPDATE_RESERVE) {
         WT_ERR(__wt_txn_log_op(session, cbt));
         /*
@@ -224,7 +226,7 @@ err:
             __wt_txn_unmodify(session);
         __wt_free(session, ins);
         cbt->ins = NULL;
-        if (upd_arg == NULL)
+        if (upd_arg == NULL && !inserted_to_update_chain)
             __wt_free(session, upd);
         if (last_upd != NULL)
             last_upd->next = NULL;

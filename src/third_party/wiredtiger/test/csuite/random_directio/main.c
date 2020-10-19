@@ -800,7 +800,6 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
     char checkdir[4096], dbgdir[4096], savedir[4096];
     char *gotkey, *gotvalue, *keybuf, *p;
     char **large_arr;
-    bool fatal;
 
     keybuf = dcalloc(datasize, 1);
     lastid = dcalloc(nth, sizeof(uint64_t));
@@ -825,21 +824,9 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
      * Copy the original home directory explicitly without direct I/O. Copy this first because
      * copying with directio may abort and we want to see what the original copy saw.
      */
-    fatal = copy_directory(home, dbgdir, false);
-    if (fatal) {
-        printf("FATAL: Copying from %s to %s, directio %d\n", home, dbgdir, false);
-        kill_child(pid);
-    }
-    fatal = copy_directory(home, checkdir, directio);
-    if (fatal) {
-        printf("FATAL: Copying from %s to %s, directio %d\n", home, checkdir, directio);
-        kill_child(pid);
-    }
-    fatal = copy_directory(checkdir, savedir, false);
-    if (fatal) {
-        printf("FATAL: Copying from %s to %s, directio %d\n", checkdir, savedir, false);
-        kill_child(pid);
-    }
+    copy_directory(home, dbgdir, false);
+    copy_directory(home, checkdir, directio);
+    copy_directory(checkdir, savedir, false);
 
     printf("Open database, run recovery and verify content\n");
     ret = wiredtiger_open(checkdir, NULL, ENV_CONFIG_REC, &conn);

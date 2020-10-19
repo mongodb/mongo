@@ -44,10 +44,15 @@ class test_import05(test_import_base):
     values = [b'\x01\x02aaa\x03\x04', b'\x01\x02bbb\x03\x04', b'\x01\x02ccc\x03\x04',
               b'\x01\x02ddd\x03\x04', b'\x01\x02eee\x03\x04', b'\x01\x02fff\x03\x04']
     ts = [10*k for k in range(1, len(keys)+1)]
-    scenarios = make_scenarios([
+    optypes = [
         ('insert', dict(op_type='insert')),
         ('delete', dict(op_type='delete')),
-    ])
+    ]
+    import_types = [
+        ('file_metadata', dict(repair=False)),
+        ('repair', dict(repair=True)),
+    ]
+    scenarios = make_scenarios(optypes, import_types)
 
     def test_file_import_ts_past_oldest(self):
         original_db_file = 'original_db_file'
@@ -96,8 +101,11 @@ class test_import05(test_import_base):
         self.copy_file(original_db_file, '.', newdir)
 
         # Contruct the config string.
-        import_config = 'import=(enabled,repair=false,file_metadata=(' + \
-            original_db_file_config + '))'
+        if self.repair:
+            import_config = 'import=(enabled,repair=true)'
+        else:
+            import_config = 'import=(enabled,repair=false,file_metadata=(' + \
+                original_db_file_config + '))'
 
         # Create error pattern. Depending on the situation, we substitute a different timestamp into
         # error message to check against.

@@ -69,5 +69,56 @@ class test_util03(wttest.WiredTigerTestCase, suite_subprocess):
             self.fail('table should be empty')
         cursor.close()
 
+class test_util03_import(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_util03.a'
+    nentries = 1000
+    create_config = 'allocation_size=512,key_format=i,value_format=i'
+    scenarios = make_scenarios([
+        ('file_metadata', dict(repair=False)),
+        ('repair', dict(repair=True)),
+    ])
+
+    def test_create_process_import(self):
+        """
+        Test create in a 'wt' process with the import flags.
+        """
+
+        # Create and populate the table.
+        uri = 'file:' + self.tablename
+        self.session.create(uri, self.create_config)
+        cursor = self.session.open_cursor(uri)
+        for i in range(1, 1000):
+            cursor[i] = i
+        cursor.close()
+
+        self.session.checkpoint()
+
+        # Export the metadata for the file.
+        c = self.session.open_cursor('metadata:', None, None)
+        original_db_file_config = c[uri]
+        c.close()
+
+        # Now drop it. Keep the file there since we're about to import it back.
+        self.session.drop(uri, 'remove_files=false')
+
+        # Can't open the cursor on the file anymore since we dropped it.
+        self.assertRaisesException(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor(uri))
+
+        # Import with the WT tool.
+        # We want to test the case where we have the associated file metadata AND when we don't
+        # and wish to repair it.
+        if self.repair:
+            import_config = 'import=(enabled,repair=true)'
+        else:
+            import_config = 'import=(enabled,repair=false,file_metadata=({}))'.format(original_db_file_config)
+        self.runWt(['create', '-c', import_config, uri])
+
+        # Check that the data got imported correctly.
+        cursor = self.session.open_cursor(uri)
+        for i in range(1, 1000):
+            self.assertEqual(cursor[i], i)
+        cursor.close()
+
 if __name__ == '__main__':
     wttest.run()

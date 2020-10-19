@@ -377,6 +377,13 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
     if (desc->magic != WT_BLOCK_MAGIC || !checksum_matched) {
         if (strcmp(block->name, WT_METAFILE) == 0 || strcmp(block->name, WT_HS_FILE) == 0)
             WT_ERR_MSG(session, WT_TRY_SALVAGE, "%s is corrupted", block->name);
+        /*
+         * If we're doing an import, we can't expect to be able to verify checksums since we don't
+         * know the allocation size being used. This isn't an error so we should just return success
+         * and let import get whatever information it needs.
+         */
+        if (F_ISSET(session, WT_SESSION_IMPORT_REPAIR))
+            goto err;
         WT_ERR_MSG(session, WT_ERROR, "%s does not appear to be a WiredTiger file", block->name);
     }
 

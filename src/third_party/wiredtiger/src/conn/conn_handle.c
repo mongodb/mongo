@@ -131,6 +131,9 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
     __wt_free(session, conn->dhhash);
     __wt_free(session, conn->fhhash);
 
+    /* Free allocated recovered checkpoint snapshot memory */
+    __wt_free(session, conn->recovery_ckpt_snapshot);
+
     /* Free allocated memory. */
     __wt_free(session, conn->cfg);
     __wt_free(session, conn->debug_ckpt);

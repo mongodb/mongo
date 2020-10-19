@@ -18,7 +18,7 @@ whitespace()
 cd ..
 
 find bench dist examples ext src test \
-    -name '*.[chi]' -o \
+    -name '*.[ch]' -o \
     -name '*.dox' -o \
     -name '*.in' -o \
     -name '*.py' -o \
