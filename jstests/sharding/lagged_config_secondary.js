@@ -13,8 +13,24 @@ TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 
 (function() {
-var st =
-    new ShardingTest({shards: 1, configReplSetTestOptions: {settings: {chainingAllowed: false}}});
+
+/* On the config server the lastApplied optime can go past the atClusterTime timestamp due to pings
+ * made on collection config.mongos by sharding uptime reporter thread.
+ * Hence, it will not write the no-op oplog entry on the config server as part of waiting for read
+ * concern. For more deterministic testing of no-op writes to the oplog, disable uptime reporter
+ * threads from reaching out to the config server.
+ */
+var st = new ShardingTest({
+    shards: 1,
+    configReplSetTestOptions: {settings: {chainingAllowed: false}},
+    other: {
+        mongosOptions: {
+            setParameter:
+                {"failpoint.disableShardingUptimeReporterPeriodicThread": "{mode: 'alwaysOn'}"}
+        }
+    }
+});
+
 var testDB = st.s.getDB('test');
 
 assert.commandWorked(testDB.adminCommand({enableSharding: 'test'}));
