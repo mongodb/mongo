@@ -585,8 +585,12 @@ private:
 
     /**
      * Invokes completion callback and transitions state to State::kComplete.
+     *
+     * schedulingError is non-OK if the _finishCallback could not be scheduled and
+     * is running in-line.
      */
-    void _finishCallback(StatusWith<OpTimeAndWallTime> lastApplied);
+    void _finishCallback(StatusWith<OpTimeAndWallTime> lastApplied,
+                         Status schedulingError = Status::OK());
 
     // Obtains a valid sync source from the sync source selector.
     // Returns error if a sync source cannot be found.

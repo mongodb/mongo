@@ -1676,7 +1676,7 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
                           "Unable to schedule initial syncer completion task. Running callback on "
                           "current thread",
                           "error"_attr = redact(scheduleResult.getStatus()));
-            _finishCallback(result);
+            _finishCallback(result, scheduleResult.getStatus());
         }
     });
 
@@ -1772,7 +1772,8 @@ void InitialSyncer::_finishInitialSyncAttempt(const StatusWith<OpTimeAndWallTime
     finishCallbackGuard.dismiss();
 }
 
-void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
+void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied,
+                                    Status schedulingError) {
     // After running callback function, clear '_onCompletion' to release any resources that might be
     // held by this function object.
     // '_onCompletion' must be moved to a temporary copy and destroyed outside the lock in case
@@ -1803,8 +1804,10 @@ void InitialSyncer::_finishCallback(StatusWith<OpTimeAndWallTime> lastApplied) {
     _retryingOperation = boost::none;
 
     // Canceling an attempt sometimes results in a ShutdownInProgress code, which callers don't
-    // expect.  Convert that to CallbackCanceled.
-    if (!lastApplied.isOK() && lastApplied.getStatus().code() == ErrorCodes::ShutdownInProgress) {
+    // expect.  Convert that to CallbackCanceled.  If the main executor isn't running, we skip
+    // this, because callers expect ShutdownInProgress in that case.
+    if (schedulingError.isOK() && !lastApplied.isOK() &&
+        lastApplied.getStatus().code() == ErrorCodes::ShutdownInProgress) {
         lastApplied = Status(ErrorCodes::CallbackCanceled, lastApplied.getStatus().reason());
     }
     // Completion callback must be invoked outside mutex.
