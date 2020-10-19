@@ -45,7 +45,7 @@ assert.eq([], res.capped);
 
     const hashes = rst.getHashes(db.getName());
     assert.eq(hashesNoFilterCapped[0].collections,
-              hashes.master.collections,
+              hashes.primary.collections,
               "getHashes() should default to not filter out capped collections");
 
     session.endSession();

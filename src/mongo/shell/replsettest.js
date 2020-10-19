@@ -2201,7 +2201,7 @@ var ReplSetTest = function(opts) {
         // uses the listCollections command after awaiting replication to determine if a collection
         // is capped.
         const hashes = this.getHashesUsingSessions(sessions, dbName, {filterCapped: false});
-        return {master: hashes[0], slaves: hashes.slice(1)};
+        return {primary: hashes[0], secondaries: hashes.slice(1)};
     };
 
     this.findOplog = function(conn, query, limit) {
@@ -2347,7 +2347,7 @@ var ReplSetTest = function(opts) {
                 }
 
                 const dbHashes = rst.getHashes(dbName, secondaries);
-                const primaryDBHash = dbHashes.master;
+                const primaryDBHash = dbHashes.primary;
                 const primaryCollections = Object.keys(primaryDBHash.collections);
                 assert.commandWorked(primaryDBHash);
 
@@ -2356,7 +2356,7 @@ var ReplSetTest = function(opts) {
                 const primaryCollInfos = new CollInfos(primary, 'primary', dbName);
                 primaryCollInfos.filter(primaryCollections);
 
-                dbHashes.slaves.forEach(secondaryDBHash => {
+                dbHashes.secondaries.forEach(secondaryDBHash => {
                     assert.commandWorked(secondaryDBHash);
 
                     var secondary = secondaryDBHash._mongo;

@@ -40,10 +40,10 @@ s._rs.forEach(function(rsNode) {
     var dbHashes = rsNode.test.getHashes("test");
     print(rsNode.url + ': ' + tojson(dbHashes));
 
-    for (var j = 0; j < dbHashes.slaves.length; j++) {
-        assert.eq(dbHashes.master.md5,
-                  dbHashes.slaves[j].md5,
-                  "hashes not same for: " + rsNode.url + " slave: " + j);
+    for (var j = 0; j < dbHashes.secondaries.length; j++) {
+        assert.eq(dbHashes.primary.md5,
+                  dbHashes.secondaries[j].md5,
+                  "hashes not same for: " + rsNode.url + " secondary: " + j);
     }
 });
 
