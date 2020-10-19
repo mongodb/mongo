@@ -388,26 +388,25 @@ function test(st, description, testBody) {
              // The index on the original shard key shouldn't be required anymore.
              assert.commandWorked(st.s.getCollection(ns).dropIndex(originalShardKey));
 
-             // We will use this to wait until the following migration has completed, since we
-             // expect the client to time out. Waiting for this failpoint technically just waits for
-             // the recipient side of the migration to complete, but it's expected that if the
-             // migration can get to that point, then it should be able to succeed overall.
+             // We will use this to wait until the following migration has completed. Waiting for
+             // this failpoint technically just waits for the recipient side of the migration to
+             // complete, but it's expected that if the migration can get to that point, then it
+             // should be able to succeed overall.
              let hangDonorAtEndOfMigration =
                  configureFailPoint(st.rs1.getPrimary(), "moveChunkHangAtStep6");
 
-             jsTestLog("Attempting to move the chunk back to shard 0");
+             // Attempt to move the chunk back to shard 0. Synchronize with the parallel shell to
+             // make sure that the moveChunk started.
+             let hangOnStep1 = configureFailPoint(st.rs1.getPrimary(), "moveChunkHangAtStep1");
+             const awaitResult = startParallelShell(
+                 funWithArgs(function(ns, toShardName, middle) {
+                     jsTestLog("Attempting to move the chunk back to shard 0");
+                     assert.commandWorked(
+                         db.adminCommand({moveChunk: ns, find: middle, to: toShardName}));
+                 }, ns, st.shard0.shardName, refinedShardKeyValueInChunk), st.s.port);
 
-             // Attempt to move the chunk back to shard 0, sending it with maxTimeMS. Since there
-             // will be orphaned documents still on shard 0 (because range deletion is paused), we
-             // expected this command to time out. This will NOT fail the migration, however, since
-             // that occurs in a background OperationContext.
-             assert.commandFailedWithCode(st.s.adminCommand({
-                 moveChunk: ns,
-                 find: refinedShardKeyValueInChunk,
-                 to: st.shard0.shardName,
-                 maxTimeMS: 1000
-             }),
-                                          ErrorCodes.MaxTimeMSExpired);
+             hangOnStep1.wait();
+             hangOnStep1.off();
 
              // Hang after waiting for orphan cleanup so that in the test we can check for orphans
              // on disk before documents begin migrating.
@@ -429,12 +428,7 @@ function test(st, description, testBody) {
              // Wait for the previous migration to complete before continuing.
              hangDonorAtEndOfMigration.wait();
              hangDonorAtEndOfMigration.off();
-
-             // TODO (SERVER-47003): There will be a left-over entry in config.migrations after the
-             // previous moveChunk fails with MaxTimeMSExpired, so we drop the collection. Otherwise
-             // future migrations would receive a DuplicateKeyError when trying to update
-             // config.migrations.
-             st.config.getSiblingDB('config').migrations.drop();
+             awaitResult();
          });
 
     test(st,
