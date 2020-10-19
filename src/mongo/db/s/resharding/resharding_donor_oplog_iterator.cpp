@@ -57,31 +57,6 @@ ReshardingDonorOplogId getId(const repl::OplogEntry& oplog) {
 
 }  // anonymous namespace
 
-/**
- * Sentinel oplog format:
- * {
- *   op: "n",
- *   ns: "<database>.<collection>",
- *   ui: <existingUUID>,
- *   destinedRecipient: <recipientShardId>,
- *   o: {msg: "Writes to <database>.<collection> is temporarily blocked for resharding"},
- *   o2: {type: "reshardFinalOp", reshardingUUID: <reshardingUUID>},
- *   fromMigrate: true,
- * }
- */
-bool isFinalOplog(const repl::OplogEntry& oplog) {
-    if (oplog.getOpType() != repl::OpTypeEnum::kNoop) {
-        return false;
-    }
-
-    auto o2Field = oplog.getObject2();
-    if (!o2Field) {
-        return false;
-    }
-
-    return o2Field->getField("type").valueStringDataSafe() == "reshardFinalOp"_sd;
-}
-
 ReshardingDonorOplogIterator::ReshardingDonorOplogIterator(
     NamespaceString donorOplogBufferNs, boost::optional<ReshardingDonorOplogId> resumeToken)
     : _oplogBufferNs(std::move(donorOplogBufferNs)), _resumeToken(std::move(resumeToken)) {}

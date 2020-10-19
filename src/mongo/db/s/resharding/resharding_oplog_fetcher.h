@@ -28,19 +28,61 @@
  */
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status_with.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/util/background.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 class ReshardingOplogFetcher {
 public:
+    ReshardingOplogFetcher(UUID reshardingUUID,
+                           UUID collUUID,
+                           ReshardingDonorOplogId startAt,
+                           ShardId donorShard,
+                           ShardId recipientShard,
+                           bool doesDonorOwnMinKeyChunk,
+                           NamespaceString toWriteInto);
+
     /**
+     * Schedules a task that will do the following:
+     *
+     * - Find a valid connection to fetch oplog entries from.
+     * - Send an aggregation request + getMores until either:
+     * -- The "final resharding" oplog entry is found.
+     * -- An interruption occurs.
+     * -- A different error occurs.
+     *
+     * In the first two circumstances, the task will return. In the last circumstance, the task will
+     * be rescheduled in a way that resumes where it had left off from.
+     */
+    void schedule(executor::TaskExecutor* exector);
+
+    /**
+     * Given a connection, fetches and copies oplog entries until reaching an error, or coming
+     * across a sentinel finish oplog entry. Throws if there's more oplog entries to be copied.
+     */
+    void consume(DBClientBase* conn);
+
+    /**
+     * Kill the underlying client the BackgroundJob is using to expedite cleaning up resources when
+     * the output is no longer necessary. The underlying `toWriteInto` collection is left intact,
+     * though likely incomplete.
+     */
+    void setKilled();
+
+    /**
+     * Returns boost::none if the last oplog entry to be copied is found. Otherwise returns the
+     * ReshardingDonorOplogId to resume querying from.
+     *
      * Issues an aggregation to `DBClientBase`s starting at `startAfter` and copies the entries
      * relevant to `recipientShard` into `toWriteInto`. Control is returned when the aggregation
      * cursor is exhausted.
@@ -54,15 +96,36 @@ public:
      * a `Shard` object will provide critical behavior such as advancing logical clock values on a
      * response and targetting a node to send the aggregation command to.
      */
-    ReshardingDonorOplogId iterate(OperationContext* opCtx,
-                                   DBClientBase* conn,
-                                   boost::intrusive_ptr<ExpressionContext> expCtx,
-                                   ReshardingDonorOplogId startAfter,
-                                   UUID collUUID,
-                                   const ShardId& recipientShard,
-                                   bool doesDonorOwnMinKeyChunk,
-                                   NamespaceString toWriteInto);
+    boost::optional<ReshardingDonorOplogId> iterate(OperationContext* opCtx,
+                                                    DBClientBase* conn,
+                                                    boost::intrusive_ptr<ExpressionContext> expCtx,
+                                                    ReshardingDonorOplogId startAfter,
+                                                    UUID collUUID,
+                                                    const ShardId& recipientShard,
+                                                    bool doesDonorOwnMinKeyChunk,
+                                                    NamespaceString toWriteInto);
+
+    int getNumOplogEntriesCopied() {
+        return _numOplogEntriesCopied;
+    }
 
 private:
+    /**
+     * Returns true if there's more work to do and the task should be rescheduled.
+     */
+    bool _runTask();
+
+    const UUID _reshardingUUID;
+    const UUID _collUUID;
+    ReshardingDonorOplogId _startAt;
+    const ShardId _donorShard;
+    const ShardId _recipientShard;
+    const bool _doesDonorOwnMinKeyChunk;
+    const NamespaceString _toWriteInto;
+
+    ServiceContext::UniqueClient _client;
+    AtomicWord<bool> _isAlive{true};
+
+    int _numOplogEntriesCopied = 0;
 };
 }  // namespace mongo

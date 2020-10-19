@@ -116,12 +116,9 @@ public:
 
     /**
      * Semantically equivalent to the previous connect method, but returns a Status
-     * instead of taking an errmsg out parameter. Also allows optional validation of the reply to
-     * the 'isMaster' command executed during connection.
+     * instead of taking an errmsg out parameter.
      *
      * @param server The server to connect to.
-     * @param a hook to validate the 'isMaster' reply received during connection. If the hook
-     * fails, the connection will be terminated and a non-OK status will be returned.
      */
     virtual Status connect(const HostAndPort& server, StringData applicationName);
 
@@ -133,16 +130,6 @@ public:
      * @param server The server to connect to.
      */
     Status connectSocketOnly(const HostAndPort& server);
-
-    /** Connect to a Mongo database server.  Exception throwing version.
-        Throws a AssertionException if cannot connect.
-
-       If autoReconnect is true, you can try to use the DBClientConnection even when
-       false was returned -- it will try to connect again.
-
-       @param serverHostname host to connect to.  can include port number ( 127.0.0.1 ,
-                               127.0.0.1:5555 )
-    */
 
     /**
      * Logs out the connection for the given database.

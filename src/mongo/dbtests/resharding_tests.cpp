@@ -105,6 +105,10 @@ public:
     OperationContext* _opCtx = _opCtxRaii.get();
     ServiceContext* _svcCtx = _opCtx->getServiceContext();
     VectorClockMutable* _clock = VectorClockMutable::get(_opCtx);
+    // A convenience UUID.
+    UUID _reshardingUUID = UUID::gen();
+    // Timestamp of the first oplog entry which the fixture will set up.
+    Timestamp _fetchTimestamp;
 
     ReshardingTest() {
         repl::ReplSettings replSettings;
@@ -133,8 +137,31 @@ public:
         opObsRegistry->addObserver(std::make_unique<OpObserverImpl>());
         _opCtx->getServiceContext()->setOpObserver(std::move(opObsRegistry));
 
+        // Clean out the oplog and write one no-op entry. The timestamp of this first oplog entry
+        // will serve as resharding's `fetchTimestamp`.
         repl::setOplogCollectionName(_svcCtx);
         repl::createOplog(_opCtx);
+        reset(NamespaceString::kRsOplogNamespace);
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            Lock::GlobalLock lk(_opCtx, LockMode::MODE_IX);
+            _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                _opCtx,
+                // Choose a random, irrelevant replicated namespace.
+                NamespaceString::kSystemKeysNamespace,
+                UUID::gen(),
+                BSON("msg"
+                     << "Dummy op."),
+                boost::none,
+                boost::none,
+                boost::none,
+                boost::none,
+                boost::none);
+            wuow.commit();
+            repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
+        }
+        _fetchTimestamp = queryOplog(BSONObj())["ts"].timestamp();
+        std::cout << " Fetch timestamp: " << _fetchTimestamp.toString() << std::endl;
 
         _clock->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));
     }
@@ -155,6 +182,9 @@ public:
      */
     void reset(NamespaceString nss) const {
         ::mongo::writeConflictRetry(_opCtx, "deleteAll", nss.ns(), [&] {
+            // Do not write DDL operations to the oplog. This keeps the initial oplog state for each
+            // test predictable.
+            repl::UnreplicatedWritesBlock uwb(_opCtx);
             _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
             AutoGetCollection collRaii(_opCtx, nss, LockMode::MODE_X);
 
@@ -228,6 +258,64 @@ public:
 
         return ret;
     }
+
+    // Writes five documents to `dataCollectionNss` that are replicated with a `destinedRecipient`
+    // followed by the final no-op oplog entry that signals the last oplog entry needed to be
+    // applied for resharding to move to the next stage.
+    void setupBasic(NamespaceString outputCollectionNss,
+                    NamespaceString dataCollectionNss,
+                    ShardId destinedRecipient) {
+        reset(outputCollectionNss);
+        reset(dataCollectionNss);
+
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
+
+        // Set a failpoint to tack a `destinedRecipient` onto oplog entries.
+        setGlobalFailPoint("addDestinedRecipient",
+                           BSON("mode"
+                                << "alwaysOn"
+                                << "data"
+                                << BSON("destinedRecipient" << destinedRecipient.toString())));
+
+        // Insert five documents. Advance the majority point.
+        const std::int32_t docsToInsert = 5;
+        {
+            for (std::int32_t num = 0; num < docsToInsert; ++num) {
+                WriteUnitOfWork wuow(_opCtx);
+                insertDocument(dataColl.getCollection(),
+                               InsertStatement(BSON("_id" << num << "a" << num)));
+                wuow.commit();
+            }
+        }
+
+        // Write an entry saying that fetching is complete.
+        {
+            WriteUnitOfWork wuow(_opCtx);
+            _opCtx->getServiceContext()->getOpObserver()->onInternalOpMessage(
+                _opCtx,
+                dataColl.getCollection()->ns(),
+                dataColl.getCollection()->uuid(),
+                BSON("msg" << fmt::format("Writes to {} are temporarily blocked for resharding.",
+                                          dataColl.getCollection()->ns().toString())),
+                BSON("type"
+                     << "reshardFinalOp"
+                     << "reshardingUUID" << _reshardingUUID),
+                boost::none,
+                boost::none,
+                boost::none,
+                boost::none);
+            wuow.commit();
+        }
+
+        repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
+        _svcCtx->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
+            getLastApplied().getTimestamp());
+
+        // Disable the failpoint.
+        setGlobalFailPoint("addDestinedRecipient",
+                           BSON("mode"
+                                << "off"));
+    }
 };
 
 class RunFetchIteration : public ReshardingTest {
@@ -280,48 +368,102 @@ public:
         repl::StorageInterface::get(_opCtx)->waitForAllEarlierOplogWritesToBeVisible(_opCtx);
         const Timestamp latestLastApplied = getLastApplied().getTimestamp();
 
-        BSONObj firstOplog = queryOplog(BSONObj());
-        Timestamp firstTimestamp = firstOplog["ts"].timestamp();
-        std::cout << "First oplog: " << firstOplog.toString()
-                  << " Timestamp: " << firstTimestamp.toString() << std::endl;
-
         // The first call to `iterate` should return the first five inserts and return a
         // `ReshardingDonorOplogId` matching the last applied of those five inserts.
-        ReshardingOplogFetcher fetcher;
+        ReshardingOplogFetcher fetcher(_reshardingUUID,
+                                       dataColl->uuid(),
+                                       {_fetchTimestamp, _fetchTimestamp},
+                                       ShardId("fakeDonorShard"),
+                                       ShardId("shard1"),
+                                       true,
+                                       outputCollectionNss);
         DBDirectClient client(_opCtx);
-        StatusWith<ReshardingDonorOplogId> ret = fetcher.iterate(_opCtx,
-                                                                 &client,
-                                                                 createExpressionContext(),
-                                                                 {firstTimestamp, firstTimestamp},
-                                                                 dataColl->uuid(),
-                                                                 {"shard1"},
-                                                                 true,
-                                                                 outputCollectionNss);
-        ReshardingDonorOplogId donorOplodId = unittest::assertGet(ret);
-        // +1 because of the create collection oplog entry.
-        ASSERT_EQ(docsToInsert + 1, itcount(outputCollectionNss));
-        ASSERT_EQ(firstFiveLastApplied, donorOplodId.getClusterTime());
-        ASSERT_EQ(firstFiveLastApplied, donorOplodId.getTs());
+        boost::optional<ReshardingDonorOplogId> donorOplogId =
+            fetcher.iterate(_opCtx,
+                            &client,
+                            createExpressionContext(),
+                            {_fetchTimestamp, _fetchTimestamp},
+                            dataColl->uuid(),
+                            {"shard1"},
+                            true,
+                            outputCollectionNss);
+
+        ASSERT(donorOplogId != boost::none);
+        ASSERT_EQ(docsToInsert, itcount(outputCollectionNss));
+        ASSERT_EQ(firstFiveLastApplied, donorOplogId->getClusterTime());
+        ASSERT_EQ(firstFiveLastApplied, donorOplogId->getTs());
 
         // Advance the committed snapshot. A second `iterate` should return the second batch of five
         // inserts.
         _svcCtx->getStorageEngine()->getSnapshotManager()->setCommittedSnapshot(
             getLastApplied().getTimestamp());
 
-        ret = fetcher.iterate(_opCtx,
-                              &client,
-                              createExpressionContext(),
-                              {firstFiveLastApplied, firstFiveLastApplied},
-                              dataColl->uuid(),
-                              {"shard1"},
-                              true,
-                              outputCollectionNss);
+        donorOplogId = fetcher.iterate(_opCtx,
+                                       &client,
+                                       createExpressionContext(),
+                                       {firstFiveLastApplied, firstFiveLastApplied},
+                                       dataColl->uuid(),
+                                       {"shard1"},
+                                       true,
+                                       outputCollectionNss);
 
-        donorOplodId = unittest::assertGet(ret);
-        // Two batches of five inserts + 1 entry for the create collection oplog entry.
-        ASSERT_EQ((2 * docsToInsert) + 1, itcount(outputCollectionNss));
-        ASSERT_EQ(latestLastApplied, donorOplodId.getClusterTime());
-        ASSERT_EQ(latestLastApplied, donorOplodId.getTs());
+        ASSERT(donorOplogId != boost::none);
+        // Two batches of five inserts entry for the create collection oplog entry.
+        ASSERT_EQ((2 * docsToInsert), itcount(outputCollectionNss));
+        ASSERT_EQ(latestLastApplied, donorOplogId->getClusterTime());
+        ASSERT_EQ(latestLastApplied, donorOplogId->getTs());
+    }
+};
+
+class RunConsume : public ReshardingTest {
+public:
+    void run() {
+        const NamespaceString outputCollectionNss("dbtests.outputCollection");
+        const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+
+        const ShardId destinationShard("shard1");
+        setupBasic(outputCollectionNss, dataCollectionNss, destinationShard);
+
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IS);
+        ReshardingOplogFetcher fetcher(_reshardingUUID,
+                                       dataColl->uuid(),
+                                       {_fetchTimestamp, _fetchTimestamp},
+                                       ShardId("fakeDonorShard"),
+                                       destinationShard,
+                                       true,
+                                       outputCollectionNss);
+        DBDirectClient client(_opCtx);
+        fetcher.consume(&client);
+
+        // Six oplog entries should be copied. Five inserts and the final no-op oplog entry.
+        ASSERT_EQ(6, fetcher.getNumOplogEntriesCopied());
+    }
+};
+
+class InterruptConsume : public ReshardingTest {
+public:
+    void run() {
+        const NamespaceString outputCollectionNss("dbtests.outputCollection");
+        const NamespaceString dataCollectionNss("dbtests.runFetchIteration");
+
+        const ShardId destinationShard("shard1");
+        setupBasic(outputCollectionNss, dataCollectionNss, destinationShard);
+
+        AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IS);
+        ReshardingOplogFetcher fetcher(_reshardingUUID,
+                                       dataColl->uuid(),
+                                       {_fetchTimestamp, _fetchTimestamp},
+                                       ShardId("fakeDonorShard"),
+                                       destinationShard,
+                                       true,
+                                       outputCollectionNss);
+
+        // Interrupt the fetcher. A fetcher object owns its own client, but interruption does not
+        // require the background job to be started.
+        fetcher.setKilled();
+
+        DBDirectClient client(_opCtx);
+        ASSERT_THROWS(fetcher.consume(&client), ExceptionForCat<ErrorCategory::Interruption>);
     }
 };
 
@@ -355,6 +497,8 @@ public:
 
     void setupTests() {
         addIf<RunFetchIteration>();
+        addIf<RunConsume>();
+        addIf<InterruptConsume>();
     }
 };
 

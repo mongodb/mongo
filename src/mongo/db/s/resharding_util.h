@@ -215,4 +215,21 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
     const NamespaceString& sourceNss,
     const ShardId& recipientShard);
 
+/**
+ * Sentinel oplog format:
+ * {
+ *   op: "n",
+ *   ns: "<database>.<collection>",
+ *   ui: <existingUUID>,
+ *   destinedRecipient: <recipientShardId>,
+ *   o: {msg: "Writes to <database>.<collection> is temporarily blocked for resharding"},
+ *   o2: {type: "reshardFinalOp", reshardingUUID: <reshardingUUID>},
+ *   fromMigrate: true,
+ * }
+ */
+bool isFinalOplog(const repl::OplogEntry& oplog);
+bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID);
+
+NamespaceString getLocalOplogBufferNamespace(UUID reshardingUUID, ShardId donorShardId);
+
 }  // namespace mongo

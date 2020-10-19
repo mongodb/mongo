@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/recipient_document_gen.h"
+#include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {

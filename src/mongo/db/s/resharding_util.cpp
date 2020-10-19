@@ -722,4 +722,32 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
         .getShardId();
 }
 
+bool isFinalOplog(const repl::OplogEntry& oplog) {
+    if (oplog.getOpType() != repl::OpTypeEnum::kNoop) {
+        return false;
+    }
+
+    auto o2Field = oplog.getObject2();
+    if (!o2Field) {
+        return false;
+    }
+
+    return o2Field->getField("type").valueStringDataSafe() == "reshardFinalOp"_sd;
+}
+
+bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID) {
+    if (!isFinalOplog(oplog)) {
+        return false;
+    }
+
+    return uassertStatusOK(UUID::parse(oplog.getObject2()->getField("reshardingUUID"))) ==
+        reshardingUUID;
+}
+
+
+NamespaceString getLocalOplogBufferNamespace(UUID reshardingUUID, ShardId donorShardId) {
+    return NamespaceString("config.localReshardingOplogBuffer.{}.{}"_format(
+        reshardingUUID.toString(), donorShardId.toString()));
+}
+
 }  // namespace mongo
