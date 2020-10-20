@@ -90,6 +90,7 @@ if env['TARGET_ARCH'] == 'aarch64':
 
 env.Append(
     CCFLAGS=[
+        '-fcommon',
         '-fexceptions',
         '-Wno-unused-result',
         '-Wno-unused-value',
