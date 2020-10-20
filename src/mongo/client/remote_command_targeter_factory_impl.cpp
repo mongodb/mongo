@@ -48,16 +48,16 @@ RemoteCommandTargeterFactoryImpl::~RemoteCommandTargeterFactoryImpl() = default;
 std::unique_ptr<RemoteCommandTargeter> RemoteCommandTargeterFactoryImpl::create(
     const ConnectionString& connStr) {
     switch (connStr.type()) {
-        case ConnectionString::MASTER:
-        case ConnectionString::CUSTOM:
+        case ConnectionString::ConnectionType::kStandalone:
+        case ConnectionString::ConnectionType::kCustom:
             invariant(connStr.getServers().size() == 1);
             return std::make_unique<RemoteCommandTargeterStandalone>(connStr.getServers().front());
-        case ConnectionString::SET:
+        case ConnectionString::ConnectionType::kReplicaSet:
             return std::make_unique<RemoteCommandTargeterRS>(connStr.getSetName(),
                                                              connStr.getServers());
         // These connections should never be seen
-        case ConnectionString::INVALID:
-        case ConnectionString::LOCAL:
+        case ConnectionString::ConnectionType::kInvalid:
+        case ConnectionString::ConnectionType::kLocal:
             MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;

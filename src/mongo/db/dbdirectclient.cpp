@@ -110,7 +110,7 @@ bool DBDirectClient::isReplicaSetMember() const {
 }
 
 ConnectionString::ConnectionType DBDirectClient::type() const {
-    return ConnectionString::MASTER;
+    return ConnectionString::ConnectionType::kStandalone;
 }
 
 double DBDirectClient::getSoTimeout() const {

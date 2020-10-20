@@ -763,7 +763,7 @@ void MongoBase::Functions::isReplicaSetConnection::call(JSContext* cx, JS::CallA
         uasserted(ErrorCodes::BadValue, "isReplicaSetConnection takes no args");
     }
 
-    args.rval().setBoolean(conn->type() == ConnectionString::ConnectionType::SET);
+    args.rval().setBoolean(conn->type() == ConnectionString::ConnectionType::kReplicaSet);
 }
 
 void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs args) {

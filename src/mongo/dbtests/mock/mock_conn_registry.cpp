@@ -107,7 +107,7 @@ std::unique_ptr<mongo::DBClientBase> MockConnRegistry::MockConnHook::connect(
     auto conn = _registry->connect(hostName);
 
     if (!conn->connect(hostName.c_str(), StringData(), errmsg)) {
-        // mimic ConnectionString::connect for MASTER type connection to return NULL
+        // mimic ConnectionString::connect for kStandalone type connection to return NULL
         // if the destination is unreachable.
         return nullptr;
     }

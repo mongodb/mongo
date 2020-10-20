@@ -173,7 +173,7 @@ std::unique_ptr<mongo::DBClientCursor> MockDBClientConnection::query(
 }
 
 mongo::ConnectionString::ConnectionType MockDBClientConnection::type() const {
-    return mongo::ConnectionString::CUSTOM;
+    return mongo::ConnectionString::ConnectionType::kCustom;
 }
 
 unsigned long long MockDBClientConnection::query(

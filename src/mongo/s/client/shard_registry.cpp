@@ -383,8 +383,8 @@ void ShardRegistry::_removeReplicaSet(const std::string& setName) {
 
 void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
                                        ConnectionStringUpdateType updateType) {
-    invariant(givenConnString.type() == ConnectionString::SET ||
-              givenConnString.type() == ConnectionString::CUSTOM);  // For dbtests
+    invariant(givenConnString.type() == ConnectionString::ConnectionType::kReplicaSet ||
+              givenConnString.type() == ConnectionString::ConnectionType::kCustom);  // For dbtests
 
     auto setName = givenConnString.getSetName();
 
@@ -830,10 +830,10 @@ void ShardRegistryData::_addShard(std::shared_ptr<Shard> shard) {
                 "Adding new shard to shard registry",
                 "shardId"_attr = shard->getId(),
                 "shardConnectionString"_attr = connString);
-    if (connString.type() == ConnectionString::SET) {
+    if (connString.type() == ConnectionString::ConnectionType::kReplicaSet) {
         _rsLookup[connString.getSetName()] = shard;
-    } else if (connString.type() == ConnectionString::CUSTOM) {
-        // CUSTOM connection strings (ie "$dummy:10000) become DBDirectClient connections which
+    } else if (connString.type() == ConnectionString::ConnectionType::kCustom) {
+        // kCustom connection strings (ie "$dummy:10000) become DBDirectClient connections which
         // always return "localhost" as their response to getServerAddress().  This is just for
         // making dbtest work.
         _shardIdLookup[ShardId("localhost")] = shard;

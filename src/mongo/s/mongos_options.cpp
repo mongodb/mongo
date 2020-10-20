@@ -137,7 +137,8 @@ Status storeMongosOptions(const moe::Environment& params) {
         return configdbConnectionString.getStatus();
     }
 
-    if (configdbConnectionString.getValue().type() != ConnectionString::SET) {
+    if (configdbConnectionString.getValue().type() !=
+        ConnectionString::ConnectionType::kReplicaSet) {
         return Status(ErrorCodes::BadValue,
                       str::stream() << "configdb supports only replica set connection string");
     }

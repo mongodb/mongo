@@ -232,8 +232,8 @@ class ConnectionStringTests {
 public:
     void run() {
         {
-            ConnectionString s("a/b,c,d", ConnectionString::SET);
-            ASSERT_EQUALS(ConnectionString::SET, s.type());
+            ConnectionString s("a/b,c,d", ConnectionString::ConnectionType::kReplicaSet);
+            ASSERT_EQUALS(ConnectionString::ConnectionType::kReplicaSet, s.type());
             ASSERT_EQUALS("a", s.getSetName());
             vector<HostAndPort> v = s.getServers();
             ASSERT_EQUALS(3U, v.size());

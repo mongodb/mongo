@@ -244,7 +244,7 @@ public:
               bool assertOk,
               std::string* actualServer) override;
     ConnectionString::ConnectionType type() const override {
-        return ConnectionString::MASTER;
+        return ConnectionString::ConnectionType::kStandalone;
     }
     void setSoTimeout(double timeout);
     double getSoTimeout() const override {

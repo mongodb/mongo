@@ -208,6 +208,10 @@ public:
         return _connectString.isValid();
     }
 
+    explicit operator bool() const {
+        return isValid();
+    }
+
     const ConnectionString& connectionString() const {
         return _connectString;
     }
@@ -216,8 +220,12 @@ public:
         return _connectString.toString();
     }
 
-    const std::string& getSetName() const {
+    const std::string& getReplicaSetName() const {
         return _connectString.getSetName();
+    }
+
+    const std::string& getSetName() const {
+        return getReplicaSetName();
     }
 
     const std::vector<HostAndPort>& getServers() const {
@@ -240,7 +248,7 @@ public:
 
     // If you are trying to clone a URI (including its options/auth information) for a single
     // server (say a member of a replica-set), you can pass in its HostAndPort information to
-    // get a new URI with the same info, except type() will be MASTER and getServers() will
+    // get a new URI with the same info, except type() will be kStandalone and getServers() will
     // be the single host you pass in.
     MongoURI cloneURIForServer(HostAndPort hostAndPort, StringData applicationName) const {
         auto out = *this;

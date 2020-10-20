@@ -442,7 +442,9 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
         uassert(40372, "", shardingState->clusterId() == shardIdentity.getClusterId());
 
         auto prevConfigsvrConnStr = shardRegistry->getConfigServerConnectionString();
-        uassert(40373, "", prevConfigsvrConnStr.type() == ConnectionString::SET);
+        uassert(40373,
+                "",
+                prevConfigsvrConnStr.type() == ConnectionString::ConnectionType::kReplicaSet);
         uassert(40374, "", prevConfigsvrConnStr.getSetName() == configSvrConnStr.getSetName());
 
         return;
@@ -531,9 +533,9 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     };
 
     ShardFactory::BuildersMap buildersMap{
-        {ConnectionString::SET, std::move(setBuilder)},
-        {ConnectionString::MASTER, std::move(masterBuilder)},
-        {ConnectionString::LOCAL, std::move(localBuilder)},
+        {ConnectionString::ConnectionType::kReplicaSet, std::move(setBuilder)},
+        {ConnectionString::ConnectionType::kStandalone, std::move(masterBuilder)},
+        {ConnectionString::ConnectionType::kLocal, std::move(localBuilder)},
     };
 
     auto shardFactory =
@@ -571,9 +573,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
             catCache->invalidateEntriesThatReferenceShard(removedShard);
         }};
 
-    uassert(ErrorCodes::BadValue,
-            "Unrecognized connection string.",
-            configCS.type() != ConnectionString::INVALID);
+    uassert(ErrorCodes::BadValue, "Unrecognized connection string.", configCS);
 
     auto shardRegistry = std::make_unique<ShardRegistry>(
         std::move(shardFactory), configCS, std::move(shardRemovalHooks));

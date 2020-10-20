@@ -80,7 +80,7 @@ using std::vector;
 PoolForHost::PoolForHost()
     : _created(0),
       _minValidCreationTimeMicroSec(0),
-      _type(ConnectionString::INVALID),
+      _type(ConnectionString::ConnectionType::kInvalid),
       _maxPoolSize(kPoolSizeUnlimited),
       _maxInUse(kDefaultMaxInUse),
       _checkedOut(0),
@@ -701,7 +701,7 @@ void ScopedDbConnection::_setSocketTimeout() {
     if (!_conn)
         return;
 
-    if (_conn->type() == ConnectionString::MASTER)
+    if (_conn->type() == ConnectionString::ConnectionType::kStandalone)
         static_cast<DBClientConnection*>(_conn)->setSoTimeout(_socketTimeoutSecs);
 }
 

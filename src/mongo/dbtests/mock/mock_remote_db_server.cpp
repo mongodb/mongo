@@ -230,7 +230,7 @@ mongo::BSONArray MockRemoteDBServer::query(MockRemoteDBServer::InstanceID id,
 }
 
 mongo::ConnectionString::ConnectionType MockRemoteDBServer::type() const {
-    return mongo::ConnectionString::CUSTOM;
+    return mongo::ConnectionString::ConnectionType::kCustom;
 }
 
 size_t MockRemoteDBServer::getCmdCount() const {

@@ -503,7 +503,7 @@ void DBClientCursor::attach(AScopedConnection* conn) {
     verify(conn);
     verify(conn->get());
 
-    if (conn->get()->type() == ConnectionString::SET) {
+    if (conn->get()->type() == ConnectionString::ConnectionType::kReplicaSet) {
         if (_lazyHost.size() > 0)
             _scopedHost = _lazyHost;
         else if (_client)

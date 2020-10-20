@@ -196,7 +196,7 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     std::vector<std::pair<ShardId, BSONObj>> requests;
     for (const auto& shardId : shardIds) {
         const auto shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardId));
-        invariant(!shard->isConfig() || shard->getConnString().type() != ConnectionString::INVALID);
+        invariant(!shard->isConfig() || shard->getConnString());
 
         BSONObjBuilder cmdBuilder;
         qrToForward->asFindCommand(&cmdBuilder);

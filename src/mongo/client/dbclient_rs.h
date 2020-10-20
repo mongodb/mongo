@@ -203,7 +203,7 @@ public:
     std::string getServerAddress() const override;
 
     ConnectionString::ConnectionType type() const override {
-        return ConnectionString::SET;
+        return ConnectionString::ConnectionType::kReplicaSet;
     }
     bool lazySupported() const override {
         return true;

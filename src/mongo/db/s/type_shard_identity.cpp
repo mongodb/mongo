@@ -52,7 +52,7 @@ StatusWith<ShardIdentityType> ShardIdentityType::fromShardIdentityDocument(const
             ShardIdentity::parse(IDLParserErrorContext("ShardIdentity"), shardIdentityBSON);
 
         const auto& configsvrConnStr = shardIdentity.getConfigsvrConnectionString();
-        if (configsvrConnStr.type() != ConnectionString::SET) {
+        if (configsvrConnStr.type() != ConnectionString::ConnectionType::kReplicaSet) {
             return Status(ErrorCodes::UnsupportedFormat,
                           str::stream()
                               << "config server connection string can only be replica sets: "
@@ -67,7 +67,7 @@ StatusWith<ShardIdentityType> ShardIdentityType::fromShardIdentityDocument(const
 
 Status ShardIdentityType::validate() const {
     const auto& configsvrConnStr = getConfigsvrConnectionString();
-    if (configsvrConnStr.type() != ConnectionString::SET) {
+    if (configsvrConnStr.type() != ConnectionString::ConnectionType::kReplicaSet) {
         return {ErrorCodes::UnsupportedFormat,
                 str::stream() << "config connection string can only be replica sets, got "
                               << ConnectionString::typeToString(configsvrConnStr.type())};

@@ -90,7 +90,7 @@ private:
 TEST_F(ShardingInitializationOpObserverTest, GlobalInitGetsCalledAfterWriteCommits) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
 
@@ -102,7 +102,7 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitGetsCalledAfterWriteCommi
 TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAborts) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
 
@@ -128,7 +128,7 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAbo
 TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetsCalledIfNSIsNotForShardIdentity) {
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
 

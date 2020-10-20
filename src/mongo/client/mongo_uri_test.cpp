@@ -105,8 +105,8 @@ void compareOptions(size_t lineNumber,
                                                       << " data on line: " << lineNumber << uri;
 }
 
-const ConnectionString::ConnectionType kMaster = ConnectionString::MASTER;
-const ConnectionString::ConnectionType kSet = ConnectionString::SET;
+const ConnectionString::ConnectionType kMaster = ConnectionString::ConnectionType::kStandalone;
+const ConnectionString::ConnectionType kReplicaSet = ConnectionString::ConnectionType::kReplicaSet;
 
 const URITestCase validCases[] = {
 
@@ -155,7 +155,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/dbname?a=b&replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"a", "b"}, {"replicaSet", "replName"}},
@@ -166,7 +166,7 @@ const URITestCase validCases[] = {
      "dbname?a=b&replicaSet=replName",
      "needs encoding%#!<>",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"a", "b"}, {"replicaSet", "replName"}},
@@ -177,7 +177,7 @@ const URITestCase validCases[] = {
      "db@name?a=b&replicaSet=replName",
      "needs encoding%#!<>",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"a", "b"}, {"replicaSet", "replName"}},
@@ -188,7 +188,7 @@ const URITestCase validCases[] = {
      "dbname?a=b&replicaSet=replName",
      "user",
      "needs encoding%#!<>",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"a", "b"}, {"replicaSet", "replName"}},
@@ -198,7 +198,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/dbname?a=b&replicaSet=needs%20encoding%25%23!%3C%3E",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "needs encoding%#!<>",
      2,
      {{"a", "b"}, {"replicaSet", "needs encoding%#!<>"}},
@@ -208,7 +208,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/needsencoding%40hello?a=b&replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"a", "b"}, {"replicaSet", "replName"}},
@@ -218,7 +218,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@127.0.0.1,127.0.0.2/?replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -228,7 +228,7 @@ const URITestCase validCases[] = {
     {"mongodb://user@127.0.0.1,127.0.0.2/?replicaSet=replName",
      "user",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -238,7 +238,7 @@ const URITestCase validCases[] = {
     {"mongodb://user@127.0.0.1,127.0.0.2/?replicaset=replName",
      "user",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -248,7 +248,7 @@ const URITestCase validCases[] = {
     {"mongodb://127.0.0.1,127.0.0.2/dbName?foo=a&c=b&replicaSet=replName",
      "",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"foo", "a"}, {"c", "b"}, {"replicaSet", "replName"}},
@@ -258,7 +258,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@127.0.0.1:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -268,7 +268,7 @@ const URITestCase validCases[] = {
     {"mongodb://user@127.0.0.1:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -278,7 +278,7 @@ const URITestCase validCases[] = {
     {"mongodb://127.0.0.1:1234,127.0.0.1:1234/dbName?foo=a&c=b&replicaSet=replName",
      "",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"foo", "a"}, {"c", "b"}, {"replicaSet", "replName"}},
@@ -316,7 +316,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@[::1],127.0.0.2/?replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -326,7 +326,7 @@ const URITestCase validCases[] = {
     {"mongodb://user@[::1],127.0.0.2/?replicaSet=replName",
      "user",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -336,7 +336,7 @@ const URITestCase validCases[] = {
     {"mongodb://[::1],127.0.0.2/dbName?foo=a&c=b&replicaSet=replName",
      "",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"foo", "a"}, {"c", "b"}, {"replicaSet", "replName"}},
@@ -346,7 +346,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -356,7 +356,7 @@ const URITestCase validCases[] = {
     {"mongodb://user@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -366,7 +366,7 @@ const URITestCase validCases[] = {
     {"mongodb://[::1]:1234,[::1]:1234/dbName?foo=a&c=b&replicaSet=replName",
      "",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"foo", "a"}, {"c", "b"}, {"replicaSet", "replName"}},
@@ -404,7 +404,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@[::1],127.0.0.2/?replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -414,7 +414,7 @@ const URITestCase validCases[] = {
     {"mongodb://user@[::1],127.0.0.2/?replicaSet=replName",
      "user",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -424,7 +424,7 @@ const URITestCase validCases[] = {
     {"mongodb://[::1],127.0.0.2/dbName?foo=a&c=b&replicaSet=replName",
      "",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"foo", "a"}, {"c", "b"}, {"replicaSet", "replName"}},
@@ -434,7 +434,7 @@ const URITestCase validCases[] = {
     {"mongodb://user:pwd@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
      "pwd",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -444,7 +444,7 @@ const URITestCase validCases[] = {
     {"mongodb://user@[::1]:1234,127.0.0.2:1234/?replicaSet=replName",
      "user",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -454,7 +454,7 @@ const URITestCase validCases[] = {
     {"mongodb://[::1]:1234,[::1]:1234/dbName?foo=a&c=b&replicaSet=replName",
      "",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"foo", "a"}, {"c", "b"}, {"replicaSet", "replName"}},
@@ -486,7 +486,7 @@ const URITestCase validCases[] = {
     {"mongodb://%2Ftmp%2Fmongodb-27017.sock,%2Ftmp%2Fmongodb-27018.sock/?replicaSet=replName",
      "",
      "",
-     kSet,
+     kReplicaSet,
      "replName",
      2,
      {{"replicaSet", "replName"}},
@@ -609,7 +609,7 @@ void testValidURIFormat(URITestCase testCase) {
     ASSERT_EQ(testCase.uname, result.getUser());
     ASSERT_EQ(testCase.password, result.getPassword());
     ASSERT_EQ(testCase.type, result.type());
-    ASSERT_EQ(testCase.setname, result.getSetName());
+    ASSERT_EQ(testCase.setname, result.getReplicaSetName());
     ASSERT_EQ(testCase.numservers, result.getServers().size());
     compareOptions(0, testCase.URI, result.getOptions(), testCase.options);
     ASSERT_EQ(testCase.database, result.getDatabase());
@@ -657,8 +657,8 @@ TEST(MongoURI, CloneURIForServer) {
     ASSERT_OK(sw_uri.getStatus());
 
     auto uri = sw_uri.getValue();
-    ASSERT_EQ(uri.type(), kSet);
-    ASSERT_EQ(uri.getSetName(), "rs1");
+    ASSERT_EQ(uri.type(), kReplicaSet);
+    ASSERT_EQ(uri.getReplicaSetName(), "rs1");
     ASSERT_EQ(uri.getServers().size(), static_cast<std::size_t>(3));
 
     auto& uriOptions = uri.getOptions();
@@ -667,7 +667,7 @@ TEST(MongoURI, CloneURIForServer) {
     auto clonedURI = uri.cloneURIForServer(HostAndPort{"localhost:27020"}, StringData());
 
     ASSERT_EQ(clonedURI.type(), kMaster);
-    ASSERT_TRUE(clonedURI.getSetName().empty());
+    ASSERT_TRUE(clonedURI.getReplicaSetName().empty());
     ASSERT_EQ(clonedURI.getServers().size(), static_cast<std::size_t>(1));
     auto& clonedURIOptions = clonedURI.getOptions();
     ASSERT_EQ(clonedURIOptions.at("ssl"), "true");
@@ -754,7 +754,7 @@ TEST(MongoURI, specTests) {
                     if (!replsetElement.eoo()) {
                         ASSERT_EQ(replsetElement.type(), String);
                         setName = replsetElement.String();
-                        connectionType = kSet;
+                        connectionType = kReplicaSet;
                     }
 
                     for (auto&& field : optionsElement.Obj()) {

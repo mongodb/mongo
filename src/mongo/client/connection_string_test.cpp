@@ -38,7 +38,7 @@ namespace {
 
 using unittest::assertGet;
 
-TEST(ConnectionString, EqualityOperatorMaster) {
+TEST(ConnectionString, EqualityOperatorStandalone) {
     const auto cs = assertGet(ConnectionString::parse("TestHostA:12345"));
     ASSERT(cs == assertGet(ConnectionString::parse("TestHostA:12345")));
     ASSERT_FALSE(cs != assertGet(ConnectionString::parse("TestHostA:12345")));

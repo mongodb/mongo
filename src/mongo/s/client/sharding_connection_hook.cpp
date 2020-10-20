@@ -49,7 +49,7 @@ ShardingConnectionHook::ShardingConnectionHook(std::unique_ptr<rpc::EgressMetada
     : _egressHook(std::move(egressHook)) {}
 
 void ShardingConnectionHook::onCreate(DBClientBase* conn) {
-    if (conn->type() == ConnectionString::INVALID) {
+    if (conn->type() == ConnectionString::ConnectionType::kInvalid) {
         uasserted(ErrorCodes::BadValue, str::stream() << "Unrecognized connection string.");
     }
 
@@ -72,7 +72,7 @@ void ShardingConnectionHook::onCreate(DBClientBase* conn) {
     });
 
 
-    if (conn->type() == ConnectionString::MASTER) {
+    if (conn->type() == ConnectionString::ConnectionType::kStandalone) {
         BSONObj isMasterResponse;
         if (!conn->runCommand("admin", BSON("ismaster" << 1), isMasterResponse)) {
             uassertStatusOK(getStatusFromCommandResult(isMasterResponse));

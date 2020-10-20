@@ -88,8 +88,8 @@ StatusWith<AddShardRequest> AddShardRequest::parseInternalFields(const BSONObj& 
     }
     ConnectionString connString = std::move(swConnString.getValue());
 
-    if (connString.type() != ConnectionString::MASTER &&
-        connString.type() != ConnectionString::SET) {
+    if (connString.type() != ConnectionString::ConnectionType::kStandalone &&
+        connString.type() != ConnectionString::ConnectionType::kReplicaSet) {
         return {ErrorCodes::FailedToParse,
                 stream() << "Invalid connection string " << connString.toString()};
     }

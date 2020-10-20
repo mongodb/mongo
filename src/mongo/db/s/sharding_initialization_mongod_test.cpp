@@ -172,7 +172,7 @@ TEST_F(ShardingInitializationMongoDTest, ValidShardIdentitySucceeds) {
 
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
 
@@ -189,7 +189,7 @@ TEST_F(ShardingInitializationMongoDTest, InitWhilePreviouslyInErrorStateWillStay
 
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(OID::gen());
 
@@ -222,7 +222,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentit
     auto clusterID = OID::gen();
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(clusterID);
 
@@ -230,7 +230,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingShardIdentit
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity2.setShardName(kShardName);
     shardIdentity2.setClusterId(clusterID);
 
@@ -255,7 +255,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameS
     auto clusterID = OID::gen();
     ShardIdentityType shardIdentity;
     shardIdentity.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
     shardIdentity.setShardName(kShardName);
     shardIdentity.setClusterId(clusterID);
 
@@ -263,7 +263,7 @@ TEST_F(ShardingInitializationMongoDTest, InitializeAgainWithMatchingReplSetNameS
 
     ShardIdentityType shardIdentity2;
     shardIdentity2.setConfigsvrConnectionString(
-        ConnectionString(ConnectionString::SET, "b:2,c:3", "config"));
+        ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "b:2,c:3", "config"));
     shardIdentity2.setShardName(kShardName);
     shardIdentity2.setClusterId(clusterID);
 
@@ -319,7 +319,7 @@ TEST_F(ShardingInitializationMongoDTest,
     serverGlobalParams.overrideShardIdentity = [] {
         ShardIdentityType shardIdentity;
         shardIdentity.setConfigsvrConnectionString(
-            ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+            ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
         shardIdentity.setShardName(kShardName);
         shardIdentity.setClusterId(OID::gen());
         ASSERT_OK(shardIdentity.validate());
@@ -363,7 +363,7 @@ TEST_F(ShardingInitializationMongoDTest,
     serverGlobalParams.overrideShardIdentity = [] {
         ShardIdentityType shardIdentity;
         shardIdentity.setConfigsvrConnectionString(
-            ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+            ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
         shardIdentity.setShardName(kShardName);
         shardIdentity.setClusterId(OID::gen());
         ASSERT_OK(shardIdentity.validate());
@@ -406,7 +406,7 @@ TEST_F(ShardingInitializationMongoDTest,
     serverGlobalParams.overrideShardIdentity = [] {
         ShardIdentityType shardIdentity;
         shardIdentity.setConfigsvrConnectionString(
-            ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+            ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
         shardIdentity.setShardName(kShardName);
         shardIdentity.setClusterId(OID::gen());
         ASSERT_OK(shardIdentity.validate());
@@ -469,8 +469,8 @@ TEST_F(ShardingInitializationMongoDTest,
 
         BSONObj validShardIdentity = [&] {
             ShardIdentityType shardIdentity;
-            shardIdentity.setConfigsvrConnectionString(
-                ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+            shardIdentity.setConfigsvrConnectionString(ConnectionString(
+                ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
             shardIdentity.setShardName(kShardName);
             shardIdentity.setClusterId(OID::gen());
             ASSERT_OK(shardIdentity.validate());
@@ -516,7 +516,7 @@ TEST_F(ShardingInitializationMongoDTest,
     BSONObj validShardIdentity = [&] {
         ShardIdentityType shardIdentity;
         shardIdentity.setConfigsvrConnectionString(
-            ConnectionString(ConnectionString::SET, "a:1,b:2", "config"));
+            ConnectionString(ConnectionString::ConnectionType::kReplicaSet, "a:1,b:2", "config"));
         shardIdentity.setShardName(kShardName);
         shardIdentity.setClusterId(OID::gen());
         ASSERT_OK(shardIdentity.validate());

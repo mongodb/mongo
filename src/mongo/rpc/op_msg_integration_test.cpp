@@ -196,7 +196,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
     const auto connStr = unittest::getFixtureConnectionString();
 
     // This test only works against a replica set.
-    if (connStr.type() != ConnectionString::SET) {
+    if (connStr.type() != ConnectionString::ConnectionType::kReplicaSet) {
         return;
     }
 

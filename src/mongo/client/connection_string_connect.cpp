@@ -58,7 +58,7 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(
     }
 
     switch (_type) {
-        case MASTER: {
+        case ConnectionType::kStandalone: {
             for (const auto& server : _servers) {
                 auto c = std::make_unique<DBClientConnection>(
                     true, 0, newURI, DBClientConnection::HandshakeValidationHook(), apiParameters);
@@ -78,8 +78,8 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(
             return nullptr;
         }
 
-        case SET: {
-            auto set = std::make_unique<DBClientReplicaSet>(_setName,
+        case ConnectionType::kReplicaSet: {
+            auto set = std::make_unique<DBClientReplicaSet>(_replicaSetName,
                                                             _servers,
                                                             applicationName,
                                                             socketTimeout,
@@ -93,7 +93,7 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(
             return std::move(set);
         }
 
-        case CUSTOM: {
+        case ConnectionType::kCustom: {
             // Lock in case other things are modifying this at the same time
             stdx::lock_guard<Latch> lk(_connectHookMutex);
 
@@ -118,8 +118,8 @@ std::unique_ptr<DBClientBase> ConnectionString::connect(
             return replacementConn;
         }
 
-        case LOCAL:
-        case INVALID:
+        case ConnectionType::kLocal:
+        case ConnectionType::kInvalid:
             MONGO_UNREACHABLE;
     }
 

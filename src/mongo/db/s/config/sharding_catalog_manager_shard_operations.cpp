@@ -236,7 +236,8 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             if (proposedShardConnectionString.type() != existingShardConnStr.type()) {
                 return false;
             }
-            if (proposedShardConnectionString.type() == ConnectionString::SET &&
+            if (proposedShardConnectionString.type() ==
+                    ConnectionString::ConnectionType::kReplicaSet &&
                 proposedShardConnectionString.getSetName() != existingShardConnStr.getSetName()) {
                 return false;
             }
@@ -246,8 +247,8 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             return true;
         };
 
-        if (existingShardConnStr.type() == ConnectionString::SET &&
-            proposedShardConnectionString.type() == ConnectionString::SET &&
+        if (existingShardConnStr.type() == ConnectionString::ConnectionType::kReplicaSet &&
+            proposedShardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet &&
             existingShardConnStr.getSetName() == proposedShardConnectionString.getSetName()) {
             // An existing shard has the same replica set name as the shard being added.
             // If the options aren't the same, then this is an error,
@@ -533,7 +534,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
     const long long maxSize) {
-    if (shardConnectionString.type() == ConnectionString::INVALID) {
+    if (!shardConnectionString) {
         return {ErrorCodes::BadValue, "Invalid connection string"};
     }
 
@@ -565,7 +566,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     auto targeter = shard->getTargeter();
 
     auto stopMonitoringGuard = makeGuard([&] {
-        if (shardConnectionString.type() == ConnectionString::SET) {
+        if (shardConnectionString.type() == ConnectionString::ConnectionType::kReplicaSet) {
             // This is a workaround for the case were we could have some bad shard being
             // requested to be added and we put that bad connection string on the global replica set
             // monitor registry. It needs to be cleaned up so that when a correct replica set is

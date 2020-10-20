@@ -521,8 +521,8 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 TEST_F(AddShardTest, AddSCCCConnectionStringAsShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         std::make_unique<RemoteCommandTargeterMock>());
-    auto invalidConn =
-        ConnectionString("host1:12345,host2:12345,host3:12345", ConnectionString::INVALID);
+    auto invalidConn = ConnectionString("host1:12345,host2:12345,host3:12345",
+                                        ConnectionString::ConnectionType::kInvalid);
     targeter->setConnectionStringReturnValue(invalidConn);
 
     auto future = launchAsync([this, invalidConn] {

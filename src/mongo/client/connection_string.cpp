@@ -38,30 +38,32 @@
 
 namespace mongo {
 
-ConnectionString::ConnectionString(const HostAndPort& server) : _type(MASTER) {
+ConnectionString::ConnectionString(const HostAndPort& server) : _type(ConnectionType::kStandalone) {
     _servers.push_back(server);
     _finishInit();
 }
 
-ConnectionString::ConnectionString(StringData setName, std::vector<HostAndPort> servers)
-    : _type(SET), _servers(std::move(servers)), _setName(setName.toString()) {
+ConnectionString::ConnectionString(StringData replicaSetName, std::vector<HostAndPort> servers)
+    : _type(ConnectionType::kReplicaSet),
+      _servers(std::move(servers)),
+      _replicaSetName(replicaSetName.toString()) {
     _finishInit();
 }
 
 // TODO: unify c-tors
 ConnectionString::ConnectionString(ConnectionType type,
                                    const std::string& s,
-                                   const std::string& setName) {
+                                   const std::string& replicaSetName) {
     _type = type;
-    _setName = setName;
+    _replicaSetName = replicaSetName;
     _fillServers(s);
     _finishInit();
 }
 
 ConnectionString::ConnectionString(ConnectionType type,
                                    std::vector<HostAndPort> servers,
-                                   const std::string& setName)
-    : _type(type), _servers(std::move(servers)), _setName(setName) {
+                                   const std::string& replicaSetName)
+    : _type(type), _servers(std::move(servers)), _replicaSetName(replicaSetName) {
     _finishInit();
 }
 
@@ -72,16 +74,20 @@ ConnectionString::ConnectionString(const std::string& s, ConnectionType connType
 }
 
 ConnectionString::ConnectionString(ConnectionType connType) : _type(connType), _string("<local>") {
-    invariant(_type == LOCAL);
+    invariant(_type == ConnectionType::kLocal);
 }
 
-ConnectionString ConnectionString::forReplicaSet(StringData setName,
+ConnectionString ConnectionString::forReplicaSet(StringData replicaSetName,
                                                  std::vector<HostAndPort> servers) {
-    return ConnectionString(setName, std::move(servers));
+    return ConnectionString(replicaSetName, std::move(servers));
+}
+
+ConnectionString ConnectionString::forStandalones(std::vector<HostAndPort> servers) {
+    return ConnectionString(ConnectionType::kStandalone, std::move(servers), "");
 }
 
 ConnectionString ConnectionString::forLocal() {
-    return ConnectionString(LOCAL);
+    return ConnectionString(ConnectionType::kLocal);
 }
 
 // TODO: rewrite parsing  make it more reliable
@@ -93,15 +99,15 @@ void ConnectionString::_fillServers(std::string s) {
     //
 
     if (s.find('$') == 0) {
-        _type = CUSTOM;
+        _type = ConnectionType::kCustom;
     }
 
     std::string::size_type idx = s.find('/');
     if (idx != std::string::npos) {
-        _setName = s.substr(0, idx);
+        _replicaSetName = s.substr(0, idx);
         s = s.substr(idx + 1);
-        if (_type != CUSTOM)
-            _type = SET;
+        if (_type != ConnectionType::kCustom)
+            _type = ConnectionType::kReplicaSet;
     }
 
     while ((idx = s.find(',')) != std::string::npos) {
@@ -111,22 +117,22 @@ void ConnectionString::_fillServers(std::string s) {
 
     _servers.push_back(HostAndPort(s));
 
-    if (_servers.size() == 1 && _type == INVALID) {
-        _type = MASTER;
+    if (_servers.size() == 1 && _type == ConnectionType::kInvalid) {
+        _type = ConnectionType::kStandalone;
     }
 }
 
 void ConnectionString::_finishInit() {
     switch (_type) {
-        case MASTER:
+        case ConnectionType::kStandalone:
             uassert(ErrorCodes::FailedToParse,
-                    "Cannot specify a replica set name for a ConnectionString of type MASTER",
-                    _setName.empty());
+                    "Cannot specify a replica set name for a standalone ConnectionString",
+                    _replicaSetName.empty());
             break;
-        case SET:
+        case ConnectionType::kReplicaSet:
             uassert(ErrorCodes::FailedToParse,
                     "Must specify set name for replica set ConnectionStrings",
-                    !_setName.empty());
+                    !_replicaSetName.empty());
             uassert(ErrorCodes::FailedToParse,
                     "Replica set ConnectionStrings must have at least one server specified",
                     _servers.size() >= 1);
@@ -139,16 +145,16 @@ void ConnectionString::_finishInit() {
 
     // Needed here as well b/c the parsing logic isn't used in all constructors
     // TODO: Refactor so that the parsing logic *is* used in all constructors
-    if (_type == MASTER && _servers.size() > 0) {
+    if (_type == ConnectionType::kStandalone && _servers.size() > 0) {
         if (_servers[0].host().find('$') == 0) {
-            _type = CUSTOM;
+            _type = ConnectionType::kCustom;
         }
     }
 
     std::stringstream ss;
 
-    if (_type == SET) {
-        ss << _setName << "/";
+    if (_type == ConnectionType::kReplicaSet) {
+        ss << _replicaSetName << "/";
     }
 
     for (unsigned i = 0; i < _servers.size(); i++) {
@@ -177,15 +183,15 @@ bool ConnectionString::operator==(const ConnectionString& other) const {
     }
 
     switch (_type) {
-        case INVALID:
+        case ConnectionType::kInvalid:
             return true;
-        case MASTER:
+        case ConnectionType::kStandalone:
             return _servers[0] == other._servers[0];
-        case SET:
-            return _setName == other._setName && _servers == other._servers;
-        case CUSTOM:
+        case ConnectionType::kReplicaSet:
+            return _replicaSetName == other._replicaSetName && _servers == other._servers;
+        case ConnectionType::kCustom:
             return _string == other._string;
-        case LOCAL:
+        case ConnectionType::kLocal:
             return true;
     }
 
@@ -201,7 +207,7 @@ StatusWith<ConnectionString> ConnectionString::parse(const std::string& url) {
 
     // Replica set
     if (i != std::string::npos && i != 0) {
-        return ConnectionString(SET, url.substr(i + 1), url.substr(0, i));
+        return ConnectionString(ConnectionType::kReplicaSet, url.substr(i + 1), url.substr(0, i));
     }
 
     const int numCommas = str::count(url, ',');
@@ -233,15 +239,15 @@ ConnectionString ConnectionString::deserialize(StringData url) {
 
 std::string ConnectionString::typeToString(ConnectionType type) {
     switch (type) {
-        case INVALID:
+        case ConnectionType::kInvalid:
             return "invalid";
-        case MASTER:
-            return "master";
-        case SET:
-            return "set";
-        case CUSTOM:
+        case ConnectionType::kStandalone:
+            return "standalone";
+        case ConnectionType::kReplicaSet:
+            return "replicaSet";
+        case ConnectionType::kCustom:
             return "custom";
-        case LOCAL:
+        case ConnectionType::kLocal:
             return "local";
     }
 
