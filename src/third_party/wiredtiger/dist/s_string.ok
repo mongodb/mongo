@@ -698,12 +698,14 @@ dll
 dlopen
 dlsym
 dmalloc
+dmb
 dmsg
 doxgen
 doxygen
 drealloc
 ds
 dsb
+dsbs
 dsk
 dsrc
 dst
@@ -894,6 +896,9 @@ isalpha
 iscntrl
 isdigit
 isgraph
+ish
+ishld
+ishst
 islocked
 islower
 ispo
@@ -1224,6 +1229,7 @@ setstr
 setv
 setvbuf
 sfence
+shareability
 signalled
 sii
 sizeof
@@ -1306,6 +1312,7 @@ timestamp
 timestamped
 timestamps
 tinfo
+tlb
 tmp
 todo
 tokenizer

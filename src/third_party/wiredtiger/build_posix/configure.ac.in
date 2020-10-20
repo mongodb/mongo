@@ -102,6 +102,12 @@ if test "$GCC" = "yes"; then
 	# instructions.
 	if test "$wt_cv_arm64" = "yes"; then
 		AM_CFLAGS="$AM_CFLAGS -march=armv8-a+crc"
+		# moutline-atomics preserves backwards compatibility with Arm v8.0
+		# systems but also supports using Arm v8.1 atomics. The latter can
+		# massively improve performance on larger Arm systems. The flag was
+		# back ported to gcc8, 9 and is the default in gcc10+. See if  the
+		# compiler supports the flag.
+		AX_CHECK_COMPILE_FLAG([-moutline-atomics], [AM_CFLAGS="$AM_CFLAGS -moutline-atomics"])
 	fi
 else
 	# The Solaris native compiler gets the additional -mt flag.

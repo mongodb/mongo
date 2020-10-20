@@ -218,17 +218,28 @@ WT_ATOMIC_FUNC(size, size_t, size_t *vp, size_t v)
 
 #elif defined(__aarch64__)
 #define WT_PAUSE() __asm__ volatile("yield" ::: "memory")
-#define WT_FULL_BARRIER()                        \
-    do {                                         \
-        __asm__ volatile("dsb sy" ::: "memory"); \
+
+/*
+ * dmb are chosen here because they are sufficient to guarantee the ordering described above. We
+ * don't want to use dsbs because they provide a much stronger guarantee of completion which isn't
+ * required. Additionally, dsbs synchronize other system activities such as tlb and cache
+ * maintenance instructions which is not required in this case.
+ *
+ * A shareability domain of inner-shareable is selected because all the entities participating in
+ * the ordering requirements are CPUs and ordering with respect to other devices or memory-types
+ * isn't required.
+ */
+#define WT_FULL_BARRIER()                         \
+    do {                                          \
+        __asm__ volatile("dmb ish" ::: "memory"); \
     } while (0)
-#define WT_READ_BARRIER()                        \
-    do {                                         \
-        __asm__ volatile("dsb ld" ::: "memory"); \
+#define WT_READ_BARRIER()                           \
+    do {                                            \
+        __asm__ volatile("dsb ishld" ::: "memory"); \
     } while (0)
-#define WT_WRITE_BARRIER()                       \
-    do {                                         \
-        __asm__ volatile("dsb st" ::: "memory"); \
+#define WT_WRITE_BARRIER()                          \
+    do {                                            \
+        __asm__ volatile("dsb ishst" ::: "memory"); \
     } while (0)
 
 #elif defined(__s390x__)

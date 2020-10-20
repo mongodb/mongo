@@ -35,7 +35,7 @@ test -f "../dist/plantuml.jar" || {
 	if [ $download_plantuml -eq 1 ]
 	then
 		echo 'Downloading plantuml:'
-		wget $PLANTUML_URL -O ../dist/plantuml.jar
+		curl -Li $PLANTUML_URL -o ../dist/plantuml.jar
 	else
 		echo 'plantuml can be downloaded from:'
 		echo 'https://sourceforge.net/projects/plantuml/files/plantuml.jar/download'

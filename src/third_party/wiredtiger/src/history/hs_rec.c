@@ -847,10 +847,11 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
     WT_CURSOR_BTREE *hs_cbt;
     WT_DECL_RET;
     WT_HS_TIME_POINT start_time_point, stop_time_point;
-    WT_ITEM hs_key;
+    WT_ITEM hs_key, hs_value;
+    WT_TIME_WINDOW tw;
     WT_UPDATE *tombstone;
     wt_timestamp_t hs_ts;
-    uint64_t hs_counter;
+    uint64_t hs_counter, hs_upd_type;
     uint32_t hs_btree_id;
     int cmp;
     char ts_string[5][WT_TS_INT_STRING_SIZE];
@@ -859,6 +860,7 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
     insert_cursor = NULL;
     hs_cbt = (WT_CURSOR_BTREE *)hs_cursor;
     WT_CLEAR(hs_key);
+    WT_CLEAR(hs_value);
     tombstone = NULL;
 
     /*
@@ -973,9 +975,13 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
         stop_time_point.ts = stop_time_point.durable_ts = ts;
         stop_time_point.txnid = hs_cbt->upd_value->tw.stop_txn;
 
+        /* Extract the underlying value for reinsertion. */
+        WT_ERR(hs_cursor->get_value(
+          hs_cursor, &tw.durable_stop_ts, &tw.durable_start_ts, &hs_upd_type, &hs_value));
+
         /* Reinsert entry with earlier timestamp. */
         while ((ret = __hs_insert_record_with_btree_int(session, insert_cursor, btree, key,
-                  WT_UPDATE_STANDARD, &hs_cursor->value, &start_time_point, &stop_time_point,
+                  (uint8_t)hs_upd_type, &hs_value, &start_time_point, &stop_time_point,
                   *counter)) == WT_RESTART)
             ;
         WT_ERR(ret);
