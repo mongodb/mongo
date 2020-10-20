@@ -387,192 +387,6 @@ functions:
   ###
 
 
-  # This gets replaced by mongodb_setup
-  "f_start_server": &f_start_server
-    - command: s3.get
-      params:
-        aws_key: ${aws_key}
-        aws_secret: ${aws_secret}
-        remote_file: *_remote_file
-        bucket: mciuploads
-        local_file: src/mongodb.tar.gz
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -e
-          set -v
-          tar xf mongodb.tar.gz
-    - command: shell.exec
-      params:
-        background: true
-        working_dir: src
-        script: |
-          set -e
-          set -o verbose
-          mkdir -p ./dbdata
-          echo -e "my secret key" > "${workdir}/key"
-          chmod 600 "${workdir}/key"
-          # We provide the key file for mongod here, rather than in mongod_flags next to the --auth
-          # option, because the path to key file requires expanding the {workdir} variable.
-          ${mongod_exec_wrapper} ./mongodb/bin/mongod --dbpath ./dbdata ${mongod_flags} --keyFile "${workdir}/key" --logpath "${workdir}/mongod.log"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -e
-          set -o verbose
-          sleep 5
-
-          # if we started a replset, initiate it and wait for it to become primary
-          #
-          # Note: This process is always currently started with --nojournal (not a recommended production configuration, see
-          #       https://docs.mongodb.com/manual/tutorial/manage-journaling/#disable-journaling).
-          #       As a result, writeConcernMajorityJournalDefault can be set to false. If this becomes configurable later
-          #       then the correct value should be passed to rs.initiate or getCmdLineOpts needs to interrogated (but
-          #       only after db.createUser).
-          ./mongodb/bin/mongo --eval "if(db.isMaster().isreplicaset){\
-                             rs.initiate({_id: 'test', version: 1, members: [ { _id: 0, host : 'localhost:27017' }], writeConcernMajorityJournalDefault:false});\
-                             assert.soon(function(){return db.isMaster().ismaster}, 'no primary');\
-                          }"
-
-          # benchRun() authenticates against the admin db, with a user that must has admin access.
-          # Note: This is possibly a legacy requirement from times when it would call serverStatus.
-          # Btw, when mongod is started without --auth, these should be harmless no-ops
-          ./mongodb/bin/mongo --eval "db.createUser({user: 'admin', pwd: 'password', roles:\
-                         [ { role: 'root', db: 'admin' } ] })"\
-                           admin
-
-          # print the replset config unless this is a standalone
-          ./mongodb/bin/mongo --eval "if( db.isMaster().hosts ) { printjson(rs.config()); }" --username admin --password password admin
-          echo "MONGOD STARTED."
-
-  # This gets replaced by subset of f_run_dsi_workload's invocation of analysis
-  "f_run_analysis": &f_run_analysis
-    - command: shell.exec
-      params:
-        silent: true
-        script: |
-          set -o errexit
-          is_patch=${is_patch}
-          task_id=${task_id}
-          perf_jira_user=${perf_jira_user}
-          perf_jira_pw=${perf_jira_pw}
-          analysis_user=${dsi_analysis_atlas_user}
-          analysis_password=${dsi_analysis_atlas_pw}
-          evergreen_api_key=${evergreen_api_key}
-          evergreen_api_user=${evergreen_api_user}
-          source ./src/dsi/src/signal_processing_setup.sh
-    - command: shell.exec
-      params:
-        script: |
-          set -o verbose
-          source ./signal_processing_venv/bin/activate
-          detect-changes --config .signal-processing.yml --mongo-repo ./src/mongo
-    - command: shell.exec
-      params:
-        script: |
-          set -o errexit
-          set -o verbose
-          cat > overrides.yml <<EOF
-          bootstrap:
-            production: true
-          test_control:
-            reports_dir_basename: ..
-          runtime:
-            # evergreen default expansions
-            is_patch: ${is_patch}
-            task_id: ${task_id}
-          EOF
-          cp ./src/dsi/configurations/analysis/analysis.microbenchmarks.yml  analysis.yml
-    - command: shell.exec
-      params:
-        silent: true
-        script: |
-          cat > runtime_secret.yml <<EOF
-          dsi_analysis_atlas_user: "${dsi_analysis_atlas_user}"
-          dsi_analysis_atlas_pw: "${dsi_analysis_atlas_pw}"
-          EOF
-          chmod 400 runtime_secret.yml
-    - command: shell.exec
-      type: test
-      params:
-        script: ./src/dsi/run-dsi analysis
-
-  # This gets replaced by test_control
-  f_run_genny_workload:
-    - command: git.get_project
-      params:
-        directory: src/mongo
-        revisions:
-          genny: ${genny_rev}
-          dsi: ${dsi_rev}
-          mongo-perf: ${mongo-perf_rev}
-          signal-processing: ${signal-processing_rev}
-    - command: shell.exec
-      params:
-        script: |
-          set -eo pipefail
-          pushd ./src/genny
-              export PATH="/opt/mongodbtoolchain/v3/bin:$PATH"
-              python3 -m virtualenv ./venv
-              source ./venv/bin/activate
-              python3 -m pip install ./src/python
-
-              ./scripts/lamp --linux-distro rhel62
-              ./scripts/genny run -w "./dist/etc/genny/workloads/${workload}" -u 'mongodb://admin:password@localhost:27017'
-              genny-metrics-legacy-report --report-file "${workdir}/perf.json" build/genny-metrics.csv
-          popd
-    - command: json.send
-      params:
-        name: "perf"
-        file: "./perf.json"
-
-  f_run_perf_tests:
-    - command: git.get_project
-      params:
-        directory: src/mongo
-        revisions:
-          genny: ${genny_rev}
-          dsi: ${dsi_rev}
-          mongo-perf: ${mongo-perf_rev}
-          signal-processing: ${signal-processing_rev}
-    - command: shell.exec
-      params:
-        working_dir: src/mongo-perf
-        script: |
-          set -ev
-          virtualenv ./venv
-          source ./venv/bin/activate
-          pip install argparse
-
-          sleep 5
-          ${perf_exec_wrapper} python benchrun.py \
-              --shell ../mongodb/bin/mongo          \
-              -t ${threads}                       \
-              --trialCount 5                      \
-              -f testcases/*.js                   \
-              --readCmd ${readCmd}                \
-              --includeFilter ${includeFilter1}   \
-              --includeFilter ${includeFilter2}   \
-              --excludeFilter ${excludeFilter}    \
-              --out ${workdir}/perf.json          \
-              --exclude-testbed                   \
-              --username admin                    \
-              --password password
-
-          echo "Oplog size at end of tests..."
-          ../mongodb/bin/mongo        \
-              --username admin      \
-              --password password   \
-              --eval "db.getSiblingDB('local').oplog.rs.totalSize()/1024/1024" \
-              admin
-
-    - command: json.send
-      params:
-        name: "perf"
-        file: "./perf.json"
-
 tasks:
 ###
 # Same in every DSI project
@@ -690,52 +504,21 @@ tasks:
     - func: "compile mongodb"
 
 
-- name: genny_scale_InsertRemove
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_genny_workload
-      vars:
-        workload: scale/InsertRemove.yml
-    - func: f_run_analysis
-- name: genny_scale_InsertRemove_dsi
-  depends_on: *_compile
-  commands:
-    - func: f_run_dsi_workload
-      vars:
-        test_control: genny_auto_workload
-        auto_workload_path: scale/InsertRemove.yml
-
 - name: genny_execution_UserAcquisition
   depends_on: *_compile
   commands:
-    - func: f_start_server
-    - func: f_run_genny_workload
+    - func: f_run_dsi_workload
       vars:
-        workload: execution/UserAcquisition.yml
-    - func: f_run_analysis
-- name: genny_execution_UserAcquisition_dsi
+        test_control: auto_genny_workload
+        auto_workload_path: execution/UserAcquisition.yml
+- name: genny_scale_InsertRemove
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
       vars:
-        test_control: genny_auto_workload
-        auto_workload_path: execution/UserAcquisition.yml
-
-
+        test_control: auto_genny_workload
+        auto_workload_path: scale/InsertRemove.yml
 - name: query
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "query"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: query_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -747,21 +530,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: views-query
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "query_identityview"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: true
-    - func: f_run_analysis
-- name: views-query_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -773,21 +542,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'true'}
-
-
 - name: views-aggregation
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "aggregation_identityview"
-        includeFilter2: "regression"
-        excludeFilter: "none"
-        threads: "1"
-        readCmd: true
-    - func: f_run_analysis
-- name: views-aggregation_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -799,20 +554,7 @@ tasks:
            exclude_filter: none,
            threads: "1",
            read_cmd: 'true'}
-
 - name: where
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "where"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: where_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -824,20 +566,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
 - name: update
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "update"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: update_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -849,21 +578,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: insert
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "insert"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: insert_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -875,21 +590,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: wildcard-index-read
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "wildcard_read"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: wildcard-index-read_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -901,21 +602,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: wildcard-index-write
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "wildcard_write"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: wildcard-index-write_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -927,21 +614,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: geo
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "geo"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: geo_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -953,21 +626,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: misc
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "command multi remove mixed"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: misc_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -979,21 +638,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: singleThreaded
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "single_threaded"
-        includeFilter2: "core regression"
-        excludeFilter: "none"
-        threads: "1"
-        readCmd: false
-    - func: f_run_analysis
-- name: singleThreaded_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -1005,20 +650,7 @@ tasks:
            exclude_filter: none,
            threads: "1",
            read_cmd: 'false'}
-
 - name: aggregation
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "aggregation"
-        includeFilter2: "regression"
-        excludeFilter: "js"
-        threads: "1"
-        readCmd: false
-    - func: f_run_analysis
-- name: aggregation_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -1030,21 +662,7 @@ tasks:
            exclude_filter: js,
            threads: "1",
            read_cmd: 'false'}
-
-
 - name: agg-query-comparison
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "agg_query_comparison"
-        includeFilter2: "core regression"
-        excludeFilter: "single_threaded"
-        threads: "1 2 4 8"
-        readCmd: false
-    - func: f_run_analysis
-- name: agg-query-comparison_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -1056,21 +674,7 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
-
-
 - name: pipeline-updates
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "pipeline-updates"
-        includeFilter2: "regression"
-        excludeFilter: "none"
-        threads: "1 2 4 8"
-        readCmd: true
-    - func: f_run_analysis
-- name: pipeline-updates_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -1082,21 +686,7 @@ tasks:
            exclude_filter: none,
            threads: "1 2 4 8",
            read_cmd: 'true'}
-
-
 - name: javascript
-  depends_on: *_compile
-  commands:
-    - func: f_start_server
-    - func: f_run_perf_tests
-      vars:
-        includeFilter1: "js"
-        includeFilter2: "aggregation"
-        excludeFilter: "none"
-        threads: "1 2 4 8"
-        readCmd: true
-    - func: f_run_analysis
-- name: javascript_dsi
   depends_on: *_compile
   commands:
     - func: f_run_dsi_workload
@@ -1147,40 +737,22 @@ buildvariants:
     distros:
     - rhel62-large
   - name: genny_scale_InsertRemove
-  - name: genny_scale_InsertRemove_dsi
   - name: genny_execution_UserAcquisition
-  - name: genny_execution_UserAcquisition_dsi
   - name: aggregation
-  - name: aggregation_dsi
   - name: agg-query-comparison
-  - name: agg-query-comparison_dsi
   - name: query
-  - name: query_dsi
   - name: views-aggregation
-  - name: views-aggregation_dsi
   - name: views-query
-  - name: views-query_dsi
   - name: where
-  - name: where_dsi
   - name: update
-  - name: update_dsi
   - name: insert
-  - name: insert_dsi
   - name: wildcard-index-read
-  - name: wildcard-index-read_dsi
   - name: wildcard-index-write
-  - name: wildcard-index-write_dsi
   - name: geo
-  - name: geo_dsi
   - name: misc
-  - name: misc_dsi
   - name: singleThreaded
-  - name: singleThreaded_dsi
   - name: pipeline-updates
-  - name: pipeline-updates_dsi
   - name: javascript
-  - name: javascript_dsi
-
 
 - name: linux-wt-repl
   display_name: 1-Node ReplSet Linux inMemory
@@ -1212,16 +784,9 @@ buildvariants:
   - "centos6-perf"
   tasks:
   - name: genny_scale_InsertRemove
-  - name: genny_scale_InsertRemove_dsi
   - name: update
-  - name: update_dsi
   - name: insert
-  - name: insert_dsi
   - name: misc
-  - name: misc_dsi
   - name: singleThreaded
-  - name: singleThreaded_dsi
   - name: wildcard-index-write
-  - name: wildcard-index-write_dsi
   - name: pipeline-updates
-  - name: pipeline-updates_dsi
