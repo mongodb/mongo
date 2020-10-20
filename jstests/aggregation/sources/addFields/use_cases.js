@@ -52,6 +52,13 @@
         // Then assert they are the same.
         assert(arrayEq(addFieldsResult, correct),
                "$addFields does not work the same as a $project with computed and included fields");
+
+        // $addFields with an empty spec is allowed and should be treated as a no-op
+        let addFieldsEmptySpecPipe = [{$addFields: {}}];
+
+        assert(
+            arrayEq(coll.aggregate(addFieldsEmptySpecPipe).toArray(), coll.aggregate().toArray()),
+            "$addFields with empty spec did not result in no-op");
     }
 
     // Test against the standalone started by resmoke.py.

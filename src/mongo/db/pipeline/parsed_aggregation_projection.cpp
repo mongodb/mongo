@@ -97,9 +97,6 @@ void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(const std::string
 }
 
 void ProjectionSpecValidator::validate() {
-    if (_rawObj.isEmpty()) {
-        uasserted(40177, "specification must have at least one field");
-    }
     for (auto&& elem : _rawObj) {
         parseElement(elem, FieldPath(elem.fieldName()));
     }
@@ -297,6 +294,9 @@ std::unique_ptr<ParsedAggregationProjection> ParsedAggregationProjection::create
     // Check that the specification was valid. Status returned is unspecific because validate()
     // is used by the $addFields stage as well as $project.
     // If there was an error, uassert with a $project-specific message.
+    if (spec.isEmpty()) {
+        uasserted(40177, "$project specification must have at least one field");
+    }
     ProjectionSpecValidator::uassertValid(spec, "$project");
 
     // Check for any conflicting specifications, and determine the type of the projection.
