@@ -1118,13 +1118,16 @@ void execCommandDatabase(OperationContext* opCtx,
                 couldHaveOptedIn && ReadPreferenceSetting::get(opCtx).canRunOnSecondary();
             bool canRunHere = commandCanRunHere(opCtx, dbname, command, inMultiDocumentTransaction);
             if (!canRunHere && couldHaveOptedIn) {
-                uasserted(ErrorCodes::NotPrimaryNoSecondaryOk, "not master and slaveOk=false");
+                const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"_sd
+                                                         : "not master and slaveOk=false"_sd;
+                uasserted(ErrorCodes::NotPrimaryNoSecondaryOk, msg);
             }
 
             if (MONGO_unlikely(respondWithNotPrimaryInCommandDispatch.shouldFail())) {
                 uassert(ErrorCodes::NotWritablePrimary, "not primary", canRunHere);
             } else {
-                uassert(ErrorCodes::NotWritablePrimary, "not master", canRunHere);
+                const auto msg = client->supportsHello() ? "not primary"_sd : "not master"_sd;
+                uassert(ErrorCodes::NotWritablePrimary, msg, canRunHere);
             }
 
             if (!command->maintenanceOk() &&
@@ -1494,9 +1497,10 @@ DbResponse receivedCommands(OperationContext* opCtx,
         if (LastError::get(opCtx->getClient()).hadNotPrimaryError()) {
             if (c && c->getReadWriteType() == Command::ReadWriteType::kWrite)
                 notPrimaryUnackWrites.increment();
+
             uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream()
-                          << "Not-master error while processing '" << request.getCommandName()
+                          << "Not-primary error while processing '" << request.getCommandName()
                           << "' operation  on '" << request.getDatabase() << "' database via "
                           << "fire-and-forget command execution.");
         }

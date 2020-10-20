@@ -255,6 +255,22 @@ public:
         return _killed.loadRelaxed();
     }
 
+    /**
+     * Whether this client supports the hello command, which indicates that the server
+     * can return "not primary" error messages.
+     */
+    bool supportsHello() const {
+        return _supportsHello;
+    }
+
+    /**
+     * Will be set to true if the client sent { helloOk: true } when opening a
+     * connection to the server. Defaults to false.
+     */
+    void setSupportsHello(bool newVal) {
+        _supportsHello = newVal;
+    }
+
 private:
     friend class ServiceContext;
     friend class ThreadClient;
@@ -286,6 +302,10 @@ private:
     PseudoRandom _prng;
 
     AtomicWord<bool> _killed{false};
+
+    // Whether this client used { helloOk: true } when opening its connection, indicating that
+    // it supports the hello command.
+    bool _supportsHello = false;
 };
 
 /**
