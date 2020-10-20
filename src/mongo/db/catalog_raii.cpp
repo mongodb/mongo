@@ -93,7 +93,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // exclusive lock.
     if (modeColl == MODE_X) {
         invariant(!opCtx->recoveryUnit()->inActiveTxn(),
-                  str::stream() << "Snapshot opened before acquiring X lock for " << *nss);
+                  str::stream() << "Snapshot opened before acquiring X lock for " << nsOrUUID);
     }
 
     _collLock.emplace(opCtx, nsOrUUID, modeColl, deadline);
