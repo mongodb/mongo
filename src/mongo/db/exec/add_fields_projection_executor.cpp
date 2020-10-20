@@ -159,9 +159,6 @@ void ProjectionSpecValidator::ensurePathDoesNotConflictOrThrow(const std::string
 }
 
 void ProjectionSpecValidator::validate() {
-    if (_rawObj.isEmpty()) {
-        uasserted(40177, "specification must have at least one field");
-    }
     for (auto&& elem : _rawObj) {
         parseElement(elem, FieldPath(elem.fieldName()));
     }

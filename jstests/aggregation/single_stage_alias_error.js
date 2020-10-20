@@ -14,11 +14,11 @@ coll.drop();
 
 // Assert that, despite the fact $set and $addFields are internally identical, error messages
 // use only the name used by the user.
-var pipeline = [{'$set': {}}];
+var pipeline = [{'$set': {"a.$c": 1}}];
 assertErrMsgContains(coll, pipeline, "$set");
 assertErrMsgDoesNotContain(coll, pipeline, "$addFields");
 
-pipeline = [{'$addFields': {}}];
+pipeline = [{'$addFields': {"$a.$c": 1}}];
 assertErrMsgContains(coll, pipeline, "$addFields");
 assertErrMsgDoesNotContain(coll, pipeline, "$set");
 
