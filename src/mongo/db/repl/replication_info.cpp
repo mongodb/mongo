@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
@@ -369,6 +370,23 @@ public:
         }
 
         appendReplicationInfo(opCtx, result, 0, useLegacyResponseFields());
+
+        // Try to parse the optional 'helloOk' field. This should be provided on the initial
+        // handshake for an incoming connection if the client supports the hello command. Clients
+        // that specify 'helloOk' do not rely on "not master" error message parsing, which means
+        // that we can safely return "not primary" error messages instead.
+        bool helloOk = opCtx->getClient()->supportsHello();
+        Status status = bsonExtractBooleanField(cmdObj, "helloOk", &helloOk);
+        if (status.isOK()) {
+            // If the hello request contains a "helloOk" field, set _supportsHello on the Client
+            // to the value.
+            opCtx->getClient()->setSupportsHello(helloOk);
+            // Attach helloOk: true to the response so that the client knows the server supports
+            // the hello command.
+            result.append("helloOk", true);
+        } else if (status.code() != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(status);
+        }
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             const int configServerModeNumber = 2;

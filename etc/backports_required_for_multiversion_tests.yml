@@ -102,6 +102,8 @@ all:
     test_file: jstests/replsets/force_shutdown_primary.js
   - ticket: SERVER-52953
     test_file: jstests/core/geo_near_point_query.js
+  - ticket: SERVER-50412
+    test_file: jstests/replsets/not_primary_errors_returned_if_client_sends_helloOk.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:
