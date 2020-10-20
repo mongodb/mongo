@@ -118,8 +118,8 @@ public:
     inline static const HostAndPort kHost = HostAndPort("foobar:123");
     inline static const std::string kErrorMessage = "an error message";
     inline static const BSONObj kErrorBson = BSONObjBuilder().append("ok", 0).obj();
-    inline static const sdam::IsMasterOutcome kErrorIsMasterOutcome =
-        sdam::IsMasterOutcome(kHost, kErrorBson, kErrorMessage);
+    inline static const sdam::HelloOutcome kErrorIsMasterOutcome =
+        sdam::HelloOutcome(kHost, kErrorBson, kErrorMessage);
 
     static constexpr bool kApplicationOperation = true;
     static constexpr bool kMonitoringOperation = false;

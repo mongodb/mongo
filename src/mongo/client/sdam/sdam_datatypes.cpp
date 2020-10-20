@@ -145,26 +145,26 @@ const std::vector<TopologyType> allTopologyTypes() {
     return result;
 }
 
-const HostAndPort& IsMasterOutcome::getServer() const {
+const HostAndPort& HelloOutcome::getServer() const {
     return _server;
 }
-bool IsMasterOutcome::isSuccess() const {
+bool HelloOutcome::isSuccess() const {
     return _success;
 }
-const boost::optional<BSONObj>& IsMasterOutcome::getResponse() const {
+const boost::optional<BSONObj>& HelloOutcome::getResponse() const {
     return _response;
 }
-const boost::optional<IsMasterRTT>& IsMasterOutcome::getRtt() const {
+const boost::optional<HelloRTT>& HelloOutcome::getRtt() const {
     return _rtt;
 }
-const boost::optional<TopologyVersion>& IsMasterOutcome::getTopologyVersion() const {
+const boost::optional<TopologyVersion>& HelloOutcome::getTopologyVersion() const {
     return _topologyVersion;
 }
-const std::string& IsMasterOutcome::getErrorMsg() const {
+const std::string& HelloOutcome::getErrorMsg() const {
     return _errorMsg;
 }
 
-BSONObj IsMasterOutcome::toBSON() const {
+BSONObj HelloOutcome::toBSON() const {
     BSONObjBuilder builder;
     builder.append("host", _server.toString());
     builder.append("success", _success);

@@ -43,7 +43,7 @@ ServerDescriptionBuilder& ServerDescriptionBuilder::withError(const std::string&
     return *this;
 }
 
-ServerDescriptionBuilder& ServerDescriptionBuilder::withRtt(const IsMasterRTT& rtt) {
+ServerDescriptionBuilder& ServerDescriptionBuilder::withRtt(const HelloRTT& rtt) {
     _instance->_rtt = rtt;
     return *this;
 }

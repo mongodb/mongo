@@ -73,17 +73,15 @@ std::string toString(const ServerType serverType);
 StatusWith<ServerType> parseServerType(StringData strServerType);
 std::ostream& operator<<(std::ostream& os, const ServerType serverType);
 
-using IsMasterRTT = mongo::Microseconds;
+using HelloRTT = Microseconds;
 
-// The result of an attempt to call the "ismaster" command on a server.
-class IsMasterOutcome {
-    IsMasterOutcome() = delete;
+// The result of an attempt to call the "hello" command on a server.
+class HelloOutcome {
+    HelloOutcome() = delete;
 
 public:
     // Success constructor.
-    IsMasterOutcome(HostAndPort server,
-                    BSONObj response,
-                    boost::optional<IsMasterRTT> rtt = boost::none)
+    HelloOutcome(HostAndPort server, BSONObj response, boost::optional<HelloRTT> rtt = boost::none)
         : _server(std::move(server)), _success(true), _response(response), _rtt(rtt) {
         const auto topologyVersionField = response.getField("topologyVersion");
         if (topologyVersionField) {
@@ -93,7 +91,7 @@ public:
     }
 
     // Failure constructor.
-    IsMasterOutcome(HostAndPort server, BSONObj response, std::string errorMsg)
+    HelloOutcome(HostAndPort server, BSONObj response, std::string errorMsg)
         : _server(std::move(server)), _success(false), _errorMsg(errorMsg) {
         const auto topologyVersionField = response.getField("topologyVersion");
         if (topologyVersionField) {
@@ -105,7 +103,7 @@ public:
     const HostAndPort& getServer() const;
     bool isSuccess() const;
     const boost::optional<BSONObj>& getResponse() const;
-    const boost::optional<IsMasterRTT>& getRtt() const;
+    const boost::optional<HelloRTT>& getRtt() const;
     const boost::optional<TopologyVersion>& getTopologyVersion() const;
     const std::string& getErrorMsg() const;
     BSONObj toBSON() const;
@@ -120,7 +118,7 @@ private:
     boost::optional<BSONObj> _response;
     // The round trip time to execute the command (or boost::none if it failed or is not the outcome
     // from an initial handshake exchange).
-    boost::optional<IsMasterRTT> _rtt;
+    boost::optional<HelloRTT> _rtt;
     // Indicates how fresh the topology information in this reponse is (or boost::none if it failed
     // or the response did not include this).
     boost::optional<TopologyVersion> _topologyVersion;

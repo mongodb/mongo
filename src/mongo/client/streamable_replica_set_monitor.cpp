@@ -641,7 +641,7 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
 void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                                   const BSONObj reply) {
     // After the inital handshake, isMasterResponses should not update the RTT with durationMs.
-    IsMasterOutcome outcome(hostAndPort, reply, boost::none);
+    HelloOutcome outcome(hostAndPort, reply, boost::none);
     _topologyManager->onServerDescription(outcome);
 }
 
@@ -663,7 +663,7 @@ void StreamableReplicaSetMonitor::onServerHandshakeFailedEvent(const HostAndPort
     _failedHost(HostAndPort(address), status, reply, HandshakeStage::kPreHandshake, false);
 };
 
-void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::IsMasterRTT durationMS,
+void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::HelloRTT durationMS,
                                                              const HostAndPort& hostAndPort) {
     LOGV2_DEBUG(4668132,
                 kLowerLogLevel,
@@ -674,10 +674,10 @@ void StreamableReplicaSetMonitor::onServerPingSucceededEvent(sdam::IsMasterRTT d
     _topologyManager->onServerRTTUpdated(hostAndPort, durationMS);
 }
 
-void StreamableReplicaSetMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+void StreamableReplicaSetMonitor::onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                                                  const HostAndPort& hostAndPort,
                                                                  const BSONObj reply) {
-    IsMasterOutcome outcome(hostAndPort, reply, durationMs);
+    HelloOutcome outcome(hostAndPort, reply, durationMs);
     _topologyManager->onServerDescription(outcome);
 }
 

@@ -53,14 +53,14 @@ public:
      * This function atomically:
      *   1. Clones the current TopologyDescription
      *   2. Executes the state machine logic given the cloned TopologyDescription and provided
-     * IsMasterOutcome (containing the new ServerDescription).
+     * HelloOutcome (containing the new ServerDescription).
      *   3. Installs the cloned (and possibly modified) TopologyDescription as the current one.
      *
      * Multiple threads may call this function concurrently. However, the manager will process the
      * IsMasterOutcomes serially, as required by:
      *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#process-one-ismaster-outcome-at-a-time
      */
-    bool onServerDescription(const IsMasterOutcome& isMasterOutcome);
+    bool onServerDescription(const HelloOutcome& isMasterOutcome);
 
 
     /**
@@ -72,7 +72,7 @@ public:
      *   3. Installs the cloned ServerDescription into the TopologyDescription from step 1
      *   4. Installs the cloned TopologyDescription as the current one.
      */
-    void onServerRTTUpdated(HostAndPort hostAndPort, IsMasterRTT rtt);
+    void onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt);
 
     /**
      * Get the current TopologyDescription. This is safe to call from multiple threads.

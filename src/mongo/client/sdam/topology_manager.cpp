@@ -71,10 +71,10 @@ TopologyManager::TopologyManager(SdamConfiguration config,
       _topologyStateMachine(std::make_unique<TopologyStateMachine>(_config)),
       _topologyEventsPublisher(eventsPublisher) {}
 
-bool TopologyManager::onServerDescription(const IsMasterOutcome& isMasterOutcome) {
+bool TopologyManager::onServerDescription(const HelloOutcome& isMasterOutcome) {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
 
-    boost::optional<IsMasterRTT> lastRTT;
+    boost::optional<HelloRTT> lastRTT;
     boost::optional<TopologyVersion> lastTopologyVersion;
 
     const auto& lastServerDescription =
@@ -122,7 +122,7 @@ const std::shared_ptr<TopologyDescription> TopologyManager::getTopologyDescripti
     return _topologyDescription;
 }
 
-void TopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, IsMasterRTT rtt) {
+void TopologyManager::onServerRTTUpdated(HostAndPort hostAndPort, HelloRTT rtt) {
     {
         stdx::lock_guard<mongo::Mutex> lock(_mutex);
 

@@ -58,7 +58,7 @@ public:
      */
     std::vector<Status> getIsMasterResponse(const HostAndPort& hostAndPort);
 
-    void onServerPingSucceededEvent(IsMasterRTT latency, const HostAndPort& hostAndPort) override;
+    void onServerPingSucceededEvent(HelloRTT latency, const HostAndPort& hostAndPort) override;
 
     void onServerPingFailedEvent(const HostAndPort& hostAndPort, const Status& status) override;
 
@@ -71,12 +71,12 @@ public:
     /**
      * Returns the responses for the most recent onServerPing events.
      */
-    std::vector<StatusWith<IsMasterRTT>> getPingResponse(const HostAndPort& hostAndPort);
+    std::vector<StatusWith<HelloRTT>> getPingResponse(const HostAndPort& hostAndPort);
 
 private:
     Mutex _mutex;
     stdx::unordered_map<HostAndPort, std::vector<Status>> _serverIsMasterReplies;
-    stdx::unordered_map<HostAndPort, std::vector<StatusWith<IsMasterRTT>>> _serverPingRTTs;
+    stdx::unordered_map<HostAndPort, std::vector<StatusWith<HelloRTT>>> _serverPingRTTs;
 };
 
 }  // namespace mongo::sdam

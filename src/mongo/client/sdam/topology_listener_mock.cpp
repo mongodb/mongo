@@ -75,14 +75,14 @@ std::vector<Status> TopologyListenerMock::getIsMasterResponse(const HostAndPort&
     return statusWithIsMasterResponse;
 }
 
-void TopologyListenerMock::onServerPingSucceededEvent(IsMasterRTT latency,
+void TopologyListenerMock::onServerPingSucceededEvent(HelloRTT latency,
                                                       const HostAndPort& hostAndPort) {
     stdx::lock_guard lk(_mutex);
     auto it = _serverPingRTTs.find(hostAndPort);
     if (it != _serverPingRTTs.end()) {
         it->second.emplace_back(latency);
     } else {
-        _serverPingRTTs.emplace(hostAndPort, std::vector<StatusWith<IsMasterRTT>>{latency});
+        _serverPingRTTs.emplace(hostAndPort, std::vector<StatusWith<HelloRTT>>{latency});
     }
 }
 
@@ -95,7 +95,7 @@ void TopologyListenerMock::onServerPingFailedEvent(const HostAndPort& hostAndPor
     if (it != _serverPingRTTs.end()) {
         it->second.emplace_back(errorStatus);
     } else {
-        _serverPingRTTs.emplace(hostAndPort, std::vector<StatusWith<IsMasterRTT>>{errorStatus});
+        _serverPingRTTs.emplace(hostAndPort, std::vector<StatusWith<HelloRTT>>{errorStatus});
     }
 }
 
@@ -108,7 +108,7 @@ bool TopologyListenerMock::_hasPingResponse(WithLock, const HostAndPort& hostAnd
     return _serverPingRTTs.find(hostAndPort) != _serverPingRTTs.end();
 }
 
-std::vector<StatusWith<IsMasterRTT>> TopologyListenerMock::getPingResponse(
+std::vector<StatusWith<HelloRTT>> TopologyListenerMock::getPingResponse(
     const HostAndPort& hostAndPort) {
     stdx::lock_guard lock(_mutex);
     invariant(_hasPingResponse(lock, hostAndPort));

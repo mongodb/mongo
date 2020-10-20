@@ -40,7 +40,7 @@ public:
     struct ErrorActions {
         bool dropConnections = false;
         bool requestImmediateCheck = false;
-        boost::optional<sdam::IsMasterOutcome> isMasterOutcome;
+        boost::optional<sdam::HelloOutcome> isMasterOutcome;
         BSONObj toBSON() const;
     };
 
@@ -58,10 +58,10 @@ public:
                                              BSONObj bson) noexcept = 0;
 
 protected:
-    sdam::IsMasterOutcome _createErrorIsMasterOutcome(const HostAndPort& host,
-                                                      boost::optional<BSONObj> bson,
-                                                      const Status& status) const {
-        return sdam::IsMasterOutcome(host, bson ? *bson : BSONObj(), status.toString());
+    sdam::HelloOutcome _createErrorIsMasterOutcome(const HostAndPort& host,
+                                                   boost::optional<BSONObj> bson,
+                                                   const Status& status) const {
+        return sdam::HelloOutcome(host, bson ? *bson : BSONObj(), status.toString());
     }
 };
 

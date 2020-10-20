@@ -52,7 +52,7 @@ public:
     ServerDescriptionBuilder& withSetName(const std::string setName);
 
     // network attributes
-    ServerDescriptionBuilder& withRtt(const IsMasterRTT& rtt);
+    ServerDescriptionBuilder& withRtt(const HelloRTT& rtt);
     ServerDescriptionBuilder& withError(const std::string& error);
     ServerDescriptionBuilder& withLogicalSessionTimeoutMinutes(
         const boost::optional<int> logicalSessionTimeoutMinutes);

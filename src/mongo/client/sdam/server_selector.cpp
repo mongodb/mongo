@@ -309,7 +309,7 @@ void LatencyWindow::filterServers(std::vector<ServerDescriptionPtr>* servers) {
                    servers->end());
 }
 
-bool LatencyWindow::isWithinWindow(IsMasterRTT latency) {
+bool LatencyWindow::isWithinWindow(HelloRTT latency) {
     return lower <= latency && latency <= upper;
 }
 }  // namespace mongo::sdam

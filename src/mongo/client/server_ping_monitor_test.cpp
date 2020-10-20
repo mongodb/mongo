@@ -48,7 +48,7 @@
 namespace mongo {
 namespace {
 
-const sdam::IsMasterRTT initialRTT = duration_cast<Milliseconds>(Milliseconds(100));
+const sdam::HelloRTT initialRTT = duration_cast<Milliseconds>(Milliseconds(100));
 using executor::NetworkInterfaceMock;
 using executor::RemoteCommandResponse;
 using executor::ThreadPoolExecutorTest;

@@ -178,10 +178,10 @@ private:
 
     void onServerPingFailedEvent(const HostAndPort& hostAndPort, const Status& status) override;
 
-    void onServerPingSucceededEvent(sdam::IsMasterRTT durationMS,
+    void onServerPingSucceededEvent(sdam::HelloRTT durationMS,
                                     const HostAndPort& hostAndPort) override;
 
-    void onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+    void onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                         const HostAndPort& hostAndPort,
                                         const BSONObj reply) override;
 

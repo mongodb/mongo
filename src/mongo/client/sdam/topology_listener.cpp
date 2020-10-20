@@ -84,7 +84,7 @@ void TopologyEventsPublisher::onTopologyDescriptionChangedEvent(
     _scheduleNextDelivery();
 }
 
-void TopologyEventsPublisher::onServerHandshakeCompleteEvent(IsMasterRTT duration,
+void TopologyEventsPublisher::onServerHandshakeCompleteEvent(HelloRTT duration,
                                                              const HostAndPort& address,
                                                              const BSONObj reply) {
     {
@@ -161,7 +161,7 @@ void TopologyEventsPublisher::onServerPingFailedEvent(const HostAndPort& hostAnd
     _scheduleNextDelivery();
 }
 
-void TopologyEventsPublisher::onServerPingSucceededEvent(IsMasterRTT duration,
+void TopologyEventsPublisher::onServerPingSucceededEvent(HelloRTT duration,
                                                          const HostAndPort& hostAndPort) {
     {
         stdx::lock_guard lock(_eventQueueMutex);

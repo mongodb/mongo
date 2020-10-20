@@ -188,15 +188,15 @@ private:
 
 // This is used to filter out servers based on their current latency measurements.
 struct LatencyWindow {
-    const IsMasterRTT lower;
-    IsMasterRTT upper;
+    const HelloRTT lower;
+    HelloRTT upper;
 
-    explicit LatencyWindow(const IsMasterRTT lowerBound, const IsMasterRTT windowWidth)
+    explicit LatencyWindow(const HelloRTT lowerBound, const HelloRTT windowWidth)
         : lower(lowerBound) {
-        upper = (lowerBound == IsMasterRTT::max()) ? lowerBound : lowerBound + windowWidth;
+        upper = (lowerBound == HelloRTT::max()) ? lowerBound : lowerBound + windowWidth;
     }
 
-    bool isWithinWindow(IsMasterRTT latency);
+    bool isWithinWindow(HelloRTT latency);
 
     // remove servers not in the latency window in-place.
     void filterServers(std::vector<ServerDescriptionPtr>* servers);

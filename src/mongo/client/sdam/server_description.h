@@ -55,11 +55,11 @@ public:
 
     /**
      * Build a new ServerDescription according to the rules of the SDAM spec based on the
-     * last RTT to the server and isMaster response.
+     * last RTT to the server and hello response.
      */
     ServerDescription(ClockSource* clockSource,
-                      const IsMasterOutcome& isMasterOutcome,
-                      boost::optional<IsMasterRTT> lastRtt = boost::none,
+                      const HelloOutcome& helloOutcome,
+                      boost::optional<HelloRTT> lastRtt = boost::none,
                       boost::optional<TopologyVersion> topologyVersion = boost::none);
 
     /**
@@ -84,7 +84,7 @@ public:
 
     // network attributes
     const boost::optional<std::string>& getError() const;
-    const boost::optional<IsMasterRTT>& getRtt() const;
+    const boost::optional<HelloRTT>& getRtt() const;
     const boost::optional<int>& getLogicalSessionTimeoutMinutes() const;
 
     // server capabilities
@@ -109,18 +109,18 @@ public:
 
     BSONObj toBson() const;
     std::string toString() const;
-    ServerDescriptionPtr cloneWithRTT(IsMasterRTT rtt);
+    ServerDescriptionPtr cloneWithRTT(HelloRTT rtt);
 
 private:
     /**
-     * Classify the server's type based on the ismaster response.
-     * @param isMaster - reply information for the ismaster command
+     * Classify the server's type based on the hello response.
+     * @param helloReply - reply information for the hello command
      */
-    void parseTypeFromIsMaster(const BSONObj isMaster);
+    void parseTypeFromHelloReply(BSONObj helloReply);
 
 
-    void calculateRtt(const boost::optional<IsMasterRTT> currentRtt,
-                      const boost::optional<IsMasterRTT> lastRtt);
+    void calculateRtt(const boost::optional<HelloRTT> currentRtt,
+                      const boost::optional<HelloRTT> lastRtt);
     void saveLastWriteInfo(BSONObj lastWriteBson);
 
     void storeHostListIfPresent(const std::string key,
@@ -135,7 +135,7 @@ private:
     static inline const double kRttAlpha = 0.2;
 
     // address: the hostname or IP, and the port number, that the client connects to. Note that this
-    // is not the server's ismaster.me field, in the case that the server reports an address
+    // is not the server's hello.me field, in the case that the server reports an address
     // different from the address the client uses.
     HostAndPort _address;
 
@@ -145,11 +145,11 @@ private:
     // error: information about the last error related to this server. Default null.
     boost::optional<std::string> _error;
 
-    // roundTripTime: the duration of the ismaster call. Default null.
-    boost::optional<IsMasterRTT> _rtt;
+    // roundTripTime: the duration of the hello call. Default null.
+    boost::optional<HelloRTT> _rtt;
 
     // lastWriteDate: a 64-bit BSON datetime or null. The "lastWriteDate" from the server's most
-    // recent ismaster response.
+    // recent hello response.
     boost::optional<Date_t> _lastWriteDate;
 
     // opTime: an ObjectId or null. The last opTime reported by the server; an ObjectId or null.

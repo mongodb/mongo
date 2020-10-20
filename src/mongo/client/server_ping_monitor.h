@@ -153,7 +153,7 @@ public:
      * The first isMaster exchange for a connection to the server succeeded. Creates a new
      * SingleServerPingMonitor to monitor the new replica set member.
      */
-    void onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+    void onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                         const HostAndPort& address,
                                         const BSONObj reply = BSONObj());
 

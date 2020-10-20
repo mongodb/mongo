@@ -232,7 +232,7 @@ void ServerPingMonitor::shutdown() {
     }
 }
 
-void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::IsMasterRTT durationMs,
+void ServerPingMonitor::onServerHandshakeCompleteEvent(sdam::HelloRTT durationMs,
                                                        const HostAndPort& address,
                                                        const BSONObj reply) {
     stdx::lock_guard lk(_mutex);

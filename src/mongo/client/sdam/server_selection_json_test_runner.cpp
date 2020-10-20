@@ -127,11 +127,11 @@ public:
             auto clockSource = std::make_unique<ClockSourceMock>();
             updatedServerDescription = std::make_shared<ServerDescription>(
                 ServerDescription(clockSource.get(),
-                                  IsMasterOutcome(HostAndPort("dummy"),
-                                                  BSON("ok" << 1 << "setname"
-                                                            << "replSet"
-                                                            << "ismaster" << true),
-                                                  IsMasterRTT(Milliseconds(_newRtt)))));
+                                  HelloOutcome(HostAndPort("dummy"),
+                                               BSON("ok" << 1 << "setname"
+                                                         << "replSet"
+                                                         << "ismaster" << true),
+                                               HelloRTT(Milliseconds(_newRtt)))));
         }
 
         TestCaseResult result{{}, _testFilePath};
