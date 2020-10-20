@@ -267,7 +267,6 @@ functions:
           extra_args="$extra_args --jobs=$num_jobs_available"
         fi
 
-        ${rlp_environment}   \
         $python buildscripts/resmoke.py run ${resmoke_args} $extra_args ${test_flags} --log=buildlogger --reportFile=report.json
 
   "cleanup environment":
@@ -547,7 +546,7 @@ tasks:
 
           ${compile_env|} $python ./buildscripts/scons.py                                     \
               ${compile_flags|} ${scons_cache_args|} $extra_args                              \
-              install-core install-unittests install-unittests-debug                          \
+              archive-dist-test install-unittests install-unittests-debug                     \
               MONGO_VERSION=${version}
 
           # Note to next reader: mongo drivers tests expect the binaries to be
@@ -555,7 +554,7 @@ tasks:
           # it for this purpose
           # Pack up the binaries
           mkdir -p mongodb-binaries/bin
-          find build/install/bin -maxdepth 1 -type f -iname "mongo*" -exec mv {} ./mongodb-binaries/bin/ \;
+          find build/install/bin -maxdepth 1 -type f -iname "mongo*" ! \( -iname "*_*" -o -iname ".debug" \) -exec mv {} ./mongodb-binaries/bin/ \;
           ${compress} mongodb-binaries.${ext|tgz} mongodb-binaries/
 
     ### Run the unittests after the compile
@@ -760,14 +759,12 @@ buildvariants:
   run_on:
   - rhel62-small
   expansions:
-    rlp_environment: MONGOD_UNITTEST_RLP_LANGUAGE_TEST_BTROOT=/opt/basis
     platform: linux
     compile_flags: --ssl MONGO_DISTMOD=rhel62 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform_arch: "rhel62"
     multiversion_edition: "targeted"
     num_jobs_available: $(grep -c ^processor /proc/cpuinfo)
     use_scons_cache: true
-    ### build_mongoreplay: true
     ext: tgz
   tags: ["compile-variant"]
   tasks:
