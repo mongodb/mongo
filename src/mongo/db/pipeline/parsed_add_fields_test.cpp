@@ -92,8 +92,8 @@ TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithInvalidFieldPath) {
     ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON(".a" << true)), AssertionException);
 }
 
-// Verify that ParsedAddFields rejects specifications that contain empty objects or invalid
-// expressions.
+// Verify that ParsedAddFields rejects specifications that contain invalid expressions and accepts
+// empty specifications.
 TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithInvalidObjectsOrExpressions) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     // Invalid expressions should be rejected.
@@ -108,8 +108,8 @@ TEST(ParsedAddFieldsSpec, ThrowsOnCreationWithInvalidObjectsOrExpressions) {
                       expCtx, BSON("a" << false << "b" << BSON("$unknown" << BSON_ARRAY(4 << 2)))),
                   AssertionException);
 
-    // Empty specifications are not allowed.
-    ASSERT_THROWS(ParsedAddFields::create(expCtx, BSONObj()), AssertionException);
+    // Empty specifications are allowed.
+    ASSERT(ParsedAddFields::create(expCtx, BSONObj()));
 
     // Empty nested objects are not allowed.
     ASSERT_THROWS(ParsedAddFields::create(expCtx, BSON("a" << BSONObj())), AssertionException);
@@ -170,6 +170,17 @@ TEST(ParsedAddFieldsDeps, AddsDependenciesForComputedFields) {
     ASSERT_EQ(deps.fields.count("b"), 1UL);    // Needed by the ExpressionFieldPath for a.
 }
 
+TEST(ParsedAddFieldsDeps, ShouldNotIncludeDependenciesForEmptySpec) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedAddFields addition(expCtx);
+    addition.parse(BSONObj{});
+
+    DepsTracker deps;
+    addition.addDependencies(&deps);
+
+    ASSERT_EQ(deps.fields.size(), 0UL);
+}
+
 // Verify that the serialization produces the correct output: converting numbers and literals to
 // their corresponding $const form.
 TEST(ParsedAddFieldsSerialize, SerializesToCorrectForm) {
@@ -188,6 +199,17 @@ TEST(ParsedAddFieldsSerialize, SerializesToCorrectForm) {
                        addition.serializeTransformation(ExplainOptions::Verbosity::kExecStats));
     ASSERT_DOCUMENT_EQ(expectedSerialization,
                        addition.serializeTransformation(ExplainOptions::Verbosity::kExecAllPlans));
+}
+
+TEST(ParsedAddFieldsSerialize, EmptySpecSerializesToCorrectForm) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedAddFields addition(expCtx);
+    addition.parse(fromjson("{}"));
+
+    auto expectedSerialization = Document();
+
+    // Should be the same if we're serializing for explain or for internal use.
+    ASSERT_DOCUMENT_EQ(expectedSerialization, addition.serializeTransformation(boost::none));
 }
 
 // Verify that serialize treats the _id field as any other field: including when explicity included.
@@ -285,6 +307,21 @@ TEST(ParsedAddFieldsExecutionTest, AddsNewFieldToEndOfDocument) {
     // There are fields in the document but none of them are the added field.
     result = addition.applyProjection(Document{{"a", 1}, {"b", 2}});
     expectedResult = Document{{"a", 1}, {"b", 2}, {"c", 3}};
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+}
+
+TEST(ParsedAddFieldsExecutionTest, AddingEmptySpecResultsInNoOp) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    ParsedAddFields addition(expCtx);
+
+    // There are no fields in the document.
+    auto result = addition.applyProjection(Document{});
+    auto expectedResult = Document{{}};
+    ASSERT_DOCUMENT_EQ(result, expectedResult);
+
+    // There are fields in the document but none of them are the added field.
+    result = addition.applyProjection(Document{{"a", 1}, {"b", 2}});
+    expectedResult = Document{{"a", 1}, {"b", 2}};
     ASSERT_DOCUMENT_EQ(result, expectedResult);
 }
 
