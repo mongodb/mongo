@@ -297,11 +297,22 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
     return _donorReplicaSetMonitor->getHostOrRefresh(_readPreference, findHostTimeout)
         .thenRunOn(**_scopedExecutor)
         .then([this](const HostAndPort& serverAddress) {
+            // Application name is constructed such that it doesn't exceeds
+            // kMaxApplicationNameByteLength (128 bytes).
+            // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
+            // <migrationUuid> (36 bytes) =  114 bytes length.
+            // Note: Since the total length of tenant database name (<tenantId>_<user provided db
+            // name>) can't exceed 63 bytes and the user provided db name should be at least one
+            // character long, the maximum length of tenantId can only be 61 bytes.
             auto applicationName =
-                "TenantMigrationRecipient_" + getTenantId() + "_" + getMigrationUUID().toString();
+                "TenantMigration_" + getTenantId() + "_" + getMigrationUUID().toString();
             auto client = _connectAndAuth(serverAddress, applicationName, _authParams);
 
-            applicationName += "_fetcher";
+            // Application name is constructed such that it doesn't exceeds
+            // kMaxApplicationNameByteLength (128 bytes).
+            // "TenantMigration_" (16 bytes) + <tenantId> (61 bytes) + "_" (1 byte) +
+            // <migrationUuid> (36 bytes) + _oplogFetcher" (13 bytes) =  127 bytes length.
+            applicationName += "_oplogFetcher";
             auto oplogFetcherClient = _connectAndAuth(serverAddress, applicationName, _authParams);
             return ConnectionPair(std::move(client), std::move(oplogFetcherClient));
         })
