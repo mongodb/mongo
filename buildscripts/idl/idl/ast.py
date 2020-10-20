@@ -211,6 +211,7 @@ class Command(Struct):
         """Construct a command."""
         self.namespace = None  # type: str
         self.command_field = None  # type: Field
+        self.reply_type = None  # type: Field
         super(Command, self).__init__(file_name, line, column)
 
 

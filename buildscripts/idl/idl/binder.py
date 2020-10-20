@@ -417,6 +417,26 @@ def _bind_command_type(ctxt, parsed_spec, command):
     return ast_field
 
 
+def _bind_command_reply_type(ctxt, parsed_spec, command):
+    # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> ast.Field
+    """Bind the reply_type field in a command."""
+    ast_field = ast.Field(command.file_name, command.line, command.column)
+    ast_field.name = "replyType"
+    ast_field.description = f"{command.name} reply type"
+
+    # Resolve the command type as a field
+    syntax_symbol = parsed_spec.symbols.resolve_field_type(ctxt, command, command.name,
+                                                           command.reply_type)
+    if syntax_symbol is None:
+        # Resolution failed, we've recorded an error.
+        return None
+
+    if not isinstance(syntax_symbol, syntax.Struct):
+        ctxt.add_reply_type_invalid_type(ast_field, command.name, command.reply_type)
+
+    return ast_field
+
+
 def _bind_command(ctxt, parsed_spec, command):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> ast.Command
     """
@@ -437,6 +457,9 @@ def _bind_command(ctxt, parsed_spec, command):
 
     if command.type:
         ast_command.command_field = _bind_command_type(ctxt, parsed_spec, command)
+
+    if command.reply_type:
+        ast_command.reply_type = _bind_command_reply_type(ctxt, parsed_spec, command)
 
     if [field for field in ast_command.fields if field.name == ast_command.name]:
         ctxt.add_bad_command_name_duplicates_field(ast_command, ast_command.name)

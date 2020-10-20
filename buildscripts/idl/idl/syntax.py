@@ -414,6 +414,7 @@ class Command(Struct):
         """Construct a Command."""
         self.namespace = None  # type: str
         self.type = None  # type: str
+        self.reply_type = None  # type: str
 
         super(Command, self).__init__(file_name, line, column)
 

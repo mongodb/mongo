@@ -112,6 +112,7 @@ ERROR_ID_SERVER_PARAMETER_INVALID_METHOD_OVERRIDE = "ID0068"
 ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT = "ID0069"
 ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION = "ID0070"
 ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION = "ID0071"
+ERROR_ID_INVALID_REPLY_TYPE = "ID0072"
 
 
 class IDLError(Exception):
@@ -820,6 +821,14 @@ class ParserContext(object):
         self._add_error(
             location, ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
             ("The 'version' attribute is not allowed for feature flag that defaults to false"))
+
+    def add_reply_type_invalid_type(self, location, command_name, reply_type_name):
+        # type: (common.SourceLocation, str, str) -> None
+        """Add an error about a command whose reply_type refers to an unknown type."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_INVALID_REPLY_TYPE,
+            ("Command '%s' has invalid reply_type '%s'" % (command_name, reply_type_name)))
 
 
 def _assert_unique_error_messages():

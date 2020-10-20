@@ -1374,6 +1374,12 @@ class TestBinder(testcase.IDLTestcase):
                 serializer: foo
                 deserializer: foo
                 default: foo
+        
+        structs:
+            reply:
+                description: foo
+                fields:
+                    foo: string
         """)
 
         self.assert_bind(test_preamble + textwrap.dedent("""
@@ -1384,6 +1390,7 @@ class TestBinder(testcase.IDLTestcase):
                     strict: true
                     fields:
                         foo1: string
+                    reply_type: reply
             """))
 
     def test_command_negative(self):
@@ -1446,6 +1453,26 @@ class TestBinder(testcase.IDLTestcase):
                     fields:
                         foo: string
             """), idl.errors.ERROR_ID_COMMAND_DUPLICATES_FIELD)
+
+        # Reply type must be resolvable
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+            commands:
+                foo:
+                    description: foo
+                    namespace: ignored
+                    reply_type: not_defined
+            """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
+
+        # Reply type must be a struct
+        self.assert_bind_fail(
+            test_preamble + textwrap.dedent("""
+            commands:
+                foo:
+                    description: foo
+                    namespace: ignored
+                    reply_type: string
+            """), idl.errors.ERROR_ID_INVALID_REPLY_TYPE)
 
     def test_command_doc_sequence_positive(self):
         # type: () -> None

@@ -137,6 +137,11 @@ structs:
                 type: object
                 optional: true
 
+    reply_type_struct:
+        description: Used for testing the IDL command reply_type field
+        fields:
+            reply_field: int
+
 ##################################################################################################
 #
 # Structs to test derived parsers
@@ -773,3 +778,8 @@ commands:
             negative_double:
                 type: double
                 validator: { lt: 0.0 }
+
+    CommandWithReplyType:
+        description: A command with its reply type specified by an IDL struct
+        namespace: ignored
+        reply_type: reply_type_struct
