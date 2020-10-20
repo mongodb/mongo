@@ -59,6 +59,17 @@ server_parameters:
     set_at: startup
     cpp_varname: "sslGlobalParams.tlsWithholdClientCertificate"
 
+  tlsOCSPVerifyTimeoutSecs:
+    description: >-
+        How long the http client should wait before timing out
+        when fetching OCSP Responses for peer certificate
+    set_at: startup
+    cpp_vartype: int
+    default: 5
+    cpp_varname: "gTLSOCSPVerifyTimeoutSecs"
+    validator:
+      gte: 1
+
   opensslCipherConfig:
     description: "Cipher configuration string for OpenSSL based TLS connections"
     set_at: startup

@@ -65,6 +65,7 @@ const std::set<std::string> kSetShellParameterWhitelist = {
     "disabledSecureAllocatorDomains",
     "newLineAfterPasswordPromptForTest",
     "skipShellCursorFinalize",
+    "tlsOCSPVerifyTimeoutSecs",
 };
 
 std::string getMongoShellHelp(StringData name, const moe::OptionSection& options) {

@@ -59,6 +59,7 @@
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl.hpp"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
@@ -1698,6 +1699,8 @@ Status validatePeerCertificate(const std::string& remoteHost,
         certChainPara.RequestedUsage.Usage.cUsageIdentifier = _countof(usage);
         certChainPara.RequestedUsage.Usage.rgpszUsageIdentifier = usage;
     }
+
+    certChainPara.dwUrlRetrievalTimeout = gTLSOCSPVerifyTimeoutSecs * 1000;
 
     PCCERT_CHAIN_CONTEXT chainContext;
     BOOL ret = CertGetCertificateChain(certChainEngine,
