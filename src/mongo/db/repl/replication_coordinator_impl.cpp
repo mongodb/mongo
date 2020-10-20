@@ -3276,47 +3276,50 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     _rsConfig = newConfig;
     _protVersion.store(_rsConfig.getProtocolVersion());
 
-    // Warn if running --nojournal and writeConcernMajorityJournalDefault = true
+    // Warn if using the in-memory (ephemeral) storage engine or running running --nojournal with
+    // writeConcernMajorityJournalDefault=true.
     StorageEngine* storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    if (storageEngine && !storageEngine->isDurable() &&
-        (newConfig.getWriteConcernMajorityShouldJournal() &&
-         (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: This replica set node is running without journaling enabled but the "
-              << startupWarningsLog;
-        log() << "**          writeConcernMajorityJournalDefault option to the replica set config "
-              << startupWarningsLog;
-        log() << "**          is set to true. The writeConcernMajorityJournalDefault "
-              << startupWarningsLog;
-        log() << "**          option to the replica set config must be set to false "
-              << startupWarningsLog;
-        log() << "**          or w:majority write concerns will never complete."
-              << startupWarningsLog;
-        log() << "**          In addition, this node's memory consumption may increase until all"
-              << startupWarningsLog;
-        log() << "**          available free RAM is exhausted." << startupWarningsLog;
-        log() << startupWarningsLog;
-    }
-
-    // Warn if using the in-memory (ephemeral) storage engine with
-    // writeConcernMajorityJournalDefault = true
-    if (storageEngine && storageEngine->isEphemeral() &&
-        (newConfig.getWriteConcernMajorityShouldJournal() &&
-         (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal()))) {
-        log() << startupWarningsLog;
-        log() << "** WARNING: This replica set node is using in-memory (ephemeral) storage with the"
-              << startupWarningsLog;
-        log() << "**          writeConcernMajorityJournalDefault option to the replica set config "
-              << startupWarningsLog;
-        log() << "**          set to true. The writeConcernMajorityJournalDefault option to the "
-              << startupWarningsLog;
-        log() << "**          replica set config must be set to false " << startupWarningsLog;
-        log() << "**          or w:majority write concerns will never complete."
-              << startupWarningsLog;
-        log() << "**          In addition, this node's memory consumption may increase until all"
-              << startupWarningsLog;
-        log() << "**          available free RAM is exhausted." << startupWarningsLog;
-        log() << startupWarningsLog;
+    if (storageEngine && newConfig.getWriteConcernMajorityShouldJournal() &&
+        (!oldConfig.isInitialized() || !oldConfig.getWriteConcernMajorityShouldJournal())) {
+        if (storageEngine->isEphemeral()) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: This replica set node is using in-memory (ephemeral) storage "
+                     "with the"
+                  << startupWarningsLog;
+            log() << "**          writeConcernMajorityJournalDefault option to the replica set "
+                     "config "
+                  << startupWarningsLog;
+            log()
+                << "**          set to true. The writeConcernMajorityJournalDefault option to the "
+                << startupWarningsLog;
+            log() << "**          replica set config must be set to false " << startupWarningsLog;
+            log() << "**          or w:majority write concerns will never complete."
+                  << startupWarningsLog;
+            log()
+                << "**          In addition, this node's memory consumption may increase until all"
+                << startupWarningsLog;
+            log() << "**          available free RAM is exhausted." << startupWarningsLog;
+            log() << startupWarningsLog;
+        } else if (!storageEngine->isDurable()) {
+            log() << startupWarningsLog;
+            log() << "** WARNING: This replica set node is running without journaling enabled but "
+                     "the "
+                  << startupWarningsLog;
+            log() << "**          writeConcernMajorityJournalDefault option to the replica set "
+                     "config "
+                  << startupWarningsLog;
+            log() << "**          is set to true. The writeConcernMajorityJournalDefault "
+                  << startupWarningsLog;
+            log() << "**          option to the replica set config must be set to false "
+                  << startupWarningsLog;
+            log() << "**          or w:majority write concerns will never complete."
+                  << startupWarningsLog;
+            log()
+                << "**          In addition, this node's memory consumption may increase until all"
+                << startupWarningsLog;
+            log() << "**          available free RAM is exhausted." << startupWarningsLog;
+            log() << startupWarningsLog;
+        }
     }
 
 
