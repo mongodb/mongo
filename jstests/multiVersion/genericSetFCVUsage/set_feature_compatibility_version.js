@@ -148,23 +148,22 @@ function runStandaloneTest(downgradeVersion) {
         if (downgradeFCV === lastContinuousFCV) {
             // Attempt to downgrade FCV from last-continuous to last-lts.
             assert.commandFailedWithCode(
-                adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
-                ErrorCodes.IllegalOperation);
+                adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}), 5147403);
             // Downgrading from last-continuous to last-lts is not allowed even with
             // fromConfigServer: true.
             assert.commandFailedWithCode(
                 adminDB.runCommand(
                     {setFeatureCompatibilityVersion: lastLTSFCV, fromConfigServer: true}),
-                ErrorCodes.IllegalOperation);
+                5147403);
         } else {
             // Attempt to upgrade FCV from last-lts to last-continuous.
             assert.commandFailedWithCode(
-                adminDB.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV}), 5070603);
+                adminDB.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV}), 5147403);
 
             assert.commandFailedWithCode(
                 adminDB.runCommand(
                     {setFeatureCompatibilityVersion: lastContinuousFCV, fromConfigServer: false}),
-                5070603);
+                5147403);
             assert.commandWorked(adminDB.runCommand(
                 {setFeatureCompatibilityVersion: lastContinuousFCV, fromConfigServer: true}));
             checkFCV(adminDB, lastContinuousFCV);
@@ -319,17 +318,16 @@ function runReplicaSetTest(downgradeVersion) {
 
     // Downgrading the FCV should fail if a previous upgrade has not yet completed.
     assert.commandFailedWithCode(
-        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}),
-        ErrorCodes.IllegalOperation);
+        primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}), 5147403);
 
     if (downgradeFCV === lastLTSFCV && lastLTSFCV !== lastContinuousFCV) {
         // Upgrading to last-continuous should fail if we are in the middle of upgrading to latest.
         assert.commandFailedWithCode(
-            primary.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV}), 5070602);
+            primary.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV}), 5147403);
         assert.commandFailedWithCode(
             primary.adminCommand(
                 {setFeatureCompatibilityVersion: lastContinuousFCV, fromConfigServer: true}),
-            5070602);
+            5147403);
     }
 
     // Because the failed upgrade command left the primary in an intermediary state, complete the
@@ -345,7 +343,7 @@ function runReplicaSetTest(downgradeVersion) {
 
     // Upgrading the FCV should fail if a previous downgrade has not yet completed.
     assert.commandFailedWithCode(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}),
-                                 ErrorCodes.IllegalOperation);
+                                 5147403);
 
     if (lastContinuousFCV !== lastLTSFCV) {
         // We will fail if we have not yet completed a downgrade and attempt to downgrade to a
@@ -354,7 +352,7 @@ function runReplicaSetTest(downgradeVersion) {
             setFeatureCompatibilityVersion: downgradeFCV === lastContinuousFCV ? lastLTSFCV
                                                                                : lastContinuousFCV
         }),
-                                     ErrorCodes.IllegalOperation);
+                                     5147403);
     }
     // Complete the downgrade.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
@@ -374,7 +372,7 @@ function runReplicaSetTest(downgradeVersion) {
         // Upgrading the FCV to latest should fail if a previous upgrade to lastContinuous has not
         // yet completed.
         assert.commandFailedWithCode(
-            primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}), 5070602);
+            primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}), 5147403);
 
         // Complete the upgrade to last-continuous.
         assert.commandWorked(primary.adminCommand(

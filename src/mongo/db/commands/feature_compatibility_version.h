@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/feature_compatibility_version_document_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/server_options.h"
 
@@ -67,30 +68,23 @@ public:
     static void fassertInitializedAfterStartup(OperationContext* opCtx);
 
     /**
-     * Records intent to perform a fromVersion -> newVersion upgrade by updating the on-disk
-     * feature compatibility version document to have 'version'=currentVersion,
-     * 'targetVersion'=newVersion. Should be called before schemas are modified.
+     * uassert that a transition from fromVersion to newVersion is permitted. Different rules apply
+     * if the request is from a config server.
      */
-    static void setTargetUpgradeFrom(OperationContext* opCtx,
-                                     ServerGlobalParams::FeatureCompatibility::Version fromVersion,
-                                     ServerGlobalParams::FeatureCompatibility::Version newVersion);
+    static void validateSetFeatureCompatibilityVersionRequest(
+        ServerGlobalParams::FeatureCompatibility::Version fromVersion,
+        ServerGlobalParams::FeatureCompatibility::Version newVersion,
+        bool isFromConfigServer);
 
     /**
-     * Records intent to perform a downgrade from the latest version by updating the on-disk feature
-     * compatibility version document to have 'version'=version, 'targetVersion'=version and
-     * 'previousVersion'=kLatest. Should be called before schemas are modified.
+     * Updates the on-disk feature compatibility version document for the transition fromVersion ->
+     * newVersion. This is required to be a valid transition.
      */
-    static void setTargetDowngrade(OperationContext* opCtx,
-                                   ServerGlobalParams::FeatureCompatibility::Version version);
-
-    /**
-     * Records the completion of a upgrade or downgrade by updating the on-disk
-     * feature compatibility version document to have 'version'=version and unsetting the
-     * 'targetVersion' field and the 'previousVersion' field. Should be called after schemas are
-     * modified.
-     */
-    static void unsetTargetUpgradeOrDowngrade(
-        OperationContext* opCtx, ServerGlobalParams::FeatureCompatibility::Version version);
+    static void updateFeatureCompatibilityVersionDocument(
+        OperationContext* opCtx,
+        ServerGlobalParams::FeatureCompatibility::Version fromVersion,
+        ServerGlobalParams::FeatureCompatibility::Version newVersion,
+        bool isFromConfigServer);
 
     /**
      * If there are no non-local databases, store the featureCompatibilityVersion document. If we

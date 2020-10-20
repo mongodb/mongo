@@ -37,6 +37,7 @@ imports:
 structs:
   featureCompatibilityVersionDocument:
     description: "featureCompatibilityVersion on-disk document format"
+    generate_comparison_operators: true
     fields:
       _id:
         type: string

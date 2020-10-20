@@ -105,7 +105,7 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     // vice versa. Ensure that the in-memory and on-disk FCV are consistent by checking that this
     // rule is upheld after rollback.
     assert.commandFailedWithCode(newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}),
-                                 ErrorCodes.IllegalOperation);
+                                 5147403);
 }
 
 const testName = jsTest.name();
