@@ -566,6 +566,19 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
     } else if (lhsTag == TypeTags::Null && rhsTag == TypeTags::Null) {
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (isArray(lhsTag) && isArray(rhsTag)) {
+        // ArraySets carry semantics of an unordered set, so we cannot define a deterministic less
+        // or greater operations on them, but only compare for equality. Comparing an ArraySet with
+        // a regular Array is equivalent of converting the ArraySet to an Array and them comparing
+        // the two Arrays, so we can simply use a generic algorithm below.
+        if (lhsTag == TypeTags::ArraySet && rhsTag == TypeTags::ArraySet) {
+            auto lhsArr = getArraySetView(lhsValue);
+            auto rhsArr = getArraySetView(rhsValue);
+            if (lhsArr->values() == rhsArr->values()) {
+                return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+            }
+            return {TypeTags::Nothing, 0};
+        }
+
         auto lhsArr = ArrayEnumerator{lhsTag, lhsValue};
         auto rhsArr = ArrayEnumerator{rhsTag, rhsValue};
         while (!lhsArr.atEnd() && !rhsArr.atEnd()) {
