@@ -534,6 +534,14 @@ add_option('enable-usdt-probes',
     const='on',
 )
 
+add_option('libdeps-debug',
+    choices=['on', 'off'],
+    const='off',
+    help='Print way too much debugging information on how libdeps is handling dependencies.',
+    nargs='?',
+    type='choice',
+)
+
 add_option('libdeps-linting',
     choices=['on', 'off', 'print'],
     const='on',
@@ -1741,6 +1749,7 @@ if get_option('build-tools') == 'next':
     libdeps.setup_environment(
         env,
         emitting_shared=(link_model.startswith("dynamic")),
+        debug=get_option('libdeps-debug'),
         linting=get_option('libdeps-linting'),
         sanitize_typeinfo=libdeps_typeinfo)
 else:

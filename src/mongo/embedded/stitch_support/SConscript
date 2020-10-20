@@ -1,9 +1,12 @@
 # -*- mode: python; -*-
 
-import libdeps
-
 Import("env")
 Import("get_option")
+
+if get_option('build-tools') == 'next':
+    import libdeps_next as libdeps
+else:
+    import libdeps
 
 env = env.Clone()
 

@@ -1,7 +1,5 @@
 # -*- mode: python -*-
 
-import libdeps
-
 Import([
     'env',
     'get_option',

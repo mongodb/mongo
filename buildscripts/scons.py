@@ -23,4 +23,5 @@ except ImportError as import_err:
     print("ImportError:", import_err)
     sys.exit(1)
 
-SCons.Script.main()
+if __name__ == '__main__':
+    SCons.Script.main()

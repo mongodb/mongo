@@ -68,13 +68,12 @@ if env.TargetOSIs('windows'):
     env.Alias('generated-sources', generatedResourceConstantFile)
 
 # Shim library for boost to depend on
-env.Library(
-    target='boost_assert_shim',
-    source=[
-        'boost_assert_shim.cpp'
-    ],
+env.ShimLibrary(
+    name='boost_assert',
+    needs_link=True,
     LIBDEPS_TAGS=[
         # NOTE: This library *must not* depend on any mongodb code
+        # TODO: Remove when SERVER-48291 is merged into stable build tools
         'lint-leaf-node-no-deps',
     ],
 )

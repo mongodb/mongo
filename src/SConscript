@@ -4,17 +4,28 @@
 # to delegate to any and all per-module SConscript files.
 
 Import('env')
+Import('get_option')
 Import('module_sconscripts')
+
+
+env = env.Clone()
+if get_option("build-tools") == "next":
+    # Add any "global" dependencies here. This is where we make every build node
+    # depend on a list of other build nodes, such as an allocator or libunwind
+    # or libstdx or similar.
+    env.AppendUnique(
+        LIBDEPS_GLOBAL=[
+            '$BUILD_DIR/third_party/shim_allocator',
+        ],
+    )
 
 # NOTE: We must do third_party first as it adds methods to the environment
 # that we need in the mongo sconscript
-env = env.Clone()
 env.SConscript('third_party/SConscript', exports=['env'])
 
 # Inject common dependencies from third_party globally for all core mongo code
 # and modules. Ideally, pcre wouldn't be here, but enough things require it
 # now that it seems hopeless to remove it.
-env = env.Clone()
 env.InjectThirdParty(libraries=[
     'abseil-cpp',
     'boost',

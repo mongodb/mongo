@@ -29,10 +29,18 @@ graph generated from SCons generate-libdeps-graph target. The graph
 represents the dependency information between all binaries from the build.
 """
 
+import sys
+
 from enum import Enum, auto
 from pathlib import Path
 
 import networkx
+
+sys.path.append(str(Path(__file__).parent.parent))
+import scons  # pylint: disable=wrong-import-position
+
+sys.path.append(str(Path(scons.MONGODB_ROOT).joinpath('site_scons')))
+from libdeps_next import deptype  # pylint: disable=wrong-import-position
 
 
 class CountTypes(Enum):
@@ -106,23 +114,23 @@ class LibdepsGraph(networkx.DiGraph):
 
         return len([
             edge for edge in self.edges(data=True) if edge[2].get(EdgeProps.direct.name) == 1
-            and edge[2].get(EdgeProps.visibility.name) == 0
+            and edge[2].get(EdgeProps.visibility.name) == int(deptype.Public)
         ])
 
     def public_edge_count(self):
         """Count the graphs public edges."""
 
-        return self.number_of_edge_types(EdgeProps.visibility.name, 0)
+        return self.number_of_edge_types(EdgeProps.visibility.name, int(deptype.Public))
 
     def private_edge_count(self):
         """Count the graphs private edges."""
 
-        return self.number_of_edge_types(EdgeProps.visibility.name, 1)
+        return self.number_of_edge_types(EdgeProps.visibility.name, int(deptype.Private))
 
     def interface_edge_count(self):
         """Count the graphs interface edges."""
 
-        return self.number_of_edge_types(EdgeProps.visibility.name, 2)
+        return self.number_of_edge_types(EdgeProps.visibility.name, int(deptype.Interface))
 
     def direct_depends(self, node):
         """For given nodes, report what nodes depend directly on that node."""
