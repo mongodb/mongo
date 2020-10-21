@@ -9,7 +9,7 @@ env.Library(
     source=[
         'shard_remote.cpp',
         'num_hosts_targeted_metrics.cpp',
-         env.Idlc('shard_remote.idl')[0],
+         'shard_remote.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/fetcher',

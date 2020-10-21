@@ -7,7 +7,7 @@ env = env.Clone()
 env.Library(
     target='sdam_configuration_parameters',
     source=[
-        env.Idlc('sdam_configuration_parameters.idl')[0],
+        'sdam_configuration_parameters.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -71,7 +71,7 @@ env.Library(
     target='json_test',
     source=[
         'json_test_arg_parser.cpp',
-        env.Idlc('json_test_runner_cli_options.idl')[0],
+        'json_test_runner_cli_options.idl',
     ],
     LIBDEPS=[
         'sdam',

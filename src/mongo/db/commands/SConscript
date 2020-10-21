@@ -9,7 +9,7 @@ env.Library(
     target="test_commands_enabled",
     source=[
         "test_commands_enabled.cpp",
-        env.Idlc('test_commands_enabled.idl')[0],
+        'test_commands_enabled.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -108,9 +108,9 @@ env.Library(
         'rename_collection_common.cpp',
         'start_session_command.cpp',
         'update_metrics.cpp',
-        env.Idlc('parameters.idl')[0],
-        env.Idlc('sessions_commands.idl')[0],
-        env.Idlc('generic.idl')[0],
+        'parameters.idl',
+        'sessions_commands.idl',
+        'generic.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -146,9 +146,9 @@ env.Library(
         'reap_logical_session_cache_now.cpp',
         'traffic_recording_cmds.cpp',
         'user_management_commands_common.cpp',
-        env.Idlc('drop_connections.idl')[0],
-        env.Idlc('rwc_defaults_commands.idl')[0],
-        env.Idlc('user_management_commands.idl')[0],
+        'drop_connections.idl',
+        'rwc_defaults_commands.idl',
+        'user_management_commands.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
@@ -216,7 +216,7 @@ env.Library(
     target="mongod_fcv",
     source=[
         "feature_compatibility_version.cpp",
-        env.Idlc('feature_compatibility_version.idl')[0],
+        'feature_compatibility_version.idl',
     ],
     LIBDEPS=[
         'feature_compatibility_parsers',
@@ -242,7 +242,7 @@ env.Library(
 env.Library(
     target='list_databases_command',
     source=[
-        env.Idlc('list_databases.idl')[0],
+        'list_databases.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -266,7 +266,7 @@ env.Library(
         "get_last_error.cpp",
         "getmore_cmd.cpp",
         "http_client.cpp",
-        env.Idlc('http_client.idl')[0],
+        'http_client.idl',
         "index_filter_commands.cpp",
         "kill_op.cpp",
         "killcursors_cmd.cpp",
@@ -284,7 +284,7 @@ env.Library(
         "validate.cpp",
         "whats_my_sni_command.cpp",
         "write_commands/write_commands.cpp",
-        env.Idlc('create.idl')[0],
+        'create.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -345,7 +345,7 @@ env.Library(
 env.Library(
     target='set_index_commit_quorum_idl',
     source=[
-        env.Idlc('set_index_commit_quorum.idl')[0],
+        'set_index_commit_quorum.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
@@ -357,7 +357,7 @@ env.Library(
 env.Library(
     target='rename_collection_idl',
     source=[
-        env.Idlc('rename_collection.idl')[0],
+        'rename_collection.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/idl_parser',
@@ -385,7 +385,7 @@ env.Library(
         "oplog_note.cpp",
         'read_write_concern_defaults_server_status.cpp',
         "resize_oplog.cpp",
-        env.Idlc("resize_oplog.idl")[0],
+        "resize_oplog.idl",
         'rwc_defaults_commands.cpp',
         "set_feature_compatibility_version_command.cpp",
         "set_index_commit_quorum_command.cpp",
@@ -396,8 +396,8 @@ env.Library(
         "txn_cmds.cpp",
         "user_management_commands.cpp",
         "vote_commit_index_build_command.cpp",
-        env.Idlc('internal_rename_if_options_and_indexes_match.idl')[0],
-        env.Idlc('vote_commit_index_build.idl')[0],
+        'internal_rename_if_options_and_indexes_match.idl',
+        'vote_commit_index_build.idl',
     ],
     LIBDEPS=[
         'txn_cmd_request',
@@ -452,7 +452,7 @@ env.Library(
     source=[
         'killcursors_common.cpp',
         'kill_op_cmd_base.cpp',
-        env.Idlc('kill_operations.idl')[0],
+        'kill_operations.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
@@ -485,7 +485,7 @@ env.Library(
     target='profile_common',
     source=[
         'profile_common.cpp',
-        env.Idlc('profile.idl')[0],
+        'profile.idl',
         '$BUILD_DIR/mongo/db/profile_filter_impl.cpp',
     ],
     LIBDEPS=[
@@ -513,8 +513,8 @@ env.Library(
 env.Library(
     target='txn_cmd_request',
     source=[
-        env.Idlc("txn_cmds.idl")[0],
-        env.Idlc("txn_two_phase_commit_cmds.idl")[0],
+        "txn_cmds.idl",
+        "txn_two_phase_commit_cmds.idl",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -526,7 +526,7 @@ env.Library(
     target='map_reduce_parser',
     source=[
         'map_reduce_out_options.cpp',
-        env.Idlc('map_reduce.idl')[0],
+        'map_reduce.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/write_concern_options',

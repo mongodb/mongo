@@ -7,7 +7,7 @@ env = env.Clone()
 env.Library(
     target='repl_server_parameters',
     source=[
-        env.Idlc('repl_server_parameters.idl')[0]
+        'repl_server_parameters.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/read_preference',
@@ -36,7 +36,7 @@ env.Library(
         'oplog.cpp',
         'oplog_entry_or_grouped_inserts.cpp',
         'transaction_oplog_application.cpp',
-        env.Idlc('apply_ops.idl')[0],
+        'apply_ops.idl',
     ],
     LIBDEPS_PRIVATE=[
         'dbcheck',
@@ -143,7 +143,7 @@ env.Library(
     target='repl_settings',
     source=[
         'repl_settings.cpp',
-        env.Idlc('repl_settings.idl')[0],
+        'repl_settings.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -167,7 +167,7 @@ env.Library(
     source=[
         'dbcheck.cpp',
         "dbcheck_idl.cpp",
-        env.Idlc('dbcheck.idl')[0],
+        'dbcheck.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -186,7 +186,7 @@ env.Library(
 env.Library(
     target='rollback_idl',
     source=[
-        env.Idlc('rollback.idl')[0],
+        'rollback.idl',
     ],
     LIBDEPS=[
         'optime',
@@ -233,7 +233,7 @@ env.Library(
 env.Library(
     target='replication_consistency_markers_idl',
     source=[
-        env.Idlc('replication_consistency_markers.idl')[0],
+        'replication_consistency_markers.idl',
     ],
     LIBDEPS=[
         'optime',
@@ -458,7 +458,7 @@ env.Library(
     target='rollback_impl',
     source=[
         'rollback_impl.cpp',
-        env.Idlc('rollback_impl.idl')[0],
+        'rollback_impl.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
@@ -482,7 +482,7 @@ env.Library(
     target='oplog_entry',
     source=[
         'oplog_entry.cpp',
-        env.Idlc('oplog_entry.idl')[0],
+        'oplog_entry.idl',
     ],
     LIBDEPS=[
         'optime',
@@ -500,7 +500,7 @@ env.Library(
 env.Library(
     target='optime_and_wall_time_base',
     source=[
-        env.Idlc('optime_and_wall_time_base.idl')[0],
+        'optime_and_wall_time_base.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -634,33 +634,33 @@ env.Library(
 )
 
 env.Library('member_data',
-            [
-                'member_data.cpp',
-            ],
-            LIBDEPS=[
-                'replica_set_messages',
-            ])
+    [
+        'member_data.cpp',
+    ],
+    LIBDEPS=[
+        'replica_set_messages',
+    ])
 
 env.Library('topology_coordinator',
-            [
-                'heartbeat_response_action.cpp',
-                'topology_coordinator.cpp',
-                env.Idlc('topology_coordinator.idl')[0],
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/db/audit',
-                '$BUILD_DIR/mongo/rpc/metadata',
-                '$BUILD_DIR/mongo/util/fail_point',
-                'isself',
-                'member_data',
-                'replica_set_messages',
-                'repl_settings',
-                'repl_coordinator_interface',
-            ],
-            LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-                '$BUILD_DIR/mongo/idl/server_parameter',
-            ])
+    [
+        'heartbeat_response_action.cpp',
+        'topology_coordinator.cpp',
+        'topology_coordinator.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        '$BUILD_DIR/mongo/util/fail_point',
+        'isself',
+        'member_data',
+        'replica_set_messages',
+        'repl_settings',
+        'repl_coordinator_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ])
 
 env.Library(
     target='repl_coordinator_impl',
@@ -671,7 +671,7 @@ env.Library(
         'replication_coordinator_impl_elect_v1.cpp',
         'replication_coordinator_impl_heartbeat.cpp',
         'vote_requester.cpp',
-        env.Idlc('replication_coordinator_impl.idl')[0],
+        'replication_coordinator_impl.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/common',
@@ -794,35 +794,35 @@ env.Library('speculative_majority_read_info',
             ])
 
 env.Library('replica_set_messages',
-            [
-                'is_master_response.cpp',
-                'member_config.cpp',
-                'repl_set_config.cpp',
-                'repl_set_heartbeat_args_v1.cpp',
-                'repl_set_heartbeat_response.cpp',
-                'repl_set_request_votes_args.cpp',
-                'repl_set_tag.cpp',
-                'update_position_args.cpp',
-                'last_vote.cpp',
-                env.Idlc('repl_set_config.idl')[0],
-            ],
-            LIBDEPS=[
-                '$BUILD_DIR/mongo/base',
-                '$BUILD_DIR/mongo/bson/util/bson_extract',
-                '$BUILD_DIR/mongo/client/connection_string',
-                '$BUILD_DIR/mongo/db/common',
-                '$BUILD_DIR/mongo/db/server_options_core',
-                '$BUILD_DIR/mongo/transport/transport_layer_common',
-                '$BUILD_DIR/mongo/util/net/network',
-                '$BUILD_DIR/mongo/rpc/command_status',
-                '$BUILD_DIR/mongo/rpc/metadata',
-                'optime',
-                'read_concern_args',
-            ],
-            LIBDEPS_PRIVATE=[
-                '$BUILD_DIR/mongo/idl/server_parameter',
-                'split_horizon',
-            ])
+    [
+        'is_master_response.cpp',
+        'member_config.cpp',
+        'repl_set_config.cpp',
+        'repl_set_heartbeat_args_v1.cpp',
+        'repl_set_heartbeat_response.cpp',
+        'repl_set_request_votes_args.cpp',
+        'repl_set_tag.cpp',
+        'update_position_args.cpp',
+        'last_vote.cpp',
+        'repl_set_config.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/client/connection_string',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/transport/transport_layer_common',
+        '$BUILD_DIR/mongo/util/net/network',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/rpc/metadata',
+        'optime',
+        'read_concern_args',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/server_parameter',
+        'split_horizon',
+    ])
 
 env.Library(
     target='repl_set_status_commands',
@@ -943,7 +943,7 @@ env.Library(
         'base_cloner.cpp',
         'collection_cloner.cpp',
         'database_cloner.cpp',
-        env.Idlc('database_cloner.idl')[0]
+        'database_cloner.idl'
     ],
     LIBDEPS = [
         'task_runner',
@@ -1389,7 +1389,7 @@ env.Library(
     target='replication_metrics',
     source=[
         'replication_metrics.cpp',
-        env.Idlc('replication_metrics.idl')[0],
+        'replication_metrics.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1405,7 +1405,7 @@ env.Library(
     target='election_reason_counter',
     source=[
         'election_reason_counter.cpp',
-        env.Idlc('election_reason_counter.idl')[0],
+        'election_reason_counter.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -118,7 +118,7 @@ env.Library(
     target='role_graph_update',
     source=[
         'role_graph_update.cpp',
-        env.Idlc("auth_options.idl")[0],
+        'auth_options.idl',
     ],
     LIBDEPS=[
         'auth',
@@ -135,7 +135,7 @@ env.Library(
         'authz_manager_external_state.cpp',
         'authz_session_external_state.cpp',
         'user_set.cpp',
-        env.Idlc('authorization_manager_impl_parameters.idl')[0],
+        'authorization_manager_impl_parameters.idl',
     ],
     LIBDEPS=[
         'address_restriction',
@@ -194,7 +194,7 @@ env.Library(
     target='authorization_manager_global',
     source=[
         'authorization_manager_global.cpp',
-        env.Idlc('authorization_manager_global_parameters.idl')[0],
+        'authorization_manager_global_parameters.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -231,7 +231,7 @@ env.Library(
     source=[
         'authz_session_external_state_server_common.cpp',
         'sasl_commands.cpp',
-        env.Idlc('enable_localhost_auth_bypass_parameter.idl')[0],
+        'enable_localhost_auth_bypass_parameter.idl',
     ],
     LIBDEPS=[
         'auth',
@@ -280,11 +280,11 @@ env.Library(
 env.Library(
   target='sasl_options_init',
   source=[
-      'sasl_options_init.cpp',
-       env.Idlc('sasl_options.idl')[0],
+        'sasl_options_init.cpp',
+        'sasl_options.idl',
   ],
   LIBDEPS=[
-    'sasl_options'
+        'sasl_options'
   ],
   LIBDEPS_PRIVATE=[
        '$BUILD_DIR/mongo/util/options_parser/options_parser',
@@ -339,7 +339,7 @@ env.Library(
         'authz_manager_external_state_s.cpp',
         'authz_session_external_state_s.cpp',
         'user_cache_invalidator_job.cpp',
-        env.Idlc('user_cache_invalidator_job_parameters.idl')[0],
+        'user_cache_invalidator_job_parameters.idl',
         ],
     LIBDEPS=[
         'authservercommon',
@@ -371,7 +371,7 @@ env.Library(
     target='address_restriction',
     source=[
         'address_restriction.cpp',
-        env.Idlc('address_restriction.idl')[0],
+        'address_restriction.idl',
     ],
     LIBDEPS_PRIVATE=[
         'authentication_restriction',

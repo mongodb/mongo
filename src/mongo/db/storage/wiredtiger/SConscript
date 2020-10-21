@@ -49,7 +49,7 @@ if wiredtiger:
             'wiredtiger_snapshot_manager.cpp',
             'wiredtiger_size_storer.cpp',
             'wiredtiger_util.cpp',
-            env.Idlc('wiredtiger_parameters.idl')[0],
+            'wiredtiger_parameters.idl',
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/base',
@@ -100,7 +100,7 @@ if wiredtiger:
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
             'wiredtiger_server_status.cpp',
-            env.Idlc('wiredtiger_global_options.idl')[0],
+            'wiredtiger_global_options.idl',
         ],
         LIBDEPS=[
             'storage_wiredtiger_core',
@@ -180,7 +180,7 @@ if wiredtiger:
     wtEnv.Library(
         target='oplog_stone_parameters',
         source=[
-            env.Idlc('oplog_stone_parameters.idl')[0],
+            'oplog_stone_parameters.idl',
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/idl/server_parameter',

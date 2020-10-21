@@ -36,7 +36,7 @@ env.Library(
         "query_planner_common.cpp",
         "query_settings.cpp",
         "query_solution.cpp",
-        env.Idlc("expression_index_knobs.idl")[0],
+        "expression_index_knobs.idl",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -75,7 +75,7 @@ env.Library(
 env.Library(
     target='distinct_command_idl',
     source=[
-        env.Idlc('distinct_command.idl')[0],
+        'distinct_command.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/idl_parser',
@@ -139,7 +139,7 @@ env.Library(
         'killcursors_request.cpp',
         'killcursors_response.cpp',
         'view_response_formatter.cpp',
-        env.Idlc('count_command.idl')[0],
+        'count_command.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -161,7 +161,7 @@ env.Library(
     source=[
         "query_request.cpp",
         "tailable_mode.cpp",
-        env.Idlc("tailable_mode.idl")[0],
+        "tailable_mode.idl",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -177,7 +177,7 @@ env.Library(
 env.Library(
     target="query_knobs",
     source=[
-        env.Idlc('query_knobs.idl')[0]
+        'query_knobs.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter'
@@ -225,7 +225,7 @@ env.Library(
     target="hint_parser",
     source=[
         "hint_parser.cpp",
-        env.Idlc('hint.idl')[0],
+        'hint.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

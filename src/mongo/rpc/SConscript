@@ -58,7 +58,7 @@ env.Library(
         'legacy_reply.cpp',
         'legacy_reply_builder.cpp',
         'reply_builder_interface.cpp',
-        env.Idlc('object_check.idl')[0],
+        'object_check.idl',
     ],
     LIBDEPS=[
         'metadata',
@@ -100,7 +100,7 @@ env.Library(
         'metadata/repl_set_metadata.cpp',
         'metadata/oplog_query_metadata.cpp',
         'metadata/tracking_metadata.cpp',
-        env.Idlc('topology_version.idl')[0],
+        'topology_version.idl',
     ],
     LIBDEPS=[
         'client_metadata',
@@ -120,7 +120,7 @@ env.Library(
     ],
     source=[
         'metadata/impersonated_user_metadata.cpp',
-        env.Idlc('metadata/impersonated_user_metadata.idl')[0],
+        'metadata/impersonated_user_metadata.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

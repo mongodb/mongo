@@ -45,7 +45,7 @@ env.Library(
     target='ftdc_server',
     source=[
         'ftdc_server.cpp',
-        env.Idlc('ftdc_server.idl')[0],
+        'ftdc_server.idl',
         'ftdc_system_stats.cpp',
         'ftdc_system_stats_${TARGET_OS}.cpp',
     ],

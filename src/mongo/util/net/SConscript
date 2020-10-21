@@ -16,7 +16,7 @@ env.Library(
         "sockaddr.cpp",
         "socket_exception.cpp",
         "socket_utils.cpp",
-        env.Idlc('hostandport.idl')[0],
+        'hostandport.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -46,7 +46,7 @@ env.Library(
     target='ssl_options_client',
     source=[
         'ssl_options_client.cpp',
-        env.Idlc('ssl_options_client.idl')[0],
+        'ssl_options_client.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -61,7 +61,7 @@ env.Library(
     target='ssl_options_server',
     source=[
         'ssl_options_server.cpp',
-        env.Idlc('ssl_options_server.idl')[0],
+        'ssl_options_server.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -122,7 +122,7 @@ if not get_option('ssl') == 'off':
             "ssl_parameters.cpp",
             "ssl_manager_%s.cpp" % (ssl_provider),
             "ssl_stream.cpp",
-            env.Idlc('ssl_parameters.idl')[0],
+            'ssl_parameters.idl',
             "ocsp/ocsp_manager.cpp",
         ],
         LIBDEPS=[
@@ -154,7 +154,7 @@ if not get_option('ssl') == 'off':
         target='ssl_parameters_auth',
         source=[
             'ssl_parameters_auth.cpp',
-            env.Idlc('ssl_parameters_auth.idl')[0],
+            'ssl_parameters_auth.idl',
         ],
         LIBDEPS_PRIVATE=[
             'ssl_options',

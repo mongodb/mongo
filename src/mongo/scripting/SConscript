@@ -13,7 +13,7 @@ env.Library(
     target='scripting_common',
     source=[
         'deadline_monitor.cpp',
-        env.Idlc('deadline_monitor.idl')[0],
+        'deadline_monitor.idl',
         'dbdirectclient_factory.cpp',
         'engine.cpp',
         'jsexception.cpp',
@@ -110,8 +110,8 @@ if usemozjs:
             'mozjs/uri.cpp',
             'mozjs/valuereader.cpp',
             'mozjs/valuewriter.cpp',
-            env.Idlc('mozjs/engine.idl')[0],
-            env.Idlc('mozjs/scripting_util.idl')[0],
+            'mozjs/engine.idl',
+            'mozjs/scripting_util.idl',
         ],
         LIBDEPS=[
             'bson_template_evaluator',

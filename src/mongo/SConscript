@@ -529,7 +529,7 @@ mongos = env.Program(
         's/cluster_cursor_stats.cpp',
         's/mongos_options.cpp',
         's/mongos_options_init.cpp',
-        env.Idlc('s/mongos_options.idl')[0],
+        's/mongos_options.idl',
         's/router_transactions_server_status.cpp',
         's/s_sharding_server_status.cpp',
         's/server.cpp',

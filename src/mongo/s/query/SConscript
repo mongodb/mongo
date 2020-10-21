@@ -8,7 +8,7 @@ env.Library(
     target="cluster_query",
     source=[
         "cluster_find.cpp",
-        env.Idlc('cluster_query_knobs.idl')[0],
+        'cluster_query_knobs.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands',
@@ -74,7 +74,7 @@ env.Library(
         "async_results_merger.cpp",
         "blocking_results_merger.cpp",
         "establish_cursors.cpp",
-        env.Idlc('async_results_merger_params.idl')[0],
+        'async_results_merger_params.idl',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query/command_request_response",

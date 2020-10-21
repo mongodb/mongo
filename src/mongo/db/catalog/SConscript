@@ -64,7 +64,7 @@ env.Library(
 env.Library(
     target='commit_quorum_idl',
     source=[
-        env.Idlc('commit_quorum.idl')[0],
+        'commit_quorum.idl',
     ],
     LIBDEPS=[
         'commit_quorum_options',
@@ -76,7 +76,7 @@ env.Library(
 env.Library(
     target='max_validate_mb_per_sec_idl',
     source=[
-        env.Idlc('max_validate_mb_per_sec.idl')[0],
+        'max_validate_mb_per_sec.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -86,7 +86,7 @@ env.Library(
 env.Library(
     target='index_build_entry_idl',
     source=[
-        env.Idlc('index_build_entry.idl')[0],
+        'index_build_entry.idl',
     ],
     LIBDEPS=[
         'commit_quorum_idl',
@@ -98,7 +98,7 @@ env.Library(
     target='health_log',
     source=[
         "health_log.cpp",
-        env.Idlc("health_log.idl")[0],
+        "health_log.idl",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -240,7 +240,7 @@ env.Library(
     target='multi_index_block',
     source=[
         'multi_index_block.cpp',
-        env.Idlc('multi_index_block.idl')[0],
+        'multi_index_block.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

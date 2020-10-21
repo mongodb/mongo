@@ -43,8 +43,8 @@ env.Library(
     source=[
         'server_read_concern_metrics.cpp',
         'server_write_concern_metrics.cpp',
-        env.Idlc('read_concern_stats.idl')[0],
-        env.Idlc('server_write_concern_metrics.idl')[0],
+        'read_concern_stats.idl',
+        'server_write_concern_metrics.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

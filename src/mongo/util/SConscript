@@ -148,7 +148,7 @@ env.Library(
     target="fail_point",
     source=[
         "fail_point.cpp",
-        env.Idlc('fail_point_server_parameter.idl')[0],
+        'fail_point_server_parameter.idl',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -161,7 +161,7 @@ env.Library(
     target="testing_options",
     source=[
         "testing_options.cpp",
-        env.Idlc('testing_options.idl')[0],
+        'testing_options.idl',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
@@ -261,7 +261,7 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
         source=[
             'tcmalloc_server_status_section.cpp',
             'tcmalloc_set_parameter.cpp',
-            env.Idlc('tcmalloc_parameters.idl')[0],
+            'tcmalloc_parameters.idl',
             'heap_profiler.cpp',
         ],
         LIBDEPS=[
@@ -438,7 +438,7 @@ env.Library(
     target='password',
     source=[
         'password.cpp',
-        env.Idlc('password_params.idl')[0],
+        'password_params.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

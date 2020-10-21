@@ -1509,6 +1509,10 @@ env['BUILDERS']['SharedArchive'] = SCons.Builder.Builder(
     src_suffix=env['BUILDERS']['SharedLibrary'].src_suffix,
 )
 
+# Teach builders how to build idl files
+for builder in ['SharedObject', 'StaticObject']:
+    env['BUILDERS'][builder].add_src_builder("Idlc")
+
 if link_model.startswith("dynamic"):
 
     def library(env, target, source, *args, **kwargs):

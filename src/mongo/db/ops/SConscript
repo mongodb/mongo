@@ -30,7 +30,7 @@ env.Library(
     target='write_ops_parsers',
     source=[
         'write_ops_parsers.cpp',
-        env.Idlc('write_ops.idl')[0],
+        'write_ops.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

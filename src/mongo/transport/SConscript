@@ -52,7 +52,7 @@ tlEnv.Library(
     target='transport_layer',
     source=[
         'transport_layer_asio.cpp',
-        env.Idlc('transport_options.idl')[0],
+        'transport_options.idl',
     ],
     LIBDEPS=[
         'transport_layer_common',
@@ -88,7 +88,7 @@ tlEnv.Library(
         'service_executor_adaptive.cpp',
         'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
-        env.Idlc('service_executor.idl')[0],
+        'service_executor.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
@@ -149,7 +149,7 @@ zlibEnv.Library(
 env.Library(
     target='message_compressor_options_client',
     source=[
-        env.Idlc('message_compressor_options_client.idl')[0],
+        'message_compressor_options_client.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -160,7 +160,7 @@ env.Library(
 env.Library(
     target='message_compressor_options_server',
     source=[
-        env.Idlc('message_compressor_options_server.idl')[0],
+        'message_compressor_options_server.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -95,8 +95,8 @@ env.Library(
         'kill_sessions_remote.cpp',
         's_read_write_concern_defaults_server_status.cpp',
         'strategy.cpp',
-        env.Idlc('cluster_multicast.idl')[0],
-        env.Idlc('kill_sessions_remote.idl')[0],
+        'cluster_multicast.idl',
+        'kill_sessions_remote.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/servers',

@@ -24,7 +24,7 @@ env.Library(
     target='write_conflict_exception',
     source=[
         'write_conflict_exception.cpp',
-        env.Idlc('write_conflict_exception.idl')[0],
+        'write_conflict_exception.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

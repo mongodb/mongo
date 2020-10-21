@@ -139,7 +139,7 @@ env.Library(
     target='storage_options',
     source=[
         'storage_options.cpp',
-        env.Idlc('storage_parameters.idl')[0],
+        'storage_parameters.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -368,7 +368,7 @@ env.Library(
 env.Library(
     target='flow_control_parameters',
     source=[
-        env.Idlc('flow_control_parameters.idl')[0],
+        'flow_control_parameters.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -464,7 +464,7 @@ env.Library(
 env.Library(
     target='two_phase_index_build_knobs_idl',
     source=[
-        env.Idlc('two_phase_index_build_knobs.idl')[0],
+        'two_phase_index_build_knobs.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/server_parameter',
