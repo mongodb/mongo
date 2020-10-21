@@ -5751,6 +5751,42 @@ tasks:
       resmoke_args: --suites=core --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: config_fuzzer_jsCore
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=core --storageEngine=wiredTiger --fuzzMongodConfigs
+
+- <<: *task_template
+  name: config_fuzzer_concurrency
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency --storageEngine=wiredTiger --fuzzMongodConfigs
+
+- <<: *task_template
+  name: config_fuzzer_concurrency_replication
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication --storageEngine=wiredTiger --fuzzMongodConfigs
+
+- <<: *task_template
+  name: config_fuzzer_replica_sets_jscore_passthrough
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=replica_sets_jscore_passthrough --storageEngine=wiredTiger --fuzzMongodConfigs
+
+- <<: *task_template
   name: jsCore_ese
   tags: ["jscore", "encrypt"]
   depends_on:
@@ -11105,6 +11141,14 @@ buildvariants:
   - name: auth_audit_gen
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_concurrency_replication
+    distros:
+    - rhel70-large
+  - name: config_fuzzer_jsCore
+  - name: config_fuzzer_replica_sets_jscore_passthrough
+    distros:
+    - rhel70-large
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
