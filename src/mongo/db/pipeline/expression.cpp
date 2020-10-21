@@ -6463,7 +6463,7 @@ intrusive_ptr<Expression> ExpressionRandom::optimize() {
 }
 
 void ExpressionRandom::_doAddDependencies(DepsTracker* deps) const {
-    // Nothing to do.
+    deps->needRandomGenerator = true;
 }
 
 Value ExpressionRandom::serialize(const bool explain) const {

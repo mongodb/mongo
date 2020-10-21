@@ -117,11 +117,13 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     // assertions.
     DepsTracker deps(DepsTracker::kNoMetadata);
 
-    // Iterate through the pipeline stages until we find one which references an external variable.
+    // Iterate through the pipeline stages until we find one which cannot be cached.
+    // A stage cannot be cached if it either: 1. depends on a variable defined in this scope, or
+    // 2. generates random numbers.
     for (; prefixSplit != container->end(); ++prefixSplit) {
         (*prefixSplit)->getDependencies(&deps);
 
-        if (deps.hasVariableReferenceTo(varIDs)) {
+        if (deps.hasVariableReferenceTo(varIDs) || deps.needRandomGenerator) {
             break;
         }
     }

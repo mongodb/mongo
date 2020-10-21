@@ -107,6 +107,12 @@ struct DepsTracker {
      */
     BSONObj toProjectionWithoutMetadata() const;
 
+    /**
+     * Returns 'true' if there is no dependency on the input documents or metadata.
+     *
+     * Note: this method does not say anything about dependencies on variables, or on a random
+     * generator.
+     */
     bool hasNoRequirements() const {
         return fields.empty() && !needWholeDocument && !_metadataDeps.any();
     }
@@ -176,6 +182,11 @@ struct DepsTracker {
     std::set<std::string> fields;    // Names of needed fields in dotted notation.
     std::set<Variables::Id> vars;    // IDs of referenced variables.
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
+
+    // The output of some operators (such as $sample and $rand) depends on a source of fresh random
+    // numbers. During execution this dependency is implicit, but during optimize() we need to know
+    // about this dependency to decide whether it's ok to cache or reevaluate an operator.
+    bool needRandomGenerator = false;
 
 private:
     // Represents all metadata not available to the pipeline.

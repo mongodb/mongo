@@ -55,6 +55,7 @@ public:
     }
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        deps->needRandomGenerator = true;
         return DepsTracker::State::SEE_NEXT;
     }
 
