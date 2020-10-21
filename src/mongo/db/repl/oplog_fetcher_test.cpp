@@ -174,8 +174,9 @@ void validateFindCommand(Message m,
 
                           msg.body.getObjectField("filter"));
     } else {
-        ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp()) << "$and"
-                                    << BSON_ARRAY(filter)),
+        ASSERT_BSONOBJ_EQ(BSON("ts"
+                               << BSON("$gte" << lastFetched.getTimestamp()) << "$or"
+                               << BSON_ARRAY(filter << BSON("ts" << lastFetched.getTimestamp()))),
                           msg.body.getObjectField("filter"));
     }
     ASSERT_EQUALS(lastFetched.getTerm(), msg.body.getIntField("term"));
@@ -361,6 +362,13 @@ protected:
     OpTime lastFetched;
 
     std::unique_ptr<MockRemoteDBServer> _mockServer;
+
+private:
+    executor::ThreadPoolMock::Options makeThreadPoolMockOptions() const override {
+        executor::ThreadPoolMock::Options options;
+        options.onCreateThread = []() { Client::initThread("OplogFetcherTest"); };
+        return options;
+    };
 };
 
 const int OplogFetcherTest::remoteRBID;
@@ -1592,6 +1600,90 @@ TEST_F(OplogFetcherTest, CursorIsDeadShutsDownOplogFetcherWithSuccessfulStatus) 
     // Check that the next batch was successfully processed.
     validateLastBatch(
         true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+
+    ASSERT_OK(shutdownState.getStatus());
+    ASSERT_EQ(remoteRBID, shutdownState.getRBID());
+}
+
+TEST_F(OplogFetcherTest, SkipFirstDocumentIfDoesntMatchFilter) {
+    ShutdownState shutdownState;
+
+    // Create a filter that won't match the first document.
+    BSONObj filter = BSON("ns" << BSON("$regex"
+                                       << "^notmydb"));
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher =
+        getOplogFetcherAfterConnectionCreated(std::ref(shutdownState),
+                                              1,
+                                              true, /* requireFresherSyncSource */
+                                              OplogFetcher::StartingPoint::kEnqueueFirstDoc,
+                                              ReplicationProcess::kUninitializedRollbackId,
+                                              filter);
+
+    CursorId cursorId = 0LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(124), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto firstBatch = {firstEntry, secondEntry};
+
+    auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                          makeFirstBatch(cursorId, firstBatch, metadataObj));
+
+    validateFindCommand(m,
+                        lastFetched,
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()),
+                        filter);
+
+    // Check that the oplog fetcher has shut down to make sure it has processed the next batch
+    // before verifying the batch's contents.
+    oplogFetcher->join();
+
+    // Check that the next batch was successfully processed.
+    // Note that though we told the oplog fetcher not to skip the first doc, we should skip it
+    // anyway because it won't match the filter.
+    validateLastBatch(
+        true /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
+
+    ASSERT_OK(shutdownState.getStatus());
+    ASSERT_EQ(remoteRBID, shutdownState.getRBID());
+}
+
+TEST_F(OplogFetcherTest, DontSkipFirstDocumentIfDoesMatchFilter) {
+    ShutdownState shutdownState;
+
+    // Create a filter that will match the first document.
+    BSONObj filter = BSON("ns" << BSON("$regex"
+                                       << "^test"));
+    // Create an oplog fetcher with one retry.
+    auto oplogFetcher =
+        getOplogFetcherAfterConnectionCreated(std::ref(shutdownState),
+                                              1,
+                                              true, /* requireFresherSyncSource */
+                                              OplogFetcher::StartingPoint::kEnqueueFirstDoc,
+                                              ReplicationProcess::kUninitializedRollbackId,
+                                              filter);
+
+    CursorId cursorId = 0LL;
+    auto firstEntry = makeNoopOplogEntry(lastFetched);
+    auto secondEntry = makeNoopOplogEntry({{Seconds(124), 0}, lastFetched.getTerm()});
+    auto metadataObj = makeOplogBatchMetadata(replSetMetadata, oqMetadata);
+    auto firstBatch = {firstEntry, secondEntry};
+
+    auto m = processSingleRequestResponse(oplogFetcher->getDBClientConnection_forTest(),
+                                          makeFirstBatch(cursorId, firstBatch, metadataObj));
+
+    validateFindCommand(m,
+                        lastFetched,
+                        durationCount<Milliseconds>(oplogFetcher->getInitialFindMaxTime_forTest()),
+                        filter);
+
+    // Check that the oplog fetcher has shut down to make sure it has processed the next batch
+    // before verifying the batch's contents.
+    oplogFetcher->join();
+
+    // Check that the next batch was successfully processed.
+    validateLastBatch(
+        false /* skipFirstDoc */, firstBatch, oplogFetcher->getLastOpTimeFetched_forTest());
 
     ASSERT_OK(shutdownState.getStatus());
     ASSERT_EQ(remoteRBID, shutdownState.getRBID());

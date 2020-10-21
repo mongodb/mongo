@@ -502,7 +502,8 @@ BSONObj OplogFetcher::_makeFindQuery(long long findTimeout) const {
     filterBob.append("ts", BSON("$gte" << lastOpTimeFetched.getTimestamp()));
     // Handle caller-provided filter.
     if (!_queryFilter.isEmpty()) {
-        filterBob.append("$and", BSON_ARRAY(_queryFilter));
+        filterBob.append(
+            "$or", BSON_ARRAY(_queryFilter << BSON("ts" << lastOpTimeFetched.getTimestamp())));
     }
     filterBob.done();
 
@@ -715,9 +716,19 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
         //       right after that first document was enqueued. In such a scenario, we would not
         //       have advanced the lastFetched opTime, so we skip past that document to avoid
         //       duplicating it.
+        //    3. We have a query filter, and the first document doesn't match that filter.  This
+        //       happens on the first batch when we always accept a document with the previous
+        //       fetched timestamp.
 
         if (_startingPoint == StartingPoint::kSkipFirstDoc) {
             firstDocToApply++;
+        } else if (!_queryFilter.isEmpty()) {
+            auto opCtx = cc().makeOperationContext();
+            auto expCtx =
+                make_intrusive<ExpressionContext>(opCtx.get(), nullptr /* collator */, _nss);
+            Matcher m(_queryFilter, expCtx);
+            if (!m.matches(*firstDocToApply))
+                firstDocToApply++;
         }
     }
 
