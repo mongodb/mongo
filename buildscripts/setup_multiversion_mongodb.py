@@ -19,6 +19,9 @@ import zipfile
 
 import requests
 import requests.exceptions
+import yaml
+
+SETUP_MULTIVERSION_FILE = "etc/setup_multiversion_mapping.yml"
 
 
 def dump_stacks(_signal_num, _frame):  # pylint: disable=unused-argument
@@ -109,6 +112,27 @@ def download_file(url, file_name, download_retries=5):
         return True
 
     raise Exception("Unknown download problem for {} to file {}".format(url, file_name))
+
+
+def get_buildvariant_name(edition, platform, architecture, version):
+    """Return Evergreen buildvariant name."""
+
+    with open(SETUP_MULTIVERSION_FILE) as file_handle:
+        config_yaml = yaml.safe_load(file_handle)
+
+    buildvariant_name = ""
+    for buildvariant in config_yaml.get("evergreen_buildvariants", []):
+        if (buildvariant.get("edition", "") == edition
+                and buildvariant.get("platform", "") == platform
+                and buildvariant.get("architecture", "") == architecture):
+            versions = buildvariant.get("versions", [])
+            if version in versions:
+                buildvariant_name = buildvariant.get("name", "")
+                break
+            elif not versions:
+                buildvariant_name = buildvariant.get("name", "")
+
+    return buildvariant_name
 
 
 class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attributes
