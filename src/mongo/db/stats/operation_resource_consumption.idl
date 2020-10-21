@@ -54,3 +54,13 @@ server_parameters:
     default: 128
     validator:
       gte: 1
+
+  indexEntryUnitSizeBytes:
+    description: "The size of an index entry unit for resource consumption metrics collection"
+    set_at:
+      - startup
+    cpp_varname: gIndexEntryUnitSizeBytes
+    cpp_vartype: int32_t
+    default: 16
+    validator:
+      gte: 1

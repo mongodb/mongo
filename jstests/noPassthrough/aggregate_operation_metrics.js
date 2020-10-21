@@ -20,20 +20,28 @@ rst.startSet();
 rst.initiate();
 
 let assertMetricsExist = function(metrics) {
-    assert.neq(metrics, undefined);
-    let primaryMetrics = metrics.primaryMetrics;
-    let secondaryMetrics = metrics.secondaryMetrics;
-    [primaryMetrics, secondaryMetrics].forEach((readMetrics) => {
-        assert.gte(readMetrics.docBytesRead, 0);
-        assert.gte(readMetrics.docUnitsRead, 0);
-        assert.gte(readMetrics.idxEntriesRead, 0);
-        assert.gte(readMetrics.keysSorted, 0);
-    });
+    try {
+        assert.neq(metrics, undefined);
+        let primaryMetrics = metrics.primaryMetrics;
+        let secondaryMetrics = metrics.secondaryMetrics;
+        [primaryMetrics, secondaryMetrics].forEach((readMetrics) => {
+            assert.gte(readMetrics.docBytesRead, 0);
+            assert.gte(readMetrics.docUnitsRead, 0);
+            assert.gte(readMetrics.idxEntryBytesRead, 0);
+            assert.gte(readMetrics.idxEntryUnitsRead, 0);
+            assert.gte(readMetrics.keysSorted, 0);
+            assert.gte(readMetrics.docUnitsReturned, 0);
+        });
 
-    assert.gte(metrics.cpuMillis, 0);
-    assert.gte(metrics.docBytesWritten, 0);
-    assert.gte(metrics.docUnitsWritten, 0);
-    assert.gte(metrics.docUnitsReturned, 0);
+        assert.gte(metrics.cpuMillis, 0);
+        assert.gte(metrics.docBytesWritten, 0);
+        assert.gte(metrics.docUnitsWritten, 0);
+        assert.gte(metrics.idxEntryBytesWritten, 0);
+        assert.gte(metrics.idxEntryUnitsWritten, 0);
+    } catch (e) {
+        print("caught exception while checking metrics output: " + tojson(metrics));
+        throw e;
+    }
 };
 
 let getDBMetrics = (adminDB) => {

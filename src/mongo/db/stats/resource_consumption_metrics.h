@@ -53,8 +53,10 @@ public:
         void add(const ReadMetrics& other) {
             docBytesRead += other.docBytesRead;
             docUnitsRead += other.docUnitsRead;
-            idxEntriesRead += other.idxEntriesRead;
+            idxEntryBytesRead += other.idxEntryBytesRead;
+            idxEntryUnitsRead += other.idxEntryUnitsRead;
             keysSorted += other.keysSorted;
+            docUnitsReturned += other.docUnitsReturned;
         }
 
         ReadMetrics operator+(const ReadMetrics& other) const {
@@ -72,10 +74,14 @@ public:
         long long docBytesRead;
         // Number of document units read
         long long docUnitsRead;
-        // Number of index entries read
-        long long idxEntriesRead;
+        // Number of index entry bytes read
+        long long idxEntryBytesRead;
+        // Number of index entries units read
+        long long idxEntryUnitsRead;
         // Number of keys sorted for query operations
         long long keysSorted;
+        // Number of document units returned by a query
+        long long docUnitsReturned;
     };
 
     /**
@@ -92,7 +98,8 @@ public:
             cpuMillis += other.cpuMillis;
             docBytesWritten += other.docBytesWritten;
             docUnitsWritten += other.docUnitsWritten;
-            docUnitsReturned += other.docUnitsReturned;
+            idxEntryBytesWritten += other.idxEntryBytesWritten;
+            idxEntryUnitsWritten += other.idxEntryUnitsWritten;
         };
 
         Metrics& operator+=(const Metrics& other) {
@@ -110,8 +117,10 @@ public:
         long long docBytesWritten;
         // Number of document units written
         long long docUnitsWritten;
-        // Number of document units returned by a query.
-        long long docUnitsReturned;
+        // Number of index entry bytes written
+        long long idxEntryBytesWritten;
+        // Number of index entry units written
+        long long idxEntryUnitsWritten;
 
         /**
          * Reports all metrics on a BSONObjectBuilder. The generated object has nested fields to
@@ -221,8 +230,15 @@ public:
          */
         void incrementOneDocRead(OperationContext* opCtx, size_t docBytesRead);
 
-        void incrementIdxEntriesRead(OperationContext* opCtx, size_t idxEntriesRead);
+        /**
+         * This should be called once per index entry read with the number of bytes read for that
+         * entry. This is replication-state aware and increments the metric based on the current
+         * replication state. This is a no-op when metrics collection is disabled on this operation.
+         */
+        void incrementOneIdxEntryRead(OperationContext* opCtx, size_t idxEntryBytesRead);
+
         void incrementKeysSorted(OperationContext* opCtx, size_t keysSorted);
+        void incrementDocUnitsReturned(OperationContext* opCtx, size_t docUnitsReturned);
 
         /**
          * This should be called once per document written with the number of bytes written for that
@@ -231,8 +247,14 @@ public:
          */
         void incrementOneDocWritten(size_t docBytesWritten);
 
+        /**
+         * This should be called once per index entry written with the number of bytes written for
+         * that entry. This increments the metric independent of replication state, and only when
+         * metrics collection is enabled for this operation.
+         */
+        void incrementOneIdxEntryWritten(size_t idxEntryBytesWritten);
+
         void incrementCpuMillis(size_t cpuMillis);
-        void incrementDocUnitsReturned(size_t docUnitsReturned);
 
     private:
         /**

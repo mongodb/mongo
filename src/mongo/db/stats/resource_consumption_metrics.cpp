@@ -48,11 +48,14 @@ static const char kPrimaryMetrics[] = "primaryMetrics";
 static const char kSecondaryMetrics[] = "secondaryMetrics";
 static const char kDocBytesRead[] = "docBytesRead";
 static const char kDocUnitsRead[] = "docUnitsRead";
-static const char kIdxEntriesRead[] = "idxEntriesRead";
+static const char kIdxEntryBytesRead[] = "idxEntryBytesRead";
+static const char kIdxEntryUnitsRead[] = "idxEntryUnitsRead";
 static const char kKeysSorted[] = "keysSorted";
 static const char kCpuMillis[] = "cpuMillis";
 static const char kDocBytesWritten[] = "docBytesWritten";
 static const char kDocUnitsWritten[] = "docUnitsWritten";
+static const char kIdxEntryBytesWritten[] = "idxEntryBytesWritten";
+static const char kIdxEntryUnitsWritten[] = "idxEntryUnitsWritten";
 static const char kDocUnitsReturned[] = "docUnitsReturned";
 
 inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long long value) {
@@ -90,8 +93,10 @@ void ResourceConsumption::Metrics::toBson(BSONObjBuilder* builder) const {
         BSONObjBuilder primaryBuilder = builder->subobjStart(kPrimaryMetrics);
         primaryBuilder.appendNumber(kDocBytesRead, primaryMetrics.docBytesRead);
         primaryBuilder.appendNumber(kDocUnitsRead, primaryMetrics.docUnitsRead);
-        primaryBuilder.appendNumber(kIdxEntriesRead, primaryMetrics.idxEntriesRead);
+        primaryBuilder.appendNumber(kIdxEntryBytesRead, primaryMetrics.idxEntryBytesRead);
+        primaryBuilder.appendNumber(kIdxEntryUnitsRead, primaryMetrics.idxEntryUnitsRead);
         primaryBuilder.appendNumber(kKeysSorted, primaryMetrics.keysSorted);
+        primaryBuilder.appendNumber(kDocUnitsReturned, primaryMetrics.docUnitsReturned);
         primaryBuilder.done();
     }
 
@@ -99,15 +104,18 @@ void ResourceConsumption::Metrics::toBson(BSONObjBuilder* builder) const {
         BSONObjBuilder secondaryBuilder = builder->subobjStart(kSecondaryMetrics);
         secondaryBuilder.appendNumber(kDocBytesRead, secondaryMetrics.docBytesRead);
         secondaryBuilder.appendNumber(kDocUnitsRead, secondaryMetrics.docUnitsRead);
-        secondaryBuilder.appendNumber(kIdxEntriesRead, secondaryMetrics.idxEntriesRead);
+        secondaryBuilder.appendNumber(kIdxEntryBytesRead, secondaryMetrics.idxEntryBytesRead);
+        secondaryBuilder.appendNumber(kIdxEntryUnitsRead, secondaryMetrics.idxEntryUnitsRead);
         secondaryBuilder.appendNumber(kKeysSorted, secondaryMetrics.keysSorted);
+        secondaryBuilder.appendNumber(kDocUnitsReturned, secondaryMetrics.docUnitsReturned);
         secondaryBuilder.done();
     }
 
     builder->appendNumber(kCpuMillis, cpuMillis);
     builder->appendNumber(kDocBytesWritten, docBytesWritten);
     builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
-    builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
+    builder->appendNumber(kIdxEntryBytesWritten, idxEntryBytesWritten);
+    builder->appendNumber(kIdxEntryUnitsWritten, idxEntryUnitsWritten);
 }
 
 void ResourceConsumption::Metrics::toFlatBsonAllFields(BSONObjBuilder* builder) const {
@@ -115,13 +123,16 @@ void ResourceConsumption::Metrics::toFlatBsonAllFields(BSONObjBuilder* builder) 
     auto readMetrics = primaryMetrics + secondaryMetrics;
     builder->appendNumber(kDocBytesRead, readMetrics.docBytesRead);
     builder->appendNumber(kDocUnitsRead, readMetrics.docUnitsRead);
-    builder->appendNumber(kIdxEntriesRead, readMetrics.idxEntriesRead);
+    builder->appendNumber(kIdxEntryBytesRead, readMetrics.idxEntryBytesRead);
+    builder->appendNumber(kIdxEntryUnitsRead, readMetrics.idxEntryUnitsRead);
     builder->appendNumber(kKeysSorted, readMetrics.keysSorted);
+    builder->appendNumber(kDocUnitsReturned, readMetrics.docUnitsReturned);
 
     builder->appendNumber(kCpuMillis, cpuMillis);
     builder->appendNumber(kDocBytesWritten, docBytesWritten);
     builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
-    builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
+    builder->appendNumber(kIdxEntryBytesWritten, idxEntryBytesWritten);
+    builder->appendNumber(kIdxEntryUnitsWritten, idxEntryUnitsWritten);
 }
 
 void ResourceConsumption::Metrics::toFlatBsonNonZeroFields(BSONObjBuilder* builder) const {
@@ -129,13 +140,16 @@ void ResourceConsumption::Metrics::toFlatBsonNonZeroFields(BSONObjBuilder* build
     auto readMetrics = primaryMetrics + secondaryMetrics;
     appendNonZeroMetric(builder, kDocBytesRead, readMetrics.docBytesRead);
     appendNonZeroMetric(builder, kDocUnitsRead, readMetrics.docUnitsRead);
-    appendNonZeroMetric(builder, kIdxEntriesRead, readMetrics.idxEntriesRead);
+    appendNonZeroMetric(builder, kIdxEntryBytesRead, readMetrics.idxEntryBytesRead);
+    appendNonZeroMetric(builder, kIdxEntryUnitsRead, readMetrics.idxEntryUnitsRead);
     appendNonZeroMetric(builder, kKeysSorted, readMetrics.keysSorted);
+    appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docUnitsReturned);
 
     appendNonZeroMetric(builder, kCpuMillis, cpuMillis);
     appendNonZeroMetric(builder, kDocBytesWritten, docBytesWritten);
     appendNonZeroMetric(builder, kDocUnitsWritten, docUnitsWritten);
-    appendNonZeroMetric(builder, kDocUnitsReturned, docUnitsReturned);
+    appendNonZeroMetric(builder, kIdxEntryBytesWritten, idxEntryBytesWritten);
+    appendNonZeroMetric(builder, kIdxEntryUnitsWritten, idxEntryUnitsWritten);
 }
 
 template <typename Func>
@@ -171,15 +185,25 @@ void ResourceConsumption::MetricsCollector::incrementOneDocRead(OperationContext
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementIdxEntriesRead(OperationContext* opCtx,
-                                                                    size_t idxEntriesRead) {
-    _updateReadMetrics(
-        opCtx, [&](ReadMetrics& readMetrics) { readMetrics.idxEntriesRead += idxEntriesRead; });
+void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(OperationContext* opCtx,
+                                                                     size_t bytesRead) {
+    _updateReadMetrics(opCtx, [&](ReadMetrics& readMetrics) {
+        size_t units = std::ceil(bytesRead / static_cast<float>(gIndexEntryUnitSizeBytes));
+        readMetrics.idxEntryBytesRead += bytesRead;
+        readMetrics.idxEntryUnitsRead += units;
+    });
 }
+
 void ResourceConsumption::MetricsCollector::incrementKeysSorted(OperationContext* opCtx,
                                                                 size_t keysSorted) {
     _updateReadMetrics(opCtx,
                        [&](ReadMetrics& readMetrics) { readMetrics.keysSorted += keysSorted; });
+}
+
+void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(OperationContext* opCtx,
+                                                                      size_t returned) {
+    _updateReadMetrics(opCtx,
+                       [&](ReadMetrics& readMetrics) { readMetrics.docUnitsReturned += returned; });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneDocWritten(size_t bytesWritten) {
@@ -190,12 +214,16 @@ void ResourceConsumption::MetricsCollector::incrementOneDocWritten(size_t bytesW
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementCpuMillis(size_t cpuMillis) {
-    _doIfCollecting([&] { _metrics.cpuMillis += cpuMillis; });
+void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(size_t bytesWritten) {
+    _doIfCollecting([&] {
+        size_t idxUnits = std::ceil(bytesWritten / static_cast<float>(gIndexEntryUnitSizeBytes));
+        _metrics.idxEntryBytesWritten += bytesWritten;
+        _metrics.idxEntryUnitsWritten += idxUnits;
+    });
 }
 
-void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(size_t returned) {
-    _doIfCollecting([&] { _metrics.docUnitsReturned += returned; });
+void ResourceConsumption::MetricsCollector::incrementCpuMillis(size_t cpuMillis) {
+    _doIfCollecting([&] { _metrics.cpuMillis += cpuMillis; });
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,

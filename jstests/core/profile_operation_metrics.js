@@ -39,13 +39,16 @@ const assertMetricsExist = (profilerEntry) => {
 
     assert.gte(metrics.docBytesRead, 0);
     assert.gte(metrics.docUnitsRead, 0);
-    assert.gte(metrics.idxEntriesRead, 0);
+    assert.gte(metrics.idxEntryBytesRead, 0);
+    assert.gte(metrics.idxEntryUnitsRead, 0);
     assert.gte(metrics.keysSorted, 0);
+    assert.gte(metrics.docUnitsReturned, 0);
 
     assert.gte(metrics.cpuMillis, 0);
     assert.gte(metrics.docBytesWritten, 0);
     assert.gte(metrics.docUnitsWritten, 0);
-    assert.gte(metrics.docUnitsReturned, 0);
+    assert.gte(metrics.idxEntryBytesWritten, 0);
+    assert.gte(metrics.idxEntryUnitsWritten, 0);
 };
 
 const runInLegacyQueryMode = (db, func) => {
@@ -90,9 +93,12 @@ const operations = [
             // test run, so only assert this is non-zero.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.gt(profileDoc.docBytesWritten, 0);
             assert.gt(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -108,9 +114,12 @@ const operations = [
             // metrics for index builds.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.gt(profileDoc.docBytesWritten, 0);
             assert.gt(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -123,7 +132,8 @@ const operations = [
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             if (isReplSet) {
                 // Ensure writes to the oplog are counted. Some oplog fields like UUID are
                 // randomized between runs, but the types are fixed-length, so we can make strong
@@ -137,6 +147,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 7);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 2);
         }
     },
     {
@@ -160,9 +172,12 @@ const operations = [
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -175,9 +190,12 @@ const operations = [
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -190,9 +208,12 @@ const operations = [
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -205,9 +226,12 @@ const operations = [
             // Does not read from the collection.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -226,7 +250,8 @@ const operations = [
                 assert.gte(profileDoc.docBytesRead, 29);
                 assert.gte(profileDoc.docUnitsRead, 1);
             }
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (isReplSet) {
                 // Ensure writes to the oplog are counted.
                 assert.eq(profileDoc.docBytesWritten, 224);
@@ -237,6 +262,9 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            // Deletes one index entry and writes another.
+            assert.eq(profileDoc.idxEntryBytesWritten, 9);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 2);
         }
     },
     {
@@ -255,7 +283,8 @@ const operations = [
                 assert.gte(profileDoc.docUnitsRead, 1);
                 assert.gte(profileDoc.docBytesRead, 29);
             }
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (isReplSet) {
                 // Ensure writes to the oplog are counted.
                 assert.eq(profileDoc.docBytesWritten, 224);
@@ -266,6 +295,9 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            // Deletes one index entry and writes another.
+            assert.eq(profileDoc.idxEntryBytesWritten, 10);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 2);
         }
     },
     {
@@ -278,8 +310,11 @@ const operations = [
             // Reads from the fast-count, not the collection.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -292,9 +327,12 @@ const operations = [
             // Should not read from the collection.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     // Clear the profile collection so we can easily identify new operations with similar filters as
@@ -310,8 +348,11 @@ const operations = [
             // Should read from the collection.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -324,9 +365,12 @@ const operations = [
             // This reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -339,9 +383,12 @@ const operations = [
             // This reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.gt(profileDoc.docBytesWritten, 0);
             assert.gt(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     resetProfileColl,
@@ -365,9 +412,12 @@ const operations = [
                 assert.gte(profileDoc.docBytesRead, 29);
                 assert.gte(profileDoc.docUnitsRead, 1);
             }
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -386,7 +436,8 @@ const operations = [
                 assert.gte(profileDoc.docBytesRead, 58);
                 assert.gte(profileDoc.docUnitsRead, 2);
             }
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (isReplSet) {
                 // Ensure writes to the oplog are counted.
                 assert.eq(profileDoc.docBytesWritten, 177);
@@ -396,6 +447,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 3);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
     },
     {
@@ -414,7 +467,8 @@ const operations = [
                 assert.gte(profileDoc.docBytesRead, 58);
                 assert.gte(profileDoc.docUnitsRead, 2);
             }
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             if (isReplSet) {
                 // Ensure writes to the oplog are counted.
                 assert.eq(profileDoc.docBytesWritten, 177);
@@ -424,6 +478,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 3);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
     },
     {
@@ -436,9 +492,12 @@ const operations = [
             // Reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.gt(profileDoc.docBytesWritten, 0);
             assert.gt(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     resetProfileColl,
@@ -457,9 +516,12 @@ const operations = [
             // The exact amount of data read is not easily calculable.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -475,9 +537,12 @@ const operations = [
             // metrics for index builds.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     resetProfileColl,
@@ -491,7 +556,9 @@ const operations = [
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            // Reads the index entry for 'a' to determine uniqueness.
+            assert.eq(profileDoc.idxEntryBytesRead, 6);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (isReplSet) {
                 // Ensure writes to the oplog are counted. Some oplog fields like UUID are
                 // randomized between runs, but the types are fixed-length, so we can make strong
@@ -503,6 +570,9 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            // Deletes one entry and writes another.
+            assert.eq(profileDoc.idxEntryBytesWritten, 10);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 2);
         }
     },
     resetProfileColl,
@@ -519,12 +589,15 @@ const operations = [
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
             // Inserting into a unique index requires reading one key.
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 4);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             // Despite failing to insert keys into the unique index, the operation first succeeded
             // in writing to the collection. Even though the operation was rolled-back, this counts
             // towards metrics.
             assert.eq(profileDoc.docBytesWritten, 29);
             assert.eq(profileDoc.docUnitsWritten, 1);
+            assert.eq(profileDoc.idxEntryBytesWritten, 4);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
     },
     {
@@ -544,7 +617,8 @@ const operations = [
                 assert.gte(profileDoc.docUnitsRead, 1);
             }
             // Reads index entries on '_id' for the lookup and 'a' to ensure uniqueness.
-            assert.eq(profileDoc.idxEntriesRead, 2);
+            assert.eq(profileDoc.idxEntryBytesRead, 9);
+            assert.eq(profileDoc.idxEntryUnitsRead, 2);
             if (isReplSet) {
                 // Ensure writes to the oplog are counted.
                 assert.eq(profileDoc.docBytesWritten, 224);
@@ -555,6 +629,9 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            // Removes one entry and inserts another.
+            assert.eq(profileDoc.idxEntryBytesWritten, 11);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 2);
         }
     },
     {
@@ -580,7 +657,8 @@ const operations = [
                 assert.gte(profileDoc.docUnitsRead, 9);
             }
             // Reads index entries on '_id' for the lookup and 'a' to ensure uniqueness.
-            assert.eq(profileDoc.idxEntriesRead, 2);
+            assert.eq(profileDoc.idxEntryBytesRead, 10);
+            assert.eq(profileDoc.idxEntryUnitsRead, 2);
             if (isReplSet) {
                 // When WT_MODIFY is used on a replicated collection, in addition to writing fewer
                 // bytes per the comment about WT_MODIFY above, ensure it also inserts into the
@@ -591,6 +669,9 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 1061);
                 assert.eq(profileDoc.docUnitsWritten, 9);
             }
+            // Removes one entry and inserts another.
+            assert.eq(profileDoc.idxEntryBytesWritten, 10);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 2);
         }
     },
     {
@@ -615,7 +696,8 @@ const operations = [
                 assert.gte(profileDoc.docBytesRead, 29);
                 assert.gte(profileDoc.docUnitsRead, 1);
             }
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 4);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (isReplSet) {
                 // When WT_MODIFY is used on a replicated collection, in addition to writing fewer
                 // bytes per the comment about WT_MODIFY above, ensure it also inserts into the
@@ -628,6 +710,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 16);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     resetProfileColl,
@@ -644,7 +728,8 @@ const operations = [
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             if (isReplSet) {
                 assert.eq(profileDoc.docBytesWritten, 188);
                 assert.eq(profileDoc.docUnitsWritten, 3);
@@ -652,6 +737,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 3);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
     },
     {
@@ -665,9 +752,12 @@ const operations = [
         profileAssert: (profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     resetProfileColl,
@@ -691,9 +781,12 @@ const operations = [
         profileAssert: (profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 18);
             assert.eq(profileDoc.docUnitsRead, 1);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docBytesWritten, 0);
             assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -712,7 +805,8 @@ const operations = [
                 assert.gte(profileDoc.docBytesRead, 29);
                 assert.gte(profileDoc.docUnitsRead, 1);
             }
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (isReplSet) {
                 assert.eq(profileDoc.docBytesWritten, 211);
                 assert.eq(profileDoc.docUnitsWritten, 3);
@@ -720,6 +814,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 16);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
     },
     {
@@ -740,7 +836,8 @@ const operations = [
                 assert.gte(profileDoc.docBytesRead, 58);
                 assert.gte(profileDoc.docUnitsRead, 2);
             }
-            assert.eq(profileDoc.idxEntriesRead, 1);
+            assert.eq(profileDoc.idxEntryBytesRead, 3);
+            assert.eq(profileDoc.idxEntryUnitsRead, 1);
             if (isReplSet) {
                 assert.eq(profileDoc.docBytesWritten, 177);
                 assert.eq(profileDoc.docUnitsWritten, 3);
@@ -748,6 +845,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 29);
                 assert.eq(profileDoc.docUnitsWritten, 1);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 3);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
     },
     resetProfileColl,
@@ -765,7 +864,8 @@ const operations = [
         profileAssert: (profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
-            assert.eq(profileDoc.idxEntriesRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
             if (isReplSet) {
                 assert.eq(profileDoc.docBytesWritten, 18800);
                 // Each inserted document counts for 1 document unit plus 2 document units for its
@@ -775,6 +875,8 @@ const operations = [
                 assert.eq(profileDoc.docBytesWritten, 2900);
                 assert.eq(profileDoc.docUnitsWritten, 100);
             }
+            assert.eq(profileDoc.idxEntryBytesWritten, 299);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 100);
         }
     },
 
