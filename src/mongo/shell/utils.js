@@ -298,6 +298,7 @@ jsTestOptions = function() {
             enableMajorityReadConcern: TestData.enableMajorityReadConcern,
             writeConcernMajorityShouldJournal: TestData.writeConcernMajorityShouldJournal,
             enableEncryption: TestData.enableEncryption,
+            encryptionCipherMode: TestData.encryptionCipherMode,
             encryptionKeyFile: TestData.encryptionKeyFile,
             auditDestination: TestData.auditDestination,
             minPort: TestData.minPort,

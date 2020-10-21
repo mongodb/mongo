@@ -725,6 +725,18 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts.enableEncryption = "";
     }
 
+    if (opts.hasOwnProperty("encryptionCipherMode")) {
+        if (typeof opts.encryptionCipherMode !== "string") {
+            // opts.encryptionCipherMode, if set, must be a string
+            throw new Error("The encryptionCipherMode option must be a string if it is specified");
+        }
+    } else if (jsTestOptions().encryptionCipherMode !== undefined) {
+        if (typeof jsTestOptions().encryptionCipherMode !== "string") {
+            throw new Error("The encryptionCipherMode option must be a string if it is specified");
+        }
+        opts.encryptionCipherMode = jsTestOptions().encryptionCipherMode;
+    }
+
     if (opts.hasOwnProperty("encryptionKeyFile")) {
         // opts.encryptionKeyFile, if set, must be a string
         if (typeof opts.encryptionKeyFile !== "string") {
