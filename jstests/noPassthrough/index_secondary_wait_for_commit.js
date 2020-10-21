@@ -42,6 +42,10 @@ const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a
 try {
     IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
+    // Wait for replication to allow listIndexes (in IndexBuildTest.assertIndexes()) to read the
+    // latest state on the secondary.
+    rst.awaitReplication();
+
     IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
 } finally {
     // Wait for the index build to stop.
