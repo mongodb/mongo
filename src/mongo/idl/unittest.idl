@@ -799,3 +799,9 @@ commands:
         command_name: CommandWithReplyType
         namespace: ignored
         reply_type: reply_type_struct
+
+    CommandWithOkReply:
+        description: "A mock command that replies with only {ok: 1}"
+        command_name: CommandWithOkReply
+        namespace: ignored
+        reply_type: OkReply

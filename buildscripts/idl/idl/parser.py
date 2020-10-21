@@ -458,10 +458,6 @@ def _parse_struct(ctxt, spec, name, node):
             "generate_comparison_operators": _RuleDesc("bool_scalar"),
         })
 
-    # TODO: SHOULD WE ALLOW STRUCTS ONLY WITH CHAINED STUFF and no fields???
-    if struct.fields is None and struct.chained_types is None and struct.chained_structs is None:
-        ctxt.add_empty_struct_error(node, struct.name)
-
     spec.symbols.add_struct(ctxt, struct)
 
 

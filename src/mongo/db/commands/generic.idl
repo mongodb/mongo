@@ -43,13 +43,6 @@ enums:
             kLog: "log"
             kDebug: "debug"
 
-structs:
-    # TODO(SERVER-51373): remove.
-    OkReply:
-        description: "temporary"
-        fields:
-            ok: int
-
 commands:
     logMessage:
         description: "Log a message on the server"

@@ -44,6 +44,15 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='basic_types',
+    source=[
+        'basic_types.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
 
 env.CppUnitTest(
     target='idl_test',
@@ -60,6 +69,7 @@ env.CppUnitTest(
         'unittest.idl',
         'unittest_import.idl',
     ],
+
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/namespace_string',
@@ -67,6 +77,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'basic_types',
         'feature_flag',
         'server_parameter',
     ],

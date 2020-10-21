@@ -103,8 +103,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const override {}
         virtual Reply typedRun(OperationContext* opCtx) override {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
-            // TODO(SERVER-51373): pass no arguments to the Reply constructor.
-            return Reply{1};
+            return Reply{};
         }
     };
 } pingCmd;

@@ -32,6 +32,7 @@
 #include <limits>
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/unittest_gen.h"
 #include "mongo/rpc/op_msg.h"
@@ -549,6 +550,15 @@ TEST(IDLStructTests, TestNonStrictStruct) {
             BSON("field4" << 1234 << "1" << 12 << "2" << 123 << "3" << 1234 << "field4" << 1234);
         ASSERT_THROWS(RequiredNonStrictField3::parse(ctxt, testDoc), AssertionException);
     }
+}
+
+// Test some basic properties of the OkReply struct. TODO SERVER-51380 replace with a more
+// thorough/integration-oriented test once some basic OkReplying-commands like ping get implemented.
+TEST(IDLStructTests, TestOkReplyStruct) {
+    OkReply okReply;
+
+    // Ensure that the serialized OkReply struct is the empty BSON object.
+    ASSERT_BSONOBJ_EQ(okReply.toBSON(), BSONObj());
 }
 
 /// Struct default comparison tests

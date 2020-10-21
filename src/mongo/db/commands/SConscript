@@ -131,6 +131,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/rpc/protocol',
         'test_commands_enabled',

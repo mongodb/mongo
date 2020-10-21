@@ -194,3 +194,8 @@ types:
         cpp_type: "ServerGlobalParams::FeatureCompatibility::Version"
         serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersion"
         deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"
+
+structs:
+    OkReply:
+        description: "Shared by commands that reply with just {ok: 1} and no additional information"
+        strict: true

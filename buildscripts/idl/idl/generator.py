@@ -1533,6 +1533,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         func_def = struct_type_info.get_deserializer_method().get_definition()
         with self._block('%s {' % (func_def), '}'):
 
+            # If the struct contains no fields, there's nothing to deserialize, so we write an empty function stub.
+            if not struct.fields:
+                return
+
             # Deserialize all the fields
             field_usage_check = self._gen_fields_deserializer_common(struct, "bsonObject")
 
@@ -1547,6 +1551,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """Generate the C++ deserializer method definitions from OpMsgRequest."""
         # pylint: disable=invalid-name
         # Commands that have concatentate_with_db namespaces require db name as a parameter
+        # 'Empty' structs (those with no fields) don't need to be deserialized
         if not isinstance(struct, ast.Command):
             return
 

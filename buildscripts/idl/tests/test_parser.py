@@ -304,6 +304,15 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
             """))
 
+        # Missing fields
+        self.assert_parse(
+            textwrap.dedent("""
+        structs:
+            foo:
+                description: foo
+                strict: true
+            """))
+
     def test_struct_negative(self):
         # type: () -> None
         """Negative struct test cases."""
@@ -314,15 +323,6 @@ class TestParser(testcase.IDLTestcase):
         structs:
             foo: foo
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
-
-        # Missing fields
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        structs:
-            foo:
-                description: foo
-                strict: true
-            """), idl.errors.ERROR_ID_EMPTY_FIELDS)
 
         # unknown field
         self.assert_parse_fail(

@@ -53,7 +53,6 @@ ERROR_ID_DUPLICATE_NODE = "ID0005"
 ERROR_ID_UNKNOWN_TYPE = "ID0006"
 ERROR_ID_IS_NODE_VALID_BOOL = "ID0007"
 ERROR_ID_UNKNOWN_NODE = "ID0008"
-ERROR_ID_EMPTY_FIELDS = "ID0009"
 ERROR_ID_MISSING_REQUIRED_FIELD = "ID0010"
 ERROR_ID_ARRAY_NOT_VALID_TYPE = "ID0011"
 ERROR_ID_MISSING_AST_REQUIRED_FIELD = "ID0012"
@@ -361,13 +360,6 @@ class ParserContext(object):
         """Add an error about a duplicate node."""
         self._add_node_error(node, ERROR_ID_DUPLICATE_NODE,
                              "Duplicate node found for '%s'" % (node_name))
-
-    def add_empty_struct_error(self, node, name):
-        # type: (yaml.nodes.Node, str) -> None
-        """Add an error about a struct without fields."""
-        self._add_node_error(node, ERROR_ID_EMPTY_FIELDS,
-                             ("Struct '%s' must either have fields, chained_types, or " +
-                              "chained_structs specified but neither were found") % (name))
 
     def add_missing_required_field_error(self, node, node_parent, node_name):
         # type: (yaml.nodes.Node, str, str) -> None
