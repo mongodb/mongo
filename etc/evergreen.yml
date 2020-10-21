@@ -1241,6 +1241,12 @@ functions:
             echo "Skipping pip upgrade, architecture was: $uname_arch"
           fi
           python -m pip install $pip_resolver -r "$toolchain_txt" -q
+          packager_arch="${packager_arch}"
+          if [[ $packager_arch != "arm64" ]]; then
+            # For now, skip upgrading pip on ARM variants due to setup tools
+            # issue.
+            python -m pip install --upgrade pip
+          fi
           python -m pip freeze > pip-requirements.txt
 
   "upload pip requirements": &upload_pip_requirements
@@ -1381,6 +1387,10 @@ functions:
       working_dir: src
       shell: bash
       script: |
+        # Export these before verbose is set to avoid sharing sensitive info.
+        export CEDAR_USERNAME=${cedar_user}
+        export CEDAR_API_KEY=${cedar_api_key}
+
         set -o errexit
         set -o verbose
 
