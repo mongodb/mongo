@@ -162,7 +162,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/grid',
         'sharding_api_d',
-
+        'sharding_catalog_manager',
     ],
 )
 
@@ -561,6 +561,7 @@ env.CppUnitTest(
         'config/sharding_catalog_manager_add_shard_test.cpp',
         'config/sharding_catalog_manager_add_shard_to_zone_test.cpp',
         'config/sharding_catalog_manager_assign_key_range_to_zone_test.cpp',
+        'config/sharding_catalog_manager_bump_shard_versions_and_change_metadata_test.cpp',
         'config/sharding_catalog_manager_clear_jumbo_flag_test.cpp',
         'config/sharding_catalog_manager_commit_chunk_migration_test.cpp',
         'config/sharding_catalog_manager_config_initialization_test.cpp',

@@ -59,8 +59,8 @@ void persistCommittedState(OperationContext* opCtx,
                            boost::optional<int> expectedNumChunksModified,
                            boost::optional<int> expectedNumZonesModified);
 
-void persistStateTransition(OperationContext* opCtx,
-                            const ReshardingCoordinatorDocument& coordinatorDoc);
+void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
+    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);
 
 void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
                                              const ReshardingCoordinatorDocument& coordinatorDoc);
@@ -201,9 +201,10 @@ private:
      * Updates the entry for this resharding operation in config.reshardingOperations and the
      * catalog entries for the original and temporary namespaces in config.collections.
      */
-    void _runUpdates(CoordinatorStateEnum nextState,
-                     ReshardingCoordinatorDocument updatedStateDoc,
-                     boost::optional<Timestamp> fetchTimestamp = boost::none);
+    void _updateCoordinatorDocStateAndCatalogEntries(
+        CoordinatorStateEnum nextState,
+        ReshardingCoordinatorDocument coordinatorDoc,
+        boost::optional<Timestamp> fetchTimestamp = boost::none);
 
     /**
      * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' for the temporary namespace to all
