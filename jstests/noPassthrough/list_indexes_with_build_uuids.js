@@ -79,7 +79,7 @@ let res = secondaryDB.runCommand({listIndexes: collName, includeBuildUUIDs: true
 
 assert.commandWorked(res);
 let indexes = res.cursor.firstBatch;
-assert.eq(3, indexes.length);
+assert.eq(3, indexes.length, tojson(res));
 
 jsTest.log(indexes);
 
