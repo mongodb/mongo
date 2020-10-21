@@ -838,6 +838,8 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: true
                 namespace: ignored
+                api_version: 1
+                is_deprecated: true
                 immutable: true
                 inline_chained_structs: true
                 generate_comparison_operators: true
@@ -854,9 +856,23 @@ class TestParser(testcase.IDLTestcase):
                 description: foo
                 strict: false
                 namespace: ignored
+                api_version: 1
+                is_deprecated: false
                 immutable: false
                 inline_chained_structs: false
                 generate_comparison_operators: false
+                fields:
+                    foo: bar
+            """))
+
+        # Quoted api_version
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                api_version: "1"
                 fields:
                     foo: bar
             """))
@@ -937,6 +953,41 @@ class TestParser(testcase.IDLTestcase):
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # is_deprecated is a bool
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                is_deprecated: bar
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # api_version is a scalar
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                api_version: [1]
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                api_version: ["1"]
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE)
 
         # Namespace is required
         self.assert_parse_fail(

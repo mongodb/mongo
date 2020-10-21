@@ -212,6 +212,8 @@ class Command(Struct):
         self.namespace = None  # type: str
         self.command_field = None  # type: Field
         self.reply_type = None  # type: Field
+        self.api_version = ""  # type: str
+        self.is_deprecated = False  # type: bool
         super(Command, self).__init__(file_name, line, column)
 
 

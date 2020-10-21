@@ -528,6 +528,8 @@ def _parse_command(ctxt, spec, name, node):
             "cpp_name": _RuleDesc('scalar'),
             "type": _RuleDesc('scalar'),
             "reply_type": _RuleDesc('scalar'),
+            "api_version": _RuleDesc('scalar'),
+            "is_deprecated": _RuleDesc('bool_scalar'),
             "strict": _RuleDesc("bool_scalar"),
             "inline_chained_structs": _RuleDesc("bool_scalar"),
             "immutable": _RuleDesc('bool_scalar'),
