@@ -1800,10 +1800,62 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetUnion(uint8_
             arrIter.advance();
         }
     }
+    resGuard.reset();
+    return {true, resTag, resVal};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinSetIntersection(uint8_t arity) {
+    value::ValueMapType<size_t> intersectionMap;
+
+    for (size_t idx = 0; idx < arity; ++idx) {
+        auto [arrOwned, arrTag, arrVal] = getFromStack(idx);
+        if (!value::isArray(arrTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+    }
+
+    auto [resTag, resVal] = value::makeNewArraySet();
+    value::ValueGuard resGuard{resTag, resVal};
+
+    for (size_t idx = 0; idx < arity; ++idx) {
+        auto [arrOwned, arrTag, arrVal] = getFromStack(idx);
+
+        bool atLeastOneCommonElement = false;
+        auto enumerator = value::ArrayEnumerator{arrTag, arrVal};
+        while (!enumerator.atEnd()) {
+            auto [elTag, elVal] = enumerator.getViewOfValue();
+            if (idx == 0) {
+                intersectionMap[{elTag, elVal}] = 1;
+            } else {
+                if (intersectionMap.find({elTag, elVal}) != intersectionMap.end()) {
+                    if (intersectionMap[{elTag, elVal}] == idx) {
+                        intersectionMap[{elTag, elVal}]++;
+                    }
+                    atLeastOneCommonElement = true;
+                }
+            }
+            enumerator.advance();
+        }
+
+        if (idx > 0 && !atLeastOneCommonElement) {
+            resGuard.reset();
+            return {true, resTag, resVal};
+        }
+    }
+
+    auto resView = value::getArraySetView(resVal);
+    for (auto&& [item, counter] : intersectionMap) {
+        if (counter == arity) {
+            auto [elTag, elVal] = item;
+            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
+            resView->push_back(copyTag, copyVal);
+        }
+    }
 
     resGuard.reset();
     return {true, resTag, resVal};
 }
+
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           uint8_t arity) {
@@ -1904,6 +1956,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinIsTimezone(arity);
         case Builtin::setUnion:
             return builtinSetUnion(arity);
+        case Builtin::setIntersection:
+            return builtinSetIntersection(arity);
     }
 
     MONGO_UNREACHABLE;

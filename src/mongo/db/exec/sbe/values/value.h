@@ -308,6 +308,35 @@ T bitcastTo(const Value in) noexcept {
 }
 
 /**
+ * Defines hash value for <TypeTags, Value> pair. To be used in associative containers.
+ */
+struct ValueHash {
+    size_t operator()(const std::pair<TypeTags, Value>& p) const {
+        return hashValue(p.first, p.second);
+    }
+};
+
+/**
+ * Defines equivalence of two <TypeTags, Value> pairs. To be used in associative containers.
+ */
+struct ValueEq {
+    bool operator()(const std::pair<TypeTags, Value>& lhs,
+                    const std::pair<TypeTags, Value>& rhs) const {
+        auto [tag, val] = compareValue(lhs.first, lhs.second, rhs.first, rhs.second);
+
+        if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+};
+
+template <typename T>
+using ValueMapType = absl::flat_hash_map<std::pair<TypeTags, Value>, T, ValueHash, ValueEq>;
+using ValueSetType = absl::flat_hash_set<std::pair<TypeTags, Value>, ValueHash, ValueEq>;
+
+/**
  * This is the SBE representation of objects/documents. It is a relatively simple structure of
  * vectors of field names, type tags, and values.
  */
@@ -451,27 +480,8 @@ private:
  * This is a set of unique values with the same interface as Array.
  */
 class ArraySet {
-    struct Hash {
-        size_t operator()(const std::pair<TypeTags, Value>& p) const {
-            return hashValue(p.first, p.second);
-        }
-    };
-    struct Eq {
-        bool operator()(const std::pair<TypeTags, Value>& lhs,
-                        const std::pair<TypeTags, Value>& rhs) const {
-            auto [tag, val] = compareValue(lhs.first, lhs.second, rhs.first, rhs.second);
-
-            if (tag != TypeTags::NumberInt32 || bitcastTo<int32_t>(val) != 0) {
-                return false;
-            } else {
-                return true;
-            }
-        }
-    };
-    using SetType = absl::flat_hash_set<std::pair<TypeTags, Value>, Hash, Eq>;
-
 public:
-    using iterator = SetType::iterator;
+    using iterator = ValueSetType::iterator;
 
     ArraySet() = default;
     ArraySet(const ArraySet& other) {
@@ -506,7 +516,7 @@ public:
     }
 
 private:
-    SetType _values;
+    ValueSetType _values;
 };
 
 constexpr size_t kSmallStringThreshold = 8;

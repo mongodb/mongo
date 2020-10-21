@@ -34,14 +34,14 @@ namespace mongo::sbe {
 class SBEBuiltinSetOpTest : public EExpressionTestFixture {
 protected:
     void runAndAssertExpression(const vm::CodeFragment* compiledExpr,
-                                std::pair<value::TypeTags, value::Value> expectedArraySet) {
+                                std::pair<value::TypeTags, value::Value> expectedArray) {
         auto [tag, val] = runCompiledExpression(compiledExpr);
         value::ValueGuard guard(tag, val);
 
-        ASSERT_EQUALS(value::TypeTags::ArraySet, tag);
+        ASSERT(isArray(tag));
         auto [cmpTag, cmpVal] =
-            value::compareValue(tag, val, expectedArraySet.first, expectedArraySet.second);
-        ASSERT(isNumber(cmpTag));
+            value::compareValue(tag, val, expectedArray.first, expectedArray.second);
+        ASSERT_EQUALS(cmpTag, sbe::value::TypeTags::NumberInt32);
         ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
     }
 
@@ -90,6 +90,46 @@ TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetUnion) {
     auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2));
     slotAccessor1.reset(arrTag1, arrVal1);
     slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(189));
+    runAndAssertNothing(compiledExpr.get());
+}
+
+TEST_F(SBEBuiltinSetOpTest, ComputesSetIntersection) {
+    value::OwnedValueAccessor slotAccessor1, slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setIntersectionExpr = sbe::makeE<sbe::EFunction>(
+        "setIntersection", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto compiledExpr = compileExpression(*setIntersectionExpr);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    auto [arrTag2, arrVal2] = makeArray(BSON_ARRAY(2 << 5 << 3));
+    slotAccessor2.reset(arrTag2, arrVal2);
+    auto [resArrTag, resArrVal] = makeArraySet(BSON_ARRAY(2 << 3));
+    value::ValueGuard resGuard(resArrTag, resArrVal);
+    runAndAssertExpression(compiledExpr.get(), {resArrTag, resArrVal});
+
+    std::tie(arrTag1, arrVal1) = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    std::tie(arrTag2, arrVal2) = value::makeNewArray();
+    slotAccessor2.reset(arrTag2, arrVal2);
+    auto [resArrTag1, resArrVal1] = value::makeNewArraySet();
+    value::ValueGuard resGuard1(resArrTag1, resArrVal1);
+    runAndAssertExpression(compiledExpr.get(), {resArrTag1, resArrVal1});
+}
+
+TEST_F(SBEBuiltinSetOpTest, ReturnsNothingSetIntersection) {
+    value::OwnedValueAccessor slotAccessor1;
+    value::OwnedValueAccessor slotAccessor2;
+    auto arrSlot1 = bindAccessor(&slotAccessor1);
+    auto arrSlot2 = bindAccessor(&slotAccessor2);
+    auto setIntersectionExpr = sbe::makeE<sbe::EFunction>(
+        "setIntersection", sbe::makeEs(makeE<EVariable>(arrSlot1), makeE<EVariable>(arrSlot2)));
+    auto compiledExpr = compileExpression(*setIntersectionExpr);
+
+    auto [arrTag1, arrVal1] = makeArray(BSON_ARRAY(1 << 2 << 3));
+    slotAccessor1.reset(arrTag1, arrVal1);
+    slotAccessor2.reset(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(21));
     runAndAssertNothing(compiledExpr.get());
 }
 }  // namespace mongo::sbe

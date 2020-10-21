@@ -2268,8 +2268,9 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSetIntersection* expr) final {
-        unsupportedExpression(expr->getOpName());
+        generateNarySetExpression(expr, "setIntersection");
     }
+
     void visit(ExpressionSetIsSubset* expr) final {
         unsupportedExpression(expr->getOpName());
     }

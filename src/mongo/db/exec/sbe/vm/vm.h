@@ -220,6 +220,7 @@ enum class Builtin : uint8_t {
     indexOfCP,
     isTimezone,
     setUnion,
+    setIntersection,
 };
 
 class CodeFragment {
@@ -539,6 +540,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsTimezone(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetUnion(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinSetIntersection(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> getFromStack(size_t offset) {
