@@ -12,6 +12,20 @@ env.Library(
         ]
     )
 
+env.Library(
+    target='query_sbe_values',
+    source=[
+        'values/bson.cpp',
+        'values/value.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/third_party/shim_pcrecpp',
+    ]
+)
+
 sbeEnv = env.Clone()
 sbeEnv.InjectThirdParty(libraries=['snappy'])
 sbeEnv.Library(
@@ -38,9 +52,7 @@ sbeEnv.Library(
         'stages/unique.cpp',
         'stages/unwind.cpp',
         'util/debug_print.cpp',
-        'values/bson.cpp',
         'values/slot.cpp',
-        'values/value.cpp',
         'vm/arith.cpp',
         'vm/vm.cpp',
         ],
@@ -52,11 +64,11 @@ sbeEnv.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
-        '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/third_party/shim_snappy',
-        'query_sbe_plan_stats'
-         ],
+        'query_sbe_plan_stats',
+        'query_sbe_values',
+        ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
          ]
