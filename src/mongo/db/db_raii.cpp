@@ -300,12 +300,9 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
             opCtx, _autoGetCollectionForReadBase.get()->uuid());
 
         // The collection may have been dropped since the previous lookup, run the loop one more
-        // time to cleanup
-        if (!newCollection) {
-            continue;
-        }
-
-        if (_autoGetCollectionForReadBase.get()->getMinimumVisibleSnapshot() ==
+        // time to cleanup if newCollection is nullptr
+        if (newCollection &&
+            _autoGetCollectionForReadBase.get()->getMinimumVisibleSnapshot() ==
                 newCollection->getMinimumVisibleSnapshot() &&
             replTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm()) {
             break;
