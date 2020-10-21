@@ -4763,9 +4763,13 @@ Value ExpressionSubtract::evaluate(const Document& root, Variables* variables) c
         double left = lhs.coerceToDouble();
         return Value(left - right);
     } else if (diffType == NumberLong) {
-        long long right = rhs.coerceToLong();
-        long long left = lhs.coerceToLong();
-        return Value(left - right);
+        long long result;
+
+        // If there is an overflow, convert the values to doubles.
+        if (overflow::sub(lhs.coerceToLong(), rhs.coerceToLong(), &result)) {
+            return Value(lhs.coerceToDouble() - rhs.coerceToDouble());
+        }
+        return Value(result);
     } else if (diffType == NumberInt) {
         long long right = rhs.coerceToLong();
         long long left = lhs.coerceToLong();
