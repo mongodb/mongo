@@ -58,6 +58,10 @@ def make_process(*args, **kwargs):
     process_cls = process.Process
     if config.SPAWN_USING == "jasper":
         process_cls = jasper_process.Process
+    else:
+        # remove jasper process specific args
+        kwargs.pop("job_num", None)
+        kwargs.pop("test_id", None)
 
     # Add the current working directory and /data/multiversion to the PATH.
     env_vars = kwargs.get("env_vars", {}).copy()
@@ -308,9 +312,9 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     return make_process(logger, args, **process_kwargs)
 
 
-def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
-        logger, executable=None, connection_string=None, filename=None, process_kwargs=None,
-        **kwargs):
+def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals,too-many-statements
+        logger, job_num=None, test_id=None, executable=None, connection_string=None, filename=None,
+        process_kwargs=None, **kwargs):
     """Return a Process instance that starts a mongo shell.
 
     The shell is started with the given connection string and arguments constructed from 'kwargs'.
@@ -469,6 +473,8 @@ def mongo_shell_program(  # pylint: disable=too-many-branches,too-many-locals,to
     _set_keyfile_permissions(test_data)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
+    process_kwargs["job_num"] = job_num
+    process_kwargs["test_id"] = test_id
     return make_process(logger, args, **process_kwargs)
 
 
