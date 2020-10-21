@@ -63,10 +63,14 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
     // from the map. However, that race is inconsequential and remains memory safe.
     auto mapSharedPtr = atomic_load(&_indexUsageStatsMap);
 
-    dassert(mapSharedPtr->find(indexName) != mapSharedPtr->end());
+    auto it = mapSharedPtr->find(indexName);
+    if (it == mapSharedPtr->end()) {
+        // We are using an index that has been removed from the catalog, no need to track usage
+        return;
+    }
 
     // Increment the index usage atomic counter.
-    mapSharedPtr->at(indexName)->accesses.fetchAndAdd(1);
+    it->second->accesses.fetchAndAdd(1);
 }
 
 void CollectionIndexUsageTracker::recordCollectionScans(unsigned long long collectionScans) {
