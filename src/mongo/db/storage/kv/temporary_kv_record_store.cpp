@@ -54,7 +54,7 @@ void TemporaryKVRecordStore::finalizeTemporaryTable(OperationContext* opCtx,
     // This function is added as an onCommit() handler in certain places, at which point it is not
     // possible to get a WriteConflictException. We're only concerned when calling this function in
     // a WriteUnitOfWork that can still be rolled back.
-    if (opCtx->recoveryUnit()->inActiveTxn()) {
+    if (opCtx->recoveryUnit()->isActive()) {
         opCtx->recoveryUnit()->onRollback([this]() { _recordStoreHasBeenFinalized = false; });
     }
 

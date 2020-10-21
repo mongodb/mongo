@@ -1867,7 +1867,7 @@ void WiredTigerRecordStore::appendCustomStats(OperationContext* opCtx,
 void WiredTigerRecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCtx) const {
     // Make sure that callers do not hold an active snapshot so it will be able to see the oplog
     // entries it waited for afterwards.
-    invariant(!_getRecoveryUnit(opCtx)->inActiveTxn());
+    invariant(!_getRecoveryUnit(opCtx)->isActive());
 
     auto oplogManager = _kvEngine->getOplogManager();
     if (oplogManager->isRunning()) {
@@ -2390,7 +2390,7 @@ std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
         // If we already have a snapshot we don't know what it can see, unless we know no one
         // else could be writing (because we hold an exclusive lock).
-        invariant(!wru->inActiveTxn() ||
+        invariant(!wru->isActive() ||
                   opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_ns), MODE_X) ||
                   wru->getIsOplogReader());
         wru->setIsOplogReader();
@@ -2442,7 +2442,7 @@ std::unique_ptr<SeekableRecordCursor> PrefixedWiredTigerRecordStore::getCursor(
         WiredTigerRecoveryUnit* wru = WiredTigerRecoveryUnit::get(opCtx);
         // If we already have a snapshot we don't know what it can see, unless we know no one
         // else could be writing (because we hold an exclusive lock).
-        invariant(!wru->inActiveTxn() ||
+        invariant(!wru->isActive() ||
                   opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_ns), MODE_X) ||
                   wru->getIsOplogReader());
         wru->setIsOplogReader();

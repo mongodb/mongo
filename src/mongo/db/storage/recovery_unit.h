@@ -481,10 +481,12 @@ public:
     };
 
     /**
-     * Indicates whether a unit of work is active. Will be true after beginUnitOfWork
-     * is called and before either commitUnitOfWork or abortUnitOfWork gets called.
+     * Indicates whether the RecoveryUnit has an open snapshot. A snapshot can be opened inside or
+     * outside of a WriteUnitOfWork.
      */
-    virtual bool inActiveTxn() const = 0;
+    virtual bool isActive() const {
+        return _isActive();
+    };
 
     /**
      * When called, the WriteUnitOfWork ignores the multi timestamp constraint for the remainder of

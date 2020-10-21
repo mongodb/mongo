@@ -203,9 +203,7 @@ public:
     WiredTigerSessionCache* getSessionCache() {
         return _sessionCache;
     }
-    bool inActiveTxn() const {
-        return _isActive();
-    }
+
     void assertInActiveTxn() const;
 
     /**

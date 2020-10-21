@@ -92,7 +92,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // This may not be the case if an operation already has a snapshot open before acquiring an
     // exclusive lock.
     if (modeColl == MODE_X) {
-        invariant(!opCtx->recoveryUnit()->inActiveTxn(),
+        invariant(!opCtx->recoveryUnit()->isActive(),
                   str::stream() << "Snapshot opened before acquiring X lock for " << nsOrUUID);
     }
 

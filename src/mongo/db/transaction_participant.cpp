@@ -1688,7 +1688,7 @@ void TransactionParticipant::Participant::_cleanUpTxnResourceOnOpCtx(
         // We could have failed trying to get the initial global lock; in that case we will have a
         // WriteUnitOfWork but not have allocated the storage transaction.  That is the only case
         // where it is legal to abort a unit of work without the RSTL.
-        invariant(opCtx->lockState()->isRSTLLocked() || !opCtx->recoveryUnit()->inActiveTxn());
+        invariant(opCtx->lockState()->isRSTLLocked() || !opCtx->recoveryUnit()->isActive());
         opCtx->setWriteUnitOfWork(nullptr);
     }
 

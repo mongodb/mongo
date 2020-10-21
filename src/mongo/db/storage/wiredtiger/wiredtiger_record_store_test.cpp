@@ -941,17 +941,17 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
 
         auto cursor = rs->getCursor(opCtx.get());
         ASSERT(cursor->next());
-        ASSERT_TRUE(ru->inActiveTxn());
+        ASSERT_TRUE(ru->isActive());
 
         // Committing a WriteUnitOfWork will end the current transaction.
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_TRUE(ru->inActiveTxn());
+        ASSERT_TRUE(ru->isActive());
         wuow.commit();
-        ASSERT_FALSE(ru->inActiveTxn());
+        ASSERT_FALSE(ru->isActive());
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
         ASSERT(cursor->next());
-        ASSERT_TRUE(ru->inActiveTxn());
+        ASSERT_TRUE(ru->isActive());
     }
 }
 
@@ -981,17 +981,17 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
 
         auto cursor = rs->getCursor(opCtx.get());
         ASSERT(cursor->seekExact(rid1));
-        ASSERT_TRUE(ru->inActiveTxn());
+        ASSERT_TRUE(ru->isActive());
 
         // Committing a WriteUnitOfWork will end the current transaction.
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_TRUE(ru->inActiveTxn());
+        ASSERT_TRUE(ru->isActive());
         wuow.commit();
-        ASSERT_FALSE(ru->inActiveTxn());
+        ASSERT_FALSE(ru->isActive());
 
         // If a cursor is used after a WUOW commits, it should implicitly start a new transaction.
         ASSERT(cursor->seekExact(rid1));
-        ASSERT_TRUE(ru->inActiveTxn());
+        ASSERT_TRUE(ru->isActive());
     }
 }
 
