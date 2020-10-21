@@ -13,7 +13,7 @@ env.Library(
         'temp_dir.cpp',
         'unittest_helpers.cpp',
         'unittest.cpp',
-        env.Idlc('unittest.idl')[0],
+        'unittest.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -29,7 +29,7 @@ env.Library(
     target="unittest_main",
     source=[
         'unittest_main.cpp',
-        env.Idlc('unittest_options.idl')[0],
+        'unittest_options.idl',
     ],
     LIBDEPS=[
         'unittest',
@@ -45,7 +45,7 @@ env.Library(
     target="integration_test_main",
     source=[
         'integration_test_main.cpp',
-        env.Idlc('integration_test_main.idl')[0],
+        'integration_test_main.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

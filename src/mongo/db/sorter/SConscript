@@ -23,7 +23,7 @@ sorterEnv.CppUnitTest(
 env.Library(
     target='sorter_idl',
     source=[
-        env.Idlc('sorter.idl')[0],
+        'sorter.idl',
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

@@ -15,9 +15,9 @@ fmEnv.Library(
         'free_mon_op_observer.cpp',
         'free_mon_storage.cpp',
         'free_mon_controller.cpp',
-        env.Idlc('free_mon_protocol.idl')[0],
-        env.Idlc('free_mon_commands.idl')[0],
-        env.Idlc('free_mon_storage.idl')[0],
+        'free_mon_protocol.idl',
+        'free_mon_commands.idl',
+        'free_mon_storage.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -35,9 +35,9 @@ if free_monitoring == "on":
         source=[
             'free_mon_commands.cpp',
             'free_mon_mongod.cpp',
-            env.Idlc('free_mon_mongod.idl')[0],
+            'free_mon_mongod.idl',
             'free_mon_options.cpp',
-            env.Idlc('free_mon_options.idl')[0],
+            'free_mon_options.idl',
             'free_mon_status.cpp',
         ],
         LIBDEPS=[

@@ -71,7 +71,7 @@ env.Library(
         'transaction_coordinator_factory_embedded.cpp',
         'transaction_coordinator_worker_curop_repository_embedded.cpp',
         'transaction_coordinator_curop_embedded.cpp',
-        env.Idlc('embedded_options.idl')[0],
+        'embedded_options.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -32,7 +32,7 @@ env.Library(
 env.Library(
     target='sharding_runtime_d_params',
     source=[
-        env.Idlc('sharding_runtime_d_params.idl')[0],
+        'sharding_runtime_d_params.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/server_parameter',
@@ -93,9 +93,9 @@ env.Library(
         'split_chunk.cpp',
         'split_vector.cpp',
         'start_chunk_clone_request.cpp',
-        env.Idlc('migration_coordinator_document.idl')[0],
-        env.Idlc('range_deletion_task.idl')[0],
-        env.Idlc('resharding/resharding_oplog_applier_progress.idl')[0],
+        'migration_coordinator_document.idl',
+        'range_deletion_task.idl',
+        'resharding/resharding_oplog_applier_progress.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
@@ -141,10 +141,10 @@ env.Library(
     target='resharding_util',
     source=[
         'resharding_util.cpp',
-        env.Idlc('resharding/coordinator_document.idl')[0],
-        env.Idlc('resharding/donor_document.idl')[0],
-        env.Idlc('resharding/donor_oplog_id.idl')[0],
-        env.Idlc('resharding/recipient_document.idl')[0],
+        'resharding/coordinator_document.idl',
+        'resharding/donor_document.idl',
+        'resharding/donor_oplog_id.idl',
+        'resharding/recipient_document.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -211,8 +211,8 @@ env.Library(
         'transaction_coordinator_util.cpp',
         'transaction_coordinator_worker_curop_repository_mongod.cpp',
         'transaction_coordinator.cpp',
-        env.Idlc('transaction_coordinator_document.idl')[0],
-        env.Idlc('transaction_coordinators_stats.idl')[0],
+        'transaction_coordinator_document.idl',
+        'transaction_coordinators_stats.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
@@ -243,7 +243,7 @@ env.Library(
 env.Library(
     target='type_shard_identity',
     source=[
-        env.Idlc('add_shard_cmd.idl')[0],
+        'add_shard_cmd.idl',
         'type_shard_identity.cpp',
     ],
     LIBDEPS=[

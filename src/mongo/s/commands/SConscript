@@ -99,7 +99,7 @@ env.Library(
         'kill_sessions_remote.cpp',
         's_read_write_concern_defaults_server_status.cpp',
         'strategy.cpp',
-        env.Idlc('cluster_commands.idl')[0],
+        'cluster_commands.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/servers',

@@ -302,7 +302,7 @@ pipelineEnv.Library(
 env.Library(
     target='runtime_constants_idl',
     source=[
-        env.Idlc('runtime_constants.idl')[0]
+        'runtime_constants.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
@@ -312,14 +312,14 @@ env.Library(
 env.Library(
     target='document_sources_idl',
     source=[
-        env.Idlc('document_source_change_stream.idl')[0],
-        env.Idlc('document_source_list_sessions.idl')[0],
-        env.Idlc('document_source_merge.idl')[0],
-        env.Idlc('document_source_merge_modes.idl')[0],
-        env.Idlc('document_source_replace_root.idl')[0],
-        env.Idlc('document_source_union_with.idl')[0],
-        env.Idlc('exchange_spec.idl')[0],
-        env.Idlc('value.idl')[0],
+        'document_source_change_stream.idl',
+        'document_source_list_sessions.idl',
+        'document_source_merge.idl',
+        'document_source_merge_modes.idl',
+        'document_source_replace_root.idl',
+        'document_source_union_with.idl',
+        'exchange_spec.idl',
+        'value.idl',
         'document_source_merge_spec.cpp',
         'resume_token.cpp'
     ],

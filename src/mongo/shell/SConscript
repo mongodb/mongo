@@ -106,7 +106,7 @@ env.Library(
 env.Library(
     target='shell_options_register',
     source=[
-        env.Idlc('shell_options.idl')[0],
+        'shell_options.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -150,7 +150,7 @@ if get_option('ssl') == 'on':
             "kms.cpp",
             "kms_aws.cpp",
             "kms_local.cpp",
-            kmsEnv.Idlc("kms.idl")[0],
+            "kms.idl",
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/base/secure_allocator',
@@ -184,7 +184,7 @@ if get_option('ssl') == 'on':
         target="encrypted_dbclient",
         source=[
             "encrypted_dbclient_base.cpp",
-            scriptingEnv.Idlc("fle_shell_options.idl")[0],
+            "fle_shell_options.idl",
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/clientdriver_minimal',

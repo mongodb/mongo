@@ -89,7 +89,7 @@ idl_scanner = SCons.Scanner.Scanner(function=idl_scanner, skeys=[".idl"])
 IDLCBuilder = SCons.Builder.Builder(
     action=IDLCAction,
     emitter=idlc_emitter,
-    srcsuffx=".idl",
+    src_suffix=".idl",
     suffix=".cpp",
     source_scanner=idl_scanner,
 )

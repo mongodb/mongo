@@ -256,7 +256,7 @@ env.Library(
     target='task_executor_pool',
     source=[
         'task_executor_pool.cpp',
-        env.Idlc("task_executor_pool_parameters.idl")[0],
+        "task_executor_pool_parameters.idl",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/server_parameter',
