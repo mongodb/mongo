@@ -140,11 +140,17 @@ std::function<StatusWithMatchExpression(StringData,
                                         DocumentParseLevel)>
 retrievePathlessParser(StringData name);
 
-StatusWithMatchExpression parseRegexElement(StringData name, BSONElement e) {
+StatusWithMatchExpression parseRegexElement(StringData name,
+                                            BSONElement e,
+                                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (e.type() != BSONType::RegEx)
         return {Status(ErrorCodes::BadValue, "not a regex")};
 
-    return {std::make_unique<RegexMatchExpression>(name, e.regex(), e.regexFlags())};
+    return {std::make_unique<RegexMatchExpression>(
+        name,
+        e.regex(),
+        e.regexFlags(),
+        doc_validation_error::createAnnotation(expCtx, "$regex", BSON(name << e)))};
 }
 
 StatusWithMatchExpression parseComparison(
@@ -297,7 +303,7 @@ StatusWithMatchExpression parse(const BSONObj& obj,
         }
 
         if (e.type() == BSONType::RegEx) {
-            auto result = parseRegexElement(e.fieldNameStringData(), e);
+            auto result = parseRegexElement(e.fieldNameStringData(), e, expCtx);
             if (!result.isOK())
                 return result;
             root->add(result.getValue().release());
@@ -382,10 +388,14 @@ StatusWithMatchExpression parseSampleRate(StringData name,
         return {Status(ErrorCodes::BadValue, "numeric argument to $sampleRate must be in [0, 1]")};
     } else if (x == kRandomMinValue) {
         return std::make_unique<ExprMatchExpression>(
-            ExpressionConstant::create(expCtx.get(), Value(false)), expCtx);
+            ExpressionConstant::create(expCtx.get(), Value(false)),
+            expCtx,
+            doc_validation_error::createAnnotation(expCtx, "$sampleRate", elem.wrap()));
     } else if (x == kRandomMaxValue) {
         return std::make_unique<ExprMatchExpression>(
-            ExpressionConstant::create(expCtx.get(), Value(true)), expCtx);
+            ExpressionConstant::create(expCtx.get(), Value(true)),
+            expCtx,
+            doc_validation_error::createAnnotation(expCtx, "$sampleRate", elem.wrap()));
     } else {
         return std::make_unique<ExprMatchExpression>(
             Expression::parseExpression(expCtx.get(),
@@ -1382,11 +1392,13 @@ StatusWithMatchExpression parseNot(StringData name,
                                    MatchExpressionParser::AllowedFeatureSet allowedFeatures,
                                    DocumentParseLevel currentLevel) {
     if (elem.type() == BSONType::RegEx) {
-        auto regex = parseRegexElement(name, elem);
+        auto regex = parseRegexElement(name, elem, expCtx);
         if (!regex.isOK()) {
             return regex;
         }
-        return {std::make_unique<NotMatchExpression>(regex.getValue().release())};
+        return {std::make_unique<NotMatchExpression>(
+            regex.getValue().release(),
+            doc_validation_error::createAnnotation(expCtx, "$not", BSONObj()))};
     }
 
     if (elem.type() != BSONType::Object) {

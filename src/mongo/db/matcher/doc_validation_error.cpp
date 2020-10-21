@@ -732,8 +732,8 @@ public:
         }
     }
     void visit(const ExprMatchExpression* expr) final {
-        static constexpr auto kNormalReason = "$expr did not match";
-        static constexpr auto kInvertedReason = "$expr did match";
+        static constexpr auto kNormalReason = "expression did not match";
+        static constexpr auto kInvertedReason = "expression did match";
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);

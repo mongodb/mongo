@@ -900,7 +900,7 @@ TEST(MiscellaneousMatchExpression, BasicExpr) {
     BSONObj expectedError = BSON("operatorName"
                                  << "$expr"
                                  << "specifiedAs" << query << "reason"
-                                 << "$expr did not match"
+                                 << "expression did not match"
                                  << "expressionResult" << false);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
@@ -918,7 +918,7 @@ TEST(MiscellaneousMatchExpression, NorExpr) {
                                                 << BSON("operatorName"
                                                         << "$expr"
                                                         << "specifiedAs" << failingQuery << "reason"
-                                                        << "$expr did match"
+                                                        << "expression did match"
                                                         << "expressionResult" << true))));
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
@@ -929,8 +929,31 @@ TEST(MiscellaneousMatchExpression, ExprImplicitArrayTraversal) {
     BSONObj expectedError = BSON("operatorName"
                                  << "$expr"
                                  << "specifiedAs" << query << "reason"
-                                 << "$expr did not match"
+                                 << "expression did not match"
                                  << "expressionResult" << false);
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+// $sampleRate
+TEST(MiscellaneousMatchExpression, SampleRateAlwaysFalse) {
+    BSONObj query = fromjson("{$sampleRate: 0}");
+    BSONObj document = fromjson("{'will this always fail?': 'yes!'}");
+    BSONObj expectedError = BSON("operatorName"
+                                 << "$sampleRate"
+                                 << "specifiedAs" << query << "reason"
+                                 << "expression did not match"
+                                 << "expressionResult" << false);
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+TEST(MiscellaneousMatchExpression, SampleRateAlwaysTrue) {
+    BSONObj query = fromjson("{$nor: [{$sampleRate: 1}]}");
+    BSONObj document = fromjson("{'will this always succeed?': 'yes!'}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$nor', 'clausesSatisfied': ["
+        "   {index: 0, details:"
+        "       {operatorName:  '$sampleRate',"
+        "       specifiedAs: {$sampleRate: 1},"
+        "       reason: 'expression did match',"
+        "       expressionResult: true}}]}");
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 // $mod
@@ -1137,6 +1160,30 @@ TEST(MiscellaneousMatchExpression, RegexImplicitArrayTraversalMixedTypes) {
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
 
+TEST(MiscellaneousMatchExpression, RegexNoExplicitOperator) {
+    BSONObj query = BSON("a" << BSONRegEx("^S"));
+    BSONObj document = BSON("a"
+                            << "so sorry; not capitalized");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$regex',"
+        "specifiedAs: {a: /^S/}, "
+        "reason: 'regular expression did not match',"
+        "consideredValue: 'so sorry; not capitalized'}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
+
+TEST(MiscellaneousMatchExpression, NotOverRegexNoExplicitOperator) {
+    BSONObj query = BSON("a" << BSON("$not" << BSONRegEx("^S")));
+    BSONObj document = BSON("a"
+                            << "S");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$not', 'details': "
+        "   {operatorName: '$regex',"
+        "   specifiedAs: {a: /^S/}, "
+        "   reason: 'regular expression did match',"
+        "   consideredValue: 'S'}}");
+    doc_validation_error::verifyGeneratedError(query, document, expectedError);
+}
 // Verifies that $bitsAllClear expression with numeric bitmask correctly generates a validation
 // error.
 TEST(BitTestMatchExpression, GeneratesValidationErrorBitsAllClearNumeric) {
