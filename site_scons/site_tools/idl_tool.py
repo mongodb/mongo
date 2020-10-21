@@ -102,13 +102,16 @@ def generate(env):
     idlc = idlc_mod
 
     env["IDLC"] = "$PYTHON buildscripts/idl/idlc.py"
-    base_dir = env.Dir("$BUILD_ROOT/$VARIANT_DIR").path
+    base_dir = env.Dir("$BUILD_DIR").path
     env["IDLCFLAGS"] = [
         "--include", "src",
         "--base_dir", base_dir,
         "--target_arch", "$TARGET_ARCH",
     ]
     env["IDLCCOM"] = "$IDLC $IDLCFLAGS --header ${TARGETS[1]} --output ${TARGETS[0]} $SOURCES"
+    env["IDLCCOMSTR"] = ("Generating ${TARGETS[0]}"
+        if not env.get("VERBOSE", "").lower() in ['true', '1']
+        else None)
     env["IDLCSUFFIX"] = ".idl"
 
     IDL_GLOBAL_DEPS = env.Glob("#buildscripts/idl/*.py") + env.Glob(

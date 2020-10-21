@@ -158,17 +158,19 @@ def _update_import_includes(args, spec, header_file_name):
         include_h_file_name = os.path.splitext(resolved_file_name)[0] + args.output_suffix + ".h"
 
         if args.output_base_dir:
-            include_h_file_name = os.path.relpath(
-                os.path.normpath(include_h_file_name), os.path.normpath(args.output_base_dir))
+            base_dir = os.path.normpath(args.output_base_dir)
+            include_h_file_name = os.path.relpath(os.path.normpath(include_h_file_name), base_dir)
+
+            if os.path.isabs(base_dir):
+                include_h_file_name = os.path.join(
+                    base_dir, include_h_file_name[include_h_file_name.rfind(first_dir):])
+            else:
+                include_h_file_name = include_h_file_name[include_h_file_name.find(first_dir):]
         else:
             include_h_file_name = os.path.abspath(include_h_file_name)
 
         # Normalize to POSIX style for consistency across Windows and POSIX.
         include_h_file_name = include_h_file_name.replace("\\", "/")
-
-        if args.output_base_dir:
-            # Guess: The layout of build vs source directory
-            include_h_file_name = include_h_file_name[include_h_file_name.find(first_dir):]
 
         spec.globals.cpp_includes.append(include_h_file_name)
 
