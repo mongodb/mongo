@@ -24,9 +24,9 @@ function testExpressionWithCollation(coll, expression, result, collationSpec) {
 
 /**
  * Returns true if 'al' is the same as 'ar'. If the two are arrays, the arrays can be in any order.
- * Objects (either 'al' and 'ar' themselves, or embedded objects) must have all the same properties.
- * If 'al' and 'ar' are neither object nor arrays, they must compare equal using 'valueComparator',
- * or == if not provided.
+ * Objects (either 'al' and 'ar' themselves, or embedded objects) must have all the same properties,
+ * with the exception of '_id'. If 'al' and 'ar' are neither object nor arrays, they must compare
+ * equal using 'valueComparator', or == if not provided.
  */
 function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
@@ -37,7 +37,7 @@ function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
             return false;
         }
 
-        if (!arrayEq(al, ar, verbose, valueComparator, fieldsToSkip)) {
+        if (!arrayEq(al, ar, verbose, valueComparator)) {
             debug(`anyEq: arrayEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
             return false;
         }
@@ -68,8 +68,8 @@ function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
  * or false. Returns true or false. Only equal if they have the exact same set of properties, and
  * all the properties' values match according to 'valueComparator'.
  */
-function customDocumentEq({left, right, verbose, valueComparator, fieldsToSkip = []}) {
-    return documentEq(left, right, verbose, valueComparator, fieldsToSkip);
+function customDocumentEq({left, right, verbose, valueComparator}) {
+    return documentEq(left, right, verbose, valueComparator);
 }
 
 /**
@@ -102,7 +102,8 @@ function documentEq(dl, dr, verbose = false, valueComparator, fieldsToSkip = [])
             return false;
         }
 
-        if (fieldsToSkip.includes(propertyName))
+        // If the property is the _id, they don't have to be equal.
+        if (propertyName == '_id' || fieldsToSkip.includes(propertyName))
             continue;
 
         if (!anyEq(dl[propertyName], dr[propertyName], verbose, valueComparator, fieldsToSkip)) {
@@ -173,7 +174,7 @@ function arrayEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
     return true;
 }
 
-function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
+function arrayDiff(al, ar, verbose = false, valueComparator) {
     // Check that these are both arrays.
     if (!(al instanceof Array)) {
         debug('arrayDiff: al is not an array: ' + tojson(al));
@@ -191,8 +192,7 @@ function arrayDiff(al, ar, verbose = false, valueComparator, fieldsToSkip = []) 
     for (let leftElem of al) {
         let foundMatch = false;
         for (let i = 0; i < ar.length; ++i) {
-            if (!matchedIndexesInRight.has(i) &&
-                anyEq(leftElem, ar[i], verbose, valueComparator, fieldsToSkip)) {
+            if (!matchedIndexesInRight.has(i) && anyEq(leftElem, ar[i], verbose, valueComparator)) {
                 matchedIndexesInRight.add(i);  // Don't use the same value each time.
                 foundMatch = true;
                 break;
@@ -221,12 +221,11 @@ function arrayShallowCopy(a) {
 
 /**
  * Compare two sets of documents (expressed as arrays) to see if they match. The two sets must have
- * the same documents, although the order need not match and values for fields defined in
- * "fieldsToSkip" need not match.
+ * the same documents, although the order need not match and the _id values need not match.
  *
  * Are non-scalar values references?
  */
-function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
+function resultsEq(rl, rr, verbose = false) {
     const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
 
     // Make clones of the arguments so that we don't damage them.
@@ -243,7 +242,7 @@ function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
 
         // Find a match in the other array.
         for (let j = 0; j < rr.length; ++j) {
-            if (!anyEq(rl[i], rr[j], verbose, null, fieldsToSkip))
+            if (!anyEq(rl[i], rr[j], verbose))
                 continue;
 
             // Because we made the copies above, we can edit these out of the arrays so we don't
@@ -266,7 +265,7 @@ function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
     return true;
 }
 
-function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
+function orderedArrayEq(al, ar, verbose = false) {
     if (al.length != ar.length) {
         if (verbose)
             print(`orderedArrayEq:  array lengths do not match ${tojson(al)}, ${tojson(ar)}`);
@@ -274,7 +273,7 @@ function orderedArrayEq(al, ar, verbose = false, fieldsToSkip = []) {
     }
 
     for (let i = 0; i < al.length; ++i) {
-        if (!anyEq(al[i], ar[i], verbose, null, fieldsToSkip))
+        if (!anyEq(al[i], ar[i], verbose))
             return false;
     }
 
@@ -349,9 +348,8 @@ function assertErrMsgDoesNotContain(coll, pipe, expectedMessage) {
  * the 'actual' array has a matching element in the 'expected' array, without honoring elements
  * order.
  */
-function assertArrayEq({actual = [], expected = [], fieldsToSkip = []} = {}) {
-    assert(arrayEq(actual, expected, false, null, fieldsToSkip),
-           `actual=${tojson(actual)}, expected=${tojson(expected)}`);
+function assertArrayEq({actual = [], expected = []} = {}) {
+    assert(arrayEq(actual, expected), `actual=${tojson(actual)}, expected=${tojson(expected)}`);
 }
 
 /**
