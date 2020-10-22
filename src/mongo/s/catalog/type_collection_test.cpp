@@ -29,8 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/oid.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/time_support.h"
@@ -47,13 +45,14 @@ TEST(CollectionType, Empty) {
 
 TEST(CollectionType, Basic) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
-        CollectionType::kNssFieldName << "db.coll" << CollectionType::epoch(oid)
-                                      << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-                                      << CollectionType::keyPattern(BSON("a" << 1))
-                                      << CollectionType::defaultCollation(BSON("locale"
-                                                                               << "fr_CA"))
-                                      << CollectionType::unique(true)));
+    StatusWith<CollectionType> status = CollectionType::fromBSON(
+        BSON(CollectionType::kNssFieldName << "db.coll" << CollectionType::kEpochFieldName << oid
+                                           << CollectionType::kUpdatedAtFieldName
+                                           << Date_t::fromMillisSinceEpoch(1)
+                                           << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+                                           << CollectionType::defaultCollation(BSON("locale"
+                                                                                    << "fr_CA"))
+                                           << CollectionType::unique(true)));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -80,9 +79,9 @@ TEST(CollectionType, AllFieldsPresent) {
 
     StatusWith<CollectionType> status = CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1))
+             << "db.coll" << CollectionType::kEpochFieldName << oid
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
              << CollectionType::defaultCollation(BSON("locale"
                                                       << "fr_CA"))
              << CollectionType::unique(true) << CollectionType::uuid() << uuid
@@ -111,20 +110,20 @@ TEST(CollectionType, EmptyDefaultCollationFailsToParse) {
     const OID oid = OID::gen();
     StatusWith<CollectionType> status = CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1))
+             << "db.coll" << CollectionType::kEpochFieldName << oid
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
              << CollectionType::defaultCollation(BSONObj()) << CollectionType::unique(true)));
     ASSERT_FALSE(status.isOK());
 }
 
 TEST(CollectionType, MissingDefaultCollationParses) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> status = CollectionType::fromBSON(
-        BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
+        CollectionType::kNssFieldName
+        << "db.coll" << CollectionType::kEpochFieldName << oid
+        << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+        << CollectionType::kKeyPatternFieldName << BSON("a" << 1) << CollectionType::unique(true)));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -134,13 +133,14 @@ TEST(CollectionType, MissingDefaultCollationParses) {
 
 TEST(CollectionType, DefaultCollationSerializesCorrectly) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
-        CollectionType::kNssFieldName << "db.coll" << CollectionType::epoch(oid)
-                                      << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-                                      << CollectionType::keyPattern(BSON("a" << 1))
-                                      << CollectionType::defaultCollation(BSON("locale"
-                                                                               << "fr_CA"))
-                                      << CollectionType::unique(true)));
+    StatusWith<CollectionType> status = CollectionType::fromBSON(
+        BSON(CollectionType::kNssFieldName << "db.coll" << CollectionType::kEpochFieldName << oid
+                                           << CollectionType::kUpdatedAtFieldName
+                                           << Date_t::fromMillisSinceEpoch(1)
+                                           << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+                                           << CollectionType::defaultCollation(BSON("locale"
+                                                                                    << "fr_CA"))
+                                           << CollectionType::unique(true)));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -153,11 +153,11 @@ TEST(CollectionType, DefaultCollationSerializesCorrectly) {
 
 TEST(CollectionType, MissingDefaultCollationIsNotSerialized) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> status = CollectionType::fromBSON(
-        BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
+        CollectionType::kNssFieldName
+        << "db.coll" << CollectionType::kEpochFieldName << oid
+        << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+        << CollectionType::kKeyPatternFieldName << BSON("a" << 1) << CollectionType::unique(true)));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -168,11 +168,11 @@ TEST(CollectionType, MissingDefaultCollationIsNotSerialized) {
 
 TEST(CollectionType, MissingDistributionModeImpliesDistributionModeSharded) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> status = CollectionType::fromBSON(
-        BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+    StatusWith<CollectionType> status = CollectionType::fromBSON(BSON(
+        CollectionType::kNssFieldName
+        << "db.coll" << CollectionType::kEpochFieldName << oid
+        << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+        << CollectionType::kKeyPatternFieldName << BSON("a" << 1) << CollectionType::unique(true)));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -189,10 +189,10 @@ TEST(CollectionType, DistributionModeUnshardedParses) {
     const OID oid = OID::gen();
     StatusWith<CollectionType> status = CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("unsharded")));
+             << "db.coll" << CollectionType::kEpochFieldName << oid
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("unsharded")));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -208,10 +208,10 @@ TEST(CollectionType, DistributionModeShardedParses) {
     const OID oid = OID::gen();
     StatusWith<CollectionType> status = CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("sharded")));
+             << "db.coll" << CollectionType::kEpochFieldName << oid
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("sharded")));
     ASSERT_TRUE(status.isOK());
 
     CollectionType coll = status.getValue();
@@ -227,27 +227,27 @@ TEST(CollectionType, UnknownDistributionModeFailsToParse) {
     const OID oid = OID::gen();
     StatusWith<CollectionType> status = CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("badvalue")));
+             << "db.coll" << CollectionType::kEpochFieldName << oid
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("badvalue")));
     ASSERT_EQUALS(ErrorCodes::FailedToParse, status.getStatus());
 }
 
 TEST(CollectionType, HasSameOptionsReturnsTrueIfBothDistributionModesExplicitlySetToUnsharded) {
     const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("unsharded"))));
+             << "db.coll" << CollectionType::kEpochFieldName << OID::gen()
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("unsharded"))));
 
     const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("unsharded"))));
+             << "db.coll" << CollectionType::kEpochFieldName << OID::gen()
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("unsharded"))));
 
     ASSERT(collType1.hasSameOptions(collType2));
     ASSERT(collType2.hasSameOptions(collType1));
@@ -256,17 +256,17 @@ TEST(CollectionType, HasSameOptionsReturnsTrueIfBothDistributionModesExplicitlyS
 TEST(CollectionType, HasSameOptionsReturnsTrueIfBothDistributionModesExplicitlySetToSharded) {
     const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("sharded"))));
+             << "db.coll" << CollectionType::kEpochFieldName << OID::gen()
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("sharded"))));
 
     const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("sharded"))));
+             << "db.coll" << CollectionType::kEpochFieldName << OID::gen()
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("sharded"))));
 
     ASSERT(collType1.hasSameOptions(collType2));
     ASSERT(collType2.hasSameOptions(collType1));
@@ -277,17 +277,17 @@ TEST(
     HasSameOptionsReturnsFalseIfOneDistributionModeExplicitlySetToUnshardedAndOtherExplicitlySetToSharded) {
     const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("unsharded"))));
+             << "db.coll" << CollectionType::kEpochFieldName << OID::gen()
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("unsharded"))));
 
     const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("sharded"))));
+             << "db.coll" << CollectionType::kEpochFieldName << OID::gen()
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("sharded"))));
 
     ASSERT(!collType1.hasSameOptions(collType2));
     ASSERT(!collType2.hasSameOptions(collType1));
@@ -297,16 +297,17 @@ TEST(CollectionType,
      HasSameOptionsReturnsTrueIfOneDistributionModeExplicitlySetToShardedAndOtherIsNotSet) {
     const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)
-             << CollectionType::distributionMode("sharded"))));
+             << "db.coll" << CollectionType::kEpochFieldName << OID::gen()
+             << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+             << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+             << CollectionType::unique(true) << CollectionType::distributionMode("sharded"))));
 
     const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
-        BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true))));
+        BSON(CollectionType::kNssFieldName << "db.coll" << CollectionType::kEpochFieldName
+                                           << OID::gen() << CollectionType::kUpdatedAtFieldName
+                                           << Date_t::fromMillisSinceEpoch(1)
+                                           << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+                                           << CollectionType::unique(true))));
 
     ASSERT(collType1.hasSameOptions(collType2));
     ASSERT(collType2.hasSameOptions(collType1));
@@ -314,42 +315,21 @@ TEST(CollectionType,
 
 TEST(CollectionType, HasSameOptionsReturnsTrueIfNeitherDistributionModeExplicitlySet) {
     const auto collType1 = uassertStatusOK(CollectionType::fromBSON(
-        BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true))));
+        BSON(CollectionType::kNssFieldName << "db.coll" << CollectionType::kEpochFieldName
+                                           << OID::gen() << CollectionType::kUpdatedAtFieldName
+                                           << Date_t::fromMillisSinceEpoch(1)
+                                           << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+                                           << CollectionType::unique(true))));
 
     const auto collType2 = uassertStatusOK(CollectionType::fromBSON(
-        BSON(CollectionType::kNssFieldName
-             << "db.coll" << CollectionType::epoch(OID::gen())
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true))));
+        BSON(CollectionType::kNssFieldName << "db.coll" << CollectionType::kEpochFieldName
+                                           << OID::gen() << CollectionType::kUpdatedAtFieldName
+                                           << Date_t::fromMillisSinceEpoch(1)
+                                           << CollectionType::kKeyPatternFieldName << BSON("a" << 1)
+                                           << CollectionType::unique(true))));
 
     ASSERT(collType1.hasSameOptions(collType2));
     ASSERT(collType2.hasSameOptions(collType1));
-}
-
-TEST(CollectionType, EpochCorrectness) {
-    CollectionType coll;
-    coll.setNss(NamespaceString{"db.coll"});
-    coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(1));
-    coll.setKeyPattern(KeyPattern{BSON("a" << 1)});
-    coll.setUnique(false);
-    coll.setDropped(false);
-
-    // Validation will fail because we don't have epoch set. This ensures that if we read a
-    // collection with no epoch, we will write back one with epoch.
-    ASSERT_NOT_OK(coll.validate());
-
-    // We should be allowed to set empty epoch for dropped collections
-    coll.setDropped(true);
-    coll.setEpoch(OID());
-    ASSERT_OK(coll.validate());
-
-    // We should be allowed to set normal epoch for non-dropped collections
-    coll.setDropped(false);
-    coll.setEpoch(OID::gen());
-    ASSERT_OK(coll.validate());
 }
 
 TEST(CollectionType, Pre22Format) {
@@ -370,11 +350,11 @@ TEST(CollectionType, Pre22Format) {
 
 TEST(CollectionType, InvalidCollectionNamespace) {
     const OID oid = OID::gen();
-    StatusWith<CollectionType> result = CollectionType::fromBSON(
-        BSON(CollectionType::kNssFieldName
-             << "foo\\bar.coll" << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+    StatusWith<CollectionType> result = CollectionType::fromBSON(BSON(
+        CollectionType::kNssFieldName
+        << "foo\\bar.coll" << CollectionType::kEpochFieldName << oid
+        << CollectionType::kUpdatedAtFieldName << Date_t::fromMillisSinceEpoch(1)
+        << CollectionType::kKeyPatternFieldName << BSON("a" << 1) << CollectionType::unique(true)));
     ASSERT_NOT_OK(result.getStatus());
 }
 
@@ -382,9 +362,9 @@ TEST(CollectionType, BadType) {
     const OID oid = OID::gen();
     StatusWith<CollectionType> result = CollectionType::fromBSON(
         BSON(CollectionType::kNssFieldName
-             << 1 << CollectionType::epoch(oid)
-             << CollectionType::updatedAt(Date_t::fromMillisSinceEpoch(1))
-             << CollectionType::keyPattern(BSON("a" << 1)) << CollectionType::unique(true)));
+             << 1 << CollectionType::kEpochFieldName << oid << CollectionType::kUpdatedAtFieldName
+             << Date_t::fromMillisSinceEpoch(1) << CollectionType::kKeyPatternFieldName
+             << BSON("a" << 1) << CollectionType::unique(true)));
     ASSERT_NOT_OK(result.getStatus());
 }
 

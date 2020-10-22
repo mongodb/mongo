@@ -141,6 +141,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
         CollectionType coll;
         coll.setNss(nss);
         coll.setEpoch(version.epoch());
+        coll.setUpdatedAt(Date_t::now());
         coll.setKeyPattern(shardKeyPattern.getKeyPattern());
         coll.setUnique(unique);
 
@@ -203,6 +204,7 @@ void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
         CollectionType collType;
         collType.setNss(nss);
         collType.setEpoch(epoch);
+        collType.setUpdatedAt(Date_t::now());
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);
         if (uuid) {

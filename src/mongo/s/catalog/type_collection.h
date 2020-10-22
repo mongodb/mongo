@@ -29,20 +29,12 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
-#include <string>
-
-#include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
-class Status;
-template <typename T>
-class StatusWith;
 
 using ReshardingFields = TypeCollectionReshardingFields;
 
@@ -88,23 +80,33 @@ using ReshardingFields = TypeCollectionReshardingFields;
  *   }
  *
  */
-class CollectionType : public CollectionTypeBase {
+class CollectionType : private CollectionTypeBase {
 public:
+    // Make field names accessible.
+    using CollectionTypeBase::kNssFieldName;
+    static constexpr auto kEpochFieldName = CollectionTypeBase::kPre22CompatibleEpochFieldName;
+    using CollectionTypeBase::kUpdatedAtFieldName;
+    static constexpr auto kKeyPatternFieldName =
+        CollectionTypeBase::kPre50CompatibleKeyPatternFieldName;
+
+    // Make getters and setters accessible.
+    using CollectionTypeBase::getNss;
+    using CollectionTypeBase::getUpdatedAt;
+    using CollectionTypeBase::setNss;
+    using CollectionTypeBase::setUpdatedAt;
+
     // Name of the collections collection in the config server.
     static const NamespaceString ConfigNS;
 
-    static const BSONField<OID> epoch;
-    static const BSONField<Date_t> updatedAt;
-    static const BSONField<BSONObj> keyPattern;
     static const BSONField<BSONObj> defaultCollation;
     static const BSONField<bool> unique;
     static const BSONField<UUID> uuid;
     static const BSONField<std::string> distributionMode;
     static const BSONField<ReshardingFields> reshardingFields;
 
-    explicit CollectionType(const BSONObj& obj);
-
     CollectionType() = default;
+
+    explicit CollectionType(const BSONObj& obj);
 
     /**
      * Constructs a new CollectionType object from BSON. Also does validation of the contents.
@@ -136,27 +138,19 @@ public:
      */
     std::string toString() const;
 
-    OID getEpoch() const {
-        return _epoch.get();
+    const OID& getEpoch() const {
+        return *getPre22CompatibleEpoch();
     }
     void setEpoch(OID epoch);
 
-    Date_t getUpdatedAt() const {
-        return _updatedAt.get();
-    }
-    void setUpdatedAt(Date_t updatedAt);
-
     bool getDropped() const {
-        return _dropped.get_value_or(false);
-    }
-    void setDropped(bool dropped) {
-        _dropped = dropped;
+        return getPre50CompatibleDropped() ? *getPre50CompatibleDropped() : false;
     }
 
     const KeyPattern& getKeyPattern() const {
-        return _keyPattern.get();
+        return *getPre50CompatibleKeyPattern();
     }
-    void setKeyPattern(const KeyPattern& keyPattern);
+    void setKeyPattern(KeyPattern keyPattern);
 
     const BSONObj& getDefaultCollation() const {
         return _defaultCollation;
@@ -175,7 +169,6 @@ public:
     boost::optional<UUID> getUUID() const {
         return _uuid;
     }
-
     void setUUID(UUID uuid) {
         _uuid = uuid;
     }
@@ -184,38 +177,24 @@ public:
         return _allowBalance.get_value_or(true);
     }
 
+    DistributionMode getDistributionMode() const {
+        return _distributionMode.get_value_or(DistributionMode::kSharded);
+    }
     void setDistributionMode(DistributionMode distributionMode) {
         _distributionMode = distributionMode;
     }
 
-    DistributionMode getDistributionMode() const {
-        return _distributionMode.get_value_or(DistributionMode::kSharded);
-    }
-
-    void setReshardingFields(boost::optional<ReshardingFields> reshardingFields);
-
     const boost::optional<ReshardingFields>& getReshardingFields() const {
         return _reshardingFields;
     }
+    void setReshardingFields(boost::optional<ReshardingFields> reshardingFields);
 
     bool hasSameOptions(const CollectionType& other) const;
 
 private:
-    // Required to disambiguate collection namespace incarnations.
-    boost::optional<OID> _epoch;
-
-    // Required last updated time.
-    boost::optional<Date_t> _updatedAt;
-
     // New field in v4.4; optional in v4.4 for backwards compatibility with v4.2. Whether the
     // collection is unsharded or sharded. If missing, implies sharded.
     boost::optional<DistributionMode> _distributionMode;
-
-    // Optional, whether the collection has been dropped. If missing, implies false.
-    boost::optional<bool> _dropped;
-
-    // Sharding key. Required, if collection is not dropped.
-    boost::optional<KeyPattern> _keyPattern;
 
     // Optional collection default collation. If empty, implies simple collation.
     BSONObj _defaultCollation;

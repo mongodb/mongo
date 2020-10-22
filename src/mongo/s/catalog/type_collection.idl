@@ -46,3 +46,35 @@ structs:
                 type: namespacestring
                 description: "The full namespace (with the database prefix)."
                 optional: false
+            lastmodEpoch:
+                cpp_name: pre22CompatibleEpoch
+                type: objectid
+                description: "Uniquely identifies this incarnation of the collection. Only changes
+                              in case of drop and create, or shard key refine.
+
+                              It is optional for parsing purposes, because in versions of MongoDB
+                              prior to 2.2, this value wasn't being written. In such cases, it will
+                              default to an all-zero OID."
+                optional: true
+            lastmod:
+                cpp_name: updatedAt
+                type: date
+                description: "Contains the time of when the collection was either created, or if
+                              dropped = true, when it was dropped."
+                optional: false
+            dropped:      # TODO (SERVER-51881): Remove this field after 5.0 is released
+                cpp_name: pre50CompatibleDropped
+                type: bool
+                description: "Legacy (pre 5.0 only) field, which indicates that the collection is
+                              dropped"
+                optional: true
+            key:
+                cpp_name: pre50CompatibleKeyPattern
+                type: KeyPattern
+                description: "The shard key pattern for the collection.
+
+                              It is optional for parsing purposes, because in versions of MongoDB
+                              prior to 5.0, this value would be missing for entries where 'dropped'
+                              is set to true, because dropped collections' entries were being
+                              written as dropped with certain fields missing instead of deleted."
+                optional: true

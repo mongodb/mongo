@@ -45,8 +45,6 @@ assert.neq(null, st.shard1.getDB('test').user.findOne({_id: 10}));
 var configDB = st.s.getDB('config');
 var collDoc = configDB.collections.findOne({_id: 'test.user'});
 
-assert(!collDoc.dropped);
-
 assert.eq(2, configDB.chunks.count({ns: 'test.user'}));
 assert.eq(1, configDB.tags.count({ns: 'test.user'}));
 
@@ -59,12 +57,20 @@ assert.eq(null, st.shard1.getDB('test').user.findOne());
 assert.commandWorked(testDB.runCommand({drop: 'user'}));
 
 // Check for the collection with majority RC to verify that the write to remove the collection
-// document from the catalog has propagated to the majority snapshot.
-var findColl = configDB.runCommand(
-    {find: 'collections', filter: {_id: 'test.user'}, readConcern: {'level': 'majority'}});
-collDoc = findColl.cursor.firstBatch[0];
-
-assert(collDoc.dropped);
+// document from the catalog has propagated to the majority snapshot. Note that here we explicitly
+// use a command instead of going through the driver's 'find' helper, in order to be able to specify
+// a 'majority' read concern.
+//
+// TODO (SERVER-51881): Remove this check after 5.0 is released
+var collEntry =
+    assert
+        .commandWorked(configDB.runCommand(
+            {find: 'collections', filter: {_id: 'test.user'}, readConcern: {'level': 'majority'}}))
+        .cursor.firstBatch;
+if (collEntry.length > 0) {
+    assert.eq(1, collEntry.length);
+    assert.eq(true, collEntry[0].dropped);
+}
 
 assert.eq(0, configDB.chunks.count({ns: 'test.user'}));
 assert.eq(0, configDB.tags.count({ns: 'test.user'}));

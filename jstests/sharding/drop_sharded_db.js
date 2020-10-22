@@ -46,8 +46,14 @@ assert.eq(0, config.databases.count({_id: dbA.getName()}));
 assert.eq(1, config.databases.count({_id: dbB.getName()}));
 assert.eq(1, config.databases.count({_id: dbC.getName()}));
 
-// 10 dropped collections
-assert.eq(numColls, config.collections.count({_id: RegExp("^" + dbA + "\\..*"), dropped: true}));
+// 10 dropped collections (they either do not exist or all have the dropped field set)
+//
+// TODO (SERVER-51881): Remove this check after 5.0 is released
+var droppedCollEntries = config.collections.count({_id: RegExp("^" + dbA + "\\..*")});
+if (droppedCollEntries > 0) {
+    assert.eq(numColls, droppedCollEntries.length);
+    droppedCollEntries.forEach((collEntry) => assert.eq(true, collEntry.dropped));
+}
 
 // 20 active (dropped is missing)
 assert.eq(numColls, config.collections.count({_id: RegExp("^" + dbB + "\\..*")}));

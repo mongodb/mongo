@@ -20,9 +20,12 @@ assert.eq(exists, 1);
 // Test that drop database properly cleans up config
 s.getDB(specialDB).dropDatabase();
 
-var cursor = s.getDB("config").collections.find({_id: specialNS});
-assert(cursor.next()["dropped"]);
-assert(!cursor.hasNext());
+// TODO (SERVER-51881): Remove this check after 5.0 is released
+var droppedColl = s.getDB("config").collections.find({_id: specialNS}).toArray();
+if (droppedColl.length > 0) {
+    assert.eq(1, droppedColl.length);
+    assert.eq(true, droppedColl.dropped);
+}
 
 s.stop();
 })();

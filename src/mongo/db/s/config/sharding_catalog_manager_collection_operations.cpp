@@ -401,21 +401,16 @@ void ShardingCatalogManager::dropCollection(OperationContext* opCtx, const Names
                 "dropCollection chunk and tag data deleted",
                 "namespace"_attr = nss.ns());
 
-    // Mark the collection as dropped
-    CollectionType coll;
-    coll.setNss(nss);
-    coll.setDropped(true);
-    coll.setEpoch(ChunkVersion::DROPPED().epoch());
-    coll.setUpdatedAt(Grid::get(opCtx)->getNetwork()->now());
-
-    const bool upsert = false;
-    uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
-        opCtx, nss, coll, upsert));
-
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             CollectionType::ConfigNS,
+                                             BSON(CollectionType::kNssFieldName << nss.ns()),
+                                             ShardingCatalogClient::kMajorityWriteConcern));
     LOGV2_DEBUG(21927,
                 1,
-                "dropCollection {namespace} collection marked as dropped",
-                "dropCollection collection marked as dropped",
+                "dropCollection {namespace} collection entry deleted",
+                "dropCollection collection entry deleted",
                 "namespace"_attr = nss.ns());
 
     sendSSVToAllShards(opCtx, nss);

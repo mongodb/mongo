@@ -63,6 +63,7 @@ public:
         CollectionType shardedCollection;
         shardedCollection.setNss(shardedNS());
         shardedCollection.setEpoch(OID::gen());
+        shardedCollection.setUpdatedAt(Date_t::now());
         shardedCollection.setKeyPattern(BSON("x" << 1));
 
         ASSERT_OK(insertToConfigCollection(
@@ -140,23 +141,6 @@ TEST_F(AssignKeyRangeToZoneTestFixture, BasicAssignKeyRange) {
 
 TEST_F(AssignKeyRangeToZoneTestFixture, BasicAssignKeyRangeOnUnshardedColl) {
     const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10));
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->assignKeyRangeToZone(operationContext(), unshardedNS(), newRange, zoneName()));
-
-    assertOnlyZone(unshardedNS(), newRange, zoneName());
-}
-
-TEST_F(AssignKeyRangeToZoneTestFixture, AssignKeyRangeOnDroppedShardedColl) {
-    CollectionType unshardedCollection;
-    unshardedCollection.setNss(unshardedNS());
-    unshardedCollection.setEpoch(OID::gen());
-    unshardedCollection.setKeyPattern(BSON("x" << 1));
-    unshardedCollection.setDropped(true);
-
-    const ChunkRange newRange(BSON("x" << 0), BSON("x" << 10));
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, unshardedCollection.toBSON()));
-
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->assignKeyRangeToZone(operationContext(), unshardedNS(), newRange, zoneName()));
 
@@ -276,6 +260,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToF
     CollectionType shardedCollection;
     shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
+    shardedCollection.setUpdatedAt(Date_t::now());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -295,6 +280,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToF
     CollectionType shardedCollection;
     shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
+    shardedCollection.setUpdatedAt(Date_t::now());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -349,6 +335,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed
     CollectionType shardedCollection;
     shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
+    shardedCollection.setUpdatedAt(Date_t::now());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -488,6 +475,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShou
     CollectionType shardedCollection;
     shardedCollection.setNss(NamespaceString("other.coll"));
     shardedCollection.setEpoch(OID::gen());
+    shardedCollection.setUpdatedAt(Date_t::now());
     shardedCollection.setKeyPattern(BSON("x" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -683,23 +671,6 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, BasicRemoveKeyRangeOnUnshardedColl) {
     assertNoZoneDocWithNamespace(unshardedNS());
 }
 
-TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveKeyRangeOnDroppedShardedColl) {
-    CollectionType unshardedCollection;
-    unshardedCollection.setNss(unshardedNS());
-    unshardedCollection.setEpoch(OID::gen());
-    unshardedCollection.setKeyPattern(BSON("x" << 1));
-    unshardedCollection.setDropped(true);
-
-    ASSERT_OK(insertToConfigCollection(
-        operationContext(), CollectionType::ConfigNS, unshardedCollection.toBSON()));
-
-    ASSERT_OK(ShardingCatalogManager::get(operationContext())
-                  ->removeKeyRangeFromZone(operationContext(),
-                                           unshardedNS(),
-                                           ChunkRange(BSON("x" << 0), BSON("x" << 10))));
-    assertOnlyZone(shardedNS(), getExistingRange(), zoneName());
-}
-
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithInvalidMinShardKeyShouldFail) {
     auto status = ShardingCatalogManager::get(operationContext())
                       ->removeKeyRangeFromZone(operationContext(),
@@ -725,6 +696,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemove
     CollectionType shardedCollection;
     shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
+    shardedCollection.setUpdatedAt(Date_t::now());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -751,6 +723,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMaxPrefixShouldRemove
     CollectionType shardedCollection;
     shardedCollection.setNss(ns);
     shardedCollection.setEpoch(OID::gen());
+    shardedCollection.setUpdatedAt(Date_t::now());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(

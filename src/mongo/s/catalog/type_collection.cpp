@@ -42,15 +42,11 @@ namespace mongo {
 namespace {
 
 const BSONField<bool> kNoBalance("noBalance");
-const BSONField<bool> kDropped("dropped");
 
 }  // namespace
 
 const NamespaceString CollectionType::ConfigNS("config.collections");
 
-const BSONField<OID> CollectionType::epoch("lastmodEpoch");
-const BSONField<Date_t> CollectionType::updatedAt("lastmod");
-const BSONField<BSONObj> CollectionType::keyPattern("key");
 const BSONField<BSONObj> CollectionType::defaultCollation("defaultCollation");
 const BSONField<bool> CollectionType::unique("unique");
 const BSONField<UUID> CollectionType::uuid("uuid");
@@ -60,8 +56,14 @@ const BSONField<ReshardingFields> CollectionType::reshardingFields("reshardingFi
 CollectionType::CollectionType(const BSONObj& obj) {
     CollectionType::parseProtected(IDLParserErrorContext("CollectionType"), obj);
     uassert(ErrorCodes::BadValue,
-            str::stream() << "invalid namespace " << getNss(),
+            str::stream() << "Invalid namespace " << getNss(),
             getNss().isValid());
+    if (!getPre22CompatibleEpoch()) {
+        setPre22CompatibleEpoch(OID());
+    }
+    uassert(ErrorCodes::NoSuchKey,
+            "Shard key is missing",
+            getPre50CompatibleKeyPattern() || getDropped());
 }
 
 StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
@@ -79,24 +81,6 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     CollectionType coll = std::move(swColl.getValue());
 
     {
-        OID collEpoch;
-        Status status = bsonExtractOIDFieldWithDefault(source, epoch.name(), OID(), &collEpoch);
-        if (!status.isOK())
-            return status;
-
-        coll._epoch = collEpoch;
-    }
-
-    {
-        BSONElement collUpdatedAt;
-        Status status = bsonExtractTypedField(source, updatedAt.name(), Date, &collUpdatedAt);
-        if (!status.isOK())
-            return status;
-
-        coll._updatedAt = collUpdatedAt.Date();
-    }
-
-    {
         std::string collDistributionMode;
         Status status =
             bsonExtractStringField(source, distributionMode.name(), &collDistributionMode);
@@ -111,39 +95,6 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
             }
         } else if (status == ErrorCodes::NoSuchKey) {
             // In v4.4, distributionMode can be missing in which case it is presumed "sharded"
-        } else {
-            return status;
-        }
-    }
-
-    {
-        bool collDropped;
-        Status status = bsonExtractBooleanField(source, kDropped.name(), &collDropped);
-        if (status.isOK()) {
-            coll._dropped = collDropped;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // Dropped can be missing in which case it is presumed false
-        } else {
-            return status;
-        }
-    }
-
-    {
-        BSONElement collKeyPattern;
-        Status status = bsonExtractTypedField(source, keyPattern.name(), Object, &collKeyPattern);
-        if (status.isOK()) {
-            BSONObj obj = collKeyPattern.Obj();
-            if (obj.isEmpty()) {
-                return Status(ErrorCodes::ShardKeyNotFound, "empty shard key");
-            }
-
-            coll._keyPattern = KeyPattern(obj.getOwned());
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // Sharding key can only be missing if the collection is dropped
-            if (!coll.getDropped()) {
-                return {ErrorCodes::NoSuchKey,
-                        str::stream() << "Empty shard key. Failed to parse: " << source.toString()};
-            }
         } else {
             return status;
         }
@@ -219,47 +170,12 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
 }
 
 Status CollectionType::validate() const {
-    if (!_epoch.is_initialized()) {
-        return Status(ErrorCodes::NoSuchKey, "missing epoch");
-    }
-
-    if (!_updatedAt.is_initialized()) {
-        return Status(ErrorCodes::NoSuchKey, "missing updated at timestamp");
-    }
-
-    if (!_dropped.get_value_or(false)) {
-        if (!_epoch->isSet()) {
-            return Status(ErrorCodes::BadValue, "invalid epoch");
-        }
-
-        if (Date_t() == _updatedAt.get()) {
-            return Status(ErrorCodes::BadValue, "invalid updated at timestamp");
-        }
-
-        if (!_keyPattern.is_initialized()) {
-            return Status(ErrorCodes::NoSuchKey, "missing key pattern");
-        } else {
-            invariant(!_keyPattern->toBSON().isEmpty());
-        }
-    }
-
     return Status::OK();
 }
 
 BSONObj CollectionType::toBSON() const {
     BSONObjBuilder builder;
     serialize(&builder);
-
-    builder.append(epoch.name(), _epoch.get_value_or(OID()));
-    builder.append(updatedAt.name(), _updatedAt.get_value_or(Date_t()));
-    builder.append(kDropped.name(), _dropped.get_value_or(false));
-
-    // These fields are optional, so do not include them in the metadata for the purposes of
-    // consuming less space on the config servers.
-
-    if (_keyPattern.is_initialized()) {
-        builder.append(keyPattern.name(), _keyPattern->toBSON());
-    }
 
     if (!_defaultCollation.isEmpty()) {
         builder.append(defaultCollation.name(), _defaultCollation);
@@ -299,16 +215,11 @@ std::string CollectionType::toString() const {
 }
 
 void CollectionType::setEpoch(OID epoch) {
-    _epoch = epoch;
+    setPre22CompatibleEpoch(std::move(epoch));
 }
 
-void CollectionType::setUpdatedAt(Date_t updatedAt) {
-    _updatedAt = updatedAt;
-}
-
-void CollectionType::setKeyPattern(const KeyPattern& keyPattern) {
-    invariant(!keyPattern.toBSON().isEmpty());
-    _keyPattern = keyPattern;
+void CollectionType::setKeyPattern(KeyPattern keyPattern) {
+    setPre50CompatibleKeyPattern(std::move(keyPattern));
 }
 
 void CollectionType::setReshardingFields(boost::optional<ReshardingFields> reshardingFields) {
@@ -316,11 +227,8 @@ void CollectionType::setReshardingFields(boost::optional<ReshardingFields> resha
 }
 
 bool CollectionType::hasSameOptions(const CollectionType& other) const {
-    // The relevant options must have been set on this CollectionType.
-    invariant(_keyPattern && _unique);
-
     return getNss() == other.getNss() &&
-        SimpleBSONObjComparator::kInstance.evaluate(_keyPattern->toBSON() ==
+        SimpleBSONObjComparator::kInstance.evaluate(getKeyPattern().toBSON() ==
                                                     other.getKeyPattern().toBSON()) &&
         SimpleBSONObjComparator::kInstance.evaluate(_defaultCollation ==
                                                     other.getDefaultCollation()) &&

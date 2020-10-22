@@ -84,15 +84,15 @@ structs:
                 type: namespacestring
                 description: "The full namespace (with the database prefix)."
                 optional: false
-            uuid:
-                type: uuid
-                description: "The UUID of the collection, if known."
-                optional: true
             epoch:
                 type: objectid
                 description: "Uniquely identifies this instance of the collection, in case of
                               drop/create or shard key refine."
                 optional: false
+            uuid:
+                type: uuid
+                description: "The UUID of the collection, if known."
+                optional: true
             key:
                 cpp_name: keyPattern
                 type: KeyPattern

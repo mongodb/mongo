@@ -4,6 +4,7 @@
 // operation on a mongos may be active when it happens.  All operations should handle gracefully.
 //
 
+(function() {
 var st = new ShardingTest({shards: 2, mongos: 5, verbose: 1});
 // Balancer is by default stopped, thus it will not interfere
 
@@ -72,12 +73,15 @@ jsTest.log("Rebuilding sharded collection with different split...");
 
 coll.drop();
 
+// TODO (SERVER-51881): Remove this check after 5.0 is released
 var droppedCollDoc = config.collections.findOne({_id: coll.getFullName()});
-assert(droppedCollDoc != null);
-assert.eq(true, droppedCollDoc.dropped);
-assert(droppedCollDoc.lastmodEpoch != null);
-assert(droppedCollDoc.lastmodEpoch.equals(new ObjectId("000000000000000000000000")),
-       "epoch not zero: " + droppedCollDoc.lastmodEpoch);
+if (droppedCollDoc) {
+    assert(droppedCollDoc != null);
+    assert.eq(true, droppedCollDoc.dropped);
+    assert(droppedCollDoc.lastmodEpoch != null);
+    assert(droppedCollDoc.lastmodEpoch.equals(new ObjectId("000000000000000000000000")),
+           "epoch not zero: " + droppedCollDoc.lastmodEpoch);
+}
 
 assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
@@ -131,3 +135,4 @@ coll.drop();
 jsTest.log("Done!");
 
 st.stop();
+})();

@@ -141,16 +141,16 @@ var queryConfigCollections = function(st, testNamespaces) {
     var cursor;
 
     // Find query.
-    cursor = configDB.collections.find({"key.a": 1}, {dropped: 1, "key.a": 1, "key.c": 1})
+    cursor = configDB.collections.find({"key.a": 1}, {"key.a": 1, "key.c": 1})
                  .sort({"_id": 1})
                  .batchSize(2);
     assert.eq(cursor.objsLeftInBatch(), 2);
-    assert.eq(cursor.next(), {_id: testNamespaces[1], dropped: false, key: {a: 1}});
-    assert.eq(cursor.next(), {_id: testNamespaces[3], dropped: false, key: {a: 1, c: 1}});
+    assert.eq(cursor.next(), {_id: testNamespaces[1], key: {a: 1}});
+    assert.eq(cursor.next(), {_id: testNamespaces[3], key: {a: 1, c: 1}});
     assert(cursor.hasNext());
     assert.eq(cursor.objsLeftInBatch(), 2);
-    assert.eq(cursor.next(), {_id: testNamespaces[2], dropped: false, key: {a: 1}});
-    assert.eq(cursor.next(), {_id: testNamespaces[0], dropped: false, key: {a: 1}});
+    assert.eq(cursor.next(), {_id: testNamespaces[2], key: {a: 1}});
+    assert.eq(cursor.next(), {_id: testNamespaces[0], key: {a: 1}});
     assert(!cursor.hasNext());
 
     // Aggregate query.

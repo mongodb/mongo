@@ -89,6 +89,7 @@ protected:
 
         collType.setNss(kNss);
         collType.setEpoch(epoch);
+        collType.setUpdatedAt(Date_t::now());
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);
 
