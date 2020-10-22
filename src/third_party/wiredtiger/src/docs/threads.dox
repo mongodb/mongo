@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},threads,Multithreading}
+/*! @page threads Multithreading
 
 All WT_CONNECTION methods are thread safe, and WT_CONNECTION handles can
 be shared between threads.  Applications typically open a single

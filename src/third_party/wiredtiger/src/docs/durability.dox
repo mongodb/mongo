@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},durability,Commit-level durability}
+/*! @page durability Commit-level durability
 
 WiredTiger supports checkpoint durability by default, and optionally
 commit-level durability when logging is enabled. In most applications,

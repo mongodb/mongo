@@ -109,11 +109,11 @@ __create_file(
     WT_DECL_RET;
     const char *filename, **p,
       *filecfg[] = {WT_CONFIG_BASE(session, file_meta), config, NULL, NULL, NULL};
-    char *fileconf;
+    char *fileconf, *filemeta;
     uint32_t allocsize;
     bool exists, import_repair, is_metadata;
 
-    fileconf = NULL;
+    fileconf = filemeta = NULL;
 
     import_repair = false;
     is_metadata = strcmp(uri, WT_METAFILE_URI) == 0;
@@ -175,7 +175,8 @@ __create_file(
                     cval.str++;
                     cval.len -= 2;
                 }
-                WT_ERR(__wt_strndup(session, cval.str, cval.len, &filecfg[2]));
+                WT_ERR(__wt_strndup(session, cval.str, cval.len, &filemeta));
+                filecfg[2] = filemeta;
             } else {
                 /*
                  * If there is no file metadata provided, the user should be specifying a "repair".
@@ -248,6 +249,7 @@ __create_file(
 err:
     __wt_scr_free(session, &val);
     __wt_free(session, fileconf);
+    __wt_free(session, filemeta);
     return (ret);
 }
 

@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},basic_api,Getting Started with the API}
+/*! @page basic_api Getting Started with the API
 
 WiredTiger applications will generally use the following classes to access
 and manage data:
@@ -28,11 +28,7 @@ languages (among others).
 
 By default, WiredTiger works as a traditional key/value store, where the
 keys and values are
-@m_if{c}
 raw byte arrays accessed using a WT_ITEM structure.
-@m_else
-raw byte arrays.
-@m_endif
 Keys and values may be up to (4GB - 512B) bytes in size, but depending
 on how WT_SESSION::create "maximum item sizes" are configured,
 large key and value items will be stored on overflow pages.
@@ -56,17 +52,11 @@ for the single thread accessing the database:
 The configuration string @c "create" is passed to ::wiredtiger_open to
 indicate the database should be created if it does not already exist.
 
-@m_if{c}
 The code block above also shows simple error handling with
 ::wiredtiger_strerror (a function that returns a string describing an
 error code passed as its argument).  More complex error handling can be
 configured by passing an implementation of WT_EVENT_HANDLER to
 ::wiredtiger_open or WT_CONNECTION::open_session.
-@m_endif
-@m_if{java}
-The code block above also shows simple error handling by catching
-WiredTigerException.
-@m_endif
 
 @section basic_create_table Creating a table
 

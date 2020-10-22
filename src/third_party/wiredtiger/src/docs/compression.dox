@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},compression,Compressors}
+/*! @page compression Compressors
 
 This section explains how to configure WiredTiger's builtin support for
 the lz4, snappy, zlib and zstd compression engines.

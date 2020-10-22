@@ -12,10 +12,9 @@ CC=clang CFLAGS=\"-Wall -Werror -Qunused-arguments -Wno-self-assign -Wno-parenth
 options="--enable-diagnostic
 --disable-shared
 --disable-static --enable-python
---enable-java --enable-python
 --enable-snappy --enable-zlib --enable-lz4
 --with-builtins=lz4,snappy,zlib
---enable-diagnostic --enable-java --enable-python
+--enable-diagnostic --enable-python
 --enable-strict --disable-shared"
 
 saved_IFS=$IFS

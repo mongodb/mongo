@@ -259,7 +259,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
              */
             memset(&addr_unpack, 0, sizeof(addr_unpack));
             WT_TIME_AGGREGATE_COPY(&addr_unpack.ta, &ckpt->ta);
-            if (ckpt->write_gen <= S2C(session)->base_write_gen) {
+            if (ckpt->write_gen <= btree->base_write_gen) {
                 addr_unpack.ta.newest_txn = WT_TXN_NONE;
                 addr_unpack.ta.newest_stop_txn = WT_TXN_MAX;
             }

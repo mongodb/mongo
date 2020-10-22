@@ -10,7 +10,7 @@ apply to data files which don't appear in the backup.
 
 */
 
-/*! @m_page{{c,java},backup,Backups}
+/*! @page backup Backups
 
 WiredTiger cursors provide access to data from a variety of sources.
 One of these sources is the list of files required to perform a backup

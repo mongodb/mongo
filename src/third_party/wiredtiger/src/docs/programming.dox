@@ -1,11 +1,7 @@
-/*! @m_page{{c,java},programming,Writing WiredTiger applications}
+/*! @page programming Writing WiredTiger applications
 
 This section covers topics of interest for programmers writing
-@m_if{c}
 WiredTiger applications.
-@m_else
-WiredTiger applications in Java.
-@m_endif
 
 We follow SQL terminology: a database is set of tables managed together.
 Tables consist of rows, where each row is a key and its associated
@@ -31,9 +27,7 @@ each of which is ordered by one or more columns.
 - @subpage threads
 - @subpage namespace
 - @subpage readonly
-@m_if{c}
 - @subpage signals
-@m_endif
 
 <h2>Advanced topics</h2>
 - @subpage backup
@@ -49,14 +43,12 @@ each of which is ordered by one or more columns.
 - @subpage statistics
 - @subpage_single upgrade
 
-@m_if{c}
 <h2>Extending WiredTiger</h2>
 - @subpage extensions
 - @subpage custom_collators
 - @subpage custom_extractors
 - @subpage custom_data_sources
 - @subpage custom_file_systems
-@m_endif
 
 <h2>Performance monitoring and tuning</h2>
 - @subpage_single tune_statistics

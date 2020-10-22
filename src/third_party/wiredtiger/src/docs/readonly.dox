@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},readonly,Database read-only mode}
+/*! @page readonly Database read-only mode
 
 WiredTiger supports read-only mode databases. When a database is opened
 in read-only mode, all modifications are disabled on the WT_CONNECTION

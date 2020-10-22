@@ -719,7 +719,6 @@ FILE_PATTERNS          = *.c \
                          *.cpp \
                          *.c++ \
                          *.d \
-                         *.java \
                          *.ii \
                          *.ixx \
                          *.ipp \
@@ -793,7 +792,6 @@ EXCLUDE_SYMBOLS        = __F \
 # the \include command).
 
 EXAMPLE_PATH           = ../../examples/c \
-			 ../../examples/java/com/wiredtiger/examples/ \
 			 ../../ext/compressors/nop \
 			 ../../ext/encryptors/nop \
 			 ../../ext/encryptors/rotn

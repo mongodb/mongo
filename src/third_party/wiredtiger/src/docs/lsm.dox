@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},lsm,Log-Structured Merge Trees}
+/*! @page lsm Log-Structured Merge Trees
 
 @section lsm_background Background
 
@@ -42,18 +42,13 @@ An LSM tree can be created as follows, in much the same way as a
 WiredTiger btree file:
 
 @code
-@m_if{c}
 session->create(session, "table:bucket", "type=lsm,key_format=S,value_format=S");
-@m_else
-session.create("table:bucket", "type=lsm,key_format=S,value_format=S");
-@m_endif
 @endcode
 
 Once created, the LSM tree can be accessed using the same cursor interface
 as other data sources in WiredTiger:
 
 @code
-@m_if{c}
 WT_CURSOR *c;
 
 session->open_cursor(session, "table:bucket", NULL, NULL, &c);
@@ -62,14 +57,6 @@ for(;;) {
     c->set_value(c, "value");
     c->insert(c);
 }
-@m_else
-Cursor c = session.open_cursor("table:bucket", null, null);
-for(;;) {
-    c.putKeyString("key");
-    c.putValueString("value");
-    c.insert();
-}
-@m_endif
 @endcode
 
 If an LSM cursor is configured with \c "overwrite=false" passed to
@@ -104,11 +91,7 @@ Tables or indices can be stored using LSM trees.  Schema support is provided
 for LSM as an extension to the WT_SESSION::create method:
 
 @code
-@m_if{c}
 session->create(session, "table:T", "type=lsm");
-@m_else
-session.create("table:T", "type=lsm");
-@m_endif
 @endcode
 
 @section lsm_caveats Caveats

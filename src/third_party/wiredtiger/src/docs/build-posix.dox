@@ -120,10 +120,6 @@ Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 Configure WiredTiger to perform various run-time diagnostic tests.
 <b>DO NOT</b> configure this option in production environments.
 
-@par \c --enable-java
-Build the WiredTiger Java API; requires <a href="http://swig.org">SWIG</a>
-and Java JDK.
-
 @par \c --enable-lz4
 Configure WiredTiger for <a href="https://github.com/Cyan4973/lz4">LZ4</a>
 compression; see @ref compression for more information.

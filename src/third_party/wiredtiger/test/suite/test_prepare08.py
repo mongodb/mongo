@@ -39,7 +39,7 @@ def timestamp_str(t):
 # to the data store.
 class test_prepare08(wttest.WiredTigerTestCase):
     # Force a small cache.
-    conn_config = 'cache_size=5MB,eviction_dirty_trigger=80,eviction_updates_trigger=80'
+    conn_config = 'cache_size=10MB,eviction_dirty_trigger=80,eviction_updates_trigger=80'
 
     def updates(self, ds, uri, nrows, value, ts):
         cursor = self.session.open_cursor(uri)

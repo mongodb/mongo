@@ -246,6 +246,10 @@ fdatasync
 fextend
 fh
 fieldname
+fileBackgroundColor
+fileBorderColor
+fileFontColor
+fileShadowing
 fileID
 fileformats
 fileid
@@ -481,6 +485,7 @@ seqno
 serializable
 sess
 sid
+skinparam
 skiplist
 spinlock
 spinlocks

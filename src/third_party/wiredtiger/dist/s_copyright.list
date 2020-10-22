@@ -8,7 +8,6 @@ skip	dist/db.py
 skip	dist/dist.py
 skip	dist/flags.py
 skip	dist/function.py
-skip	dist/java_doc.py
 skip	dist/log.py
 skip	dist/log_data.py
 skip	dist/prototypes.py
@@ -18,15 +17,6 @@ skip	dist/stat.py
 skip	dist/stat_data.py
 skip	dist/style.py
 skip	dist/wtperf_config.py
-skip	lang/java/java_doc.i
-skip	lang/java/src/com/wiredtiger/db/Connection.java
-skip	lang/java/src/com/wiredtiger/db/Cursor.java
-skip	lang/java/src/com/wiredtiger/db/SearchStatus.java
-skip	lang/java/src/com/wiredtiger/db/Session.java
-skip	lang/java/src/com/wiredtiger/db/wiredtiger.java
-skip	lang/java/src/com/wiredtiger/db/wiredtigerConstants.java
-skip	lang/java/src/com/wiredtiger/db/wiredtigerJNI.java
-skip	lang/java/wiredtiger_wrap.c
 skip	lang/python/wiredtiger.py
 skip	lang/python/wiredtiger/__init__.py
 skip	lang/python/wiredtiger_wrap.c

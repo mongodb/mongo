@@ -259,6 +259,10 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         WT_STAT_DATA_INCR(session, cache_eviction_dirty);
     }
 
+    /* Count page evictions in parallel with checkpoint. */
+    if (conn->txn_global.checkpoint_running)
+        WT_STAT_CONN_INCR(session, cache_eviction_pages_in_parallel_with_checkpoint);
+
     if (0) {
 err:
         if (!closing)

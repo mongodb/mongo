@@ -1,15 +1,136 @@
 /*! @page arch-index WiredTiger Architecture Guide
 
+WiredTiger is built as a library that is linked into the application.  Applications
+use the API interface to direct WiredTiger's operations (see @ref basic_api).
+Here is an overview of the software components in WiredTiger and how they are organized.
+An arrow indicates the "from" component uses "to" component.
+
+@plantuml_start{wt_diagram.png}
+@startuml{wt_diagram.png}
+
+' We add spacing to the diagram in places to influence the layout.
+' To do this, we create some invisible components with hidden arrows
+' pointing to them.  Since we don't otherwise use the "file" component,
+' we set all its parts to be transparent, and any use of "file" results
+' in an invisible spacer whose width is directed by the length of its label.
+' When modifying this diagram, it's sometimes useful to comment out the
+' following lines, and any [hidden] directives used below, to see how
+' the spacers influence the layout.  Note that this may be fragile;
+' the spacers give hints to the layout, such hints will not always be honored.
+
+skinparam fileBorderColor Transparent
+skinparam fileBackgroundColor Transparent
+skinparam fileFontColor Transparent
+skinparam fileShadowing false
+
+' Our diagram is simple.  First, we define lots of labeled rectangles
+' with most nesting within the "engine" rectangle.
+
+together {
+  rectangle "Python API" as python_api
+  ' "storage" displays as an oval.
+  storage "       C/C++  \n   applications   " as application
+  rectangle "wt Utility" as utility
+}
+
+' Trailing spaces for this label puts the text to the left.
+rectangle "**WiredTiger Engine**                                                                 " as wt_engine {
+  ' Leading and trailing spaces make a wide rectangle.
+  together {
+    file "____" as SPACE_api
+    rectangle "                                        C API                                        " as c_api
+    file "____" as SPACE_api2
+  }
+  rectangle "[[#component-schema Schema]]" as schema
+  rectangle "Cursor" as cursor
+  rectangle "Transactions" as txn
+  rectangle "Metadata" as meta
+  rectangle "[[#component-dhandle dhandle/\n Btree]]" as btree
+  rectangle " Row\n storage" as row
+  rectangle " Column\n storage" as column
+  rectangle "History\n Store" as history
+  rectangle "Snapshots" as snapshot
+  rectangle "Cache" as cache
+  rectangle "Eviction" as evict
+
+  together {
+    rectangle "  Block\n Manager" as block
+    file "__________" as SPACE_log
+    rectangle "Logging" as log
+    file "___" as SPACE_log2
+  }
+  rectangle "                                         File System & OS                                               \n                                                interface" as os
+}
+together {
+  database "Database\n   Files" as wt_file
+  database "   Log   \n  Files" as log_file
+}
+
+' Influence the ordering at the top using (hidden) directed labels
+python_api -[hidden]right-> application
+application -[hidden]right-> utility
+
+python_api -down-> c_api
+application -down-> c_api
+utility -down-> c_api
+
+c_api -down-> schema
+c_api -down-> cursor
+c_api -down-> txn
+SPACE_api -[hidden]right-> c_api
+c_api -[hidden]right-> SPACE_api2
+
+schema -down-> meta
+schema -down-> btree
+cursor -down-> btree
+btree -down-> row
+btree -down-> column
+meta -up-> cursor
+' The hidden arrow helps our boxes to line up in a better way.
+meta -[hidden]right-> btree
+cursor -[hidden]right-> txn
+txn -down-> snapshot
+row -down-> cache
+column -down-> cache
+cache -down-> history
+evict -down-> history
+history -up-> cursor
+snapshot -down-> evict
+cache -right-> evict
+cache -down-> block
+evict -down-> block
+txn -down-> log
+
+block -[hidden]right-> SPACE_log
+cache -[hidden]down-> SPACE_log
+evict -[hidden]down-> SPACE_log
+SPACE_log -[hidden]right-> log
+log -[hidden]right-> SPACE_log2
+
+block -down-> os
+log -down-> os
+os -down-> wt_file
+os -down-> log_file
+
+wt_file -[hidden]right-> log_file
+
+@enduml
+@plantuml_end
+
+We go into some detail for some of the internal components.
+
 @subpage arch-glossary
 
 WiredTiger assigns specific meanings to certain words. Here we decode them.
 
+\anchor component-schema
 @subpage arch-schema
 
 Most applications begin to make use of WiredTiger by creating a table (or other
 data object) to store their data in. Create is one of several schema operations
 available in WiredTiger.
 
+\anchor component-dhandle
 @subpage arch-dhandle-lifecycle
 
 An internal structure called Data Handle (dhandle) is used to represent and
