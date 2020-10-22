@@ -625,6 +625,71 @@ tasks:
            exclude_filter: single_threaded,
            threads: "1 2 4 8",
            read_cmd: 'false'}
+- name: misc_custom_filter_default
+  depends_on: *_compile
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: microbenchmarks
+        mongodb_setup: microbenchmarks_standalone_custom_filter_default
+        test_control_params: |
+          {include_filter_1: command multi remove mixed,
+           include_filter_2: core regression,
+           exclude_filter: single_threaded,
+           threads: "1 2 4 8",
+           read_cmd: 'false'}
+- name: misc_custom_filter_slow_or_sample
+  depends_on: *_compile
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: microbenchmarks
+        mongodb_setup: microbenchmarks_standalone_custom_filter_slow_or_sample
+        test_control_params: |
+          {include_filter_1: command multi remove mixed,
+           include_filter_2: core regression,
+           exclude_filter: single_threaded,
+           threads: "1 2 4 8",
+           read_cmd: 'false'}
+- name: misc_custom_filter_complex
+  depends_on: *_compile
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: microbenchmarks
+        mongodb_setup: microbenchmarks_standalone_custom_filter_complex
+        test_control_params: |
+          {include_filter_1: command multi remove mixed,
+           include_filter_2: core regression,
+           exclude_filter: single_threaded,
+           threads: "1 2 4 8",
+           read_cmd: 'false'}
+- name: misc_custom_filter_whole_doc
+  depends_on: *_compile
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: microbenchmarks
+        mongodb_setup: microbenchmarks_standalone_custom_filter_whole_doc
+        test_control_params: |
+          {include_filter_1: command multi remove mixed,
+           include_filter_2: core regression,
+           exclude_filter: single_threaded,
+           threads: "1 2 4 8",
+           read_cmd: 'false'}
+- name: misc_slowms_everything
+  depends_on: *_compile
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: microbenchmarks
+        mongodb_setup: microbenchmarks_standalone_slowms_everything
+        test_control_params: |
+          {include_filter_1: command multi remove mixed,
+           include_filter_2: core regression,
+           exclude_filter: single_threaded,
+           threads: "1 2 4 8",
+           read_cmd: 'false'}
 - name: singleThreaded
   depends_on: *_compile
   commands:
@@ -737,6 +802,11 @@ buildvariants:
   - name: wildcard-index-write
   - name: geo
   - name: misc
+  - name: misc_custom_filter_default
+  - name: misc_custom_filter_slow_or_sample
+  - name: misc_custom_filter_complex
+  - name: misc_custom_filter_whole_doc
+  - name: misc_slowms_everything
   - name: singleThreaded
   - name: pipeline-updates
   - name: javascript
