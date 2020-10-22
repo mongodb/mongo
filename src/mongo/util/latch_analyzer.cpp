@@ -51,6 +51,8 @@
 
 namespace mongo {
 
+using namespace fmt::literals;
+
 namespace {
 
 auto kLatchAnalysisName = "latchAnalysis"_sd;
@@ -144,21 +146,6 @@ struct LatchSetState {
 };
 
 const auto getLatchSetState = Client::declareDecoration<LatchSetState>();
-
-void dumpLevels(const LatchSetState& state) {
-    if (!state.identities) {
-        return;
-    }
-
-    auto identityName = [](const auto& identity) { return identity->name(); };
-    auto begin = boost::make_transform_iterator(state.identities->begin(), identityName);
-    auto end = boost::make_transform_iterator(state.identities->end(), identityName);
-    LOGV2_OPTIONS(23162,
-                  {logv2::LogTruncation::Disabled},
-                  "Dumping Latch Identities",
-                  "names"_attr = logv2::seqLog(begin, end));
-}
-
 }  // namespace
 
 void LatchAnalyzer::setAllowExitOnViolation(bool allowExitOnViolation) {
@@ -185,6 +172,69 @@ LatchAnalyzer& LatchAnalyzer::get() {
 
 void LatchAnalyzer::onContention(const latch_detail::Identity&) {
     // Nothing at the moment
+}
+
+void LatchAnalyzer::_handleAcquireViolation(ErrorCodes::Error ec,
+                                            StringData message,
+                                            const latch_detail::Identity& identity,
+                                            Client* client) noexcept {
+
+    {
+        stdx::lock_guard lk(_mutex);
+
+        auto& violation = _violations[identity.index()];
+        ++violation.onAcquire;
+    }
+
+    _handleViolation(ec, message, identity, client);
+}
+
+void LatchAnalyzer::_handleReleaseViolation(ErrorCodes::Error ec,
+                                            StringData message,
+                                            const latch_detail::Identity& identity,
+                                            Client* client) noexcept {
+
+    {
+        stdx::lock_guard lk(_mutex);
+
+        auto& violation = _violations[identity.index()];
+        ++violation.onRelease;
+    }
+
+    _handleViolation(ec, message, identity, client);
+}
+
+void LatchAnalyzer::_handleViolation(ErrorCodes::Error ec,
+                                     StringData message,
+                                     const latch_detail::Identity& identity,
+                                     Client* client) noexcept {
+    if (allowExitOnViolation()) {
+        auto identities = LatchSetState::LatchIdentitySet{};
+
+        auto& state = getLatchSetState(client);
+        if (state.identities) {
+            // We're in fatal territory, we can take our Client's list to the local stack.
+            identities = std::move(*state.identities);
+        }
+
+        const auto derefIdentity = [](const auto& id) -> const latch_detail::Identity& {
+            return *id;
+        };
+        auto begin = boost::make_transform_iterator(identities.begin(), derefIdentity);
+        auto end = boost::make_transform_iterator(identities.end(), derefIdentity);
+
+        LOGV2_FATAL_OPTIONS(ec,
+                            {logv2::LogTruncation::Disabled},
+                            "Theoretical deadlock found on use of latch",
+                            "reason"_attr = message,
+                            "latch"_attr = identity,
+                            "latchesHeld"_attr = logv2::seqLog(begin, end));
+    } else {
+        LOGV2_WARNING(ec,
+                      "Theoretical deadlock found on use of latch",
+                      "reason"_attr = message,
+                      "latch"_attr = identity);
+    }
 }
 
 void LatchAnalyzer::onAcquire(const latch_detail::Identity& identity) {
@@ -215,35 +265,23 @@ void LatchAnalyzer::onAcquire(const latch_detail::Identity& identity) {
     auto level = *identity.level();
     auto& handle = getLatchSetState(client);
     auto result = handle.levelsHeld.add(level);
-    if (result != HierarchicalAcquisitionSet::AddResult::kValidWasAbsent) {
-        using namespace fmt::literals;
-
-        auto errorMessage =
-            "Theoretical deadlock alert - {} latch acquisition at {}:{:d} on latch {}"_format(
-                toString(result),
-                identity.sourceLocation()->file_name(),
-                identity.sourceLocation()->line(),
-                identity.name());
-
-        if (allowExitOnViolation()) {
-            dumpLevels(handle);
-
-            fassert(31360, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
-        } else {
-            LOGV2_WARNING(23164,
-                          "Theoretical deadlock alert at latch acquisition",
-                          "result"_attr = result,
-                          "file"_attr = identity.sourceLocation()->file_name(),
-                          "line"_attr = identity.sourceLocation()->line(),
-                          "latch"_attr = identity.name());
-            {
-                stdx::lock_guard lk(_mutex);
-
-                auto& violation = _violations[identity.index()];
-                ++violation.onAcquire;
-            }
-        }
-    }
+    switch (result) {
+        case HierarchicalAcquisitionSet::AddResult::kValidWasAbsent: {
+            // The good result. Nothing to do.
+        } break;
+        case HierarchicalAcquisitionSet::AddResult::kInvalidWasAbsent: {
+            _handleAcquireViolation(ErrorCodes::Error{5106800},
+                                    "Latch acquired after other latch of lower level"_sd,
+                                    identity,
+                                    client);
+        } break;
+        case HierarchicalAcquisitionSet::AddResult::kInvalidWasPresent: {
+            _handleAcquireViolation(ErrorCodes::Error{5106801},
+                                    "Latch acquired after other latch of same level"_sd,
+                                    identity,
+                                    client);
+        } break;
+    };
 
     if (handle.identities) {
         // Since this latch has a verified Level, we can add it to the stack of identities
@@ -278,36 +316,24 @@ void LatchAnalyzer::onRelease(const latch_detail::Identity& identity) {
     auto level = *identity.level();
     auto& handle = getLatchSetState(client);
     auto result = handle.levelsHeld.remove(level);
-    if (result != HierarchicalAcquisitionSet::RemoveResult::kValidWasPresent) {
-        using namespace fmt::literals;
-
-        auto errorMessage =
-            "Theoretical deadlock alert - {} latch release at {}:{} on latch {}"_format(
-                toString(result),
-                identity.sourceLocation()->file_name(),
-                identity.sourceLocation()->line(),
-                identity.name());
-
-        if (allowExitOnViolation()) {
-            dumpLevels(handle);
-
-            fassert(31361, Status(ErrorCodes::HierarchicalAcquisitionLevelViolation, errorMessage));
-        } else {
-            LOGV2_WARNING(23165,
-                          "Theoretical deadlock alert at latch release",
-                          "result"_attr = result,
-                          "file"_attr = identity.sourceLocation()->file_name(),
-                          "line"_attr = identity.sourceLocation()->line(),
-                          "latch"_attr = identity.name());
-
-            {
-                stdx::lock_guard lk(_mutex);
-
-                auto& violation = _violations[identity.index()];
-                ++violation.onRelease;
-            }
-        }
-    }
+    switch (result) {
+        case HierarchicalAcquisitionSet::RemoveResult::kValidWasPresent: {
+            // The good result. Nothing to do.
+        } break;
+        case HierarchicalAcquisitionSet::RemoveResult::kInvalidWasAbsent: {
+            _handleReleaseViolation(
+                ErrorCodes::Error{5106802},
+                "Latch released after other latch of same level (usually the same latch twice)"_sd,
+                identity,
+                client);
+        } break;
+        case HierarchicalAcquisitionSet::RemoveResult::kInvalidWasPresent: {
+            _handleReleaseViolation(ErrorCodes::Error{5106803},
+                                    "Latch released before other latch of lower level"_sd,
+                                    identity,
+                                    client);
+        } break;
+    };
 
     if (handle.identities) {
         // Since this latch has a verified Level, we can remove it from the stack of identities

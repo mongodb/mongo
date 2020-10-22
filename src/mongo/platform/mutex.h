@@ -50,6 +50,8 @@
 
 namespace mongo {
 
+class BSONObjBuilder;
+
 namespace latch_detail {
 
 class Mutex;
@@ -115,6 +117,11 @@ public:
     size_t index() const {
         return _index;
     }
+
+    /**
+     * Append structured data describing this latch
+     */
+    void serialize(BSONObjBuilder* bob) const;
 
 private:
     static int64_t _nextIndex() {

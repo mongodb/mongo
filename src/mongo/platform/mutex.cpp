@@ -30,8 +30,26 @@
 #include "mongo/platform/mutex.h"
 
 #include "mongo/base/init.h"
+#include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo::latch_detail {
+
+void Identity::serialize(BSONObjBuilder* bob) const {
+    bob->append("name"_sd, name());
+
+    size_t id = index();
+    bob->appendNumber("latchId"_sd, id);
+
+    auto& hal = level();
+    invariant(hal);
+    bob->appendNumber("level"_sd, hal->index());
+
+    auto& loc = sourceLocation();
+    invariant(loc);
+    size_t line = loc->line();
+    bob->append("file"_sd, loc->file_name());
+    bob->appendNumber("line"_sd, line);
+}
 
 Mutex::Mutex(std::shared_ptr<Data> data) : _data{std::move(data)} {
     invariant(_data);

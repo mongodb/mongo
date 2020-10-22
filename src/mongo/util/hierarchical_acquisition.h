@@ -88,13 +88,17 @@ public:
     static constexpr IndexType kMinIndex = 0;
     static constexpr IndexType kMaxIndex = sizeof(ValueType) * CHAR_BIT - 1;
 
-    explicit constexpr Level(IndexType index) : Level(maxValue() >> index) {}
+    explicit constexpr Level(IndexType index) : Level(maxValue() >> index, index) {}
 
     constexpr Level prevLevel() const {
         return Level(_value << 1);
     }
     constexpr Level nextLevel() const {
         return Level(_value >> 1);
+    }
+
+    constexpr IndexType index() const {
+        return _index;
     }
 
     constexpr friend bool operator<(const Level& lhs, const Level& rhs) {
@@ -129,12 +133,13 @@ private:
         return ValueType{0x1} << kMaxIndex;
     }
 
-    explicit constexpr Level(ValueType value) : _value(value) {
+    explicit constexpr Level(ValueType value, IndexType index) : _value(value), _index(index) {
         invariantForConstexpr(_value >= minValue());
         invariantForConstexpr(_value <= maxValue());
     }
 
     ValueType _value;
+    IndexType _index;
 };
 
 /**

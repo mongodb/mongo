@@ -89,6 +89,20 @@ private:
         int onRelease = 0;
     };
 
+    // Either warn about the violation or crash the process.
+    void _handleViolation(ErrorCodes::Error ec,
+                          StringData message,
+                          const latch_detail::Identity& identity,
+                          Client* client) noexcept;
+    void _handleAcquireViolation(ErrorCodes::Error ec,
+                                 StringData message,
+                                 const latch_detail::Identity& identity,
+                                 Client* client) noexcept;
+    void _handleReleaseViolation(ErrorCodes::Error ec,
+                                 StringData message,
+                                 const latch_detail::Identity& identity,
+                                 Client* client) noexcept;
+
     AtomicWord<bool> _allowExitOnViolation{true};
 
     mutable stdx::mutex _mutex;  // NOLINT
