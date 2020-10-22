@@ -404,7 +404,7 @@ const testCases = [
     },
     {
         desc: "$abs with missing input",
-        expected: [{_id: 23, abs_n: null, abs_ne: null}],
+        expected: [{_id: 25, abs_n: null, abs_ne: null}],
         query: {s: "string"},
         proj: {abs_n: {$abs: "$n"}, abs_ne: {$abs: "$non_existent"}}
     },

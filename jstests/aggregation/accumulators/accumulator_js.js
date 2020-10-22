@@ -225,9 +225,10 @@ command.pipeline = [{
     }
 }];
 res = assert.commandWorked(db.runCommand(command));
-assert(resultsEq(res.cursor.firstBatch,
-                 [{_id: ['A', 'B', 'C'], value: "A,B,C"}, {_id: ['X', 'Y'], value: "X,Y"}]),
-       res.cursor);
+assert(
+    resultsEq(res.cursor.firstBatch,
+              [{_id: {a: ['A', 'B', 'C']}, value: "A,B,C"}, {_id: {a: ['X', 'Y']}, value: "X,Y"}]),
+    res.cursor);
 
 // Test that accumulateArgs must evaluate to an array.
 command.pipeline = [{
