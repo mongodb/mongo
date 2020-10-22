@@ -74,6 +74,9 @@ const createIdx =
 const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 jsTestLog('Index builds started on secondary. Op ID of one of the builds: ' + opId);
 
+// Wait for replication to allow listIndexes to read the latest state on the secondary.
+replSet.awaitReplication();
+
 // Check the listIndexes() output.
 let res = secondaryDB.runCommand({listIndexes: collName, includeBuildUUIDs: true});
 
