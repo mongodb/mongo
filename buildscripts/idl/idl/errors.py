@@ -113,6 +113,8 @@ ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT = "ID0069"
 ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION = "ID0070"
 ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION = "ID0071"
 ERROR_ID_INVALID_REPLY_TYPE = "ID0072"
+ERROR_ID_UNSTABLE_NO_API_VERSION = "ID0073"
+ERROR_ID_MISSING_REPLY_TYPE = "ID0074"
 
 
 class IDLError(Exception):
@@ -829,6 +831,22 @@ class ParserContext(object):
         self._add_error(
             location, ERROR_ID_INVALID_REPLY_TYPE,
             ("Command '%s' has invalid reply_type '%s'" % (command_name, reply_type_name)))
+
+    def add_unstable_no_api_version(self, location, command_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about a command with 'unstable' but no 'api_version'."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_UNSTABLE_NO_API_VERSION,
+            ("Command '%s' specifies 'unstable' but has no 'api_version" % (command_name, )))
+
+    def add_missing_reply_type(self, location, command_name):
+        # type: (common.SourceLocation, str) -> None
+        """Add an error about a command with 'api_version' but no 'reply_type'."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_MISSING_REPLY_TYPE,
+            ("Command '%s' has an 'api_version' but no 'reply_type'" % (command_name, )))
 
 
 def _assert_unique_error_messages():

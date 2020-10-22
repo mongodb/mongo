@@ -72,6 +72,13 @@ class _RuleDesc(object):
         self.mapping_parser_func = mapping_parser_func  # type: Callable[[errors.ParserContext,yaml.nodes.MappingNode], Any]
 
 
+def _has_field(
+        node,  # type: Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]
+        field_name,  # type: str
+):  # type: (...) -> bool
+    return any(kv[0].value == field_name for kv in node.value)
+
+
 def _generic_parser(
         ctxt,  # type: errors.ParserContext
         node,  # type: Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]
@@ -530,6 +537,9 @@ def _parse_command(ctxt, spec, name, node):
             "reply_type": _RuleDesc('scalar'),
             "api_version": _RuleDesc('scalar'),
             "is_deprecated": _RuleDesc('bool_scalar'),
+            "unstable": _RuleDesc("bool_scalar"),
+            "forward_to_shards": _RuleDesc("bool_scalar"),
+            "forward_from_shards": _RuleDesc("bool_scalar"),
             "strict": _RuleDesc("bool_scalar"),
             "inline_chained_structs": _RuleDesc("bool_scalar"),
             "immutable": _RuleDesc('bool_scalar'),
@@ -552,6 +562,12 @@ def _parse_command(ctxt, spec, name, node):
 
         if command.namespace != common.COMMAND_NAMESPACE_TYPE and command.type:
             ctxt.add_extranous_command_type(command, command.name)
+
+    if _has_field(node, "unstable") and not command.api_version:
+        ctxt.add_unstable_no_api_version(command, command.name)
+
+    if command.api_version and command.reply_type is None:
+        ctxt.add_missing_reply_type(command, command.name)
 
     # Commands may only have the first parameter, ensure the fields property is an empty array.
     if not command.fields:

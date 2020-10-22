@@ -840,12 +840,16 @@ class TestParser(testcase.IDLTestcase):
                 namespace: ignored
                 api_version: 1
                 is_deprecated: true
+                unstable: true
+                forward_to_shards: true
+                forward_from_shards: true
                 immutable: true
                 inline_chained_structs: true
                 generate_comparison_operators: true
                 cpp_name: foo
                 fields:
                     foo: bar
+                reply_type: foo_reply_struct
             """))
 
         # All fields with false for bools
@@ -858,11 +862,15 @@ class TestParser(testcase.IDLTestcase):
                 namespace: ignored
                 api_version: 1
                 is_deprecated: false
+                unstable: false
+                forward_to_shards: false
+                forward_from_shards: false
                 immutable: false
                 inline_chained_structs: false
                 generate_comparison_operators: false
                 fields:
                     foo: bar
+                reply_type: foo_reply_struct
             """))
 
         # Quoted api_version
@@ -875,6 +883,7 @@ class TestParser(testcase.IDLTestcase):
                 api_version: "1"
                 fields:
                     foo: bar
+                reply_type: foo_reply_struct
             """))
 
         # Namespace ignored
@@ -909,7 +918,7 @@ class TestParser(testcase.IDLTestcase):
                 strict: true
             """))
 
-        # Reply type
+        # Reply type permitted without api_version
         self.assert_parse(
             textwrap.dedent("""
         commands:
@@ -976,6 +985,7 @@ class TestParser(testcase.IDLTestcase):
                 api_version: [1]
                 fields:
                     foo: bar
+                reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
 
         self.assert_parse_fail(
@@ -987,7 +997,70 @@ class TestParser(testcase.IDLTestcase):
                 api_version: ["1"]
                 fields:
                     foo: bar
+                reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # Cannot specify unstable with empty api_version
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                api_version: ""
+                unstable: true
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                api_version: ""
+                unstable: false
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
+
+        # Cannot specify unstable without an api_version
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                unstable: true
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                unstable: false
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
+
+        # Must specify reply_type if api_version is non-empty
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                api_version: 1
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_MISSING_REPLY_TYPE)
 
         # Namespace is required
         self.assert_parse_fail(
