@@ -687,6 +687,8 @@ TEST(FTDCProcVMStat, TestLocalVMStat) {
         "balloon_deflate"_sd,
         "balloon_inflate"_sd,
         "nr_mlock"_sd,
+        "numa_pages_migrated"_sd,  // Not on RHEL 6, added with
+                                   // https://github.com/torvalds/linux/commit/03c5a6e16322c
         "pgfault"_sd,
         "pgmajfault"_sd,
         "pswpin"_sd,
