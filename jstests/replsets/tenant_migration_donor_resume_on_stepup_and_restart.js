@@ -188,9 +188,11 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
 (() => {
     jsTest.log("Test that the migration resumes on stepup");
     testDonorStartMigrationInterrupt((donorRst) => {
-        // Use a short replSetStepDown seconds to make it more likely for the old primary to
-        // step back up.
-        assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
+        // Force the primary to step down but make it likely to step back up.
+        const donorPrimary = donorRst.getPrimary();
+        assert.commandWorked(
+            donorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
     });
 })();
 
@@ -205,9 +207,11 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
 (() => {
     jsTest.log("Test that the donorForgetMigration command can be retried on stepup");
     testDonorForgetMigrationInterrupt((donorRst) => {
-        // Use a short replSetStepDown seconds to make it more likely for the old primary to
-        // step back up.
-        assert.commandWorked(donorRst.getPrimary().adminCommand({replSetStepDown: 1, force: true}));
+        // Force the primary to step down but make it likely to step back up.
+        const donorPrimary = donorRst.getPrimary();
+        assert.commandWorked(
+            donorPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+        assert.commandWorked(donorPrimary.adminCommand({replSetFreeze: 0}));
     });
 })();
 
