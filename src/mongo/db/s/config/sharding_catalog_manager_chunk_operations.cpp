@@ -405,6 +405,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     // Find the chunk history.
     const auto origChunk = _findChunkOnConfig(opCtx, nss, range.getMin());
     if (!origChunk.isOK()) {
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         return origChunk.getStatus();
     }
 
