@@ -242,6 +242,11 @@ private:
         moveTimingHelper.done(1);
         moveChunkHangAtStep1.pauseWhileSet();
 
+        if (moveChunkRequest.getFromShardId() == moveChunkRequest.getToShardId()) {
+            // TODO: SERVER-46669 handle wait for delete.
+            return;
+        }
+
         MigrationSourceManager migrationSourceManager(
             opCtx, moveChunkRequest, donorConnStr, recipientHost);
 

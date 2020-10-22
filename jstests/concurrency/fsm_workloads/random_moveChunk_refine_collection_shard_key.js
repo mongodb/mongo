@@ -65,10 +65,7 @@ var $config = extendWorkload($config, function($config, $super) {
               // that represent the pre-refine chunks, but the collection has already been changed
               // to possess the post-refine chunk boundaries.
               (err.message.includes("shard key bounds") &&
-               err.message.includes("are not valid for shard key pattern")) ||
-              // This error will occur if another worker thread has already moved the chunk to the
-              // destination shard.
-              err.message.includes("Destination shard cannot be the same as source")));
+               err.message.includes("are not valid for shard key pattern"))));
     };
 
     $config.states.refineCollectionShardKey = function refineCollectionShardKey(

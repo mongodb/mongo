@@ -128,11 +128,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
       _stats(ShardingStatistics::get(_opCtx)) {
     invariant(!_opCtx->lockState()->isLocked());
 
-    // Disallow moving a chunk to ourselves
-    uassert(ErrorCodes::InvalidOptions,
-            "Destination shard cannot be the same as source",
-            _args.getFromShardId() != _args.getToShardId());
-
     LOGV2(22016,
           "Starting chunk migration donation {requestParameters} with expected collection epoch "
           "{collectionEpoch}",
