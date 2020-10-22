@@ -188,7 +188,11 @@ void FreeMonController::stop() {
 
     _thread.join();
 
-    _state = State::kDone;
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+
+        _state = State::kDone;
+    }
 }
 
 void FreeMonController::turnCrankForTest(size_t countMessagesToIgnore) {
