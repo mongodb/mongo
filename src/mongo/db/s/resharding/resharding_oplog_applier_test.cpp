@@ -34,19 +34,25 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator_interface.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
@@ -93,10 +99,24 @@ private:
 
 class ReshardingOplogApplierTest : public ShardingMongodTestFixture {
 public:
+    const HostAndPort kConfigHostAndPort{"DummyConfig", 12345};
+    const std::string kOriginalShardKey = "sk";
+    const BSONObj kOriginalShardKeyPattern{BSON(kOriginalShardKey << 1)};
+
     void setUp() override {
         ShardingMongodTestFixture::setUp();
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+
+        auto clusterId = OID::gen();
+        ShardingState::get(getServiceContext())
+            ->setInitialized(_sourceId.getShardId().toString(), clusterId);
+
+        auto mockLoader = std::make_unique<CatalogCacheLoaderMock>();
+        CatalogCacheLoader::set(getServiceContext(), std::move(mockLoader));
+
+        uassertStatusOK(
+            initializeGlobalShardingStateForMongodForTest(ConnectionString(kConfigHostAndPort)));
 
         auto mockNetwork = std::make_unique<executor::NetworkInterfaceMock>();
         _executor = executor::makeThreadPoolTestExecutor(std::move(mockNetwork));
@@ -107,6 +127,38 @@ public:
         uassertStatusOK(createCollection(operationContext(),
                                          kAppliedToNs.db().toString(),
                                          BSON("create" << kAppliedToNs.coll())));
+
+        _cm = createChunkManagerForOriginalColl();
+    }
+
+    ChunkManager createChunkManagerForOriginalColl() {
+        // Create two chunks, one that is owned by this donor shard and the other owned by some
+        // other shard.
+        const OID epoch = OID::gen();
+        std::vector<ChunkType> chunks = {
+            ChunkType{kCrudNs,
+                      ChunkRange{BSON(kOriginalShardKey << MINKEY), BSON(kOriginalShardKey << 0)},
+                      ChunkVersion(1, 0, epoch),
+                      kOtherShardId},
+            ChunkType{kCrudNs,
+                      ChunkRange{BSON(kOriginalShardKey << 0), BSON(kOriginalShardKey << MAXKEY)},
+                      ChunkVersion(1, 0, epoch),
+                      _sourceId.getShardId()}};
+
+        auto rt = RoutingTableHistory::makeNew(kCrudNs,
+                                               kCrudUUID,
+                                               kOriginalShardKeyPattern,
+                                               nullptr,
+                                               false,
+                                               epoch,
+                                               boost::none,
+                                               false,
+                                               chunks);
+
+        return ChunkManager(_sourceId.getShardId(),
+                            DatabaseVersion(UUID::gen(), 1),
+                            makeStandaloneRoutingTableHistory(std::move(rt)),
+                            boost::none);
     }
 
     ThreadPool* writerPool() {
@@ -147,6 +199,13 @@ public:
                                 Value(id.toBSON()));
     }
 
+    void setReshardingOplogApplicationServerParameterTrue() {
+        const ServerParameter::Map& parameterMap = ServerParameterSet::getGlobal()->getMap();
+        invariant(parameterMap.size());
+        const auto param = parameterMap.find("useReshardingOplogApplicationRules");
+        uassertStatusOK(param->second->setFromString("true"));
+    }
+
     const NamespaceString& oplogNs() {
         return kOplogNs;
     }
@@ -163,6 +222,10 @@ public:
         return kAppliedToNs;
     }
 
+    const NamespaceString& stashNs() {
+        return kStashNs;
+    }
+
     executor::ThreadPoolTaskExecutor* getExecutor() {
         return _executor.get();
     }
@@ -171,14 +234,21 @@ public:
         return _sourceId;
     }
 
+    const ChunkManager& chunkManager() {
+        return _cm.get();
+    }
+
 protected:
     static constexpr int kWriterPoolSize = 4;
     const NamespaceString kOplogNs{"config.localReshardingOplogBuffer.xxx.yyy"};
     const NamespaceString kCrudNs{"foo.bar"};
     const UUID kCrudUUID = UUID::gen();
     const NamespaceString kAppliedToNs{"foo", "system.resharding.{}"_format(kCrudUUID.toString())};
+    const NamespaceString kStashNs{"foo", "{}.{}"_format(kCrudNs.coll(), kOplogNs.coll())};
     const ShardId kMyShardId{"shard1"};
+    const ShardId kOtherShardId{"shard2"};
     UUID _crudNsUuid = UUID::gen();
+    boost::optional<ChunkManager> _cm;
 
     const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
 
@@ -198,6 +268,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -236,6 +307,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -283,6 +355,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                                    Timestamp(8, 3),
                                    std::move(iterator),
                                    3 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -338,6 +411,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
                                    Timestamp(7, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -381,6 +455,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -425,6 +500,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -466,6 +542,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -507,6 +584,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
                                    Timestamp(8, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -552,6 +630,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -598,6 +677,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
                                    Timestamp(7, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -655,6 +735,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -703,6 +784,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -743,6 +825,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -780,6 +863,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -820,6 +904,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -834,6 +919,176 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
     DBDirectClient client(operationContext());
     auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
     ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+}
+
+TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingApplicationRules) {
+    // This case tests applying rule #2 described in ReshardingOplogApplicationRules::_applyInsert.
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> crudOps;
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 2),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 3),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 4),
+                           boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   Timestamp(6, 3),
+                                   std::move(iterator),
+                                   2 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2), doc);
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 3));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 3), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 4));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 4), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       InsertOpShouldTurnIntoReplacementUpdateOnOutputCollectionUseReshardingApplicationRules) {
+    // This case tests applying rule #3 described in ReshardingOplogApplicationRules::_applyInsert.
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> crudOps;
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1 << "sk" << 2),
+                           boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   Timestamp(5, 3),
+                                   std::move(iterator),
+                                   1 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    // Make sure a doc with {_id: 1} exists in the output collection before applying an insert with
+    // the same _id. This donor shard owns these docs under the original shard key (it owns the
+    // range {sk: 0} -> {sk: maxKey}).
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << 1));
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    // We should have replaced the existing doc in the output collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(5, 3), progressDoc->getProgress().getTs());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       InsertOpShouldWriteToStashCollectionUseReshardingApplicationRules) {
+    // This case tests applying rules #1 and #4 described in
+    // ReshardingOplogApplicationRules::_applyInsert.
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> crudOps;
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1 << "sk" << 2),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1 << "sk" << 3),
+                           boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   Timestamp(5, 3),
+                                   std::move(iterator),
+                                   1 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    // Make sure a doc with {_id: 1} exists in the output collection before applying inserts with
+    // the same _id. This donor shard does not own the doc {_id: 1, sk: -1} under the original shard
+    // key, so we should apply rule #4 and insert the doc into the stash collection.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
+    // sk: 2} should have been inserted into the stash collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // The output collection should still hold the doc {_id: 1, x: 1}. We should have applied rule
+    // #1 and turned the last insert op into a replacement update on the stash collection, so the
+    // doc {_id: 1, x: 3} should now exist in the stash collection.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 3), doc);
 
     auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
     ASSERT_TRUE(progressDoc);
@@ -976,6 +1231,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -1055,6 +1311,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -1108,6 +1365,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -1154,6 +1412,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -1210,6 +1469,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxnNum) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -1257,6 +1517,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 
@@ -1304,6 +1565,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
+                                   chunkManager(),
                                    getExecutor(),
                                    writerPool());
 

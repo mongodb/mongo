@@ -37,10 +37,14 @@
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator_interface.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/transaction_participant.h"
@@ -173,6 +177,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     Timestamp reshardingCloneFinishedTs,
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
     size_t batchSize,
+    const ChunkManager& sourceChunkMgr,
     OutOfLineExecutor* executor,
     ThreadPool* writerPool)
     : _sourceId(std::move(sourceId)),
@@ -185,6 +190,8 @@ ReshardingOplogApplier::ReshardingOplogApplier(
                         "{}.{}"_format(_nsBeingResharded.coll(), _oplogNs.coll())),
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
       _batchSize(batchSize),
+      _applicationRules(ReshardingOplogApplicationRules(
+          _outputNs, _reshardingTempNs, _sourceId.getShardId(), sourceChunkMgr)),
       _service(service),
       _executor(executor),
       _writerPool(writerPool),
@@ -487,13 +494,32 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
         return insertOplogAndUpdateConfigForRetryable(opCtx, entryOrGroupedInserts.getOp());
     }
 
-    // We always use oplog application mode 'kInitialSync', because we're applying oplog entries to
-    // a cloned database the way initial sync does.
-    return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(opCtx,
-                                                                          entryOrGroupedInserts,
-                                                                          oplogApplicationMode,
-                                                                          incrementOpsAppliedStats,
-                                                                          nullptr /* opCounters*/);
+    invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
+
+    auto opType = op.getOpType();
+    if (opType == repl::OpTypeEnum::kNoop) {
+        return Status::OK();
+    } else if (resharding::gUseReshardingOplogApplicationRules) {
+        if (opType == repl::OpTypeEnum::kInsert) {
+            return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
+        } else {
+            // TODO SERVER-49902 call ReshardingOplogApplicationRules::applyOperation for deletes
+            // TODO SERVER-49903 call ReshardingOplogApplicationRules::applyOperation for updates
+            return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
+                opCtx,
+                entryOrGroupedInserts,
+                oplogApplicationMode,
+                incrementOpsAppliedStats,
+                nullptr);
+        }
+    } else {
+        // We always use oplog application mode 'kInitialSync', because we're applying oplog entries
+        // to a cloned database the way initial sync does.
+        return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
+            opCtx, entryOrGroupedInserts, oplogApplicationMode, incrementOpsAppliedStats, nullptr);
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 // TODO: use MutableOplogEntry to handle prePostImageOps? Because OplogEntry tries to create BSON

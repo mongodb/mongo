@@ -34,7 +34,9 @@
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/resharding/resharding_donor_oplog_iterator.h"
+#include "mongo/db/s/resharding/resharding_oplog_application.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/util/future.h"
 
 namespace mongo {
@@ -58,6 +60,7 @@ public:
                            Timestamp reshardingCloneFinishedTs,
                            std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
                            size_t batchSize,
+                           const ChunkManager& sourceChunkMgr,
                            OutOfLineExecutor* executor,
                            ThreadPool* writerPool);
 
@@ -174,6 +177,10 @@ private:
     // before deciding to apply all oplog entries currently in the buffer.
     const size_t _batchSize;
 
+    // Actually applies the ops, using special rules that apply only to resharding. Only used when
+    // the 'useReshardingOplogApplicationRules' server parameter is set to true.
+    ReshardingOplogApplicationRules _applicationRules;
+
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingOplogApplier::_mutex");
 
     // Member variable concurrency access rules:
@@ -209,7 +216,7 @@ private:
     int _remainingWritersToWait{0};
 
     // (M) Keeps track of the status from writer vectors. Will only keep one error if there are
-    // mulitple occurrances.
+    // multiple occurrances.
     Status _currentBatchConsolidatedStatus{Status::OK()};
 
     // (R) The source of the oplog entries to be applied.
