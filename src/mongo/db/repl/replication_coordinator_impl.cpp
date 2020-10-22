@@ -2794,7 +2794,7 @@ bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
 bool ReplicationCoordinatorImpl::canAcceptWritesForDatabase(OperationContext* opCtx,
                                                             StringData dbName) {
     // The answer isn't meaningful unless we hold the ReplicationStateTransitionLock.
-    invariant(opCtx->lockState()->isRSTLLocked());
+    invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 }
 
@@ -2876,7 +2876,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* opCtx,
                                                          const NamespaceString& ns,
                                                          bool slaveOk) {
-    invariant(opCtx->lockState()->isRSTLLocked());
+    invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return checkCanServeReadsFor_UNSAFE(opCtx, ns, slaveOk);
 }
 
@@ -5616,7 +5616,7 @@ bool ReplicationCoordinatorImpl::ReadWriteAbility::canServeNonLocalReads(
     OperationContext* opCtx) const {
     // We must be holding the RSTL.
     invariant(opCtx);
-    invariant(opCtx->lockState()->isRSTLLocked());
+    invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
     return _canServeNonLocalReads.loadRelaxed();
 }
 

@@ -270,6 +270,11 @@ public:
     }
 
 private:
+    // Indicate that we are lock-free on code paths that can run either lock-free or locked for
+    // different kinds of operations. Note: this class member is currently declared first so that it
+    // destructs last, as a safety measure, but not because it is currently depended upon behavior.
+    boost::optional<LockFreeReadsBlock> _lockFreeReadsBlock;
+
     Lock::GlobalLock _globalLock;
 
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is

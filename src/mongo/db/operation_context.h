@@ -283,6 +283,13 @@ public:
     }
 
     /**
+     * Returns true if the operation is running lock-free.
+     */
+    bool isLockFreeReadsOp() const {
+        return _isLockFreeReadsOp;
+    }
+
+    /**
      * Returns true if operations' durations should be added to serverStatus latency metrics.
      */
     bool shouldIncrementLatencyStats() const {
@@ -572,8 +579,16 @@ private:
         _writesAreReplicated = writesAreReplicated;
     }
 
+    /**
+     * Set whether or not the operation is running lock-free.
+     */
+    void setIsLockFreeReadsOp(bool isLockFreeReadsOp) {
+        _isLockFreeReadsOp = isLockFreeReadsOp;
+    }
+
     friend class WriteUnitOfWork;
     friend class repl::UnreplicatedWritesBlock;
+    friend class LockFreeReadsBlock;
 
     Client* const _client;
 
@@ -626,6 +641,7 @@ private:
     Timer _elapsedTime;
 
     bool _writesAreReplicated = true;
+    bool _isLockFreeReadsOp = false;
     bool _shouldIncrementLatencyStats = true;
     bool _shouldParticipateInFlowControl = true;
     bool _inMultiDocumentTransaction = false;
@@ -673,4 +689,29 @@ private:
     const bool _shouldReplicateWrites;
 };
 }  // namespace repl
+
+/**
+ * RAII-style class to indicate the operation is lock-free and code should behave accordingly.
+ */
+class LockFreeReadsBlock {
+    LockFreeReadsBlock(const LockFreeReadsBlock&) = delete;
+    LockFreeReadsBlock& operator=(const LockFreeReadsBlock&) = delete;
+
+public:
+    LockFreeReadsBlock(OperationContext* opCtx)
+        : _opCtx(opCtx), _previousLockFreeReadsSetting(opCtx->isLockFreeReadsOp()) {
+        opCtx->setIsLockFreeReadsOp(true);
+    }
+
+    ~LockFreeReadsBlock() {
+        _opCtx->setIsLockFreeReadsOp(_previousLockFreeReadsSetting);
+    }
+
+private:
+    OperationContext* _opCtx;
+
+    // Used to re-set the value on the operation context upon destruction that was originally set.
+    const bool _previousLockFreeReadsSetting;
+};
+
 }  // namespace mongo
