@@ -105,8 +105,9 @@ void ReshardingDonorService::DonorStateMachine::run(
         .then([this] { _transitionToPreparingToDonate(); })
         .then([this] { _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating(); })
         .then([this, executor] {
-            return _awaitAllRecipientsDoneApplyingThenStartMirroring(executor);
+            return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(executor);
         })
+        .then([this] { _writeTransactionOplogEntryThenTransitionToMirroring(); })
         .then([this, executor] {
             return _awaitCoordinatorHasCommittedThenTransitionToDropping(executor);
         })
@@ -175,16 +176,25 @@ void ReshardingDonorService::DonorStateMachine::
     _transitionState(DonorStateEnum::kDonating, minFetchTimestamp);
 }
 
-ExecutorFuture<void>
-ReshardingDonorService::DonorStateMachine::_awaitAllRecipientsDoneApplyingThenStartMirroring(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
+    _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_donorDoc.getState() > DonorStateEnum::kDonating) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
     return _allRecipientsDoneApplying.getFuture().thenRunOn(**executor).then([this]() {
-        _transitionState(DonorStateEnum::kMirroring);
+        _transitionState(DonorStateEnum::kPreparingToMirror);
     });
+}
+
+void ReshardingDonorService::DonorStateMachine::
+    _writeTransactionOplogEntryThenTransitionToMirroring() {
+    if (_donorDoc.getState() > DonorStateEnum::kPreparingToMirror) {
+        return;
+    }
+
+    _transitionState(DonorStateEnum::kMirroring);
 }
 
 ExecutorFuture<void>

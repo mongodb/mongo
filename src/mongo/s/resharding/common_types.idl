@@ -58,6 +58,7 @@ enums:
             kUnused: "unused"
             kPreparingToDonate: "preparing-to-donate"
             kDonating: "donating"
+            kPreparingToMirror: "preparing-to-mirror"
             kMirroring: "mirroring"
             kDropping: "dropping"
             kDone: "done"

@@ -103,8 +103,10 @@ private:
 
     void _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating();
 
-    ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenStartMirroring(
+    ExecutorFuture<void> _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    void _writeTransactionOplogEntryThenTransitionToMirroring();
 
     ExecutorFuture<void> _awaitCoordinatorHasCommittedThenTransitionToDropping(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
