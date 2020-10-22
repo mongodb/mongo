@@ -527,6 +527,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         return applyOpsStatus;
     }
 
+    // The current implementation of the split chunk is not idempotent (SERVER-51805).
+    // Best effort: in order to reduce the probability of having an error, try to execute the
+    // getShardAndCollectionVersion as soon as the batch of updates is completed
+    const auto shardAndCollVersion = getShardAndCollectionVersion(opCtx, nss, ShardId(shardName));
+
     // log changes
     BSONObjBuilder logDetail;
     {
@@ -556,12 +561,16 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
             appendShortVersion(&chunkDetail.subobjStart("chunk"), newChunks[i]);
             chunkDetail.append("owningShard", shardName);
 
-            ShardingLogging::get(opCtx)->logChange(
+            const auto status = ShardingLogging::get(opCtx)->logChangeChecked(
                 opCtx, "multi-split", nss.ns(), chunkDetail.obj(), WriteConcernOptions());
+
+            // Stop logging if the last log op failed because the primary stepped down
+            if (status.code() == ErrorCodes::InterruptedDueToReplStateChange)
+                break;
         }
     }
 
-    return getShardAndCollectionVersion(opCtx, nss, ShardId(shardName));
+    return shardAndCollVersion;
 }
 
 StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
