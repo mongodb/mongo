@@ -96,6 +96,7 @@ namespace mongo {
     X(emptycapped)                                                                    \
     X(enableProfiler)                                                                 \
     X(enableSharding)                                                                 \
+    X(exportCollection)                                                               \
     X(find)                                                                           \
     X(flushRouterConfig)                                                              \
     X(forceUUID)                                                                      \
@@ -113,7 +114,7 @@ namespace mongo {
     X(grantRolesToUser)      /* ID only */                                            \
     X(hostInfo)                                                                       \
     X(impersonate)                                                                    \
-    X(importCollection) /* ID only */                                                 \
+    X(importCollection)                                                               \
     X(indexStats)                                                                     \
     X(inprog)                                                                         \
     X(insert)                                                                         \
