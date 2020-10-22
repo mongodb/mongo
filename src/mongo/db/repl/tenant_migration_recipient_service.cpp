@@ -387,7 +387,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
         _client->findOne(NamespaceString::kRsOplogNamespace.ns(),
                          Query().sort("$natural", -1),
                          &oplogOpTimeFields,
-                         QueryOption_SlaveOk,
+                         QueryOption_SecondaryOk,
                          ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
     uassert(4880601, "Found no entries in the remote oplog", !lastOplogEntry1Bson.isEmpty());
     LOGV2_DEBUG(4880600,
@@ -409,7 +409,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
         QUERY("state" << BSON("$in" << BSON_ARRAY(preparedState << inProgressState)))
             .sort(SessionTxnRecord::kStartOpTimeFieldName.toString(), 1),
         &transactionTableOpTimeFields,
-        QueryOption_SlaveOk,
+        QueryOption_SecondaryOk,
         ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
     LOGV2_DEBUG(4880602,
                 2,
@@ -428,7 +428,7 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
         _client->findOne(NamespaceString::kRsOplogNamespace.ns(),
                          Query().sort("$natural", -1),
                          &oplogOpTimeFields,
-                         QueryOption_SlaveOk,
+                         QueryOption_SecondaryOk,
                          ReadConcernArgs(ReadConcernLevel::kMajorityReadConcern).toBSONInner());
     uassert(4880603, "Found no entries in the remote oplog", !lastOplogEntry2Bson.isEmpty());
     LOGV2_DEBUG(4880604,

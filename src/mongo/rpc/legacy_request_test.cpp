@@ -74,7 +74,7 @@ TEST(LegacyRequestBuilder, DownconvertSecondaryReadPreference) {
     auto parsed = QueryMessage(msg);
 
     ASSERT_EQ(parsed.ns, "admin.$cmd"_sd);
-    ASSERT_EQ(parsed.queryOptions, QueryOption_SlaveOk);
+    ASSERT_EQ(parsed.queryOptions, QueryOption_SecondaryOk);
     ASSERT_BSONOBJ_EQ(parsed.query,
                       fromjson("{$query: {ping: 1}, $readPreference : {mode: 'secondary'}}"));
 }

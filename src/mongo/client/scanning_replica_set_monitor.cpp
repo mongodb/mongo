@@ -350,7 +350,7 @@ Future<std::vector<HostAndPort>> ScanningReplicaSetMonitor::_getHostsOrRefresh(
 
     return std::move(pf.future);
 }
-HostAndPort ScanningReplicaSetMonitor::getMasterOrUassert() {
+HostAndPort ScanningReplicaSetMonitor::getPrimaryOrUassert() {
     return getHostOrRefresh(kPrimaryOnlyReadPreference).get();
 }
 
@@ -574,7 +574,7 @@ void Refresher::scheduleIsMaster(const HostAndPort& host) {
             auto timer = Timer();
             auto reply = BSONObj();
             bool ignoredOutParam = false;
-            conn->isMaster(ignoredOutParam, &reply);
+            conn->isPrimary(ignoredOutParam, &reply);
             conn.done();  // return to pool on success.
 
             receivedIsMaster(host, timer.micros(), reply);

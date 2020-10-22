@@ -898,7 +898,7 @@ int QueryRequest::getOptions() const {
         options |= QueryOption_AwaitData;
     }
     if (_slaveOk) {
-        options |= QueryOption_SlaveOk;
+        options |= QueryOption_SecondaryOk;
     }
     if (_noCursorTimeout) {
         options |= QueryOption_NoCursorTimeout;
@@ -916,7 +916,7 @@ void QueryRequest::initFromInt(int options) {
     bool tailable = (options & QueryOption_CursorTailable) != 0;
     bool awaitData = (options & QueryOption_AwaitData) != 0;
     _tailableMode = uassertStatusOK(tailableModeFromBools(tailable, awaitData));
-    _slaveOk = (options & QueryOption_SlaveOk) != 0;
+    _slaveOk = (options & QueryOption_SecondaryOk) != 0;
     _noCursorTimeout = (options & QueryOption_NoCursorTimeout) != 0;
     _exhaust = (options & QueryOption_Exhaust) != 0;
     _allowPartialResults = (options & QueryOption_PartialResults) != 0;

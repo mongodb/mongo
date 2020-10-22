@@ -951,7 +951,7 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
     }
 
     // Determine the default read preference mode based on the value of the slaveOk flag.
-    const auto defaultReadPref = q.queryOptions & QueryOption_SlaveOk
+    const auto defaultReadPref = q.queryOptions & QueryOption_SecondaryOk
         ? ReadPreference::SecondaryPreferred
         : ReadPreference::PrimaryOnly;
     ReadPreferenceSetting::get(opCtx) =

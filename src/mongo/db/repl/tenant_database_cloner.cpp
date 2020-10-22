@@ -105,7 +105,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(_operationTime);
-    getClient()->runCommand("admin", cmd, readResult, QueryOption_SlaveOk);
+    getClient()->runCommand("admin", cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "TenantDatabaseCloner failed to get listCollections result majority-committed");

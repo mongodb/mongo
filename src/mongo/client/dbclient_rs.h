@@ -48,7 +48,7 @@ struct ReadPreferenceSetting;
 typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 
 /** Use this class to connect to a replica set of servers.  The class will manage
-   checking for which server in a replica set is master, and do failover automatically.
+   checking for which server in a replica set is primary, and do failover automatically.
 
    This can also be used to connect to replica pairs since pairs are a subset of sets
 
@@ -90,7 +90,7 @@ public:
 
     // ----------- simple functions --------------
 
-    /** throws userassertion "no master found" */
+    /** throws userassertion "no primary found" */
     std::unique_ptr<DBClientCursor> query(
         const NamespaceStringOrUUID& nsOrUuid,
         Query query,
@@ -101,7 +101,7 @@ public:
         int batchSize = 0,
         boost::optional<BSONObj> readConcernObj = boost::none) override;
 
-    /** throws userassertion "no master found" */
+    /** throws userassertion "no primary found" */
     BSONObj findOne(const std::string& ns,
                     const Query& query,
                     const BSONObj* fieldsToReturn = nullptr,
@@ -137,20 +137,20 @@ public:
 
     /**
      * WARNING: this method is very dangerous - this object can decide to free the
-     *     returned master connection any time.
+     *     returned primary connection any time.
      *
-     * @return the reference to the address that points to the master connection.
+     * @return the reference to the address that points to the primary connection.
      */
-    DBClientConnection& masterConn();
+    DBClientConnection& primaryConn();
 
     /**
      * WARNING: this method is very dangerous - this object can decide to free the
-     *     returned master connection any time. This can also unpin the cached
-     *     slaveOk/read preference connection.
+     *     returned primary connection any time. This can also unpin the cached
+     *     secondaryOk/read preference connection.
      *
      * @return the reference to the address that points to a secondary connection.
      */
-    DBClientConnection& slaveConn();
+    DBClientConnection& secondaryConn();
 
     // ---- callback pieces -------
 
@@ -161,19 +161,19 @@ public:
                        bool* retry = nullptr,
                        std::string* targetHost = nullptr) override;
 
-    /* this is the callback from our underlying connections to notify us that we got a "not master"
+    /* this is the callback from our underlying connections to notify us that we got a "not primary"
      * error.
      */
-    void isntMaster();
+    void isNotPrimary();
 
-    /* this is used to indicate we got a "not master or secondary" error from a secondary.
+    /* this is used to indicate we got a "not primary or secondary" error from a secondary.
      */
     void isntSecondary();
 
     // ----- status ------
 
     bool isFailed() const override {
-        return !_master || _master->isFailed();
+        return !_primary || _primary->isFailed();
     }
     bool isStillConnected() override;
 
@@ -271,15 +271,16 @@ protected:
 
 private:
     /**
-     * Used to simplify slave-handling logic on errors
+     * Used to simplify secondary-handling logic on errors
      *
      * @return back the passed cursor
      * @throws DBException if the directed node cannot accept the query because it
-     *     is not a master
+     *     is not a primary
      */
-    std::unique_ptr<DBClientCursor> checkSlaveQueryResult(std::unique_ptr<DBClientCursor> result);
+    std::unique_ptr<DBClientCursor> checkSecondaryQueryResult(
+        std::unique_ptr<DBClientCursor> result);
 
-    DBClientConnection* checkMaster();
+    DBClientConnection* checkPrimary();
 
     template <typename Authenticate>
     Status _runAuthLoop(Authenticate authCb);
@@ -299,16 +300,16 @@ private:
     DBClientConnection* selectNodeUsingTags(std::shared_ptr<ReadPreferenceSetting> readPref);
 
     /**
-     * @return true if the last host used in the last slaveOk query is still in the
+     * @return true if the last host used in the last secondaryOk query is still in the
      * set and can be used for the given read preference.
      */
     bool checkLastHost(const ReadPreferenceSetting* readPref);
 
     /**
-     * Destroys all cached information about the last slaveOk operation and reports the host as
+     * Destroys all cached information about the last secondaryOk operation and reports the host as
      * failed in the replica set monitor with the specified 'status'.
      */
-    void _invalidateLastSlaveOkCache(const Status& status);
+    void _invalidateLastSecondaryOkCache(const Status& status);
 
     void _authConnection(DBClientConnection* conn);
 
@@ -319,14 +320,14 @@ private:
     void logoutAll(DBClientConnection* conn);
 
     /**
-     * Clears the master connection.
+     * Clears the primary connection.
      */
-    void resetMaster();
+    void resetPrimary();
 
     /**
-     * Clears the slaveOk connection and returns it to the pool if not the same as _master.
+     * Clears the secondaryOk connection and returns it to the pool if not the same as _primary.
      */
-    void resetSlaveOkConn();
+    void resetSecondaryOkConn();
 
     // TODO: remove this when processes other than mongos uses the driver version.
     static bool _authPooledSecondaryConn;
@@ -338,16 +339,16 @@ private:
     std::string _applicationName;
     std::shared_ptr<ReplicaSetMonitor> _rsm;
 
-    HostAndPort _masterHost;
-    std::shared_ptr<DBClientConnection> _master;
+    HostAndPort _primaryHost;
+    std::shared_ptr<DBClientConnection> _primary;
 
-    // Last used host in a slaveOk query (can be a primary).
-    HostAndPort _lastSlaveOkHost;
-    // Last used connection in a slaveOk query (can be a primary).
+    // Last used host in a secondaryOk query (can be a primary).
+    HostAndPort _lastSecondaryOkHost;
+    // Last used connection in a secondaryOk query (can be a primary).
     // Connection can either be owned here or returned to the connection pool. Note that
-    // if connection is primary, it is owned by _master so it is incorrect to return
+    // if connection is primary, it is owned by _primary so it is incorrect to return
     // it to the pool.
-    std::shared_ptr<DBClientConnection> _lastSlaveOkConn;
+    std::shared_ptr<DBClientConnection> _lastSecondaryOkConn;
     std::shared_ptr<ReadPreferenceSetting> _lastReadPref;
 
     double _so_timeout;

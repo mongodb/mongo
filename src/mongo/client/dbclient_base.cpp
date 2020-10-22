@@ -95,8 +95,9 @@ bool DBClientBase::isOk(const BSONObj& o) {
     return o["ok"].trueValue();
 }
 
-bool DBClientBase::isNotMasterErrorString(const BSONElement& e) {
-    return e.type() == String && str::contains(e.valuestr(), "not master");
+bool DBClientBase::isNotPrimaryErrorString(const BSONElement& e) {
+    return e.type() == String &&
+        (str::contains(e.valuestr(), "not primary") || str::contains(e.valuestr(), "not master"));
 }
 
 
@@ -582,7 +583,7 @@ void DBClientBase::logout(const string& dbname, BSONObj& info) {
     runCommand(dbname, BSON("logout" << 1), info);
 }
 
-bool DBClientBase::isMaster(bool& isMaster, BSONObj* info) {
+bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObjBuilder bob;
     bob.append("ismaster", 1);
     if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
@@ -593,7 +594,7 @@ bool DBClientBase::isMaster(bool& isMaster, BSONObj* info) {
     if (info == nullptr)
         info = &o;
     bool ok = runCommand("admin", bob.obj(), *info);
-    isMaster = info->getField("ismaster").trueValue();
+    isPrimary = info->getField("ismaster").trueValue();
     return ok;
 }
 
@@ -629,7 +630,7 @@ list<BSONObj> DBClientBase::getCollectionInfos(const string& db, const BSONObj& 
     if (runCommand(db,
                    BSON("listCollections" << 1 << "filter" << filter << "cursor" << BSONObj()),
                    res,
-                   QueryOption_SlaveOk)) {
+                   QueryOption_SecondaryOk)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObj collections = cursorObj["firstBatch"].Obj();
         BSONObjIterator it(collections);
@@ -675,7 +676,7 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
     BSONObj cmd = bob.done();
 
     BSONObj res;
-    if (runCommand("admin", cmd, res, QueryOption_SlaveOk)) {
+    if (runCommand("admin", cmd, res, QueryOption_SecondaryOk)) {
         BSONObj dbs = res["databases"].Obj();
         BSONObjIterator it(dbs);
         while (it.more()) {
@@ -768,7 +769,7 @@ std::pair<BSONObj, NamespaceString> DBClientBase::findOneByUUID(
 
     BSONObj cmd = cmdBuilder.obj();
 
-    if (runCommand(db, cmd, res, QueryOption_SlaveOk)) {
+    if (runCommand(db, cmd, res, QueryOption_SecondaryOk)) {
         BSONObj cursorObj = res.getObjectField("cursor");
         BSONObj docs = cursorObj.getObjectField("firstBatch");
         BSONObjIterator it(docs);
@@ -855,7 +856,7 @@ unsigned long long DBClientBase::query(std::function<void(DBClientCursorBatchIte
                                        int batchSize,
                                        boost::optional<BSONObj> readConcernObj) {
     // mask options
-    queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk);
+    queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SecondaryOk);
 
     unique_ptr<DBClientCursor> c(this->query(
         nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize, readConcernObj));

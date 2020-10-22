@@ -71,7 +71,7 @@ TEST(Metadata, UpconvertValidMetadata) {
                         "$readPreference"
                                  << BSON("mode"
                                          << "secondary")),
-                   mongo::QueryOption_SlaveOk,
+                   mongo::QueryOption_SecondaryOk,
                    BSON("ping" << 1 << "$readPreference"
                                << BSON("mode"
                                        << "secondary")));

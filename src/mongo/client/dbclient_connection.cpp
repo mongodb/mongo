@@ -643,7 +643,8 @@ unsigned long long DBClientConnection::query(std::function<void(DBClientCursorBa
     }
 
     // mask options
-    queryOptions &= (int)(QueryOption_NoCursorTimeout | QueryOption_SlaveOk | QueryOption_Exhaust);
+    queryOptions &=
+        (int)(QueryOption_NoCursorTimeout | QueryOption_SecondaryOk | QueryOption_Exhaust);
 
     unique_ptr<DBClientCursor> c(this->query(
         nsOrUuid, query, 0, 0, fieldsToReturn, queryOptions, batchSize, readConcernObj));
@@ -811,7 +812,7 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
     const BSONElement errorMsgElem = replyBody[errorMsgFieldName];
     const BSONElement codeElem = replyBody["code"];
 
-    if (!isNotMasterErrorString(errorMsgElem) &&
+    if (!isNotPrimaryErrorString(errorMsgElem) &&
         !ErrorCodes::isNotPrimaryError(ErrorCodes::Error(codeElem.numberInt()))) {
         return;
     }

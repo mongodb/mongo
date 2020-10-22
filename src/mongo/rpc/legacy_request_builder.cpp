@@ -64,7 +64,7 @@ BSONObj downconvertRequestBody(const OpMsgRequest& request, int* queryOptions) {
     if (auto readPref = request.body["$readPreference"]) {
         auto parsed = ReadPreferenceSetting::fromInnerBSON(readPref);
         if (parsed.isOK() && parsed.getValue().canRunOnSecondary()) {
-            *queryOptions |= QueryOption_SlaveOk;
+            *queryOptions |= QueryOption_SecondaryOk;
         }
 
         BSONObjBuilder outer;

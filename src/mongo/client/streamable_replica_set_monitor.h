@@ -95,7 +95,7 @@ public:
     SemiFuture<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref, Milliseconds maxWait = kDefaultFindHostTimeout);
 
-    HostAndPort getMasterOrUassert();
+    HostAndPort getPrimaryOrUassert();
 
     void failedHost(const HostAndPort& host, const Status& status) override;
     void failedHostPreHandshake(const HostAndPort& host,

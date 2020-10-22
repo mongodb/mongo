@@ -85,13 +85,13 @@ public:
         const ReadPreferenceSetting& readPref, Milliseconds maxWait = kDefaultFindHostTimeout) = 0;
 
     /**
-     * Returns the host the RSM thinks is the current master or uasserts.
+     * Returns the host the RSM thinks is the current primary or uasserts.
      *
      * This is a thin wrapper around getHostOrRefresh and will also refresh the view if a primary
      * does not exist. The main difference is that this will uassert rather than returning an empty
      * HostAndPort.
      */
-    virtual HostAndPort getMasterOrUassert() = 0;
+    virtual HostAndPort getPrimaryOrUassert() = 0;
 
     /**
      * Notifies this Monitor that a host has failed because of the specified error 'status' and

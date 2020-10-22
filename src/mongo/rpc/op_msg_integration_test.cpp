@@ -204,9 +204,9 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
     for (auto host : connStr.getServers()) {
         DBClientConnection conn;
         uassertStatusOK(conn.connect(host, "integration_test"));
-        bool isMaster;
-        ASSERT(conn.isMaster(isMaster));
-        if (isMaster)
+        bool isPrimary;
+        ASSERT(conn.isPrimary(isPrimary));
+        if (isPrimary)
             continue;
         foundSecondary = true;
 
@@ -564,7 +564,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterCorrectly) {
 
     if (fixtureConn->isReplicaSetMember()) {
         // Connect directly to the primary.
-        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
+        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->primaryConn();
         ASSERT(conn);
     }
 
@@ -627,7 +627,7 @@ TEST(OpMsg, ServerHandlesExhaustIsMasterWithTopologyChange) {
 
     if (fixtureConn->isReplicaSetMember()) {
         // Connect directly to the primary.
-        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
+        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->primaryConn();
         ASSERT(conn);
     }
 
@@ -693,7 +693,7 @@ TEST(OpMsg, ServerRejectsExhaustIsMasterWithoutMaxAwaitTimeMS) {
 
     if (fixtureConn->isReplicaSetMember()) {
         // Connect directly to the primary.
-        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
+        conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->primaryConn();
         ASSERT(conn);
     }
 

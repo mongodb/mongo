@@ -164,7 +164,7 @@ OpMsgRequest upconvertRequest(StringData db, BSONObj cmdObj, int queryFlags) {
 
     if (!readPrefContainer.isEmpty()) {
         cmdObj = BSONObjBuilder(std::move(cmdObj)).appendElements(readPrefContainer).obj();
-    } else if (!cmdObj.hasField("$readPreference") && (queryFlags & QueryOption_SlaveOk)) {
+    } else if (!cmdObj.hasField("$readPreference") && (queryFlags & QueryOption_SecondaryOk)) {
         BSONObjBuilder bodyBuilder(std::move(cmdObj));
         ReadPreferenceSetting(ReadPreference::SecondaryPreferred).toContainingBSON(&bodyBuilder);
         cmdObj = bodyBuilder.obj();

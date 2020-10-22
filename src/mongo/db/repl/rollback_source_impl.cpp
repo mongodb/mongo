@@ -67,14 +67,20 @@ int RollbackSourceImpl::getRollbackId() const {
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
     const Query query = Query().sort(BSON("$natural" << -1));
-    return _getConnection()->findOne(
-        _collectionName, query, nullptr, QueryOption_SlaveOk, ReadConcernArgs::kImplicitDefault);
+    return _getConnection()->findOne(_collectionName,
+                                     query,
+                                     nullptr,
+                                     QueryOption_SecondaryOk,
+                                     ReadConcernArgs::kImplicitDefault);
 }
 
 BSONObj RollbackSourceImpl::findOne(const NamespaceString& nss, const BSONObj& filter) const {
     return _getConnection()
-        ->findOne(
-            nss.toString(), filter, nullptr, QueryOption_SlaveOk, ReadConcernArgs::kImplicitDefault)
+        ->findOne(nss.toString(),
+                  filter,
+                  nullptr,
+                  QueryOption_SecondaryOk,
+                  ReadConcernArgs::kImplicitDefault)
         .getOwned();
 }
 

@@ -376,7 +376,7 @@ boost::optional<std::vector<HostAndPort>> StreamableReplicaSetMonitor::_getHosts
     return _getHosts(_currentTopology(), criteria);
 }
 
-HostAndPort StreamableReplicaSetMonitor::getMasterOrUassert() {
+HostAndPort StreamableReplicaSetMonitor::getPrimaryOrUassert() {
     return getHostOrRefresh(kPrimaryOnlyReadPreference).get();
 }
 

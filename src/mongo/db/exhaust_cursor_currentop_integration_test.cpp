@@ -341,7 +341,7 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     }
 
     // Connect directly to the primary.
-    DBClientBase* conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->masterConn();
+    DBClientBase* conn = &static_cast<DBClientReplicaSet*>(fixtureConn.get())->primaryConn();
     ASSERT(conn);
 
     conn->dropCollection(testNSS.ns());
@@ -364,7 +364,7 @@ TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     // Create a new connection to the primary for the exhaust query.
     const auto fixtureQueryConn = connect(testBackgroundAppName);
     DBClientBase* queryConn =
-        &static_cast<DBClientReplicaSet*>(fixtureQueryConn.get())->masterConn();
+        &static_cast<DBClientReplicaSet*>(fixtureQueryConn.get())->primaryConn();
     std::unique_ptr<DBClientCursor> queryCursor;
 
     // Enable a failpoint to block getMore during execution to avoid races between getCursorId() and

@@ -401,7 +401,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
             "Got invalid reply from external server while reading from cursor",
             data.atEof());
 
-    _client->checkResponse(batch.objs, false, &retry, &host);  // watches for "not master"
+    _client->checkResponse(batch.objs, false, &retry, &host);  // watches for "not primary"
 
     if (qr.getResultFlags() & ResultFlag_ShardConfigStale) {
         BSONObj error;
@@ -599,7 +599,7 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
         if (!client->runCommand(aggRequest.getNamespaceString().db().toString(),
                                 aggRequest.serializeToCommandObj().toBson(),
                                 ret,
-                                secondaryOk ? QueryOption_SlaveOk : 0)) {
+                                secondaryOk ? QueryOption_SecondaryOk : 0)) {
             return {ErrorCodes::CommandFailed, ret.toString()};
         }
     } catch (...) {

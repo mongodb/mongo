@@ -809,20 +809,20 @@ TEST_F(TaggedFiveMemberRS, ConnShouldNotPinIfDiffTag) {
     }
 }
 
-// Note: slaveConn is dangerous and should be deprecated! Also see SERVER-7801.
-TEST_F(TaggedFiveMemberRS, SlaveConnReturnsSecConn) {
+// Note: secondaryConn is dangerous and should be deprecated! Also see SERVER-7801.
+TEST_F(TaggedFiveMemberRS, SecondaryConnReturnsSecConn) {
     MockReplicaSet* replSet = getReplSet();
     vector<HostAndPort> seedList;
     seedList.push_back(HostAndPort(replSet->getPrimary()));
 
     DBClientReplicaSet replConn(replSet->getSetName(), seedList, StringData());
 
-    // Need up-to-date view since slaveConn() uses SecondaryPreferred, and this test assumes it
+    // Need up-to-date view since secondaryConn() uses SecondaryPreferred, and this test assumes it
     // knows about at least one secondary.
     ReplicaSetMonitor::get(replSet->getSetName())->runScanForMockReplicaSet();
 
     string dest;
-    mongo::DBClientConnection& secConn = replConn.slaveConn();
+    mongo::DBClientConnection& secConn = replConn.secondaryConn();
 
     // Note: IdentityNS contains the name of the server.
     unique_ptr<DBClientCursor> cursor = secConn.query(NamespaceString(IdentityNS), Query());

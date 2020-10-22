@@ -135,7 +135,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::TenantCollectionClonerSta
 BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
     auto count = getClient()->count(_sourceDbAndUuid,
                                     {} /* Query */,
-                                    QueryOption_SlaveOk,
+                                    QueryOption_SecondaryOk,
                                     0 /* limit */,
                                     0 /* skip */,
                                     ReadConcernArgs::kImplicitDefault);
@@ -165,7 +165,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
     _operationTime = Timestamp();
 
     auto indexSpecs = getClient()->getIndexSpecs(
-        _sourceDbAndUuid, false /* includeBuildUUIDs */, QueryOption_SlaveOk);
+        _sourceDbAndUuid, false /* includeBuildUUIDs */, QueryOption_SecondaryOk);
 
     // Do a majority read on the sync source to make sure the indexes listed exist on a majority of
     // nodes in the set. We do not check the rollbackId - rollback would lead to the sync source
@@ -193,7 +193,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(_operationTime);
-    getClient()->runCommand("admin", cmd, readResult, QueryOption_SlaveOk);
+    getClient()->runCommand("admin", cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "TenantCollectionCloner failed to get listIndexes result majority-committed");
@@ -282,7 +282,7 @@ void TenantCollectionCloner::runQuery() {
                        _sourceDbAndUuid,
                        query,
                        nullptr /* fieldsToReturn */,
-                       QueryOption_NoCursorTimeout | QueryOption_SlaveOk |
+                       QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
                            (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
                        _collectionClonerBatchSize);
     _dbWorkTaskRunner.join();

@@ -145,7 +145,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
 BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
     auto count = getClient()->count(_sourceDbAndUuid,
                                     {} /* Query */,
-                                    QueryOption_SlaveOk,
+                                    QueryOption_SecondaryOk,
                                     0 /* limit */,
                                     0 /* skip */,
                                     ReadConcernArgs::kImplicitDefault);
@@ -171,7 +171,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::countStage() {
 BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
     const bool includeBuildUUIDs = true;
     auto indexSpecs =
-        getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SlaveOk);
+        getClient()->getIndexSpecs(_sourceDbAndUuid, includeBuildUUIDs, QueryOption_SecondaryOk);
     if (indexSpecs.empty()) {
         LOGV2_WARNING(21143,
                       "No indexes found for collection {namespace} while cloning from {source}",
@@ -308,7 +308,7 @@ void CollectionCloner::runQuery() {
                            _sourceDbAndUuid,
                            query,
                            nullptr /* fieldsToReturn */,
-                           QueryOption_NoCursorTimeout | QueryOption_SlaveOk |
+                           QueryOption_NoCursorTimeout | QueryOption_SecondaryOk |
                                (collectionClonerUsesExhaust ? QueryOption_Exhaust : 0),
                            _collectionClonerBatchSize,
                            ReadConcernArgs::kImplicitDefault);

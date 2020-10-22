@@ -79,7 +79,7 @@ public:
         const ReadPreferenceSetting& readPref,
         Milliseconds maxWait = kDefaultFindHostTimeout) override;
 
-    HostAndPort getMasterOrUassert() override;
+    HostAndPort getPrimaryOrUassert() override;
 
     /*
      * For the ScanningReplicaSetMonitor, all the failedHost methods are equivalent.
