@@ -66,10 +66,12 @@ public:
     StatusWith<SessionHandle> connect(HostAndPort peer,
                                       ConnectSSLMode sslMode,
                                       Milliseconds timeout) override;
-    Future<SessionHandle> asyncConnect(HostAndPort peer,
-                                       ConnectSSLMode sslMode,
-                                       const ReactorHandle& reactor,
-                                       Milliseconds timeout) override;
+    Future<SessionHandle> asyncConnect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        const ReactorHandle& reactor,
+        Milliseconds timeout,
+        std::shared_ptr<SSLConnectionContext> sslContextOverride = nullptr) override;
 
     Status start() override;
     void shutdown() override;

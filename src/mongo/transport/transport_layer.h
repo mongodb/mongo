@@ -37,6 +37,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -89,10 +90,12 @@ public:
                                               ConnectSSLMode sslMode,
                                               Milliseconds timeout) = 0;
 
-    virtual Future<SessionHandle> asyncConnect(HostAndPort peer,
-                                               ConnectSSLMode sslMode,
-                                               const ReactorHandle& reactor,
-                                               Milliseconds timeout) = 0;
+    virtual Future<SessionHandle> asyncConnect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        const ReactorHandle& reactor,
+        Milliseconds timeout,
+        std::shared_ptr<SSLConnectionContext> sslContextOverride) = 0;
 
     /**
      * Start the TransportLayer. After this point, the TransportLayer will begin accepting active

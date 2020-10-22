@@ -67,11 +67,13 @@ StatusWith<SessionHandle> TransportLayerManager::connect(HostAndPort peer,
     return _tls.front()->connect(peer, sslMode, timeout);
 }
 
-Future<SessionHandle> TransportLayerManager::asyncConnect(HostAndPort peer,
-                                                          ConnectSSLMode sslMode,
-                                                          const ReactorHandle& reactor,
-                                                          Milliseconds timeout) {
-    return _tls.front()->asyncConnect(peer, sslMode, reactor, timeout);
+Future<SessionHandle> TransportLayerManager::asyncConnect(
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    const ReactorHandle& reactor,
+    Milliseconds timeout,
+    std::shared_ptr<SSLConnectionContext> sslContextOverride) {
+    return _tls.front()->asyncConnect(peer, sslMode, reactor, timeout, sslContextOverride);
 }
 
 ReactorHandle TransportLayerManager::getReactor(WhichReactor which) {

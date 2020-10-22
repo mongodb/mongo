@@ -124,10 +124,12 @@ public:
                                       ConnectSSLMode sslMode,
                                       Milliseconds timeout) final;
 
-    Future<SessionHandle> asyncConnect(HostAndPort peer,
-                                       ConnectSSLMode sslMode,
-                                       const ReactorHandle& reactor,
-                                       Milliseconds timeout) final;
+    Future<SessionHandle> asyncConnect(
+        HostAndPort peer,
+        ConnectSSLMode sslMode,
+        const ReactorHandle& reactor,
+        Milliseconds timeout,
+        std::shared_ptr<SSLConnectionContext> sslContextOverride = nullptr) final;
 
     Status setup() final;
 
@@ -205,11 +207,6 @@ private:
     std::shared_ptr<ASIOReactor> _acceptorReactor;
 
 #ifdef MONGO_CONFIG_SSL
-    struct SSLConnectionContext {
-        std::unique_ptr<asio::ssl::context> ingress;
-        std::unique_ptr<asio::ssl::context> egress;
-        std::shared_ptr<SSLManagerInterface> manager;
-    };
     synchronized_value<std::shared_ptr<SSLConnectionContext>> _sslContext;
 #endif
 

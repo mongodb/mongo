@@ -40,6 +40,7 @@
 #include "mongo/rpc/unique_message.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/future.h"
 
@@ -54,11 +55,13 @@ public:
 
     using Handle = std::shared_ptr<AsyncDBClient>;
 
-    static Future<Handle> connect(const HostAndPort& peer,
-                                  transport::ConnectSSLMode sslMode,
-                                  ServiceContext* const context,
-                                  transport::ReactorHandle reactor,
-                                  Milliseconds timeout);
+    static Future<Handle> connect(
+        const HostAndPort& peer,
+        transport::ConnectSSLMode sslMode,
+        ServiceContext* const context,
+        transport::ReactorHandle reactor,
+        Milliseconds timeout,
+        std::shared_ptr<transport::SSLConnectionContext> sslContextOverride = nullptr);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(
         executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);

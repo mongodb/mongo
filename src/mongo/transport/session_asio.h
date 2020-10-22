@@ -36,6 +36,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/baton.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
@@ -86,9 +87,11 @@ public:
     ASIOSession(TransportLayerASIO* tl,
                 GenericSocket socket,
                 bool isIngressSession,
-                Endpoint endpoint = Endpoint()) try : _socket(std::move(socket)),
-                                                      _tl(tl),
-                                                      _isIngressSession(isIngressSession) {
+                Endpoint endpoint = Endpoint(),
+                std::shared_ptr<SSLConnectionContext> overrideSSLContext = nullptr) try
+        : _socket(std::move(socket)),
+          _tl(tl),
+          _isIngressSession(isIngressSession) {
         auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
         if (family == AF_INET || family == AF_INET6) {
             _socket.set_option(asio::ip::tcp::no_delay(true));
@@ -110,7 +113,7 @@ public:
         _local = HostAndPort(_localAddr.toString(true));
         _remote = HostAndPort(_remoteAddr.toString(true));
 #ifdef MONGO_CONFIG_SSL
-        _sslContext = *tl->_sslContext;
+        _sslContext = overrideSSLContext ? overrideSSLContext : *tl->_sslContext;
 #endif
     } catch (const DBException&) {
         throw;
@@ -815,7 +818,7 @@ private:
 #ifdef MONGO_CONFIG_SSL
     boost::optional<asio::ssl::stream<decltype(_socket)>> _sslSocket;
     bool _ranHandshake = false;
-    std::shared_ptr<TransportLayerASIO::SSLConnectionContext> _sslContext;
+    std::shared_ptr<SSLConnectionContext> _sslContext;
 #endif
 
     TransportLayerASIO* const _tl;

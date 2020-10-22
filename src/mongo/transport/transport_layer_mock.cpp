@@ -67,10 +67,12 @@ StatusWith<SessionHandle> TransportLayerMock::connect(HostAndPort peer,
     MONGO_UNREACHABLE;
 }
 
-Future<SessionHandle> TransportLayerMock::asyncConnect(HostAndPort peer,
-                                                       ConnectSSLMode sslMode,
-                                                       const ReactorHandle& reactor,
-                                                       Milliseconds timeout) {
+Future<SessionHandle> TransportLayerMock::asyncConnect(
+    HostAndPort peer,
+    ConnectSSLMode sslMode,
+    const ReactorHandle& reactor,
+    Milliseconds timeout,
+    std::shared_ptr<SSLConnectionContext> sslContextOverride) {
     MONGO_UNREACHABLE;
 }
 
