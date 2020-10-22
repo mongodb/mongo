@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},config_strings,Configuration Strings}
+/*! @page config_strings Configuration Strings
 
 @section config_intro Introduction
 
@@ -77,14 +77,8 @@ Superfluous commas and whitespace in the configuration string are ignored
 combine two configuration strings by concatenating them with a comma in
 between.
 
-@m_if{c}
 Empty configuration strings may be represented in C or C++ by passing
 <code>NULL</code>.
-@m_endif
-@m_if{java}
-Empty configuration strings may be represented in Java by passing
-<code>null</code>.
-@m_endif
 
 @section config_json JavaScript Object Notation (JSON) compatibility
 

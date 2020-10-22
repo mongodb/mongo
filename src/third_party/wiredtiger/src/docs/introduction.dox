@@ -31,9 +31,6 @@ For more information about building and installing WiredTiger, see:
 For more information about writing WiredTiger applications, see:
 
 - @subpage programming
-- @subpage programming_lang_java
-(The Java API is not available on Windows.)
-- @ref wt "WiredTiger API reference manual"
 
 For more information about the architecture and internals of WiredTiger, see:
 

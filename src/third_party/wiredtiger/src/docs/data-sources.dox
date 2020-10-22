@@ -58,7 +58,7 @@ Advanced applications may also open the following low-level cursor types:
 
 /* ----------------- */
 
-/*! @m_page{{c,java},data_sources,Data Sources}
+/*! @page data_sources Data Sources
 
 WiredTiger provides access to data from a variety of sources.  At the
 lowest level, data may be stored in a file using a tree structure.  A

@@ -140,24 +140,12 @@ if test "$wt_cv_enable_strict" = "yes"; then
 	AM_CFLAGS="$AM_CFLAGS $wt_cv_strict_warnings"
 fi
 
-# Java and Python APIs
-if test "$wt_cv_enable_java" = "yes" -o "$wt_cv_enable_python" = "yes"; then
+# Python API
+if test "$wt_cv_enable_python" = "yes"; then
 	# Only a warning, we need to build release packages without SWIG.
 	AX_PKG_SWIG(2.0.4, [],
-	    [AC_MSG_WARN([SWIG is required to rebuild Java or Python APIs.]) &&
+	    [AC_MSG_WARN([SWIG is required to rebuild Python API.]) &&
               SWIG="SWIG_NOT_FOUND_DURING_CONFIGURE"])
-fi
-
-if test "$wt_cv_enable_java" = "yes"; then
-	JAVAC=${JAVAC-javac}
-	AX_PROG_JAVAC
-	AX_PROG_JAR
-	AX_JNI_INCLUDE_DIR
-	AX_CHECK_JUNIT
-	for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS ; do
-		JNI_CPPFLAGS="$JNI_CPPFLAGS -I$JNI_INCLUDE_DIR"
-	done
-	AC_SUBST(JNI_CPPFLAGS)
 fi
 
 if test "$wt_cv_enable_python" = "yes"; then

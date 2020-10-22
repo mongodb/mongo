@@ -109,7 +109,6 @@ fi
 (cd .. && find [a-z]* -name '*.[ch]' \
 	-o -name '*.cxx' \
 	-o -name '*.in' \
-	-o -name '*.java' \
 	-o -name '*.py' \
 	-o -name '*.swig' |
     sed	-e '/Makefile.in/d' \
@@ -142,7 +141,6 @@ special_copyright()
 
 special_copyright LICENSE 1 "$string1"
 special_copyright dist/s_c_test_create 1 "$string4"
-special_copyright src/docs/build-javadoc.sh 1 "$string2"
 special_copyright src/docs/style/footer.html 2 "$string2"
 special_copyright src/utilities/util_cpyright.c 1 "$string3"
 

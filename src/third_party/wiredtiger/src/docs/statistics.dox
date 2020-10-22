@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},statistics,Statistics}
+/*! @page statistics Statistics
 
 WiredTiger can be configured to maintain a variety of run-time and
 data-source statistics.  As maintaining statistics may involve updating

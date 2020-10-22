@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},packing,Packing and Unpacking Data}
+/*! @page packing Packing and Unpacking Data
 
 WiredTiger's data packing uses format strings similar to those specified in the
 Python struct module:
@@ -27,7 +27,6 @@ The remaining characters in the format string specify the type of each field
 to be packed into or unpacked from a byte array.  See @ref schema_column_types
 for the list of supported types.
 
-@m_if{c}
 @todo Describe the variable-length integer packing in sufficient detail that it can be re-implemented in other programming languages or in network clients.
 
 @section config_examples Code samples
@@ -35,10 +34,5 @@ for the list of supported types.
 The code below is taken from the complete example program @ex_ref{ex_pack.c}.  It demonstrates how to pack three integer values into a buffer and then unpack them again.
 
 @snippet ex_pack.c packing
-@m_else
-In Java, data is packed and unpacked using cursor put* and get* operations,
-for example:
-@snippet ex_schema.c Insert and list records
-@m_endif
 
  */

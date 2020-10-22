@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},cursor_random,Cursor random}
+/*! @page cursor_random Cursor random
 
 The \c next_random configuration to the WT_SESSION::open_cursor method
 configures the cursor to return a pseudo-random record from a row-store

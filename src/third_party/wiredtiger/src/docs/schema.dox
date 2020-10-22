@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},schema,Schema, Columns, Column Groups, Indices and Projections}
+/*! @page schema Schema, Columns, Column Groups, Indices and Projections
 
 While many tables have simple key/value pairs for records, WiredTiger
 also supports more complex data patterns.
@@ -98,19 +98,14 @@ NUL character. When preceded by a size, that indicates the maximum number of
 bytes the string can store. In a string with characters less than the
 specified size, the remaining bytes are NUL padded. If the supplied string
 is longer than the specified size, it will be stored without a trailing NUL.
-@m_if{java}
-Because of this, the associated Java String may not contain the NUL character.
-@m_endif
 
 The \c 't' type is used for fixed-length bit field values.  If
 it is preceded by a size, that indicates the number of bits to store,
 between 1 and 8.  That number of low-order bits will be stored in the
 table.  The default is a size of 1 bit: that is, a boolean.
-@m_if{c}
 C applications must always use a \c uint8_t type (or equivalently,
 <code>unsigned char</code>) for calls to WT_CURSOR::set_value, and a
 pointer to the same for calls to WT_CURSOR::get_value.
-@m_endif
 If a bit field
 value is combined with other types in a packing format, it is equivalent to
 \c 'B', and a full byte is used to store it.
@@ -140,11 +135,7 @@ natural integer ordering under the default collator.
 See @subpage packing for details of WiredTiger's packing format.
 
 WiredTiger can also be extended with custom collators by implementing the
-@m_if{c}
 WT_COLLATOR interface.
-@m_else
-WT_COLLATOR interface (C only).
-@m_endif
 
 @section schema_key_and_value_formats Key and value formats
 
@@ -166,15 +157,9 @@ follows:
 @section schema_cursor_formats Cursor formats
 
 Cursors for a table have the same key format as the table itself.
-@m_if{c}
 The key columns of a cursor are set with WT_CURSOR::set_key and accessed with
 WT_CURSOR::get_key.  WT_CURSOR::set_key is analogous to \c printf,
 and takes a list of value
-@m_else
-The key columns of a cursor are set with the \c Cursor.putKey* methods
-and accessed with the \c Cursor.getKey* methods.  \c Cursor.putKey* methods
-must be called
-@m_endif
 in the order the key columns are configured in \c
 key_format.
 
@@ -194,12 +179,8 @@ the key_format was \c "SiH", would be done as follows:
 @snippet ex_all.c Set the cursor's composite key
 
 The key's values are accessed with
-@m_if{c}
 WT_CURSOR::get_key, which is analogous
 to \c scanf, and takes a list of pointers to values in the same order:
-@m_else
-successive calls to \c Cursor.getKey* methods:
-@m_endif
 
 @snippet ex_all.c Get the cursor's string key
 @snippet ex_all.c Get the cursor's record number key
@@ -209,15 +190,9 @@ Cursors for a table have the same value format as the table, unless a
 projection is configured with WT_SESSION::open_cursor.  See
 @ref cursor_projections for more information.
 
-@m_if{c}
 WT_CURSOR::set_value is used to set value columns, and
 WT_CURSOR::get_value is used to get value columns, in the same way as
 described for WT_CURSOR::set_key and WT_CURSOR::get_key.
-@m_else
-\c The Cursor.putValue* methods are used to set value columns, and
-\c Cursor.getValue* are used to get value columns, in the same way as
-described for \c Cursor.putKey* and \c Cursor.getKey*.
-@m_endif
 
 @section schema_columns Columns
 
@@ -307,11 +282,7 @@ Cursors are opened on indices by passing the index's URI to the
 WT_SESSION::open_cursor method.
 
 Index cursors use the specified index key columns for
-@m_if{c}
 WT_CURSOR::get_key and WT_CURSOR::set_key.
-@m_else
-\c Cursor.getKey* and \c Cursor.putKey* calls.
-@m_endif
 For example, we can retrieve information from
 the \c country index as follows:
 
@@ -323,11 +294,7 @@ to the WT_SESSION::create call:
 @snippet ex_schema.c Create an index with a composite key
 
 To retrieve information from a composite index requires a more complicated
-@m_if{c}
 WT_CURSOR::set_key call,
-@m_else
-set of \c Cursor.putKey* calls,
-@m_endif
 but is otherwise the same:
 
 @snippet ex_schema.c Search in a composite index
@@ -350,18 +317,10 @@ An example of using an immutable index is:
 @section schema_index_projections Index cursor projections
 
 By default, index cursors return all of the table's value columns from
-@m_if{c}
 WT_CURSOR::get_value.
-@m_else
-\c Cursor.getValue* calls.
-@m_endif
 The application can specify that a subset of the
 usual columns should be returned in calls to
-@m_if{c}
 WT_CURSOR::get_value
-@m_else
-\c Cursor.getValue
-@m_endif
 by appending a list of columns to the \c uri parameter of the
 WT_SESSION::open_cursor call.  This is called a \em projection, see
 @ref cursor_projections for more details.

@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},encryption,Encryptors}
+/*! @page encryption Encryptors
 
 @section encryption_overview Overview of Encryption in WiredTiger
 @ref encryption_custom "Custom encryption engines" may be used to

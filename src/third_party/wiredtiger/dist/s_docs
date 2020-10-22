@@ -145,22 +145,6 @@ EOF
 		e=1
 	}
 
-	# Add optional extras
-	EXTRAS="../lang/java/src/com/wiredtiger/db"
-	EXTRA_INPUT=""
-	for f in $EXTRAS ; do
-		[ -e "$f" ] && EXTRA_INPUT="$EXTRA_INPUT ../$f"
-	done
-
-	# Run again to generate the full doc set with Python and Java.
-	[ "$additional_languages" -eq 1 ] && [ "x$EXTRA_INPUT" != "x" ] && (
-	cd ../src/docs &&
-		(eval cat Doxyfile $filter ; cat <<EOF
-QUIET=YES
-INPUT+=$EXTRA_INPUT
-EOF
-) | doxygen -)
-
 	# Fix up bad links doxygen generates in navtree.js
 	(cd ../docs &&
 	    sed -i~ -e 's,/\.html,/,' -e 's,\.html\.html,.html,' navtree.js &&

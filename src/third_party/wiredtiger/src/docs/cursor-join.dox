@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},cursor_join,Join cursors}
+/*! @page cursor_join Join cursors
 
 Join cursors provide a way to iterate over a subset of a table, where the subset is specified by relationships with reference cursors.
 

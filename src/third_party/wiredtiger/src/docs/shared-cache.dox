@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},shared_cache,Per-process shared caches}
+/*! @page shared_cache Per-process shared caches
 
 WiredTiger supports sharing a single cache among multiple databases within
 a process.

@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},error_handling,Error handling}
+/*! @page error_handling Error handling
 
 WiredTiger operations return a value of 0 on success and a non-zero
 value on error.  Error codes may be either positive or negative:
@@ -9,28 +9,6 @@ codes are WiredTiger-specific (for example, \c WT_ROLLBACK).
 WiredTiger-specific error codes always appear in the -31,800 to -31,999
 range, inclusive.
 
-@m_if{java}
-Informational return values, like <code>wiredtiger.WT_NOTFOUND</code>
-or <code>wiredtiger.WT_DUPLICATE_KEY</code> or 0 (success),
-are directly returned by APIs.  More severe errors
-are thrown as \c WiredTigerException, which may be caught by the
-application.
-
-The \c WiredTigerRollbackException is a specific type of \c WiredTigerException,
-thrown when there is a conflict between concurrent operations.
-An application that catches this exception should call rollback() on
-the relevant transaction, and retry as necessary.
-
-The \c WiredTigerPanicException is a specific type of \c WiredTigerException,
-thrown when there is a fatal error requiring database restart. Applications
-will normally handle \c WiredTigerPanicException as a special case. A
-correctly-written WiredTiger application will likely catch
-\c WiredTigerPanicException and immediately exit or otherwise handle fatal
-errors. Note that no further WiredTiger calls are required after
-\c WiredTigerPanicException is caught (and further calls will themselves
-immediately fail).
-@m_endif
-
 WiredTiger returns \c EBUSY for operations requiring exclusive access, when
 an object is not available for exclusive access. For example, the
 WT_SESSION::drop or WT_SESSION::verify methods will fail if the object
@@ -39,13 +17,8 @@ open cursors on objects (for example, threads performing operations like
 statistics logging), and operations may temporarily fail and return \c EBUSY
 when there are no application cursors open on the object.
 
-@m_if{java}
-The following is a complete list of the WiredTiger-specific return
-values, all constants defined in the com.wiredtiger.db.wiredtiger class:
-@m_else
 The following is a complete list of the WiredTiger-specific return
 values:
-@m_endif
 
 @if IGNORE_BUILT_BY_API_ERR_BEGIN
 @endif
@@ -107,7 +80,6 @@ standard API.
 
 Note that ::wiredtiger_strerror is not thread-safe.
 
-@m_if{c}
 @section event_message_handling Message handling using the WT_EVENT_HANDLER
 
 Specific error and other message handling can be configured by passing an
@@ -132,7 +104,5 @@ fail).
 
 @snippet ex_event_handler.c Function event_handler
 @snippet ex_event_handler.c Configure event_handler
-
-@m_endif
 
 */

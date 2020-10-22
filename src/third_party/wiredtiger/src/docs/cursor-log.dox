@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},cursor_log,Log cursors}
+/*! @page cursor_log Log cursors
 
 WiredTiger cursors provide access to data from a variety of sources, and
 one of these sources is the records in the transaction log files.  Log
@@ -25,11 +25,7 @@ To open a log cursor on the database:
 @snippet ex_log.c log cursor open
 
 A log cursor's key is a unique log record identifier, plus a
-@m_if{c}
-uint32_t
-@m_else
-int
-@m_endif
+\c uint32_t
 operation counter within that log record.  When a log record reflects
 something log record that is not a transaction, such as the start of
 a checkpoint, the operation counter
@@ -51,17 +47,10 @@ Here is an example of getting the log cursor's key:
 
 The log cursor's value is comprised of six fields:
 
-@m_if{c}
 - a \c uint64_t transaction ID (set for commit records only, otherwise 0),
 - a \c uint32_t log record type
 - a \c uint32_t operation type (set for commit records only, otherwise 0)
 - a \c uint32_t file id (if applicable, otherwise 0)
-@m_else
-- a \c long transaction ID (set for commit records only, otherwise 0),
-- a \c int record type
-- a \c int operation type (set for commit records only, otherwise 0)
-- a \c int file id (if applicable, otherwise 0)
-@m_endif
 - the operation key (commit records only, otherwise empty)
 - the operation value
 

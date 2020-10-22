@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},operation_tracking,Track function calls}
+/*! @page operation_tracking Track function calls
 
 When this option is enabled, WiredTiger tracks all API calls as well as certain
 functions that are deemed important for performance, such as eviction-related

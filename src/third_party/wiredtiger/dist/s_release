@@ -32,10 +32,9 @@ fi
 echo "Running 'dist/s_all' in the release tree"
 (cd "$DEST/dist" && env WT_RELEASE_BUILD=yes sh s_all -A > /dev/null)
 
-echo "Running swig to generate the Java and Python API"
+echo "Running swig to generate the Python API"
 (cd "$DEST/build_posix" &&
-    ../configure --enable-java --enable-python &&
-    (cd lang/java && make ../../../lang/java/wiredtiger_wrap.c) &&
+    ../configure --enable-python &&
     (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c) &&
     make distclean &&
     find . -type d -a -empty | xargs rmdir &&

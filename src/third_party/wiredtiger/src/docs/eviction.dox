@@ -1,4 +1,4 @@
-/*! @m_page{{c,java},eviction, Eviction}
+/*! @page eviction Eviction
 
 All the operations performed in WiredTiger are on the data read into
 pre-configured amount of memory. WiredTiger uses memory as a cache for

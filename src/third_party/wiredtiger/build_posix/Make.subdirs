@@ -18,7 +18,6 @@ ext/encryptors/rotn
 ext/extractors/csv
 ext/test/fail_fs
 .
-lang/java JAVA
 lang/python PYTHON
 
 # Test/Benchmark/Examples support library.
@@ -26,7 +25,6 @@ test/utility
 
 # Example programs.
 examples/c
-examples/java JAVA
 
 # Test programs.
 test/bloom
