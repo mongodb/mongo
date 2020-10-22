@@ -78,6 +78,7 @@ static const std::vector<StringData> kVMKeys{
     "balloon_deflate"_sd,
     "balloon_inflate"_sd,
     "nr_mlock"_sd,
+    "numa_pages_migrated"_sd,
     "pgfault"_sd,
     "pgmajfault"_sd,
     "pswpin"_sd,
