@@ -499,7 +499,7 @@ BSONObj OplogFetcher::_makeFindQuery(long long findTimeout) const {
     filterBob.append("ts", BSON("$gte" << lastOpTimeFetched.getTimestamp()));
     // Handle caller-provided filter.
     if (!_queryFilter.isEmpty()) {
-        filterBob.append("$and", BSON_ARRAY(_queryFilter));
+        filterBob.append("$and", _queryFilter);
     }
     filterBob.done();
 

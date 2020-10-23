@@ -2316,7 +2316,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesFilter) {
     // Create an oplog fetcher without any retries but with a filter.  Note the filter is not
     // respected as our Mock objects do not respect them; this unit test only tests the command
     // is well-formed.
-    const BSONObj filter = BSON("ns" << BSON("$regex"
+    const BSONObj filter = BSON("ns" << BSON("$regexp"
                                              << "/^tenant_.*/"));
     auto oplogFetcher =
         getOplogFetcherAfterConnectionCreated(std::ref(shutdownState),

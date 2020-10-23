@@ -191,6 +191,12 @@ private:
      */
     void waitForDatabaseWorkToComplete();
 
+    /**
+     * Sets up tracking the lastVisibleOpTime from response metadata.
+     */
+    void setMetadataReader();
+    void unsetMetadataReader();
+
     // All member variables are labeled with one of the following codes indicating the
     // synchronization rules for accessing them.
     //

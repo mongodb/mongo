@@ -38,7 +38,7 @@ namespace mongo {
 namespace repl {
 
 BSONObj ClonerUtils::makeTenantDatabaseRegex(StringData prefix) {
-    return BSON("$regex"
+    return BSON("$regexp"
                 << "^" + prefix + "_");
 }
 
