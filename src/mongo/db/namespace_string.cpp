@@ -146,6 +146,9 @@ bool NamespaceString::isLegalClientSystemNS() const {
     if (isTemporaryReshardingCollection()) {
         return true;
     }
+    if (isTimeseriesBucketsCollection()) {
+        return true;
+    }
 
     return false;
 }
@@ -274,6 +277,15 @@ bool NamespaceString::isConfigDotCacheDotChunks() const {
 
 bool NamespaceString::isTemporaryReshardingCollection() const {
     return coll().startsWith(kTemporaryReshardingCollectionPrefix);
+}
+
+bool NamespaceString::isTimeseriesBucketsCollection() const {
+    return coll().startsWith(kTimeseriesBucketsCollectionPrefix);
+}
+
+NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
+    auto bucketsColl = kTimeseriesBucketsCollectionPrefix.toString() + coll();
+    return {db(), bucketsColl};
 }
 
 bool NamespaceString::isReplicated() const {

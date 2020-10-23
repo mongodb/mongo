@@ -76,6 +76,9 @@ public:
     // Prefix for temporary resharding collection.
     static constexpr StringData kTemporaryReshardingCollectionPrefix = "system.resharding."_sd;
 
+    // Prefix for time-series buckets collection.
+    static constexpr StringData kTimeseriesBucketsCollectionPrefix = "system.buckets."_sd;
+
     // Namespace for storing configuration data, which needs to be replicated if the server is
     // running as a replica set. Documents in this collection should represent some configuration
     // state of the server, which needs to be recovered/consulted at startup. Each document in this
@@ -306,6 +309,16 @@ public:
      * Returns whether the specified namespace is <database>.system.resharding.<>.
      */
     bool isTemporaryReshardingCollection() const;
+
+    /**
+     * Returns whether the specified namespace is <database>.system.buckets.<>.
+     */
+    bool isTimeseriesBucketsCollection() const;
+
+    /**
+     * Returns the time-series buckets namespace for this view.
+     */
+    NamespaceString makeTimeseriesBucketsNamespace() const;
 
     /**
      * Returns whether a namespace is replicated, based only on its string value. One notable
