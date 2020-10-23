@@ -31,7 +31,9 @@ global:
 
 server_parameters:
     maxAcceptableLogicalClockDriftSecs:
-        description: "The value defines the maximum time, in seconds, that a new logical time (such as $clusterTime) may be ahead of the node's current wallclock time. Default value is 1 year."
+        description: "The value defines the maximum time, in seconds, that a new logical time (such
+                      as $clusterTime) may be ahead of the node's current wallclock time. Default
+                      value is 1 year."
         set_at: [ startup ]
         cpp_vartype: long long
         cpp_varname: gMaxAcceptableLogicalClockDriftSecs
