@@ -53,6 +53,8 @@ selector:
   # These tests use legacy read mode which does not use runCommand.
   - jstests/core/comment_field.js
   - jstests/core/invalidated_legacy_cursors.js
+  # TODO (SERVER-51753): Handle applyOps running concurrently with a tenant migration.
+  - jstests/core/rename_stayTemp.js
 
 executor:
   archive:

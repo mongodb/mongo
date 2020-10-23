@@ -61,9 +61,12 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangWriteBeforeWaitingForMigrationDecision);
 
 void redactTooLongLog(mutablebson::Document* cmdObj, StringData fieldName) {
     namespace mmb = mutablebson;
@@ -166,10 +169,10 @@ void serializeReply(OperationContext* opCtx,
         } else if (ErrorCodes::isTenantMigrationError(status.code())) {
             if (ErrorCodes::TenantMigrationConflict == status.code()) {
                 auto migrationConflictInfo = status.extraInfo<TenantMigrationConflictInfo>();
-                auto& mtabRegistry =
-                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
-                auto mtab = mtabRegistry.getTenantMigrationAccessBlockerForTenantId(
-                    migrationConflictInfo->getTenantId());
+
+                hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
+
+                auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
 
                 auto migrationStatus = mtab->waitUntilCommittedOrAbortedNoThrow(opCtx);
                 error.append("code", static_cast<int>(migrationStatus.code()));

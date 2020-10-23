@@ -59,7 +59,7 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
             return;
         case Access::kBlockWrites:
         case Access::kBlockWritesAndReads:
-            uasserted(TenantMigrationConflictInfo(_tenantId),
+            uasserted(TenantMigrationConflictInfo(_tenantId, shared_from_this()),
                       "Write must block until this tenant migration commits or aborts");
         case Access::kReject:
             uasserted(TenantMigrationCommittedInfo(_tenantId, _recipientConnString),

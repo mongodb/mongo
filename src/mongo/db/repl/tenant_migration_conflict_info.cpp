@@ -43,12 +43,6 @@ constexpr StringData kTenantIdFieldName = "tenantId"_sd;
 
 }  // namespace
 
-BSONObj TenantMigrationConflictInfo::toBSON() const {
-    BSONObjBuilder bob;
-    serialize(&bob);
-    return bob.obj();
-}
-
 void TenantMigrationConflictInfo::serialize(BSONObjBuilder* bob) const {
     bob->append(kTenantIdFieldName, _tenantId);
 }

@@ -472,18 +472,20 @@ const testCases = {
         }
     },
     appendOplogNote: {skip: isNotRunOnUserDatabase},
-    applyOps: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {applyOps: [{op: "i", ns: dbName + "." + collName, o: {_id: 0}}]};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {_id: 0}), 1);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {_id: 0}), 0);
-        }
-    },
+
+    // TODO (SERVER-51753): Handle applyOps running concurrently with a tenant migration.
+    // applyOps: {
+    //     explicitlyCreateCollection: true,
+    //     command: function(dbName, collName) {
+    //         return {applyOps: [{op: "i", ns: dbName + "." + collName, o: {_id: 0}}]};
+    //     },
+    //     assertCommandSucceeded: function(db, dbName, collName) {
+    //         assert.eq(countDocs(db, collName, {_id: 0}), 1);
+    //     },
+    //     assertCommandFailed: function(db, dbName, collName) {
+    //         assert.eq(countDocs(db, collName, {_id: 0}), 0);
+    //     }
+    // },
     authenticate: {skip: isAuthCommand},
     availableQueryOptions: {skip: isNotWriteCommand},
     buildInfo: {skip: isNotWriteCommand},

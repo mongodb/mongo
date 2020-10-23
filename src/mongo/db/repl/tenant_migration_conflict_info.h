@@ -32,6 +32,7 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/repl/tenant_migration_access_blocker.h"
 
 namespace mongo {
 
@@ -39,18 +40,24 @@ class TenantMigrationConflictInfo final : public ErrorExtraInfo {
 public:
     static constexpr auto code = ErrorCodes::TenantMigrationConflict;
 
-    TenantMigrationConflictInfo(const std::string tenantId) : _tenantId(std::move(tenantId)){};
+    TenantMigrationConflictInfo(const std::string tenantId,
+                                std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
+        : _tenantId(std::move(tenantId)), _mtab(std::move(mtab)){};
 
     const auto& getTenantId() const {
         return _tenantId;
     }
 
-    BSONObj toBSON() const;
+    const auto& getTenantMigrationAccessBlocker() const {
+        return _mtab;
+    }
+
     void serialize(BSONObjBuilder* bob) const override;
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
     std::string _tenantId;
+    std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
 };
 using TenantMigrationConflictException = ExceptionFor<ErrorCodes::TenantMigrationConflict>;
 

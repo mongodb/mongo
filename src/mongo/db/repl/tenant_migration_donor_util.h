@@ -92,8 +92,6 @@ void migrationConflictHandler(OperationContext* opCtx,
                               rpc::ReplyBuilderInterface* replyBuilder) {
     checkIfCanReadOrBlock(opCtx, dbName);
 
-    auto& mtabRegistry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
-
     try {
         // callable will modify replyBuilder.
         callable();
@@ -113,8 +111,7 @@ void migrationConflictHandler(OperationContext* opCtx,
         auto migrationConflictInfo = ex.extraInfo<TenantMigrationConflictInfo>();
         invariant(migrationConflictInfo);
 
-        if (auto mtab = mtabRegistry.getTenantMigrationAccessBlockerForTenantId(
-                migrationConflictInfo->getTenantId())) {
+        if (auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker()) {
             mtab->waitUntilCommittedOrAborted(opCtx);
         }
     }
