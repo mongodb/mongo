@@ -251,13 +251,12 @@ void _reportValidationResults(OperationContext* opCtx,
                               BSONObjBuilder* keysPerIndex,
                               ValidateResults* results,
                               BSONObjBuilder* output) {
-    std::unique_ptr<BSONObjBuilder> indexDetails;
+    BSONObjBuilder indexDetails;
 
     results->readTimestamp = validateState->getValidateTimestamp();
 
     if (validateState->isFullIndexValidation()) {
         invariant(opCtx->lockState()->isCollectionLockedForMode(validateState->nss(), MODE_X));
-        indexDetails = std::make_unique<BSONObjBuilder>();
     }
 
     // Report detailed index validation results gathered when using {full: true} for validated
@@ -274,17 +273,15 @@ void _reportValidationResults(OperationContext* opCtx,
             results->valid = false;
         }
 
-        if (indexDetails) {
-            BSONObjBuilder bob(indexDetails->subobjStart(indexName));
-            bob.appendBool("valid", vr.valid);
+        BSONObjBuilder bob(indexDetails.subobjStart(indexName));
+        bob.appendBool("valid", vr.valid);
 
-            if (!vr.warnings.empty()) {
-                bob.append("warnings", vr.warnings);
-            }
+        if (!vr.warnings.empty()) {
+            bob.append("warnings", vr.warnings);
+        }
 
-            if (!vr.errors.empty()) {
-                bob.append("errors", vr.errors);
-            }
+        if (!vr.errors.empty()) {
+            bob.append("errors", vr.errors);
         }
 
         results->warnings.insert(results->warnings.end(), vr.warnings.begin(), vr.warnings.end());
@@ -293,9 +290,7 @@ void _reportValidationResults(OperationContext* opCtx,
 
     output->append("nIndexes", static_cast<int>(validateState->getIndexes().size()));
     output->append("keysPerIndex", keysPerIndex->done());
-    if (indexDetails) {
-        output->append("indexDetails", indexDetails->done());
-    }
+    output->append("indexDetails", indexDetails.done());
 }
 
 void _reportInvalidResults(OperationContext* opCtx,
