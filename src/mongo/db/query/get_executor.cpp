@@ -303,10 +303,8 @@ void fillOutPlannerParams(OperationContext* opCtx,
 
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-        auto collDesc = CollectionShardingState::get(opCtx, canonicalQuery->nss())
-                            ->getCollectionDescription(opCtx);
-        if (collDesc.isSharded()) {
-            const auto& keyPattern = collDesc.getKeyPattern();
+        if (collection.isSharded()) {
+            const auto& keyPattern = collection.getShardKeyPattern();
             ShardKeyPattern shardKeyPattern(keyPattern);
 
             // If the shard key is specified exactly, the query is guaranteed to only target one

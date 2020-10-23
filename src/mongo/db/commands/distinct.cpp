@@ -206,10 +206,7 @@ public:
                 "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
                 "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
                 "alternative.",
-                !opCtx->inMultiDocumentTransaction() ||
-                    !CollectionShardingState::get(opCtx, nss)
-                         ->getCollectionDescription(opCtx)
-                         .isSharded());
+                !opCtx->inMultiDocumentTransaction() || !ctx->getCollection().isSharded());
         }
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);

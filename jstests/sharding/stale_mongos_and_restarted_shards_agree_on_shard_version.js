@@ -212,10 +212,10 @@ const staleMongoS = st.s1;
     assert.eq(kNumThreadsForConvoyTest,
               freshMongoS.getDB(kDatabaseName).TestConvoyColl.countDocuments({a: 1}));
 
-    // Check if we're convoying counting the number of refresh.
+    // Check for the expected number of refreshes.
     const catalogCacheStatistics =
         st.shard0.adminCommand({serverStatus: 1}).shardingStatistics.catalogCache;
-    assert.eq(1, catalogCacheStatistics.countFullRefreshesStarted);
+    assert.eq(kNumThreadsForConvoyTest, catalogCacheStatistics.countFullRefreshesStarted);
     assert.eq(0, catalogCacheStatistics.countIncrementalRefreshesStarted);
 }
 

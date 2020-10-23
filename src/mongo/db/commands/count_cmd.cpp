@@ -177,11 +177,10 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto* const css = CollectionShardingState::get(opCtx, nss);
         boost::optional<ScopedCollectionFilter> rangePreserver;
-        if (css->getCollectionDescription(opCtx).isSharded()) {
+        if (collection.isSharded()) {
             rangePreserver.emplace(
-                CollectionShardingState::get(opCtx, nss)
+                CollectionShardingState::getSharedForLockFreeReads(opCtx, nss)
                     ->getOwnershipFilter(
                         opCtx,
                         CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));
@@ -245,11 +244,10 @@ public:
 
         // Prevent chunks from being cleaned up during yields - this allows us to only check the
         // version on initial entry into count.
-        auto* const css = CollectionShardingState::get(opCtx, nss);
         boost::optional<ScopedCollectionFilter> rangePreserver;
-        if (css->getCollectionDescription(opCtx).isSharded()) {
+        if (collection.isSharded()) {
             rangePreserver.emplace(
-                CollectionShardingState::get(opCtx, nss)
+                CollectionShardingState::getSharedForLockFreeReads(opCtx, nss)
                     ->getOwnershipFilter(
                         opCtx,
                         CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup));

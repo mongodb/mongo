@@ -2,7 +2,11 @@
 // Tests that serverStatus includes sharding statistics by default and the sharding statistics are
 // indeed the correct values. Does not test the catalog cache portion of sharding statistics.
 //
-// @tags: [uses_transactions]
+// @tags: [
+//     uses_transactions,
+//     # This test expects to block a migration by hanging (failpoint) a read that holds a lock.
+//     incompatible_with_lockfreereads,
+// ]
 
 (function() {
 'use strict';

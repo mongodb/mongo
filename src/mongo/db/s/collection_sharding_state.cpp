@@ -59,7 +59,7 @@ public:
         _factory->join();
     }
 
-    CollectionShardingState& getOrCreate(const NamespaceString& nss) {
+    std::shared_ptr<CollectionShardingState> getOrCreate(const NamespaceString& nss) {
         stdx::lock_guard<Latch> lg(_mutex);
 
         auto it = _collections.find(nss.ns());
@@ -69,7 +69,7 @@ public:
             it = std::move(inserted.first);
         }
 
-        return *it->second;
+        return it->second;
     }
 
     void appendInfoForShardingStateCommand(BSONObjBuilder* builder) {
@@ -121,13 +121,19 @@ CollectionShardingState* CollectionShardingState::get(OperationContext* opCtx,
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
 
     auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
-    return &collectionsMap->getOrCreate(nss);
+    return collectionsMap->getOrCreate(nss).get();
+}
+
+std::shared_ptr<CollectionShardingState> CollectionShardingState::getSharedForLockFreeReads(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    auto& collectionsMap = CollectionShardingStateMap::get(opCtx->getServiceContext());
+    return collectionsMap->getOrCreate(nss);
 }
 
 CollectionShardingState* CollectionShardingState::get_UNSAFE(ServiceContext* svcCtx,
                                                              const NamespaceString& nss) {
     auto& collectionsMap = CollectionShardingStateMap::get(svcCtx);
-    return &collectionsMap->getOrCreate(nss);
+    return collectionsMap->getOrCreate(nss).get();
 }
 
 void CollectionShardingState::appendInfoForShardingStateCommand(OperationContext* opCtx,

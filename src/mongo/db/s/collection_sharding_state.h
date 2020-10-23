@@ -74,6 +74,14 @@ public:
     static CollectionShardingState* get(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
+     * Obtain a pointer to the CollectionShardingState that remains safe to access without holding
+     * a collection lock. Should be called instead of the regular get() if no collection lock is
+     * held. The returned CollectionShardingState instance should not be modified!
+     */
+    static std::shared_ptr<CollectionShardingState> getSharedForLockFreeReads(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
      * Reports all collections which have filtering information associated.
      */
     static void appendInfoForShardingStateCommand(OperationContext* opCtx, BSONObjBuilder* builder);

@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/util/fail_point.h"
@@ -150,6 +151,16 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
             }
         }
 
+        // Fetch and store the sharding collection description data needed for use during the
+        // operation. The shardVersion will be checked later if the shard filtering metadata is
+        // fetched, ensuring both that the collection description info used here and the routing
+        // table are consistent with the read request's shardVersion.
+        auto collDesc =
+            CollectionShardingState::get(opCtx, getNss())->getCollectionDescription(opCtx);
+        if (collDesc.isSharded()) {
+            _coll.setShardKeyPattern(collDesc.getKeyPattern());
+        }
+
         // If the collection exists, there is no need to check for views.
         return;
     }
@@ -232,9 +243,26 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
                                        return _collection.get();
                                    });
 
-    // TODO (SERVER-51319): add DatabaseShardingState::checkDbVersion somewhere.
+    {
+        // Check that the sharding database version matches our read.
+        // Note: this must always be checked, regardless of whether the collection exists, so that
+        // the dbVersion of this node or the caller gets updated quickly in case either is stale.
+        auto dss = DatabaseShardingState::getSharedForLockFreeReads(opCtx, _resolvedNss.db());
+        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss.get());
+        dss->checkDbVersion(opCtx, dssLock);
+    }
 
     if (_collection) {
+        // Fetch and store the sharding collection description data needed for use during the
+        // operation. The shardVersion will be checked later if the shard filtering metadata is
+        // fetched, ensuring both that the collection description info fetched here and the routing
+        // table are consistent with the read request's shardVersion.
+        auto collDesc = CollectionShardingState::getSharedForLockFreeReads(opCtx, _collection->ns())
+                            ->getCollectionDescription(opCtx);
+        if (collDesc.isSharded()) {
+            _collectionPtr.setShardKeyPattern(collDesc.getKeyPattern());
+        }
+
         // If the collection exists, there is no need to check for views.
         return;
     }

@@ -52,7 +52,7 @@ public:
 
     DatabaseShardingStateMap() {}
 
-    DatabaseShardingState& getOrCreate(const StringData dbName) {
+    std::shared_ptr<DatabaseShardingState> getOrCreate(const StringData dbName) {
         stdx::lock_guard<Latch> lg(_mutex);
 
         auto it = _databases.find(dbName);
@@ -63,7 +63,7 @@ public:
             it = std::move(inserted.first);
         }
 
-        return *it->second;
+        return it->second;
     }
 
 private:
@@ -87,7 +87,13 @@ DatabaseShardingState* DatabaseShardingState::get(OperationContext* opCtx,
     dassert(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
 
     auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
-    return &databasesMap.getOrCreate(dbName);
+    return databasesMap.getOrCreate(dbName).get();
+}
+
+std::shared_ptr<DatabaseShardingState> DatabaseShardingState::getSharedForLockFreeReads(
+    OperationContext* opCtx, const StringData dbName) {
+    auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
+    return databasesMap.getOrCreate(dbName);
 }
 
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx, DSSLock&) {

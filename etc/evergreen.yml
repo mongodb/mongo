@@ -11034,14 +11034,17 @@ buildvariants:
   - name: compile_TG
     distros:
     - rhel62-large
-  - name: .aggregation !.sharded
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.sharded
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.sharded
+  - name: .aggregation
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel62-medium
-  - name: .jscore .common !.sharding
-  - name: .misc_js !.sharded
+  - name: .jscore .common
+  - name: .misc_js
   - name: .replica_sets
+  - name: .sharding .common
+  - name: .sharding .jscore
+  - name: .sharding .txns
 
 - name: enterprise-rhel-62-64-bit-time-series-collection
   display_name: "Enterprise RHEL 6.2 (Time-series Collection)"

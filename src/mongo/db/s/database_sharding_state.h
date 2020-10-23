@@ -66,6 +66,14 @@ public:
     static DatabaseShardingState* get(OperationContext* opCtx, const StringData dbName);
 
     /**
+     * Obtain a pointer to the DatabaseShardingState that remains safe to access without holding
+     * a database lock. Should be called instead of the regular get() if no database lock is held.
+     * The returned DatabaseShardingState instance should not be modified!
+     */
+    static std::shared_ptr<DatabaseShardingState> getSharedForLockFreeReads(
+        OperationContext* opCtx, const StringData dbName);
+
+    /**
      * Methods to control the databases's critical section. Must be called with the database X lock
      * held.
      */

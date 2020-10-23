@@ -117,9 +117,12 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             ON_BLOCK_EXIT([&] {
                 UninterruptibleLockGuard noInterrupt(opCtx->lockState());
                 // A view can potentially be created after spawning a thread to recover nss's shard
-                // version. It is then ok to lock also views in order to clear filtering metadata.
-                AutoGetCollection autoColl(
-                    opCtx, nss, MODE_IX, AutoGetCollectionViewMode::kViewsPermitted);
+                // version. It is then ok to lock views in order to clear filtering metadata.
+                //
+                // DBLock and CollectionLock are used here to avoid throwing further recursive stale
+                // config errors.
+                Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
+                Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
                 auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
@@ -161,7 +164,8 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 // Return true if joins a shard version update/recover/refresh (in that case, all locks are dropped)
 bool joinShardVersionOperation(OperationContext* opCtx,
                                CollectionShardingRuntime* csr,
-                               boost::optional<AutoGetCollection>* collLock,
+                               boost::optional<Lock::DBLock>* dbLock,
+                               boost::optional<Lock::CollectionLock>* collLock,
                                boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
     invariant(collLock->has_value());
     invariant(csrLock->has_value());
@@ -176,6 +180,7 @@ bool joinShardVersionOperation(OperationContext* opCtx,
         // Drop the locks and wait for an ongoing shard version's recovery/refresh/update
         csrLock->reset();
         collLock->reset();
+        dbLock->reset();
 
         if (critSecSignal) {
             critSecSignal->get(opCtx);
@@ -214,14 +219,16 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
     boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
     while (true) {
-        boost::optional<AutoGetCollection> autoColl;
-        autoColl.emplace(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
+        boost::optional<Lock::DBLock> dbLock;
+        boost::optional<Lock::CollectionLock> collLock;
+        dbLock.emplace(opCtx, nss.db(), MODE_IS);
+        collLock.emplace(opCtx, nss, MODE_IS);
 
         auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
         boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
             CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
-        if (joinShardVersionOperation(opCtx, csr, &autoColl, &csrLock)) {
+        if (joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
             continue;
         }
 
@@ -243,7 +250,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
         // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
         // thread and associate it to the CSR.
-        if (!joinShardVersionOperation(opCtx, csr, &autoColl, &csrLock)) {
+        if (!joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
             // If the shard doesn't yet know its filtering metadata, recovery needs to be run
             const bool runRecover = metadata ? false : true;
             csr->setShardVersionRecoverRefreshFuture(
@@ -261,21 +268,27 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
     : _opCtx(opCtx), _nss(std::move(nss)) {
 
     while (true) {
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "Namespace " << nss << " is not a valid collection name",
+                _nss.isValid());
+
         // This acquisition is performed with collection lock MODE_S in order to ensure that any
-        // ongoing writes have completed and become visible
-        boost::optional<AutoGetCollection> autoColl;
-        autoColl.emplace(_opCtx,
-                         _nss,
-                         MODE_S,
-                         AutoGetCollectionViewMode::kViewsForbidden,
-                         _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                             Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+        // ongoing writes have completed and become visible.
+        //
+        // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
+        // errors.
+        boost::optional<Lock::DBLock> dbLock;
+        boost::optional<Lock::CollectionLock> collLock;
+        auto deadline = _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+            Milliseconds(migrationLockAcquisitionMaxWaitMS.load());
+        dbLock.emplace(_opCtx, _nss.db(), MODE_IS, deadline);
+        collLock.emplace(_opCtx, _nss, MODE_S, deadline);
 
         auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
         boost::optional<CollectionShardingRuntime::CSRLock> csrLock =
             CollectionShardingRuntime::CSRLock::lockShared(_opCtx, csr);
 
-        if (joinShardVersionOperation(_opCtx, csr, &autoColl, &csrLock)) {
+        if (joinShardVersionOperation(_opCtx, csr, &dbLock, &collLock, &csrLock)) {
             continue;
         }
 
@@ -283,7 +296,8 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
         auto metadata = csr->getCurrentMetadataIfKnown();
         if (!metadata) {
             csrLock.reset();
-            autoColl.reset();
+            collLock.reset();
+            dbLock.reset();
             onShardVersionMismatch(_opCtx, _nss, boost::none);
             continue;
         }
@@ -291,7 +305,7 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
         csrLock.reset();
         csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr));
 
-        if (!joinShardVersionOperation(_opCtx, csr, &autoColl, &csrLock)) {
+        if (!joinShardVersionOperation(_opCtx, csr, &dbLock, &collLock, &csrLock)) {
             CollectionShardingRuntime::get(_opCtx, _nss)
                 ->enterCriticalSectionCatchUpPhase(*csrLock);
             break;
@@ -303,18 +317,21 @@ ScopedShardVersionCriticalSection::ScopedShardVersionCriticalSection(OperationCo
 
 ScopedShardVersionCriticalSection::~ScopedShardVersionCriticalSection() {
     UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-    AutoGetCollection autoColl(_opCtx, _nss, MODE_IX);
+    // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
+    // errors.
+    Lock::DBLock dbLock(_opCtx, _nss.db(), MODE_IX);
+    Lock::CollectionLock collLock(_opCtx, _nss, MODE_IX);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     csr->exitCriticalSection(_opCtx);
 }
 
 void ScopedShardVersionCriticalSection::enterCommitPhase() {
-    AutoGetCollection autoColl(_opCtx,
-                               _nss,
-                               MODE_IS,
-                               AutoGetCollectionViewMode::kViewsForbidden,
-                               _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                   Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+    auto deadline = _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+        Milliseconds(migrationLockAcquisitionMaxWaitMS.load());
+    // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
+    // errors.
+    Lock::DBLock dbLock(_opCtx, _nss.db(), MODE_IS, deadline);
+    Lock::CollectionLock collLock(_opCtx, _nss, MODE_IS, deadline);
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
     csr->enterCriticalSectionCommitPhase(csrLock);
@@ -382,9 +399,10 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
 
     if (!cm.isSharded()) {
-        // The collection is not sharded. Avoid using AutoGetCollection() as it returns the
-        // InvalidViewDefinition error code if an invalid view is in the 'system.views' collection.
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+        // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
+        // errors, as well as a possible InvalidViewDefinition error if an invalid view is in the
+        // 'system.views' collection.
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss)
             ->setFilteringMetadata(opCtx, CollectionMetadata());
@@ -395,9 +413,10 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     // Optimistic check with only IS lock in order to avoid threads piling up on the collection X
     // lock below
     {
-        // Avoid using AutoGetCollection() as it returns the InvalidViewDefinition error code
-        // if an invalid view is in the 'system.views' collection.
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
+        // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
+        // errors, as well as a possible InvalidViewDefinition error if an invalid view is in the
+        // 'system.views' collection.
+        Lock::DBLock dbLock(opCtx, nss.db(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
         auto optMetadata = CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
 
@@ -421,10 +440,12 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         }
     }
 
-    // Exclusive collection lock needed since we're now changing the metadata. Avoid using
-    // AutoGetCollection() as it returns the InvalidViewDefinition error code if an invalid view is
-    // in the 'system.views' collection.
-    AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+    // Exclusive collection lock needed since we're now changing the metadata.
+    //
+    // DBLock and CollectionLock are used here to avoid throwing further recursive stale config
+    // errors, as well as a possible InvalidViewDefinition error if an invalid view is in the
+    // 'system.views' collection.
+    Lock::DBLock dbLock(opCtx, nss.db(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 

@@ -207,7 +207,9 @@ protected:
  * object goes out of scope. This object ensures the continued existence of a Collection reference,
  * if the collection exists when this object is instantiated.
  *
- * This class is only used by AutoGetCollectionForReadLockFree.
+ * NOTE: this class is not safe to instantiate outside of AutoGetCollectionForReadLockFree. For
+ * example, it does not perform database or collection level shard version checks; nor does it
+ * establish a consistent storage snapshot with which to read.
  */
 class AutoGetCollectionLockFree {
     AutoGetCollectionLockFree(const AutoGetCollectionLockFree&) = delete;

@@ -6,7 +6,6 @@
  *   do_not_wrap_aggregations_in_facets,
  *   requires_replication,
  *   requires_sharding,
- *   incompatible_with_lockfreereads, // SERVER-51319
  * ]
  */
 

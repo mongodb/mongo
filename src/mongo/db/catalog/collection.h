@@ -660,6 +660,15 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll);
 
+    void setShardKeyPattern(const BSONObj& shardKeyPattern) {
+        _shardKeyPattern = shardKeyPattern.getOwned();
+    }
+    const BSONObj& getShardKeyPattern() const;
+
+    bool isSharded() const {
+        return static_cast<bool>(_shardKeyPattern);
+    }
+
 private:
     bool _canYield() const;
 
@@ -670,6 +679,10 @@ private:
 
     OperationContext* _opCtx;
     RestoreFn _restoreFn;
+
+    // Stores a consistent view of shard key with the collection that will be needed during the
+    // operation. If _shardKeyPattern is set, that indicates that the collection is sharded.
+    boost::optional<BSONObj> _shardKeyPattern = boost::none;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {

@@ -169,7 +169,7 @@ profilerHasSingleMatchingEntryOrThrow({
     filter: {
         ns: sourceCollection.getFullName(),
         errCode: ErrorCodes.StaleConfig,
-        errMsg: {$regex: `${foreignCollection.getFullName()} is not currently known`}
+        errMsg: {$regex: `${foreignCollection.getFullName()} is not currently available`}
     }
 });
 
