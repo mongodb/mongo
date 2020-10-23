@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because of following errmsg: A single
 // update/delete on a sharded collection must contain an exact match on _id or contain the shard
 // key.
-// @tags: [assumes_unsharded_collection, requires_non_retryable_writes, requires_fcv_47]
+// @tags: [assumes_unsharded_collection, requires_non_retryable_writes]
 
 // Basic examples for $bit
 var res;
@@ -32,10 +32,3 @@ assert.eq(coll.findOne().a, 4);
 // SERVER-19706 Empty bit operation.
 res = coll.update({}, {$bit: {a: {}}});
 assert.writeError(res);
-
-// Make sure $bit on index arrays 9 and 10 when padding is needed works.
-assert.commandWorked(coll.insert({_id: 2, a: [0]}));
-assert.commandWorked(
-    coll.update({_id: 2}, {$bit: {"a.9": {or: NumberInt(0)}, "a.10": {or: NumberInt(0)}}}));
-res = coll.find({_id: 2}).toArray();
-assert.eq(res[0]["a"], [0, null, null, null, null, null, null, null, null, 0, 0]);

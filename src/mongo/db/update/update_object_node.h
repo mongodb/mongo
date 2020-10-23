@@ -39,7 +39,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/update/modifier_table.h"
-#include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_internal_node.h"
 #include "mongo/stdx/unordered_map.h"
 
@@ -127,12 +126,12 @@ public:
         visitor->visit(this);
     }
 
-    const auto& getChildren() const {
+    const std::map<std::string, clonable_ptr<UpdateNode>>& getChildren() const {
         return _children;
     }
 
 private:
-    std::map<std::string, clonable_ptr<UpdateNode>, pathsupport::cmpPathsAndArrayIndexes> _children;
+    std::map<std::string, clonable_ptr<UpdateNode>> _children;
     clonable_ptr<UpdateNode> _positionalChild;
 
     // When calling apply() causes us to merge an element of '_children' with '_positionalChild', we
