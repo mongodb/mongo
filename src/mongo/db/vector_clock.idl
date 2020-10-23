@@ -29,7 +29,6 @@
 global:
     cpp_namespace: "mongo"
 
-# TODO SERVER-48435: Rename this file to vector_clock.idl (but keep the parameter name the same).
 server_parameters:
     maxAcceptableLogicalClockDriftSecs:
         description: "The value defines the maximum time, in seconds, that a new logical time (such as $clusterTime) may be ahead of the node's current wallclock time. Default value is 1 year."

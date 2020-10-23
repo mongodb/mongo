@@ -33,9 +33,9 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/logical_clock_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/vector_clock_document_gen.h"
+#include "mongo/db/vector_clock_gen.h"
 #include "mongo/util/static_immortal.h"
 
 namespace mongo {

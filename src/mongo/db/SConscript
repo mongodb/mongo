@@ -1674,7 +1674,7 @@ env.Library(
         'logical_time_validator.cpp',
         'vector_clock.cpp',
         'keys_collection_manager.idl',
-        'logical_clock.idl',
+        'vector_clock.idl',
         'vector_clock_document.idl',
     ],
     LIBDEPS=[
