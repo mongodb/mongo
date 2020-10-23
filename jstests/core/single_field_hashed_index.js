@@ -6,6 +6,7 @@
  *   assumes_no_implicit_index_creation,
  *   requires_fastcount,
  *   sbe_incompatible,
+ *   requires_fcv_49,
  * ]
  */
 (function() {
@@ -66,6 +67,10 @@ assert(isIxscan(db, explain.queryPlanner.winningPlan), "not using hashed index")
 explain = t.find({$and: [{a: {$in: [1, 2]}}, {a: {$gt: 1}}]}).explain();
 assert(isIxscan(db, explain.queryPlanner.winningPlan), "not using hashed index");
 
+// Non-sparse hashed index can be used to satisfy {$exists: false}.
+explain = t.find({a: {$exists: false}}).explain();
+assert(isIxscan(db, explain.queryPlanner.winningPlan), explain);
+
 // Test creation of index based on hash of _id index.
 const indexSpec2 = {
     '_id': "hashed"
@@ -84,6 +89,10 @@ const sparseIndex = {
 };
 assert.commandWorked(t.createIndex(sparseIndex, {"sparse": true}));
 assert.eq(t.getIndexes().length, 4, "sparse index didn't get created");
+
+// Sparse hashed indexes cannot be used to satisfy {$exists: false}.
+explain = t.find({b: {$exists: false}}).explain();
+assert(!isIxscan(db, explain.queryPlanner.winningPlan), explain);
 
 // Test sparse index has smaller total items on after inserts.
 for (let i = 0; i < 10; i++) {

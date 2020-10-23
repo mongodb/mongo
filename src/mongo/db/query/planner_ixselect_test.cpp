@@ -1293,6 +1293,42 @@ TEST(QueryPlannerIXSelectTest, HashedIndexShouldNotBeRelevantForNotEqualsNullPre
     testRateIndices("{a: {$ne: null}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
 }
 
+TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForExistsFalse) {
+    auto entry = buildSimpleIndexEntry(BSON("a"
+                                            << "hashed"));
+    entry.type = IndexType::INDEX_HASHED;
+    entry.sparse = true;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$exists: false}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldNotBeRelevantForEqualsNull) {
+    auto entry = buildSimpleIndexEntry(BSON("a"
+                                            << "hashed"));
+    entry.type = IndexType::INDEX_HASHED;
+    entry.sparse = true;
+    std::set<size_t> expectedIndices = {};
+    testRateIndices("{a: {$eq: null}}", "", kSimpleCollator, {entry}, "a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, HashedNonSparseIndexShouldBeRelevantForExistsFalse) {
+    auto entry = buildSimpleIndexEntry(BSON("a"
+                                            << "hashed"));
+    entry.type = IndexType::INDEX_HASHED;
+    entry.sparse = false;
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$exists: false}}", "", kSimpleCollator, {entry}, "a,a", expectedIndices);
+}
+
+TEST(QueryPlannerIXSelectTest, HashedSparseIndexShouldBeRelevantForExistsTrue) {
+    auto entry = buildSimpleIndexEntry(BSON("a"
+                                            << "hashed"));
+    entry.type = IndexType::INDEX_HASHED;
+    entry.sparse = true;
+    std::set<size_t> expectedIndices = {0};
+    testRateIndices("{a: {$exists: true}}", "", kSimpleCollator, {entry}, "a", expectedIndices);
+}
+
 /*
  * Will compare 'keyPatterns' with 'entries'. As part of comparing, it will sort both of them.
  */

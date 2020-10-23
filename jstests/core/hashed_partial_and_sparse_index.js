@@ -4,6 +4,7 @@
  * prefix.
  * @tags: [
  *   sbe_incompatible,
+ *   requires_fcv_49,
  * ]
  */
 (function() {
@@ -37,24 +38,45 @@ function validateFindCmdOutputAndPlan({filter, expectedStages, expectedOutput}) 
     assertStagesForExplainOfCommand({coll: coll, cmdObj: cmdObj, expectedStages: expectedStages});
 }
 
+function testSparseHashedIndex(indexSpec) {
+    assert.commandWorked(coll.dropIndexes());
+    assert.commandWorked(coll.createIndex(indexSpec, {sparse: true}));
+
+    // Verify index not used for null/missing queries with sparse index.
+    validateFindCmdOutputAndPlan({filter: {a: null}, expectedStages: ["COLLSCAN"]});
+    validateFindCmdOutputAndPlan({filter: {a: {$exists: false}}, expectedStages: ["COLLSCAN"]});
+
+    // Verify index can be used for non-null queries with sparse index.
+    validateFindCmdOutputAndPlan({
+        filter: {a: {$exists: true}},
+        expectedOutput: [{a: null}, {a: 1}, {a: 1, b: 6}],
+        expectedStages: ["IXSCAN", "FETCH"]
+    });
+
+    validateFindCmdOutputAndPlan({
+        filter: {a: 1, b: 6},
+        expectedOutput: [{a: 1, b: 6}],
+        expectedStages: ["IXSCAN", "FETCH"]
+    });
+
+    // Test {$exists: false} when hashed field is not a prefix and index is sparse.
+    validateFindCmdOutputAndPlan({
+        filter: {a: {$exists: false}},
+        expectedOutput: [{b: 4}, {}],
+        expectedStages: ["COLLSCAN"],
+        stagesNotExpected: ["IXSCAN"]
+    });
+}
+
 /**
- * Tests for sparse indexes.
+ * Tests sparse indexes with non-hashed prefix.
  */
-assert.commandWorked(coll.createIndex({a: 1, b: "hashed", c: -1}, {sparse: true}));
+testSparseHashedIndex({a: 1, b: "hashed", c: -1});
 
-// Verify index not used for null/missing queries with sparse index.
-validateFindCmdOutputAndPlan({filter: {a: null}, expectedStages: ["COLLSCAN"]});
-validateFindCmdOutputAndPlan({filter: {a: {$exists: false}}, expectedStages: ["COLLSCAN"]});
-
-// Verify index can be used for non-null queries with sparse index.
-validateFindCmdOutputAndPlan({
-    filter: {a: {$exists: true}},
-    expectedOutput: [{a: null}, {a: 1}, {a: 1, b: 6}],
-    expectedStages: ["IXSCAN", "FETCH"]
-});
-
-validateFindCmdOutputAndPlan(
-    {filter: {a: 1, b: 6}, expectedOutput: [{a: 1, b: 6}], expectedStages: ["IXSCAN", "FETCH"]});
+/**
+ * Test sparse indexes with hashed prefix.
+ */
+testSparseHashedIndex({a: "hashed", b: 1});
 
 /**
  * Tests for partial indexes.
