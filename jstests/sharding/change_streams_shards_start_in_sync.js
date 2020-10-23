@@ -78,7 +78,7 @@ let waitForShell = startParallelShell(checkStream, st.s1.port);
 
 // Wait for the aggregate cursor to appear in currentOp on the current shard.
 function waitForShardCursor(rs) {
-    assert.soon(() => st.rs0.getPrimary()
+    assert.soon(() => rs.getPrimary()
                           .getDB('admin')
                           .aggregate([
                               {"$currentOp": {"idleCursors": true}},
