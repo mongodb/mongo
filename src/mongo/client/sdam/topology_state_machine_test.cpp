@@ -184,14 +184,12 @@ TEST_F(TopologyStateMachineTestFixture,
                                  .instance();
 
     ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
-    auto serversBefore = map<ServerDescriptionPtr, HostAndPort>(topologyDescription->getServers(),
-                                                                getServerDescriptionAddress);
+    auto serversBefore = map(topologyDescription->getServers(), getServerDescriptionAddress);
 
     stateMachine.onServerDescription(*topologyDescription, serverDescription);
 
-    auto serversAfter = map<ServerDescriptionPtr, HostAndPort>(topologyDescription->getServers(),
-                                                               getServerDescriptionAddress);
-    ASSERT_EQUALS(serversBefore, serversAfter);
+    auto serversAfter = map(topologyDescription->getServers(), getServerDescriptionAddress);
+    ASSERT_EQUALS(adaptForAssert(serversBefore), adaptForAssert(serversAfter));
 }
 
 TEST_F(TopologyStateMachineTestFixture,
@@ -259,15 +257,14 @@ TEST_F(TopologyStateMachineTestFixture,
     ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
     ASSERT_EQUALS(static_cast<size_t>(2), topologyDescription->getServers().size());
 
-    auto serversBefore = map<ServerDescriptionPtr, HostAndPort>(topologyDescription->getServers(),
-                                                                getServerDescriptionAddress);
+    auto serversBefore = map(topologyDescription->getServers(), getServerDescriptionAddress);
 
     stateMachine.onServerDescription(*topologyDescription, serverDescription);
-    ASSERT_EQUALS(topologyDescription->getType(), TopologyType::kReplicaSetWithPrimary);
+    ASSERT_EQUALS(adaptForAssert(topologyDescription->getType()),
+                  adaptForAssert(TopologyType::kReplicaSetWithPrimary));
 
-    auto serversAfter = map<ServerDescriptionPtr, HostAndPort>(topologyDescription->getServers(),
-                                                               getServerDescriptionAddress);
-    ASSERT_EQUALS(serversBefore, serversAfter);
+    auto serversAfter = map(topologyDescription->getServers(), getServerDescriptionAddress);
+    ASSERT_EQUALS(adaptForAssert(serversBefore), adaptForAssert(serversAfter));
 }
 
 TEST_F(TopologyStateMachineTestFixture,

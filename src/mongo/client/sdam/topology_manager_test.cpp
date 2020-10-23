@@ -35,10 +35,8 @@
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo {
-template std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& s);
 
 namespace sdam {
-using mongo::operator<<;
 
 class TopologyManagerTestFixture : public SdamTestFixture {
 protected:

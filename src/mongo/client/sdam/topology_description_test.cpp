@@ -41,15 +41,12 @@
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
-template std::ostream& operator<<(std::ostream& os, const std::vector<HostAndPort>& s);
 
 bool operator==(const TopologyVersion& a, const TopologyVersion& b) {
     return a.getProcessId() == b.getProcessId() && a.getCounter() == b.getCounter();
 }
 
 namespace sdam {
-using mongo::operator<<;
-
 
 class TopologyDescriptionTestFixture : public SdamTestFixture {
 protected:
@@ -106,7 +103,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldHaveCorrectDefaultValues) {
 //
 //    auto expectedAddresses = kTwoServersNormalCase;
 //
-//    auto serverAddresses = map<ServerDescriptionPtr, HostAndPort>(
+//    auto serverAddresses = map(
 //        topologyDescription.getServers(),
 //        [](const ServerDescriptionPtr& description) { return description->getAddress(); });
 //
@@ -118,10 +115,9 @@ TEST_F(TopologyDescriptionTestFixture, ShouldAllowTypeSingleWithASingleSeed) {
 
     ASSERT(TopologyType::kSingle == topologyDescription.getType());
 
-    auto servers = map<ServerDescriptionPtr, HostAndPort>(
-        topologyDescription.getServers(),
-        [](const ServerDescriptionPtr& desc) { return desc->getAddress(); });
-    ASSERT_EQUALS(kOneServer, servers);
+    auto servers =
+        map(topologyDescription.getServers(), [](const auto& desc) { return desc->getAddress(); });
+    ASSERT_EQUALS(adaptForAssert(kOneServer), adaptForAssert(servers));
 }
 
 TEST_F(TopologyDescriptionTestFixture, DoesNotAllowMultipleSeedsWithSingle) {
@@ -244,7 +240,7 @@ TEST_F(TopologyDescriptionTestFixture, ShouldSetLogicalSessionTimeoutToMinOfAllS
 
     const auto logicalSessionTimeouts = std::vector{300, 100, 200};
     auto timeoutIt = logicalSessionTimeouts.begin();
-    const auto serverDescriptionsWithTimeouts = map<ServerDescriptionPtr, ServerDescriptionPtr>(
+    const auto serverDescriptionsWithTimeouts = map(
         topologyDescription->getServers(), [&timeoutIt](const ServerDescriptionPtr& description) {
             auto newInstanceBuilder = ServerDescriptionBuilder()
                                           .withType(ServerType::kRSSecondary)
@@ -274,8 +270,8 @@ TEST_F(TopologyDescriptionTestFixture,
     const auto logicalSessionTimeouts = std::vector{300, 100, 200};
     auto timeoutIt = logicalSessionTimeouts.begin();
 
-    const auto serverDescriptionsWithTimeouts = map<ServerDescriptionPtr, ServerDescriptionPtr>(
-        topologyDescription->getServers(), [&](const ServerDescriptionPtr& description) {
+    const auto serverDescriptionsWithTimeouts =
+        map(topologyDescription->getServers(), [&](const ServerDescriptionPtr& description) {
             auto timeoutValue = (timeoutIt == logicalSessionTimeouts.begin())
                 ? boost::none
                 : boost::make_optional(*timeoutIt);
@@ -341,5 +337,5 @@ TEST_F(TopologyDescriptionTestFixture, ShouldNotUpdateTopologyVersionOnError) {
     auto topologyVersion = topologyDescription->getServers()[1]->getTopologyVersion();
     ASSERT(topologyVersion == boost::none);
 }
-};  // namespace sdam
-};  // namespace mongo
+}  // namespace sdam
+}  // namespace mongo

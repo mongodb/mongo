@@ -39,6 +39,7 @@
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo::sdam {
@@ -212,8 +213,7 @@ class ServerDescriptionTestFixture : public SdamTestFixture {
 protected:
     // returns a set containing the elements in the given bson array with lowercase values.
     std::set<std::string> toHostSet(std::vector<BSONElement> bsonArray) {
-        return mapSet<BSONElement, std::string>(
-            bsonArray, [](const BSONElement& e) { return boost::to_lower_copy(e.String()); });
+        return mapSet(bsonArray, [](const BSONElement& e) { return str::toLower(e.String()); });
     }
 
     std::map<std::string, std::string> toStringMap(BSONObj bsonObj) {
@@ -466,7 +466,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreTags) {
     auto response = HelloOutcome(
         HostAndPort("foo:1234"), kBsonTags, duration_cast<HelloRTT>(mongo::Milliseconds(40)));
     auto description = ServerDescription(clockSource, response);
-    ASSERT_EQUALS(toStringMap(kBsonTags["tags"].Obj()), description.getTags());
+    ASSERT_EQUALS(adaptForAssert(toStringMap(kBsonTags["tags"].Obj())),
+                  adaptForAssert(description.getTags()));
 }
 
 TEST_F(ServerDescriptionTestFixture, ShouldStoreSetVersionAndName) {
