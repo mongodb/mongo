@@ -10780,6 +10780,33 @@ buildvariants:
   - name: jsCore
   - name: .replica_sets
 
+- name: enterprise-rhel-62-64-bit-time-series-collection
+  display_name: "Enterprise RHEL 6.2 (Time-series Collection)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel62-small
+  expansions: &enterprise-rhel-62-64-bit-time-series-collection-expansions
+    test_flags: >-
+      --mongodSetParameters="{featureFlagTimeSeriesCollection: true}"
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      MONGO_DISTMOD=rhel62
+    multiversion_platform: rhel62
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    build_mongoreplay: false
+    large_distro_name: rhel62-large
+  tasks:
+  - name: burn_in_tests_gen
+  - name: compile_TG
+    distros:
+    - rhel62-large
+  - name: jsCore
+
 - name: enterprise-rhel-62-64-bit-operation-resource-consumption-metrics
   display_name: "Enterprise RHEL 6.2 Shared Library (Operation Resource Consumption Metrics)"
   modules:

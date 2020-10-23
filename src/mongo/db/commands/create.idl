@@ -28,9 +28,44 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+    - "mongo/db/commands/create_command_validation.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
+
+structs:
+    IndexOptionDefaults:
+        description: "The default configuration for indexes per storage engine."
+        strict: true
+        fields:
+            storageEngine:
+                description: "The index options for the specified storage engines."
+                type: object_owned
+                optional: true
+                validator:
+                    callback: create_command_validation::validateStorageEngineOptions
+
+    TimeseriesOptions:
+        description: "The options that define a time-series collection."
+        strict: true
+        fields:
+            timeField:
+                description: "The name of the field to be used for time. Inserted documents must
+                              have this field, and the field must be of the BSON UTC datetime type
+                              (0x9)"
+                type: string
+            metaField:
+                description: "The name of the field describing the series. This field is used to
+                              group related data and may be of any BSON type. This may not be
+                              \"_id\" or the same as 'timeField'."
+                type: string
+                optional: true
+            expireAfterSeconds:
+                description: "The number of seconds after which old time-series data should be
+                              deleted."
+                type: long
+                optional: true
 
 commands:
     create:
@@ -57,11 +92,16 @@ commands:
                 description: "Specify a maximum size in bytes for the capped collection."
                 type: safeInt64
                 optional: true
+                validator:
+                    gte: 1
+                    lte: 1125899906842624  # 1 PB
             max:
                 description: "The maximum number of documents allowed in the capped collection. The
                               'size' limit takes precedence over this limit."
                 type: safeInt64
                 optional: true
+                validator:
+                    lt: 2147483648  # 2^31
             storageEngine:
                 description: "Specify a configuration to the storage engine on a per-collection
                               basis when creating a collection."
@@ -76,23 +116,25 @@ commands:
                               documents during an update.
                               Can be one of following values: 'off', 'strict' or 'moderate'."
                 type: string
-                default: '"strict"'
+                optional: true
             validationAction:
                 description: "Determines whether to error on invalid documents or just warn about
                               the violations but allow invalid documents to be inserted.
                               Can be either 'warn' or 'error'."
                 type: string
-                default: '"error"'
+                optional: true
             indexOptionDefaults:
                 description: "Allows users to specify a default configuration for indexes when
                               creating a collection."
-                type: object
+                type: IndexOptionDefaults
                 optional: true
             viewOn:
                 description: "The name of the source collection or view from which to create the 
                               view."
                 type: string
                 optional: true
+                validator:
+                    callback: create_command_validation::validateViewOnNotEmpty
             pipeline:
                 description: "An array that consists of the aggregation pipeline. Creates the view
                               by applying the specified pipeline to the 'viewOn' collection or 
@@ -103,6 +145,8 @@ commands:
                 description: "Specifies the default collation for the collection or the view."
                 type: object
                 optional: true
+                validator:
+                    callback: create_command_validation::validateCollationNotEmpty
             writeConcern:
                 description: "A document that expresses the write concern for the operation."
                 type: object
@@ -111,6 +155,10 @@ commands:
                 description: "Sets whether updates/deletes should store the pre-image of the
                               document in the oplog"
                 type: safeBool
+                optional: true
+            timeseries:
+                description: "The options to create the time-series collection with."
+                type: TimeseriesOptions
                 optional: true
             temp:
                 description: "DEPRECATED"

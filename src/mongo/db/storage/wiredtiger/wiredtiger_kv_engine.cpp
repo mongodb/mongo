@@ -1473,10 +1473,9 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
 
     std::string collIndexOptions;
 
-    if (!collOptions.indexOptionDefaults["storageEngine"].eoo()) {
-        BSONObj storageEngineOptions = collOptions.indexOptionDefaults["storageEngine"].Obj();
+    if (auto storageEngineOptions = collOptions.indexOptionDefaults.getStorageEngine()) {
         collIndexOptions =
-            dps::extractElementAtPath(storageEngineOptions, _canonicalName + ".configString")
+            dps::extractElementAtPath(*storageEngineOptions, _canonicalName + ".configString")
                 .valuestrsafe();
     }
     // Some unittests use a OperationContextNoop that can't support such lookups.

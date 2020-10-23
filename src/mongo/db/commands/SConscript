@@ -264,6 +264,18 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='create_command',
+    source=[
+        'create.idl',
+        'create_command_validation.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
 # Commands that are present in both mongod and embedded
 env.Library(
     target="standalone",
@@ -298,7 +310,6 @@ env.Library(
         "validate.cpp",
         "whats_my_sni_command.cpp",
         "write_commands/write_commands.cpp",
-        'create.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -328,9 +339,11 @@ env.Library(
         "$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl",
         '$BUILD_DIR/mongo/db/transaction',
         '$BUILD_DIR/mongo/db/views/views_mongod',
+        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/net/http_client',
         'core',
+        'create_command',
         'current_op_common',
         'fsync_locked',
         'kill_common',

@@ -34,6 +34,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/uuid.h"
 
@@ -82,14 +83,10 @@ struct CollectionOptions {
     static StatusWith<CollectionOptions> parse(const BSONObj& options,
                                                ParseKind kind = parseForCommand);
 
+    static CollectionOptions parse(const CreateCommand& cmd);
+
     void appendBSON(BSONObjBuilder* builder) const;
     BSONObj toBSON() const;
-
-    /**
-     * @param max in and out, will be adjusted
-     * @return if the value is valid at all
-     */
-    static bool validMaxCappedDocs(long long* max);
 
     /**
      * Returns true if given options matches to this.
@@ -124,8 +121,8 @@ struct CollectionOptions {
     // Storage engine collection options. Always owned or empty.
     BSONObj storageEngine;
 
-    // Default options for indexes created on the collection. Always owned or empty.
-    BSONObj indexOptionDefaults;
+    // Default options for indexes created on the collection.
+    IndexOptionDefaults indexOptionDefaults;
 
     // Index specs for the _id index.
     BSONObj idIndex;
@@ -144,5 +141,9 @@ struct CollectionOptions {
     std::string viewOn;
     // The aggregation pipeline that defines this view.
     BSONObj pipeline;
+
+    // The options that define the time-series collection, or boost::none if not a time-series
+    // collection.
+    boost::optional<TimeseriesOptions> timeseries;
 };
 }  // namespace mongo

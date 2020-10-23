@@ -21,6 +21,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/command_generic_argument',
+        '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
     ],
 )
@@ -106,7 +107,10 @@ env.Library(
         "$BUILD_DIR/mongo/db/service_context",
         "$BUILD_DIR/mongo/idl/idl_parser",
     ],
-);
+    LIBDEPS_PRIVATE=[
+        'collection_options',
+    ],
+)
 
 env.Library(
     target='index_builds_manager',

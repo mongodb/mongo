@@ -21,6 +21,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/storage/oplog_hack',

@@ -160,6 +160,33 @@ Status _createCollection(OperationContext* opCtx,
 }
 
 /**
+ * Creates the collection or the view as described by 'options'.
+ */
+Status createCollection(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const CollectionOptions& options,
+                        const BSONObj& idIndex) {
+    auto status = userAllowedCreateNS(ns);
+    if (!status.isOK()) {
+        return status;
+    }
+
+    if (options.isView()) {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create a view in a multi-document "
+                                 "transaction.",
+                !opCtx->inMultiDocumentTransaction());
+        return _createView(opCtx, ns, options, idIndex);
+    } else {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream() << "Cannot create system collection " << ns
+                              << " within a transaction.",
+                !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
+        return _createCollection(opCtx, ns, options, idIndex);
+    }
+}
+
+/**
  * Shared part of the implementation of the createCollection versions for replicated and regular
  * collection creation.
  */
@@ -173,11 +200,6 @@ Status createCollection(OperationContext* opCtx,
     // Skip the first cmdObj element.
     BSONElement firstElt = it.next();
     invariant(firstElt.fieldNameStringData() == "create");
-
-    Status status = userAllowedCreateNS(nss);
-    if (!status.isOK()) {
-        return status;
-    }
 
     // Build options object from remaining cmdObj elements.
     BSONObjBuilder optionsBuilder;
@@ -205,19 +227,7 @@ Status createCollection(OperationContext* opCtx,
         collectionOptions = statusWith.getValue();
     }
 
-    if (collectionOptions.isView()) {
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create a view in a multi-document "
-                                 "transaction.",
-                !opCtx->inMultiDocumentTransaction());
-        return _createView(opCtx, nss, collectionOptions, idIndex);
-    } else {
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create system collection " << nss.toString()
-                              << " within a transaction.",
-                !opCtx->inMultiDocumentTransaction() || !nss.isSystem());
-        return _createCollection(opCtx, nss, collectionOptions, idIndex);
-    }
+    return createCollection(opCtx, nss, collectionOptions, idIndex);
 }
 
 }  // namespace
@@ -231,6 +241,14 @@ Status createCollection(OperationContext* opCtx,
                             cmdObj,
                             idIndex,
                             CollectionOptions::parseForCommand);
+}
+
+Status createCollection(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const CreateCommand& cmd) {
+    auto options = CollectionOptions::parse(cmd);
+    auto idIndex = std::exchange(options.idIndex, {});
+    return createCollection(opCtx, ns, options, idIndex);
 }
 
 Status createCollectionForApplyOps(OperationContext* opCtx,

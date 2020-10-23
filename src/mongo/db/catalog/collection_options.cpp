@@ -41,58 +41,19 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-// static
-bool CollectionOptions::validMaxCappedDocs(long long* max) {
-    if (*max <= 0 || *max == std::numeric_limits<long long>::max()) {
-        *max = 0x7fffffff;
-        return true;
-    }
-
-    if (*max < (0x1LL << 31)) {
-        return true;
-    }
-
-    return false;
-}
-
 namespace {
-
-Status checkStorageEngineOptions(const BSONElement& elem) {
-    invariant(elem.fieldNameStringData() == "storageEngine");
-
-    // Storage engine-specific collection options.
-    // "storageEngine" field must be of type "document".
-    // Every field inside "storageEngine" has to be a document.
-    // Format:
-    // {
-    //     ...
-    //     storageEngine: {
-    //         storageEngine1: {
-    //             ...
-    //         },
-    //         storageEngine2: {
-    //             ...
-    //         }
-    //     },
-    //     ...
-    // }
-    if (elem.type() != mongo::Object) {
-        return {ErrorCodes::BadValue, "'storageEngine' has to be a document."};
-    }
-
-    BSONForEach(storageEngineElement, elem.Obj()) {
-        StringData storageEngineName = storageEngineElement.fieldNameStringData();
-        if (storageEngineElement.type() != mongo::Object) {
-            return {ErrorCodes::BadValue,
-                    str::stream() << "'storageEngine." << storageEngineName
-                                  << "' has to be an embedded document."};
-        }
-    }
-
-    return Status::OK();
+long long adjustCappedSize(long long cappedSize) {
+    cappedSize += 0xff;
+    cappedSize &= 0xffffffffffffff00LL;
+    return cappedSize;
 }
 
+long long adjustCappedMaxDocs(long long cappedMaxDocs) {
+    if (cappedMaxDocs <= 0 || cappedMaxDocs == std::numeric_limits<long long>::max()) {
+        cappedMaxDocs = 0x7fffffff;
+    }
+    return cappedMaxDocs;
+}
 }  // namespace
 
 bool CollectionOptions::isView() const {
@@ -137,24 +98,24 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            collectionOptions.cappedSize = e.safeNumberLong();
-            if (collectionOptions.cappedSize < 0)
+            auto cappedSize = e.safeNumberLong();
+            if (cappedSize < 0)
                 return Status(ErrorCodes::BadValue, "size has to be >= 0");
             const long long kGB = 1024 * 1024 * 1024;
             const long long kPB = 1024 * 1024 * kGB;
-            if (collectionOptions.cappedSize > kPB)
+            if (cappedSize > kPB)
                 return Status(ErrorCodes::BadValue, "size cannot exceed 1 PB");
-            collectionOptions.cappedSize += 0xff;
-            collectionOptions.cappedSize &= 0xffffffffffffff00LL;
+            collectionOptions.cappedSize = adjustCappedSize(cappedSize);
         } else if (fieldName == "max") {
             if (!options["capped"].trueValue() || !e.isNumber()) {
                 // Ignoring for backwards compatibility.
                 continue;
             }
-            collectionOptions.cappedMaxDocs = e.safeNumberLong();
-            if (!validMaxCappedDocs(&collectionOptions.cappedMaxDocs))
+            auto cappedMaxDocs = e.safeNumberLong();
+            if (cappedMaxDocs >= 0x1LL << 31)
                 return Status(ErrorCodes::BadValue,
                               "max in a capped collection has to be < 2^31 or not set");
+            collectionOptions.cappedMaxDocs = adjustCappedMaxDocs(cappedMaxDocs);
         } else if (fieldName == "$nExtents") {
             // Ignoring for backwards compatibility.
             continue;
@@ -171,29 +132,27 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
         } else if (fieldName == "recordPreImages") {
             collectionOptions.recordPreImages = e.trueValue();
         } else if (fieldName == "storageEngine") {
-            Status status = checkStorageEngineOptions(e);
+            if (e.type() != mongo::Object) {
+                return {ErrorCodes::TypeMismatch, "'storageEngine' must be a document"};
+            }
+
+            auto status = create_command_validation::validateStorageEngineOptions(e.Obj());
             if (!status.isOK()) {
                 return status;
             }
+
             collectionOptions.storageEngine = e.Obj().getOwned();
         } else if (fieldName == "indexOptionDefaults") {
             if (e.type() != mongo::Object) {
                 return {ErrorCodes::TypeMismatch, "'indexOptionDefaults' has to be a document."};
             }
-            BSONForEach(option, e.Obj()) {
-                if (option.fieldNameStringData() == "storageEngine") {
-                    Status status = checkStorageEngineOptions(option);
-                    if (!status.isOK()) {
-                        return status.withContext("Error in indexOptionDefaults");
-                    }
-                } else {
-                    // Return an error on first unrecognized field.
-                    return {ErrorCodes::InvalidOptions,
-                            str::stream() << "indexOptionDefaults." << option.fieldNameStringData()
-                                          << " is not a supported option."};
-                }
+
+            try {
+                collectionOptions.indexOptionDefaults =
+                    IndexOptionDefaults::parse({"CollectionOptions::parse"}, e.Obj());
+            } catch (const DBException& ex) {
+                return ex.toStatus();
             }
-            collectionOptions.indexOptionDefaults = e.Obj().getOwned();
         } else if (fieldName == "validator") {
             if (e.type() != mongo::Object) {
                 return Status(ErrorCodes::BadValue, "'validator' has to be a document.");
@@ -248,6 +207,17 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             }
 
             collectionOptions.idIndex = std::move(tempIdIndex);
+        } else if (fieldName == "timeseries") {
+            if (e.type() != mongo::Object) {
+                return {ErrorCodes::TypeMismatch, "'timeseries' must be a document"};
+            }
+
+            try {
+                collectionOptions.timeseries =
+                    TimeseriesOptions::parse({"CollectionOptions::parse"}, e.Obj());
+            } catch (const DBException& ex) {
+                return ex.toStatus();
+            }
         } else if (!createdOn24OrEarlier && !mongo::isGenericArgument(fieldName)) {
             return Status(ErrorCodes::InvalidOptions,
                           str::stream()
@@ -261,6 +231,63 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
     }
 
     return collectionOptions;
+}
+
+CollectionOptions CollectionOptions::parse(const CreateCommand& cmd) {
+    CollectionOptions options;
+
+    options.capped = cmd.getCapped();
+    if (auto size = cmd.getSize()) {
+        options.cappedSize = adjustCappedSize(*size);
+    }
+    if (auto max = cmd.getMax()) {
+        options.cappedMaxDocs = adjustCappedMaxDocs(*max);
+    }
+    if (auto autoIndexId = cmd.getAutoIndexId()) {
+        options.autoIndexId = *autoIndexId ? YES : NO;
+    }
+    if (auto idIndex = cmd.getIdIndex()) {
+        options.idIndex = std::move(*idIndex);
+    }
+    if (auto storageEngine = cmd.getStorageEngine()) {
+        options.storageEngine = std::move(*storageEngine);
+    }
+    if (auto validator = cmd.getValidator()) {
+        options.validator = std::move(*validator);
+    }
+    if (auto validationLevel = cmd.getValidationLevel()) {
+        options.validationLevel = validationLevel->toString();
+    }
+    if (auto validationAction = cmd.getValidationAction()) {
+        options.validationAction = validationAction->toString();
+    }
+    if (auto indexOptionDefaults = cmd.getIndexOptionDefaults()) {
+        options.indexOptionDefaults = std::move(*indexOptionDefaults);
+    }
+    if (auto viewOn = cmd.getViewOn()) {
+        options.viewOn = viewOn->toString();
+    }
+    if (auto pipeline = cmd.getPipeline()) {
+        BSONArrayBuilder builder;
+        for (const auto& item : *pipeline) {
+            builder.append(std::move(item));
+        }
+        options.pipeline = std::move(builder.arr());
+    }
+    if (auto collation = cmd.getCollation()) {
+        options.collation = std::move(*collation);
+    }
+    if (auto recordPreImages = cmd.getRecordPreImages()) {
+        options.recordPreImages = *recordPreImages;
+    }
+    if (auto timeseries = cmd.getTimeseries()) {
+        options.timeseries = std::move(*timeseries);
+    }
+    if (auto temp = cmd.getTemp()) {
+        options.temp = *temp;
+    }
+
+    return options;
 }
 
 BSONObj CollectionOptions::toBSON() const {
@@ -296,8 +323,8 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
         builder->append("storageEngine", storageEngine);
     }
 
-    if (!indexOptionDefaults.isEmpty()) {
-        builder->append("indexOptionDefaults", indexOptionDefaults);
+    if (indexOptionDefaults.getStorageEngine()) {
+        builder->append("indexOptionDefaults", indexOptionDefaults.toBSON());
     }
 
     if (!validator.isEmpty()) {
@@ -326,6 +353,10 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder) const {
 
     if (!idIndex.isEmpty()) {
         builder->append("idIndex", idIndex);
+    }
+
+    if (timeseries) {
+        builder->append("timeseries", timeseries->toBSON());
     }
 }
 
@@ -359,7 +390,7 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
         return false;
     }
 
-    if (indexOptionDefaults.woCompare(other.indexOptionDefaults) != 0) {
+    if (indexOptionDefaults.toBSON().woCompare(other.indexOptionDefaults.toBSON()) != 0) {
         return false;
     }
 
@@ -392,6 +423,12 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     if (pipeline.woCompare(other.pipeline) != 0) {
+        return false;
+    }
+
+    if ((timeseries && other.timeseries &&
+         timeseries->toBSON().woCompare(other.timeseries->toBSON()) != 0) ||
+        (timeseries == boost::none) != (other.timeseries == boost::none)) {
         return false;
     }
 

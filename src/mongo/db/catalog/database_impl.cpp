@@ -930,9 +930,9 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    if (auto indexOptions = collectionOptions.indexOptionDefaults["storageEngine"]) {
+    if (auto storageEngineOptions = collectionOptions.indexOptionDefaults.getStorageEngine()) {
         status = validateStorageOptions(
-            opCtx->getServiceContext(), indexOptions.Obj(), [](const auto& x, const auto& y) {
+            opCtx->getServiceContext(), *storageEngineOptions, [](const auto& x, const auto& y) {
                 return x->validateIndexStorageOptions(y);
             });
 
