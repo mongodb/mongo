@@ -3,6 +3,7 @@
  * replica set. We have two replica sets, A and B, where A has two nodes, A_0 and A_1, and B has one
  * node, B_0. Adding B_0 to replica set A should fail on detecting an inconsistent replica set ID in
  * the heartbeat response metadata from B_0.
+ * @tags: [requires_fcv_49]
  */
 
 (function() {
