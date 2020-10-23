@@ -169,6 +169,11 @@ class ConfigOptions(object):
         return self.task
 
     @property
+    def generated_suite_filename(self):
+        """Filename for the generated suite file."""
+        return self.suite
+
+    @property
     def gen_task_set(self):
         """Return the set of tasks used to generate this configuration."""
         return {self.task_name}
@@ -394,8 +399,8 @@ def generate_resmoke_suite_config(source_config, source_file, roots=None, exclud
     return contents
 
 
-def render_suite_files(suites: List, suite_name: str, test_list: List[str], suite_dir,
-                       create_misc_suite: bool) -> Dict:
+def render_suite_files(suites: List, suite_name: str, generated_suite_filename: str,
+                       test_list: List[str], suite_dir, create_misc_suite: bool) -> Dict:
     """
     Render the given list of suites.
 
@@ -404,19 +409,21 @@ def render_suite_files(suites: List, suite_name: str, test_list: List[str], suit
 
     :param suites: List of suites to render.
     :param suite_name: Base name of suites.
+    :param generated_suite_filename: The name to use as the file name for generated suite file.
     :param test_list: List of tests used in suites.
     :param suite_dir: Directory containing test suite configurations.
     :param create_misc_suite: Whether or not a _misc suite file should be created.
     :return: Dictionary of rendered resmoke config files.
     """
+    # pylint: disable=too-many-arguments
     source_config = read_yaml(suite_dir, suite_name + ".yml")
     suite_configs = {
         f"{os.path.basename(suite.name)}.yml": suite.generate_resmoke_config(source_config)
         for suite in suites
     }
     if create_misc_suite:
-        suite_configs[f"{os.path.basename(suite_name)}_misc.yml"] = generate_resmoke_suite_config(
-            source_config, suite_name, excludes=test_list)
+        suite_configs[f"{generated_suite_filename}_misc.yml"] = generate_resmoke_suite_config(
+            source_config, generated_suite_filename, excludes=test_list)
     return suite_configs
 
 
@@ -722,7 +729,7 @@ class EvergreenConfigGenerator(object):
 
         if self.options.create_misc_suite:
             # Add the misc suite
-            misc_suite_name = f"{os.path.basename(self.options.suite)}_misc"
+            misc_suite_name = f"{os.path.basename(self.options.generated_suite_filename)}_misc"
             misc_task_name = f"{self.options.task}_misc_{self.options.variant}"
             tasks.add(
                 self._generate_task(misc_suite_name, misc_task_name,
@@ -825,9 +832,9 @@ class GenerateSubSuites(object):
             LOGGER.debug("No test runtimes after filter, using fallback")
             return self.calculate_fallback_suites()
         self.test_list = [info.test_name for info in tests_runtimes]
-        return divide_tests_into_suites(self.config_options.suite, tests_runtimes,
-                                        execution_time_secs, self.config_options.max_sub_suites,
-                                        self.config_options.max_tests_per_suite)
+        return divide_tests_into_suites(
+            self.config_options.generated_suite_filename, tests_runtimes, execution_time_secs,
+            self.config_options.max_sub_suites, self.config_options.max_tests_per_suite)
 
     def filter_tests(self,
                      tests_runtimes: List[teststats.TestRuntime]) -> List[teststats.TestRuntime]:
@@ -859,7 +866,7 @@ class GenerateSubSuites(object):
         self.test_list = self.list_tests()
         num_suites = min(self.config_options.fallback_num_sub_suites, len(self.test_list),
                          self.config_options.max_sub_suites)
-        suites = [Suite(self.config_options.suite) for _ in range(num_suites)]
+        suites = [Suite(self.config_options.generated_suite_filename) for _ in range(num_suites)]
         for idx, test_file in enumerate(self.test_list):
             suites[idx % num_suites].add_test(test_file, 0)
         return suites
@@ -894,7 +901,8 @@ class GenerateSubSuites(object):
 
         :return: The suites files and evergreen configuration for the generated task.
         """
-        return render_suite_files(suites, self.config_options.suite, self.test_list,
+        return render_suite_files(suites, self.config_options.suite,
+                                  self.config_options.generated_suite_filename, self.test_list,
                                   self.config_options.test_suites_dir,
                                   self.config_options.create_misc_suite)
 

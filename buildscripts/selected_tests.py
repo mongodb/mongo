@@ -137,6 +137,11 @@ class SelectedTestsConfigOptions(ConfigOptions):
         return f"{self.task}_{self.variant}"
 
     @property
+    def generated_suite_filename(self):
+        """Filename for the generated suite file."""
+        return f"{self.suite}_{self.variant}"
+
+    @property
     def gen_task_set(self):
         """Return the set of tasks used to generate this configuration."""
         return set()

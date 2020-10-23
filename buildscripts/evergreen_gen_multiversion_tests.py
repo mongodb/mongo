@@ -260,9 +260,9 @@ class EvergreenMultiversionConfigGenerator(object):
         start_date = end_date - datetime.timedelta(days=generate_resmoke.LOOKBACK_DURATION_DAYS)
         suites = gen_suites.calculate_suites(start_date, end_date)
         # Render the given suites into yml files that can be used by resmoke.py.
-        config_file_dict = generate_resmoke.render_suite_files(suites, self.options.suite,
-                                                               gen_suites.test_list, TEST_SUITE_DIR,
-                                                               self.options.create_misc_suite)
+        config_file_dict = generate_resmoke.render_suite_files(
+            suites, self.options.suite, self.options.generated_suite_filename, gen_suites.test_list,
+            TEST_SUITE_DIR, self.options.create_misc_suite)
         generate_resmoke.write_file_dict(CONFIG_DIR, config_file_dict)
 
         return suites

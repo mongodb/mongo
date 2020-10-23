@@ -154,7 +154,6 @@ class TestAcceptance(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             target_directory, source_directory = self._prep_dirs(tmpdir, mock_config)
             suite_path = os.path.join(source_directory, task)
-            mock_config["suite"] = suite_path
             test_list = self._mock_test_files(source_directory, n_tests, 5, evg_api_mock,
                                               suites_config_mock)
             mock_resmoke_config_file(test_list, suite_path + ".yml")
@@ -200,7 +199,6 @@ class TestAcceptance(unittest.TestCase):
         with TemporaryDirectory() as tmpdir:
             target_directory, source_directory = self._prep_dirs(tmpdir, mock_config)
             suite_path = os.path.join(source_directory, task)
-            mock_config["suite"] = suite_path
             test_list = self._mock_test_files(source_directory, n_tests, 15 * 60, evg_api_mock,
                                               suites_config_mock)
             mock_resmoke_config_file(test_list, suite_path + ".yml")

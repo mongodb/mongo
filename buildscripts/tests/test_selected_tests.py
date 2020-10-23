@@ -92,6 +92,10 @@ class TestAcceptance(unittest.TestCase):
 
         self.assertIn("selected_tests_config.json", config_dict)
 
+        # assert that generated suite files have the suite name and the variant name in the
+        # filename, to prevent tasks on different variants from using the same suite file
+        self.assertIn("auth_enterprise-rhel-62-64-bit-dynamic-required_0.yml", config_dict)
+
         # assert that tasks are generated on all required build variants
         build_variants_with_generated_tasks = json.loads(
             config_dict["selected_tests_config.json"])["buildvariants"]
