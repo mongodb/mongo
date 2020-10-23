@@ -90,8 +90,10 @@ function testReplaceWithInitialSync(secondariesDown) {
 
     jsTestLog("Stopping node for replacement of data");
     rst.stop(node, undefined, {skipValidation: true}, {forRestart: true});
-    if (!majorityDown) {
-        // Add some data.  This can't work in a majority-down situation, so we don't do it then.
+    if (secondariesDown === 0) {
+        // Add some data.  We skip this if we have disconnected any nodes, since we may lose the
+        // majority, and thus the primary, if we have one node disconnected and another node
+        // stopped.
         assert.commandWorked(testDb[testName].insert({replaceWithInitialSync: secondariesDown},
                                                      {writeConcern: {w: 1}}));
     }
