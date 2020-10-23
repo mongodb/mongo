@@ -58,7 +58,7 @@ class AbstractAsyncComponent {
 public:
     AbstractAsyncComponent(executor::TaskExecutor* executor, const std::string& componentName);
 
-    virtual ~AbstractAsyncComponent();
+    virtual ~AbstractAsyncComponent() = default;
 
     /**
      * Returns true if this component is currently running or in the process of shutting down.
@@ -83,11 +83,6 @@ public:
      * Blocks until inactive.
      */
     void join() noexcept;
-
-    /**
-     * Returns a future that will complete when the component becomes inactive.
-     */
-    SemiFuture<void> joinAsync() noexcept;
 
     /**
      * State transitions:
@@ -221,8 +216,6 @@ private:
     // (R)  Read-only in concurrent operation; no synchronization required.
     // (S)  Self-synchronizing; access in any way from any context.
     // (M)  Reads and writes guarded by mutex returned by _getMutex().
-    // (W)  May read and call const methods without synchronization,
-    //      must hold mutex to write and call non-const methods.
 
     // Task executor used to schedule tasks and remote commands.
     executor::TaskExecutor* const _executor;  // (R)
@@ -235,7 +228,7 @@ private:
     State _state = State::kPreStart;  // (M)
 
     // Used by _transitionToComplete_inlock() to signal changes in '_state'.
-    mutable SharedPromise<void> _statePromise;  // (W)
+    mutable stdx::condition_variable _stateCondition;  // (S)
 };
 
 /**
