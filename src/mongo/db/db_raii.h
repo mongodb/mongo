@@ -84,17 +84,18 @@ private:
     const LogMode _logMode;
 };
 
-template <typename AutoGetCollectionType>
+/**
+ * Shared base class for AutoGetCollectionForRead and AutoGetCollectionForReadLockFree.
+ * Do not use directly.
+ */
+template <typename AutoGetCollectionType, typename EmplaceAutoGetCollectionFunc>
 class AutoGetCollectionForReadBase {
     AutoGetCollectionForReadBase(const AutoGetCollectionForReadBase&) = delete;
     AutoGetCollectionForReadBase& operator=(const AutoGetCollectionForReadBase&) = delete;
 
 public:
-    AutoGetCollectionForReadBase(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max());
+    AutoGetCollectionForReadBase(OperationContext* opCtx,
+                                 const EmplaceAutoGetCollectionFunc& emplaceAutoColl);
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -133,6 +134,27 @@ protected:
 };
 
 /**
+ * Helper for AutoGetCollectionForRead below. Contains implementation on how contained
+ * AutoGetCollection is instantiated by AutoGetCollectionForReadBase.
+ */
+class EmplaceAutoGetCollectionForRead {
+public:
+    EmplaceAutoGetCollectionForRead(OperationContext* opCtx,
+                                    const NamespaceStringOrUUID& nsOrUUID,
+                                    AutoGetCollectionViewMode viewMode,
+                                    Date_t deadline);
+
+    void emplace(boost::optional<AutoGetCollection>& autoColl) const;
+
+private:
+    OperationContext* _opCtx;
+    const NamespaceStringOrUUID& _nsOrUUID;
+    AutoGetCollectionViewMode _viewMode;
+    Date_t _deadline;
+    LockMode _collectionLockMode;
+};
+
+/**
  * Same as calling AutoGetCollection with MODE_IS, but in addition ensures that the read will be
  * performed against an appropriately committed snapshot if the operation is using a readConcern of
  * 'majority'.
@@ -144,14 +166,14 @@ protected:
  * NOTE: Must not be used with any locks held, because it needs to block waiting on the committed
  * snapshot to become available, and can potentially release and reacquire locks.
  */
-class AutoGetCollectionForRead : public AutoGetCollectionForReadBase<AutoGetCollection> {
+class AutoGetCollectionForRead
+    : public AutoGetCollectionForReadBase<AutoGetCollection, EmplaceAutoGetCollectionForRead> {
 public:
     AutoGetCollectionForRead(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
         AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max())
-        : AutoGetCollectionForReadBase(opCtx, nsOrUUID, viewMode, deadline) {}
+        Date_t deadline = Date_t::max());
 
     Database* getDb() const {
         return _autoColl->getDb();
@@ -196,7 +218,28 @@ public:
     }
 
 private:
-    boost::optional<AutoGetCollectionForReadBase<AutoGetCollectionLockFree>>
+    /**
+     * Helper for how AutoGetCollectionForReadBase instantiates its owned AutoGetCollectionLockFree.
+     */
+    class EmplaceHelper {
+    public:
+        EmplaceHelper(OperationContext* opCtx,
+                      CollectionCatalogStasher& catalogStasher,
+                      const NamespaceStringOrUUID& nsOrUUID,
+                      AutoGetCollectionViewMode viewMode,
+                      Date_t deadline);
+
+        void emplace(boost::optional<AutoGetCollectionLockFree>& autoColl) const;
+
+    private:
+        OperationContext* _opCtx;
+        CollectionCatalogStasher& _catalogStasher;
+        const NamespaceStringOrUUID& _nsOrUUID;
+        AutoGetCollectionViewMode _viewMode;
+        Date_t _deadline;
+    };
+
+    boost::optional<AutoGetCollectionForReadBase<AutoGetCollectionLockFree, EmplaceHelper>>
         _autoGetCollectionForReadBase;
     CollectionCatalogStasher _catalogStash;
 };

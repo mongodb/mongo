@@ -62,6 +62,90 @@ bool supportsLockFreeRead(OperationContext* opCtx) {
         !opCtx->inMultiDocumentTransaction();
 }
 
+/**
+ * Helper function to acquire a collection and consistent snapshot without holding the RSTL or
+ * collection locks.
+ *
+ * GetCollectionAndEstablishReadSourceFunc is called before we open a snapshot, it needs to fetch
+ * the Collection from the catalog and select the read source.
+ *
+ * GetCollectionAfterSnapshotFunc is called after the snapshot is opened, it needs to fetch the
+ * Collection from the catalog that is used to compare consistency with the Collection returned by
+ * GetCollectionAndEstablishReadSourceFunc.
+ *
+ * ResetFunc is called when we failed to achieve consistency and need to retry.
+ */
+template <typename GetCollectionAndEstablishReadSourceFunc,
+          typename GetCollectionAfterSnapshotFunc,
+          typename ResetFunc>
+auto aquireCollectionAndConsistentSnapshot(
+    OperationContext* opCtx,
+    CollectionCatalogStasher& catalogStasher,
+    GetCollectionAndEstablishReadSourceFunc getCollectionAndEstablishReadSource,
+    GetCollectionAfterSnapshotFunc getCollectionAfterSnapshot,
+    ResetFunc reset) {
+    // Figure out what type of Collection GetCollectionAndEstablishReadSourceFunc returns. It needs
+    // to behave like a pointer.
+    using CollectionPtrT = decltype(std::declval<GetCollectionAndEstablishReadSourceFunc>()(
+        std::declval<OperationContext*>(), std::declval<const CollectionCatalog&>()));
+
+    CollectionPtrT collection;
+    catalogStasher.reset();
+    while (true) {
+        // AutoGetCollectionForReadBase can choose a read source based on the current replication
+        // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
+        long long replTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
+
+        auto catalog = CollectionCatalog::get(opCtx);
+        collection = getCollectionAndEstablishReadSource(opCtx, *catalog);
+
+        // A lock request does not always find a collection to lock.
+        if (!collection)
+            break;
+
+        // We must open a storage snapshot consistent with the fetched in-memory Collection instance
+        // and chosen read source. The Collection instance and replication state after opening a
+        // snapshot will be compared with the previously acquired state. If either does not match,
+        // then this loop will retry lock acquisition and read source selection until there is a
+        // match.
+        //
+        // Note: getCollectionAndEstablishReadSource() may open a snapshot for PIT reads, so
+        // preallocateSnapshot() may be a no-op, but that is OK because the snapshot is established
+        // by getCollectionAndEstablishReadSource() after it fetches a Collection instance.
+        if (collection->ns().isOplog()) {
+            // Signal to the RecoveryUnit that the snapshot will be used for reading the oplog.
+            // Normally the snapshot is opened from a cursor that can take special action when
+            // reading from the oplog.
+            opCtx->recoveryUnit()->preallocateSnapshotForOplogRead();
+        } else {
+            opCtx->recoveryUnit()->preallocateSnapshot();
+        }
+
+        // The collection may have been dropped since the previous lookup, run the loop one more
+        // time to cleanup if newCollection is nullptr
+        auto newCatalog = CollectionCatalog::get(opCtx);
+        if (catalog == newCatalog) {
+            auto newCollection = getCollectionAfterSnapshot(opCtx, *catalog);
+            if (newCollection && catalog == newCatalog &&
+                collection->getMinimumVisibleSnapshot() ==
+                    newCollection->getMinimumVisibleSnapshot() &&
+                replTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm()) {
+                catalogStasher.stash(std::move(catalog));
+                break;
+            }
+        }
+
+        LOGV2_DEBUG(5067701,
+                    3,
+                    "Retrying acquiring state for lock-free read because collection or replication "
+                    "state changed.");
+        reset();
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+
+    return collection;
+}
+
 }  // namespace
 
 AutoStatsTracker::AutoStatsTracker(OperationContext* opCtx,
@@ -95,12 +179,10 @@ AutoStatsTracker::~AutoStatsTracker() {
                 curOp->getReadWriteType());
 }
 
-template <typename AutoGetCollectionType>
-AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBase(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline) {
+template <typename AutoGetCollectionType, typename EmplaceAutoCollFunc>
+AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
+    AutoGetCollectionForReadBase(OperationContext* opCtx,
+                                 const EmplaceAutoCollFunc& emplaceAutoColl) {
     // The caller was expecting to conflict with batch application before entering this function.
     // i.e. the caller does not currently have a ShouldNotConflict... block in scope.
     bool callerWasConflicting = opCtx->lockState()->shouldConflictWithSecondaryBatchApplication();
@@ -110,10 +192,7 @@ AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBas
         _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
     }
 
-    // Multi-document transactions need MODE_IX locks, otherwise MODE_IS.
-    const auto collectionLockMode = getLockModeForQuery(opCtx, nsOrUUID.nss());
-
-    _autoColl.emplace(opCtx, nsOrUUID, collectionLockMode, viewMode, deadline);
+    emplaceAutoColl.emplace(_autoColl);
 
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     const auto readConcernLevel = repl::ReadConcernArgs::get(opCtx).getLevel();
@@ -253,8 +332,82 @@ AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBas
             CurOp::get(opCtx)->yielded();
         }
 
-        _autoColl.emplace(opCtx, nsOrUUID, collectionLockMode, viewMode, deadline);
+        emplaceAutoColl.emplace(_autoColl);
     }
+}
+
+EmplaceAutoGetCollectionForRead::EmplaceAutoGetCollectionForRead(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline)
+    : _opCtx(opCtx), _nsOrUUID(nsOrUUID), _viewMode(viewMode), _deadline(deadline) {
+    // Multi-document transactions need MODE_IX locks, otherwise MODE_IS.
+    _collectionLockMode = getLockModeForQuery(opCtx, nsOrUUID.nss());
+}
+
+void EmplaceAutoGetCollectionForRead::emplace(boost::optional<AutoGetCollection>& autoColl) const {
+    autoColl.emplace(_opCtx, _nsOrUUID, _collectionLockMode, _viewMode, _deadline);
+}
+
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const NamespaceStringOrUUID& nsOrUUID,
+                                                   AutoGetCollectionViewMode viewMode,
+                                                   Date_t deadline)
+    : AutoGetCollectionForReadBase(
+          opCtx, EmplaceAutoGetCollectionForRead(opCtx, nsOrUUID, viewMode, deadline)) {}
+
+AutoGetCollectionForReadLockFree::EmplaceHelper::EmplaceHelper(
+    OperationContext* opCtx,
+    CollectionCatalogStasher& catalogStasher,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollectionViewMode viewMode,
+    Date_t deadline)
+    : _opCtx(opCtx),
+      _catalogStasher(catalogStasher),
+      _nsOrUUID(nsOrUUID),
+      _viewMode(viewMode),
+      _deadline(deadline) {}
+
+void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
+    boost::optional<AutoGetCollectionLockFree>& autoColl) const {
+    autoColl.emplace(
+        _opCtx,
+        _nsOrUUID,
+        /* restoreFromYield */
+        [& catalogStasher = _catalogStasher](std::shared_ptr<const Collection>& collection,
+                                             OperationContext* opCtx,
+                                             CollectionUUID uuid) {
+            collection = aquireCollectionAndConsistentSnapshot(
+                opCtx,
+                catalogStasher,
+                /* GetCollectionAndEstablishReadSourceFunc */
+                [uuid](OperationContext* opCtx, const CollectionCatalog& catalog) {
+                    auto coll = catalog.lookupCollectionByUUIDForRead(opCtx, uuid);
+
+                    // After yielding and reacquiring locks, the preconditions that were used to
+                    // select our ReadSource initially need to be checked again. We select a
+                    // ReadSource based on replication state. After a query yields its locks, the
+                    // replication state may have changed, invalidating our current choice of
+                    // ReadSource. Using the same preconditions, change our ReadSource if necessary.
+                    if (coll) {
+                        auto newReadSource = SnapshotHelper::getNewReadSource(opCtx, coll->ns());
+                        if (newReadSource) {
+                            opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
+                        }
+                    }
+
+                    return coll;
+                },
+                /* GetCollectionAfterSnapshotFunc */
+                [uuid](OperationContext* opCtx, const CollectionCatalog& catalog) {
+                    return catalog.lookupCollectionByUUIDForRead(opCtx, uuid);
+                },
+                /* ResetFunc */
+                []() {});
+        },
+        _viewMode,
+        _deadline);
 }
 
 AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
@@ -267,59 +420,22 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     // this helper. The storage snapshot and in-memory state fetched here must be consistent.
     invariant(supportsLockFreeRead(opCtx) && !opCtx->recoveryUnit()->isActive());
 
-    while (true) {
-        // AutoGetCollectionForReadBase can choose a read source based on the current replication
-        // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
-        long long replTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
-
-        auto catalog = CollectionCatalog::get(opCtx);
-        _autoGetCollectionForReadBase.emplace(opCtx, nsOrUUID, viewMode, deadline);
-
-        // A lock request does not always find a collection to lock.
-        if (!_autoGetCollectionForReadBase.get()) {
-            break;
-        }
-
-        // We must open a storage snapshot consistent with the fetched in-memory Collection instance
-        // and chosen read source. The Collection instance and replication state after opening a
-        // snapshot will be compared with the previously acquired state. If either does not match,
-        // then this loop will retry lock acquisition and read source selection until there is a
-        // match.
-        //
-        // Note: AutoGetCollectionForReadBase may open a snapshot for PIT reads, so
-        // preallocateSnapshot() may be a no-op, but that is OK because the snapshot is established
-        // by _autoGetCollectionForReadBase after it fetches a Collection instance.
-
-        if (_autoGetCollectionForReadBase->getNss().isOplog()) {
-            // Signal to the RecoveryUnit that the snapshot will be used for reading the oplog.
-            // Normally the snapshot is opened from a cursor that can take special action when
-            // reading from the oplog.
-            opCtx->recoveryUnit()->preallocateSnapshotForOplogRead();
-        } else {
-            opCtx->recoveryUnit()->preallocateSnapshot();
-        }
-
-        auto newCatalog = CollectionCatalog::get(opCtx);
-        auto newCollection = newCatalog->lookupCollectionByUUIDForRead(
-            opCtx, _autoGetCollectionForReadBase.get()->uuid());
-
-        // The collection may have been dropped since the previous lookup, run the loop one more
-        // time to cleanup if newCollection is nullptr
-        if (newCollection && catalog == newCatalog &&
-            _autoGetCollectionForReadBase.get()->getMinimumVisibleSnapshot() ==
-                newCollection->getMinimumVisibleSnapshot() &&
-            replTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm()) {
-            _catalogStash.stash(std::move(catalog));
-            break;
-        }
-
-        LOGV2_DEBUG(5067701,
-                    3,
-                    "Retrying acquiring state for lock-free read because collection or replication "
-                    "state changed.");
-        _autoGetCollectionForReadBase.reset();
-        opCtx->recoveryUnit()->abandonSnapshot();
-    }
+    EmplaceHelper emplaceFunc(opCtx, _catalogStash, nsOrUUID, viewMode, deadline);
+    aquireCollectionAndConsistentSnapshot(
+        opCtx,
+        _catalogStash,
+        /* GetCollectionAndEstablishReadSourceFunc */
+        [this, &emplaceFunc](OperationContext* opCtx, const CollectionCatalog&) {
+            _autoGetCollectionForReadBase.emplace(opCtx, emplaceFunc);
+            return _autoGetCollectionForReadBase->getCollection().get();
+        },
+        /* GetCollectionAfterSnapshotFunc */
+        [this](OperationContext* opCtx, const CollectionCatalog& catalog) {
+            return catalog.lookupCollectionByUUIDForRead(
+                opCtx, _autoGetCollectionForReadBase.get()->uuid());
+        },
+        /* ResetFunc */
+        [this]() { _autoGetCollectionForReadBase.reset(); });
 }
 
 AutoGetCollectionForReadMaybeLockFree::AutoGetCollectionForReadMaybeLockFree(
@@ -492,9 +608,10 @@ BlockSecondaryReadsDuringBatchApplication_DONT_USE::
     allowSecondaryReads->swap(_originalSettings);
 }
 
-template class AutoGetCollectionForReadBase<AutoGetCollection>;
+template class AutoGetCollectionForReadBase<AutoGetCollection, EmplaceAutoGetCollectionForRead>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;
-template class AutoGetCollectionForReadBase<AutoGetCollectionLockFree>;
+template class AutoGetCollectionForReadBase<AutoGetCollectionLockFree,
+                                            AutoGetCollectionForReadLockFree::EmplaceHelper>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadLockFree>;
 
 }  // namespace mongo

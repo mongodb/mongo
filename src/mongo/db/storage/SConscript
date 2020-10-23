@@ -38,8 +38,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager_defs',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         'recovery_unit_base',

@@ -38,6 +38,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -1037,7 +1038,21 @@ void CollectionCatalogStasher::reset() {
 
 const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* opCtx,
                                                               CollectionUUID uuid) const {
-    return CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid).get();
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid).get();
+    if (!collection)
+        return nullptr;
+
+    // After yielding and reacquiring locks, the preconditions that were used to select our
+    // ReadSource initially need to be checked again. We select a ReadSource based on replication
+    // state. After a query yields its locks, the replication state may have changed, invalidating
+    // our current choice of ReadSource. Using the same preconditions, change our ReadSource if
+    // necessary.
+    auto newReadSource = SnapshotHelper::getNewReadSource(opCtx, collection->ns());
+    if (newReadSource) {
+        opCtx->recoveryUnit()->setTimestampReadSource(*newReadSource);
+    }
+
+    return collection;
 }
 
 }  // namespace mongo

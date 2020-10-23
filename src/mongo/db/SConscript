@@ -1257,7 +1257,6 @@ env.Library(
         'commands/server_status_core',
         'kill_sessions',
         'stats/resource_consumption_metrics',
-        'storage/snapshot_helper',
     ],
 )
 

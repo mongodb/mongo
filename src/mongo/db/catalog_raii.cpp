@@ -207,6 +207,7 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
 
 AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
                                                      const NamespaceStringOrUUID& nsOrUUID,
+                                                     RestoreFromYieldFn restoreFromYield,
                                                      AutoGetCollectionViewMode viewMode,
                                                      Date_t deadline)
     : _lockFreeReadsBlock(opCtx),
@@ -223,11 +224,13 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
 
     // When we restore from yield on this CollectionPtr we will update _collection above and use its
     // new pointer in the CollectionPtr
-    _collectionPtr = CollectionPtr(
-        opCtx, _collection.get(), [this](OperationContext* opCtx, CollectionUUID uuid) {
-            _collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(opCtx, uuid);
-            return _collection.get();
-        });
+    _collectionPtr = CollectionPtr(opCtx,
+                                   _collection.get(),
+                                   [this, restoreFromYield = std::move(restoreFromYield)](
+                                       OperationContext* opCtx, CollectionUUID uuid) {
+                                       restoreFromYield(_collection, opCtx, uuid);
+                                       return _collection.get();
+                                   });
 
     // TODO (SERVER-51319): add DatabaseShardingState::checkDbVersion somewhere.
 

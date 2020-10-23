@@ -1109,12 +1109,4 @@ void resetGlobalLockStats() {
     globalStats.reset();
 }
 
-// Hardcoded resource IDs.
-const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, StringData("local"));
-const ResourceId resourceIdOplog = ResourceId(RESOURCE_COLLECTION, StringData("local.oplog.rs"));
-const ResourceId resourceIdAdminDB = ResourceId(RESOURCE_DATABASE, StringData("admin"));
-const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, 1ULL);
-const ResourceId resourceIdParallelBatchWriterMode = ResourceId(RESOURCE_PBWM, 1ULL);
-const ResourceId resourceIdReplicationStateTransitionLock = ResourceId(RESOURCE_RSTL, 1ULL);
-
 }  // namespace mongo

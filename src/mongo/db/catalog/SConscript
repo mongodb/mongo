@@ -272,6 +272,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/profile_filter',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/storage/snapshot_helper',
         'collection',
     ],
     LIBDEPS_PRIVATE=[
