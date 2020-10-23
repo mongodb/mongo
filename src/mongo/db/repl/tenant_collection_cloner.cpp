@@ -250,8 +250,25 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
 }
 
 BaseCloner::AfterStageBehavior TenantCollectionCloner::queryStage() {
-    ON_BLOCK_EXIT([this] { this->unsetMetadataReader(); });
-    setMetadataReader();
+    // Sets up tracking the lastVisibleOpTime from response metadata.
+    auto requestMetadataWriter = [this](OperationContext* opCtx,
+                                        BSONObjBuilder* metadataBob) -> Status {
+        *metadataBob << rpc::kReplSetMetadataFieldName << 1;
+        return Status::OK();
+    };
+    auto replyMetadataReader =
+        [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData source) -> Status {
+        auto readResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
+        if (!readResult.isOK()) {
+            return readResult.getStatus().withContext(
+                "tenant collection cloner failed to read repl set metadata");
+        }
+        stdx::lock_guard<TenantMigrationSharedData> lk(*getSharedData());
+        getSharedData()->setLastVisibleOpTime(lk, readResult.getValue().getLastOpVisible());
+        return Status::OK();
+    };
+    ScopedMetadataWriterAndReader mwr(getClient(), requestMetadataWriter, replyMetadataReader);
+
     runQuery();
     waitForDatabaseWorkToComplete();
     return kContinueNormally;
@@ -355,26 +372,6 @@ void TenantCollectionCloner::insertDocumentsCallback(
 
 void TenantCollectionCloner::waitForDatabaseWorkToComplete() {
     _dbWorkTaskRunner.join();
-}
-
-void TenantCollectionCloner::setMetadataReader() {
-    getClient()->setReplyMetadataReader(
-        [this](OperationContext* opCtx, const BSONObj& metadataObj, StringData source) {
-            auto readResult = rpc::ReplSetMetadata::readFromMetadata(metadataObj);
-            if (!readResult.isOK()) {
-                return readResult.getStatus().withContext(
-                    "tenant collection cloner failed to read repl set metadata");
-            }
-            stdx::lock_guard<TenantMigrationSharedData> lk(*getSharedData());
-            getSharedData()->setLastVisibleOpTime(lk, readResult.getValue().getLastOpVisible());
-            return Status::OK();
-        });
-}
-
-void TenantCollectionCloner::unsetMetadataReader() {
-    getClient()->setReplyMetadataReader([this](OperationContext* opCtx,
-                                               const BSONObj& metadataObj,
-                                               StringData source) { return Status::OK(); });
 }
 
 bool TenantCollectionCloner::isMyFailPoint(const BSONObj& data) const {

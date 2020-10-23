@@ -173,9 +173,9 @@ void validateFindCommand(Message m,
 
                           msg.body.getObjectField("filter"));
     } else {
-        ASSERT_BSONOBJ_EQ(
-            BSON("ts" << BSON("$gte" << lastFetched.getTimestamp()) << "$and" << filter),
-            msg.body.getObjectField("filter"));
+        ASSERT_BSONOBJ_EQ(BSON("ts" << BSON("$gte" << lastFetched.getTimestamp()) << "$and"
+                                    << BSON_ARRAY(filter)),
+                          msg.body.getObjectField("filter"));
     }
     ASSERT_EQUALS(lastFetched.getTerm(), msg.body.getIntField("term"));
     ASSERT_BSONOBJ_EQ(readConcern.toBSONInner(), msg.body.getObjectField("readConcern"));
@@ -2316,7 +2316,7 @@ TEST_F(OplogFetcherTest, CheckFindCommandIncludesFilter) {
     // Create an oplog fetcher without any retries but with a filter.  Note the filter is not
     // respected as our Mock objects do not respect them; this unit test only tests the command
     // is well-formed.
-    const BSONObj filter = BSON("ns" << BSON("$regexp"
+    const BSONObj filter = BSON("ns" << BSON("$regex"
                                              << "/^tenant_.*/"));
     auto oplogFetcher =
         getOplogFetcherAfterConnectionCreated(std::ref(shutdownState),

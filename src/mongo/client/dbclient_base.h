@@ -852,4 +852,34 @@ private:
 BSONElement getErrField(const BSONObj& result);
 bool hasErrField(const BSONObj& result);
 
+/*
+ * RAII-style class to set new RequestMetadataWriter and ReplyMetadataReader on DBClientConnection
+ * "_conn". On object destruction, '_conn' is set back to it's old RequestsMetadataWriter and
+ * ReplyMetadataReader.
+ */
+class ScopedMetadataWriterAndReader {
+    ScopedMetadataWriterAndReader(const ScopedMetadataWriterAndReader&) = delete;
+    ScopedMetadataWriterAndReader& operator=(const ScopedMetadataWriterAndReader&) = delete;
+
+public:
+    ScopedMetadataWriterAndReader(DBClientBase* conn,
+                                  rpc::RequestMetadataWriter writer,
+                                  rpc::ReplyMetadataReader reader)
+        : _conn(conn),
+          _oldWriter(std::move(conn->getRequestMetadataWriter())),
+          _oldReader(std::move(conn->getReplyMetadataReader())) {
+        _conn->setRequestMetadataWriter(std::move(writer));
+        _conn->setReplyMetadataReader(std::move(reader));
+    }
+    ~ScopedMetadataWriterAndReader() {
+        _conn->setRequestMetadataWriter(std::move(_oldWriter));
+        _conn->setReplyMetadataReader(std::move(_oldReader));
+    }
+
+private:
+    DBClientBase* const _conn;  // not owned.
+    rpc::RequestMetadataWriter _oldWriter;
+    rpc::ReplyMetadataReader _oldReader;
+};
+
 }  // namespace mongo
