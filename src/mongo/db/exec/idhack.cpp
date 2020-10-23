@@ -148,8 +148,10 @@ void IDHackStage::doSaveStateRequiresIndex() {
 }
 
 void IDHackStage::doRestoreStateRequiresIndex() {
-    if (_recordCursor)
-        _recordCursor->restore();
+    if (_recordCursor) {
+        auto couldRestore = _recordCursor->restore();
+        uassert(5083800, "IDHackStage could not restore cursor", couldRestore);
+    }
 }
 
 void IDHackStage::doDetachFromOperationContext() {
