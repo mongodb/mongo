@@ -38,11 +38,11 @@ function verifyServerStatusElectionReasonCounterChange(initialElectionMetrics,
     const initialField = initialElectionMetrics[fieldName];
     const newField = newElectionMetrics[fieldName];
 
-    const assertFunc = function(left, right, msg) {
+    const assertFunc = function(expected, actual, msg) {
         if (allowGreater) {
-            assert.gte(left, right, msg);
+            assert.lte(expected, actual, msg);
         } else {
-            assert.eq(left, right, msg);
+            assert.eq(expected, actual, msg);
         }
     };
 
