@@ -172,6 +172,11 @@ public:
     int dayOfYear(Date_t) const;
 
     /**
+     * Returns the day of the month, ranging from 1 to 31.
+     */
+    int dayOfMonth(Date_t) const;
+
+    /**
      * Returns the week number for a date as a number between 0 (the partial week that precedes the
      * first Sunday of the year) and 53.
      */

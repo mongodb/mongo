@@ -298,30 +298,8 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
         sbe::makeE<sbe::ELocalBind>(frameId, std::move(str), std::move(totalCaseConversionExpr)));
 }
 
-/**
- * Generates an EExpression that checks if the input expression is not a string, _assuming that
- * it has already been verified to be neither null nor missing.
- */
-std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var) {
-    return sbe::makeE<sbe::EPrimUnary>(
-        sbe::EPrimUnary::logicNot,
-        sbe::makeE<sbe::EFunction>("isString", sbe::makeEs(var.clone())));
-}
-
-/**
- * Generates an EExpression that checks whether the input expression is null, missing, or
- * unable to be converted to the type NumberInt32.
- */
-std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
-    const sbe::EVariable& var) {
-    auto numericConvert32 =
-        sbe::makeE<sbe::ENumericConvert>(var.clone(), sbe::value::TypeTags::NumberInt32);
-    return sbe::makeE<sbe::EPrimBinary>(
-        sbe::EPrimBinary::logicOr,
-        generateNullOrMissing(var),
-        sbe::makeE<sbe::EPrimUnary>(
-            sbe::EPrimUnary::logicNot,
-            sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(std::move(numericConvert32)))));
+std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e) {
+    return sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot, std::move(e));
 }
 
 void buildArrayAccessByConstantIndex(ExpressionVisitorContext* context,
@@ -2137,13 +2115,13 @@ public:
         generateTrigonometricExpression("radiansToDegrees");
     }
     void visit(ExpressionDayOfMonth* expr) final {
-        unsupportedExpression("$dayOfMonth");
+        generateDayOfExpression("dayOfMonth", expr);
     }
     void visit(ExpressionDayOfWeek* expr) final {
-        unsupportedExpression("$dayOfWeek");
+        generateDayOfExpression("dayOfWeek", expr);
     }
     void visit(ExpressionDayOfYear* expr) final {
-        unsupportedExpression("$dayOfYear");
+        generateDayOfExpression("dayOfYear", expr);
     }
     void visit(ExpressionHour* expr) final {
         unsupportedExpression("$hour");
@@ -2342,6 +2320,73 @@ private:
                                           _context->getLexicalEnvironment());
 
         _context->pushExpr(resultExpr.extractExpr(), std::move(loopJoinStage));
+    }
+
+    void generateDayOfExpression(StringData exprName, Expression* expr) {
+        auto frameId = _context->frameIdGenerator->generate();
+        std::vector<std::unique_ptr<sbe::EExpression>> args;
+        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        sbe::EVariable dateRef(frameId, 0);
+        sbe::EVariable timezoneRef(frameId, 1);
+
+        auto children = expr->getChildren();
+        invariant(children.size() == 2);
+        _context->ensureArity(children[1] ? 2 : 1);
+
+        auto timezone = [&]() {
+            if (children[1]) {
+                return _context->popExpr();
+            }
+            auto [utcTag, utcVal] = sbe::value::makeNewString("UTC");
+            return sbe::makeE<sbe::EConstant>(utcTag, utcVal);
+        }();
+        auto date = _context->popExpr();
+
+        auto timeZoneDBSlot = _context->runtimeEnvironment->getSlot("timeZoneDB"_sd);
+        args.push_back(sbe::makeE<sbe::EVariable>(timeZoneDBSlot));
+
+        // Add date to arguments.
+        uint32_t dateTypeMask = (getBSONTypeMask(sbe::value::TypeTags::Date) |
+                                 getBSONTypeMask(sbe::value::TypeTags::Timestamp) |
+                                 getBSONTypeMask(sbe::value::TypeTags::ObjectId) |
+                                 getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
+        binds.push_back(std::move(date));
+        args.push_back(dateRef.clone());
+
+        // Add timezone to arguments.
+        binds.push_back(std::move(timezone));
+        args.push_back(timezoneRef.clone());
+
+        // Check that each argument exists, is not null, and is the correct type.
+        auto totalDayOfFunc = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(timezoneRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonStringCheck(timezoneRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998200},
+                                                 str::stream() << "$" << exprName.toString()
+                                                               << " timezone must be a string")},
+            CaseValuePair{sbe::makeE<sbe::EPrimUnary>(
+                              sbe::EPrimUnary::logicNot,
+                              sbe::makeE<sbe::EFunction>(
+                                  "isTimezone",
+                                  sbe::makeEs(sbe::makeE<sbe::EVariable>(timeZoneDBSlot),
+                                              timezoneRef.clone()))),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998201},
+                                                 str::stream()
+                                                     << "$" << exprName.toString()
+                                                     << " timezone must be a valid timezone")},
+            CaseValuePair{generateNullOrMissing(dateRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{
+                sbe::makeE<sbe::EPrimUnary>(
+                    sbe::EPrimUnary::logicNot,
+                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask)),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998202},
+                                       str::stream() << "$" << exprName.toString()
+                                                     << " date must have a format of a date")},
+            sbe::makeE<sbe::EFunction>(exprName.toString(), std::move(args)));
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(totalDayOfFunc)));
     }
 
     /**

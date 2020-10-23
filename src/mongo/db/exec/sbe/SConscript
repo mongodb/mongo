@@ -54,6 +54,7 @@ sbeEnv.Library(
         'util/debug_print.cpp',
         'values/slot.cpp',
         'vm/arith.cpp',
+        'vm/datetime.cpp',
         'vm/vm.cpp',
         ],
     LIBDEPS=[
@@ -104,6 +105,7 @@ env.CppUnitTest(
         'expressions/sbe_coerce_to_string_test.cpp',
         'expressions/sbe_concat_test.cpp',
         'expressions/sbe_date_to_parts_test.cpp',
+        'expressions/sbe_day_of_expressions_test.cpp',
         'expressions/sbe_get_element_builtin_test.cpp',
         'expressions/sbe_index_of_test.cpp',
         'expressions/sbe_is_member_builtin_test.cpp',

@@ -86,6 +86,19 @@ std::unique_ptr<sbe::EExpression> generateNegativeCheck(const sbe::EVariable& va
 std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& var);
 
 /**
+ * Generates an EExpression that checks if the input expression is not a string, _assuming that
+ * it has already been verified to be neither null nor missing.
+ */
+std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var);
+
+/**
+ * Generates an EExpression that checks whether the input expression is null, missing, or
+ * unable to be converted to the type NumberInt32.
+ */
+std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
+    const sbe::EVariable& var);
+
+/**
  * A pair representing a 1) true/false condition and 2) the value that should be returned if that
  * condition evaluates to true.
  */

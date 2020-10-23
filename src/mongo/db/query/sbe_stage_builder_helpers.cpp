@@ -100,6 +100,24 @@ std::unique_ptr<sbe::EExpression> generateNonObjectCheck(const sbe::EVariable& v
         sbe::makeE<sbe::EFunction>("isObject", sbe::makeEs(var.clone())));
 }
 
+std::unique_ptr<sbe::EExpression> generateNonStringCheck(const sbe::EVariable& var) {
+    return sbe::makeE<sbe::EPrimUnary>(
+        sbe::EPrimUnary::logicNot,
+        sbe::makeE<sbe::EFunction>("isString", sbe::makeEs(var.clone())));
+}
+
+std::unique_ptr<sbe::EExpression> generateNullishOrNotRepresentableInt32Check(
+    const sbe::EVariable& var) {
+    auto numericConvert32 =
+        sbe::makeE<sbe::ENumericConvert>(var.clone(), sbe::value::TypeTags::NumberInt32);
+    return sbe::makeE<sbe::EPrimBinary>(
+        sbe::EPrimBinary::logicOr,
+        generateNullOrMissing(var),
+        sbe::makeE<sbe::EPrimUnary>(
+            sbe::EPrimUnary::logicNot,
+            sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(std::move(numericConvert32)))));
+}
+
 template <>
 std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
     std::unique_ptr<sbe::EExpression> defaultCase) {
