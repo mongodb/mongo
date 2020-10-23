@@ -32,7 +32,6 @@ sbeEnv.Library(
         'stages/sort.cpp',
         'stages/sorted_merge.cpp',
         'stages/spool.cpp',
-        'stages/stages.cpp',
         'stages/text_match.cpp',
         'stages/traverse.cpp',
         'stages/union.cpp',
