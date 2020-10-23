@@ -171,6 +171,16 @@ Status createCollection(OperationContext* opCtx,
         return status;
     }
 
+    if (options.timeseries) {
+        // TODO(SERVER-51502): Move buckets collection creation into time-series view creation.
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream()
+                    << "Cannot create a time-series collection in a multi-document transaction.",
+                !opCtx->inMultiDocumentTransaction());
+        auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
+        uassertStatusOK(_createCollection(opCtx, bucketsNs, {}, idIndex));
+    }
+
     if (options.isView()) {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Cannot create a view in a multi-document "

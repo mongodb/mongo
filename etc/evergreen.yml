@@ -10806,6 +10806,7 @@ buildvariants:
     distros:
     - rhel62-large
   - name: jsCore
+  - name: jsCore_txns
 
 - name: enterprise-rhel-62-64-bit-operation-resource-consumption-metrics
   display_name: "Enterprise RHEL 6.2 Shared Library (Operation Resource Consumption Metrics)"
