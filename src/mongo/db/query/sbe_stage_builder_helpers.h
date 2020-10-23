@@ -237,4 +237,30 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
                                                    PlanNodeId planNodeId,
                                                    sbe::value::SlotIdGenerator* slotIdGenerator);
 
+/** This helper takes an SBE SlotIdGenerator and an SBE Array and returns an output slot and a
+ * unwind/project/limit/coscan subtree that streams out the elements of the array one at a time via
+ * the output slot over a series of calls to getNext(), mimicking the output of a collection scan or
+ * an index scan. Note that this method assumes ownership of the SBE Array being passed in.
+ */
+std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::TypeTags arrTag,
+    sbe::value::Value arrVal);
+
+/**
+ * Make a mock scan with multiple output slots from an BSON array. This method does NOT assume
+ * ownership of the BSONArray passed in.
+ */
+std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtualScanMulti(
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    int numSlots,
+    sbe::value::TypeTags arrTag,
+    sbe::value::Value arrVal);
+
+/**
+ * Converts a BSONArray to an SBE Array. Caller owns the SBE Array returned. This method does not
+ * assume ownership of the BSONArray.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba);
+
 }  // namespace mongo::stage_builder

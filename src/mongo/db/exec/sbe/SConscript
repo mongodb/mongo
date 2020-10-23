@@ -98,6 +98,18 @@ env.Library(
         ]
     )
 
+env.Library(
+    target='sbe_plan_stage_test',
+    source=[
+        'sbe_plan_stage_test.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/sbe_stage_builder_helpers',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'query_sbe',
+        ]
+    )
+
 env.CppUnitTest(
     target='db_sbe_test',
     source=[
@@ -120,7 +132,6 @@ env.CppUnitTest(
         'sbe_limit_skip_test.cpp',
         'sbe_math_builtins_test.cpp',
         'sbe_numeric_convert_test.cpp',
-        'sbe_plan_stage_test.cpp',
         'sbe_sort_test.cpp',
         'sbe_sorted_merge_test.cpp',
         'sbe_test.cpp',
@@ -130,7 +141,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/unittest/unittest',
         'query_sbe_parser',
+        'sbe_plan_stage_test',
     ],
 )

@@ -234,6 +234,29 @@ QuerySolutionNode* CollectionScanNode::clone() const {
 }
 
 //
+// VirtualScanNode
+//
+
+VirtualScanNode::VirtualScanNode(std::vector<BSONArray> docs, bool hasRecordId)
+    : docs(std::move(docs)), hasRecordId(hasRecordId) {}
+
+void VirtualScanNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "VIRTUAL_SCAN\n";
+    addIndent(ss, indent + 1);
+    *ss << "nDocuments = " << docs.size();
+    addIndent(ss, indent + 1);
+    *ss << "hasRecordId = " << hasRecordId;
+    addCommon(ss, indent);
+}
+
+QuerySolutionNode* VirtualScanNode::clone() const {
+    auto copy = new VirtualScanNode(docs, this->hasRecordId);
+    cloneBaseData(copy);
+    return copy;
+}
+
+//
 // AndHashNode
 //
 

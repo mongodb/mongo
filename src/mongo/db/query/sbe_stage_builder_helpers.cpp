@@ -35,8 +35,10 @@
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 
 namespace mongo::stage_builder {
@@ -314,6 +316,74 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
     };
 
     return generateSingleResultUnion(std::move(branches), branchFn, planNodeId, slotIdGenerator);
+}
+
+std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    sbe::value::TypeTags arrTag,
+    sbe::value::Value arrVal) {
+    // The value passed in must be an array.
+    invariant(sbe::value::isArray(arrTag));
+
+    // Make an EConstant expression for the array.
+    auto arrayExpression = sbe::makeE<sbe::EConstant>(arrTag, arrVal);
+
+    // Build the unwind/project/limit/coscan subtree.
+    auto projectSlot = slotIdGenerator->generate();
+    auto unwindSlot = slotIdGenerator->generate();
+    auto unwind = sbe::makeS<sbe::UnwindStage>(
+        sbe::makeProjectStage(makeLimitCoScanTree(kEmptyPlanNodeId, 1),
+                              kEmptyPlanNodeId,
+                              projectSlot,
+                              std::move(arrayExpression)),
+        projectSlot,
+        unwindSlot,
+        slotIdGenerator->generate(),  // We don't need an index slot but must to provide it.
+        false,                        // Don't preserve null and empty arrays.
+        kEmptyPlanNodeId);
+
+    // Return the UnwindStage and its output slot. The UnwindStage can be used as an input
+    // to other PlanStages.
+    return {unwindSlot, std::move(unwind)};
+}
+
+std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtualScanMulti(
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    int numSlots,
+    sbe::value::TypeTags arrTag,
+    sbe::value::Value arrVal) {
+    using namespace std::literals;
+
+    invariant(numSlots >= 1);
+
+    // Generate a mock scan with a single output slot.
+    auto [scanSlot, scanStage] = generateVirtualScan(slotIdGenerator, arrTag, arrVal);
+
+    // Create a ProjectStage that will read the data from 'scanStage' and split it up
+    // across multiple output slots.
+    sbe::value::SlotVector projectSlots;
+    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
+    for (int32_t i = 0; i < numSlots; ++i) {
+        projectSlots.emplace_back(slotIdGenerator->generate());
+        projections.emplace(
+            projectSlots.back(),
+            sbe::makeE<sbe::EFunction>(
+                "getElement"sv,
+                sbe::makeEs(sbe::makeE<sbe::EVariable>(scanSlot),
+                            sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
+                                                       sbe::value::bitcastFrom<int32_t>(i)))));
+    }
+
+    return {std::move(projectSlots),
+            sbe::makeS<sbe::ProjectStage>(
+                std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
+}
+
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba) {
+    int numBytes = ba.objsize();
+    uint8_t* data = new uint8_t[numBytes];
+    memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
+    return {sbe::value::TypeTags::bsonArray, sbe::value::bitcastFrom<uint8_t*>(data)};
 }
 
 }  // namespace mongo::stage_builder

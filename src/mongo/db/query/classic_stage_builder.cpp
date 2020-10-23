@@ -53,6 +53,7 @@
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/return_key.h"
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/skip.h"
@@ -353,6 +354,29 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         }
         case STAGE_EOF: {
             return std::make_unique<EOFStage>(expCtx);
+        }
+        case STAGE_VIRTUAL_SCAN: {
+            const auto* vsn = static_cast<const VirtualScanNode*>(root);
+            invariant(vsn->hasRecordId);
+
+            auto qds = std::make_unique<QueuedDataStage>(expCtx, _ws);
+            for (auto&& arr : vsn->docs) {
+                // The VirtualScanNode should only have a single element that carrys the document
+                // as the QueuedDataStage cannot handle a recordId properly.
+                BSONObjIterator arrIt{arr};
+                invariant(arrIt.more());
+                auto firstElt = arrIt.next();
+                invariant(firstElt.type() == BSONType::Object);
+                invariant(!arrIt.more());
+
+                // Only add the first element to the working set.
+                auto wsID = _ws->allocate();
+                qds->pushBack(wsID);
+                auto* member = _ws->get(wsID);
+                member->keyData.clear();
+                member->doc = {{}, Document{firstElt.embeddedObject()}};
+            }
+            return qds;
         }
         case STAGE_CACHED_PLAN:
         case STAGE_COUNT:

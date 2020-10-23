@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::sbe {
 /**
@@ -42,10 +43,10 @@ namespace mongo::sbe {
 using UniqueStageTest = PlanStageTestFixture;
 
 TEST_F(UniqueStageTest, DeduplicatesAndPreservesOrderSimple) {
-    auto [inputTag, inputVal] = makeValue(BSON_ARRAY(1 << 2 << 3 << 1));
+    auto [inputTag, inputVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3 << 1));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
-    auto [expectedTag, expectedVal] = makeValue(BSON_ARRAY(1 << 2 << 3));
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 3));
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
@@ -61,19 +62,20 @@ TEST_F(UniqueStageTest, DeduplicatesAndPreservesOrderSimple) {
 }
 
 TEST_F(UniqueStageTest, DeduplicatesMultipleSlotsInKey) {
-    auto [tag, val] = makeValue(BSON_ARRAY(
+    auto [tag, val] = stage_builder::makeValue(BSON_ARRAY(
         BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(1 << 1) << BSON_ARRAY(3 << 3)));
-    auto [scanSlots, scan] = generateMockScanMulti(2,  // numSlots
-                                                   tag,
-                                                   val);
+    auto [scanSlots, scan] = generateVirtualScanMulti(2,  // numSlots
+                                                      tag,
+                                                      val);
 
-    auto [expectedTag, expectedVal] =
-        makeValue(BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(
+        BSON_ARRAY(BSON_ARRAY(1 << 1) << BSON_ARRAY(2 << 2) << BSON_ARRAY(3 << 3)));
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     auto unique = makeS<UniqueStage>(std::move(scan), scanSlots, kEmptyPlanNodeId);
 
-    auto resultAccessors = prepareTree(unique.get(), scanSlots);
+    auto ctx = makeCompileCtx();
+    auto resultAccessors = prepareTree(ctx.get(), unique.get(), scanSlots);
 
     auto [resultsTag, resultsVal] = getAllResultsMulti(unique.get(), resultAccessors);
     value::ValueGuard resultGuard{resultsTag, resultsVal};

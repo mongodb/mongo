@@ -52,6 +52,7 @@
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/util/make_data_structure.h"
@@ -99,6 +100,34 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildCollScan(
     }
 
     return std::move(stage);
+}
+
+std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildVirtualScan(
+    const QuerySolutionNode* root) {
+    auto vsn = static_cast<const VirtualScanNode*>(root);
+
+    auto [inputTag, inputVal] = sbe::value::makeNewArray();
+    sbe::value::ValueGuard inputGuard{inputTag, inputVal};
+    auto inputView = sbe::value::getArrayView(inputVal);
+
+    for (auto& doc : vsn->docs) {
+        auto [tag, val] = makeValue(doc);
+        inputView->push_back(tag, val);
+    }
+
+    inputGuard.reset();
+    auto [scanSlots, scanStage] =
+        generateVirtualScanMulti(&_slotIdGenerator, vsn->hasRecordId ? 2 : 1, inputTag, inputVal);
+
+    if (vsn->hasRecordId) {
+        invariant(scanSlots.size() == 2);
+        _data.recordIdSlot = scanSlots[0];
+        _data.resultSlot = scanSlots[1];
+    } else {
+        invariant(scanSlots.size() == 1);
+        _data.resultSlot = scanSlots[0];
+    }
+    return std::move(scanStage);
 }
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildIndexScan(
@@ -772,6 +801,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
                                          SlotBasedStageBuilder&, const QuerySolutionNode* root)>>
         kStageBuilders = {
             {STAGE_COLLSCAN, std::mem_fn(&SlotBasedStageBuilder::buildCollScan)},
+            {STAGE_VIRTUAL_SCAN, std::mem_fn(&SlotBasedStageBuilder::buildVirtualScan)},
             {STAGE_IXSCAN, std::mem_fn(&SlotBasedStageBuilder::buildIndexScan)},
             {STAGE_FETCH, std::mem_fn(&SlotBasedStageBuilder::buildFetch)},
             {STAGE_LIMIT, std::mem_fn(&SlotBasedStageBuilder::buildLimit)},
@@ -786,7 +816,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
             {STAGE_TEXT, &SlotBasedStageBuilder::buildText},
             {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey},
             {STAGE_EOF, &SlotBasedStageBuilder::buildEof},
-            {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge}};
+            {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge},
+            {STAGE_VIRTUAL_SCAN, &SlotBasedStageBuilder::buildVirtualScan}};
 
     uassert(4822884,
             str::stream() << "Can't build exec tree for node: " << root->toString(),

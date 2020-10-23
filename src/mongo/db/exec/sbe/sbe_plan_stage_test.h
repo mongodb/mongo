@@ -40,6 +40,8 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -53,14 +55,14 @@ using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
  * PlanStageTestFixture is a unittest framework for testing sbe::PlanStages.
  *
  * To facilitate writing unittests for PlanStages, PlanStageTestFixture sets up an OperationContext
- * and a CompileCtx and offers a number of methods to help unittest writers. From the perspective a
- * unittest writer, the most important methods in the PlanStageTestFixture class are prepareTree(),
- * runTest(), and runTestMulti(). Each unittest should directly call only one of these methods once.
+ * and offers a number of methods to help unittest writers. From the perspective a unittest writer,
+ * the most important methods in the PlanStageTestFixture class are prepareTree(), runTest(), and
+ * runTestMulti(). Each unittest should directly call only one of these methods once.
  *
  * For unittests where you need more control and flexibility, calling prepareTree() directly is
- * the way to go. prepareTree() takes the root stage of a PlanStage tree and 0 or more SlotIds as
- * parameters. When invoked, prepareTree() calls prepare() on the root stage (passing in the
- * CompileCtx), attaches the OperationContext to the root stage, calls open() on the root stage,
+ * the way to go. prepareTree() takes a CompileCtx, the root stage of a PlanStage tree and 0 or more
+ * SlotIds as parameters. When invoked, prepareTree() calls prepare() on the root stage (passing in
+ * the CompileCtx), attaches the OperationContext to the root stage, calls open() on the root stage,
  * and then returns the SlotAccessors corresponding to the specified SlotIds. For a given unittest
  * that calls prepareTree() directly, you can think of the unittest as having two parts: (1) the
  * part before prepareTree(); and (2) the part after prepareTree(). The first part of the test
@@ -68,8 +70,9 @@ using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
  * The second part of the test (after prepareTree()) should drive the execution of the PlanStage
  * tree (by calling getNext() on the root stage one or more times) and verify that the PlanStage
  * tree behaves as expected. During the first part before prepareTree(), it's common to use
- * generateMockScan() or generateMockScanMulti() which provide an easy way to build a PlanStage
- * subtree that streams out the contents of an SBE array (mimicking a real collection scan).
+ * generateVirtualScan() or generateVirtualScanMulti() which provide an easy way to build a
+ * PlanStage subtree that streams out the contents of an SBE array (mimicking a real collection
+ * scan).
  *
  * For unittests where you just need to stream the contents of an input array to a PlanStage and
  * compare the values produced against an "expected output" array, runTest() or runTestMulti() are
@@ -85,11 +88,9 @@ public:
         ServiceContextTest::setUp();
         _opCtx = makeOperationContext();
         _slotIdGenerator.reset(new value::SlotIdGenerator());
-        _compileCtx.reset(new CompileCtx(std::make_unique<RuntimeEnvironment>()));
     }
 
     void tearDown() override {
-        _compileCtx.reset();
         _slotIdGenerator.reset();
         _opCtx.reset();
         ServiceContextTest::tearDown();
@@ -103,8 +104,11 @@ public:
         return _slotIdGenerator->generate();
     }
 
-    CompileCtx* compileCtx() {
-        return _compileCtx.get();
+    /**
+     * Makes a new CompileCtx suitable for preparing an sbe::PlanStage tree.
+     */
+    std::unique_ptr<CompileCtx> makeCompileCtx() {
+        return std::make_unique<CompileCtx>(std::make_unique<RuntimeEnvironment>());
     }
 
     /**
@@ -119,29 +123,19 @@ public:
     }
 
     /**
-     * Converts a BSONArray to an SBE Array. Caller owns the SBE Array returned. This method
-     * does not assume ownership of the BSONArray.
-     */
-    std::pair<value::TypeTags, value::Value> makeValue(const BSONArray& ba);
-
-    /**
-     * Converts a BSONObj to an SBE Object. Caller owns the SBE Object returned. This method
-     * does not assume ownership of the BSONObj.
-     */
-    std::pair<value::TypeTags, value::Value> makeValue(const BSONObj& bo);
-
-    /**
      * This method takes an SBE array and returns an output slot and a unwind/project/limit/coscan
      * subtree that streams out the elements of the array one at a time via the output slot over a
      * series of calls to getNext(), mimicking the output of a collection scan or an index scan.
      *
      * Note that this method assumes ownership of the SBE Array being passed in.
      */
-    std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateMockScan(value::TypeTags arrTag,
-                                                                          value::Value arrVal);
+    std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateVirtualScan(value::TypeTags arrTag,
+                                                                             value::Value arrVal) {
+        return stage_builder::generateVirtualScan(_slotIdGenerator.get(), arrTag, arrVal);
+    };
 
     /**
-     * This method is similar to generateMockScan(), except that the subtree returned outputs to
+     * This method is similar to generateVirtualScan(), except that the subtree returned outputs to
      * multiple slots instead of a single slot. `numSlots` specifies the number of output slots.
      * `array` is expected to be an array of subarrays. Each subarray is expected to have exactly
      * `numSlots` elements, where the value at index 0 corresponds to output slot 0, the value at
@@ -151,37 +145,43 @@ public:
      *
      * Note that this method assumes ownership of the SBE Array being passed in.
      */
-    std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateMockScanMulti(
-        int32_t numSlots, value::TypeTags arrTag, value::Value arrVal);
+    std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateVirtualScanMulti(
+        int32_t numSlots, value::TypeTags arrTag, value::Value arrVal) {
+        return stage_builder::generateVirtualScanMulti(
+            _slotIdGenerator.get(), numSlots, arrTag, arrVal);
+    };
 
     /**
      * Make a mock scan from an BSON array. This method does NOT assume ownership of the BSONArray
      * passed in.
      */
-    std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateMockScan(const BSONArray& array);
+    std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateVirtualScan(
+        const BSONArray& array);
 
     /**
      * Make a mock scan with multiple output slots from an BSON array. This method does NOT assume
      * ownership of the BSONArray passed in.
      */
-    std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateMockScanMulti(
+    std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateVirtualScanMulti(
         int32_t numSlots, const BSONArray& array);
 
     /**
-     * Prepares the tree of PlanStages given by `root` and returns the SlotAccessor* for `slot`.
+     * Prepares the tree of PlanStages given by `root`.
      */
-    void prepareTree(PlanStage* root);
+    void prepareTree(CompileCtx* ctx, PlanStage* root);
 
     /**
      * Prepares the tree of PlanStages given by `root` and returns the SlotAccessor* for `slot`.
      */
-    value::SlotAccessor* prepareTree(PlanStage* root, value::SlotId slot);
+    value::SlotAccessor* prepareTree(CompileCtx* ctx, PlanStage* root, value::SlotId slot);
 
     /**
      * Prepares the tree of PlanStages given by `root` and returns the SlotAccessor*'s for
      * the specified slots.
      */
-    std::vector<value::SlotAccessor*> prepareTree(PlanStage* root, value::SlotVector slots);
+    std::vector<value::SlotAccessor*> prepareTree(CompileCtx* ctx,
+                                                  PlanStage* root,
+                                                  value::SlotVector slots);
 
     /**
      * This method repeatedly calls getNext() on the specified PlanStage, stores all the values
@@ -242,7 +242,6 @@ public:
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     std::unique_ptr<value::SlotIdGenerator> _slotIdGenerator;
-    std::unique_ptr<CompileCtx> _compileCtx;
 };
 
 }  // namespace mongo::sbe

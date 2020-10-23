@@ -41,11 +41,13 @@ namespace mongo::sbe {
 using LimitSkipStageTest = PlanStageTestFixture;
 
 TEST_F(LimitSkipStageTest, LimitSimpleTest) {
+    auto ctx = makeCompileCtx();
+
     // Make a "limit 1000" stage.
     auto limit = makeS<LimitSkipStage>(
         makeS<CoScanStage>(kEmptyPlanNodeId), 1000, boost::none, kEmptyPlanNodeId);
 
-    prepareTree(limit.get());
+    prepareTree(ctx.get(), limit.get());
 
     // Verify that `limit` produces at least 1000 values.
     for (int i = 0; i < 1000; ++i) {
@@ -57,6 +59,8 @@ TEST_F(LimitSkipStageTest, LimitSimpleTest) {
 }
 
 TEST_F(LimitSkipStageTest, LimitSkipSimpleTest) {
+    auto ctx = makeCompileCtx();
+
     // Make an input array containing 64-integers 0 thru 999, inclusive.
     auto [inputTag, inputVal] = value::makeNewArray();
     value::ValueGuard inputGuard{inputTag, inputVal};
@@ -68,10 +72,10 @@ TEST_F(LimitSkipStageTest, LimitSkipSimpleTest) {
 
     // Make a "limit 200 skip 300" stage.
     inputGuard.reset();
-    auto [scanSlot, scanStage] = generateMockScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
     auto limit = makeS<LimitSkipStage>(std::move(scanStage), 200, 300, kEmptyPlanNodeId);
 
-    auto resultAccessor = prepareTree(limit.get(), scanSlot);
+    auto resultAccessor = prepareTree(ctx.get(), limit.get(), scanSlot);
 
     // Verify that `limit` produces exactly 300 thru 499, inclusive.
     for (i = 0; i < 200; ++i) {

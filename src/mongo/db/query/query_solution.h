@@ -482,6 +482,51 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     bool stopApplyingFilterAfterFirstMatch = false;
 };
 
+/**
+ * A VirtualScanNode is similar to a collection or an index scan except that it doesn't depend on an
+ * underlying storage implementation. It can be used to represent a virtual
+ * collection or an index scan in memory by using a backing vector of BSONArray.
+ */
+struct VirtualScanNode : public QuerySolutionNodeWithSortSet {
+    VirtualScanNode(std::vector<BSONArray> docs, bool hasRecordId);
+    virtual ~VirtualScanNode() {}
+
+    virtual StageType getType() const {
+        return STAGE_VIRTUAL_SCAN;
+    }
+
+    virtual void appendToString(str::stream* ss, int indent) const;
+
+    bool fetched() const {
+        return true;
+    }
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kFullyProvided;
+    }
+    bool sortedByDiskLoc() const {
+        return false;
+    }
+
+    QuerySolutionNode* clone() const;
+
+    // A representation of a collection's documents. Here we use a BSONArray so metadata like a
+    // RecordId can be stored alongside of the main document payload. The format of the data in
+    // BSONArray is entirely up to a client of this node, but if this node is to be used for
+    // consumption downstream by stage builder implementations it must conform to the format
+    // expected by those stage builders. That expected contract depends on the hasRecordId flag. If
+    // the hasRecordId flag is 'false' the BSONArray will have a single element that is a BSONObj
+    // representation of a document being produced from this node. If 'hasRecordId' is true, then
+    // each BSONArray in docs will carry a RecordId in the zeroth position of the array and a
+    // BSONObj in the first position of the array.
+    std::vector<BSONArray> docs;
+
+    // A flag to indicate the format of the BSONArray document payload in the above vector, docs. If
+    // hasRecordId is set to true, then both a RecordId and a BSONObj document are stored in that
+    // order for every BSONArray in docs. Otherwise, the RecordId is omitted and the BSONArray will
+    // only carry a BSONObj document.
+    bool hasRecordId;
+};
+
 struct AndHashNode : public QuerySolutionNode {
     AndHashNode();
     virtual ~AndHashNode();

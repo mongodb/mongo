@@ -43,8 +43,8 @@ namespace mongo::sbe {
 using FilterStageTest = PlanStageTestFixture;
 
 TEST_F(FilterStageTest, ConstantFilterAlwaysTrueTest) {
-    auto [inputTag, inputVal] =
-        makeValue(BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
+    auto [inputTag, inputVal] = stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
     auto [expectedTag, expectedVal] = value::copyValue(inputTag, inputVal);
@@ -66,8 +66,8 @@ TEST_F(FilterStageTest, ConstantFilterAlwaysTrueTest) {
 }
 
 TEST_F(FilterStageTest, ConstantFilterAlwaysFalseTest) {
-    auto [inputTag, inputVal] =
-        makeValue(BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
+    auto [inputTag, inputVal] = stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
     auto [expectedTag, expectedVal] = value::makeNewArray();
@@ -89,8 +89,8 @@ TEST_F(FilterStageTest, ConstantFilterAlwaysFalseTest) {
 }
 
 TEST_F(FilterStageTest, FilterAlwaysTrueTest) {
-    auto [inputTag, inputVal] =
-        makeValue(BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
+    auto [inputTag, inputVal] = stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
     auto [expectedTag, expectedVal] = value::copyValue(inputTag, inputVal);
@@ -112,8 +112,8 @@ TEST_F(FilterStageTest, FilterAlwaysTrueTest) {
 }
 
 TEST_F(FilterStageTest, FilterAlwaysFalseTest) {
-    auto [inputTag, inputVal] =
-        makeValue(BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
+    auto [inputTag, inputVal] = stage_builder::makeValue(
+        BSON_ARRAY(12LL << "yar" << BSON_ARRAY(2.5) << 7.5 << BSON("foo" << 23)));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
     auto [expectedTag, expectedVal] = value::makeNewArray();
@@ -137,11 +137,11 @@ TEST_F(FilterStageTest, FilterAlwaysFalseTest) {
 TEST_F(FilterStageTest, FilterIsNumberTest) {
     using namespace std::literals;
 
-    auto [inputTag, inputVal] =
-        makeValue(BSON_ARRAY(12LL << "42" << BSON_ARRAY(2.5) << 7.5 << BSON("34" << 56)));
+    auto [inputTag, inputVal] = stage_builder::makeValue(
+        BSON_ARRAY(12LL << "42" << BSON_ARRAY(2.5) << 7.5 << BSON("34" << 56)));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
-    auto [expectedTag, expectedVal] = makeValue(BSON_ARRAY(12LL << 7.5));
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(BSON_ARRAY(12LL << 7.5));
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     auto makeStageFn = [](value::SlotId scanSlot, std::unique_ptr<PlanStage> scanStage) {
@@ -160,13 +160,13 @@ TEST_F(FilterStageTest, FilterIsNumberTest) {
 }
 
 TEST_F(FilterStageTest, FilterLessThanTest) {
-    auto [inputTag, inputVal] = makeValue(BSON_ARRAY(
+    auto [inputTag, inputVal] = stage_builder::makeValue(BSON_ARRAY(
         BSON_ARRAY(2.8 << 3) << BSON_ARRAY(7LL << 5.0) << BSON_ARRAY(4LL << 4.3)
                              << BSON_ARRAY(8 << 8) << BSON_ARRAY("1" << 2) << BSON_ARRAY(1 << "2")
                              << BSON_ARRAY(4.9 << 5) << BSON_ARRAY(6.0 << BSON_ARRAY(11.0))));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
-    auto [expectedTag, expectedVal] = makeValue(
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(2.8 << 3) << BSON_ARRAY(4LL << 4.3) << BSON_ARRAY(4.9 << 5)));
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 

@@ -39,12 +39,12 @@ namespace mongo::sbe {
 using SortStageTest = PlanStageTestFixture;
 
 TEST_F(SortStageTest, SortNumbersTest) {
-    auto [inputTag, inputVal] = makeValue(
+    auto [inputTag, inputVal] = stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(12LL << "A") << BSON_ARRAY(2.5 << "B") << BSON_ARRAY(7 << "C")
                                            << BSON_ARRAY(Decimal128(4) << "D")));
     value::ValueGuard inputGuard{inputTag, inputVal};
 
-    auto [expectedTag, expectedVal] = makeValue(
+    auto [expectedTag, expectedVal] = stage_builder::makeValue(
         BSON_ARRAY(BSON_ARRAY(2.5 << "B") << BSON_ARRAY(Decimal128(4) << "D")
                                           << BSON_ARRAY(7 << "C") << BSON_ARRAY(12LL << "A")));
     value::ValueGuard expectedGuard{expectedTag, expectedVal};

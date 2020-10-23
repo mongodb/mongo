@@ -39,108 +39,39 @@
 
 namespace mongo::sbe {
 
-std::pair<value::TypeTags, value::Value> PlanStageTestFixture::makeValue(const BSONArray& ba) {
-    int numBytes = ba.objsize();
-    uint8_t* data = new uint8_t[numBytes];
-    memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
-    return {value::TypeTags::bsonArray, value::bitcastFrom<uint8_t*>(data)};
-}
-
-std::pair<value::TypeTags, value::Value> PlanStageTestFixture::makeValue(const BSONObj& bo) {
-    int numBytes = bo.objsize();
-    uint8_t* data = new uint8_t[numBytes];
-    memcpy(data, reinterpret_cast<const uint8_t*>(bo.objdata()), numBytes);
-    return {value::TypeTags::bsonObject, value::bitcastFrom<uint8_t*>(data)};
-}
-
-std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateMockScan(
-    value::TypeTags arrTag, value::Value arrVal) {
-    // The value passed in must be an array.
-    invariant(value::isArray(arrTag));
-
-    // Make an EConstant expression for the array.
-    auto arrayExpression = makeE<EConstant>(arrTag, arrVal);
-
-    // Build the unwind/project/limit/coscan subtree.
-    auto projectSlot = generateSlotId();
-    auto unwindSlot = generateSlotId();
-    auto unwind = makeS<UnwindStage>(
-        makeProjectStage(
-            makeS<LimitSkipStage>(
-                makeS<CoScanStage>(kEmptyPlanNodeId), 1, boost::none, kEmptyPlanNodeId),
-            kEmptyPlanNodeId,
-            projectSlot,
-            std::move(arrayExpression)),
-        projectSlot,
-        unwindSlot,
-        generateSlotId(),  // We don't need an index slot but must to provide it.
-        false,             // Don't preserve null and empty arrays.
-        kEmptyPlanNodeId);
-
-    // Return the UnwindStage and its output slot. The UnwindStage can be used as an input
-    // to other PlanStages.
-    return {unwindSlot, std::move(unwind)};
-}
-
-std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
-PlanStageTestFixture::generateMockScanMulti(int32_t numSlots,
-                                            value::TypeTags arrTag,
-                                            value::Value arrVal) {
-    using namespace std::literals;
-
-    invariant(numSlots >= 1);
-
-    // Generate a mock scan with a single output slot.
-    auto [scanSlot, scanStage] = generateMockScan(arrTag, arrVal);
-
-    // Create a ProjectStage that will read the data from `scanStage` and split it up
-    // across multiple output slots.
-    value::SlotVector projectSlots;
-    value::SlotMap<std::unique_ptr<EExpression>> projections;
-    for (int32_t i = 0; i < numSlots; ++i) {
-        projectSlots.emplace_back(generateSlotId());
-        projections.emplace(
-            projectSlots.back(),
-            makeE<EFunction>("getElement"sv,
-                             makeEs(makeE<EVariable>(scanSlot),
-                                    makeE<EConstant>(value::TypeTags::NumberInt32,
-                                                     value::bitcastFrom<int32_t>(i)))));
-    }
-
-    return {std::move(projectSlots),
-            makeS<ProjectStage>(std::move(scanStage), std::move(projections), kEmptyPlanNodeId)};
-}
-
-std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateMockScan(
+std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
     const BSONArray& array) {
-    auto [arrTag, arrVal] = makeValue(array);
-    return generateMockScan(arrTag, arrVal);
+    auto [arrTag, arrVal] = stage_builder::makeValue(array);
+    return generateVirtualScan(arrTag, arrVal);
 }
 
 std::pair<value::SlotVector, std::unique_ptr<PlanStage>>
-PlanStageTestFixture::generateMockScanMulti(int32_t numSlots, const BSONArray& array) {
-    auto [arrTag, arrVal] = makeValue(array);
-    return generateMockScanMulti(numSlots, arrTag, arrVal);
+PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots, const BSONArray& array) {
+    auto [arrTag, arrVal] = stage_builder::makeValue(array);
+    return generateVirtualScanMulti(numSlots, arrTag, arrVal);
 }
 
-void PlanStageTestFixture::prepareTree(PlanStage* root) {
-    root->prepare(*_compileCtx);
+void PlanStageTestFixture::prepareTree(CompileCtx* ctx, PlanStage* root) {
+    root->prepare(*ctx);
     root->attachFromOperationContext(opCtx());
     root->open(false);
 }
 
-value::SlotAccessor* PlanStageTestFixture::prepareTree(PlanStage* root, value::SlotId slot) {
-    prepareTree(root);
-    return root->getAccessor(*_compileCtx, slot);
+value::SlotAccessor* PlanStageTestFixture::prepareTree(CompileCtx* ctx,
+                                                       PlanStage* root,
+                                                       value::SlotId slot) {
+    prepareTree(ctx, root);
+    return root->getAccessor(*ctx, slot);
 }
 
-std::vector<value::SlotAccessor*> PlanStageTestFixture::prepareTree(PlanStage* root,
+std::vector<value::SlotAccessor*> PlanStageTestFixture::prepareTree(CompileCtx* ctx,
+                                                                    PlanStage* root,
                                                                     value::SlotVector slots) {
     std::vector<value::SlotAccessor*> slotAccessors;
 
-    prepareTree(root);
+    prepareTree(ctx, root);
     for (auto slot : slots) {
-        slotAccessors.emplace_back(root->getAccessor(*_compileCtx, slot));
+        slotAccessors.emplace_back(root->getAccessor(*ctx, slot));
     }
     return slotAccessors;
 }
@@ -193,18 +124,20 @@ void PlanStageTestFixture::runTest(value::TypeTags inputTag,
                                    value::TypeTags expectedTag,
                                    value::Value expectedVal,
                                    const MakeStageFn<value::SlotId>& makeStage) {
+    auto ctx = makeCompileCtx();
+
     // Set up a ValueGuard to ensure `expected` gets released.
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     // Generate a mock scan from `input` with a single output slot.
-    auto [scanSlot, scanStage] = generateMockScan(inputTag, inputVal);
+    auto [scanSlot, scanStage] = generateVirtualScan(inputTag, inputVal);
 
     // Call the `makeStage` callback to create the PlanStage that we want to test, passing in
     // the mock scan subtree and its output slot.
     auto [outputSlot, stage] = makeStage(scanSlot, std::move(scanStage));
 
     // Prepare the tree and get the SlotAccessor for the output slot.
-    auto resultAccessor = prepareTree(stage.get(), outputSlot);
+    auto resultAccessor = prepareTree(ctx.get(), stage.get(), outputSlot);
 
     // Get all the results produced by the PlanStage we want to test.
     auto [resultsTag, resultsVal] = getAllResults(stage.get(), resultAccessor);
@@ -220,18 +153,20 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
                                         value::TypeTags expectedTag,
                                         value::Value expectedVal,
                                         const MakeStageFn<value::SlotVector>& makeStageMulti) {
+    auto ctx = makeCompileCtx();
+
     // Set up a ValueGuard to ensure `expected` gets released.
     value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
     // Generate a mock scan from `input` with multiple output slots.
-    auto [scanSlots, scanStage] = generateMockScanMulti(numInputSlots, inputTag, inputVal);
+    auto [scanSlots, scanStage] = generateVirtualScanMulti(numInputSlots, inputTag, inputVal);
 
     // Call the `makeStageMulti` callback to create the PlanStage that we want to test, passing
     // in the mock scan subtree and its output slots.
     auto [outputSlots, stage] = makeStageMulti(scanSlots, std::move(scanStage));
 
     // Prepare the tree and get the SlotAccessors for the output slots.
-    auto resultAccessors = prepareTree(stage.get(), outputSlots);
+    auto resultAccessors = prepareTree(ctx.get(), stage.get(), outputSlots);
 
     // Get all the results produced by the PlanStage we want to test.
     auto [resultsTag, resultsVal] = getAllResultsMulti(stage.get(), resultAccessors);

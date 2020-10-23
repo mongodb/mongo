@@ -111,6 +111,7 @@ public:
 
 private:
     std::unique_ptr<sbe::PlanStage> buildCollScan(const QuerySolutionNode* root);
+    std::unique_ptr<sbe::PlanStage> buildVirtualScan(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildIndexScan(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildFetch(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildLimit(const QuerySolutionNode* root);
