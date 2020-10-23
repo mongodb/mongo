@@ -123,6 +123,7 @@ private:
     std::unique_ptr<sbe::PlanStage> buildOr(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildText(const QuerySolutionNode* root);
     std::unique_ptr<sbe::PlanStage> buildReturnKey(const QuerySolutionNode* root);
+    std::unique_ptr<sbe::PlanStage> buildEof(const QuerySolutionNode* root);
 
     std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(
         std::unique_ptr<sbe::PlanStage> inputStage,

@@ -75,9 +75,8 @@ private:
     const value::SlotVector _obs;
     const std::vector<value::SortDirection> _dirs;
     const value::SlotVector _vals;
-    const size_t _limit;
-    const size_t _memoryLimit;
     const bool _allowDiskUse;
+    SortStats _specificStats;
 
     std::vector<value::SlotAccessor*> _inKeyAccessors;
     std::vector<value::SlotAccessor*> _inValueAccessors;

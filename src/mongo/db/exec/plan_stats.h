@@ -36,6 +36,7 @@
 
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/time_support.h"
@@ -54,6 +55,8 @@ struct SpecificStats {
     virtual SpecificStats* clone() const = 0;
 
     virtual uint64_t estimateObjectSizeInBytes() const = 0;
+
+    virtual void accumulate(PlanSummaryStats& summary) const {}
 };
 
 // Every stage has CommonStats.
@@ -617,6 +620,14 @@ struct SortStats : public SpecificStats {
 
     uint64_t estimateObjectSizeInBytes() const {
         return sortPattern.objsize() + sizeof(*this);
+    }
+
+    void accumulate(PlanSummaryStats& summary) const final {
+        summary.hasSortStage = true;
+
+        if (wasDiskUsed) {
+            summary.usedDisk = true;
+        }
     }
 
     // The pattern according to which we are sorting.

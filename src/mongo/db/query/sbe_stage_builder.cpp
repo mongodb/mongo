@@ -681,6 +681,11 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::makeUnionForTailableCollS
     return unionStage;
 }
 
+std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildEof(const QuerySolutionNode* root) {
+    return sbe::makeS<sbe::LimitSkipStage>(
+        sbe::makeS<sbe::CoScanStage>(root->nodeId()), 0, boost::none, root->nodeId());
+}
+
 // Returns a non-null pointer to the root of a plan tree, or a non-OK status if the PlanStage tree
 // could not be constructed.
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
@@ -701,7 +706,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
             {STAGE_PROJECTION_COVERED, std::mem_fn(&SlotBasedStageBuilder::buildProjectionCovered)},
             {STAGE_OR, &SlotBasedStageBuilder::buildOr},
             {STAGE_TEXT, &SlotBasedStageBuilder::buildText},
-            {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey}};
+            {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey},
+            {STAGE_EOF, &SlotBasedStageBuilder::buildEof}};
 
     uassert(4822884,
             str::stream() << "Can't build exec tree for node: " << root->toString(),

@@ -45,6 +45,7 @@
 #include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
 #include "mongo/db/exec/ensure_sorted.h"
+#include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/geo_near.h"
 #include "mongo/db/exec/index_scan.h"
@@ -350,10 +351,12 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             return std::make_unique<EnsureSortedStage>(
                 expCtx, esn->pattern, _ws, std::move(childStage));
         }
+        case STAGE_EOF: {
+            return std::make_unique<EOFStage>(expCtx);
+        }
         case STAGE_CACHED_PLAN:
         case STAGE_COUNT:
         case STAGE_DELETE:
-        case STAGE_EOF:
         case STAGE_IDHACK:
         case STAGE_MOCK:
         case STAGE_MULTI_ITERATOR:

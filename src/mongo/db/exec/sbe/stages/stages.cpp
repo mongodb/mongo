@@ -75,5 +75,16 @@ void CanChangeState::restoreState() {
 
     doRestoreState();
 }
+
+void CanTrackStats::accumulate(PlanNodeId nodeId, PlanSummaryStats& summary) const {
+    if (auto stats = getSpecificStats();
+        stats && (nodeId == kEmptyPlanNodeId || _commonStats.nodeId == nodeId)) {
+        stats->accumulate(summary);
+    }
+
+    for (auto&& child : _stage->_children) {
+        child->accumulate(nodeId, summary);
+    }
+}
 }  // namespace sbe
 }  // namespace mongo

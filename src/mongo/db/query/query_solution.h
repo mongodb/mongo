@@ -1166,4 +1166,27 @@ struct EnsureSortedNode : public QuerySolutionNode {
     BSONObj pattern;
 };
 
+struct EofNode : public QuerySolutionNodeWithSortSet {
+    EofNode() {}
+
+    virtual StageType getType() const {
+        return STAGE_EOF;
+    }
+
+    virtual void appendToString(str::stream* ss, int indent) const;
+
+    bool fetched() const {
+        return false;
+    }
+
+    FieldAvailability getFieldAvailability(const std::string& field) const {
+        return FieldAvailability::kNotProvided;
+    }
+
+    bool sortedByDiskLoc() const {
+        return false;
+    }
+
+    QuerySolutionNode* clone() const;
+};
 }  // namespace mongo

@@ -135,7 +135,8 @@ private:
  */
 class CanTrackStats {
 public:
-    CanTrackStats(StringData stageType, PlanNodeId nodeId) : _commonStats(stageType, nodeId) {}
+    CanTrackStats(PlanStage* stage, StringData stageType, PlanNodeId nodeId)
+        : _stage(stage), _commonStats(stageType, nodeId) {}
 
     /**
      * Returns a tree of stats. If the stage has any children it must propagate the request for
@@ -164,6 +165,14 @@ public:
         return &_commonStats;
     }
 
+    /**
+     * Populates plan 'summary' object by walking through the entire PlanStage tree and for each
+     * node whose plan node ID equals to the given 'nodeId', or if 'nodeId' is 'kEmptyPlanNodeId',
+     * invoking 'accumulate(summary)' on the SpecificStats instance obtained by calling
+     * 'getSpecificStats()'.
+     */
+    void accumulate(PlanNodeId nodeId, PlanSummaryStats& summary) const;
+
 protected:
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
@@ -175,6 +184,7 @@ protected:
         return state;
     }
 
+    PlanStage* const _stage;
     CommonStats _commonStats;
 };
 
@@ -227,7 +237,7 @@ public:
     PlanStage(StringData stageType, PlanYieldPolicy* yieldPolicy, PlanNodeId nodeId)
         : CanSwitchOperationContext{this},
           CanChangeState{this},
-          CanTrackStats{stageType, nodeId},
+          CanTrackStats{this, stageType, nodeId},
           CanInterrupt{yieldPolicy} {}
 
     PlanStage(StringData stageType, PlanNodeId nodeId) : PlanStage(stageType, nullptr, nodeId) {}
@@ -282,6 +292,7 @@ public:
 
     friend class CanSwitchOperationContext;
     friend class CanChangeState;
+    friend class CanTrackStats;
 
 protected:
     std::vector<std::unique_ptr<PlanStage>> _children;

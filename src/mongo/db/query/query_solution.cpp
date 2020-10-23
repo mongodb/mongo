@@ -1322,4 +1322,19 @@ QuerySolutionNode* EnsureSortedNode::clone() const {
     return copy;
 }
 
+//
+// EofNode
+//
+
+void EofNode::appendToString(str::stream* ss, int indent) const {
+    addIndent(ss, indent);
+    *ss << "EOF\n";
+}
+
+QuerySolutionNode* EofNode::clone() const {
+    auto copy = new EofNode();
+    cloneBaseData(copy);
+    return copy;
+}
+
 }  // namespace mongo

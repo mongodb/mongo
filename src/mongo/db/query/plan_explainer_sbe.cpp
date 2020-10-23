@@ -105,7 +105,78 @@ std::string PlanExplainerSBE::getPlanSummary() const {
 }
 
 void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
-    // TODO: SERVER-50744
+    invariant(statsOut);
+
+    if (!_solution || !_root) {
+        return;
+    }
+
+    auto common = _root->getCommonStats();
+    statsOut->nReturned = common->advances;
+    statsOut->fromMultiPlanner = isMultiPlan();
+    statsOut->totalKeysExamined = 0;
+    statsOut->totalDocsExamined = 0;
+
+    // Collect cumulative execution stats for the plan.
+    _root->accumulate(kEmptyPlanNodeId, *statsOut);
+
+    std::queue<const QuerySolutionNode*> queue;
+    queue.push(_solution->root());
+
+    // Look through the QuerySolution to collect some static stat details.
+    //
+    // TODO SERVER-51138: handle replan reason for cached plan.
+    while (!queue.empty()) {
+        auto node = queue.front();
+        queue.pop();
+        invariant(node);
+
+        switch (node->getType()) {
+            case STAGE_COUNT_SCAN: {
+                auto csn = static_cast<const CountScanNode*>(node);
+                statsOut->indexesUsed.insert(csn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_DISTINCT_SCAN: {
+                auto dn = static_cast<const DistinctNode*>(node);
+                statsOut->indexesUsed.insert(dn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_GEO_NEAR_2D: {
+                auto geo2d = static_cast<const GeoNear2DNode*>(node);
+                statsOut->indexesUsed.insert(geo2d->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_GEO_NEAR_2DSPHERE: {
+                auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
+                statsOut->indexesUsed.insert(geo2dsphere->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_IXSCAN: {
+                auto ixn = static_cast<const IndexScanNode*>(node);
+                statsOut->indexesUsed.insert(ixn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_TEXT: {
+                auto tn = static_cast<const TextNode*>(node);
+                statsOut->indexesUsed.insert(tn->index.identifier.catalogName);
+                break;
+            }
+            case STAGE_COLLSCAN: {
+                statsOut->collectionScans++;
+                auto csn = static_cast<const CollectionScanNode*>(node);
+                if (!csn->tailable) {
+                    statsOut->collectionScansNonTailable++;
+                }
+            }
+            default:
+                break;
+        }
+
+        for (auto&& child : node->children) {
+            queue.push(child);
+        }
+    }
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(

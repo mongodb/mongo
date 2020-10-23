@@ -550,7 +550,15 @@ public:
                         "Collection does not exist. Using EOF plan",
                         "namespace"_attr = _cq->ns(),
                         "canonicalQuery"_attr = redact(_cq->toStringShort()));
-            return buildEofPlan();
+
+            auto solution = std::make_unique<QuerySolution>();
+            solution->setRoot(std::make_unique<EofNode>());
+
+            auto root = buildExecutableTree(*solution);
+
+            auto result = makeResult();
+            result->emplace(std::move(root), std::move(solution));
+            return std::move(result);
         }
 
         // Fill out the planning params.  We use these for both cached solutions and non-cached.
@@ -690,11 +698,6 @@ protected:
     virtual PlanStageType buildExecutableTree(const QuerySolution& solution) const = 0;
 
     /**
-     * Constructs a special PlanStage tree to return EOF immediately on the first call to getNext.
-     */
-    virtual std::unique_ptr<ResultType> buildEofPlan() = 0;
-
-    /**
      * If supported, constructs a special PlanStage tree for fast-path document retrievals via the
      * _id index. Otherwise, nullptr should be returned and  this helper will fall back to the
      * normal plan generation.
@@ -761,12 +764,6 @@ public:
 protected:
     std::unique_ptr<PlanStage> buildExecutableTree(const QuerySolution& solution) const final {
         return stage_builder::buildClassicExecutableTree(_opCtx, _collection, *_cq, solution, _ws);
-    }
-
-    std::unique_ptr<ClassicPrepareExecutionResult> buildEofPlan() final {
-        auto result = makeResult();
-        result->emplace(std::make_unique<EOFStage>(_cq->getExpCtxRaw()), nullptr);
-        return result;
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan(
@@ -904,16 +901,6 @@ protected:
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> buildExecutableTree(
         const QuerySolution& solution) const final {
         return buildExecutableTree(solution, false);
-    }
-
-    std::unique_ptr<SlotBasedPrepareExecutionResult> buildEofPlan() final {
-        auto result = makeResult();
-        result->emplace(
-            {sbe::makeS<sbe::LimitSkipStage>(
-                 sbe::makeS<sbe::CoScanStage>(kEmptyPlanNodeId), 0, boost::none, kEmptyPlanNodeId),
-             stage_builder::PlanStageData{std::make_unique<sbe::RuntimeEnvironment>()}},
-            nullptr);
-        return result;
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan(

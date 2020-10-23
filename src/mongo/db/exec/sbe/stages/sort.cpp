@@ -58,14 +58,15 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),
-      _limit(limit),
-      _memoryLimit(memoryLimit),
       _allowDiskUse(allowDiskUse),
       _mergeData({0, 0}),
       _tracker(tracker) {
     _children.emplace_back(std::move(input));
 
     invariant(_obs.size() == _dirs.size());
+
+    _specificStats.limit = limit;
+    _specificStats.maxMemoryUsageBytes = memoryLimit;
 }
 
 SortStage ::~SortStage() {}
@@ -75,8 +76,8 @@ std::unique_ptr<PlanStage> SortStage::clone() const {
                                        _obs,
                                        _dirs,
                                        _vals,
-                                       _limit,
-                                       _memoryLimit,
+                                       _specificStats.limit,
+                                       _specificStats.maxMemoryUsageBytes,
                                        _allowDiskUse,
                                        _tracker,
                                        _commonStats.nodeId);
@@ -121,9 +122,10 @@ value::SlotAccessor* SortStage::getAccessor(CompileCtx& ctx, value::SlotId slot)
 void SortStage::makeSorter() {
     SortOptions opts;
     opts.tempDir = storageGlobalParams.dbpath + "/_tmp";
-    opts.maxMemoryUsageBytes = _memoryLimit;
+    opts.maxMemoryUsageBytes = _specificStats.maxMemoryUsageBytes;
     opts.extSortAllowed = _allowDiskUse;
-    opts.limit = _limit != std::numeric_limits<size_t>::max() ? _limit : 0;
+    opts.limit =
+        _specificStats.limit != std::numeric_limits<size_t>::max() ? _specificStats.limit : 0;
 
     auto comp = [&](const SorterData& lhs, const SorterData& rhs) {
         auto size = lhs.first.size();
@@ -169,6 +171,7 @@ void SortStage::open(bool reOpen) {
             vals.reset(idx++, true, tag, val);
         }
 
+        // TODO SERVER-51815: count total mem usage for specificStats.
         _sorter->emplace(std::move(keys), std::move(vals));
 
         if (_tracker && _tracker->trackProgress<TrialRunProgressTracker::kNumResults>(1)) {
@@ -187,6 +190,7 @@ void SortStage::open(bool reOpen) {
     }
 
     _mergeIt.reset(_sorter->done());
+    _specificStats.wasDiskUsed = _specificStats.wasDiskUsed || _sorter->usedDisk();
 
     _children[0]->close();
 }
@@ -210,12 +214,13 @@ void SortStage::close() {
 
 std::unique_ptr<PlanStageStats> SortStage::getStats() const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
+    ret->specific = std::make_unique<SortStats>(_specificStats);
     ret->children.emplace_back(_children[0]->getStats());
     return ret;
 }
 
 const SpecificStats* SortStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 std::vector<DebugPrinter::Block> SortStage::debugPrint() const {
@@ -241,8 +246,8 @@ std::vector<DebugPrinter::Block> SortStage::debugPrint() const {
     }
     ret.emplace_back("`]");
 
-    if (_limit != std::numeric_limits<size_t>::max()) {
-        ret.emplace_back(std::to_string(_limit));
+    if (_specificStats.limit != std::numeric_limits<size_t>::max()) {
+        ret.emplace_back(std::to_string(_specificStats.limit));
     }
 
     DebugPrinter::addNewLine(ret);
