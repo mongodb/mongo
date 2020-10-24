@@ -35,7 +35,6 @@
 
 #pragma once
 
-#include <boost/preprocessor/cat.hpp>
 #include <cmath>
 #include <fmt/format.h>
 #include <functional>
@@ -195,23 +194,25 @@
  * This should be used at namespace scope, not inside a TEST function.
  *
  * Examples that pass:
- *     ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char>());
- *     ASSERT_DOES_NOT_COMPILE(bool B = false, std::enable_if_t<B, int>{});
+ *     ASSERT_DOES_NOT_COMPILE(MyTest1, typename Char = char, *std::declval<Char>());
+ *     ASSERT_DOES_NOT_COMPILE(MyTest2, bool B = false, std::enable_if_t<B, int>{});
  *
  * Examples that fail:
- *     ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char*>());
- *     ASSERT_DOES_NOT_COMPILE(bool B = true, std::enable_if_t<B, int>{});
+ *     ASSERT_DOES_NOT_COMPILE(MyTest3, typename Char = char, *std::declval<Char*>());
+ *     ASSERT_DOES_NOT_COMPILE(MyTest4, bool B = true, std::enable_if_t<B, int>{});
  *
  */
-#define ASSERT_DOES_NOT_COMPILE(Alias, /*expr*/...) \
-    ASSERT_DOES_NOT_COMPILE_1_(                     \
-        BOOST_PP_CAT(compileCheck_, __LINE__), Alias, #Alias, (__VA_ARGS__), #__VA_ARGS__)
+#define ASSERT_DOES_NOT_COMPILE(Id, Alias, ...) \
+    ASSERT_DOES_NOT_COMPILE_1_(Id, Alias, #Alias, (__VA_ARGS__), #__VA_ARGS__)
 
-#define ASSERT_DOES_NOT_COMPILE_1_(Id, Alias, AliasString, Expr, ExprString)        \
-    static auto Id(...)->std::true_type;                                            \
-    template <Alias>                                                                \
-    static auto Id(int)->std::conditional_t<true, std::false_type, decltype(Expr)>; \
-    static_assert(decltype(Id(0))::value,                                           \
+#define ASSERT_DOES_NOT_COMPILE_1_(Id, Alias, AliasString, Expr, ExprString)  \
+                                                                              \
+    static std::true_type Id(...);                                            \
+                                                                              \
+    template <Alias>                                                          \
+    static std::conditional_t<true, std::false_type, decltype(Expr)> Id(int); \
+                                                                              \
+    static_assert(decltype(Id(0))::value,                                     \
                   "Expression '" ExprString "' [with " AliasString "] shouldn't compile.");
 
 /**
@@ -621,9 +622,7 @@ private:
  */
 class TestAssertionFailureException {
 public:
-    TestAssertionFailureException(const std::string& theFile,
-                                  unsigned theLine,
-                                  const std::string& theMessage);
+    TestAssertionFailureException(std::string file, unsigned line, std::string message);
 
     const std::string& getFile() const {
         return _file;

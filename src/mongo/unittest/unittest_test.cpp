@@ -318,13 +318,14 @@ TEST(UnitTestSelfTest, ComparisonAssertionOverloadResolution) {
     ASSERT_NE(x, "x");
 }
 
-ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char>());
-ASSERT_DOES_NOT_COMPILE(bool B = false, std::enable_if_t<B, int>{});
+ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckDeclval, typename Char = char, *std::declval<Char>());
+ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckEnableIf, bool B = false, std::enable_if_t<B, int>{});
 
 // Uncomment to check that it fails when it is supposed to. Unfortunately we can't check in a test
 // that this fails when it is supposed to, only that it passes when it should.
 //
-// ASSERT_DOES_NOT_COMPILE(typename Char = char, *std::declval<Char*>());
-// ASSERT_DOES_NOT_COMPILE(bool B = true, std::enable_if_t<B, int>{});
+// ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckDeclvalFail, typename Char = char,
+// *std::declval<Char*>()); ASSERT_DOES_NOT_COMPILE(DoesNotCompileCheckEnableIfFail, bool B = true,
+// std::enable_if_t<B, int>{});
 
 }  // namespace

@@ -98,13 +98,13 @@ void testAtomicWordBitOperations() {
     ASSERT_EQUALS(WordType(highBit | 0xFF00ull), w.load());
 }
 
-ASSERT_DOES_NOT_COMPILE(typename T = int, AtomicWord<T>().fetchAndBitAnd(0));
-ASSERT_DOES_NOT_COMPILE(typename T = int, AtomicWord<T>().fetchAndBitOr(0));
-ASSERT_DOES_NOT_COMPILE(typename T = int, AtomicWord<T>().fetchAndBitXor(0));
+ASSERT_DOES_NOT_COMPILE(CharFetchAndBitAnd, typename T = int, AtomicWord<T>().fetchAndBitAnd(0));
+ASSERT_DOES_NOT_COMPILE(CharFetchAndBitOr, typename T = int, AtomicWord<T>().fetchAndBitOr(0));
+ASSERT_DOES_NOT_COMPILE(CharFetchAndBitXor, typename T = int, AtomicWord<T>().fetchAndBitXor(0));
 
-ASSERT_DOES_NOT_COMPILE(typename T = char, AtomicWord<T>().fetchAndBitAnd(0));
-ASSERT_DOES_NOT_COMPILE(typename T = char, AtomicWord<T>().fetchAndBitOr(0));
-ASSERT_DOES_NOT_COMPILE(typename T = char, AtomicWord<T>().fetchAndBitXor(0));
+ASSERT_DOES_NOT_COMPILE(IntFetchAndBitAnd, typename T = char, AtomicWord<T>().fetchAndBitAnd(0));
+ASSERT_DOES_NOT_COMPILE(IntFetchAndBitOr, typename T = char, AtomicWord<T>().fetchAndBitOr(0));
+ASSERT_DOES_NOT_COMPILE(IntFetchAndBitXor, typename T = char, AtomicWord<T>().fetchAndBitXor(0));
 
 enum TestEnum { E0, E1, E2, E3 };
 
