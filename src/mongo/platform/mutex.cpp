@@ -40,7 +40,7 @@ Mutex::Mutex(std::shared_ptr<Data> data) : _data{std::move(data)} {
 }
 
 Mutex::~Mutex() {
-    invariant(!_isLocked);
+    invariant(!_isLocked, getName().toString());
 
     _data->counts().destroyed.fetchAndAdd(1);
 }
