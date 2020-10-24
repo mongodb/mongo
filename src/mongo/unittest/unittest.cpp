@@ -60,8 +60,7 @@
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
 
-namespace mongo {
-namespace unittest {
+namespace mongo::unittest {
 namespace {
 
 bool stringContains(const std::string& haystack, const std::string& needle) {
@@ -556,9 +555,10 @@ Suite& Suite::getSuite(StringData name) {
     return *sp;
 }
 
-TestAssertionFailureException::TestAssertionFailureException(
-    const std::string& theFile, unsigned theLine, const std::string& theFailingExpression)
-    : _file(theFile), _line(theLine), _message(theFailingExpression) {
+TestAssertionFailureException::TestAssertionFailureException(std::string file,
+                                                             unsigned line,
+                                                             std::string message)
+    : _file(std::move(file)), _line(line), _message(std::move(message)) {
     std::ostringstream ostream;
     printStackTrace(ostream);
     _stacktrace = ostream.str();
@@ -645,5 +645,4 @@ namespace {
 }();
 }  // namespace
 
-}  // namespace unittest
-}  // namespace mongo
+}  // namespace mongo::unittest

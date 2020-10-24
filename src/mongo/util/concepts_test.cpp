@@ -74,7 +74,7 @@ constexpr inline auto sizeof_ = sizeof(T);
 
 static_assert(std::is_void_v<decltype(NonTemplateTest<int32_t>::test())>);
 static_assert(std::is_void_v<decltype(NonTemplateTest<int64_t>::test())>);
-ASSERT_DOES_NOT_COMPILE(typename Char = char, NonTemplateTest<Char>::test());
+ASSERT_DOES_NOT_COMPILE(CharNonTemplateTest, typename Char = char, NonTemplateTest<Char>::test());
 
 // Uncomment to see error message.
 // auto x = NonTemplateTest<char>::test();
@@ -122,12 +122,12 @@ Overload<13> requiresTest() {
 
 ASSERT_SELECTS_OVERLOAD(2, requiresTest<char>());
 ASSERT_SELECTS_OVERLOAD(3, requiresTest<int32_t>());
-ASSERT_DOES_NOT_COMPILE(typename Int64_t = int64_t, requiresTest<Int64_t>());
+ASSERT_DOES_NOT_COMPILE(Int64RequiresTest, typename Int64_t = int64_t, requiresTest<Int64_t>());
 
 ASSERT_SELECTS_OVERLOAD(11, requiresTest<0>());
 ASSERT_SELECTS_OVERLOAD(12, requiresTest<1>());
 ASSERT_SELECTS_OVERLOAD(13, requiresTest<-1>());
-ASSERT_DOES_NOT_COMPILE(int i = -10, requiresTest<i>());
+ASSERT_DOES_NOT_COMPILE(IntRequiresTest, int i = -10, requiresTest<i>());
 
 MONGO_MAKE_BOOL_TRAIT(isAddable,
                       (typename LHS, typename RHS),

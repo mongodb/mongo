@@ -10,6 +10,8 @@ env.Library(
         'barrier.cpp',
         'bson_test_util.cpp',
         'death_test.cpp',
+        'matcher.cpp',
+        'matcher_core.cpp',
         'temp_dir.cpp',
         'unittest_helpers.cpp',
         'unittest.cpp',
@@ -100,6 +102,7 @@ env.CppUnitTest(
         'fixture_test.cpp',
         'temp_dir_test.cpp',
         'thread_assertion_monitor_test.cpp',
+        'assert_that_test.cpp',
     ],
 )
 
