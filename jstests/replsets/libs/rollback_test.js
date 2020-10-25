@@ -237,6 +237,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
 
         // We must wait for collection drops to complete so that we don't get spurious failures
         // in the consistency checks.
+        rst.awaitSecondaryNodes();
         rst.nodes.forEach(TwoPhaseDropCollectionTest.waitForAllCollectionDropsToComplete);
 
         const name = rst.name;
