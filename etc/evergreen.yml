@@ -6163,6 +6163,17 @@ tasks:
       use_multiversion: /data/multiversion
       fallback_num_sub_suites: 1
 
+# Tests the runFeatureFlagMultiversionTest helper.
+# This requires the 'featureFlagToaster' and 'featureFlagSpoon' parameters to be set to true on
+# build variants that enable this task.
+- name: feature_flag_multiversion_gen
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_args: "--storageEngine=wiredTiger"
+      use_multiversion: /data/multiversion
+      fallback_num_sub_suites: 1
+
 - name: unittest_shell_hang_analyzer_gen
   commands:
   - func: "generate resmoke tasks"
@@ -10429,7 +10440,7 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-        --mongodSetParameters="{featureFlagTimeseriesCollection: true}"
+        --mongodSetParameters="{featureFlagTimeseriesCollection: true, featureFlagToaster: true, featureFlagSpoon: true}"
   tasks:
   - name: compile_parallel_TG
     distros:
@@ -10454,6 +10465,7 @@ buildvariants:
     - rhel62-large
   - name: disk_wiredtiger
   - name: .encrypt
+  - name: feature_flag_multiversion_gen
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
   - name: .integration

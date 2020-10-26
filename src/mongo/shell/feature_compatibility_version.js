@@ -91,3 +91,42 @@ function removeFCVDocument(adminDB) {
     assert.commandWorked(res, "failed to list collections");
     assert.eq(newUUID, res.cursor.firstBatch[0].info.uuid);
 }
+
+/**
+ * Runs 'testFunc' with the last-lts FCV as an argument. If 'featureFlag' has a release version
+ * equal to the latest FCV, 'testFunc' will also be run a second time but with last-continuous FCV
+ * as the argument.
+ *
+ * If featureFlag does not exist in the server, throw an error.
+ * If featureFlag is not enabled, return without running 'testFunct'.
+ *
+ * 'testFunc' is expected to be a function that accepts a valid downgrade FCV as input.
+ */
+function runFeatureFlagMultiversionTest(featureFlag, testFunc) {
+    jsTestLog("Running standalone to gather parameter info about featureFlag: " + featureFlag);
+    // Spin up a standalone to check the release version of 'featureFlag'.
+    let standalone = MongoRunner.runMongod();
+    let adminDB = standalone.getDB("admin");
+    let res;
+    try {
+        res = assert.commandWorked(adminDB.runCommand({getParameter: 1, [featureFlag]: 1}),
+                                   "Failed to call getParameter on feature flag: " + featureFlag);
+    } finally {
+        MongoRunner.stopMongod(standalone);
+    }
+
+    if (res && !res[featureFlag]["value"]) {
+        jsTestLog("Feature flag: " + featureFlag + " is not enabled. Skipping test.");
+        return;
+    }
+
+    jsTestLog("Running testFunc with last-lts FCV.");
+    testFunc(lastLTSFCV);
+    if (res && res[featureFlag].hasOwnProperty("version") &&
+        MongoRunner.compareBinVersions(res[featureFlag]["version"].toString(), "latest") === 0) {
+        // The feature associated with 'featureFlag' will be released in the latest FCV. We should
+        // also run upgrade/downgrade behavior against the last-continuous FCV.
+        jsTestLog("Running testFunc with last-continuous FCV.");
+        testFunc(lastContinuousFCV);
+    }
+}

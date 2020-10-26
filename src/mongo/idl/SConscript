@@ -32,6 +32,7 @@ env.Library(
     target='feature_flag',
     source=[
         'feature_flag.cpp',
+        'feature_flag_test.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -54,7 +55,6 @@ env.CppUnitTest(
         'server_parameter_with_storage_test.cpp',
         'config_option_no_init_test.idl',
         'config_option_test.idl',
-        'feature_flag_test.idl',
         'server_parameter_specialized_test.idl',
         'server_parameter_with_storage_test.idl',
         'unittest.idl',

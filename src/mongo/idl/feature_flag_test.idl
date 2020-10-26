@@ -35,6 +35,11 @@ feature_flags:
       cpp_varname: gFeatureFlagToaster
       default: false
 
+    featureFlagFryer:
+      description: "Create a feature flag"
+      cpp_varname: gFeatureFlagFryer
+      default: false
+
     featureFlagBlender:
       description: "Create a feature flag"
       cpp_varname: gFeatureFlagBlender

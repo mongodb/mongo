@@ -1,0 +1,13 @@
+# This test suite only includes run_feature_flag_multiversion_test.js as this test should only be
+# run on build variants that have the featureFlagToaster and featureFlagSpoon feature flags enabled.
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/multiVersion/genericSetFCVUsage/run_feature_flag_multiversion_test.js
+
+# Multiversion tests start their own mongod's.
+executor:
+  config:
+    shell_options:
+      nodb: ''
