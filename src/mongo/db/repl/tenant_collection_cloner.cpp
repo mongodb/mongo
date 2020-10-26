@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/database_cloner_gen.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -218,6 +219,16 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
         _stats.indexes = _readyIndexSpecs.size() + (_idIndexSpec.isEmpty() ? 0 : 1);
     };
 
+    // Tenant collections are replicated collections and it's impossible to have an empty _id index
+    // and collection options 'autoIndexId' as false. These are extra sanity checks made on the
+    // response received from the remote node.
+    uassert(
+        ErrorCodes::IllegalOperation,
+        str::stream() << "Found empty '_id' index spec but the collection is not specified with "
+                         "'autoIndexId' as false, tenantId: "
+                      << _tenantId << ", namespace: " << this->_sourceNss,
+        !_idIndexSpec.isEmpty() || _collectionOptions.autoIndexId == CollectionOptions::NO);
+
     if (!_idIndexSpec.isEmpty() && _collectionOptions.autoIndexId == CollectionOptions::NO) {
         LOGV2_WARNING(4884504,
                       "Found the _id index spec but the collection specified autoIndexId of false",
@@ -293,7 +304,7 @@ void TenantCollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) 
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.receivedBatches++;
         while (iter.moreInCurrentBatch()) {
-            _documentsToInsert.emplace_back(InsertStatement(iter.nextSafe()));
+            _documentsToInsert.emplace_back(iter.nextSafe());
         }
     }
 
@@ -333,7 +344,7 @@ void TenantCollectionCloner::handleNextBatch(DBClientCursorBatchIterator& iter) 
 void TenantCollectionCloner::insertDocumentsCallback(
     const executor::TaskExecutor::CallbackArgs& cbd) {
     uassertStatusOK(cbd.status);
-    std::vector<InsertStatement> docs;
+    std::vector<BSONObj> docs;
 
     {
         stdx::lock_guard<Latch> lk(_mutex);
@@ -350,7 +361,21 @@ void TenantCollectionCloner::insertDocumentsCallback(
         _progressMeter.hit(int(docs.size()));
     }
 
-    uassertStatusOK(getStorageInterface()->insertDocuments(cbd.opCtx, _sourceDbAndUuid, docs));
+    write_ops::Insert insertOp(_sourceNss);
+    insertOp.setDocuments(std::move(docs));
+    insertOp.setWriteCommandBase([] {
+        write_ops::WriteCommandBase wcb;
+        wcb.setOrdered(true);
+        wcb.setBypassDocumentValidation(true);
+        return wcb;
+    }());
+
+    // write_ops_exec::PerformInserts() will handle limiting the batch size
+    // that gets inserted in a single WUOW.
+    auto writeResults = write_ops_exec::performInserts(cbd.opCtx, insertOp);
+    // Since the writes are ordered, it's ok to check just the last writeOp result.
+    uassertStatusOKWithContext(writeResults.results.back(),
+                               "Tenant collection cloner: insert documents");
 
     tenantMigrationHangDuringCollectionClone.executeIf(
         [&](const BSONObj&) {

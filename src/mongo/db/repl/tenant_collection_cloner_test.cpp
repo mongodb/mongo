@@ -32,8 +32,12 @@
 #include <vector>
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/db/op_observer_noop.h"
+#include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/tenant_cloner_test_fixture.h"
 #include "mongo/db/repl/tenant_collection_cloner.h"
@@ -55,6 +59,55 @@ public:
     }
 };
 
+/**
+ * Mock OpObserver that tracks storage events.
+ */
+class TenantCollectionClonerTestOpObserver final : public OpObserverNoop {
+public:
+    TenantCollectionClonerTestOpObserver(const NamespaceString& nss) : nssToCapture(nss) {}
+
+    void onCreateCollection(OperationContext* opCtx,
+                            const CollectionPtr& coll,
+                            const NamespaceString& collectionName,
+                            const CollectionOptions& options,
+                            const BSONObj& idIndex,
+                            const OplogSlot& createOpTime) final {
+        if (collectionName == nssToCapture) {
+            collCreated = true;
+            collectionOptions = options;
+            idIndexCreated = !idIndex.isEmpty();
+        }
+    }
+
+    void onCreateIndex(OperationContext* opCtx,
+                       const NamespaceString& nss,
+                       CollectionUUID uuid,
+                       BSONObj indexDoc,
+                       bool fromMigrate) final {
+        if (nss == nssToCapture) {
+            secondaryIndexSpecs.emplace_back(indexDoc);
+        }
+    }
+
+    void onInserts(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   OptionalCollectionUUID uuid,
+                   std::vector<InsertStatement>::const_iterator begin,
+                   std::vector<InsertStatement>::const_iterator end,
+                   bool fromMigrate) final {
+        if (nss == nssToCapture) {
+            numDocsInserted += std::distance(begin, end);
+        }
+    }
+
+    const NamespaceString nssToCapture;
+    bool collCreated = false;
+    CollectionOptions collectionOptions;
+    bool idIndexCreated = false;
+    std::vector<BSONObj> secondaryIndexSpecs;
+    size_t numDocsInserted{0};
+};
+
 class TenantCollectionClonerTest : public TenantClonerTestFixture {
 public:
     TenantCollectionClonerTest() {}
@@ -62,43 +115,52 @@ public:
 protected:
     void setUp() override {
         TenantClonerTestFixture::setUp();
-        _standardCreateCollectionFn = [this](OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const CollectionOptions& options) -> Status {
-            this->_collCreated = true;
-            return Status::OK();
-        };
-        _storageInterface.createCollFn = _standardCreateCollectionFn;
-        _standardCreateIndexesOnEmptyCollectionFn =
-            [this](OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const std::vector<BSONObj>& secondaryIndexSpecs) -> Status {
-            this->_numSecondaryIndexesCreated += secondaryIndexSpecs.size();
-            return Status::OK();
-        };
-        _storageInterface.createIndexesOnEmptyCollFn = _standardCreateIndexesOnEmptyCollectionFn;
-        _storageInterface.insertDocumentsFn = [this](OperationContext* opCtx,
-                                                     const NamespaceStringOrUUID& nsOrUUID,
-                                                     const std::vector<InsertStatement>& ops) {
-            this->_numDocsInserted += ops.size();
-            return Status::OK();
-        };
 
         _mockServer->assignCollectionUuid(_nss.ns(), _collUuid);
         _mockClient->setOperationTime(_operationTime);
+
+        {
+            auto serviceContext = getServiceContext();
+            auto opCtx = cc().makeOperationContext();
+
+            ReplicationCoordinator::set(
+                serviceContext, std::make_unique<ReplicationCoordinatorMock>(serviceContext));
+
+            repl::setOplogCollectionName(serviceContext);
+            repl::createOplog(opCtx.get());
+
+            // Need real (non-mock) storage for the test.
+            StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
+
+            // Register mock observer.
+            auto opObserver = std::make_unique<TenantCollectionClonerTestOpObserver>(_nss);
+            _opObserver = opObserver.get();
+            auto opObserverRegistry =
+                dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
+            opObserverRegistry->addObserver(std::move(opObserver));
+
+            // step up
+            auto replCoord = ReplicationCoordinator::get(serviceContext);
+            _term++;
+            ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));
+            ASSERT_OK(replCoord->updateTerm(opCtx.get(), _term));
+            replCoord->setMyLastAppliedOpTimeAndWallTime(
+                OpTimeAndWallTime(OpTime(Timestamp(1, 1), _term), Date_t()));
+        }
     }
     std::unique_ptr<TenantCollectionCloner> makeCollectionCloner(
         CollectionOptions options = CollectionOptions()) {
         options.uuid = _collUuid;
         _options = options;
-        return std::make_unique<TenantCollectionCloner>(_nss,
-                                                        options,
-                                                        getSharedData(),
-                                                        _source,
-                                                        _mockClient.get(),
-                                                        &_storageInterface,
-                                                        _dbWorkThreadPool.get(),
-                                                        _tenantId);
+        return std::make_unique<TenantCollectionCloner>(
+            _nss,
+            options,
+            getSharedData(),
+            _source,
+            _mockClient.get(),
+            repl::StorageInterface::get(getServiceContext()),
+            _dbWorkThreadPool.get(),
+            _tenantId);
     }
 
     BSONObj createFindResponse(ErrorCodes::Error code = ErrorCodes::OK) {
@@ -124,12 +186,9 @@ protected:
         return cloner->_idIndexSpec;
     }
 
-    StorageInterfaceMock::CreateCollectionFn _standardCreateCollectionFn;
-    StorageInterfaceMock::CreateIndexesOnEmptyCollectionFn
-        _standardCreateIndexesOnEmptyCollectionFn;
-    bool _collCreated = false;
-    size_t _numSecondaryIndexesCreated{0};
-    size_t _numDocsInserted{0};
+    long long _term = 0;
+    const TenantCollectionClonerTestOpObserver* _opObserver =
+        nullptr;  // Owned by service context opObserverRegistry
     CollectionOptions _options;
 
     UUID _collUuid = UUID::gen();
@@ -175,13 +234,14 @@ TEST_F(TenantCollectionClonerTest,
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
 }
 
-TEST_F(TenantCollectionClonerTest, ListIndexesReturnedNoIndexes) {
+TEST_F(TenantCollectionClonerTest, ListIndexesReturnedNoIndexesShouldFail) {
     auto cloner = makeCollectionCloner();
     cloner->setStopAfterStage_forTest("listIndexes");
     _mockServer->setCommandReply("count", createCountResponse(1));
     _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), BSONArray()));
     _mockServer->setCommandReply("find", createFindResponse());
-    ASSERT_OK(cloner->run());
+
+    ASSERT_EQUALS(ErrorCodes::IllegalOperation, cloner->run());
     ASSERT(getIdIndexSpec(cloner.get()).isEmpty());
     ASSERT(getIndexSpecs(cloner.get()).empty());
     ASSERT_EQ(0, cloner->getStats().indexes);
@@ -215,7 +275,8 @@ TEST_F(TenantCollectionClonerTest, ListIndexesNonRetriableError) {
 TEST_F(TenantCollectionClonerTest, ListIndexesRemoteUnreachableBeforeMajorityFind) {
     auto cloner = makeCollectionCloner();
     _mockServer->setCommandReply("count", createCountResponse(1));
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), BSONArray()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
 
     auto clonerOperationTimeFP =
         globalFailPointRegistry().find("tenantCollectionClonerHangAfterGettingOperationTime");
@@ -238,7 +299,8 @@ TEST_F(TenantCollectionClonerTest, ListIndexesRemoteUnreachableBeforeMajorityFin
 TEST_F(TenantCollectionClonerTest, ListIndexesRecordsCorrectOperationTime) {
     auto cloner = makeCollectionCloner();
     _mockServer->setCommandReply("count", createCountResponse(1));
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), BSONArray()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
 
     auto clonerOperationTimeFP =
@@ -265,21 +327,6 @@ TEST_F(TenantCollectionClonerTest, BeginCollection) {
     BSONObj collIdIndexSpec;
     std::vector<BSONObj> collSecondaryIndexSpecs;
 
-    _storageInterface.createCollFn =
-        [&](OperationContext* opCtx, const NamespaceString& nss, const CollectionOptions& options) {
-            collNss = nss;
-            collOptions = options;
-            return _standardCreateCollectionFn(opCtx, nss, options);
-        };
-
-    _storageInterface.createIndexesOnEmptyCollFn =
-        [&](OperationContext* opCtx,
-            const NamespaceString& nss,
-            const std::vector<BSONObj>& secondaryIndexSpecs) {
-            collSecondaryIndexSpecs = secondaryIndexSpecs;
-            return _standardCreateIndexesOnEmptyCollectionFn(opCtx, nss, secondaryIndexSpecs);
-        };
-
     auto cloner = makeCollectionCloner();
     cloner->setStopAfterStage_forTest("createCollection");
     _mockServer->setCommandReply("count", createCountResponse(1));
@@ -293,11 +340,15 @@ TEST_F(TenantCollectionClonerTest, BeginCollection) {
 
     ASSERT_EQUALS(Status::OK(), cloner->run());
 
-    ASSERT_EQUALS(_nss.ns(), collNss.ns());
-    ASSERT_BSONOBJ_EQ(_options.toBSON(), collOptions.toBSON());
-    ASSERT_EQUALS(_secondaryIndexSpecs.size(), collSecondaryIndexSpecs.size());
+    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_TRUE(_opObserver->collCreated);
+    ASSERT_BSONOBJ_EQ(_options.toBSON(), _opObserver->collectionOptions.toBSON());
+
+    ASSERT_TRUE(_opObserver->idIndexCreated);
+
+    ASSERT_EQUALS(_secondaryIndexSpecs.size(), _opObserver->secondaryIndexSpecs.size());
     for (std::vector<BSONObj>::size_type i = 0; i < _secondaryIndexSpecs.size(); ++i) {
-        ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[i], collSecondaryIndexSpecs[i]);
+        ASSERT_BSONOBJ_EQ(_secondaryIndexSpecs[i], _opObserver->secondaryIndexSpecs[i]);
     }
 }
 
@@ -307,12 +358,33 @@ TEST_F(TenantCollectionClonerTest, BeginCollectionFailed) {
             return Status(ErrorCodes::OperationFailed, "");
         };
 
+    auto createCollectionFp =
+        globalFailPointRegistry().find("hangAndFailAfterCreateCollectionReservesOpTime");
+    auto initialTimesEntered =
+        createCollectionFp->setMode(FailPoint::alwaysOn, 0, BSON("nss" << _nss.toString()));
+
     auto cloner = makeCollectionCloner();
     cloner->setStopAfterStage_forTest("createCollection");
     _mockServer->setCommandReply("count", createCountResponse(1));
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), BSONArray()));
+    _mockServer->setCommandReply("listIndexes",
+                                 createCursorResponse(_nss.ns(), BSON_ARRAY(_idIndexSpec)));
     _mockServer->setCommandReply("find", createFindResponse());
-    ASSERT_EQUALS(ErrorCodes::OperationFailed, cloner->run());
+
+    // Run the cloner in a separate thread.
+    stdx::thread clonerThread([&] {
+        Client::initThread("ClonerRunner");
+        auto status = cloner->run();
+        ASSERT_EQUALS(51267, status.code());
+    });
+
+    // Wait for the failpoint to be reached
+    createCollectionFp->waitForTimesEntered(initialTimesEntered + 1);
+    createCollectionFp->setMode(FailPoint::off);
+
+    clonerThread.join();
+
+    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_FALSE(_opObserver->collCreated);
 }
 
 TEST_F(TenantCollectionClonerTest, InsertDocumentsSingleBatch) {
@@ -329,9 +401,11 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsSingleBatch) {
     auto cloner = makeCollectionCloner();
     ASSERT_OK(cloner->run());
 
-    ASSERT_EQUALS(2, _numDocsInserted);
+    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(2, _opObserver->numDocsInserted);
 
     auto stats = cloner->getStats();
+    ASSERT_EQUALS(2u, stats.documentsCopied);
     ASSERT_EQUALS(1u, stats.receivedBatches);
 }
 
@@ -359,9 +433,11 @@ TEST_F(TenantCollectionClonerTest, BatchSizeStoredInConstructor) {
     auto cloner = makeCollectionCloner();
     ASSERT_OK(cloner->run());
 
-    ASSERT_EQUALS(7, _numDocsInserted);
+    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(7, _opObserver->numDocsInserted);
 
     auto stats = cloner->getStats();
+    ASSERT_EQUALS(7u, stats.documentsCopied);
     ASSERT_EQUALS(3u, stats.receivedBatches);
 }
 
@@ -383,9 +459,11 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsMultipleBatches) {
     cloner->setBatchSize_forTest(2);
     ASSERT_OK(cloner->run());
 
-    ASSERT_EQUALS(5, _numDocsInserted);
+    ASSERT_EQUALS(_nss.ns(), _opObserver->nssToCapture.ns());
+    ASSERT_EQUALS(5, _opObserver->numDocsInserted);
 
     auto stats = cloner->getStats();
+    ASSERT_EQUALS(5u, stats.documentsCopied);
     ASSERT_EQUALS(3u, stats.receivedBatches);
 }
 
@@ -484,73 +562,17 @@ TEST_F(TenantCollectionClonerTest, InsertDocumentsFailed) {
     _mockServer->insert(_nss.ns(), BSON("_id" << 3));
 
     auto cloner = makeCollectionCloner();
-    // Stop before running the query to set up the failure.
-    auto collClonerBeforeFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
-    auto timesEntered = collClonerBeforeFailPoint->setMode(
-        FailPoint::alwaysOn,
-        0,
-        fromjson("{cloner: 'TenantCollectionCloner', stage: 'query', nss: '" + _nss.ns() + "'}"));
+
+    // Enable failpoint to make collection inserts to fail.
+    FailPointEnableBlock fp("failCollectionInserts", BSON("collectionNS" << _nss.toString()));
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
         Client::initThread("ClonerRunner");
-        ASSERT_EQUALS(ErrorCodes::OperationFailed, cloner->run());
+        ASSERT_EQUALS(ErrorCodes::FailPointEnabled, cloner->run());
     });
 
-    // Wait for the failpoint to be reached
-    collClonerBeforeFailPoint->waitForTimesEntered(timesEntered + 1);
-
-    // Make the insertDocuments fail.
-    _storageInterface.insertDocumentsFn = [this](OperationContext* opCtx,
-                                                 const NamespaceStringOrUUID& nsOrUUID,
-                                                 const std::vector<InsertStatement>& ops) {
-        return Status(ErrorCodes::OperationFailed, "");
-    };
-
-
-    // Continue and finish. Final status is checked in the thread.
-    collClonerBeforeFailPoint->setMode(FailPoint::off, 0);
     clonerThread.join();
-}
-
-TEST_F(TenantCollectionClonerTest, DoNotCreateIDIndexIfAutoIndexIdUsed) {
-    NamespaceString collNss;
-    CollectionOptions collOptions;
-    // We initialize collIndexSpecs with fake information to ensure it is overwritten by an empty
-    // vector.
-    std::vector<BSONObj> collIndexSpecs{BSON("fakeindexkeys" << 1)};
-    _storageInterface.createCollFn = [&, this](OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               const CollectionOptions& options) -> Status {
-        collNss = nss;
-        collOptions = options;
-        return _standardCreateCollectionFn(opCtx, nss, options);
-    };
-
-    _storageInterface.createIndexesOnEmptyCollFn =
-        [&](OperationContext* opCtx,
-            const NamespaceString& nss,
-            const std::vector<BSONObj>& secondaryIndexSpecs) {
-            collIndexSpecs = secondaryIndexSpecs;
-            return _standardCreateIndexesOnEmptyCollectionFn(opCtx, nss, secondaryIndexSpecs);
-        };
-
-    const BSONObj doc = BSON("_id" << 1);
-    _mockServer->insert(_nss.ns(), doc);
-
-    _mockServer->setCommandReply("count", createCountResponse(1));
-    _mockServer->setCommandReply("listIndexes", createCursorResponse(_nss.ns(), BSONArray()));
-    _mockServer->setCommandReply("find", createFindResponse());
-
-    CollectionOptions options;
-    options.autoIndexId = CollectionOptions::NO;
-    auto cloner = makeCollectionCloner(options);
-    ASSERT_OK(cloner->run());
-    ASSERT_EQUALS(1, _numDocsInserted);
-    ASSERT_TRUE(_collCreated);
-    ASSERT_EQ(collOptions.autoIndexId, CollectionOptions::NO);
-    ASSERT_EQ(0UL, collIndexSpecs.size());
-    ASSERT_EQ(collNss, _nss);
 }
 
 TEST_F(TenantCollectionClonerTest, QueryFailure) {

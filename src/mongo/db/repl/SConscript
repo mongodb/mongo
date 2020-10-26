@@ -230,6 +230,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/storage/oplog_cap_maintainer_thread',
         '$BUILD_DIR/mongo/db/storage/storage_control',
         '$BUILD_DIR/mongo/db/vector_clock',
@@ -1029,6 +1030,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/progress_meter',
         'repl_server_parameters',
@@ -1621,6 +1623,7 @@ env.CppUnitTest(
         'repl_server_parameters',
         'repl_sync_shared_data',
         'replmocks',
+        'storage_interface_impl',
         'tenant_migration_cloners'
     ],
 )

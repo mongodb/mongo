@@ -59,6 +59,7 @@
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
@@ -496,24 +497,29 @@ Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const std::vector<BSONObj>& secondaryIndexSpecs) {
-    return writeConflictRetry(opCtx, "createIndexesOnEmptyCollection", nss.ns(), [&] {
-        AutoGetCollection autoColl(opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_IX));
-        WriteUnitOfWork wunit(opCtx);
-
-        for (auto&& spec : secondaryIndexSpecs) {
-            // Will error if collection is not empty.
-            auto secIndexSW =
-                autoColl.getWritableCollection()->getIndexCatalog()->createIndexOnEmptyCollection(
-                    opCtx, spec);
-            auto status = secIndexSW.getStatus();
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-
-        wunit.commit();
+    if (!secondaryIndexSpecs.size())
         return Status::OK();
-    });
+
+    try {
+        writeConflictRetry(
+            opCtx, "StorageInterfaceImpl::createIndexesOnEmptyCollection", nss.ns(), [&] {
+                AutoGetCollection autoColl(
+                    opCtx, nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
+                CollectionWriter collection(opCtx, nss);
+
+                WriteUnitOfWork wunit(opCtx);
+                // Use IndexBuildsCoordinator::createIndexesOnEmptyCollection() rather than
+                // IndexCatalog::createIndexOnEmptyCollection() as the former generates
+                // 'createIndexes' oplog entry for replicated writes.
+                IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                    opCtx, collection, secondaryIndexSpecs, false /* fromMigrate */);
+                wunit.commit();
+            });
+    } catch (DBException& ex) {
+        return ex.toStatus();
+    }
+
+    return Status::OK();
 }
 
 Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {

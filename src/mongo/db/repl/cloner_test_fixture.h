@@ -32,6 +32,7 @@
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/logv2/log_component.h"
@@ -44,7 +45,7 @@
 namespace mongo {
 namespace repl {
 
-class ClonerTestFixture : public unittest::Test, public ScopedGlobalServiceContextForTest {
+class ClonerTestFixture : public ServiceContextMongoDTest {
 public:
     ClonerTestFixture() : _storageInterface{} {}
 
@@ -66,6 +67,7 @@ protected:
     std::unique_ptr<DBClientConnection> _mockClient;
     std::unique_ptr<ReplSyncSharedData> _sharedData;
     ClockSourceMock _clock;
+    ServiceContext::UniqueClient _oldClient;
 
 private:
     unittest::MinimumLoggedSeverityGuard _verboseGuard{logv2::LogComponent::kReplicationInitialSync,

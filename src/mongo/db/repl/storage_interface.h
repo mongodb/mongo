@@ -135,6 +135,17 @@ public:
      * Inserts the given documents, with associated timestamps and statement id's, into the
      * collection.
      * It is an error to call this function with an empty set of documents.
+     *
+     * NOTE: We have some limitations with this function if the caller plans to use it for
+     * replicated collection writes and 'docs' size greater than 1.
+     * 1) It will violate multi-timestamp constraints (See SERVER-48771).
+     * 2) It doesn't have batch size throttling logic so there are possibilities that we might cause
+     * stress on storage engine by trying to insert a big chunk of data in a single WUOW.
+     *    - Another side effect of writing a big chunk is that writers will hold RSTL lock for a
+     * long time, causing state transition (like step down) to get blocked.
+     *
+     * So, it's recommended to use write_ops_exec::performInserts() for replicated collection
+     * writes.
      */
     virtual Status insertDocuments(OperationContext* opCtx,
                                    const NamespaceStringOrUUID& nsOrUUID,
@@ -162,6 +173,8 @@ public:
 
     /**
      * Creates all the specified non-_id indexes on a given collection, which must be empty.
+     * Note: This function assumes the give collection is a committed collection, so it takes
+     * an exclusive collection lock on that collection.
      */
     virtual Status createIndexesOnEmptyCollection(
         OperationContext* opCtx,

@@ -55,8 +55,13 @@ BSONObj ClonerTestFixture::createCursorResponse(const std::string& nss, const BS
 }
 
 void ClonerTestFixture::setUp() {
-    unittest::Test::setUp();
+    // Set up mongod.
+    ServiceContextMongoDTest::setUp();
+
+    // Release the current client and start a new client.
+    _oldClient = Client::releaseCurrent();
     Client::initThread("ClonerTest");
+
     ThreadPool::Options options;
     options.minThreads = 1U;
     options.maxThreads = 1U;
@@ -68,15 +73,17 @@ void ClonerTestFixture::setUp() {
     const bool autoReconnect = true;
     _mockClient = std::unique_ptr<DBClientConnection>(
         new MockDBClientConnection(_mockServer.get(), autoReconnect));
-
-    // Required by CollectionCloner::listIndexesStage() and IndexBuildsCoordinator.
-    getServiceContext()->setStorageEngine(std::make_unique<StorageEngineMock>());
 }
 
 void ClonerTestFixture::tearDown() {
     _dbWorkThreadPool.reset();
+
+    // Release the current client and restore to its old client.
     Client::releaseCurrent();
-    unittest::Test::tearDown();
+    Client::setCurrent(std::move(_oldClient));
+
+    // Tear down mongod.
+    ServiceContextMongoDTest::tearDown();
 }
 
 }  // namespace repl
