@@ -297,9 +297,18 @@ void ValidateAdaptor::traverseIndex(OperationContext* opCtx,
             numKeys++;
             continue;
         }
+        try {
+            _indexConsistency->addIndexKey(
+                opCtx, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
+        } catch (const DBException& e) {
+            StringBuilder ss;
+            ss << "Parsing index key for " << indexInfo.indexName << " recId " << indexEntry->loc
+               << " threw exception " << e.toString();
+            results->errors.push_back(ss.str());
+            results->valid = false;
+            continue;
+        }
 
-        _indexConsistency->addIndexKey(
-            opCtx, indexEntry->keyString, &indexInfo, indexEntry->loc, results);
         _progress->hit();
         numKeys++;
         isFirstEntry = false;
