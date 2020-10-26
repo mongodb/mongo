@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/base/init.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
@@ -42,6 +43,12 @@
 namespace mongo {
 namespace repl {
 namespace {
+
+MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
+    // mongod_options.cpp has an initializer which depends on logging.
+    // We can stub that dependency out for unit testing purposes.
+    return Status::OK();
+}
 
 // Creates a bson document reprsenting a replica set config doc with the given members, and votes
 BSONObj createConfigDoc(int members, int voters = ReplSetConfig::kMaxVotingMembers) {

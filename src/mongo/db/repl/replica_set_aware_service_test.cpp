@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/base/init.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
@@ -38,6 +39,12 @@
 namespace mongo {
 
 namespace {
+
+MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
+    // mongod_options.cpp has an initializer which depends on logging.
+    // We can stub that dependency out for unit testing purposes.
+    return Status::OK();
+}
 
 template <class ActualService>
 class TestService : public ReplicaSetAwareService<ActualService> {

@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/builder.h"
@@ -344,6 +345,8 @@ Status canonicalizeMongodOptions(moe::Environment* params) {
     return Status::OK();
 }
 
+bool gIgnoreEnableMajorityReadConcernWarning = false;
+
 Status storeMongodOptions(const moe::Environment& params) {
     Status ret = storeServerOptions(params);
     if (!ret.isOK()) {
@@ -601,9 +604,7 @@ Status storeMongodOptions(const moe::Environment& params) {
 
             if (params.count("replication.enableMajorityReadConcern") &&
                 !params["replication.enableMajorityReadConcern"].as<bool>()) {
-                LOGV2_WARNING(20879,
-                              "Ignoring read concern override as config server requires majority "
-                              "read concern");
+                gIgnoreEnableMajorityReadConcernWarning = true;
             }
             serverGlobalParams.enableMajorityReadConcern = true;
 
@@ -678,6 +679,19 @@ Status storeMongodOptions(const moe::Environment& params) {
     }
 
     setGlobalReplSettings(replSettings);
+    return Status::OK();
+}
+
+// This warning must be deferred until after ServerLogRedirection has started up so that it goes to
+// the right place.
+MONGO_INITIALIZER_WITH_PREREQUISITES(IgnoreEnableMajorityReadConcernWarning,
+                                     ("ServerLogRedirection"))
+(InitializerContext*) {
+    if (gIgnoreEnableMajorityReadConcernWarning) {
+        LOGV2_WARNING(20879,
+                      "Ignoring read concern override as config server requires majority read "
+                      "concern");
+    }
     return Status::OK();
 }
 

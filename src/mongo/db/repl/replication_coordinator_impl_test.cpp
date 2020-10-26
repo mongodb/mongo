@@ -38,6 +38,7 @@
 #include <set>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -91,6 +92,12 @@ using rpc::OplogQueryMetadata;
 using rpc::ReplSetMetadata;
 using unittest::assertGet;
 using unittest::EnsureFCV;
+
+MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
+    // mongod_options.cpp has an initializer which depends on logging.
+    // We can stub that dependency out for unit testing purposes.
+    return Status::OK();
+}
 
 typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 // Helper class to wrap Timestamp as an OpTime with term 1.
