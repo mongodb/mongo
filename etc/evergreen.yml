@@ -3601,6 +3601,7 @@ tasks:
     - func: "run tests"
       vars:
         resmoke_args: --suites=dbtest --storageEngine=wiredTiger
+        resmoke_jobs_max: 4
 
 ## embedded_sdk_build_and_test_* - build the embedded-dev and embedded-test targets only ##
 
