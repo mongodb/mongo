@@ -10428,7 +10428,7 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-        --mongodSetParameters="{featureFlagTimeSeriesCollection: true}"
+        --mongodSetParameters="{featureFlagTimeseriesCollection: true}"
   tasks:
   - name: compile_parallel_TG
     distros:
@@ -10864,7 +10864,7 @@ buildvariants:
   - rhel62-small
   expansions: &enterprise-rhel-62-64-bit-time-series-collection-expansions
     test_flags: >-
-      --mongodSetParameters="{featureFlagTimeSeriesCollection: true}"
+      --mongodSetParameters="{featureFlagTimeseriesCollection: true}"
     compile_flags: >-
       -j$(grep -c ^processor /proc/cpuinfo)
       --ssl

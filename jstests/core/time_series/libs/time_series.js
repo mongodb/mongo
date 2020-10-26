@@ -6,8 +6,8 @@ var TimeseriesTest = class {
      */
     static timeseriesCollectionsEnabled(conn) {
         return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTimeSeriesCollection: 1}))
-            .featureFlagTimeSeriesCollection.value;
+            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTimeseriesCollection: 1}))
+            .featureFlagTimeseriesCollection.value;
     }
 
     /**
