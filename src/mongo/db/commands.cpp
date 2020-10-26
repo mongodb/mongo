@@ -54,6 +54,8 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/idl/basic_types_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/metadata/client_metadata.h"
@@ -320,6 +322,20 @@ bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const St
     }
     if (auto extraInfo = status.extraInfo()) {
         extraInfo->serialize(&result);
+    }
+    // If the command has errored, assert that it satisfies the IDL-defined requirements on a
+    // command error reply.
+    if (!status.isOK()) {
+        try {
+            ErrorReply::parse(IDLParserErrorContext("appendCommandStatusNoThrow"),
+                              result.asTempObj());
+        } catch (const DBException&) {
+            invariant(false,
+                      "invalid error-response to a command constructed in "
+                      "CommandHelpers::appendComandStatusNoThrow. All erroring command responses "
+                      "must comply with the format specified by the IDL-defined struct ErrorReply, "
+                      "defined in idl/basic_types.idl");
+        }
     }
     return status.isOK();
 }

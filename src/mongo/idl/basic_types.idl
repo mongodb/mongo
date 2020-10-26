@@ -196,6 +196,21 @@ types:
         deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"
 
 structs:
+
     OkReply:
         description: "Shared by commands that reply with just {ok: 1} and no additional information"
         strict: true
+
+    ErrorReply:
+        description: "Error Reply structure shared by all commands"
+        strict: false
+        fields:
+            ok:
+                type: safeDouble 
+                validator: { gte: 0.0, lte: 0.0 }
+            code: int
+            codeName: string
+            errmsg: string
+            errorLabels:
+                type: array<string>
+                optional: true

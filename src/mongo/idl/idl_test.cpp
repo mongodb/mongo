@@ -2945,5 +2945,60 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
     }
 }
 
+TEST(IDLTypeCommand, TestErrorReplyStruct) {
+    // Correctly parse all required fields.
+    {
+        IDLParserErrorContext ctxt("root");
+
+        auto errorDoc = BSON("ok" << 0.0 << "code" << 123456 << "codeName"
+                                  << "blah blah"
+                                  << "errmsg"
+                                  << "This is an error Message"
+                                  << "errorLabels"
+                                  << BSON_ARRAY("label1"
+                                                << "label2"));
+        auto errorReply = ErrorReply::parse(ctxt, errorDoc);
+        ASSERT_BSONOBJ_EQ(errorReply.toBSON(), errorDoc);
+    }
+    // Non-strictness: ensure we parse even if input has extra fields.
+    {
+        IDLParserErrorContext ctxt("root");
+
+        auto errorDoc = BSON("a"
+                             << "b"
+                             << "ok" << 0.0 << "code" << 123456 << "codeName"
+                             << "blah blah"
+                             << "errmsg"
+                             << "This is an error Message");
+        auto errorReply = ErrorReply::parse(ctxt, errorDoc);
+        ASSERT_BSONOBJ_EQ(errorReply.toBSON(),
+                          BSON("ok" << 0.0 << "code" << 123456 << "codeName"
+                                    << "blah blah"
+                                    << "errmsg"
+                                    << "This is an error Message"));
+    }
+    // Ensure that we fail to parse if any required fields are missing.
+    {
+        IDLParserErrorContext ctxt("root");
+
+        auto missingOk = BSON("code" << 123456 << "codeName"
+                                     << "blah blah"
+                                     << "errmsg"
+                                     << "This is an error Message");
+        auto missingCode = BSON("ok" << 0.0 << "codeName"
+                                     << "blah blah"
+                                     << "errmsg"
+                                     << "This is an error Message");
+        auto missingCodeName = BSON("ok" << 0.0 << "code" << 123456 << "errmsg"
+                                         << "This is an error Message");
+        auto missingErrmsg = BSON("ok" << 0.0 << "code" << 123456 << "codeName"
+                                       << "blah blah");
+        ASSERT_THROWS(ErrorReply::parse(ctxt, missingOk), AssertionException);
+        ASSERT_THROWS(ErrorReply::parse(ctxt, missingCode), AssertionException);
+        ASSERT_THROWS(ErrorReply::parse(ctxt, missingCodeName), AssertionException);
+        ASSERT_THROWS(ErrorReply::parse(ctxt, missingErrmsg), AssertionException);
+    }
+}
+
 }  // namespace
 }  // namespace mongo

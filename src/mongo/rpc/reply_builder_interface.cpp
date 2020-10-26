@@ -35,6 +35,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 namespace rpc {
@@ -71,6 +72,17 @@ BSONObj augmentReplyWithStatus(const Status& status, BSONObj reply) {
 
     if (auto extraInfo = status.extraInfo()) {
         extraInfo->serialize(&bob);
+    }
+
+    // Ensure the error reply satisfies the IDL-defined requirements.
+    try {
+        ErrorReply::parse(IDLParserErrorContext("augmentReplyWithStatus"), bob.asTempObj());
+    } catch (const DBException&) {
+        invariant(false,
+                  "invalid error-response to a command constructed in "
+                  "rpc::augmentReplyWithStatus. All erroring command responses "
+                  "must comply with the format specified by the IDL-defined struct ErrorReply, "
+                  "defined in idl/basic_types.idl");
     }
 
     return bob.obj();

@@ -62,6 +62,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/net/network',
         'metadata',

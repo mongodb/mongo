@@ -36,6 +36,7 @@
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -69,14 +70,14 @@ TEST(Commands, appendCommandStatusNoOverwrite) {
     BSONObjBuilder actualResult;
     actualResult.append("a", "b");
     actualResult.append("c", "d");
-    actualResult.append("ok", "not ok");
+    actualResult.append("ok", 0.0);
     const Status status(ErrorCodes::InvalidLength, "Response payload too long");
     CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 
     BSONObjBuilder expectedResult;
     expectedResult.append("a", "b");
     expectedResult.append("c", "d");
-    expectedResult.append("ok", "not ok");
+    expectedResult.append("ok", 0.0);
     expectedResult.append("errmsg", status.reason());
     expectedResult.append("code", status.code());
     expectedResult.append("codeName", ErrorCodes::errorString(status.code()));
@@ -97,6 +98,30 @@ TEST(Commands, appendCommandStatusErrorExtraInfo) {
     expectedResult.append("data", 123);
 
     ASSERT_BSONOBJ_EQ(actualResult.obj(), expectedResult.obj());
+}
+
+DEATH_TEST(Commands, appendCommandStatusInvalidOkValue, "invariant") {
+    BSONObjBuilder actualResult;
+    actualResult.append("a", "b");
+    actualResult.append("c", "d");
+    actualResult.append("ok", "yes");
+    const Status status(ErrorCodes::InvalidLength, "fake error for test");
+
+    // An "ok" value other than 1.0 or 0.0 is not allowed and should crash.
+    CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
+}
+
+DEATH_TEST(Commands, appendCommandStatusNoCodeName, "invariant") {
+    BSONObjBuilder actualResult;
+    actualResult.append("a", "b");
+    actualResult.append("code", ErrorCodes::InvalidLength);
+    actualResult.append("ok", 1.0);
+    const Status status(ErrorCodes::InvalidLength, "Response payload too long");
+
+    // If the result already has an error code, we don't move any code or codeName over from the
+    // status. Therefore, if the result has an error code but no codeName, we're missing a
+    // required field and should crash.
+    CommandHelpers::appendCommandStatusNoThrow(actualResult, status);
 }
 
 class ParseNsOrUUID : public ServiceContextTest {
