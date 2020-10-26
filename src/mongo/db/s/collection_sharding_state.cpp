@@ -199,9 +199,9 @@ void CollectionShardingState::checkShardVersionOrThrow(OperationContext* opCtx) 
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
 
-    // An operation with read concern 'available' should never have shardVersion set.
-    invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
-              repl::ReadConcernLevel::kAvailableReadConcern);
+    invariant(receivedShardVersion == ChunkVersion::UNSHARDED() ||
+              repl::ReadConcernArgs::get(opCtx).getLevel() !=
+                  repl::ReadConcernLevel::kAvailableReadConcern);
 
     const auto metadata = _getMetadata(boost::none);
     auto wantedShardVersion = ChunkVersion::UNSHARDED();
