@@ -576,22 +576,25 @@ shared_ptr<Shard> ShardRegistryData::_findShard(WithLock lk, ShardId const& shar
 }
 
 void ShardRegistryData::toBSON(BSONObjBuilder* result) const {
-    // Need to copy, then sort by shardId.
-    std::vector<std::pair<ShardId, std::string>> shards;
+    // Take a snapshot of the shardIdLookup data under the lock.
+    using ShardMapVector = std::vector<std::pair<ShardId, std::shared_ptr<Shard>>>;
+    ShardMapVector shardsSnapshot;
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        shards.reserve(_shardIdLookup.size());
-        for (auto&& shard : _shardIdLookup) {
-            shards.emplace_back(shard.first, shard.second->getConnString().toString());
-        }
+        shardsSnapshot = ShardMapVector(std::begin(_shardIdLookup), std::end(_shardIdLookup));
     }
 
-    std::sort(std::begin(shards), std::end(shards));
+    // sort by ShardId
+    std::sort(std::begin(shardsSnapshot), std::end(shardsSnapshot));
 
+    // Extract the conn strings of the shards outside of the lock
+    // to prevent deadlock with the RSM.
     BSONObjBuilder mapBob(result->subobjStart("map"));
-    for (auto&& shard : shards) {
-        mapBob.append(shard.first, shard.second);
-    }
+    std::for_each(std::begin(shardsSnapshot),
+                  std::end(shardsSnapshot),
+                  [&mapBob](const ShardMapVector::value_type& pair) {
+                      mapBob.append(pair.first, pair.second->getConnString().toString());
+                  });
 }
 
 void ShardRegistryData::getAllShardIds(std::set<ShardId>& seen) const {
