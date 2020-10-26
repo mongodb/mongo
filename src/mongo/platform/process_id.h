@@ -56,6 +56,11 @@ public:
     static ProcessId getCurrent();
 
     /**
+     * Gets the thread id for the currently executing process.
+     */
+    static ProcessId getCurrentThreadId();
+
+    /**
      * Constructs a ProcessId from a NativeProcessId.
      */
     static inline ProcessId fromNative(NativeProcessId npid) {

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,71 +29,57 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/platform/process_id.h"
+#include "mongo/util/thread_context.h"
 
-#include <iostream>
-#include <limits>
-#include <sstream>
-
-#include "mongo/base/static_assert.h"
-
-#if defined(__linux__)
-#include <sys/syscall.h>
-#include <sys/types.h>
-#endif
+#include "mongo/base/init.h"
+#include "mongo/stdx/thread.h"
 
 namespace mongo {
-
-MONGO_STATIC_ASSERT(sizeof(NativeProcessId) == sizeof(uint32_t));
-
 namespace {
-#ifdef _WIN32
-inline NativeProcessId getCurrentNativeProcessId() {
-    return GetCurrentProcessId();
-}
-
-inline NativeProcessId getCurrentNativeThreadId() {
-    return GetCurrentThreadId();
-}
-#else
-inline NativeProcessId getCurrentNativeProcessId() {
-    return getpid();
-}
-
-inline NativeProcessId getCurrentNativeThreadId() {
-    return syscall(SYS_gettid);
-}
-#endif
+const auto kMainThreadId = stdx::this_thread::get_id();
+AtomicWord<bool> gHasInitializedMain{false};
 }  // namespace
 
-ProcessId ProcessId::getCurrent() {
-    return fromNative(getCurrentNativeProcessId());
+MONGO_INITIALIZER(ThreadContextsInitialized)(InitializerContext*) {
+    ThreadContext::initializeMain();
+    return Status::OK();
 }
 
-ProcessId ProcessId::getCurrentThreadId() {
-    return fromNative(getCurrentNativeThreadId());
+void ThreadContext::initializeMain() {
+    invariant(stdx::this_thread::get_id() == kMainThreadId,
+              "initializeMain() must be called on the main thread");
+
+    if (gHasInitializedMain.swap(true)) {
+        return;
+    }
+
+    _handle.init();
 }
 
-int64_t ProcessId::asInt64() const {
-    typedef std::numeric_limits<NativeProcessId> limits;
-    if (limits::is_signed)
-        return _npid;
-    else
-        return static_cast<int64_t>(static_cast<uint64_t>(_npid));
+ThreadContext::Handle::Handle() {
+    if (!gHasInitializedMain.loadRelaxed()) {
+        // If we have not initialized main, then we delay until the MONGO_INITIALIZER runs.
+        return;
+    }
+
+    init();
 }
 
-long long ProcessId::asLongLong() const {
-    return static_cast<long long>(asInt64());
+void ThreadContext::Handle::init() {
+    // Note that construction happens before assignment to the thread_local.
+    instance = make_intrusive<ThreadContext>();
 }
 
-std::string ProcessId::toString() const {
-    std::ostringstream os;
-    os << *this;
-    return os.str();
-}
+ThreadContext::Handle::~Handle() {
+    if (!instance) {
+        // If we don't have an instance, just skip. This is mostly going to be pre-main failures.
+        return;
+    }
 
-std::ostream& operator<<(std::ostream& os, ProcessId pid) {
-    return os << pid.toNative();
+    // Remove from the thread local access, then destroy our pointer to it.
+    auto localInstance = std::exchange(instance, {});
+    localInstance->_isAlive.store(false);
+    localInstance.reset();
 }
 
 }  // namespace mongo
