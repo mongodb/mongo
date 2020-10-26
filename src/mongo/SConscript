@@ -241,6 +241,7 @@ baseEnv.Library(
         'util/testing_proctor.cpp',
         'util/text.cpp',
         'util/thread_safety_context.cpp',
+        'util/thread_context.cpp',
         'util/time_support.cpp',
         'util/timer.cpp',
         'util/uuid.cpp',

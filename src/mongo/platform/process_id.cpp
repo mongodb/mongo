@@ -31,11 +31,21 @@
 
 #include "mongo/platform/process_id.h"
 
+#ifndef _WIN32
+#include <pthread.h>
+#endif
+
+#if defined(__linux__)
+#include <sys/syscall.h>
+#include <sys/types.h>
+#endif
+
 #include <iostream>
 #include <limits>
 #include <sstream>
 
 #include "mongo/base/static_assert.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -51,10 +61,31 @@ inline NativeProcessId getCurrentNativeProcessId() {
     return getpid();
 }
 #endif
+
+#ifdef _WIN32
+inline NativeProcessId getCurrentNativeThreadId() {
+    return GetCurrentThreadId();
+}
+#elif __APPLE__
+inline NativeProcessId getCurrentNativeThreadId() {
+    // macOS deprecated syscall in 10.12.
+    uint64_t tid;
+    invariant(::pthread_threadid_np(NULL, &tid) == 0);
+    return tid;
+}
+#else
+inline NativeProcessId getCurrentNativeThreadId() {
+    return ::syscall(SYS_gettid);
+}
+#endif
 }  // namespace
 
 ProcessId ProcessId::getCurrent() {
     return fromNative(getCurrentNativeProcessId());
+}
+
+ProcessId ProcessId::getCurrentThreadId() {
+    return fromNative(getCurrentNativeThreadId());
 }
 
 int64_t ProcessId::asInt64() const {
