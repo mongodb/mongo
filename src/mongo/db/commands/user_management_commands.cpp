@@ -906,12 +906,24 @@ private:
     TransactionState _state = TransactionState::kInit;
 };
 
-template <typename RequestT, typename ReplyT>
-class CmdUMCTyped : public TypedCommand<CmdUMCTyped<RequestT, ReplyT>> {
+// Used by most UMC commands.
+struct UMCStdParams {
+    static constexpr bool supportsWriteConcern = true;
+    static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kNever;
+};
+
+// Used by {usersInfo:...} and {rolesInfo:...}
+struct UMCInfoParams {
+    static constexpr bool supportsWriteConcern = false;
+    static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kOptIn;
+};
+
+template <typename RequestT, typename ReplyT, typename Params = UMCStdParams>
+class CmdUMCTyped : public TypedCommand<CmdUMCTyped<RequestT, ReplyT, Params>> {
 public:
     using Request = RequestT;
     using Reply = ReplyT;
-    using TC = TypedCommand<CmdUMCTyped<RequestT, ReplyT>>;
+    using TC = TypedCommand<CmdUMCTyped<RequestT, ReplyT, Params>>;
 
     class Invocation final : public TC::InvocationBase {
     public:
@@ -922,7 +934,7 @@ public:
 
     private:
         bool supportsWriteConcern() const final {
-            return true;
+            return Params::supportsWriteConcern;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
@@ -935,7 +947,7 @@ public:
     };
 
     typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
-        return TC::AllowedOnSecondary::kNever;
+        return Params::allowedOnSecondary;
     }
 };
 
@@ -1282,160 +1294,134 @@ void CmdUMCTyped<RevokeRolesFromUserCommand, void>::Invocation::typedRun(Operati
     uassertStatusOK(status);
 }
 
-class CmdUsersInfo : public BasicCommand {
-public:
-    CmdUsersInfo() : BasicCommand("usersInfo") {}
+CmdUMCTyped<UsersInfoCommand, UsersInfoReply, UMCInfoParams> cmdUsersInfo;
+template <>
+UsersInfoReply CmdUMCTyped<UsersInfoCommand, UsersInfoReply, UMCInfoParams>::Invocation::typedRun(
+    OperationContext* opCtx) {
+    const auto& cmd = request();
+    const auto& arg = cmd.getCommandParameter();
+    const auto& dbname = cmd.getDbName();
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kOptIn;
-    }
+    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
+    std::vector<BSONObj> users;
+    if (cmd.getShowPrivileges() || cmd.getShowAuthenticationRestrictions()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Privilege or restriction details require exact-match usersInfo queries",
+                !cmd.getFilter() && arg.isExact());
 
-    std::string help() const override {
-        return "Returns information about users.";
-    }
+        // If you want privileges or restrictions you need to call getUserDescription
+        // on each user.
+        for (const auto& userName : arg.getElements(dbname)) {
+            BSONObj userDetails;
+            auto status = authzManager->getUserDescription(opCtx, userName, &userDetails);
+            if (status.code() == ErrorCodes::UserNotFound) {
+                continue;
+            }
+            uassertStatusOK(status);
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auth::UsersInfoArgs args;
-        uassertStatusOK(auth::parseUsersInfoCommand(cmdObj, dbname, &args));
-
-        auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-        auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
-
-        BSONArrayBuilder usersArrayBuilder(result.subarrayStart("users"));
-        if (args.showPrivileges ||
-            (args.authenticationRestrictionsFormat == AuthenticationRestrictionsFormat::kShow)) {
-            uassert(ErrorCodes::IllegalOperation,
-                    "Privilege or restriction details require exact-match usersInfo queries",
-                    !args.filter && (args.target == auth::UsersInfoArgs::Target::kExplicitUsers));
-
-            // If you want privileges or restrictions you need to call getUserDescription
-            // on each user.
-            for (const auto& userName : args.userNames) {
-                BSONObj userDetails;
-                auto status = authzManager->getUserDescription(opCtx, userName, &userDetails);
-                if (status.code() == ErrorCodes::UserNotFound) {
-                    continue;
-                }
-                uassertStatusOK(status);
-
-                // getUserDescription always includes credentials and restrictions, which may need
-                // to be stripped out
-                BSONObjBuilder strippedUser(usersArrayBuilder.subobjStart());
-                for (const BSONElement& e : userDetails) {
-                    if (e.fieldNameStringData() == "credentials") {
-                        BSONArrayBuilder mechanismNamesBuilder;
-                        BSONObj mechanismsObj = e.Obj();
-                        for (const BSONElement& mechanismElement : mechanismsObj) {
-                            mechanismNamesBuilder.append(mechanismElement.fieldNameStringData());
-                        }
-                        strippedUser.append("mechanisms", mechanismNamesBuilder.arr());
-
-                        if (!args.showCredentials) {
-                            continue;
-                        }
+            // getUserDescription always includes credentials and restrictions, which may need
+            // to be stripped out
+            BSONObjBuilder strippedUser;
+            for (const BSONElement& e : userDetails) {
+                if (e.fieldNameStringData() == "credentials") {
+                    BSONArrayBuilder mechanismNamesBuilder;
+                    BSONObj mechanismsObj = e.Obj();
+                    for (const BSONElement& mechanismElement : mechanismsObj) {
+                        mechanismNamesBuilder.append(mechanismElement.fieldNameStringData());
                     }
+                    strippedUser.append("mechanisms", mechanismNamesBuilder.arr());
 
-                    if (e.fieldNameStringData() == "authenticationRestrictions" &&
-                        args.authenticationRestrictionsFormat ==
-                            AuthenticationRestrictionsFormat::kOmit) {
+                    if (!cmd.getShowCredentials()) {
                         continue;
                     }
-
-                    strippedUser.append(e);
                 }
-                strippedUser.doneFast();
-            }
-        } else {
-            // If you don't need privileges, or authenticationRestrictions, you can just do a
-            // regular query on system.users
-            std::vector<BSONObj> pipeline;
 
-            if (args.target == auth::UsersInfoArgs::Target::kGlobal) {
-                // Leave the pipeline unconstrained, we want to return every user.
-            } else if (args.target == auth::UsersInfoArgs::Target::kDB) {
-                pipeline.push_back(
-                    BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname)));
-            } else {
-                BSONArrayBuilder usersMatchArray;
-                for (size_t i = 0; i < args.userNames.size(); ++i) {
-                    usersMatchArray.append(BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                                << args.userNames[i].getUser()
-                                                << AuthorizationManager::USER_DB_FIELD_NAME
-                                                << args.userNames[i].getDB()));
+                if ((e.fieldNameStringData() == "authenticationRestrictions") &&
+                    !cmd.getShowAuthenticationRestrictions()) {
+                    continue;
                 }
-                pipeline.push_back(BSON("$match" << BSON("$or" << usersMatchArray.arr())));
+
+                strippedUser.append(e);
             }
+            users.push_back(strippedUser.obj());
+        }
+    } else {
+        // If you don't need privileges, or authenticationRestrictions, you can just do a
+        // regular query on system.users
+        std::vector<BSONObj> pipeline;
 
-            // Order results by user field then db field, matching how UserNames are ordered
-            pipeline.push_back(BSON("$sort" << BSON("user" << 1 << "db" << 1)));
-
-            // Rewrite the credentials object into an array of its fieldnames.
+        if (arg.isAllForAllDBs()) {
+            // Leave the pipeline unconstrained, we want to return every user.
+        } else if (arg.isAllOnCurrentDB()) {
             pipeline.push_back(
-                BSON("$addFields" << BSON("mechanisms"
-                                          << BSON("$map" << BSON("input" << BSON("$objectToArray"
-                                                                                 << "$credentials")
-                                                                         << "as"
-                                                                         << "cred"
-                                                                         << "in"
-                                                                         << "$$cred.k")))));
-
-            if (args.showCredentials) {
-                // Authentication restrictions are only rendered in the single user case.
-                pipeline.push_back(BSON("$unset"
-                                        << "authenticationRestrictions"));
-            } else {
-                // Remove credentials as well, they're not required in the output
-                pipeline.push_back(BSON("$unset" << BSON_ARRAY("authenticationRestrictions"
-                                                               << "credentials")));
+                BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname)));
+        } else {
+            invariant(arg.isExact());
+            BSONArrayBuilder usersMatchArray;
+            for (const auto& userName : arg.getElements(dbname)) {
+                usersMatchArray.append(userName.toBSON());
             }
-
-            // Handle a user specified filter.
-            if (args.filter) {
-                pipeline.push_back(BSON("$match" << *args.filter));
-            }
-
-            DBDirectClient client(opCtx);
-
-            rpc::OpMsgReplyBuilder replyBuilder;
-            AggregationRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
-                                          std::move(pipeline));
-            // Impose no cursor privilege requirements, as cursor is drained internally
-            uassertStatusOK(runAggregate(opCtx,
-                                         AuthorizationManager::usersCollectionNamespace,
-                                         aggRequest,
-                                         aggRequest.serializeToCommandObj().toBson(),
-                                         PrivilegeVector(),
-                                         &replyBuilder));
-            auto bodyBuilder = replyBuilder.getBodyBuilder();
-            CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
-            bodyBuilder.doneFast();
-            auto response = CursorResponse::parseFromBSONThrowing(replyBuilder.releaseBody());
-            DBClientCursor cursor(
-                &client, response.getNSS(), response.getCursorId(), 0, 0, response.releaseBatch());
-
-            while (cursor.more()) {
-                usersArrayBuilder.append(cursor.next());
-            }
+            pipeline.push_back(BSON("$match" << BSON("$or" << usersMatchArray.arr())));
         }
 
-        usersArrayBuilder.doneFast();
-        return true;
+        // Order results by user field then db field, matching how UserNames are ordered
+        pipeline.push_back(BSON("$sort" << BSON("user" << 1 << "db" << 1)));
+
+        // Rewrite the credentials object into an array of its fieldnames.
+        pipeline.push_back(
+            BSON("$addFields" << BSON("mechanisms"
+                                      << BSON("$map" << BSON("input" << BSON("$objectToArray"
+                                                                             << "$credentials")
+                                                                     << "as"
+                                                                     << "cred"
+                                                                     << "in"
+                                                                     << "$$cred.k")))));
+
+        if (cmd.getShowCredentials()) {
+            // Authentication restrictions are only rendered in the single user case.
+            pipeline.push_back(BSON("$unset"
+                                    << "authenticationRestrictions"));
+        } else {
+            // Remove credentials as well, they're not required in the output
+            pipeline.push_back(BSON("$unset" << BSON_ARRAY("authenticationRestrictions"
+                                                           << "credentials")));
+        }
+
+        // Handle a user specified filter.
+        if (auto filter = cmd.getFilter()) {
+            pipeline.push_back(BSON("$match" << *filter));
+        }
+
+        DBDirectClient client(opCtx);
+
+        rpc::OpMsgReplyBuilder replyBuilder;
+        AggregationRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
+                                      std::move(pipeline));
+        // Impose no cursor privilege requirements, as cursor is drained internally
+        uassertStatusOK(runAggregate(opCtx,
+                                     AuthorizationManager::usersCollectionNamespace,
+                                     aggRequest,
+                                     aggRequest.serializeToCommandObj().toBson(),
+                                     PrivilegeVector(),
+                                     &replyBuilder));
+        auto bodyBuilder = replyBuilder.getBodyBuilder();
+        CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
+        bodyBuilder.doneFast();
+        auto response = CursorResponse::parseFromBSONThrowing(replyBuilder.releaseBody());
+        DBClientCursor cursor(
+            &client, response.getNSS(), response.getCursorId(), 0, 0, response.releaseBatch());
+
+        while (cursor.more()) {
+            users.push_back(cursor.next().getOwned());
+        }
     }
 
-} cmdUsersInfo;
+    UsersInfoReply reply;
+    reply.setUsers(std::move(users));
+    return reply;
+}
 
 CmdUMCTyped<CreateRoleCommand, void> cmdCreateRole;
 template <>
@@ -1907,71 +1893,55 @@ CmdUMCTyped<DropAllRolesFromDatabaseCommand, DropAllRolesFromDatabaseReply>::Inv
  *                    these roles. This format may change over time with changes to the auth
  *                    schema.
  */
-class CmdRolesInfo : public BasicCommand {
-public:
-    CmdRolesInfo() : BasicCommand("rolesInfo") {}
+CmdUMCTyped<RolesInfoCommand, RolesInfoReply, UMCInfoParams> cmdRolesInfo;
+template <>
+RolesInfoReply CmdUMCTyped<RolesInfoCommand, RolesInfoReply, UMCInfoParams>::Invocation::typedRun(
+    OperationContext* opCtx) {
+    const auto& cmd = request();
+    const auto& arg = cmd.getCommandParameter();
+    const auto& dbname = cmd.getDbName();
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kOptIn;
-    }
+    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
+    // Only usersInfo actually supports {forAllDBs: 1} mode.
+    invariant(!arg.isAllForAllDBs());
 
-    std::string help() const override {
-        return "Returns information about roles.";
-    }
+    auto privFmt = *(cmd.getShowPrivileges());
+    auto restrictionFormat = cmd.getShowAuthenticationRestrictions()
+        ? AuthenticationRestrictionsFormat::kShow
+        : AuthenticationRestrictionsFormat::kOmit;
 
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
-    }
+    RolesInfoReply reply;
+    if (arg.isAllOnCurrentDB()) {
 
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auth::RolesInfoArgs args;
-        uassertStatusOK(auth::parseRolesInfoCommand(cmdObj, dbname, &args));
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot get user fragment for all roles in a database",
+                privFmt != PrivilegeFormat::kShowAsUserFragment);
 
-        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-        auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
+        std::vector<BSONObj> roles;
+        uassertStatusOK(authzManager->getRoleDescriptionsForDB(
+            opCtx, dbname, privFmt, restrictionFormat, cmd.getShowBuiltinRoles(), &roles));
+        reply.setRoles(std::move(roles));
+    } else {
+        invariant(arg.isExact());
+        auto roleNames = arg.getElements(dbname);
 
-        if (args.allForDB) {
-            if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
-                uasserted(ErrorCodes::IllegalOperation,
-                          "Cannot get user fragment for all roles in a database");
-            }
-
-            BSONArrayBuilder rolesBuilder(result.subarrayStart("roles"));
-            uassertStatusOK(
-                authzManager->getRoleDescriptionsForDB(opCtx,
-                                                       dbname,
-                                                       args.privilegeFormat,
-                                                       args.authenticationRestrictionsFormat,
-                                                       args.showBuiltinRoles,
-                                                       &rolesBuilder));
+        if (privFmt == PrivilegeFormat::kShowAsUserFragment) {
+            BSONObj fragment;
+            uassertStatusOK(authzManager->getRolesAsUserFragment(
+                opCtx, roleNames, restrictionFormat, &fragment));
+            reply.setUserFragment(fragment);
         } else {
-            BSONObj roleDetails;
-            uassertStatusOK(authzManager->getRolesDescription(opCtx,
-                                                              args.roleNames,
-                                                              args.privilegeFormat,
-                                                              args.authenticationRestrictionsFormat,
-                                                              &roleDetails));
-
-            if (args.privilegeFormat == PrivilegeFormat::kShowAsUserFragment) {
-                result.append("userFragment", roleDetails);
-            } else {
-                result.append("roles", BSONArray(roleDetails));
-            }
+            std::vector<BSONObj> roles;
+            uassertStatusOK(authzManager->getRolesDescription(
+                opCtx, roleNames, privFmt, restrictionFormat, &roles));
+            reply.setRoles(std::move(roles));
         }
-
-        return true;
     }
 
-} cmdRolesInfo;
+    return reply;
+}
 
 class CmdInvalidateUserCache : public BasicCommand {
 public:

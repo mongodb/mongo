@@ -273,45 +273,35 @@ void checkAuthForTypedCommand(Client* client, const RevokeRolesFromRoleCommand& 
     uassertStatusOK(checkAuthorizedToRevokeRoles(as, rolesToRemove));
 }
 
-Status checkAuthForUsersInfoCommand(Client* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj) {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-    auth::UsersInfoArgs args;
-    Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
-    if (!status.isOK()) {
-        return status;
-    }
+void checkAuthForTypedCommand(Client* client, const UsersInfoCommand& request) {
+    const auto& dbname = request.getDbName();
+    const auto& arg = request.getCommandParameter();
+    auto* as = AuthorizationSession::get(client);
 
-    if (args.target == auth::UsersInfoArgs::Target::kDB) {
-        if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(dbname), ActionType::viewUser)) {
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream()
-                              << "Not authorized to view users from the " << dbname << " database");
-        }
-    } else if (args.target == auth::UsersInfoArgs::Target::kGlobal) {
-        if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                            ActionType::viewUser)) {
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream() << "Not authorized to view users from all"
-                                        << " databases");
-        }
+    if (arg.isAllOnCurrentDB()) {
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Not authorized to view users from the " << dbname << " database",
+                as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                     ActionType::viewUser));
+    } else if (arg.isAllForAllDBs()) {
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Not authorized to view users from all databases",
+                as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                     ActionType::viewUser));
     } else {
-        for (size_t i = 0; i < args.userNames.size(); ++i) {
-            if (authzSession->lookupUser(args.userNames[i])) {
-                continue;  // Can always view users you are logged in as
+        invariant(arg.isExact());
+        for (const auto& userName : arg.getElements(dbname)) {
+            if (as->lookupUser(userName)) {
+                // Can always view users you are logged in as.
+                continue;
             }
-            if (!authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(args.userNames[i].getDB()),
-                    ActionType::viewUser)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "Not authorized to view users from the " << dbname
-                                            << " database");
-            }
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to view users from the " << dbname
+                                  << " database",
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(userName.getDB()), ActionType::viewUser));
         }
     }
-    return Status::OK();
 }
 
 void checkAuthForTypedCommand(Client* client, const RevokePrivilegesFromRoleCommand& request) {
@@ -328,40 +318,32 @@ void checkAuthForTypedCommand(Client* client, const DropAllRolesFromDatabaseComm
                                                  ActionType::dropRole));
 }
 
-Status checkAuthForRolesInfoCommand(Client* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj) {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-    auth::RolesInfoArgs args;
-    Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &args);
-    if (!status.isOK()) {
-        return status;
-    }
+void checkAuthForTypedCommand(Client* client, const RolesInfoCommand& request) {
+    const auto& dbname = request.getDbName();
+    const auto& arg = request.getCommandParameter();
+    auto* as = AuthorizationSession::get(client);
 
-    if (args.allForDB) {
-        if (!authzSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(dbname), ActionType::viewRole)) {
-            return Status(ErrorCodes::Unauthorized,
-                          str::stream()
-                              << "Not authorized to view roles from the " << dbname << " database");
-        }
+    invariant(!arg.isAllForAllDBs());
+    if (arg.isAllOnCurrentDB()) {
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Not authorized to view roles from the " << dbname << " database",
+                as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                     ActionType::viewRole));
     } else {
-        for (size_t i = 0; i < args.roleNames.size(); ++i) {
-            if (authzSession->isAuthenticatedAsUserWithRole(args.roleNames[i])) {
+        invariant(arg.isExact());
+        auto roles = arg.getElements(dbname);
+        for (const auto& role : roles) {
+            if (as->isAuthenticatedAsUserWithRole(role)) {
                 continue;  // Can always see roles that you are a member of
             }
 
-            if (!authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forDatabaseName(args.roleNames[i].getDB()),
-                    ActionType::viewRole)) {
-                return Status(ErrorCodes::Unauthorized,
-                              str::stream() << "Not authorized to view roles from the "
-                                            << args.roleNames[i].getDB() << " database");
-            }
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to view roles from the " << role.getDB()
+                                  << " database",
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(role.getDB()), ActionType::viewRole));
         }
     }
-
-    return Status::OK();
 }
 
 Status checkAuthForInvalidateUserCacheCommand(Client* client) {

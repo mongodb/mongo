@@ -484,36 +484,53 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
     return ex.toStatus();
 }
 
+Status AuthzManagerExternalStateLocal::getRolesAsUserFragment(
+    OperationContext* opCtx,
+    const std::vector<RoleName>& roleNames,
+    AuthenticationRestrictionsFormat showRestrictions,
+    BSONObj* result) {
+    auto option = makeResolveRoleOption(PrivilegeFormat::kShowAsUserFragment, showRestrictions);
+
+    BSONObjBuilder fragment;
+
+    BSONArrayBuilder rolesBuilder(fragment.subarrayStart("roles"));
+    for (const auto& roleName : roleNames) {
+        roleName.serializeToBSON(&rolesBuilder);
+    }
+    rolesBuilder.doneFast();
+
+    auto swData = resolveRoles(opCtx, roleNames, option);
+    if (!swData.isOK()) {
+        return swData.getStatus();
+    }
+    auto data = std::move(swData.getValue());
+    data.roles->insert(roleNames.cbegin(), roleNames.cend());
+    serializeResolvedRoles(&fragment, data);
+
+    *result = fragment.obj();
+    return Status::OK();
+}
+
 Status AuthzManagerExternalStateLocal::getRolesDescription(
     OperationContext* opCtx,
     const std::vector<RoleName>& roleNames,
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
-    BSONObj* result) {
-    auto option = makeResolveRoleOption(showPrivileges, showRestrictions);
+    std::vector<BSONObj>* result) {
 
     if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
-        BSONObjBuilder fragment;
-
-        BSONArrayBuilder rolesBuilder(fragment.subarrayStart("roles"));
-        for (const auto& roleName : roleNames) {
-            roleName.serializeToBSON(&rolesBuilder);
+        // Shouldn't be called this way, but cope if we are.
+        BSONObj fragment;
+        auto status = getRolesAsUserFragment(opCtx, roleNames, showRestrictions, &fragment);
+        if (status.isOK()) {
+            result->push_back(fragment);
         }
-        rolesBuilder.doneFast();
-
-        auto swData = resolveRoles(opCtx, roleNames, option);
-        if (!swData.isOK()) {
-            return swData.getStatus();
-        }
-        auto data = std::move(swData.getValue());
-        data.roles->insert(roleNames.cbegin(), roleNames.cend());
-        serializeResolvedRoles(&fragment, data);
-        *result = fragment.obj();
-        return Status::OK();
+        return status;
     }
 
-    BSONArrayBuilder rolesBuilder;
-    for (const RoleName& role : roleNames) {
+    auto option = makeResolveRoleOption(showPrivileges, showRestrictions);
+
+    for (const auto& role : roleNames) {
         try {
             BSONObj roleDoc;
 
@@ -540,21 +557,19 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
             } else {
                 auto status = findOne(
                     opCtx, AuthorizationManager::rolesCollectionNamespace, role.toBSON(), &roleDoc);
-                if (!status.isOK()) {
-                    if (status.code() == ErrorCodes::NoMatchingDocument) {
-                        continue;
-                    }
-                    uassertStatusOK(status);  // throws
+                if (status.code() == ErrorCodes::NoMatchingDocument) {
+                    continue;
                 }
+                uassertStatusOK(status);  // throws
             }
 
-            BSONObjBuilder roleBuilder(rolesBuilder.subobjStart());
+            BSONObjBuilder roleBuilder;
             auto subRoles = filterAndMapRole(&roleBuilder, roleDoc, option, true);
             auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
             data.roles->insert(subRoles.cbegin(), subRoles.cend());
             serializeResolvedRoles(&roleBuilder, data, roleDoc);
 
-            roleBuilder.doneFast();
+            result->push_back(roleBuilder.obj());
         } catch (const AssertionException& ex) {
             return {ex.code(),
                     str::stream() << "Failed fetching role '" << role.getFullName()
@@ -562,7 +577,6 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
         }
     }
 
-    *result = rolesBuilder.arr();
     return Status::OK();
 }
 
@@ -572,7 +586,7 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
     PrivilegeFormat showPrivileges,
     AuthenticationRestrictionsFormat showRestrictions,
     bool showBuiltinRoles,
-    BSONArrayBuilder* result) {
+    std::vector<BSONObj>* result) {
     auto option = makeResolveRoleOption(showPrivileges, showRestrictions);
 
     if (showPrivileges == PrivilegeFormat::kShowAsUserFragment) {
@@ -582,7 +596,7 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
 
     if (showBuiltinRoles) {
         for (const auto& roleName : auth::getBuiltinRoleNamesForDB(dbname)) {
-            BSONObjBuilder roleBuilder(result->subobjStart());
+            BSONObjBuilder roleBuilder;
 
             roleBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName.getRole());
             roleBuilder.append(AuthorizationManager::ROLE_DB_FIELD_NAME, roleName.getDB());
@@ -613,7 +627,7 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
                 roleBuilder.append("inheritedAuthenticationRestrictions", BSONArray());
             }
 
-            roleBuilder.doneFast();
+            result->push_back(roleBuilder.obj());
         }
     }
 
@@ -623,14 +637,14 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
                  BSONObj(),
                  [&](const BSONObj& roleDoc) {
                      try {
-                         BSONObjBuilder roleBuilder(result->subobjStart());
+                         BSONObjBuilder roleBuilder;
 
                          auto subRoles = filterAndMapRole(&roleBuilder, roleDoc, option, true);
                          roleBuilder.append("isBuiltin", false);
                          auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
                          data.roles->insert(subRoles.cbegin(), subRoles.cend());
                          serializeResolvedRoles(&roleBuilder, data, roleDoc);
-                         roleBuilder.doneFast();
+                         result->push_back(roleBuilder.obj());
                          return Status::OK();
                      } catch (const AssertionException& ex) {
                          return ex.toStatus();

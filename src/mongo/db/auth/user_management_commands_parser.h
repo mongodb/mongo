@@ -45,39 +45,6 @@
 namespace mongo {
 namespace auth {
 
-struct UsersInfoArgs {
-    enum class Target { kExplicitUsers, kDB, kGlobal };
-
-    std::vector<UserName> userNames;
-    Target target;
-    bool showPrivileges = false;
-    AuthenticationRestrictionsFormat authenticationRestrictionsFormat =
-        AuthenticationRestrictionsFormat::kOmit;
-    bool showCredentials = false;
-    boost::optional<BSONObj> filter;
-};
-
-/**
- * Takes a command object describing an invocation of the "usersInfo" command  and parses out
- * all the arguments into the "parsedArgs" output param.
- */
-Status parseUsersInfoCommand(const BSONObj& cmdObj, StringData dbname, UsersInfoArgs* parsedArgs);
-
-struct RolesInfoArgs {
-    std::vector<RoleName> roleNames;
-    bool allForDB = false;
-    PrivilegeFormat privilegeFormat = PrivilegeFormat::kOmit;
-    AuthenticationRestrictionsFormat authenticationRestrictionsFormat =
-        AuthenticationRestrictionsFormat::kOmit;
-    bool showBuiltinRoles = false;
-};
-
-/**
- * Takes a command object describing an invocation of the "rolesInfo" command  and parses out
- * the arguments into the "parsedArgs" output param.
- */
-Status parseRolesInfoCommand(const BSONObj& cmdObj, StringData dbname, RolesInfoArgs* parsedArgs);
-
 /**
  * Parses the privileges described in "privileges" into a vector of Privilege objects.
  * Returns Status::OK() upon successfully parsing all the elements of "privileges".

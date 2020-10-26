@@ -395,8 +395,17 @@ Status AuthorizationManagerImpl::getRolesDescription(OperationContext* opCtx,
                                                      const std::vector<RoleName>& roleName,
                                                      PrivilegeFormat privileges,
                                                      AuthenticationRestrictionsFormat restrictions,
-                                                     BSONObj* result) {
+                                                     std::vector<BSONObj>* result) {
     return _externalState->getRolesDescription(opCtx, roleName, privileges, restrictions, result);
+}
+
+
+Status AuthorizationManagerImpl::getRolesAsUserFragment(
+    OperationContext* opCtx,
+    const std::vector<RoleName>& roleName,
+    AuthenticationRestrictionsFormat restrictions,
+    BSONObj* result) {
+    return _externalState->getRolesAsUserFragment(opCtx, roleName, restrictions, result);
 }
 
 
@@ -406,7 +415,7 @@ Status AuthorizationManagerImpl::getRoleDescriptionsForDB(
     PrivilegeFormat privileges,
     AuthenticationRestrictionsFormat restrictions,
     bool showBuiltinRoles,
-    BSONArrayBuilder* result) {
+    std::vector<BSONObj>* result) {
     return _externalState->getRoleDescriptionsForDB(
         opCtx, dbname, privileges, restrictions, showBuiltinRoles, result);
 }

@@ -258,39 +258,6 @@ Status AuthzManagerExternalStateMongos::rolesExist(OperationContext* opCtx,
     return ex.toStatus();
 }
 
-using ResolvedRoleData = AuthzManagerExternalState::ResolvedRoleData;
-StatusWith<ResolvedRoleData> AuthzManagerExternalStateMongos::resolveRoles(
-    OperationContext* opCtx, const std::vector<RoleName>& roleNames, ResolveRoleOption option) {
-    // mongos never calls into resolveRoles().
-    // That's done exclusively by mongod's User acquisition and user management commands.
-    dassert(false);
-    return {ErrorCodes::NotImplemented, "AuthzManagerExternalStateMongos::resolveRoles"};
-}
-
-Status AuthzManagerExternalStateMongos::getRolesDescription(
-    OperationContext* opCtx,
-    const std::vector<RoleName>& roles,
-    PrivilegeFormat showPrivileges,
-    AuthenticationRestrictionsFormat showRestrictions,
-    BSONObj* result) {
-    // mongos never calls into resolveRoles().
-    // That's done exclusively by mongod's User acquisition and user management commands.
-    dassert(false);
-    return {ErrorCodes::NotImplemented, "AuthzManagerExternalStateMongos::resolveRoles"};
-}
-Status AuthzManagerExternalStateMongos::getRoleDescriptionsForDB(
-    OperationContext* opCtx,
-    StringData dbname,
-    PrivilegeFormat showPrivileges,
-    AuthenticationRestrictionsFormat showRestrictions,
-    bool showBuiltinRoles,
-    BSONArrayBuilder* result) {
-    // mongos never calls into resolveRoles().
-    // That's done exclusively by mongod's User acquisition and user management commands.
-    dassert(false);
-    return {ErrorCodes::NotImplemented, "AuthzManagerExternalStateMongos::resolveRoles"};
-}
-
 bool AuthzManagerExternalStateMongos::hasAnyPrivilegeDocuments(OperationContext* opCtx) {
     BSONObj usersInfoCmd = BSON("usersInfo" << 1);
     BSONObjBuilder userBuilder;

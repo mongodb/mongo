@@ -88,7 +88,14 @@ public:
                                const std::vector<RoleName>&,
                                PrivilegeFormat,
                                AuthenticationRestrictionsFormat,
-                               BSONObj*) override {
+                               std::vector<BSONObj>*) override {
+        UASSERT_NOT_IMPLEMENTED;
+    }
+
+    Status getRolesAsUserFragment(OperationContext*,
+                                  const std::vector<RoleName>&,
+                                  AuthenticationRestrictionsFormat,
+                                  BSONObj*) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 
@@ -97,7 +104,7 @@ public:
                                     PrivilegeFormat,
                                     AuthenticationRestrictionsFormat,
                                     bool,
-                                    BSONArrayBuilder*) override {
+                                    std::vector<BSONObj>*) override {
         UASSERT_NOT_IMPLEMENTED;
     }
 

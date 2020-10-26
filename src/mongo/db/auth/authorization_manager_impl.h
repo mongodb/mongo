@@ -83,14 +83,19 @@ public:
                                const std::vector<RoleName>& roleName,
                                PrivilegeFormat privilegeFormat,
                                AuthenticationRestrictionsFormat,
-                               BSONObj* result) override;
+                               std::vector<BSONObj>* result) override;
+
+    Status getRolesAsUserFragment(OperationContext* opCtx,
+                                  const std::vector<RoleName>& roleName,
+                                  AuthenticationRestrictionsFormat,
+                                  BSONObj* result) override;
 
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                     StringData dbname,
                                     PrivilegeFormat privilegeFormat,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
-                                    BSONArrayBuilder* result) override;
+                                    std::vector<BSONObj>* result) override;
 
     StatusWith<UserHandle> acquireUser(OperationContext* opCtx, const UserName& userName) override;
     StatusWith<UserHandle> acquireUserForSessionRefresh(OperationContext* opCtx,

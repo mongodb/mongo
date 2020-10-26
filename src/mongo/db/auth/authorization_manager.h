@@ -273,7 +273,15 @@ public:
                                        const std::vector<RoleName>& roleName,
                                        PrivilegeFormat privilegeFormat,
                                        AuthenticationRestrictionsFormat,
-                                       BSONObj* result) = 0;
+                                       std::vector<BSONObj>* result) = 0;
+
+    /**
+     * Delegates method call to the underlying AuthzManagerExternalState.
+     */
+    virtual Status getRolesAsUserFragment(OperationContext* opCtx,
+                                          const std::vector<RoleName>& roleName,
+                                          AuthenticationRestrictionsFormat,
+                                          BSONObj* result) = 0;
 
     /**
      * Delegates method call to the underlying AuthzManagerExternalState.
@@ -283,7 +291,7 @@ public:
                                             PrivilegeFormat privilegeFormat,
                                             AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,
-                                            BSONArrayBuilder* result) = 0;
+                                            std::vector<BSONObj>* result) = 0;
 
     /**
      * Returns a Status or UserHandle for the given userName. If the user cache already has a

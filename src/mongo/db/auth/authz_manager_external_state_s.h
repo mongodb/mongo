@@ -61,18 +61,31 @@ public:
                               BSONObj* result) final;
     StatusWith<ResolvedRoleData> resolveRoles(OperationContext* opCtx,
                                               const std::vector<RoleName>& roleNames,
-                                              ResolveRoleOption option) override;
+                                              ResolveRoleOption option) final {
+        return {ErrorCodes::NotImplemented, "AuthzMongos::resolveRoles"};
+    }
+
     Status getRolesDescription(OperationContext* opCtx,
                                const std::vector<RoleName>& roles,
                                PrivilegeFormat showPrivileges,
                                AuthenticationRestrictionsFormat,
-                               BSONObj* result) final;
+                               std::vector<BSONObj>* result) final {
+        return {ErrorCodes::NotImplemented, "AuthzMongos::getRolesDescription"};
+    }
+    Status getRolesAsUserFragment(OperationContext* opCtx,
+                                  const std::vector<RoleName>& roles,
+                                  AuthenticationRestrictionsFormat,
+                                  BSONObj* result) final {
+        return {ErrorCodes::NotImplemented, "AuthzMongos::getRolesAsUserFragment"};
+    }
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                     StringData dbname,
                                     PrivilegeFormat showPrivileges,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
-                                    BSONArrayBuilder* result) final;
+                                    std::vector<BSONObj>* result) final {
+        return {ErrorCodes::NotImplemented, "AuthzMongos::getRoleDescriptionsForDB"};
+    }
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
 };

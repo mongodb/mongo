@@ -42,6 +42,7 @@
 #include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -196,43 +197,6 @@ CmdUMCPassthrough<DropAllUsersFromDatabaseCommand,
 CmdUMCPassthrough<GrantRolesToUserCommand, void, UserCacheInvalidatorUser> cmdGrantRolesToUser;
 CmdUMCPassthrough<RevokeRolesFromUserCommand, void, UserCacheInvalidatorUser>
     cmdRevokeRolesFromUser;
-
-class CmdUsersInfo : public BasicCommand {
-public:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kOptIn;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    CmdUsersInfo() : BasicCommand("usersInfo") {}
-
-    std::string help() const override {
-        return "Returns information about users.";
-    }
-
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        return auth::checkAuthForUsersInfoCommand(client, dbname, cmdObj);
-    }
-
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        return Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx,
-            dbname,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            &result);
-    }
-
-} cmdUsersInfo;
-
 CmdUMCPassthrough<CreateRoleCommand, void, UserCacheInvalidatorNOOP> cmdCreateRole;
 CmdUMCPassthrough<UpdateRoleCommand, void, UserCacheInvalidatorAll> cmdUpdateRole;
 CmdUMCPassthrough<GrantPrivilegesToRoleCommand, void, UserCacheInvalidatorAll>
@@ -247,41 +211,63 @@ CmdUMCPassthrough<DropAllRolesFromDatabaseCommand,
                   UserCacheInvalidatorAll>
     cmdDropAllRolesFromDatabase;
 
-class CmdRolesInfo : public BasicCommand {
+/**
+ * usersInfo and rolesInfo are simpler read-only passthrough commands.
+ */
+template <typename RequestT, typename ReplyT>
+class CmdUMCInfo : public TypedCommand<CmdUMCInfo<RequestT, ReplyT>> {
 public:
-    CmdRolesInfo() : BasicCommand("rolesInfo") {}
+    using Request = RequestT;
+    using Reply = ReplyT;
+    using TC = TypedCommand<CmdUMCInfo<RequestT, ReplyT>>;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kOptIn;
+    class Invocation final : public TC::InvocationBase {
+    public:
+        using TC::InvocationBase::InvocationBase;
+        using TC::InvocationBase::request;
+
+        Reply typedRun(OperationContext* opCtx) {
+            const auto& cmd = request();
+
+            BSONObjBuilder builder;
+            const bool ok = Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
+                opCtx,
+                cmd.getDbName().toString(),
+                applyReadWriteConcern(
+                    opCtx,
+                    this,
+                    CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({}))),
+                &builder);
+
+            auto result = builder.obj();
+            if (!ok) {
+                uassertStatusOK(getStatusFromCommandResult(result));
+            }
+
+            return parseUMCReply<Request, Reply>(result);
+        }
+
+    private:
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auth::checkAuthForTypedCommand(opCtx->getClient(), request());
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName(), "");
+        }
+    };
+
+    typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
+        return TC::AllowedOnSecondary::kOptIn;
     }
+};
 
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "Returns information about roles.";
-    }
-
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        return auth::checkAuthForRolesInfoCommand(client, dbname, cmdObj);
-    }
-
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        return Grid::get(opCtx)->catalogClient()->runUserManagementReadCommand(
-            opCtx,
-            dbname,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            &result);
-    }
-
-} cmdRolesInfo;
+CmdUMCInfo<UsersInfoCommand, UsersInfoReply> cmdUsersInfo;
+CmdUMCInfo<RolesInfoCommand, RolesInfoReply> cmdRolesInfo;
 
 class CmdInvalidateUserCache : public BasicCommand {
 public:

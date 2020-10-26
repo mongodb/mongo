@@ -70,13 +70,17 @@ public:
                                const std::vector<RoleName>& roles,
                                PrivilegeFormat showPrivileges,
                                AuthenticationRestrictionsFormat,
-                               BSONObj* result) override;
+                               std::vector<BSONObj>* result) override;
+    Status getRolesAsUserFragment(OperationContext* opCtx,
+                                  const std::vector<RoleName>& roles,
+                                  AuthenticationRestrictionsFormat,
+                                  BSONObj* result) override;
     Status getRoleDescriptionsForDB(OperationContext* opCtx,
                                     StringData dbname,
                                     PrivilegeFormat showPrivileges,
                                     AuthenticationRestrictionsFormat,
                                     bool showBuiltinRoles,
-                                    BSONArrayBuilder* result) override;
+                                    std::vector<BSONObj>* result) override;
 
     bool hasAnyPrivilegeDocuments(OperationContext* opCtx) final;
 

@@ -32,6 +32,7 @@ imports:
     - "mongo/idl/basic_types.idl"
     - "mongo/db/auth/auth_types.idl"
     - "mongo/db/auth/address_restriction.idl"
+    - "mongo/db/auth/user_management_commands_parser.idl"
 
 server_parameters:
   enforceUserClusterSeparation:
@@ -59,6 +60,27 @@ structs:
                 description: "Number of roles dropped from database"
                 type: int
                 cpp_name: count
+
+    usersInfoReply:
+        description: "Reply from usersInfo command"
+        strict: false
+        fields:
+            users:
+                description: "Users descriptions"
+                type: array<object_owned>
+
+    rolesInfoReply:
+        description: "Reply from usersInfo command"
+        strict: false
+        fields:
+            roles:
+                description: "Users descriptions"
+                type: array<object_owned>
+                optional: true
+            userFragment:
+                description: "Roles as user document fragment"
+                type: object_owned
+                optional: true
 
     UMCTransactionFailPoint:
         description: Data for umcTransaction failpoint
@@ -90,7 +112,7 @@ commands:
                 type: array<RoleNameOrString>
             digestPassword:
                 description: "True if the server should digest the password, false for pre-digested"
-                type: bool
+                type: safeBool
                 default: true
             writeConcern:
                 description: "The level of write concern for the creation operation"
@@ -127,7 +149,7 @@ commands:
                 optional: true
             digestPassword:
                 description: "True if the server should digest the password, false for pre-digested"
-                type: bool
+                type: safeBool
                 default: true
             writeConcern:
                 description: "The level of write concern for the update operation"
@@ -291,3 +313,65 @@ commands:
         namespace: ignored
         cpp_name: DropAllRolesFromDatabaseCommand
         strict: true
+
+    usersInfo:
+        description: "Returns information about users."
+        command_name: usersInfo
+        namespace: type
+        type: UsersInfoCommandArg
+        cpp_name: UsersInfoCommand
+        strict: true
+        fields:
+            showPrivileges:
+                description: >-
+                    Set the field to true to show the user’s full set of privileges,
+                    including expanded information for the inherited roles.
+                    If viewing all users, you cannot specify this field.
+                type: safeBool
+                default: false
+            showCredentials:
+                description: >-
+                    Set the field to true to display the user’s password hash.
+                type: safeBool
+                default: false
+            showAuthenticationRestrictions:
+                description: >-
+                    Set the field to true to show the user’s authentication restrictions.
+                    If viewing all users, you cannot specify this field.
+                type: safeBool
+                default: false
+            filter:
+                description: >-
+                    A document that specifies $match stage conditions to return information
+                    for users that match the filter conditions.
+                type: object
+                optional: true
+
+    rolesInfo:
+        description: "returns information about roles."
+        command_name: rolesInfo
+        namespace: type
+        type: RolesInfoCommandArg
+        cpp_name: RolesInfoCommand
+        strict: true
+        fields:
+            showPrivileges:
+                description: >-
+                    Set the field to true to show the user’s full set of privileges,
+                    including expanded information for the inherited roles.
+                    If viewing all roles, you cannot specify this field.
+                type: ParsedPrivilegeFormat
+                default: false
+            showBuiltinRoles:
+                description: >-
+                    When the rolesInfo field is set to 1, set showBuiltinRoles to true
+                    to include built-in roles in the output.
+                    Otherwise the output for rolesInfo: 1 displays only user-defined roles.
+                type: safeBool
+                default: false
+            showAuthenticationRestrictions:
+                description: >-
+                    Set the field to true to show the user’s authentication restrictions.
+                    If viewing all users, you cannot specify this field.
+                type: safeBool
+                default: false

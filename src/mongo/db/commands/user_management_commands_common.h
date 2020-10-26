@@ -93,14 +93,8 @@ void checkAuthForTypedCommand(Client*, const DropUserCommand&);
 void checkAuthForTypedCommand(Client*, const DropRoleCommand&);
 void checkAuthForTypedCommand(Client*, const RevokePrivilegesFromRoleCommand&);
 void checkAuthForTypedCommand(Client*, const DropAllRolesFromDatabaseCommand&);
-
-Status checkAuthForUsersInfoCommand(Client* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj);
-
-Status checkAuthForRolesInfoCommand(Client* client,
-                                    const std::string& dbname,
-                                    const BSONObj& cmdObj);
+void checkAuthForTypedCommand(Client*, const UsersInfoCommand&);
+void checkAuthForTypedCommand(Client*, const RolesInfoCommand&);
 
 Status checkAuthForInvalidateUserCacheCommand(Client* client);
 

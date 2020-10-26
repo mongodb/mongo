@@ -124,23 +124,29 @@ public:
                                                       ResolveRoleOption option) = 0;
 
     /**
-     * Writes into "result" a document describing the named role is and returns Status::OK(). If
-     * showPrivileges is kOmit or kShowPrivileges, the description includes the roles which the
-     * named roles are a member of, including those memberships held implicitly through other roles
-     * (indirect roles). If "showPrivileges" is kShowPrivileges, then the description documents
-     * will also include a full list of the roles' privileges. If "showPrivileges" is
-     * kShowAsUserFragment, then the description returned will take the form of a partial user
-     * document, describing a hypothetical user which possesses the provided and implicit roles,
-     * and all inherited privileges. In the event that some of this information is inconsistent,
-     * the document will contain a "warnings" array, with std::string messages describing
-     * inconsistencies.
+     * Fetches and returns objects representing named roles.
+     *
+     * Each BSONObj in the $result vector contains a full role description
+     * as retrieved from admin.system.roles plus inherited role/privilege
+     * information as appropriate.
      */
-
     virtual Status getRolesDescription(OperationContext* opCtx,
                                        const std::vector<RoleName>& roles,
                                        PrivilegeFormat showPrivileges,
                                        AuthenticationRestrictionsFormat,
-                                       BSONObj* result) = 0;
+                                       std::vector<BSONObj>* result) = 0;
+
+    /**
+     * Fetches named roles and synthesizes them into a fragment of a user document.
+     *
+     * The document synthesized into $result looks like a complete user document
+     * representing the $roles specified and their subordinates, but without
+     * an actual user name or credentials.
+     */
+    virtual Status getRolesAsUserFragment(OperationContext* opCtx,
+                                          const std::vector<RoleName>& roles,
+                                          AuthenticationRestrictionsFormat,
+                                          BSONObj* result) = 0;
 
     /**
      * Writes into "result" documents describing the roles that are defined on the given
@@ -159,7 +165,7 @@ public:
                                             PrivilegeFormat showPrivileges,
                                             AuthenticationRestrictionsFormat,
                                             bool showBuiltinRoles,
-                                            BSONArrayBuilder* result) = 0;
+                                            std::vector<BSONObj>* result) = 0;
 
     /**
      * Returns true if there exists at least one privilege document in the system.
