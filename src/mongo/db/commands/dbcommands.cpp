@@ -382,7 +382,7 @@ public:
         if (auto timeseries = cmd.getTimeseries()) {
             uassert(ErrorCodes::InvalidOptions,
                     "Time-series collection is not enabled",
-                    feature_flags::gTimeSeriesCollection.isEnabled(
+                    feature_flags::gTimeseriesCollection.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
             const auto timeseriesNotAllowedWith = [&nsToCreate](StringData option) -> std::string {
