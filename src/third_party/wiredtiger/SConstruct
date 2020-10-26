@@ -9,6 +9,7 @@ import textwrap
 import distutils.sysconfig
 
 EnsureSConsVersion( 2, 0, 0 )
+EnsurePythonVersion(3, 0)
 
 if not os.sys.platform == "win32":
     print ("SConstruct is only supported for Windows, use build_posix for other platforms")
@@ -59,6 +60,8 @@ var.Add('CPPPATH', 'C Preprocessor include path', [
     "#/test/windows",
     "#/.",
 ])
+
+var.Add('LIBPATH', 'Adds paths to the linker search path', [])
 
 var.Add('CFLAGS', 'C Compiler Flags', [
     "/W3", # Warning level 3
@@ -310,7 +313,6 @@ if GetOption("lang-python"):
         print("The Python Interpreter must be 64-bit in order to build the python bindings")
         Exit(1)
 
-    pythonMajorVersion = sys.version_info.major
     pythonEnv = env.Clone()
     pythonEnv.Append(SWIGFLAGS=[
             "-python",
@@ -318,7 +320,6 @@ if GetOption("lang-python"):
             "-O",
             "-nodefaultctor",
             "-nodefaultdtor",
-            "-DPY_MAJOR_VERSION=" + str(pythonMajorVersion)
             ])
     # Ignore warnings in swig-generated code.
     pythonEnv['CFLAGS'].remove("/WX")
@@ -329,15 +330,22 @@ if GetOption("lang-python"):
                       SHLIBSUFFIX=".pyd",
                       LIBS=[wtlib] + wtlibs)
 
-    copySwig = pythonEnv.Command(
-        'lang/python/wiredtiger/__init__.py',
+    # Shuffle the wiredtiger __init__ into place.
+    copySwig1 = pythonEnv.Command(
+        'lang/python/wiredtiger/swig_wiredtiger.py',
         'lang/python/wiredtiger.py',
         Copy('$TARGET', '$SOURCE'))
-    pythonEnv.Depends(copySwig, swiglib)
+    pythonEnv.Depends(copySwig1, swiglib)
+
+    copySwig2 = pythonEnv.Command(
+        'lang/python/wiredtiger/__init__.py',
+        'lang/python/wiredtiger/init.py',
+        Copy('$TARGET', '$SOURCE'))
+    pythonEnv.Depends(copySwig2, swiglib)
 
     swiginstall = pythonEnv.Install('lang/python/wiredtiger/', swiglib)
 
-    Default(swiginstall, copySwig)
+    Default(swiginstall, copySwig1, copySwig2)
 
 # Shim library of functions to emulate POSIX on Windows
 shim = env.Library("window_shim",

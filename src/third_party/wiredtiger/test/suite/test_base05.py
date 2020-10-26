@@ -28,10 +28,6 @@
 
 import wiredtiger, wttest
 from wtscenario import make_scenarios
-try:
-    xrange
-except NameError:  #python3
-    xrange = range
 
 # test_base05.py
 #    Cursor operations
@@ -150,7 +146,7 @@ class test_base05(wttest.WiredTigerTestCase):
         """
         nstrings = 2 << (n % 10)
         result = ''
-        for i in xrange(nstrings):
+        for i in range(nstrings):
             if (n + i) % 20 == 0:
                 reflist = self.non_english_strings
             else:
@@ -168,7 +164,7 @@ class test_base05(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1)
         numbers = {}
-        for i in xrange(0, self.nentries):
+        for i in range(0, self.nentries):
             numbers[i] = i
             key = self.mixed_string(i)
             value = self.mixed_string(i+1)
@@ -209,14 +205,14 @@ class test_base05(wttest.WiredTigerTestCase):
         self.pr('creating cursor')
         cursor = self.session.open_cursor('table:' + self.table_name1)
         strlist = self.non_english_strings
-        for i in xrange(0, len(strlist)):
+        for i in range(0, len(strlist)):
             if convert:
                 key = val = str(strlist[i])
             else:
                 key = val = strlist[i]
             cursor[key] = val
 
-        for i in xrange(0, len(strlist)):
+        for i in range(0, len(strlist)):
             if convert:
                 key = val = str(strlist[i])
             else:

@@ -33,10 +33,6 @@
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, simple_key, simple_value
 from wtscenario import make_scenarios
-try:
-    xrange
-except NameError:  #python3
-    xrange = range
 
 # Smoke test bulk-load.
 class test_bulk_load(wttest.WiredTigerTestCase):
@@ -64,7 +60,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
-        for i in xrange(1, 1000):
+        for i in range(1, 1000):
             cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
     # Test a bulk-load triggers variable-length column-store RLE correctly.
@@ -79,7 +75,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
-        for i in xrange(1, 1000):
+        for i in range(1, 1000):
             cursor[simple_key(cursor, i)] = simple_value(cursor, i//7)
 
     # Test a bulk-load variable-length column-store append ignores any key.
@@ -91,11 +87,11 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk,append")
-        for i in xrange(1, 1000):
+        for i in range(1, 1000):
             cursor[simple_key(cursor, 37)] = simple_value(cursor, i)
         cursor.close()
         cursor = self.session.open_cursor(uri, None, None)
-        for i in xrange(1, 1000):
+        for i in range(1, 1000):
             cursor.set_key(simple_key(cursor, i))
             cursor.search()
             self.assertEqual(cursor.get_value(), simple_value(cursor, i))
@@ -109,7 +105,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         self.session.create(uri,
             'key_format=' + self.keyfmt + ',value_format=' + self.valfmt)
         cursor = self.session.open_cursor(uri, None, "bulk")
-        for i in xrange(1, 1000):
+        for i in range(1, 1000):
             if i % 7 == 0:
                 cursor[simple_key(cursor, i)] = simple_value(cursor, i)
 
@@ -121,7 +117,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri, None, None)
 
         # Verify all the records are there, in their proper state.
-        for i in xrange(1, 1000):
+        for i in range(1, 1000):
             cursor.set_key(simple_key(cursor, i))
             if i % 7 == 0:
                 cursor.search()

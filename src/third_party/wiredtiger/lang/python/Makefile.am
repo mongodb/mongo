@@ -3,8 +3,6 @@ PYDIRS = -t $(abs_builddir) -I $(abs_top_srcdir):$(abs_top_builddir) -L $(abs_to
 PYDST = $(abs_builddir)/wiredtiger
 PYFILES = $(PYDST)/fpacking.py $(PYDST)/intpacking.py $(PYDST)/packing.py \
 	$(PYDST)/packutil.py $(PYDST)/swig_wiredtiger.py $(PYDST)/__init__.py
-PY_MAJOR_VERSION := $$($(PYTHON) -c \
-	'import sys; print(int(sys.version_info.major))')
 
 all-local: _wiredtiger.so pyfiles
 
@@ -12,7 +10,7 @@ all-local: _wiredtiger.so pyfiles
 # in release packages.
 $(PYSRC)/wiredtiger_wrap.c $(PYSRC)/wiredtiger.py: $(top_srcdir)/src/include/wiredtiger.in $(PYSRC)/wiredtiger.i
 	(cd $(PYSRC) && \
-	    $(SWIG) -python -DPY_MAJOR_VERSION=$(PY_MAJOR_VERSION) \
+	    $(SWIG) -python \
 	    -threads -O -Wall -nodefaultctor -nodefaultdtor \
 	    -I$(abs_top_builddir) wiredtiger.i)
 

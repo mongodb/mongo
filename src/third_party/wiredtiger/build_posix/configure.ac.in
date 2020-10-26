@@ -149,7 +149,7 @@ if test "$wt_cv_enable_python" = "yes"; then
 fi
 
 if test "$wt_cv_enable_python" = "yes"; then
-	AM_PATH_PYTHON([2.6])
+	AM_PATH_PYTHON([3.0])
 	if test -n "$with_python_prefix" ; then
 		PYTHON_INSTALL_ARG="-d $with_python_prefix"
 	fi

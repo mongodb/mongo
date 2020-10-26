@@ -74,6 +74,12 @@ class test_config02(wttest.WiredTigerTestCase):
         WIREDTIGER_HOME is set to homeenv, if it is not null.
         configextra are any extra configuration strings needed on the open.
         """
+        try:
+            os.putenv('SOMEVAR', 'somevalue')
+            os.unsetenv('SOMEVAR')
+        except:
+            self.skipTest('putenv and/or unsetenv not support on this OS')
+            return
         configarg = 'create'
         if configextra != None:
             configarg += ',' + configextra

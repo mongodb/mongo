@@ -458,10 +458,11 @@ struct __wt_connection_impl {
     uint32_t debug_log_cnt;  /* Log file retention count */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define WT_CONN_DEBUG_CKPT_RETAIN 0x1u
-#define WT_CONN_DEBUG_CURSOR_COPY 0x2u
-#define WT_CONN_DEBUG_REALLOC_EXACT 0x4u
-#define WT_CONN_DEBUG_SLOW_CKPT 0x8u
+#define WT_CONN_DEBUG_CKPT_RETAIN 0x01u
+#define WT_CONN_DEBUG_CORRUPTION_ABORT 0x02u
+#define WT_CONN_DEBUG_CURSOR_COPY 0x04u
+#define WT_CONN_DEBUG_REALLOC_EXACT 0x08u
+#define WT_CONN_DEBUG_SLOW_CKPT 0x10u
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint64_t debug_flags;
 

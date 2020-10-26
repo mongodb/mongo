@@ -33,10 +33,9 @@
 from __future__ import print_function
 import glob, json, os, random, re, sys
 
-try:
-    xrange
-except NameError:  #python3
-    xrange = range
+if sys.version_info[0] <= 2:
+    print('WiredTiger requires Python version 3.0 or above')
+    sys.exit(1)
 
 # Set paths
 suitedir = sys.path[0]

@@ -55,7 +55,7 @@ functions:
         set -o verbose
         if [ "$OS" != "Windows_NT" ]; then
           sh reconf
-          ${configure_env_vars|CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"} \
+          ${configure_env_vars|CC=/opt/mongodbtoolchain/v3/bin/gcc CXX=/opt/mongodbtoolchain/v3/bin/g++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"} PYTHON="python3" \
             ../configure ${configure_python_setting|} \
             ${posix_configure_flags|--enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL}
         fi
@@ -68,8 +68,11 @@ functions:
         set -o errexit
         set -o verbose
         if [ "Windows_NT" == "$OS" ]; then
-          pip install scons==3.1.1
-          scons-3.1.1.bat ${win_configure_flags|--enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic} ${smp_command|}
+          export "PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH"
+
+          python --version
+          python -m pip install scons==3.1.1
+          scons-3.1.1.bat "LIBPATH=c:\\python\\Python39\\libs" --enable-python=c:\\swigwin-3.0.2\\swig.exe --enable-diagnostic ${scons_smp_command|}
         else
           cd build_posix
           ${make_command|make} ${smp_command|} 2>&1
@@ -153,7 +156,11 @@ functions:
         set -o errexit
         set -o verbose
 
-        ${test_env_vars|} ${python_binary|python} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1
+        if [ "Windows_NT" = "$OS" ]; then
+          export "PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH"
+          export "PYTHONPATH=$(pwd)/../lang/python/wiredtiger):$(cygpath -w $(pwd)/../lang/python)"
+        fi
+        ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1
   "format test":
     command: shell.exec
     params:
@@ -587,7 +594,7 @@ tasks:
       - func: "make check all"
         vars:
           smp_command: -j 1
-          test_env_vars: ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer TESTUTIL_SLOW_MACHINE=1
+          test_env_vars: ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:disable_coredump=0 ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer TESTUTIL_SLOW_MACHINE=1 TESTUTIL_BYPASS_ASAN=1
 
   - name: make-check-linux-no-ftruncate-test
     depends_on:
@@ -1546,7 +1553,7 @@ tasks:
             set -o errexit
             set -o verbose
 
-            ${test_env_vars|} ${python_binary|python} ../../test/wtperf/test_conf_dump.py 2>&1
+            ${test_env_vars|} ${python_binary|python3} ../../test/wtperf/test_conf_dump.py 2>&1
 
   - name: compile-windows-alt
     tags: ["pull_request", "windows_only"]
@@ -1561,8 +1568,10 @@ tasks:
             set -o errexit
             set -o verbose
 
-            pip install scons==3.1.1
-            scons-3.1.1.bat ${smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /we4133" wiredtiger.dll libwiredtiger.lib
+            export "PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH"
+            python --version
+            python -m pip install scons==3.1.1
+            scons-3.1.1.bat ${scons_smp_command|} "CFLAGS=/Gv /wd4090 /wd4996 /we4047 /we4024 /TC /we4100 /we4133" wiredtiger.dll libwiredtiger.lib
 
   - name: scons-check
     tags: ["pull_request", "windows_only"]
@@ -1577,8 +1586,10 @@ tasks:
             set -o errexit
             set -o verbose
 
-            pip install scons==3.1.1
-            scons-3.1.1.bat ${smp_command|} check
+            export "PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH"
+            python --version
+            python -m pip install scons==3.1.1
+            scons-3.1.1.bat ${scons_smp_command|} check
 
   - name: fops
     tags: ["pull_request"]
@@ -1863,7 +1874,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${python_binary|python} syscall.py --verbose --preserve
+            ${python_binary|python3} syscall.py --verbose --preserve
 
   - name: checkpoint-filetypes-test
     commands:
@@ -2225,7 +2236,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            for i in {1..10}; do ${python_binary|python} split_stress.py; done
+            for i in {1..10}; do ${test_env_vars|} ${python_binary|python3} split_stress.py; done
 
   # The task name is ppc-zseries because this task will be used in both buildVariants
   - name: format-stress-ppc-zseries-test
@@ -2381,6 +2392,7 @@ buildvariants:
     test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
     - name: ".pull_request !.windows_only !.pull_request_compilers"
@@ -2410,26 +2422,11 @@ buildvariants:
   - ubuntu1804-wt-build
   expansions:
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-strict --enable-lz4 --enable-snappy --enable-zlib --enable-zstd --enable-python
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
   tasks:
     - name: ".pull_request_compilers"
-
-- name: ubuntu1804-python3
-  display_name: "! Ubuntu 18.04 (Python3)"
-  run_on:
-  - ubuntu1804-test
-  expansions:
-    test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-    configure_python_setting: PYTHON=python3
-    posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
-    make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
-    python_binary: python3
-  tasks:
-    - name: compile
-    - name: ".unit_test"
-    - name: conf-dump-test
 
 - name: ubuntu1804-stress-tests
   display_name: Ubuntu 18.04 Stress tests
@@ -2444,6 +2441,7 @@ buildvariants:
     posix_configure_flags:
       --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy
       --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
   tasks:
     - name: ".stress-test-1"
     - name: ".stress-test-2"
@@ -2467,6 +2465,7 @@ buildvariants:
     test_env_vars: LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
   tasks:
     - name: compile-linux-no-ftruncate
     - name: make-check-linux-no-ftruncate-test
@@ -2481,6 +2480,7 @@ buildvariants:
     test_env_vars: LD_PRELOAD=/usr/local/lib/libeatmydata.so PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
   tasks:
     - name: compile
     - name: make-check-test
@@ -2545,6 +2545,9 @@ buildvariants:
   display_name: "! Windows 64-bit"
   run_on:
   - windows-64-vs2017-test
+  expansions:
+    python_binary: 'python'
+    scons_smp_command: -j $(echo "$(getconf NPROCESSORS_ONLN 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1) * 2" | bc)
   tasks:
     - name: compile
     - name: ".windows_only"
@@ -2558,6 +2561,7 @@ buildvariants:
   expansions:
     configure_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ADD_CFLAGS="-ggdb -fPIC"
     posix_configure_flags: --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(sysctl -n hw.logicalcpu)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH ARCHFLAGS=-Wno-error=unused-command-line-argument-hard-error-in-future make
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH DYLD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
@@ -2573,6 +2577,7 @@ buildvariants:
   - ubuntu1804-test
   batchtime: 10080 # 7 days
   expansions:
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.libs top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
@@ -2589,6 +2594,7 @@ buildvariants:
   - ubuntu1804-zseries-build
   batchtime: 10080 # 7 days
   expansions:
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     test_env_vars: PATH=/opt/mongodbtoolchain/v3/bin:$PATH LD_LIBRARY_PATH=$(pwd)/.lib top_srcdir=$(pwd)/.. top_builddir=$(pwd)
   tasks:
@@ -2611,6 +2617,7 @@ buildvariants:
     posix_configure_flags:
       --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy
       --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
   tasks:
   - name: compile
   - name: unit-test
@@ -2631,6 +2638,7 @@ buildvariants:
     posix_configure_flags:
       --enable-silent-rules --enable-diagnostic --enable-python --enable-zlib --enable-snappy
       --enable-strict --enable-static --prefix=$(pwd)/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
   tasks:
   - name: compile
   - name: unit-test
