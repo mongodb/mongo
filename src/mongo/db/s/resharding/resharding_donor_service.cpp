@@ -94,6 +94,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(const BSONObj& dono
 
 ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
     stdx::lock_guard<Latch> lg(_mutex);
+    invariant(_allRecipientsDoneCloning.getFuture().isReady());
     invariant(_allRecipientsDoneApplying.getFuture().isReady());
     invariant(_coordinatorHasCommitted.getFuture().isReady());
     invariant(_completionPromise.getFuture().isReady());
@@ -103,7 +104,11 @@ void ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     ExecutorFuture<void>(**executor)
         .then([this] { _transitionToPreparingToDonate(); })
-        .then([this] { _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating(); })
+        .then(
+            [this] { _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(); })
+        .then([this, executor] {
+            return _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(executor);
+        })
         .then([this, executor] {
             return _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(executor);
         })
@@ -141,6 +146,10 @@ void ReshardingDonorService::DonorStateMachine::run(
 void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lg(_mutex);
+    if (!_allRecipientsDoneCloning.getFuture().isReady()) {
+        _allRecipientsDoneCloning.setError(status);
+    }
+
     if (!_allRecipientsDoneApplying.getFuture().isReady()) {
         _allRecipientsDoneApplying.setError(status);
     }
@@ -166,20 +175,32 @@ void ReshardingDonorService::DonorStateMachine::_transitionToPreparingToDonate()
 }
 
 void ReshardingDonorService::DonorStateMachine::
-    _onPreparingToDonateCalculateMinFetchTimestampThenBeginDonating() {
+    _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData() {
     if (_donorDoc.getState() > DonorStateEnum::kPreparingToDonate) {
         invariant(_donorDoc.getMinFetchTimestamp());
         return;
     }
 
     auto minFetchTimestamp = generateMinFetchTimestamp(_donorDoc);
-    _transitionState(DonorStateEnum::kDonating, minFetchTimestamp);
+    _transitionState(DonorStateEnum::kDonatingInitialData, minFetchTimestamp);
+}
+
+ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
+    _awaitAllRecipientsDoneCloningThenTransitionToDonatingOplogEntries(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    if (_donorDoc.getState() > DonorStateEnum::kDonatingInitialData) {
+        return ExecutorFuture<void>(**executor, Status::OK());
+    }
+
+    return _allRecipientsDoneCloning.getFuture().thenRunOn(**executor).then([this]() {
+        _transitionState(DonorStateEnum::kDonatingOplogEntries);
+    });
 }
 
 ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
     _awaitAllRecipientsDoneApplyingThenTransitionToPreparingToMirror(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_donorDoc.getState() > DonorStateEnum::kDonating) {
+    if (_donorDoc.getState() > DonorStateEnum::kDonatingOplogEntries) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 

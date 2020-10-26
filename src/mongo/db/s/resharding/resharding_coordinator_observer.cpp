@@ -146,6 +146,7 @@ ReshardingCoordinatorObserver::~ReshardingCoordinatorObserver() {
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(_allDonorsReportedMinFetchTimestamp.getFuture().isReady());
     invariant(_allRecipientsFinishedCloning.getFuture().isReady());
+    invariant(_allRecipientsFinishedApplying.getFuture().isReady());
     invariant(_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady());
     invariant(_allRecipientsRenamedCollection.getFuture().isReady());
     invariant(_allDonorsDroppedOriginalCollection.getFuture().isReady());
@@ -156,13 +157,22 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
 
     stdx::lock_guard<Latch> lk(_mutex);
 
-    if (stateTransitionIncomplete(
-            lk, _allDonorsReportedMinFetchTimestamp, DonorStateEnum::kDonating, updatedStateDoc)) {
+    if (stateTransitionIncomplete(lk,
+                                  _allDonorsReportedMinFetchTimestamp,
+                                  DonorStateEnum::kDonatingInitialData,
+                                  updatedStateDoc)) {
         return;
     }
 
     if (stateTransitionIncomplete(
-            lk, _allRecipientsFinishedCloning, RecipientStateEnum::kSteadyState, updatedStateDoc)) {
+            lk, _allRecipientsFinishedCloning, RecipientStateEnum::kApplying, updatedStateDoc)) {
+        return;
+    }
+
+    if (stateTransitionIncomplete(lk,
+                                  _allRecipientsFinishedApplying,
+                                  RecipientStateEnum::kSteadyState,
+                                  updatedStateDoc)) {
         return;
     }
 
@@ -195,6 +205,11 @@ ReshardingCoordinatorObserver::awaitAllRecipientsFinishedCloning() {
 }
 
 SharedSemiFuture<ReshardingCoordinatorDocument>
+ReshardingCoordinatorObserver::awaitAllRecipientsFinishedApplying() {
+    return _allRecipientsFinishedApplying.getFuture();
+}
+
+SharedSemiFuture<ReshardingCoordinatorDocument>
 ReshardingCoordinatorObserver::awaitAllRecipientsInStrictConsistency() {
     return _allRecipientsReportedStrictConsistencyTimestamp.getFuture();
 }
@@ -218,6 +233,10 @@ void ReshardingCoordinatorObserver::interrupt(Status status) {
 
     if (!_allRecipientsFinishedCloning.getFuture().isReady()) {
         _allRecipientsFinishedCloning.setError(status);
+    }
+
+    if (!_allRecipientsFinishedApplying.getFuture().isReady()) {
+        _allRecipientsFinishedApplying.setError(status);
     }
 
     if (!_allRecipientsReportedStrictConsistencyTimestamp.getFuture().isReady()) {

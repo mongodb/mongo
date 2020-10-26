@@ -540,6 +540,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsFinishedCloning(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
+        .then([this, executor] { return _awaitAllRecipientsFinishedApplying(executor); })
+        .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllRecipientsInStrictConsistency(executor); })
         .then([this](const ReshardingCoordinatorDocument& updatedStateDoc) {
             return _commit(updatedStateDoc);
@@ -678,6 +680,20 @@ ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinished
     }
 
     return _reshardingCoordinatorObserver->awaitAllRecipientsFinishedCloning()
+        .thenRunOn(**executor)
+        .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
+            this->_runUpdates(CoordinatorStateEnum::kApplying, updatedStateDoc);
+        });
+}
+
+ExecutorFuture<void>
+ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kApplying) {
+        return ExecutorFuture<void>(**executor, Status::OK());
+    }
+
+    return _reshardingCoordinatorObserver->awaitAllRecipientsFinishedApplying()
         .thenRunOn(**executor)
         .then([this](ReshardingCoordinatorDocument updatedStateDoc) {
             this->_runUpdates(CoordinatorStateEnum::kMirroring, updatedStateDoc);

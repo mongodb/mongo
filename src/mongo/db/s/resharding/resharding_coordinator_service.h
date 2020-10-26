@@ -154,9 +154,16 @@ private:
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that all recipients have finished
-     * cloning. Transitions to 'kMirroring'.
+     * cloning. Transitions to 'kApplying'.
      */
     ExecutorFuture<void> _awaitAllRecipientsFinishedCloning(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Waits on _reshardingCoordinatorObserver to notify that all recipients have finished
+     * applying oplog entries. Transitions to 'kMirroring'.
+     */
+    ExecutorFuture<void> _awaitAllRecipientsFinishedApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**

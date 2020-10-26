@@ -44,6 +44,7 @@ enums:
             kInitializing: "initializing"
             kPreparingToDonate: "preparing-to-donate"
             kCloning: "cloning"
+            kApplying: "applying"
             kMirroring: "mirroring"
             kCommitted: "committed"
             kRenaming: "renaming"
@@ -57,7 +58,8 @@ enums:
         values:
             kUnused: "unused"
             kPreparingToDonate: "preparing-to-donate"
-            kDonating: "donating"
+            kDonatingInitialData: "donating-initial-data"
+            kDonatingOplogEntries: "donating-oplog-entries"
             kPreparingToMirror: "preparing-to-mirror"
             kMirroring: "mirroring"
             kDropping: "dropping"
