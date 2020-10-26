@@ -262,11 +262,14 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
                     "manually constructing URL for {} releases; please note that only the latest release is available"
                     .format(version))
 
-                url_template = "https://downloads.mongodb.com/{bucket}/mongodb-{os_family}-{arch}-enterprise-{platform}-{version}.tgz"
+                url_template = "https://downloads.mongodb.com/{bucket}/mongodb-{os_family}-{arch}-enterprise-{platform}-{version}.{suffix}"
+
+                suffix = "tgz"
 
                 if self.platform == "windows":
                     os_family = self.platform
                     bucket = self.platform
+                    suffix = "zip"
                 elif self.platform == "osx":
                     os_family = "macos"
                     bucket = self.platform
@@ -285,7 +288,7 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
 
                 url = url_template.format(bucket=bucket, os_family=os_family,
                                           arch=self.architecture, platform=platform,
-                                          version=version)
+                                          version=version, suffix=suffix)
 
                 # URLs with missing sections lead to double dashes.
                 url = url.replace("--", "-")
