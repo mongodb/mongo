@@ -446,6 +446,40 @@ done:
 }
 
 /*
+ * __txn_config_operation_timeout --
+ *     Configure a transactions operation timeout duration.
+ */
+static int
+__txn_config_operation_timeout(WT_SESSION_IMPL *session, const char *cfg[], bool start_timer)
+{
+    WT_CONFIG_ITEM cval;
+    WT_TXN *txn;
+
+    txn = &session->txn;
+
+    if (cfg == NULL)
+        return (0);
+
+    /* Retrieve the maximum operation time, defaulting to the database-wide configuration. */
+    WT_RET(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
+
+    /*
+     * The default configuration value is 0, we can't tell if they're setting it back to 0 or, if
+     * the default was automatically passed in.
+     */
+    if (cval.val != 0) {
+        txn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
+        /*
+         * The op timer will generally be started on entry to the API call however when we configure
+         * it internally we need to start it separately.
+         */
+        if (start_timer)
+            __wt_op_timer_start(session);
+    }
+    return (0);
+}
+
+/*
  * __wt_txn_config --
  *     Configure a transaction.
  */
@@ -458,6 +492,9 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     txn = &session->txn;
 
+    if (cfg == NULL)
+        return (0);
+
     WT_RET(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
     if (cval.len != 0)
         txn->isolation = WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
@@ -465,9 +502,7 @@ __wt_txn_config(WT_SESSION_IMPL *session, const char *cfg[])
           WT_STRING_MATCH("read-committed", cval.str, cval.len) ? WT_ISO_READ_COMMITTED :
                                                                   WT_ISO_READ_UNCOMMITTED;
 
-    /* Retrieve the maximum operation time, defaulting to the database-wide configuration. */
-    WT_RET(__wt_config_gets(session, cfg, "operation_timeout_ms", &cval));
-    txn->operation_timeout_us = (uint64_t)(cval.val * WT_THOUSAND);
+    WT_RET(__txn_config_operation_timeout(session, cfg, false));
 
     /*
      * The default sync setting is inherited from the connection, but can be overridden by an
@@ -928,6 +963,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     WT_ASSERT(session, F_ISSET(txn, WT_TXN_RUNNING));
     WT_ASSERT(session, !F_ISSET(txn, WT_TXN_ERROR) || txn->mod_count == 0);
 
+    /* Configure the timeout for this commit operation. */
+    WT_ERR(__txn_config_operation_timeout(session, cfg, true));
+
     /*
      * Clear the prepared round up flag if the transaction is not prepared. There is no rounding up
      * to do in that case.
@@ -1305,8 +1343,6 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     u_int i;
     bool prepare, readonly;
 
-    WT_UNUSED(cfg);
-
     cursor = NULL;
     txn = &session->txn;
     prepare = F_ISSET(txn, WT_TXN_PREPARE);
@@ -1317,6 +1353,9 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
     /* Rollback notification. */
     if (txn->notify != NULL)
         WT_TRET(txn->notify->notify(txn->notify, (WT_SESSION *)session, txn->id, 0));
+
+    /* Configure the timeout for this rollback operation. */
+    WT_RET(__txn_config_operation_timeout(session, cfg, true));
 
     /*
      * Resolving prepared updates is expensive. Sort prepared modifications so all updates for each

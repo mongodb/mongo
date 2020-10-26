@@ -43,7 +43,17 @@ class test_txn21(wttest.WiredTigerTestCase):
 
     # Transaction-level configuration.
     def test_operation_timeout_txn(self):
+        # Test during begin.
         self.session.begin_transaction('operation_timeout_ms=2000')
+        self.session.rollback_transaction()
+
+        # Test during rollback.
+        self.session.begin_transaction()
+        self.session.rollback_transaction('operation_timeout_ms=2000')
+
+        # Test during commit.
+        self.session.begin_transaction()
+        self.session.commit_transaction('operation_timeout_ms=2000')
 
 if __name__ == '__main__':
     wttest.run()

@@ -242,53 +242,56 @@ static void
 copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
 {
     WT_CURSOR *incr_cur;
+    WT_DECL_RET;
     size_t len, tmp_sz;
     ssize_t rdsize;
-    uint64_t offset, type;
-    u_int size;
-    int ret, rfd, wfd1, wfd2;
-    char buf[512], config[512], *first, *second, *tmp;
+    uint64_t offset, size, type;
+    int rfd, wfd1, wfd2;
+    char config[512], *tmp;
     bool first_pass;
 
-    /*
-     * We need to prepend the home directory name here because we are not using the WiredTiger
-     * internal functions that would prepend it for us.
-     */
-    len = strlen(g.home) + strlen("BACKUP") + strlen(name) + 10;
-    first = dmalloc(len);
-
-    /*
-     * Save another copy of the original file to make debugging recovery errors easier.
-     */
-    len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
-    second = dmalloc(len);
-    testutil_check(__wt_snprintf(config, sizeof(config), "incremental=(file=%s)", name));
-
-    /* Open the duplicate incremental backup cursor with the file name given. */
     tmp_sz = 0;
     tmp = NULL;
     first_pass = true;
     rfd = wfd1 = wfd2 = -1;
+
+    /* Open the duplicate incremental backup cursor with the file name given. */
+    testutil_check(__wt_snprintf(config, sizeof(config), "incremental=(file=%s)", name));
     testutil_check(session->open_cursor(session, NULL, bkup_c, config, &incr_cur));
     while ((ret = incr_cur->next(incr_cur)) == 0) {
-        testutil_check(incr_cur->get_key(incr_cur, &offset, (uint64_t *)&size, &type));
+        testutil_check(incr_cur->get_key(incr_cur, &offset, &size, &type));
         if (type == WT_BACKUP_RANGE) {
             /*
              * Since we are using system calls below instead of a WiredTiger function, we have to
              * prepend the home directory to the file names ourselves.
              */
-            testutil_check(__wt_snprintf(first, len, "%s/BACKUP/%s", g.home, name));
-            testutil_check(__wt_snprintf(second, len, "%s/BACKUP.copy/%s", g.home, name));
+            if (first_pass) {
+                len = strlen(g.home) + strlen(name) + 10;
+                tmp = dmalloc(len);
+                testutil_check(__wt_snprintf(tmp, len, "%s/%s", g.home, name));
+                error_sys_check(rfd = open(tmp, O_RDONLY, 0));
+                free(tmp);
+                tmp = NULL;
+
+                len = strlen(g.home) + strlen("BACKUP") + strlen(name) + 10;
+                tmp = dmalloc(len);
+                testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP/%s", g.home, name));
+                error_sys_check(wfd1 = open(tmp, O_WRONLY | O_CREAT, 0));
+                free(tmp);
+                tmp = NULL;
+
+                len = strlen(g.home) + strlen("BACKUP.copy") + strlen(name) + 10;
+                tmp = dmalloc(len);
+                testutil_check(__wt_snprintf(tmp, len, "%s/BACKUP.copy/%s", g.home, name));
+                error_sys_check(wfd2 = open(tmp, O_WRONLY | O_CREAT, 0));
+                free(tmp);
+                tmp = NULL;
+
+                first_pass = false;
+            }
             if (tmp_sz < size) {
                 tmp = drealloc(tmp, size);
                 tmp_sz = size;
-            }
-            if (first_pass) {
-                testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", g.home, name));
-                error_sys_check(rfd = open(buf, O_RDONLY, 0));
-                error_sys_check(wfd1 = open(first, O_WRONLY | O_CREAT, 0));
-                error_sys_check(wfd2 = open(second, O_WRONLY | O_CREAT, 0));
-                first_pass = false;
             }
             error_sys_check(lseek(rfd, (wt_off_t)offset, SEEK_SET));
             error_sys_check(rdsize = read(rfd, tmp, size));
@@ -298,17 +301,27 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
             error_sys_check(write(wfd1, tmp, (size_t)rdsize));
             error_sys_check(write(wfd2, tmp, (size_t)rdsize));
         } else {
+            testutil_assert(type == WT_BACKUP_FILE);
+            testutil_assert(first_pass == true);
+            testutil_assert(rfd == -1);
+
             /*
              * These operations are using a WiredTiger function so it will prepend the home
              * directory to the name for us.
              */
-            testutil_check(__wt_snprintf(first, len, "BACKUP/%s", name));
-            testutil_check(__wt_snprintf(second, len, "BACKUP.copy/%s", name));
-            testutil_assert(type == WT_BACKUP_FILE);
-            testutil_assert(rfd == -1);
-            testutil_assert(first_pass == true);
-            testutil_check(__wt_copy_and_sync(session, name, first));
-            testutil_check(__wt_copy_and_sync(session, first, second));
+            len = strlen("BACKUP") + strlen(name) + 10;
+            tmp = dmalloc(len);
+            testutil_check(__wt_snprintf(tmp, len, "BACKUP/%s", name));
+            testutil_check(__wt_copy_and_sync(session, name, tmp));
+            free(tmp);
+            tmp = NULL;
+
+            len = strlen("BACKUP.copy") + strlen(name) + 10;
+            tmp = dmalloc(len);
+            testutil_check(__wt_snprintf(tmp, len, "BACKUP.copy/%s", name));
+            testutil_check(__wt_copy_and_sync(session, name, tmp));
+            free(tmp);
+            tmp = NULL;
         }
     }
     testutil_check(incr_cur->close(incr_cur));
@@ -317,8 +330,6 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
         error_sys_check(close(wfd1));
         error_sys_check(close(wfd2));
     }
-    free(first);
-    free(second);
     free(tmp);
 }
 /*
