@@ -9,8 +9,9 @@
 (function() {
 "use strict";
 
-if (!db.adminCommand({getParameter: 1, featureFlagTimeSeriesCollection: 1})
-         .featureFlagTimeSeriesCollection.value) {
+load("jstests/core/time_series/libs/time_series.js");
+
+if (!TimeseriesTest.timeseriesCollectionsEnabled(db.getMongo())) {
     jsTestLog("Skipping test because the time-series collection feature flag is disabled");
     return;
 }

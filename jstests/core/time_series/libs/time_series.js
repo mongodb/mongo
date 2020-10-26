@@ -2,6 +2,15 @@
 
 var TimeseriesTest = class {
     /**
+     * Returns whether time-series collections are supported.
+     */
+    static timeseriesCollectionsEnabled(conn) {
+        return assert
+            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTimeSeriesCollection: 1}))
+            .featureFlagTimeSeriesCollection.value;
+    }
+
+    /**
      * Adjusts the values in 'fields' by a random amount.
      * Ensures that the new values stay in the range [0, 100].
      */
