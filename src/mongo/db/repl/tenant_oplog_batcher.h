@@ -53,9 +53,8 @@ struct TenantOplogEntry {
 };
 
 struct TenantOplogBatch {
-    typedef std::vector<OplogEntry> ExpandedOplogEntries;
     std::vector<TenantOplogEntry> ops;
-    std::vector<ExpandedOplogEntries> expansions;
+    std::vector<std::vector<OplogEntry>> expansions;
 };
 
 /**
