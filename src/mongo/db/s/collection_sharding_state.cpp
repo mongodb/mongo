@@ -575,9 +575,9 @@ bool CollectionShardingState::_checkShardVersionOk(OperationContext* opCtx,
         *expectedShardVersion = info->getVersion(_nss.ns());
     }
 
-    // An operation with read concern 'available' should never have shardVersion set.
-    invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
-              repl::ReadConcernLevel::kAvailableReadConcern);
+    invariant(*expectedShardVersion == ChunkVersion::UNSHARDED() ||
+              repl::ReadConcernArgs::get(opCtx).getLevel() !=
+                  repl::ReadConcernLevel::kAvailableReadConcern);
 
     if (ChunkVersion::isIgnoredVersion(*expectedShardVersion)) {
         return true;
