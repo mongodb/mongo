@@ -207,9 +207,9 @@ boost::optional<ScopedCollectionMetadata> CollectionShardingState::_getMetadataW
 
     const auto& receivedShardVersion = *optReceivedShardVersion;
 
-    // An operation with read concern 'available' should never have shardVersion set.
-    invariant(repl::ReadConcernArgs::get(opCtx).getLevel() !=
-              repl::ReadConcernLevel::kAvailableReadConcern);
+    invariant(receivedShardVersion == ChunkVersion::UNSHARDED() ||
+              repl::ReadConcernArgs::get(opCtx).getLevel() !=
+                  repl::ReadConcernLevel::kAvailableReadConcern);
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
