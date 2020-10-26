@@ -299,7 +299,9 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     }
 
     // Tailable cursors can't have a sort, which should have already been validated.
-    invariant(sortComparatorObj.isEmpty() || !query.getQueryRequest().isTailable());
+    tassert(4457013,
+            "tailable cursor unexpectedly has a sort",
+            sortComparatorObj.isEmpty() || !query.getQueryRequest().isTailable());
 
     // Construct the requests that we will use to establish cursors on the targeted shards,
     // attaching the shardVersion and txnNumber, if necessary.

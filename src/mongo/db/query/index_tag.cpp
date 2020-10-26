@@ -228,7 +228,7 @@ bool pushdownNode(MatchExpression* node,
         return pushdownNode(node, indexedOr, std::move(destinations));
     }
 
-    MONGO_UNREACHABLE;
+    MONGO_UNREACHABLE_TASSERT(4457014);
 }
 
 // Populates 'out' with all descendants of 'node' that have OrPushdownTags, assuming the initial

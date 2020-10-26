@@ -73,7 +73,7 @@ namespace {
 stdx::mutex* const quickExitMutex = new stdx::mutex;
 }  // namespace
 
-void quickExit(int code) {
+void quickExitWithoutLogging(int code) {
     // Ensure that only one thread invokes the last rites here. No
     // RAII here - we never want to unlock this.
     if (quickExitMutex)

@@ -39,6 +39,7 @@
 #include "mongo/platform/source_location.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/exit_code.h"
 
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 #include "mongo/util/invariant.h"
@@ -56,6 +57,7 @@ public:
     AtomicWord<int> warning;
     AtomicWord<int> msg;
     AtomicWord<int> user;
+    AtomicWord<int> tripwire;
     AtomicWord<int> rollovers;
 };
 
@@ -472,6 +474,59 @@ inline void internalAssertWithLocation(SourceLocationHolder loc, StatusWith<T>&&
 }
 
 /**
+ * "tripwire/test assert". Like uassert, but with a deferred-fatality tripwire that gets
+ * checked prior to normal shutdown. Used to ensure that this assertion will both fail the
+ * operation and also cause a test suite failure.
+ */
+#define tassert(...) ::mongo::tassertWithLocation(MONGO_SOURCE_LOCATION(), __VA_ARGS__)
+
+MONGO_COMPILER_NORETURN void tassertFailedWithLocation(SourceLocationHolder loc,
+                                                       const Status& status);
+
+#define tasserted(...) ::mongo::tassertFailedWithLocation(MONGO_SOURCE_LOCATION(), __VA_ARGS__)
+
+MONGO_COMPILER_NORETURN inline void tassertFailedWithLocation(SourceLocationHolder loc,
+                                                              int msgid,
+                                                              const std::string& msg) {
+    tassertFailedWithLocation(std::move(loc), Status(ErrorCodes::Error(msgid), msg));
+}
+
+void tassertWithLocation(SourceLocationHolder loc, const Status& status);
+
+inline void tassertWithLocation(SourceLocationHolder loc, Status&& status) {
+    tassertWithLocation(std::move(loc), status);
+}
+
+inline void tassertWithLocation(SourceLocationHolder loc,
+                                int msgid,
+                                const std::string& msg,
+                                bool expr) {
+    if (MONGO_unlikely(!expr))
+        tassertWithLocation(std::move(loc), Status(ErrorCodes::Error(msgid), msg));
+}
+
+template <typename T>
+inline void tassertWithLocation(SourceLocationHolder loc, const StatusWith<T>& sw) {
+    tassertWithLocation(std::move(loc), sw.getStatus());
+}
+
+template <typename T>
+inline void tassertWithLocation(SourceLocationHolder loc, StatusWith<T>&& sw) {
+    tassertWithLocation(std::move(loc), sw);
+}
+
+/**
+ * Handle tassert failures during exit with a given exit code.
+ *
+ * If the exit code is success (ie. EXIT_CLEAN, EXIT_SUCCESS, or 0) and there have been any tassert
+ * failures, then abort the process.
+ *
+ * Otherwise, if the exit code is an error, then just log the number of tassert failures (and then
+ * continue exiting with that exit code).
+ */
+void checkForTripwireAssertions(int code = EXIT_CLEAN);
+
+/**
  * verify is deprecated. It is like invariant() in debug builds and massert() in release builds.
  */
 #define verify(expression) MONGO_verify(expression)
@@ -642,3 +697,8 @@ Status exceptionToStatus() noexcept;
  */
 
 #define MONGO_UNREACHABLE ::mongo::invariantFailed("Hit a MONGO_UNREACHABLE!", __FILE__, __LINE__);
+
+#define MONGO_UNREACHABLE_TASSERT(msgid) \
+    ::mongo::tassertFailedWithLocation(  \
+        MONGO_SOURCE_LOCATION(),         \
+        Status(ErrorCodes::Error(msgid), "Hit a MONGO_UNREACHABLE_TASSERT!"));

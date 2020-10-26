@@ -723,7 +723,9 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
 
     // If we sent the entire pipeline to a single shard, store the remote cursor and return.
     if (!shardDispatchResults.splitPipeline) {
-        invariant(shardDispatchResults.remoteCursors.size() == 1);
+        tassert(4457012,
+                "pipeline was split, but more than one remote cursor is present",
+                shardDispatchResults.remoteCursors.size() == 1);
         auto&& remoteCursor = std::move(shardDispatchResults.remoteCursors.front());
         const auto shardId = remoteCursor->getShardId().toString();
         const auto reply = uassertStatusOK(storePossibleCursor(opCtx,

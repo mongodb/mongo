@@ -3,6 +3,8 @@
 MongoDB code uses the following types of assertions that are available for use:
 -   `uassert` and `internalAssert`
     -   Checks for per-operation user errors. Operation-fatal.
+-   `tassert`
+    -   Like uassert, but inhibits clean shutdown.
 -   `massert`
     -   Checks per-operation invariants. Operation-fatal.
 -   `fassert`
@@ -18,9 +20,9 @@ The following types of assertions are deprecated:
 
 -   `verify`
     -   Checks per-operation invariants. A synonym for massert but doesn't require an error code.
-        Do not use for new code; use invariant or fassert instead.
+        Process fatal in debug mode. Do not use for new code; use invariant or fassert instead.
 -   `dassert`
-    -   Calls `verify` but only in debug mode. Do not use!
+    -   Calls `invariant` but only in debug mode. Do not use!
 
 MongoDB uses a series of `ErrorCodes` (defined in [mongo/base/error_codes.yml][error_codes_yml]) to 
 identify and categorize error conditions. `ErrorCodes` are defined in a YAML file and converted to 
@@ -40,6 +42,12 @@ mistakenly using these assertions midway through mutating process state. Example
 
 `fassert` failures will terminate the entire process; this is used for low-level checks where
 continuing might lead to corrupt data or loss of data on disk.
+
+`tassert` is a hybrid - it will fail the operation like `uassert`, but also triggers a
+"deferred-fatality tripwire flag". If this flag is set during clean shutdown, the process will
+invoke the tripwire fatal assertion. This is useful for ensuring that operation failures will cause
+a test suite to fail, without resorting to different behavior during testing, and without allowing
+user operations to potentially disrupt production deployments by terminating the server.
 
 Both `massert` and `uassert` take error codes, so that all assertions have codes associated with 
 them. Currently, programmers are free to provide the error code by either using a unique location 

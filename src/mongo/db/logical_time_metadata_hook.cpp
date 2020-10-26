@@ -64,7 +64,9 @@ Status LogicalTimeMetadataHook::readReplyMetadata(OperationContext* opCtx,
         auto timeTracker = OperationTimeTracker::get(opCtx);
         auto operationTime = metadataObj[kOperationTimeFieldName];
         if (!operationTime.eoo()) {
-            invariant(operationTime.type() == BSONType::bsonTimestamp);
+            tassert(4457010,
+                    "operationTime must be a timestamp if present",
+                    operationTime.type() == BSONType::bsonTimestamp);
             timeTracker->updateOperationTime(LogicalTime(operationTime.timestamp()));
         }
     }

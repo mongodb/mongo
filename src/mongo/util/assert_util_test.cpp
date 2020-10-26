@@ -38,6 +38,7 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -237,6 +238,9 @@ TEST(AssertUtils, InternalAssertWithStatus) {
         ASSERT_EQ(ex.code(), ErrorCodes::BadValue);
         ASSERT_EQ(ex.reason(), "Test");
     }
+
+    internalAssert(Status::OK());
+
     ASSERT_EQ(userAssertions, assertionCount.user.load());
 }
 
@@ -270,6 +274,94 @@ TEST(AssertUtils, MassertTypedExtraInfoWorks) {
         ASSERT(ex.extraInfo<ErrorExtraInfoExample>());
         ASSERT_EQ(ex.extraInfo<ErrorExtraInfoExample>()->data, 123);
         ASSERT_EQ(ex->data, 123);
+    }
+}
+
+// tassert
+namespace {
+
+void doTassert() {
+    auto tripwireAssertions = assertionCount.tripwire.load();
+
+    try {
+        Status status = {ErrorCodes::BadValue, "Test with Status"};
+        tassert(status);
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), ErrorCodes::BadValue);
+        ASSERT_EQ(ex.reason(), "Test with Status");
+    }
+    ASSERT_EQ(tripwireAssertions + 1, assertionCount.tripwire.load());
+
+    tassert(Status::OK());
+    ASSERT_EQ(tripwireAssertions + 1, assertionCount.tripwire.load());
+
+    try {
+        tassert(4457090, "Test with expression", false);
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), 4457090);
+        ASSERT_EQ(ex.reason(), "Test with expression");
+    }
+    ASSERT_EQ(tripwireAssertions + 2, assertionCount.tripwire.load());
+
+    tassert(4457091, "Another test with expression", true);
+    ASSERT_EQ(tripwireAssertions + 2, assertionCount.tripwire.load());
+
+    try {
+        tasserted(4457092, "Test with tasserted");
+    } catch (const DBException& ex) {
+        ASSERT_EQ(ex.code(), 4457092);
+        ASSERT_EQ(ex.reason(), "Test with tasserted");
+    }
+    ASSERT_EQ(tripwireAssertions + 3, assertionCount.tripwire.load());
+}
+
+}  // namespace
+
+DEATH_TEST(TassertTerminationTest,
+           tassertCleanLogMsg,
+           "Aborting process during clean exit due to prior failed tripwire assertions") {
+    doTassert();
+}
+
+DEATH_TEST(TassertTerminationTest, tassertCleanLogMsgCode, "4457001") {
+    doTassert();
+}
+
+DEATH_TEST(TassertTerminationTest, tassertCleanIndividualLogMsg, "Tripwire assertion") {
+    doTassert();
+}
+
+DEATH_TEST(TassertTerminationTest, tassertCleanIndividualLogMsgCode, "4457000") {
+    doTassert();
+}
+
+DEATH_TEST(TassertTerminationTest,
+           tassertUncleanLogMsg,
+           "Detected prior failed tripwire assertions during unclean exit") {
+    doTassert();
+    quickExit(EXIT_ABRUPT);
+}
+
+DEATH_TEST(TassertTerminationTest, tassertUncleanLogMsgCode, "4457002") {
+    doTassert();
+    quickExit(EXIT_ABRUPT);
+}
+
+DEATH_TEST(TassertTerminationTest, tassertUncleanIndividualLogMsg, "Tripwire assertion") {
+    doTassert();
+    quickExit(EXIT_ABRUPT);
+}
+
+DEATH_TEST(TassertTerminationTest, tassertUncleanIndividualLogMsgCode, "4457000") {
+    doTassert();
+    quickExit(EXIT_ABRUPT);
+}
+
+DEATH_TEST(TassertTerminationTest, mongoUnreachableNonFatal, "Hit a MONGO_UNREACHABLE_TASSERT!") {
+    try {
+        MONGO_UNREACHABLE_TASSERT(4457093);
+    } catch (const DBException&) {
+        // Catch the DBException, to ensure that we eventually abort during clean exit.
     }
 }
 

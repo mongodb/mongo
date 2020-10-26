@@ -253,6 +253,7 @@ public:
         asserts.append("warning", assertionCount.warning.loadRelaxed());
         asserts.append("msg", assertionCount.msg.loadRelaxed());
         asserts.append("user", assertionCount.user.loadRelaxed());
+        asserts.append("tripwire", assertionCount.tripwire.loadRelaxed());
         asserts.append("rollovers", assertionCount.rollovers.loadRelaxed());
         return asserts.obj();
     }
