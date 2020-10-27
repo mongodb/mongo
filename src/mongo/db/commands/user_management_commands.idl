@@ -397,3 +397,27 @@ commands:
         command_name: _getUserCacheGeneration
         cpp_name: GetUserCacheGenerationCommand
         strict: true
+
+    _mergeAuthzCollections:
+        description: "Internal command used by mongorestore for updating user/role data"
+        namespace: ignored
+        command_name: _mergeAuthzCollections
+        cpp_name: MergeAuthzCollectionsCommand
+        strict: true
+        fields:
+            tempUsersCollection:
+                description: "Temporary users collection name"
+                type: string
+                default: ''
+            tempRolesCollection:
+                description: "Temporary roles collection name"
+                type: string
+                default: ''
+            db:
+                description: "Database name"
+                type: string
+            drop:
+                description: "Drop temp collections when complete"
+                type: bool
+                default: false
+

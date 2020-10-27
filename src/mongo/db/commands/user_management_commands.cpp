@@ -1991,407 +1991,351 @@ CmdUMCTyped<GetUserCacheGenerationCommand, GetUserCacheGenerationReply, UMCCache
  * It either adds the users/roles to the existing ones or replaces the existing ones, depending
  * on whether the "drop" argument is true or false.
  */
-class CmdMergeAuthzCollections : public BasicCommand {
+class CmdMergeAuthzCollections : public TypedCommand<CmdMergeAuthzCollections> {
 public:
-    CmdMergeAuthzCollections() : BasicCommand("_mergeAuthzCollections") {}
+    using Request = MergeAuthzCollectionsCommand;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+        void typedRun(OperationContext* opCtx);
+
+    private:
+        bool supportsWriteConcern() const final {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auth::checkAuthForTypedCommand(opCtx->getClient(), request());
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName(), "");
+        }
+    };
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
     }
 
     bool adminOnly() const {
         return true;
     }
-
-    std::string help() const override {
-        return "Internal command used by mongorestore for updating user/role data";
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
-    }
-
-    static UserName extractUserNameFromBSON(const BSONObj& userObj) {
-        std::string name;
-        std::string db;
-        Status status =
-            bsonExtractStringField(userObj, AuthorizationManager::USER_NAME_FIELD_NAME, &name);
-        uassertStatusOK(status);
-        status = bsonExtractStringField(userObj, AuthorizationManager::USER_DB_FIELD_NAME, &db);
-        uassertStatusOK(status);
-        return UserName(name, db);
-    }
-
-    static RoleName extractRoleNameFromBSON(const BSONObj& roleObj) {
-        std::string name;
-        std::string db;
-        Status status =
-            bsonExtractStringField(roleObj, AuthorizationManager::ROLE_NAME_FIELD_NAME, &name);
-        uassertStatusOK(status);
-        status = bsonExtractStringField(roleObj, AuthorizationManager::ROLE_DB_FIELD_NAME, &db);
-        uassertStatusOK(status);
-        return RoleName(name, db);
-    }
-
-    /**
-     * Audits the fact that we are creating or updating the user described by userObj.
-     */
-    static void auditCreateOrUpdateUser(const BSONObj& userObj, bool create) {
-        UserName userName = extractUserNameFromBSON(userObj);
-        std::vector<RoleName> roles;
-        uassertStatusOK(auth::parseRoleNamesFromBSONArray(
-            BSONArray(userObj["roles"].Obj()), userName.getDB(), &roles));
-        BSONObj customData;
-        if (userObj.hasField("customData")) {
-            customData = userObj["customData"].Obj();
-        }
-
-        boost::optional<BSONArray> authenticationRestrictions;
-        if (userObj.hasField("authenticationRestrictions")) {
-            auto r = getRawAuthenticationRestrictions(
-                BSONArray(userObj["authenticationRestrictions"].Obj()));
-            uassertStatusOK(r);
-            authenticationRestrictions = r.getValue();
-        }
-
-        const bool hasPwd = userObj["credentials"].Obj().hasField("SCRAM-SHA-1") ||
-            userObj["credentials"].Obj().hasField("SCRAM-SHA-256");
-        if (create) {
-            audit::logCreateUser(Client::getCurrent(),
-                                 userName,
-                                 hasPwd,
-                                 userObj.hasField("customData") ? &customData : nullptr,
-                                 roles,
-                                 authenticationRestrictions);
-        } else {
-            audit::logUpdateUser(Client::getCurrent(),
-                                 userName,
-                                 hasPwd,
-                                 userObj.hasField("customData") ? &customData : nullptr,
-                                 &roles,
-                                 authenticationRestrictions);
-        }
-    }
-
-    /**
-     * Audits the fact that we are creating or updating the role described by roleObj.
-     */
-    static void auditCreateOrUpdateRole(const BSONObj& roleObj, bool create) {
-        RoleName roleName = extractRoleNameFromBSON(roleObj);
-        std::vector<RoleName> roles;
-        std::vector<Privilege> privileges;
-        uassertStatusOK(auth::parseRoleNamesFromBSONArray(
-            BSONArray(roleObj["roles"].Obj()), roleName.getDB(), &roles));
-        uassertStatusOK(auth::parseAndValidatePrivilegeArray(BSONArray(roleObj["privileges"].Obj()),
-                                                             &privileges));
-
-        boost::optional<BSONArray> authenticationRestrictions;
-        if (roleObj.hasField("authenticationRestrictions")) {
-            auto r = getRawAuthenticationRestrictions(
-                BSONArray(roleObj["authenticationRestrictions"].Obj()));
-            uassertStatusOK(r);
-            authenticationRestrictions = r.getValue();
-        }
-
-        if (create) {
-            audit::logCreateRole(
-                Client::getCurrent(), roleName, roles, privileges, authenticationRestrictions);
-        } else {
-            audit::logUpdateRole(
-                Client::getCurrent(), roleName, &roles, &privileges, authenticationRestrictions);
-        }
-    }
-
-    /**
-     * Designed to be used as a callback to be called on every user object in the result
-     * set of a query over the tempUsersCollection provided to the command.  For each user
-     * in the temp collection that is defined on the given db, adds that user to the actual
-     * admin.system.users collection.
-     * Also removes any users it encounters from the usersToDrop set.
-     */
-    static void addUser(OperationContext* opCtx,
-                        AuthorizationManager* authzManager,
-                        StringData db,
-                        bool update,
-                        stdx::unordered_set<UserName>* usersToDrop,
-                        const BSONObj& userObj) {
-        UserName userName = extractUserNameFromBSON(userObj);
-        if (!db.empty() && userName.getDB() != db) {
-            return;
-        }
-
-        if (update && usersToDrop->count(userName)) {
-            auditCreateOrUpdateUser(userObj, false);
-            Status status = updatePrivilegeDocument(opCtx, userName, userObj);
-            if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
-                LOGV2_WARNING(
-                    20510,
-                    "Could not update user {user} in _mergeAuthzCollections command: {error}",
-                    "Could not update user during _mergeAuthzCollections command",
-                    "user"_attr = userName,
-                    "error"_attr = redact(status));
-            }
-        } else {
-            auditCreateOrUpdateUser(userObj, true);
-            Status status = insertPrivilegeDocument(opCtx, userObj);
-            if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
-                LOGV2_WARNING(
-                    20511,
-                    "Could not insert user {user} in _mergeAuthzCollections command: {error}",
-                    "Could not insert user during _mergeAuthzCollections command",
-                    "user"_attr = userName,
-                    "error"_attr = redact(status));
-            }
-        }
-        usersToDrop->erase(userName);
-    }
-
-    /**
-     * Designed to be used as a callback to be called on every role object in the result
-     * set of a query over the tempRolesCollection provided to the command.  For each role
-     * in the temp collection that is defined on the given db, adds that role to the actual
-     * admin.system.roles collection.
-     * Also removes any roles it encounters from the rolesToDrop set.
-     */
-    static void addRole(OperationContext* opCtx,
-                        AuthorizationManager* authzManager,
-                        StringData db,
-                        bool update,
-                        stdx::unordered_set<RoleName>* rolesToDrop,
-                        const BSONObj roleObj) {
-        RoleName roleName = extractRoleNameFromBSON(roleObj);
-        if (!db.empty() && roleName.getDB() != db) {
-            return;
-        }
-
-        if (update && rolesToDrop->count(roleName)) {
-            auditCreateOrUpdateRole(roleObj, false);
-            Status status = updateRoleDocument(opCtx, roleName, roleObj);
-            if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
-                LOGV2_WARNING(
-                    20512,
-                    "Could not update role {role} in _mergeAuthzCollections command: {error}",
-                    "Could not update role during _mergeAuthzCollections command",
-                    "role"_attr = roleName,
-                    "error"_attr = redact(status));
-            }
-        } else {
-            auditCreateOrUpdateRole(roleObj, true);
-            Status status = insertRoleDocument(opCtx, roleObj);
-            if (!status.isOK()) {
-                // Match the behavior of mongorestore to continue on failure
-                LOGV2_WARNING(
-                    20513,
-                    "Could not insert role {role} in _mergeAuthzCollections command: {error}",
-                    "Could not insert role during _mergeAuthzCollections command",
-                    "role"_attr = roleName,
-                    "error"_attr = redact(status));
-            }
-        }
-        rolesToDrop->erase(roleName);
-    }
-
-    /**
-     * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
-     * removes any users that were in admin.system.users but not in usersCollName.
-     */
-    static Status processUsers(OperationContext* opCtx,
-                               AuthorizationManager* authzManager,
-                               StringData usersCollName,
-                               StringData db,
-                               bool drop) {
-        // When the "drop" argument has been provided, we use this set to store the users
-        // that are currently in the system, and remove from it as we encounter
-        // same-named users in the collection we are restoring from.  Once we've fully
-        // moved over the temp users collection into its final location, we drop
-        // any users that previously existed there but weren't in the temp collection.
-        // This is so that we can completely replace the system.users
-        // collection with the users from the temp collection, without removing all
-        // users at the beginning and thus potentially locking ourselves out by having
-        // no users in the whole system for a time.
-        stdx::unordered_set<UserName> usersToDrop;
-
-        if (drop) {
-            // Create map of the users currently in the DB
-            BSONObj query =
-                db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db);
-            BSONObj fields = BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                  << 1 << AuthorizationManager::USER_DB_FIELD_NAME << 1);
-
-            Status status =
-                queryAuthzDocument(opCtx,
-                                   AuthorizationManager::usersCollectionNamespace,
-                                   query,
-                                   fields,
-                                   [&](const BSONObj& userObj) {
-                                       usersToDrop.insert(extractUserNameFromBSON(userObj));
-                                   });
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-
-        Status status = queryAuthzDocument(
-            opCtx,
-            NamespaceString(usersCollName),
-            db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
-            BSONObj(),
-            [&](const BSONObj& userObj) {
-                return addUser(opCtx, authzManager, db, drop, &usersToDrop, userObj);
-            });
-        if (!status.isOK()) {
-            return status;
-        }
-
-        if (drop) {
-            std::int64_t numRemoved;
-            for (const UserName& userName : usersToDrop) {
-                audit::logDropUser(Client::getCurrent(), userName);
-                status = removePrivilegeDocuments(opCtx,
-                                                  BSON(AuthorizationManager::USER_NAME_FIELD_NAME
-                                                       << userName.getUser().toString()
-                                                       << AuthorizationManager::USER_DB_FIELD_NAME
-                                                       << userName.getDB().toString()),
-                                                  &numRemoved);
-                if (!status.isOK()) {
-                    return status;
-                }
-                dassert(numRemoved == 1);
-            }
-        }
-
-        return Status::OK();
-    }
-
-    /**
-     * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
-     * removes any users that were in admin.system.users but not in usersCollName.
-     */
-    static Status processRoles(OperationContext* opCtx,
-                               AuthorizationManager* authzManager,
-                               StringData rolesCollName,
-                               StringData db,
-                               bool drop) {
-        // When the "drop" argument has been provided, we use this set to store the roles
-        // that are currently in the system, and remove from it as we encounter
-        // same-named roles in the collection we are restoring from.  Once we've fully
-        // moved over the temp roles collection into its final location, we drop
-        // any roles that previously existed there but weren't in the temp collection.
-        // This is so that we can completely replace the system.roles
-        // collection with the roles from the temp collection, without removing all
-        // roles at the beginning and thus potentially locking ourselves out.
-        stdx::unordered_set<RoleName> rolesToDrop;
-
-        if (drop) {
-            // Create map of the roles currently in the DB
-            BSONObj query =
-                db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db);
-            BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                  << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
-
-            Status status =
-                queryAuthzDocument(opCtx,
-                                   AuthorizationManager::rolesCollectionNamespace,
-                                   query,
-                                   fields,
-                                   [&](const BSONObj& roleObj) {
-                                       return rolesToDrop.insert(extractRoleNameFromBSON(roleObj));
-                                   });
-            if (!status.isOK()) {
-                return status;
-            }
-        }
-
-        Status status = queryAuthzDocument(
-            opCtx,
-            NamespaceString(rolesCollName),
-            db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
-            BSONObj(),
-            [&](const BSONObj& roleObj) {
-                return addRole(opCtx, authzManager, db, drop, &rolesToDrop, roleObj);
-            });
-        if (!status.isOK()) {
-            return status;
-        }
-
-        if (drop) {
-            std::int64_t numRemoved;
-            for (stdx::unordered_set<RoleName>::iterator it = rolesToDrop.begin();
-                 it != rolesToDrop.end();
-                 ++it) {
-                const RoleName& roleName = *it;
-                audit::logDropRole(Client::getCurrent(), roleName);
-                status = removeRoleDocuments(opCtx,
-                                             BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
-                                                  << roleName.getRole().toString()
-                                                  << AuthorizationManager::ROLE_DB_FIELD_NAME
-                                                  << roleName.getDB().toString()),
-                                             &numRemoved);
-                if (!status.isOK()) {
-                    return status;
-                }
-                dassert(numRemoved == 1);
-            }
-        }
-
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auth::MergeAuthzCollectionsArgs args;
-        Status status = auth::parseMergeAuthzCollectionsCommand(cmdObj, &args);
-        uassertStatusOK(status);
-
-        if (args.usersCollName.empty() && args.rolesCollName.empty()) {
-            uasserted(ErrorCodes::BadValue,
-                      "Must provide at least one of \"tempUsersCollection\" and "
-                      "\"tempRolescollection\"");
-        }
-
-        ServiceContext* serviceContext = opCtx->getClient()->getServiceContext();
-        AuthorizationManager* authzManager = AuthorizationManager::get(serviceContext);
-
-        auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
-        // From here on, we always want to invalidate the user cache before returning.
-        auto invalidateGuard = makeGuard([&] {
-            try {
-                authzManager->invalidateUserCache(opCtx);
-            } catch (const DBException& e) {
-                // Since this may be called after a uassert, we want to catch any uasserts
-                // that come out of invalidating the user cache and explicitly append it to
-                // the command response.
-                CommandHelpers::appendCommandStatusNoThrow(result, e.toStatus());
-            }
-        });
-
-        if (!args.usersCollName.empty()) {
-            Status status =
-                processUsers(opCtx, authzManager, args.usersCollName, args.db, args.drop);
-            uassertStatusOK(status);
-        }
-
-        if (!args.rolesCollName.empty()) {
-            Status status =
-                processRoles(opCtx, authzManager, args.rolesCollName, args.db, args.drop);
-            uassertStatusOK(status);
-        }
-
-        return true;
-    }
-
 } cmdMergeAuthzCollections;
+
+UserName _extractUserNameFromBSON(const BSONObj& userObj) {
+    std::string name;
+    std::string db;
+    uassertStatusOK(
+        bsonExtractStringField(userObj, AuthorizationManager::USER_NAME_FIELD_NAME, &name));
+    uassertStatusOK(bsonExtractStringField(userObj, AuthorizationManager::USER_DB_FIELD_NAME, &db));
+    return UserName(name, db);
+}
+
+RoleName _extractRoleNameFromBSON(const BSONObj& roleObj) {
+    std::string name;
+    std::string db;
+    uassertStatusOK(
+        bsonExtractStringField(roleObj, AuthorizationManager::ROLE_NAME_FIELD_NAME, &name));
+    uassertStatusOK(bsonExtractStringField(roleObj, AuthorizationManager::ROLE_DB_FIELD_NAME, &db));
+    return RoleName(name, db);
+}
+
+/**
+ * Audits the fact that we are creating or updating the user described by userObj.
+ */
+void _auditCreateOrUpdateUser(const BSONObj& userObj, bool create) {
+    UserName userName = _extractUserNameFromBSON(userObj);
+    std::vector<RoleName> roles;
+    uassertStatusOK(auth::parseRoleNamesFromBSONArray(
+        BSONArray(userObj["roles"].Obj()), userName.getDB(), &roles));
+    BSONObj customData;
+    if (userObj.hasField("customData")) {
+        customData = userObj["customData"].Obj();
+    }
+
+    boost::optional<BSONArray> authenticationRestrictions;
+    if (userObj.hasField("authenticationRestrictions")) {
+        auto r = getRawAuthenticationRestrictions(
+            BSONArray(userObj["authenticationRestrictions"].Obj()));
+        uassertStatusOK(r);
+        authenticationRestrictions = r.getValue();
+    }
+
+    const bool hasPwd = userObj["credentials"].Obj().hasField("SCRAM-SHA-1") ||
+        userObj["credentials"].Obj().hasField("SCRAM-SHA-256");
+    if (create) {
+        audit::logCreateUser(Client::getCurrent(),
+                             userName,
+                             hasPwd,
+                             userObj.hasField("customData") ? &customData : nullptr,
+                             roles,
+                             authenticationRestrictions);
+    } else {
+        audit::logUpdateUser(Client::getCurrent(),
+                             userName,
+                             hasPwd,
+                             userObj.hasField("customData") ? &customData : nullptr,
+                             &roles,
+                             authenticationRestrictions);
+    }
+}
+
+/**
+ * Designed to be used as a callback to be called on every user object in the result
+ * set of a query over the tempUsersCollection provided to the command.  For each user
+ * in the temp collection that is defined on the given db, adds that user to the actual
+ * admin.system.users collection.
+ * Also removes any users it encounters from the usersToDrop set.
+ */
+void _addUser(OperationContext* opCtx,
+              AuthorizationManager* authzManager,
+              StringData db,
+              bool update,
+              stdx::unordered_set<UserName>* usersToDrop,
+              const BSONObj& userObj) {
+    UserName userName = _extractUserNameFromBSON(userObj);
+    if (!db.empty() && userName.getDB() != db) {
+        return;
+    }
+
+    if (update && usersToDrop->count(userName)) {
+        _auditCreateOrUpdateUser(userObj, false);
+        Status status = updatePrivilegeDocument(opCtx, userName, userObj);
+        if (!status.isOK()) {
+            // Match the behavior of mongorestore to continue on failure
+            LOGV2_WARNING(20510,
+                          "Could not update user {user} in _mergeAuthzCollections command: {error}",
+                          "Could not update user during _mergeAuthzCollections command",
+                          "user"_attr = userName,
+                          "error"_attr = redact(status));
+        }
+    } else {
+        _auditCreateOrUpdateUser(userObj, true);
+        Status status = insertPrivilegeDocument(opCtx, userObj);
+        if (!status.isOK()) {
+            // Match the behavior of mongorestore to continue on failure
+            LOGV2_WARNING(20511,
+                          "Could not insert user {user} in _mergeAuthzCollections command: {error}",
+                          "Could not insert user during _mergeAuthzCollections command",
+                          "user"_attr = userName,
+                          "error"_attr = redact(status));
+        }
+    }
+    usersToDrop->erase(userName);
+}
+
+
+/**
+ * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
+ * removes any users that were in admin.system.users but not in usersCollName.
+ */
+void _processUsers(OperationContext* opCtx,
+                   AuthorizationManager* authzManager,
+                   StringData usersCollName,
+                   StringData db,
+                   const bool drop) {
+    // When the "drop" argument has been provided, we use this set to store the users
+    // that are currently in the system, and remove from it as we encounter
+    // same-named users in the collection we are restoring from.  Once we've fully
+    // moved over the temp users collection into its final location, we drop
+    // any users that previously existed there but weren't in the temp collection.
+    // This is so that we can completely replace the system.users
+    // collection with the users from the temp collection, without removing all
+    // users at the beginning and thus potentially locking ourselves out by having
+    // no users in the whole system for a time.
+    stdx::unordered_set<UserName> usersToDrop;
+
+    if (drop) {
+        // Create map of the users currently in the DB
+        BSONObj query =
+            db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db);
+        BSONObj fields = BSON(AuthorizationManager::USER_NAME_FIELD_NAME
+                              << 1 << AuthorizationManager::USER_DB_FIELD_NAME << 1);
+
+        uassertStatusOK(queryAuthzDocument(opCtx,
+                                           AuthorizationManager::usersCollectionNamespace,
+                                           query,
+                                           fields,
+                                           [&](const BSONObj& userObj) {
+                                               usersToDrop.insert(
+                                                   _extractUserNameFromBSON(userObj));
+                                           }));
+    }
+
+    uassertStatusOK(queryAuthzDocument(
+        opCtx,
+        NamespaceString(usersCollName),
+        db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
+        BSONObj(),
+        [&](const BSONObj& userObj) {
+            return _addUser(opCtx, authzManager, db, drop, &usersToDrop, userObj);
+        }));
+
+    if (drop) {
+        for (const auto& userName : usersToDrop) {
+            audit::logDropUser(Client::getCurrent(), userName);
+            std::int64_t numRemoved;
+            uassertStatusOK(removePrivilegeDocuments(opCtx, userName.toBSON(), &numRemoved));
+            dassert(numRemoved == 1);
+        }
+    }
+}
+
+/**
+ * Audits the fact that we are creating or updating the role described by roleObj.
+ */
+void _auditCreateOrUpdateRole(const BSONObj& roleObj, bool create) {
+    RoleName roleName = _extractRoleNameFromBSON(roleObj);
+    std::vector<RoleName> roles;
+    std::vector<Privilege> privileges;
+    uassertStatusOK(auth::parseRoleNamesFromBSONArray(
+        BSONArray(roleObj["roles"].Obj()), roleName.getDB(), &roles));
+    uassertStatusOK(
+        auth::parseAndValidatePrivilegeArray(BSONArray(roleObj["privileges"].Obj()), &privileges));
+
+    boost::optional<BSONArray> authenticationRestrictions;
+    if (roleObj.hasField("authenticationRestrictions")) {
+        auto r = getRawAuthenticationRestrictions(
+            BSONArray(roleObj["authenticationRestrictions"].Obj()));
+        uassertStatusOK(r);
+        authenticationRestrictions = r.getValue();
+    }
+
+    if (create) {
+        audit::logCreateRole(
+            Client::getCurrent(), roleName, roles, privileges, authenticationRestrictions);
+    } else {
+        audit::logUpdateRole(
+            Client::getCurrent(), roleName, &roles, &privileges, authenticationRestrictions);
+    }
+}
+
+/**
+ * Designed to be used as a callback to be called on every role object in the result
+ * set of a query over the tempRolesCollection provided to the command.  For each role
+ * in the temp collection that is defined on the given db, adds that role to the actual
+ * admin.system.roles collection.
+ * Also removes any roles it encounters from the rolesToDrop set.
+ */
+void _addRole(OperationContext* opCtx,
+              AuthorizationManager* authzManager,
+              StringData db,
+              bool update,
+              stdx::unordered_set<RoleName>* rolesToDrop,
+              const BSONObj roleObj) {
+    RoleName roleName = _extractRoleNameFromBSON(roleObj);
+    if (!db.empty() && roleName.getDB() != db) {
+        return;
+    }
+
+    if (update && rolesToDrop->count(roleName)) {
+        _auditCreateOrUpdateRole(roleObj, false);
+        Status status = updateRoleDocument(opCtx, roleName, roleObj);
+        if (!status.isOK()) {
+            // Match the behavior of mongorestore to continue on failure
+            LOGV2_WARNING(20512,
+                          "Could not update role {role} in _mergeAuthzCollections command: {error}",
+                          "Could not update role during _mergeAuthzCollections command",
+                          "role"_attr = roleName,
+                          "error"_attr = redact(status));
+        }
+    } else {
+        _auditCreateOrUpdateRole(roleObj, true);
+        Status status = insertRoleDocument(opCtx, roleObj);
+        if (!status.isOK()) {
+            // Match the behavior of mongorestore to continue on failure
+            LOGV2_WARNING(20513,
+                          "Could not insert role {role} in _mergeAuthzCollections command: {error}",
+                          "Could not insert role during _mergeAuthzCollections command",
+                          "role"_attr = roleName,
+                          "error"_attr = redact(status));
+        }
+    }
+    rolesToDrop->erase(roleName);
+}
+
+/**
+ * Moves all user objects from usersCollName into admin.system.users.  If drop is true,
+ * removes any users that were in admin.system.users but not in usersCollName.
+ */
+void _processRoles(OperationContext* opCtx,
+                   AuthorizationManager* authzManager,
+                   StringData rolesCollName,
+                   StringData db,
+                   const bool drop) {
+    // When the "drop" argument has been provided, we use this set to store the roles
+    // that are currently in the system, and remove from it as we encounter
+    // same-named roles in the collection we are restoring from.  Once we've fully
+    // moved over the temp roles collection into its final location, we drop
+    // any roles that previously existed there but weren't in the temp collection.
+    // This is so that we can completely replace the system.roles
+    // collection with the roles from the temp collection, without removing all
+    // roles at the beginning and thus potentially locking ourselves out.
+    stdx::unordered_set<RoleName> rolesToDrop;
+
+    if (drop) {
+        // Create map of the roles currently in the DB
+        BSONObj query =
+            db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db);
+        BSONObj fields = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME
+                              << 1 << AuthorizationManager::ROLE_DB_FIELD_NAME << 1);
+
+        uassertStatusOK(queryAuthzDocument(opCtx,
+                                           AuthorizationManager::rolesCollectionNamespace,
+                                           query,
+                                           fields,
+                                           [&](const BSONObj& roleObj) {
+                                               return rolesToDrop.insert(
+                                                   _extractRoleNameFromBSON(roleObj));
+                                           }));
+    }
+
+    uassertStatusOK(queryAuthzDocument(
+        opCtx,
+        NamespaceString(rolesCollName),
+        db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
+        BSONObj(),
+        [&](const BSONObj& roleObj) {
+            return _addRole(opCtx, authzManager, db, drop, &rolesToDrop, roleObj);
+        }));
+
+    if (drop) {
+        for (const auto& roleName : rolesToDrop) {
+            audit::logDropRole(Client::getCurrent(), roleName);
+            std::int64_t numRemoved;
+            uassertStatusOK(removeRoleDocuments(opCtx, roleName.toBSON(), &numRemoved));
+            dassert(numRemoved == 1);
+        }
+    }
+}
+
+void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
+    const auto& cmd = request();
+    const auto tempUsersColl = cmd.getTempUsersCollection();
+    const auto tempRolesColl = cmd.getTempRolesCollection();
+
+    uassert(ErrorCodes::BadValue,
+            "Must provide at least one of \"tempUsersCollection\" and \"tempRolescollection\"",
+            !tempUsersColl.empty() | !tempRolesColl.empty());
+
+    auto* svcCtx = opCtx->getClient()->getServiceContext();
+    auto* authzManager = AuthorizationManager::get(svcCtx);
+    auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
+
+    // From here on, we always want to invalidate the user cache before returning.
+    auto invalidateGuard = makeGuard([&] { authzManager->invalidateUserCache(opCtx); });
+    const auto db = cmd.getDb();
+    const bool drop = cmd.getDrop();
+
+    if (!tempUsersColl.empty()) {
+        _processUsers(opCtx, authzManager, tempUsersColl, db, drop);
+    }
+
+    if (!tempRolesColl.empty()) {
+        _processRoles(opCtx, authzManager, tempRolesColl, db, drop);
+    }
+}
 
 }  // namespace
 }  // namespace mongo

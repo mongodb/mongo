@@ -97,8 +97,7 @@ void checkAuthForTypedCommand(Client*, const UsersInfoCommand&);
 void checkAuthForTypedCommand(Client*, const RolesInfoCommand&);
 void checkAuthForTypedCommand(Client*, const InvalidateUserCacheCommand&);
 void checkAuthForTypedCommand(Client*, const GetUserCacheGenerationCommand&);
-
-Status checkAuthForMergeAuthzCollectionsCommand(Client* client, const BSONObj& cmdObj);
+void checkAuthForTypedCommand(Client*, const MergeAuthzCollectionsCommand&);
 
 }  // namespace auth
 }  // namespace mongo

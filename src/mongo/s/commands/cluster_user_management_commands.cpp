@@ -305,56 +305,12 @@ public:
     }
 } cmdInvalidateUserCache;
 
-/**
- * This command is used only by mongorestore to handle restoring users/roles.  We do this so
- * that mongorestore doesn't do direct inserts into the admin.system.users and
- * admin.system.roles, which would bypass the authzUpdateLock and allow multiple concurrent
- * modifications to users/roles.  What mongorestore now does instead is it inserts all user/role
- * definitions it wants to restore into temporary collections, then this command moves those
- * user/role definitions into their proper place in admin.system.users and admin.system.roles.
- * It either adds the users/roles to the existing ones or replaces the existing ones, depending
- * on whether the "drop" argument is true or false.
- */
-class CmdMergeAuthzCollections : public BasicCommand {
+class CmdMergeAuthzCollections
+    : public CmdUMCPassthrough<MergeAuthzCollectionsCommand, void, UserCacheInvalidatorNOOP> {
 public:
-    CmdMergeAuthzCollections() : BasicCommand("_mergeAuthzCollections") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool adminOnly() const final {
         return true;
     }
-
-    virtual bool adminOnly() const {
-        return true;
-    }
-
-    std::string help() const override {
-        return "Internal command used by mongorestore for updating user/role data";
-    }
-
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        return auth::checkAuthForMergeAuthzCollectionsCommand(client, cmdObj);
-    }
-
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
-            opCtx,
-            getName(),
-            dbname,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            &result));
-        return true;
-    }
-
 } cmdMergeAuthzCollections;
 
 }  // namespace

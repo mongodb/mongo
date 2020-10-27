@@ -362,44 +362,37 @@ void checkAuthForTypedCommand(Client* client, const GetUserCacheGenerationComman
                                                  ActionType::internal));
 }
 
-Status checkAuthForMergeAuthzCollectionsCommand(Client* client, const BSONObj& cmdObj) {
-    auth::MergeAuthzCollectionsArgs args;
-    Status status = auth::parseMergeAuthzCollectionsCommand(cmdObj, &args);
-    if (!status.isOK()) {
-        return status;
-    }
+void checkAuthForTypedCommand(Client* client, const MergeAuthzCollectionsCommand& request) {
+    auto* as = AuthorizationSession::get(client);
 
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
     ActionSet actions;
     actions.addAction(ActionType::createUser);
     actions.addAction(ActionType::createRole);
     actions.addAction(ActionType::grantRole);
     actions.addAction(ActionType::revokeRole);
-    if (args.drop) {
+    if (request.getDrop()) {
         actions.addAction(ActionType::dropUser);
         actions.addAction(ActionType::dropRole);
     }
-    if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
-                                                        actions)) {
-        return Status(ErrorCodes::Unauthorized,
-                      "Not authorized to update user/role data using _mergeAuthzCollections"
-                      " command");
-    }
-    if (!args.usersCollName.empty() &&
-        !authzSession->isAuthorizedForActionsOnResource(
-            ResourcePattern::forExactNamespace(NamespaceString(args.usersCollName)),
-            ActionType::find)) {
-        return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to read " << args.usersCollName);
-    }
-    if (!args.rolesCollName.empty() &&
-        !authzSession->isAuthorizedForActionsOnResource(
-            ResourcePattern::forExactNamespace(NamespaceString(args.rolesCollName)),
-            ActionType::find)) {
-        return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "Not authorized to read " << args.rolesCollName);
-    }
-    return Status::OK();
+    uassert(ErrorCodes::Unauthorized,
+            "Not authorized to update user/role data using _mergeAuthzCollections a command",
+            as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(), actions));
+
+    auto tempUsersColl = request.getTempUsersCollection();
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to read " << tempUsersColl,
+            tempUsersColl.empty() ||
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(NamespaceString(tempUsersColl)),
+                    ActionType::find));
+
+    auto tempRolesColl = request.getTempRolesCollection();
+    uassert(ErrorCodes::Unauthorized,
+            str::stream() << "Not authorized to read " << tempRolesColl,
+            tempRolesColl.empty() ||
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(NamespaceString(tempRolesColl)),
+                    ActionType::find));
 }
 
 }  // namespace auth

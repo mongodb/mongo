@@ -186,50 +186,5 @@ Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
     return Status::OK();
 }
 
-Status parseMergeAuthzCollectionsCommand(const BSONObj& cmdObj,
-                                         MergeAuthzCollectionsArgs* parsedArgs) {
-    stdx::unordered_set<std::string> validFieldNames;
-    validFieldNames.insert("_mergeAuthzCollections");
-    validFieldNames.insert("tempUsersCollection");
-    validFieldNames.insert("tempRolesCollection");
-    validFieldNames.insert("db");
-    validFieldNames.insert("drop");
-
-    Status status = _checkNoExtraFields(cmdObj, "_mergeAuthzCollections", validFieldNames);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = bsonExtractStringFieldWithDefault(
-        cmdObj, "tempUsersCollection", "", &parsedArgs->usersCollName);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = bsonExtractStringFieldWithDefault(
-        cmdObj, "tempRolesCollection", "", &parsedArgs->rolesCollName);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = bsonExtractStringField(cmdObj, "db", &parsedArgs->db);
-    if (!status.isOK()) {
-        if (status == ErrorCodes::NoSuchKey) {
-            return Status(ErrorCodes::OutdatedClient,
-                          "Missing \"db\" field for _mergeAuthzCollections command. This is "
-                          "most likely due to running an outdated (pre-2.6.4) version of "
-                          "mongorestore.");
-        }
-        return status;
-    }
-
-    status = bsonExtractBooleanFieldWithDefault(cmdObj, "drop", false, &parsedArgs->drop);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return Status::OK();
-}
-
 }  // namespace auth
 }  // namespace mongo
