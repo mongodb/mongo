@@ -1589,7 +1589,8 @@ tasks:
             export "PATH=/cygdrive/c/Python39:/cygdrive/c/Python39/Scripts:$PATH"
             python --version
             python -m pip install scons==3.1.1
-            scons-3.1.1.bat ${scons_smp_command|} check
+            # The check target is not run in parallel.
+            scons-3.1.1.bat check
 
   - name: fops
     tags: ["pull_request"]
