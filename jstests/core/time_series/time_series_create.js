@@ -35,7 +35,11 @@ const testOptions = function(allowed,
     if (allowed) {
         assert.commandWorked(res);
         const bucketsCollName = 'system.buckets.' + collName;
-        assert.contains(bucketsCollName, testDB.getCollectionNames());
+        const collections =
+            assert.commandWorked(testDB.runCommand({listCollections: 1, nameOnly: true}))
+                .cursor.firstBatch;
+        assert.contains({name: collName, type: "view"}, collections);
+        assert.contains({name: bucketsCollName, type: "collection"}, collections);
         assert.commandFailedWithCode(testDB.runCommand({drop: bucketsCollName}),
                                      ErrorCodes.IllegalOperation);
     } else {

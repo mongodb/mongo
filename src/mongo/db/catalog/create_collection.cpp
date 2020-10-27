@@ -52,10 +52,19 @@
 
 namespace mongo {
 namespace {
+void _createSystemDotViewsIfNecessary(OperationContext* opCtx, const Database* db) {
+    // Create 'system.views' in a separate WUOW if it does not exist.
+    if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx,
+                                                                   db->getSystemViewsName())) {
+        WriteUnitOfWork wuow(opCtx);
+        invariant(db->createCollection(opCtx, db->getSystemViewsName()));
+        wuow.commit();
+    }
+}
 
 Status _createView(OperationContext* opCtx,
                    const NamespaceString& nss,
-                   const CollectionOptions& collectionOptions,
+                   CollectionOptions&& collectionOptions,
                    const BSONObj& idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
@@ -74,15 +83,7 @@ Status _createView(OperationContext* opCtx,
                           str::stream() << "Not primary while creating collection " << nss);
         }
 
-        // Create 'system.views' in a separate WUOW if it does not exist.
-        WriteUnitOfWork wuow(opCtx);
-        CollectionPtr coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-            opCtx, NamespaceString(db->getSystemViewsName()));
-        if (!coll) {
-            coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));
-        }
-        invariant(coll);
-        wuow.commit();
+        _createSystemDotViewsIfNecessary(opCtx, db);
 
         WriteUnitOfWork wunit(opCtx);
 
@@ -99,7 +100,7 @@ Status _createView(OperationContext* opCtx,
             Top::get(serviceContext).collectionDropped(nss);
         });
 
-        Status status = db->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
+        Status status = db->userCreateNS(opCtx, nss, std::move(collectionOptions), true, idIndex);
         if (!status.isOK()) {
             return status;
         }
@@ -109,9 +110,73 @@ Status _createView(OperationContext* opCtx,
     });
 }
 
+Status _createTimeseries(OperationContext* opCtx,
+                         const NamespaceString& ns,
+                         CollectionOptions&& options) {
+    return writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
+        Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_IX);
+        Lock::CollectionLock systemDotViewsLock(
+            opCtx,
+            NamespaceString(ns.db(), NamespaceString::kSystemDotViewsCollectionName),
+            MODE_X);
+
+        if (opCtx->writesAreReplicated() &&
+            !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
+            return {ErrorCodes::NotWritablePrimary,
+                    str::stream() << "Not primary while creating collection " << ns};
+        }
+
+        auto db = autoColl.ensureDbExists();
+        _createSystemDotViewsIfNecessary(opCtx, db);
+
+        WriteUnitOfWork wuow(opCtx);
+
+        AutoStatsTracker statsTracker(
+            opCtx,
+            ns,
+            Top::LockType::NotLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(ns.db()));
+
+        AutoStatsTracker bucketsStatsTracker(
+            opCtx,
+            bucketsNs,
+            Top::LockType::NotLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(ns.db()));
+
+        // If the buckets collection and time-series view creation roll back, ensure that their Top
+        // entries are deleted.
+        opCtx->recoveryUnit()->onRollback(
+            [serviceContext = opCtx->getServiceContext(), &ns, &bucketsNs]() {
+                Top::get(serviceContext).collectionDropped(ns);
+                Top::get(serviceContext).collectionDropped(bucketsNs);
+            });
+
+        // Create the buckets collection that will back the view.
+        invariant(db->createCollection(opCtx, bucketsNs),
+                  str::stream() << "Failed to create buckets collection " << bucketsNs
+                                << " for time-series collection " << ns);
+
+        // Create the time-series view.
+        options.viewOn = bucketsNs.coll().toString();
+        auto status = db->userCreateNS(opCtx, ns, std::move(options));
+        if (!status.isOK()) {
+            return status.withContext(str::stream() << "Failed to create view on " << bucketsNs
+                                                    << " for time-series collection " << ns);
+        }
+
+        wuow.commit();
+
+        return Status::OK();
+    });
+}
+
 Status _createCollection(OperationContext* opCtx,
                          const NamespaceString& nss,
-                         const CollectionOptions& collectionOptions,
+                         CollectionOptions&& collectionOptions,
                          const BSONObj& idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
         AutoGetOrCreateDb autoDb(opCtx, nss.db(), MODE_IX);
@@ -149,7 +214,8 @@ Status _createCollection(OperationContext* opCtx,
             Top::get(serviceContext).collectionDropped(nss);
         });
 
-        Status status = autoDb.getDb()->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
+        Status status =
+            autoDb.getDb()->userCreateNS(opCtx, nss, std::move(collectionOptions), true, idIndex);
         if (!status.isOK()) {
             return status;
         }
@@ -164,21 +230,11 @@ Status _createCollection(OperationContext* opCtx,
  */
 Status createCollection(OperationContext* opCtx,
                         const NamespaceString& ns,
-                        const CollectionOptions& options,
+                        CollectionOptions&& options,
                         const BSONObj& idIndex) {
     auto status = userAllowedCreateNS(ns);
     if (!status.isOK()) {
         return status;
-    }
-
-    if (options.timeseries) {
-        // TODO(SERVER-51502): Move buckets collection creation into time-series view creation.
-        uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream()
-                    << "Cannot create a time-series collection in a multi-document transaction.",
-                !opCtx->inMultiDocumentTransaction());
-        auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
-        uassertStatusOK(_createCollection(opCtx, bucketsNs, {}, idIndex));
     }
 
     if (options.isView()) {
@@ -186,13 +242,19 @@ Status createCollection(OperationContext* opCtx,
                 str::stream() << "Cannot create a view in a multi-document "
                                  "transaction.",
                 !opCtx->inMultiDocumentTransaction());
-        return _createView(opCtx, ns, options, idIndex);
+        return _createView(opCtx, ns, std::move(options), idIndex);
+    } else if (options.timeseries) {
+        uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                str::stream()
+                    << "Cannot create a time-series collection in a multi-document transaction.",
+                !opCtx->inMultiDocumentTransaction());
+        return _createTimeseries(opCtx, ns, std::move(options));
     } else {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "Cannot create system collection " << ns
                               << " within a transaction.",
                 !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
-        return _createCollection(opCtx, ns, options, idIndex);
+        return _createCollection(opCtx, ns, std::move(options), idIndex);
     }
 }
 
@@ -237,7 +299,7 @@ Status createCollection(OperationContext* opCtx,
         collectionOptions = statusWith.getValue();
     }
 
-    return createCollection(opCtx, nss, collectionOptions, idIndex);
+    return createCollection(opCtx, nss, std::move(collectionOptions), idIndex);
 }
 
 }  // namespace
@@ -258,7 +320,7 @@ Status createCollection(OperationContext* opCtx,
                         const CreateCommand& cmd) {
     auto options = CollectionOptions::parse(cmd);
     auto idIndex = std::exchange(options.idIndex, {});
-    return createCollection(opCtx, ns, options, idIndex);
+    return createCollection(opCtx, ns, std::move(options), idIndex);
 }
 
 Status createCollectionForApplyOps(OperationContext* opCtx,
