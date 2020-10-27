@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/shard_local.h"
@@ -41,6 +43,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
@@ -161,14 +164,29 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
             return Status::OK();
         }
 
-        writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
-            WriteUnitOfWork wunit(opCtx);
-            auto fromMigrate = true;
-            CollectionWriter collWriter(opCtx, collection->uuid());
-            IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
-                opCtx, collWriter, indexSpecs, fromMigrate);
-            wunit.commit();
-        });
+        auto fromMigrate = true;
+        if (!collection->isEmpty(opCtx)) {
+            // We typically create indexes on config/admin collections for sharding while setting up
+            // a sharded cluster, so we do not expect to see data in the collection.
+            // Therefore, it is ok to log this index build.
+            const auto& indexSpec = indexSpecs[0];
+            LOGV2(5173300,
+                  "Creating index on sharding collection with existing data",
+                  "ns"_attr = ns,
+                  "uuid"_attr = collection->uuid(),
+                  "index"_attr = indexSpec);
+            auto indexConstraints = IndexBuildsManager::IndexConstraints::kEnforce;
+            IndexBuildsCoordinator::get(opCtx)->createIndex(
+                opCtx, collection->uuid(), indexSpec, indexConstraints, fromMigrate);
+        } else {
+            writeConflictRetry(opCtx, "ShardLocal::createIndexOnConfig", ns.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                CollectionWriter collWriter(opCtx, collection->uuid());
+                IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+                    opCtx, collWriter, indexSpecs, fromMigrate);
+                wunit.commit();
+            });
+        }
     } catch (const DBException& e) {
         return e.toStatus();
     }

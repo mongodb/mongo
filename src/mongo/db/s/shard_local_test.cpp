@@ -41,7 +41,6 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/unittest/death_test.h"
 
 namespace mongo {
 namespace {
@@ -272,7 +271,7 @@ TEST_F(ShardLocalTest, CreateIndex) {
     ASSERT_EQ(2U, indexes.size());
 }
 
-DEATH_TEST_REGEX_F(ShardLocalTest, CreateIndexNonEmptyCollection, "Invariant failure.*isEmpty") {
+TEST_F(ShardLocalTest, CreateIndexNonEmptyCollection) {
     NamespaceString nss("config.foo");
 
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, getIndexes(nss).getStatus());
@@ -281,7 +280,10 @@ DEATH_TEST_REGEX_F(ShardLocalTest, CreateIndexNonEmptyCollection, "Invariant fai
     DBDirectClient dbDirectClient(_opCtx.get());
     dbDirectClient.insert(nss.toString(), BSON("_id" << 1 << "a" << 1));
 
-    _shardLocal->createIndexOnConfig(_opCtx.get(), nss, BSON("a" << 1), false).ignore();
+    auto status = _shardLocal->createIndexOnConfig(_opCtx.get(), nss, BSON("a" << 1), false);
+    ASSERT_OK(status);
+    auto indexes = unittest::assertGet(getIndexes(nss));
+    ASSERT_EQ(2U, indexes.size()) << BSON("indexes" << indexes);
 }
 
 }  // namespace
