@@ -269,42 +269,40 @@ public:
 CmdUMCInfo<UsersInfoCommand, UsersInfoReply> cmdUsersInfo;
 CmdUMCInfo<RolesInfoCommand, RolesInfoReply> cmdRolesInfo;
 
-class CmdInvalidateUserCache : public BasicCommand {
+class CmdInvalidateUserCache : public TypedCommand<CmdInvalidateUserCache> {
 public:
-    CmdInvalidateUserCache() : BasicCommand("invalidateUserCache") {}
+    using Request = InvalidateUserCacheCommand;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+            authzManager->invalidateUserCache(opCtx);
+        }
+
+    private:
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auth::checkAuthForTypedCommand(opCtx->getClient(), request());
+        }
+
+        NamespaceString ns() const override {
+            return NamespaceString(request().getDbName(), "");
+        }
+    };
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    virtual bool adminOnly() const {
+    bool adminOnly() const final {
         return true;
     }
-
-
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "Invalidates the in-memory cache of user information";
-    }
-
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        return auth::checkAuthForInvalidateUserCacheCommand(client);
-    }
-
-    bool run(OperationContext* opCtx,
-             const string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) {
-        const auto authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-        authzManager->invalidateUserCache(opCtx);
-        return true;
-    }
-
 } cmdInvalidateUserCache;
 
 /**

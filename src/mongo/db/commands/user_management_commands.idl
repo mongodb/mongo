@@ -82,6 +82,14 @@ structs:
                 type: object_owned
                 optional: true
 
+    GetUserCacheGenerationReply:
+        description: "Reply from _getUserCacheGeneration command"
+        strict: false
+        fields:
+            cacheGeneration:
+                description: "Cache generation"
+                type: objectid
+
     UMCTransactionFailPoint:
         description: Data for umcTransaction failpoint
         fields:
@@ -375,3 +383,17 @@ commands:
                     If viewing all users, you cannot specify this field.
                 type: safeBool
                 default: false
+
+    invalidateUserCache:
+        description: "Invalidate the user cache"
+        namespace: ignored
+        command_name: invalidateUserCache
+        cpp_name: InvalidateUserCacheCommand
+        strict: true
+
+    _getUserCacheGeneration:
+        description: "Returns the current user cache generation"
+        namespace: ignored
+        command_name: _getUserCacheGeneration
+        cpp_name: GetUserCacheGenerationCommand
+        strict: true

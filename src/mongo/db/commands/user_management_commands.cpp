@@ -908,14 +908,23 @@ private:
 
 // Used by most UMC commands.
 struct UMCStdParams {
+    static constexpr bool adminOnly = false;
     static constexpr bool supportsWriteConcern = true;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kNever;
 };
 
 // Used by {usersInfo:...} and {rolesInfo:...}
 struct UMCInfoParams {
+    static constexpr bool adminOnly = false;
     static constexpr bool supportsWriteConcern = false;
     static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kOptIn;
+};
+
+// Used by {invalidateUserCache:...} and {_getUserCacheGeneration:...}
+struct UMCCacheParams {
+    static constexpr bool adminOnly = true;
+    static constexpr bool supportsWriteConcern = false;
+    static constexpr auto allowedOnSecondary = BasicCommand::AllowedOnSecondary::kAlways;
 };
 
 template <typename RequestT, typename ReplyT, typename Params = UMCStdParams>
@@ -941,10 +950,14 @@ public:
             auth::checkAuthForTypedCommand(opCtx->getClient(), request());
         }
 
-        NamespaceString ns() const override {
+        NamespaceString ns() const final {
             return NamespaceString(request().getDbName(), "");
         }
     };
+
+    bool adminOnly() const final {
+        return Params::adminOnly;
+    }
 
     typename TC::AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return Params::allowedOnSecondary;
@@ -1943,83 +1956,30 @@ RolesInfoReply CmdUMCTyped<RolesInfoCommand, RolesInfoReply, UMCInfoParams>::Inv
     return reply;
 }
 
-class CmdInvalidateUserCache : public BasicCommand {
-public:
-    CmdInvalidateUserCache() : BasicCommand("invalidateUserCache") {}
+CmdUMCTyped<InvalidateUserCacheCommand, void, UMCCacheParams> cmdInvalidateUserCache;
+template <>
+void CmdUMCTyped<InvalidateUserCacheCommand, void, UMCCacheParams>::Invocation::typedRun(
+    OperationContext* opCtx) {
+    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
+    authzManager->invalidateUserCache(opCtx);
+}
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
+CmdUMCTyped<GetUserCacheGenerationCommand, GetUserCacheGenerationReply, UMCCacheParams>
+    cmdGetUserCacheGeneration;
+template <>
+GetUserCacheGenerationReply
+CmdUMCTyped<GetUserCacheGenerationCommand, GetUserCacheGenerationReply, UMCCacheParams>::
+    Invocation::typedRun(OperationContext* opCtx) {
+    uassert(ErrorCodes::IllegalOperation,
+            "_getUserCacheGeneration can only be run on config servers",
+            serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
-    bool adminOnly() const override {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "Invalidates the in-memory cache of user information";
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return auth::checkAuthForInvalidateUserCacheCommand(client);
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-        auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
-        authzManager->invalidateUserCache(opCtx);
-        return true;
-    }
-
-} cmdInvalidateUserCache;
-
-class CmdGetCacheGeneration : public BasicCommand {
-public:
-    CmdGetCacheGeneration() : BasicCommand("_getUserCacheGeneration") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "internal";
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return auth::checkAuthForGetUserCacheGenerationCommand(client);
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbname,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        uassert(ErrorCodes::IllegalOperation,
-                "_getUserCacheGeneration can only be run on config servers",
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-        AuthorizationManager* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
-        result.append("cacheGeneration", authzManager->getCacheGeneration());
-        return true;
-    }
-
-} cmdGetCacheGeneration;
+    GetUserCacheGenerationReply reply;
+    auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
+    reply.setCacheGeneration(authzManager->getCacheGeneration());
+    return reply;
+}
 
 /**
  * This command is used only by mongorestore to handle restoring users/roles.  We do this so

@@ -346,22 +346,20 @@ void checkAuthForTypedCommand(Client* client, const RolesInfoCommand& request) {
     }
 }
 
-Status checkAuthForInvalidateUserCacheCommand(Client* client) {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-    if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                        ActionType::invalidateUserCache)) {
-        return Status(ErrorCodes::Unauthorized, "Not authorized to invalidate user cache");
-    }
-    return Status::OK();
+void checkAuthForTypedCommand(Client* client, const InvalidateUserCacheCommand& request) {
+    auto* as = AuthorizationSession::get(client);
+    uassert(ErrorCodes::Unauthorized,
+            "Not authorized to invalidate user cache",
+            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                 ActionType::invalidateUserCache));
 }
 
-Status checkAuthForGetUserCacheGenerationCommand(Client* client) {
-    AuthorizationSession* authzSession = AuthorizationSession::get(client);
-    if (!authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                        ActionType::internal)) {
-        return Status(ErrorCodes::Unauthorized, "Not authorized to get cache generation");
-    }
-    return Status::OK();
+void checkAuthForTypedCommand(Client* client, const GetUserCacheGenerationCommand& request) {
+    auto* as = AuthorizationSession::get(client);
+    uassert(ErrorCodes::Unauthorized,
+            "Not authorized to get cache generation",
+            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                 ActionType::internal));
 }
 
 Status checkAuthForMergeAuthzCollectionsCommand(Client* client, const BSONObj& cmdObj) {

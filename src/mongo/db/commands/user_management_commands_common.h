@@ -95,10 +95,8 @@ void checkAuthForTypedCommand(Client*, const RevokePrivilegesFromRoleCommand&);
 void checkAuthForTypedCommand(Client*, const DropAllRolesFromDatabaseCommand&);
 void checkAuthForTypedCommand(Client*, const UsersInfoCommand&);
 void checkAuthForTypedCommand(Client*, const RolesInfoCommand&);
-
-Status checkAuthForInvalidateUserCacheCommand(Client* client);
-
-Status checkAuthForGetUserCacheGenerationCommand(Client* client);
+void checkAuthForTypedCommand(Client*, const InvalidateUserCacheCommand&);
+void checkAuthForTypedCommand(Client*, const GetUserCacheGenerationCommand&);
 
 Status checkAuthForMergeAuthzCollectionsCommand(Client* client, const BSONObj& cmdObj);
 
