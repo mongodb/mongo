@@ -191,6 +191,10 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                              const InsertDeleteOptions& options,
                                              KeyHandlerFn&& onDuplicateKey,
                                              int64_t* numInserted) {
+    // Initialize the 'numInserted' out-parameter to zero in case the caller did not already do so.
+    if (numInserted) {
+        *numInserted = 0;
+    }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
         bool unique = _descriptor->unique();
