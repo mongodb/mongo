@@ -82,7 +82,8 @@ structs:
                 type: resumeToken
                 optional: true
                 description: An object representing the point at which we should resume reporting
-                             changes from.
+                             changes from. Only one of resumeAfter, startAfter, and
+                             startAtOperationTime should be specified.
 
             startAfter:
                 cpp_name: startAfter
@@ -90,15 +91,16 @@ structs:
                 optional: true
                 description: An object representing the point at which we should start reporting
                              changes from. This is allowed to be a token from an invalidating
-                             command.
+                             command. Only one of resumeAfter, startAfter, and startAtOperationTime
+                             should be specified.
 
             startAtOperationTime:
                 cpp_name: startAtOperationTime
                 type: timestamp
                 optional: true
                 description: The operation time after which we should start reporting changes.
-                             Only one of resumeAfter, _resumeAfterClusterTimeDeprecated, and
-                             startAtOperationTime should be specified.
+                             Only one of resumeAfter, startAfter, and startAtOperationTime should
+                             be specified.
 
             fullDocument:
                 cpp_name: fullDocument
