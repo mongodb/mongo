@@ -109,7 +109,9 @@ public:
 
     /**
      * Inserts the specified keys into the index. Does not attempt to determine whether the
-     * insertion of these keys should cause the index to become multikey.
+     * insertion of these keys should cause the index to become multikey. The 'numInserted' output
+     * parameter, if non-nullptr, will be reset to the number of keys inserted by this function
+     * call, or to zero in the case of either a non-OK return Status or an empty 'keys' argument.
      */
     virtual Status insertKeys(OperationContext* opCtx,
                               const KeyStringSet& keys,
