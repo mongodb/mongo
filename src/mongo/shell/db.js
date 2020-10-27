@@ -439,99 +439,6 @@ DB.prototype.shutdownServer = function(opts) {
     }
 };
 
-/**
-  Clone database on another server to here. This functionality was removed as of MongoDB 4.2.
-  The shell helper is kept to maintain compatibility with previous versions of MongoDB.
-  <p>
-  Generally, you should dropDatabase() first as otherwise the cloned information will MERGE
-  into whatever data is already present in this database.  (That is however a valid way to use
-  clone if you are trying to do something intentionally, such as union three non-overlapping
-  databases into one.)
-  <p>
-  This is a low level administrative function will is not typically used.
-
- * @param {String} from Where to clone from (dbhostname[:port]).  May not be this database
-                   (self) as you cannot clone to yourself.
- * @return Object returned has member ok set to true if operation succeeds, false otherwise.
- * See also: db.copyDatabase()
- */
-DB.prototype.cloneDatabase = function(from) {
-    print(
-        "WARNING: db.cloneDatabase will only function with MongoDB 4.0 and below. See http://dochub.mongodb.org/core/4.2-copydb-clone");
-    assert(isString(from) && from.length);
-    return this._dbCommand({clone: from});
-};
-
-/**
-  Copy database from one server or name to another server or name. This functionality was
-  removed as of MongoDB 4.2. The shell helper is kept to maintain compatibility with previous
-  versions of MongoDB.
-
-  Generally, you should dropDatabase() first as otherwise the copied information will MERGE
-  into whatever data is already present in this database (and you will get duplicate objects
-  in collections potentially.)
-
-  For security reasons this function only works when executed on the "admin" db.  However,
-  if you have access to said db, you can copy any database from one place to another.
-
-  This method provides a way to "rename" a database by copying it to a new db name and
-  location.  Additionally, it effectively provides a repair facility.
-
-  * @param {String} fromdb database name from which to copy.
-  * @param {String} todb database name to copy to.
-  * @param {String} fromhost hostname of the database (and optionally, ":port") from which to
-                    copy the data.  default if unspecified is to copy from self.
-  * @return Object returned has member ok set to true if operation succeeds, false otherwise.
-  * See also: db.clone()
-*/
-DB.prototype.copyDatabase = function(
-    fromdb, todb, fromhost, username, password, mechanism, secondaryOk) {
-    print(
-        "WARNING: db.copyDatabase will only function with MongoDB 4.0 and below. See http://dochub.mongodb.org/core/4.2-copydb-clone");
-    assert(isString(fromdb) && fromdb.length);
-    assert(isString(todb) && todb.length);
-    fromhost = fromhost || "";
-    if ((typeof username === "boolean") && (typeof password === "undefined") &&
-        (typeof mechanism === "undefined") && (typeof secondaryOk === "undefined")) {
-        secondaryOk = username;
-        username = undefined;
-    }
-    if (typeof secondaryOk !== "boolean") {
-        secondaryOk = false;
-    }
-
-    if (!mechanism) {
-        mechanism = this._getDefaultAuthenticationMechanism(username, fromdb);
-    }
-    assert(mechanism == "SCRAM-SHA-1" || mechanism == "SCRAM-SHA-256" || mechanism == "MONGODB-CR");
-
-    // Check for no auth or copying from localhost
-    if (!username || !password || fromhost == "") {
-        return this._adminCommand(
-            {copydb: 1, fromhost: fromhost, fromdb: fromdb, todb: todb, slaveOk: secondaryOk});
-    }
-
-    // Use the copyDatabase native helper for SCRAM-SHA-1/256
-    if (mechanism != "MONGODB-CR") {
-        // TODO SERVER-30886: Add session support for Mongo.prototype.copyDatabaseWithSCRAM().
-        return this.getMongo().copyDatabaseWithSCRAM(
-            fromdb, todb, fromhost, username, password, secondaryOk);
-    }
-
-    // Fall back to MONGODB-CR
-    var n = assert.commandWorked(this._adminCommand({copydbgetnonce: 1, fromhost: fromhost}));
-    return this._adminCommand({
-        copydb: 1,
-        fromhost: fromhost,
-        fromdb: fromdb,
-        todb: todb,
-        username: username,
-        nonce: n.nonce,
-        key: this.__pwHash(n.nonce, username, password),
-        slaveOk: secondaryOk,
-    });
-};
-
 DB.prototype.help = function() {
     print("DB methods:");
     print(
@@ -539,11 +446,7 @@ DB.prototype.help = function() {
     print(
         "\tdb.aggregate([pipeline], {options}) - performs a collectionless aggregation on this database; returns a cursor");
     print("\tdb.auth(username, password)");
-    print("\tdb.cloneDatabase(fromhost) - will only function with MongoDB 4.0 and below");
     print("\tdb.commandHelp(name) returns the help for the command");
-    print(
-        "\tdb.copyDatabase(fromdb, todb, fromhost) - will only function with MongoDB 4.0 and below");
-    print("\tdb.createCollection(name, {size: ..., capped: ..., max: ...})");
     print("\tdb.createUser(userDocument)");
     print("\tdb.createView(name, viewOn, [{$operator: {...}}, ...], {viewOptions})");
     print("\tdb.currentOp() displays currently executing operations in the db");

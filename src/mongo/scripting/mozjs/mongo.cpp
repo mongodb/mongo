@@ -39,11 +39,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/client/sasl_client_session.h"
-#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/namespace_string.h"
@@ -65,7 +61,6 @@ namespace mozjs {
 const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(auth, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, MongoExternalInfo),
-    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(copyDatabaseWithSCRAM, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorHandleFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoExternalInfo),
@@ -631,83 +626,6 @@ void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs 
     setCursorHandle(scope, c, NamespaceString(ns), cursorId, args);
 
     args.rval().setObjectOrNull(c);
-}
-
-void MongoBase::Functions::copyDatabaseWithSCRAM::call(JSContext* cx, JS::CallArgs args) {
-    auto conn = getConnection(args);
-
-    if (!conn)
-        uasserted(ErrorCodes::BadValue, "no connection");
-
-    if (args.length() != 6)
-        uasserted(ErrorCodes::BadValue, "copyDatabase needs 6 arg");
-
-    // copyDatabase(fromdb, todb, fromhost, username, password);
-    std::string fromDb = ValueWriter(cx, args.get(0)).toString();
-    std::string toDb = ValueWriter(cx, args.get(1)).toString();
-    std::string fromHost = ValueWriter(cx, args.get(2)).toString();
-    std::string user = ValueWriter(cx, args.get(3)).toString();
-    std::string password = ValueWriter(cx, args.get(4)).toString();
-    bool slaveOk = ValueWriter(cx, args.get(5)).toBoolean();
-
-    std::string hashedPwd = DBClientBase::createPasswordDigest(user, password);
-
-    std::unique_ptr<SaslClientSession> session(new NativeSaslClientSession());
-
-    session->setParameter(SaslClientSession::parameterMechanism, "SCRAM-SHA-1");
-    session->setParameter(SaslClientSession::parameterUser, user);
-    session->setParameter(SaslClientSession::parameterPassword, hashedPwd);
-    session->initialize().transitional_ignore();
-
-    BSONObj saslFirstCommandPrefix =
-        BSON("copydbsaslstart" << 1 << "fromhost" << fromHost << "fromdb" << fromDb
-                               << saslCommandMechanismFieldName << "SCRAM-SHA-1");
-
-    BSONObj saslFollowupCommandPrefix =
-        BSON("copydb" << 1 << "fromhost" << fromHost << "fromdb" << fromDb << "todb" << toDb
-                      << "slaveOk" << slaveOk);
-
-    BSONObj saslCommandPrefix = saslFirstCommandPrefix;
-    BSONObj inputObj = BSON(saslCommandPayloadFieldName << "");
-    bool isServerDone = false;
-
-    while (!session->isSuccess()) {
-        std::string payload;
-        BSONType type;
-
-        Status status = saslExtractPayload(inputObj, &payload, &type);
-        uassertStatusOK(status);
-
-        std::string responsePayload;
-        status = session->step(payload, &responsePayload);
-        uassertStatusOK(status);
-
-        BSONObjBuilder commandBuilder(std::move(saslCommandPrefix));
-        commandBuilder.appendBinData(saslCommandPayloadFieldName,
-                                     static_cast<int>(responsePayload.size()),
-                                     BinDataGeneral,
-                                     responsePayload.c_str());
-        BSONElement conversationId = inputObj[saslCommandConversationIdFieldName];
-        if (!conversationId.eoo())
-            commandBuilder.append(conversationId);
-
-        BSONObj command = commandBuilder.obj();
-
-        bool ok = conn->runCommand("admin", command, inputObj);
-        if (!ok) {
-            ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
-            return;
-        }
-
-        isServerDone = inputObj[saslCommandDoneFieldName].trueValue();
-        saslCommandPrefix = saslFollowupCommandPrefix;
-    }
-
-    if (!isServerDone) {
-        uasserted(ErrorCodes::InternalError, "copydb client finished before server.");
-    }
-
-    ValueReader(cx, args.rval()).fromBSON(inputObj, nullptr, true);
 }
 
 void MongoBase::Functions::getClientRPCProtocols::call(JSContext* cx, JS::CallArgs args) {
