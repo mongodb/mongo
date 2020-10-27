@@ -573,6 +573,9 @@ def _parse_command(ctxt, spec, name, node):
     if command.api_version and command.reply_type is None:
         ctxt.add_missing_reply_type(command, command.name)
 
+    if command.api_version and not command.strict:
+        ctxt.add_api_version_no_strict(command, command.name)
+
     # Commands may only have the first parameter, ensure the fields property is an empty array.
     if not command.fields:
         command.fields = []

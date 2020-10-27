@@ -853,18 +853,38 @@ class TestParser(testcase.IDLTestcase):
                 reply_type: foo_reply_struct
             """))
 
-        # All fields with false for bools
+        # All fields with false for bools, except strict
         self.assert_parse(
             textwrap.dedent("""
         commands:
             foo:
                 description: foo
-                strict: false
                 command_name: foo
+                strict: true
                 namespace: ignored
                 api_version: 1
                 is_deprecated: false
                 unstable: false
+                forward_to_shards: false
+                forward_from_shards: false
+                immutable: false
+                inline_chained_structs: false
+                generate_comparison_operators: false
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """))
+
+        # All fields with false for bools, no api_version
+        self.assert_parse(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                strict: false
+                namespace: ignored
+                is_deprecated: false
                 forward_to_shards: false
                 forward_from_shards: false
                 immutable: false
@@ -1045,6 +1065,21 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_IS_NODE_TYPE)
+
+        # strict:true required if api_version set
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                api_version: "1"
+                strict: false
+                fields:
+                    foo: bar
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_API_VERSION_NO_STRICT)
 
         # Cannot specify unstable with empty api_version
         self.assert_parse_fail(
