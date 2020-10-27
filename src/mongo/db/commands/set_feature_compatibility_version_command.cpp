@@ -35,6 +35,8 @@
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_indexes.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
@@ -235,6 +237,12 @@ public:
                 }
             }
 
+            // Delete any haystack indexes if we're upgrading to an FCV of 4.9 or higher.
+            // TODO SERVER-51871: This block can removed once 5.0 becomes last-lts.
+            if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49) {
+                _deleteHaystackIndexesOnUpgrade(opCtx);
+            }
+
             // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 uassertStatusOK(
@@ -335,6 +343,47 @@ private:
         LOGV2(4975602,
               "Downgrading on-disk format to reflect the last-continuous version.",
               "last_continuous_version"_attr = FCVP::kLastContinuous);
+    }
+
+    /**
+     * Removes all haystack indexes from the catalog.
+     *
+     * TODO SERVER-51871: This method can be removed once 5.0 becomes last-lts.
+     */
+    void _deleteHaystackIndexesOnUpgrade(OperationContext* opCtx) {
+        auto& collCatalog = CollectionCatalog::get(opCtx);
+        for (const auto& db : collCatalog.getAllDbNames()) {
+            for (auto collIt = collCatalog.begin(opCtx, db); collIt != collCatalog.end(opCtx);
+                 ++collIt) {
+                NamespaceStringOrUUID collName(
+                    collCatalog.lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
+                AutoGetCollectionForRead coll(opCtx, collName);
+                auto idxCatalog = coll->getIndexCatalog();
+                std::vector<const IndexDescriptor*> haystackIndexes;
+                idxCatalog->findIndexByType(opCtx, IndexNames::GEO_HAYSTACK, haystackIndexes);
+
+                // Continue if 'coll' has no haystack indexes.
+                if (haystackIndexes.empty()) {
+                    continue;
+                }
+
+                // Construct a dropIndexes command to drop the indexes in 'haystackIndexes'.
+                BSONObjBuilder dropIndexesCmd;
+                dropIndexesCmd.append("dropIndexes", collName.nss()->coll());
+                BSONArrayBuilder indexNames;
+                for (auto&& haystackIndex : haystackIndexes) {
+                    indexNames.append(haystackIndex->indexName());
+                }
+                dropIndexesCmd.append("index", indexNames.arr());
+
+                BSONObjBuilder response;  // This response is ignored.
+                uassertStatusOK(
+                    dropIndexes(opCtx,
+                                *collName.nss(),
+                                CommandHelpers::appendMajorityWriteConcern(dropIndexesCmd.obj()),
+                                &response));
+            }
+        }
     }
 
 } setFeatureCompatibilityVersionCommand;
