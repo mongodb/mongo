@@ -39,6 +39,7 @@ imports:
 
 commands:
     setIndexCommitQuorum:
+        command_name: setIndexCommitQuorum
         cpp_name: SetIndexCommitQuorum
         description: "Resets the commitQuorum for an index build."
         strict: false

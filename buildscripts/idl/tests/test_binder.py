@@ -1386,6 +1386,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     strict: true
                     fields:
@@ -1415,12 +1416,14 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo1: string
 
                 bar:
                     description: foo
+                    command_name: bar
                     namespace: ignored
                     fields:
                         foo: foo
@@ -1432,6 +1435,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo1: string
@@ -1449,6 +1453,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo: string
@@ -1460,6 +1465,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     reply_type: not_defined
             """), idl.errors.ERROR_ID_UNKNOWN_TYPE)
@@ -1470,6 +1476,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     reply_type: string
             """), idl.errors.ERROR_ID_INVALID_REPLY_TYPE)
@@ -1508,6 +1515,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo1:
@@ -1519,6 +1527,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo1:
@@ -1583,6 +1592,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo:
@@ -1596,6 +1606,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo1:
@@ -1609,6 +1620,7 @@ class TestBinder(testcase.IDLTestcase):
             commands:
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo1:
@@ -1634,6 +1646,7 @@ class TestBinder(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 strict: true
                 namespace: type
                 type: string
@@ -1646,6 +1659,7 @@ class TestBinder(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 strict: true
                 namespace: type
                 type: array<string>
@@ -1672,6 +1686,7 @@ class TestBinder(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: type
                 type: int
                 fields:

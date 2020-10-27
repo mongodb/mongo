@@ -44,6 +44,7 @@ types:
 commands:
     killCursors:
         description: "Kills a specified set of cursors by ID."
+        command_name: killCursors
         cpp_name: KillCursorsRequest
         strict: true
         namespace: concatenate_with_db

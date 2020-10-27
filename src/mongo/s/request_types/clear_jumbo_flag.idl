@@ -37,6 +37,7 @@ imports:
 commands:
     clearJumboFlag:
         description: "clearJumboFlag command for mongos"
+        command_name: clearJumboFlag
         namespace: type
         type: namespacestring
         strict: false
@@ -53,6 +54,7 @@ commands:
                 optional: true
 
     _configsvrClearJumboFlag:
+        command_name: _configsvrClearJumboFlag
         cpp_name: ConfigsvrClearJumboFlag
         description: "internal clearJumboFlag command for config server"
         namespace: type

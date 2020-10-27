@@ -35,6 +35,7 @@ imports:
 commands:
     replSetResizeOplog:
         description: "Parser for the 'replSetResizeOplog' command."
+        command_name: replSetResizeOplog
         cpp_name: ReplSetResizeOplogRequest
         strict: false
         namespace: type

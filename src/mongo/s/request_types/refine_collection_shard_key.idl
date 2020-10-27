@@ -37,6 +37,7 @@ imports:
 commands:
     refineCollectionShardKey:
         description: "The public refineCollectionShardKey command on mongos"
+        command_name: refineCollectionShardKey
         strict: false
         namespace: type
         type: namespacestring
@@ -47,6 +48,7 @@ commands:
                 optional: false
     
     _configsvrRefineCollectionShardKey:
+        command_name: _configsvrRefineCollectionShardKey
         cpp_name: ConfigsvrRefineCollectionShardKey
         description: "The internal refineCollectionShardKey command on the config server"
         strict: false

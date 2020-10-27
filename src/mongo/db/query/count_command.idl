@@ -57,6 +57,7 @@ types:
 commands:
     count:
         description: "Parser for the 'count' command."
+        command_name: count
         cpp_name: CountCommand
         strict: true
         namespace: concatenate_with_db_or_uuid

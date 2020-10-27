@@ -54,6 +54,7 @@ structs:
 commands:
   donorStartMigration:
     description: "Parser for the 'donorStartMigration' command."
+    command_name: donorStartMigration
     strict: true
     namespace: ignored
     fields:
@@ -76,6 +77,7 @@ commands:
 
   donorForgetMigration:
     description: "Parser for the 'donorForgetMigration' command."
+    command_name: donorForgetMigration
     strict: true
     namespace: ignored
     fields:

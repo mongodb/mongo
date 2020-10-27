@@ -70,6 +70,7 @@ structs:
 commands:
     create:
         description: "Parser for the 'create' Command"
+        command_name: create
         namespace: concatenate_with_db
         cpp_name: CreateCommand
         strict: true

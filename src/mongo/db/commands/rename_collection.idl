@@ -35,6 +35,7 @@ imports:
 commands:
     renameCollection:
         description: "Parser for the 'renameCollection' command."
+        command_name: renameCollection
         cpp_name: RenameCollectionCommand
         strict: true
         namespace: type

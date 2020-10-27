@@ -57,6 +57,7 @@ structs:
 commands:
     setDefaultRWConcern:
         description: "Set the current read/write concern defaults (cluster-wide)"
+        command_name: setDefaultRWConcern
         namespace: ignored
         fields:
             defaultReadConcern:
@@ -70,6 +71,7 @@ commands:
 
     getDefaultRWConcern:
         description: "Get the current read/write concern defaults being applied by this node"
+        command_name: getDefaultRWConcern
         namespace: ignored
         fields:
             inMemory:

@@ -59,6 +59,7 @@ structs:
 commands:
     startRecordingTraffic:
         description: "start recording Command"
+        command_name: startRecordingTraffic
         namespace: ignored
         fields:
             filename:
@@ -75,6 +76,7 @@ commands:
 
     stopRecordingTraffic:
         description: "stop recording Command"
+        command_name: stopRecordingTraffic
         namespace: ignored
 
 server_parameters:

@@ -534,6 +534,7 @@ def _parse_command(ctxt, spec, name, node):
             "namespace": _RuleDesc('scalar', _RuleDesc.REQUIRED),
             "cpp_name": _RuleDesc('scalar'),
             "type": _RuleDesc('scalar'),
+            "command_name": _RuleDesc('scalar'),
             "reply_type": _RuleDesc('scalar'),
             "api_version": _RuleDesc('scalar'),
             "is_deprecated": _RuleDesc('bool_scalar'),
@@ -550,6 +551,9 @@ def _parse_command(ctxt, spec, name, node):
         common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB, common.COMMAND_NAMESPACE_IGNORED,
         common.COMMAND_NAMESPACE_TYPE, common.COMMAND_NAMESPACE_CONCATENATE_WITH_DB_OR_UUID
     ]
+
+    if not command.command_name:
+        ctxt.add_missing_required_field_error(node, "command", "command_name")
 
     if command.namespace:
         if command.namespace not in valid_commands:

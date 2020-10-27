@@ -37,6 +37,7 @@ imports:
 commands:
     rotateCertificates:
         description: "An administrative command which rotates the certificates to be used by new SSL connections"
+        command_name: rotateCertificates
         namespace: ignored
         fields:
             message:

@@ -71,6 +71,7 @@ structs:
 commands:
     createUser:
         description: "Create a user"
+        command_name: createUser
         namespace: type
         type: string
         cpp_name: CreateUserCommand
@@ -106,6 +107,7 @@ commands:
 
     updateUser:
         description: "Modify a user"
+        command_name: updateUser
         namespace: type
         type: string
         cpp_name: UpdateUserCommand
@@ -142,6 +144,7 @@ commands:
 
     dropUser:
         description: "Drop a single user"
+        command_name: dropUser
         namespace: type
         type: string
         cpp_name: DropUserCommand
@@ -149,12 +152,14 @@ commands:
 
     dropAllUsersFromDatabase:
         description: "Drop all users in the database"
+        command_name: dropAllUsersFromDatabase
         namespace: ignored
         cpp_name: DropAllUsersFromDatabaseCommand
         strict: true
 
     grantRolesToUser:
         description: "Grant additional roles to a user"
+        command_name: grantRolesToUser
         namespace: type
         type: string
         cpp_name: GrantRolesToUserCommand
@@ -166,6 +171,7 @@ commands:
 
     revokeRolesFromUser:
         description: "Revoke previously assigned roles from a user"
+        command_name: revokeRolesFromUser
         namespace: type
         type: string
         cpp_name: RevokeRolesFromUserCommand
@@ -177,6 +183,7 @@ commands:
 
     createRole:
         description: "Create a new role"
+        command_name: createRole
         namespace: type
         type: string
         cpp_name: CreateRoleCommand
@@ -195,6 +202,7 @@ commands:
 
     updateRole:
         description: "Update an existing role"
+        command_name: updateRole
         namespace: type
         type: string
         cpp_name: UpdateRoleCommand
@@ -215,6 +223,7 @@ commands:
 
     grantPrivilegesToRole:
         description: "Grants privileges to a role"
+        command_name: grantPrivilegesToRole
         namespace: type
         type: string
         cpp_name: GrantPrivilegesToRoleCommand
@@ -226,6 +235,7 @@ commands:
 
     revokePrivilegesFromRole:
         description: "Grants privileges to a role"
+        command_name: revokePrivilegesFromRole
         namespace: type
         type: string
         cpp_name: RevokePrivilegesFromRoleCommand
@@ -237,6 +247,7 @@ commands:
 
     grantRolesToRole:
         description: "Grant roles to a role"
+        command_name: grantRolesToRole
         namespace: type
         type: string
         cpp_name: GrantRolesToRoleCommand
@@ -248,6 +259,7 @@ commands:
 
     revokeRolesFromRole:
         description: "Revoke roles from a role"
+        command_name: revokeRolesFromRole
         namespace: type
         type: string
         cpp_name: RevokeRolesFromRoleCommand
@@ -263,6 +275,7 @@ commands:
             from any users or roles that reference it.  If any errors occur in the middle
             of that process it's possible to be left in a state where the role has been
             removed from some user/roles but otherwise still exists.
+        command_name: dropRole
         namespace: type
         type: string
         cpp_name: DropRoleCommand
@@ -274,6 +287,7 @@ commands:
             it must remove them from any users or other roles that reference them.  If any
             errors occur in the middle of that process it's possible to be left in a state
             where the roles have been removed from some user/roles but otherwise still exist.
+        command_name: dropAllRolesFromDatabase
         namespace: ignored
         cpp_name: DropAllRolesFromDatabaseCommand
         strict: true

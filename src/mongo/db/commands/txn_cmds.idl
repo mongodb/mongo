@@ -80,6 +80,7 @@ structs:
 commands:
     commitTransaction:
         description: "commitTransaction Command"
+        command_name: commitTransaction
         namespace: ignored
         fields:
             commitTimestamp:
@@ -95,4 +96,5 @@ commands:
 
     abortTransaction:
         description: "abortTransaction Command"
+        command_name: abortTransaction
         namespace: ignored

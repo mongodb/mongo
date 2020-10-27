@@ -219,6 +219,7 @@ class Command(Struct):
         self.unstable = False  # type: bool
         self.forward_to_shards = False  # type: bool
         self.forward_from_shards = False  # type: bool
+        self.command_name = None  # type: str
         super(Command, self).__init__(file_name, line, column)
 
 

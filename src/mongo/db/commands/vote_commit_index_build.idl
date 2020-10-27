@@ -37,6 +37,7 @@ imports:
 
 commands:
     voteCommitIndexBuild:
+        command_name: voteCommitIndexBuild
         cpp_name: VoteCommitIndexBuild
         description: "An internal mongod command pertaining to cross replica set index builds"
         strict: false

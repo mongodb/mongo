@@ -45,6 +45,7 @@ commands:
 
   profile:
     description: "Parser for the 'profile' command."
+    command_name: "profile"
     cpp_name: ProfileCmdRequest
     strict: false
     namespace: type

@@ -49,6 +49,7 @@ structs:
 commands:
     httpClientRequest:
         description: "Fetch an HTTP(S) resource via GET"
+        command_name: httpClientRequest
         namespace: ignored
         fields:
             uri:

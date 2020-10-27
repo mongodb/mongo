@@ -837,6 +837,7 @@ class TestParser(testcase.IDLTestcase):
             foo:
                 description: foo
                 strict: true
+                command_name: foo
                 namespace: ignored
                 api_version: 1
                 is_deprecated: true
@@ -859,6 +860,7 @@ class TestParser(testcase.IDLTestcase):
             foo:
                 description: foo
                 strict: false
+                command_name: foo
                 namespace: ignored
                 api_version: 1
                 is_deprecated: false
@@ -879,6 +881,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 api_version: "1"
                 fields:
@@ -892,6 +895,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 fields:
                     foo: bar
@@ -903,6 +907,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: concatenate_with_db
                 fields:
                     foo: bar
@@ -914,6 +919,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 strict: true
             """))
@@ -924,6 +930,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 reply_type: foo_reply_struct
             """))
@@ -945,6 +952,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 foo: bar
                 fields:
@@ -957,11 +965,46 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 strict: bar
                 namespace: ignored
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_IS_NODE_VALID_BOOL)
+
+        # command_name is required
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                namespace: ignored
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
+        # command_name is a scalar
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: [1]
+                namespace: ignored
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, True)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+        commands:
+            foo:
+                description: foo
+                command_name: ["1"]
+                namespace: ignored
+                fields:
+                    foo: bar
+            """), idl.errors.ERROR_ID_IS_NODE_TYPE, True)
 
         # is_deprecated is a bool
         self.assert_parse_fail(
@@ -969,6 +1012,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 is_deprecated: bar
                 fields:
@@ -981,6 +1025,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 api_version: [1]
                 fields:
@@ -993,6 +1038,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 api_version: ["1"]
                 fields:
@@ -1006,6 +1052,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 api_version: ""
                 unstable: true
@@ -1019,6 +1066,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 api_version: ""
                 unstable: false
@@ -1033,6 +1081,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 unstable: true
                 fields:
@@ -1044,6 +1093,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 unstable: false
                 fields:
@@ -1056,6 +1106,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 api_version: 1
                 fields:
@@ -1068,6 +1119,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
@@ -1078,6 +1130,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: foo
                 fields:
                     foo: bar
@@ -1101,6 +1154,7 @@ class TestParser(testcase.IDLTestcase):
             commands: 
                 foo:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     fields:
                         foo: string
@@ -1118,11 +1172,24 @@ class TestParser(testcase.IDLTestcase):
             commands: 
                 string:
                     description: foo
+                    command_name: foo
                     namespace: ignored
                     strict: true
                     fields:
                         foo: string
             """), idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
+
+        self.assert_parse_fail(
+            textwrap.dedent("""
+            commands:
+                foo:
+                    description: foo
+                    command_name: string
+                    namespace: ignored
+                    strict: true
+                    fields:
+                        foo: string
+            """) + test_preamble, idl.errors.ERROR_ID_DUPLICATE_SYMBOL)
 
         # Namespace concatenate_with_db
         self.assert_parse_fail(
@@ -1130,6 +1197,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: concatenate_with_db
                 type: foobar
                 fields:
@@ -1142,6 +1210,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 reply_type:
                     arbitrary_field: foo
@@ -1158,6 +1227,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 fields:
                     foo:
@@ -1171,6 +1241,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 fields:
                     foo:
@@ -1189,6 +1260,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: ignored
                 fields:
                     foo:
@@ -1205,6 +1277,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 strict: true
                 namespace: type
                 type: string
@@ -1218,6 +1291,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 strict: true
                 namespace: type
                 type: array<string>
@@ -1231,6 +1305,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 strict: true
                 namespace: type
                 type: string
@@ -1246,6 +1321,7 @@ class TestParser(testcase.IDLTestcase):
         commands:
             foo:
                 description: foo
+                command_name: foo
                 namespace: type
                 fields:
                     foo: bar

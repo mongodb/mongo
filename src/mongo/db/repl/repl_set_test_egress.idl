@@ -42,6 +42,7 @@ structs:
 commands:
     replSetTestEgress:
         description: "Attempt to connect to a cluster member"
+        command_name: replSetTestEgress
         namespace: ignored
         fields:
             target:

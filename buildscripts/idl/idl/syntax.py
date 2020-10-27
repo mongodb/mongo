@@ -126,6 +126,11 @@ class SymbolTable(object):
             if item.name == name:
                 ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name, entity_type)
                 return True
+            if entity_type == "command":
+                if item.command_name == name:
+                    ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name,
+                                                    entity_type)
+                    return True
 
         return False
 
@@ -422,6 +427,8 @@ class Command(Struct):
         self.unstable = False  # type: bool
         self.forward_to_shards = False  # type: bool
         self.forward_from_shards = False  # type: bool
+        self.command_name = None  # type: str
+
         super(Command, self).__init__(file_name, line, column)
 
 

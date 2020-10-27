@@ -43,11 +43,13 @@ structs:
 commands:
     prepareTransaction:
         description: "Parser for the 'prepareTransaction' command."
+        command_name: prepareTransaction
         strict: true
         namespace: ignored
 
     coordinateCommitTransaction:
         description: "Parser for the 'coordinateCommitTransaction' command."
+        command_name: coordinateCommitTransaction
         strict: false
         namespace: ignored
         fields:

@@ -57,6 +57,7 @@ structs:
 
 commands:
     _addShard:
+        command_name: _addShard
         cpp_name: AddShard
         description: "_addShard Command"
         namespace: ignored

@@ -163,6 +163,7 @@ commands:
 
     insert:
         description: "Parser for the 'insert' command."
+        command_name: insert
         strict: true
         namespace: concatenate_with_db
         chained_structs:
@@ -175,6 +176,7 @@ commands:
 
     update:
         description: "Parser for the 'update' command."
+        command_name: update
         strict: true
         namespace: concatenate_with_db
         chained_structs:
@@ -197,6 +199,7 @@ commands:
 
     delete:
         description: "Parser for the 'delete' command."
+        command_name: delete
         strict: true
         namespace: concatenate_with_db
         chained_structs:

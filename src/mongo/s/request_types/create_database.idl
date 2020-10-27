@@ -36,6 +36,7 @@ imports:
 
 commands:
     _configsvrCreateDatabase:
+        command_name: _configsvrCreateDatabase
         cpp_name : ConfigsvrCreateDatabase
         description: "The internal createDatabase command on the config server"
         strict: false

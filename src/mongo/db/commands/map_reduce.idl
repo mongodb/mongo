@@ -70,6 +70,7 @@ types:
 commands:
     MapReduce:
         description: "The MapReduce command."
+        command_name: "MapReduce"
         namespace: concatenate_with_db
         strict: true
         fields:

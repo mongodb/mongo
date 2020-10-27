@@ -38,6 +38,7 @@ imports:
 commands:
     dropConnections:
         description: "An administrative command which takes a list of host and ports and drops pooled connections to them"
+        command_name: dropConnections
         namespace: ignored
         fields: 
             hostAndPort:

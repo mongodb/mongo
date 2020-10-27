@@ -647,6 +647,7 @@ structs:
 commands:
     BasicIgnoredCommand:
         description: UnitTest for a basic ignored command
+        command_name: BasicIgnoredCommand
         namespace: ignored
         fields:
             field1: int
@@ -654,6 +655,7 @@ commands:
 
     BasicConcatenateWithDbCommand:
         description: UnitTest for a basic concatenate_with_db command
+        command_name: BasicConcatenateWithDbCommand
         namespace: concatenate_with_db
         fields:
             field1: int
@@ -661,6 +663,7 @@ commands:
 
     BasicConcatenateWithDbOrUUIDCommand:
         description: UnitTest for a basic concatenate_with_db_or_uuid command
+        command_name: BasicConcatenateWithDbOrUUIDCommand
         namespace: concatenate_with_db_or_uuid
         fields:
             field1: int
@@ -668,6 +671,7 @@ commands:
 
     KnownFieldCommand:
         description: UnitTest for a command that has a field that is special known generic command field
+        command_name: KnownFieldCommand
         namespace: concatenate_with_db
         fields:
             field1: int
@@ -675,6 +679,7 @@ commands:
 
     DocSequenceCommand:
         description: UnitTest for a basic command with fields marked with supports_doc_sequence
+        command_name: DocSequenceCommand
         namespace: concatenate_with_db
         fields:
             field1: int
@@ -692,6 +697,7 @@ commands:
 
     DocSequenceCommandNonStrict:
         description: UnitTest for a basic command with fields marked with supports_doc_sequence and non-strict parsing
+        command_name: DocSequenceCommandNonStrict
         namespace: concatenate_with_db
         strict: false
         fields:
@@ -710,6 +716,7 @@ commands:
 
     chained_command_type_mixed:
         description: Chained command with chained types, structs, and fields
+        command_name: chained_command_type_mixed
         namespace: concatenate_with_db
         strict: false
         chained_types:
@@ -725,6 +732,7 @@ commands:
 
     CommandTypeStringCommand:
         description: Command with custom type string
+        command_name: CommandTypeStringCommand
         namespace: type
         type: string
         fields:
@@ -732,21 +740,25 @@ commands:
 
     CommandTypeArrayObjectCommand:
         description: Command with just an array of object parameter
+        command_name: CommandTypeArrayObjectCommand
         namespace: type
         type: array<object>
 
     CommandTypeStructCommand:
         description: Command with just a struct parameter
+        command_name: CommandTypeStructCommand
         namespace: type
         type: one_string
 
     CommandTypeArrayStructCommand:
         description: Command with just an array of struct parameter
+        command_name: CommandTypeArrayStructCommand
         namespace: type
         type: array<one_string>
 
     _underscore_command:
         description: Command with custom type string
+        command_name: _underscore_command
         namespace: type
         type: string
         cpp_name: WellNamedCommand
@@ -755,6 +767,7 @@ commands:
 
     int_type_command:
         description: Command with custom type int
+        command_name: int_type_command
         namespace: type
         type: int
         fields:
@@ -762,6 +775,7 @@ commands:
 
     int_array_type_command:
         description: Command with custom type for array of int
+        command_name: int_array_type_command
         namespace: type
         type: array<int>
         fields:
@@ -769,6 +783,7 @@ commands:
 
     validated_command:
         description: Renamed command with validator
+        command_name: validated_command
         namespace: ignored
         cpp_name: doubleBasicRanges
         fields:
@@ -781,5 +796,6 @@ commands:
 
     CommandWithReplyType:
         description: A command with its reply type specified by an IDL struct
+        command_name: CommandWithReplyType
         namespace: ignored
         reply_type: reply_type_struct

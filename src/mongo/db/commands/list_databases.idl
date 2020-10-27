@@ -36,6 +36,7 @@ imports:
 commands:
     listDatabasesCommand:
         description: "listDatabases Command"
+        command_name: "listDatabases"
         namespace: ignored
         fields:
             nameOnly:

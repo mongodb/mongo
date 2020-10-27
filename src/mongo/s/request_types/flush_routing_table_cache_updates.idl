@@ -37,6 +37,7 @@ imports:
 commands:
     _flushRoutingTableCacheUpdates:
         description: "An internal command to wait for the last routing table cache refresh for a particular namespace to be persisted to disk"
+        command_name: _flushRoutingTableCacheUpdates
         strict: true
         namespace: type
         type: namespacestring
@@ -47,6 +48,7 @@ commands:
                 default: true
     _flushRoutingTableCacheUpdatesWithWriteConcern:
         description: "The same behavior as _flushRoutingTableCacheUpdates but accepts writeConcern." 
+        command_name: _flushRoutingTableCacheUpdatesWithWriteConcern
         strict: true
         namespace: type
         type: namespacestring

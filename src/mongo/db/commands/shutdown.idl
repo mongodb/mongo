@@ -34,6 +34,7 @@ imports:
 
 commands:
     shutdown:
+        command_name: shutdown
         cpp_name: ShutdownRequest
         description: "Shutdown the database"
         namespace: ignored

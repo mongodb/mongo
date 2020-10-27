@@ -51,6 +51,7 @@ structs:
 commands:
   recipientSyncData:
     description: "Parser for the 'recipientSyncData' command."
+    command_name: recipientSyncData
     strict: true
     namespace: ignored
     fields:
@@ -86,6 +87,7 @@ commands:
 
   recipientForgetMigration:
     description: "Parser for the 'recipientForgetMigration' command."
+    command_name: recipientForgetMigration
     strict: true
     namespace: ignored
     fields:

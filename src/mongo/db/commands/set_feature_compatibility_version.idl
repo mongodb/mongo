@@ -37,6 +37,7 @@ imports:
 commands:
     setFeatureCompatibilityVersion:
         description: "Parser for the 'setFeatureCompatibilityVersion' command."
+        command_name: setFeatureCompatibilityVersion
         cpp_name: SetFeatureCompatibilityVersion
         strict: true
         namespace: type

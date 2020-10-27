@@ -37,6 +37,7 @@ imports:
 commands:
   reshardCollection:
     description: "The public reshardCollection command on mongos."
+    command_name: reshardCollection
     strict: false
     namespace: type
     type: namespacestring
@@ -67,6 +68,7 @@ commands:
         optional: true
 
   _configsvrReshardCollection:
+    command_name: _configsvrReshardCollection
     cpp_name: ConfigsvrReshardCollection
     description: "The internal reshardCollection command on the config server."
     strict: false

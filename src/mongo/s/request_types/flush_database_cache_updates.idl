@@ -37,6 +37,7 @@ imports:
 commands:
     _flushDatabaseCacheUpdates:
         description: "An internal command to wait for the last routing table cache refresh for a particular database to be persisted to disk"
+        command_name: _flushDatabaseCacheUpdates
         strict: true
         namespace: type
         type: string

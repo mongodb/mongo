@@ -36,6 +36,7 @@ commands:
         description: "An internal command that does a rename, but first checks to make sure the
                       indexes and collection options on the destination match those given in the
                        command."
+        command_name: internalRenameIfOptionsAndIndexesMatch
         namespace: ignored
         fields:
             from:

@@ -49,6 +49,7 @@ structs:
 
 commands:
     balancerCollectionStatus:
+        command_name: balancerCollectionStatus
         cpp_name: BalancerCollectionStatus
         description: "Public balancerCollectionStatus command on mongos"
         strict: true
@@ -56,6 +57,7 @@ commands:
         type: namespacestring
 
     _configsvrBalancerCollectionStatus:
+        command_name: _configsvrBalancerCollectionStatus
         cpp_name: ConfigsvrBalancerCollectionStatus
         description: "Internal balancerCollectionStatus command on the config server"
         strict: true

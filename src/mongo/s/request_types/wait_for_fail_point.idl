@@ -37,6 +37,7 @@ imports:
 commands:
     waitForFailPoint:
         description: "wait for a fail point to be entered a certain number of times"
+        command_name: waitForFailPoint
         strict: false
         namespace: type
         type: string

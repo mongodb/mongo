@@ -53,6 +53,7 @@ structs:
 commands:
     logMessage:
         description: "Log a message on the server"
+        command_name: logMessage
         namespace: type
         type: string
         cpp_name: LogMessageCommand
@@ -76,6 +77,7 @@ commands:
 
     ping:
         description: "Parser for the 'ping' command."
+        command_name: ping
         strict: true
         api_version: 1
         namespace: ignored
