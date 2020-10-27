@@ -427,7 +427,6 @@ env.Library(
         "dbcommands_d.cpp",
         "dbhash.cpp",
         "driverHelpers.cpp",
-        "haystack.cpp",
         "internal_rename_if_options_and_indexes_match_cmd.cpp",
         "map_reduce_command.cpp",
         "oplog_application_checks.cpp",

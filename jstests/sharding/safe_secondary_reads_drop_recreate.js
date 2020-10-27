@@ -175,7 +175,6 @@ let testCases = {
     forceerror: {skip: "does not return user data"},
     fsync: {skip: "does not return user data"},
     fsyncUnlock: {skip: "does not return user data"},
-    geoSearch: {skip: "not supported in mongos"},
     getCmdLineOpts: {skip: "does not return user data"},
     getDefaultRWConcern: {skip: "does not return user data"},
     getDiagnosticData: {skip: "does not return user data"},

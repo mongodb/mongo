@@ -107,11 +107,6 @@ rst.initiate();
 let testDB = rst.getPrimary().getDB(dbName);
 let coll = testDB.coll;
 assert.commandWorked(coll.createIndex({geo: "2d"}));
-assert.commandWorked(testDB.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {haystack: "geoHaystack", a: 1}, name: "haystack_geo", bucketSize: 1}],
-    writeConcern: {w: "majority"}
-}));
 
 // Test snapshot in a transaction.
 session = testDB.getMongo().startSession({causalConsistency: false});
@@ -132,11 +127,6 @@ assert(!res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is supported by distinct in a transaction.
 res = assert.commandWorked(sessionDb.runCommand({distinct: collName, key: "x"}));
-assert(!res.hasOwnProperty("atClusterTime"), tojson(res));
-
-// readConcern 'snapshot' is supported by geoSearch in a transaction.
-res = assert.commandWorked(
-    sessionDb.runCommand({geoSearch: collName, near: [0, 0], maxDistance: 1, search: {a: 1}}));
 assert(!res.hasOwnProperty("atClusterTime"), tojson(res));
 
 // readConcern 'snapshot' is not supported by non-CRUD commands in a transaction.
@@ -167,16 +157,6 @@ assert(res.cursor.hasOwnProperty("atClusterTime"), tojson(res));
 res = assert.commandWorked(
     testDB.runCommand({distinct: collName, key: "x", readConcern: snapshotReadConcern}));
 assert(res.hasOwnProperty("atClusterTime"), tojson(res));
-
-// readConcern 'snapshot' is not supported by geoSearch outside of transactions.
-assert.commandFailedWithCode(testDB.runCommand({
-    geoSearch: collName,
-    near: [0, 0],
-    maxDistance: 1,
-    search: {a: 1},
-    readConcern: snapshotReadConcern
-}),
-                             ErrorCodes.InvalidOptions);
 
 // readConcern 'snapshot' is not supported by count.
 assert.commandFailedWithCode(testDB.runCommand({count: collName, readConcern: snapshotReadConcern}),

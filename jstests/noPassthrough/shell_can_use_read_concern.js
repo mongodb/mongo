@@ -191,19 +191,6 @@ function runTests({withSession}) {
     }
 
     //
-    // Tests for the "geoSearch" command.
-    //
-
-    testCommandCanBeCausallyConsistent(function() {
-        assert.commandWorked(coll.createIndex({loc: "geoHaystack", other: 1}, {bucketSize: 1}));
-    }, {expectedSession: withSession, expectedAfterClusterTime: false});
-
-    testCommandCanBeCausallyConsistent(function() {
-        assert.commandWorked(
-            db.runCommand({geoSearch: coll.getName(), near: [0, 0], maxDistance: 1, search: {}}));
-    });
-
-    //
     // Tests for the "explain" command.
     //
 

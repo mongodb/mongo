@@ -6,7 +6,6 @@ var kCommandsSupportingReadConcern = new Set([
     "count",
     "distinct",
     "find",
-    "geoSearch",
 ]);
 
 /**

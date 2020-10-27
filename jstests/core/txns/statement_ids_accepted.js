@@ -168,38 +168,6 @@ const isMongos = assert.commandWorked(db.runCommand("hello")).msg === "isdbgrid"
 if (!isMongos) {
     // Skip commands that do not exist on mongos.
 
-    jsTestLog("Check that geoSearch accepts a statement ID");
-    assert.commandWorked(testColl.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}),
-                         {writeConcern: {w: "majority"}});
-    assert.commandWorked(testColl.insert({geoh: {lat: 0, long: 0}, b: 0}),
-                         {writeConcern: {w: "majority"}});
-    assert.commandWorked(sessionDb.runCommand({
-        createIndexes: collName,
-        indexes: [
-            {name: "geo", key: {geo: "2dsphere"}},
-            {name: "geoh", key: {geoh: "geoHaystack", b: 1}, bucketSize: 1}
-        ],
-        writeConcern: {w: "majority"}
-    }));
-    // Ensure the snapshot is available following the index creation.
-    assert.soonNoExcept(function() {
-        testColl.find({}, {readConcern: {level: "snapshot"}});
-        return true;
-    });
-
-    jsTestLog("Check that geoSearch accepts a statement ID");
-    assert.commandWorked(sessionDb.runCommand({
-        geoSearch: collName,
-        search: {b: 0},
-        near: [0, 0],
-        maxDistance: 1,
-        readConcern: {level: "snapshot"},
-        txnNumber: NumberLong(txnNumber++),
-        stmtId: NumberInt(0),
-        startTransaction: true,
-        autocommit: false
-    }));
-
     jsTestLog("Check that prepareTransaction accepts a statement ID");
     assert.commandWorked(sessionDb.runCommand({
         insert: collName,

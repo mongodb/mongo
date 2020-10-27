@@ -86,11 +86,6 @@ assert.commandFailedWithCode(
                  }),
                  ErrorCodes.PreparedTransactionInProgress);
 
-jsTestLog("Test that you can't run geoSearch on a prepared transaction.");
-assert.commandFailedWithCode(
-    sessionDB.runCommand({geoSearch: collName, near: [0, 0], search: {a: 1}}),
-    ErrorCodes.PreparedTransactionInProgress);
-
 jsTestLog("Test that you can't insert on a prepared transaction.");
 res = assert.commandFailedWithCode(sessionColl.insert({_id: 5}),
                                    ErrorCodes.PreparedTransactionInProgress);

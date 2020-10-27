@@ -35,7 +35,6 @@ const nonRetryableWriteCommands = [
 const nonRetryableWriteCommandsMongodOnly = [
     // Commands that are allowed in transactions.
     {coordinateCommitTransaction: 1, participants: []},
-    {geoSearch: 1},
     {prepareTransaction: 1},
     // A selection of commands that are not allowed in transactions.
     {applyOps: 1}

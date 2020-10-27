@@ -157,7 +157,6 @@ var {
             "explain",
             "find",
             "geoNear",
-            "geoSearch",
             "group",
         ]);
 

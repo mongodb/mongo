@@ -160,15 +160,6 @@ const allCommands = {
     flushRouterConfig: {skip: isNotAUserDataRead},
     fsync: {skip: isNotAUserDataRead},
     fsyncUnlock: {skip: isNotAUserDataRead},
-    geoSearch: {
-        command: {
-            geoSearch: collName,
-            search: {},
-            near: [-42, 42],
-        },
-        expectFailure: true,
-        expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary
-    },
     getCmdLineOpts: {skip: isNotAUserDataRead},
     getDatabaseVersion: {skip: isNotAUserDataRead},
     getDefaultRWConcern: {skip: isNotAUserDataRead},

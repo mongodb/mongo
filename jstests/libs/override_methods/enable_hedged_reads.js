@@ -19,7 +19,6 @@ const kCommandsSupportingReadPreference = new Set([
     "dbStats",
     "distinct",
     "find",
-    "geoSearch",
 ]);
 const kDatabasesOnConfigServers = new Set(["config", "admin"]);
 

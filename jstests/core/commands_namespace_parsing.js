@@ -139,15 +139,6 @@ assertFailsWithInvalidNamespacesForField("out.reduce",
                                          isNotFullyQualified,
                                          isNotAdminCommand);
 
-if (!isMongos) {
-    // Test geoSearch fails with an invalid collection name.
-    assertFailsWithInvalidNamespacesForField(
-        "geoSearch",
-        {geoSearch: "", search: {}, near: [0.0, 0.0], maxDistance: 10},
-        isNotFullyQualified,
-        isNotAdminCommand);
-}
-
 // Test find fails with an invalid collection name.
 assertFailsWithInvalidNamespacesForField(
     "find", {find: ""}, isNotFullyQualified, isNotAdminCommand);

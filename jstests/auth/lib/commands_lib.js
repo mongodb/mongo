@@ -1780,11 +1780,11 @@ var authCommandsLib = {
         {
           testname: "aggregate_collStats_facet",
           command: {
-              aggregate: "foo", 
+              aggregate: "foo",
               pipeline: [
-                {$collStats: {latencyStats: {}}}, 
+                {$collStats: {latencyStats: {}}},
                 {$facet: {matched: [{$match: {a: 1}}]}}
-              ], 
+              ],
               cursor: {}
           },
           setup: function(db) {
@@ -1818,16 +1818,16 @@ var authCommandsLib = {
         {
           testname: "aggregate_collStats_within_lookup",
           command: {
-              aggregate: "foo", 
+              aggregate: "foo",
               pipeline: [
                 {$lookup: {
-                    from: "lookupColl", 
+                    from: "lookupColl",
                     pipeline: [{
                         $collStats: {latencyStats: {}}
-                    }], 
+                    }],
                     as: "result"
-                }}, 
-              ], 
+                }},
+              ],
               cursor: {}
           },
           setup: function(db) {
@@ -1852,10 +1852,10 @@ var authCommandsLib = {
         {
           testname: "aggregate_collStats_within_union",
           command: {
-              aggregate: "foo", 
+              aggregate: "foo",
               pipeline: [
-                {$unionWith: {coll: "unionColl", pipeline: [{$collStats: {latencyStats: {}}}]}}, 
-              ], 
+                {$unionWith: {coll: "unionColl", pipeline: [{$collStats: {latencyStats: {}}}]}},
+              ],
               cursor: {}
           },
           setup: function(db) {
@@ -3815,31 +3815,6 @@ var authCommandsLib = {
               },
               {runOnDb: firstDbName, roles: {}},
               {runOnDb: secondDbName, roles: {}}
-          ]
-        },
-        {
-          testname: "geoSearch",
-          command: {geoSearch: "x", near: [50, 50], maxDistance: 6, limit: 1, search: {}},
-          skipSharded: true,
-          setup: function(db) {
-              db.x.drop();
-              assert.writeOK(db.x.save({loc: {long: 50, lat: 50}}));
-              assert.commandWorked(db.x.ensureIndex({loc: "geoHaystack", type: 1}, {bucketSize: 1}));
-          },
-          teardown: function(db) {
-              db.x.drop();
-          },
-          testcases: [
-              {
-                runOnDb: firstDbName,
-                roles: roles_read,
-                privileges: [{resource: {db: firstDbName, collection: "x"}, actions: ["find"]}]
-              },
-              {
-                runOnDb: secondDbName,
-                roles: roles_readAny,
-                privileges: [{resource: {db: secondDbName, collection: "x"}, actions: ["find"]}]
-              }
           ]
         },
         {

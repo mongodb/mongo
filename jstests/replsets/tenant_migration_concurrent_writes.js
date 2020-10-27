@@ -699,7 +699,6 @@ const testCases = {
     flushRouterConfig: {skip: isNotRunOnUserDatabase},
     fsync: {skip: isNotRunOnUserDatabase},
     fsyncUnlock: {skip: isNotRunOnUserDatabase},
-    geoSearch: {skip: isNotWriteCommand},
     getCmdLineOpts: {skip: isNotRunOnUserDatabase},
     getDatabaseVersion: {skip: isNotRunOnUserDatabase},
     getDefaultRWConcern: {skip: isNotRunOnUserDatabase},

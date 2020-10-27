@@ -160,8 +160,6 @@ runCommandAndCheckLogicalTimes(
 runCommandAndCheckLogicalTimes(geoNearCmd, testDB, false);
 commandWorksAndUpdatesOperationTime(geoNearCmd, testDB);
 
-// GeoSearch is not supported for sharded clusters.
-
 // MapReduce doesn't currently support read concern majority.
 
 // Verify that the server rejects commands when operation time is invalid by running a command

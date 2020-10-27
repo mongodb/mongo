@@ -28,11 +28,6 @@ assert.commandWorked(sessionColl.insert({_id: "read-doc"}));
 assert.commandWorked(sessionColl.insert({_id: "update-doc"}));
 assert.commandWorked(sessionColl.insert({_id: "multi-update-doc-1"}));
 assert.commandWorked(sessionColl.insert({_id: "multi-update-doc-2"}));
-assert.commandWorked(testDB.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {haystack: "geoHaystack", a: 1}, name: "haystack_geo", bucketSize: 1}],
-    writeConcern: {w: "majority"}
-}));
 
 jsTestLog("Test commands that can use shell helpers.");
 session.startTransaction({readConcern: {level: "snapshot"}, writeConcern: {w: "majority"}});
@@ -96,14 +91,6 @@ assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
 assert.eq(profileObj.command.findandmodify, sessionColl.getName(), tojson(profileObj));
 assert.eq(profileObj.nMatched, 1, tojson(profileObj));
 assert.eq(profileObj.nModified, 1, tojson(profileObj));
-
-jsTestLog("Test geoSearch.");
-assert.commandWorked(
-    sessionDB.runCommand({geoSearch: collName, near: [0, 0], maxDistance: 1, search: {a: 1}}));
-profileObj = getLatestProfilerEntry(testDB);
-assert.eq(profileObj.op, "command", tojson(profileObj));
-assert.eq(profileObj.ns, sessionColl.getFullName(), tojson(profileObj));
-assert.eq(profileObj.command.geoSearch, sessionColl.getName(), tojson(profileObj));
 
 jsTestLog("Test getMore.");
 let res = assert.commandWorked(

@@ -390,18 +390,6 @@ let testCases = {
     forceerror: {skip: "test command"},
     fsync: {skip: "does not accept read or write concern"},
     fsyncUnlock: {skip: "does not accept read or write concern"},
-    geoSearch: {
-        setUp: function(conn) {
-            assert.commandWorked(conn.getDB(db).runCommand({
-                createIndexes: coll,
-                indexes: [{key: {loc: "geoHaystack", foo: 1}, bucketSize: 1, name: "foo"}],
-                writeConcern: {w: 1}
-            }));
-        },
-        command: {geoSearch: coll, search: {}, near: [0, 0], maxDistance: 1},
-        checkReadConcern: true,
-        checkWriteConcern: false,
-    },
     getCmdLineOpts: {skip: "does not accept read or write concern"},
     getDatabaseVersion: {skip: "does not accept read or write concern"},
     getDefaultRWConcern: {skip: "does not accept read or write concern"},

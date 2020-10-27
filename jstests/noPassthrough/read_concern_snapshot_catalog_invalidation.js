@@ -19,10 +19,6 @@ const coll = testDB.getCollection(kCollName);
 
 function testCommand(cmd, curOpFilter) {
     coll.drop({writeConcern: {w: "majority"}});
-    assert.commandWorked(testDB.runCommand({
-        createIndexes: kCollName,
-        indexes: [{key: {haystack: "geoHaystack", a: 1}, name: "haystack_geo", bucketSize: 1}]
-    }));
     assert.commandWorked(coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
 
     // Start a command with readConcern "snapshot" that hangs after establishing a storage
@@ -83,8 +79,6 @@ testCommand({findAndModify: kCollName, query: {x: 1}, update: {$set: {x: 2}}}, {
     "command.update.$set": {x: 2},
     "command.readConcern.level": "snapshot"
 });
-testCommand({geoSearch: kCollName, near: [0, 0], maxDistance: 1, search: {a: 1}},
-            {"command.geoSearch": kCollName, "command.readConcern.level": "snapshot"});
 testCommand({insert: kCollName, documents: [{x: 1}]},
             {"command.insert": kCollName, "command.readConcern.level": "snapshot"});
 testCommand({update: kCollName, updates: [{q: {x: 1}, u: {$set: {x: 2}}}]},

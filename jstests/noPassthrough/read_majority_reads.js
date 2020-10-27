@@ -6,7 +6,6 @@
  *  - aggregation
  *  - distinct
  *  - count
- *  - geoSearch
  *
  * Each operation is tested on a single node, and (if supported) through mongos on both sharded and
  * unsharded collections. Mongos doesn't directly handle readConcern majority, but these tests
@@ -64,9 +63,9 @@ var cursorTestCases = {
 
 // These test cases have a run method that will be passed a collection with a single object with
 // _id: 1 and a state field that equals either "before" or "after". The collection will also
-// contain both a 2dsphere and a geoHaystack index to enable testing commands that depend on
-// them. The return value from the run method is expected to be the value of expectedBefore or
-// expectedAfter depending on the state of the state field.
+// contain a 2dsphere index to enable testing commands that depend on it. The return value from the
+// run method is expected to be the value of expectedBefore or expectedAfter depending on the state
+// of the state field.
 var nonCursorTestCases = {
     count_before: {
         run: function(coll) {
@@ -94,21 +93,6 @@ var nonCursorTestCases = {
             assert.commandWorked(res);
             assert.eq(res.values.length, 1, tojson(res));
             return res.values[0];
-        },
-        expectedBefore: 'before',
-        expectedAfter: 'after',
-    },
-    geoSearch: {
-        run: function(coll) {
-            var res = coll.runCommand('geoSearch', {
-                readConcern: {level: 'majority'},
-                near: [0, 0],
-                search: {_id: 1},  // Needed due to SERVER-23158.
-                maxDistance: 1,
-            });
-            assert.commandWorked(res);
-            assert.eq(res.results.length, 1, tojson(res));
-            return res.results[0].state;
         },
         expectedBefore: 'before',
         expectedAfter: 'after',
@@ -155,7 +139,6 @@ function runTests(coll, mongodConnection) {
         assert.eq(oldCursor.next().state, 'after');
     }
 
-    assert.commandWorked(coll.createIndex({point: 'geoHaystack', _id: 1}, {bucketSize: 1}, 0));
     for (var testName in nonCursorTestCases) {
         jsTestLog('Running ' + testName + ' against ' + coll.toString());
         var getResult = nonCursorTestCases[testName].run;
@@ -212,15 +195,6 @@ var shardingTest = new ShardingTest({
     mongos: 1,
 });
 assert(shardingTest.adminCommand({addShard: replTest.getURL()}));
-
-// Remove tests of commands that aren't supported at all through mongos, even on unsharded
-// collections.
-['geoSearch'].forEach(function(cmd) {
-    // Make sure it really isn't supported.
-    assert.eq(shardingTest.getDB('test').coll.runCommand(cmd).code, ErrorCodes.CommandNotFound);
-    delete cursorTestCases[cmd];
-    delete nonCursorTestCases[cmd];
-});
 
 (function testUnshardedDBThroughMongos() {
     var db = shardingTest.getDB("throughMongos");

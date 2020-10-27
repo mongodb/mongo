@@ -135,11 +135,6 @@ const sessionColl = sessionDb[collName];
 
 testDB.runCommand({drop: collName});
 assert.commandWorked(testDB.createCollection(collName));
-assert.commandWorked(testDB.runCommand({
-    createIndexes: collName,
-    indexes: [{key: {haystack: "geoHaystack", a: 1}, name: "haystack_geo", bucketSize: 1}],
-    writeConcern: {w: "majority"}
-}));
 assert.commandWorked(testColl.insert({_id: 0}));
 
 // Run an initial transaction to get config.transactions state into memory.
@@ -200,17 +195,6 @@ for (let level of ["none", "local", "available", "snapshot", "majority", "linear
 
     if (level !== "snapshot") {
         assert.commandWorked(testDB.runCommand({count: collName, readConcern: readConcern}));
-        newStatus = getServerStatus(testDB);
-        verifyServerStatusChange(serverStatus, newStatus, level, 1);
-        serverStatus = newStatus;
-
-        assert.commandWorked(testDB.runCommand({
-            geoSearch: collName,
-            near: [0, 0],
-            maxDistance: 1,
-            search: {a: 1},
-            readConcern: readConcern
-        }));
         newStatus = getServerStatus(testDB);
         verifyServerStatusChange(serverStatus, newStatus, level, 1);
         serverStatus = newStatus;

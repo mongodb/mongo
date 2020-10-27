@@ -33,13 +33,8 @@ secondary.setSecondaryOk();
 // Create a test collection that we can run commands against.
 const primaryDB = primary.getDB(dbName);
 assert.commandWorked(primary.getDB(dbName).createCollection(collName));
-assert.commandWorked(primaryDB.runCommand({
-    createIndexes: collName,
-    indexes: [
-        {name: "geo_2d", key: {geo: "2d"}},
-        {key: {haystack: "geoHaystack", a: 1}, name: "haystack_geo", bucketSize: 1}
-    ]
-}));
+assert.commandWorked(
+    primaryDB.runCommand({createIndexes: collName, indexes: [{name: "geo_2d", key: {geo: "2d"}}]}));
 replTest.awaitLastOpCommitted();
 
 /**
@@ -81,7 +76,6 @@ let readCommands = [
     {find: collName},
     {aggregate: collName, pipeline: [{$project: {_id: 1}}], cursor: {}},
     {distinct: collName, key: "_id"},
-    {geoSearch: collName, near: [0, 0]}
 ];
 
 jsTestLog("Testing read commands.");

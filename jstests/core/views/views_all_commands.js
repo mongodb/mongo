@@ -270,14 +270,6 @@ let viewsCommandTests = {
     fsync: {skip: isUnrelated},
     fsyncUnlock: {skip: isUnrelated},
     getDatabaseVersion: {skip: isUnrelated},
-    geoSearch: {
-        command: {
-            geoSearch: "view",
-            search: {},
-            near: [-50, 37],
-        },
-        expectFailure: true
-    },
     getCmdLineOpts: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
     getDiagnosticData: {skip: isUnrelated},
