@@ -9788,8 +9788,8 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-64-vs2019-large
-  # - name: burn_in_tests_gen
-  # - name: buildscripts_test
+  - name: burn_in_tests_gen
+  - name: buildscripts_test
   - name: noPassthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
