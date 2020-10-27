@@ -819,4 +819,17 @@ BSONObjIteratorSorted::BSONObjIteratorSorted(const BSONObj& object)
 BSONArrayIteratorSorted::BSONArrayIteratorSorted(const BSONArray& array)
     : BSONIteratorSorted(array, ElementFieldCmp(true)) {}
 
+/**
+ * Types used to represent BSONObj and BSONArray memory in the Visual Studio debugger
+ */
+#if defined(_MSC_VER) && defined(_DEBUG)
+struct BSONObjData {
+    int32_t size;
+} bsonObjDataInstance;
+
+struct BSONArrayData {
+    int32_t size;
+} bsonObjArrayInstance;
+#endif  // defined(_MSC_VER) && defined(_DEBUG)
+
 }  // namespace mongo

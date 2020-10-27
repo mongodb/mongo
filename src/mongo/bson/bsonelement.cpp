@@ -971,4 +971,25 @@ bool BSONObj::coerceVector(std::vector<T>* out) const {
     return true;
 }
 
+/**
+ * Types used to represent BSONElement memory in the Visual Studio debugger
+ */
+#if defined(_MSC_VER) && defined(_DEBUG)
+struct BSONElementData {
+    char type;
+    char name;
+} bsonElementDataInstance;
+
+struct BSONElementBinaryType {
+    int32_t size;
+    uint8_t subtype;
+} bsonElementBinaryType;
+struct BSONElementRegexType {
+} bsonElementRegexType;
+struct BSONElementDBRefType {
+} bsonElementDBPointerType;
+struct BSONElementCodeWithScopeType {
+} bsonElementCodeWithScopeType;
+#endif  // defined(_MSC_VER) && defined(_DEBUG)
+
 }  // namespace mongo
