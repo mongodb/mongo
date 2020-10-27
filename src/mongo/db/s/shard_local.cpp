@@ -164,7 +164,7 @@ Status ShardLocal::createIndexOnConfig(OperationContext* opCtx,
             return Status::OK();
         }
 
-        auto fromMigrate = true;
+        auto fromMigrate = false;
         if (!collection->isEmpty(opCtx)) {
             // We typically create indexes on config/admin collections for sharding while setting up
             // a sharded cluster, so we do not expect to see data in the collection.
