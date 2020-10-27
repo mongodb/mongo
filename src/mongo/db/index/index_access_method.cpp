@@ -218,11 +218,14 @@ Status AbstractIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                              const InsertDeleteOptions& options,
                                              KeyHandlerFn&& onDuplicateKey,
                                              int64_t* numInserted) {
-    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
-
+    // Initialize the 'numInserted' out-parameter to zero in case the caller did not already do so.
+    if (numInserted) {
+        *numInserted = 0;
+    }
     // Add all new data keys, and all new multikey metadata keys, into the index. When iterating
     // over the data keys, each of them should point to the doc's RecordId. When iterating over
     // the multikey metadata keys, they should point to the reserved 'kMultikeyMetadataKeyId'.
+    bool checkIndexKeySize = shouldCheckIndexKeySize(opCtx);
     for (const auto keyVec : {&keys, &multikeyMetadataKeys}) {
         const auto& recordId = (keyVec == &keys ? loc : kMultikeyMetadataKeyId);
         for (const auto& key : *keyVec) {

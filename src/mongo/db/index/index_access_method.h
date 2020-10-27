@@ -94,6 +94,14 @@ public:
                           KeyHandlerFn&& onDuplicateKey,
                           int64_t* numInserted) = 0;
 
+    /**
+     * Inserts the specified keys into the index, and determines whether these keys should cause the
+     * index to become multikey. If so, this method also handles the task of marking the index as
+     * multikey in the catalog, and sets the path-level multikey information if applicable. The
+     * 'numInserted' output parameter, if non-nullptr, will be reset to the number of keys inserted
+     * by this function call, or to zero in the case of either a non-OK return Status or an empty
+     * 'keys' argument.
+     */
     virtual Status insertKeys(OperationContext* opCtx,
                               const std::vector<BSONObj>& keys,
                               const std::vector<BSONObj>& multikeyMetadataKeys,
