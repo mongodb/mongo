@@ -42,6 +42,36 @@ const testCases = [
         nonMatchingDocument: {a: 1},
         lastStableErrCode: 168
     },
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $dateAdd:
+                            {startDate: new Date("2020-10-10T10:00:00"), unit: "hour", amount: 1}
+                    },
+                    new Date("2020-10-10T10:00:00")
+                ]
+            }
+        },
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
+    },
+    {
+        validator: {
+            $expr: {
+                $eq: [
+                    {
+                        $dateSubtract:
+                            {startDate: new Date("2020-10-10T10:00:00"), unit: "hour", amount: 1}
+                    },
+                    new Date("2020-10-10T10:00:00")
+                ]
+            }
+        },
+        nonMatchingDocument: {a: 1},
+        lastStableErrCode: 168
+    },
 ];
 
 // Tests Feature Compatibility Version behavior of the validator of a collection by executing test

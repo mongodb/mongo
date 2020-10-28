@@ -3124,4 +3124,91 @@ protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 };
 
+class ExpressionDateArithmetics : public Expression {
+public:
+    ExpressionDateArithmetics(ExpressionContext* const expCtx,
+                              boost::intrusive_ptr<Expression> startDate,
+                              boost::intrusive_ptr<Expression> unit,
+                              boost::intrusive_ptr<Expression> amount,
+                              boost::intrusive_ptr<Expression> timezone,
+                              const StringData opName)
+        : Expression(
+              expCtx,
+              {std::move(startDate), std::move(unit), std::move(amount), std::move(timezone)}),
+          _startDate(_children[0]),
+          _unit(_children[1]),
+          _amount(_children[2]),
+          _timeZone(_children[3]),
+          _opName(opName) {}
+
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+    /**
+     * Subclasses should implement this to do their actual date arithmetics.
+     */
+    virtual Value evaluateDateArithmetics(Date_t date,
+                                          TimeUnit unit,
+                                          long long amount,
+                                          const TimeZone& timezone) const = 0;
+
+private:
+    // The expression representing the startDate argument.
+    boost::intrusive_ptr<Expression>& _startDate;
+
+    // Unit of time: year, quarter, week, etc.
+    boost::intrusive_ptr<Expression>& _unit;
+
+    // Amount of units to be added or subtracted.
+    boost::intrusive_ptr<Expression>& _amount;
+
+    // The expression representing the timezone argument.
+    boost::intrusive_ptr<Expression>& _timeZone;
+
+    // The name of this expression, e.g. $dateAdd or $dateSubtract.
+    StringData _opName;
+};
+
+class ExpressionDateAdd final : public ExpressionDateArithmetics {
+public:
+    using ExpressionDateArithmetics::ExpressionDateArithmetics;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+private:
+    virtual Value evaluateDateArithmetics(Date_t date,
+                                          TimeUnit unit,
+                                          long long amount,
+                                          const TimeZone& timezone) const override;
+};
+
+class ExpressionDateSubtract final : public ExpressionDateArithmetics {
+public:
+    using ExpressionDateArithmetics::ExpressionDateArithmetics;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+private:
+    virtual Value evaluateDateArithmetics(Date_t date,
+                                          TimeUnit unit,
+                                          long long amount,
+                                          const TimeZone& timezone) const override;
+};
+
 }  // namespace mongo

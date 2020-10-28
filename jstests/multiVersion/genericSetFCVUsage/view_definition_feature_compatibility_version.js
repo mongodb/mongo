@@ -29,6 +29,17 @@ const pipelinesWithNewFeatures = [
             }
         }
     }],
+    [{
+        $project:
+            {y: {$dateAdd: {startDate: new Date("2020-02-02T02:02:02"), unit: "week", amount: 1}}}
+    }],
+    [{
+        $project: {
+            z: {
+                $dateSubtract: {startDate: new Date("2020-02-02T02:02:02"), unit: "hour", amount: 3}
+            }
+        }
+    }],
 ];
 
 // Tests Feature Compatibility Version behavior of view creation while using aggregation pipelines

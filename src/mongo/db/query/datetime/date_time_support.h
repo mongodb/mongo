@@ -40,6 +40,7 @@
 
 struct _timelib_error_container;
 struct _timelib_time;
+struct _timelib_rel_time;
 struct _timelib_tzdb;
 struct _timelib_tzinfo;
 
@@ -47,6 +48,21 @@ namespace mongo {
 
 using namespace std::string_literals;
 static constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
+
+/**
+ * A set of standard measures of time used to express a length of time interval.
+ */
+enum class TimeUnit {
+    year,
+    quarter,  // A quarter of a year.
+    month,
+    week,
+    day,
+    hour,
+    minute,
+    second,
+    millisecond
+};
 
 /**
  * A TimeZone object represents one way of formatting/reading dates to compute things like the day
@@ -313,6 +329,10 @@ public:
     static void validateFromStringFormat(StringData format);
     std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
 
+    std::shared_ptr<_timelib_tzinfo> getTzInfo() const {
+        return _tzInfo;
+    }
+
 private:
     /**
      * Only works with 1 <= spaces <= 4 and 0 <= number <= 9999. If spaces is less than the digit
@@ -430,8 +450,8 @@ public:
     bool isTimeZoneIdentifier(StringData timeZoneId) const;
 
     /**
-     * Returns a TimeZone object representing the zone given by 'timeZoneId', or boost::none if it
-     * was not a recognized time zone.
+     * Returns a TimeZone object representing the zone given by 'timeZoneId', or throws an exception
+     * if the 'timeZoneId' was not recognized.
      */
     TimeZone getTimeZone(StringData timeZoneId) const;
 
@@ -472,26 +492,26 @@ private:
 };
 
 /**
- * A set of standard measures of time used to express a length of time interval.
- */
-enum class TimeUnit {
-    year,
-    quarter,  // A quarter of a year.
-    month,
-    week,
-    day,
-    hour,
-    minute,
-    second,
-    millisecond
-};
-
-/**
  * Parses a string representation of an enumerator of TimeUnit type 'unitName' into a value of type
  * TimeUnit. Throws an exception with error code ErrorCodes::FailedToParse when passed an invalid
  * name.
  */
 TimeUnit parseTimeUnit(const std::string& unitName);
+
+/**
+ * A custom-deleter which destructs a timelib_rel_time* when it goes out of scope.
+ */
+struct TimelibRelTimeDeleter {
+    TimelibRelTimeDeleter() = default;
+    void operator()(_timelib_rel_time* relTime);
+};
+
+/**
+ * Creates and sets a timelib_rel_time structure representing a time interval
+ * of 'amount' number of time 'units'.
+ */
+std::unique_ptr<_timelib_rel_time, TimelibRelTimeDeleter> getTimelibRelTime(TimeUnit unit,
+                                                                            long long amount);
 
 /**
  * Determines the number of upper boundaries of time intervals crossed when moving from time instant
@@ -520,4 +540,16 @@ TimeUnit parseTimeUnit(const std::string& unitName);
  * Time rules.
  */
 long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZone& timezone);
+
+/**
+ * Add time interval to a date. The interval duration is given in 'amount' number of 'units'.
+ * The amount can be a negative number in which case the interval is subtracted from the date.
+ * The result date is always in UTC.
+ *
+ * startDate - starting time instant
+ * unit - length of time intervals, defined in the TimeUnit enumeration
+ * amount - the amount of time units to be added
+ * timezone - the timezone in which the start date is interpreted
+ */
+Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& timezone);
 }  // namespace mongo

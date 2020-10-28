@@ -727,4 +727,172 @@ TimeUnit parseTimeUnit(const std::string& unitName) {
             iterator != timeUnitNameToTimeUnitMap.end());
     return iterator->second;
 }
+
+void TimelibRelTimeDeleter::operator()(timelib_rel_time* relTime) {
+    timelib_rel_time_dtor(relTime);
+}
+
+std::unique_ptr<_timelib_rel_time, TimelibRelTimeDeleter> createTimelibRelTime() {
+    return std::unique_ptr<_timelib_rel_time, TimelibRelTimeDeleter>(timelib_rel_time_ctor());
+}
+
+std::unique_ptr<timelib_rel_time, TimelibRelTimeDeleter> getTimelibRelTime(TimeUnit unit,
+                                                                           long long amount) {
+    auto relTime = createTimelibRelTime();
+    switch (unit) {
+        case TimeUnit::year:
+            relTime->y = amount;
+            break;
+        case TimeUnit::quarter:
+            relTime->m = amount * kQuarterLengthInMonths;
+            break;
+        case TimeUnit::month:
+            relTime->m = amount;
+            break;
+        case TimeUnit::week:
+            relTime->d = amount * kDaysPerWeek;
+            break;
+        case TimeUnit::day:
+            relTime->d = amount;
+            break;
+        case TimeUnit::hour:
+            relTime->h = amount;
+            break;
+        case TimeUnit::minute:
+            relTime->i = amount;
+            break;
+        case TimeUnit::second:
+            relTime->s = amount;
+            break;
+        case TimeUnit::millisecond:
+            relTime->us = durationCount<Microseconds>(Milliseconds(amount));
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+    return relTime;
+}
+
+namespace {
+/**
+ * A helper function that adds an amount of months to a month given by 'year' and 'month'.
+ * The amount can be a negative number. Returns the new month as a [year, month] pair.
+ */
+std::pair<long long, long long> addMonths(long long year, long long month, long long amount) {
+    auto m = month + amount;
+    auto y = year;
+    if (m > 12) {
+        y += m / 12;
+        m -= 12 * (m / 12);
+    }
+    if (m <= 0) {
+        auto yearsInBetween = (-m) / 12 + 1;
+        m += 12 * yearsInBetween;
+        y -= yearsInBetween;
+    }
+    return {y, m};
+}
+
+/**
+ * A helper function that checks if last day adjustment is needed for a dateAdd operation.
+ * If yes, the function computes and returns the time interval in a number of days, so that the day
+ * in the result date is the last valid day in the respective month. Example: 2020-10-31 + 1 month
+ * -> day adjustment is needed since there is no 31st of November. The function computes adjusted
+ * time interval of 30 days.
+ *
+ * tm: start date of the operation
+ * unit: the time unit
+ * amount: the amount of time units to be added
+ * returns optional intervalInDays : adjusted time interval in number of days if adjustment is
+ * needed
+ */
+boost::optional<long long> needsDayAdjustment(timelib_time* tm, TimeUnit unit, long long amount) {
+    if (tm->d <= 28) {
+        return boost::none;
+    }
+    if (unit == TimeUnit::year) {
+        unit = TimeUnit::month;
+        amount *= kMonthsInOneYear;
+    }
+    if (unit == TimeUnit::quarter) {
+        unit = TimeUnit::month;
+        amount *= kQuarterLengthInMonths;
+    }
+
+    auto [resYear, resMonth] = addMonths(tm->y, tm->m, amount);
+    auto maxResDay = timelib_days_in_month(resYear, resMonth);
+
+    if (tm->d > maxResDay) {
+        long long intervalInDays = timelib_day_of_year(resYear, resMonth, maxResDay) -
+            timelib_day_of_year(tm->y, tm->m, tm->d) + daysBetweenYears(tm->y, resYear);
+        return boost::make_optional(intervalInDays);
+    }
+    return boost::none;
+}
+
+/**
+ * A helper function that computes DST correction in seconds for start and end seconds-since-epoch
+ * for the given timezone argument.
+ */
+long long dateAddDSTCorrection(long long startSse, long long endSse, const TimeZone& timezone) {
+    auto tz = timezone.getTzInfo();
+    if (!tz) {
+        return 0;
+    }
+    auto startOffset = timelib_get_time_zone_info(startSse, tz.get());
+    auto endOffset = timelib_get_time_zone_info(endSse, tz.get());
+    long long corr = startOffset->offset - endOffset->offset;
+    timelib_time_offset_dtor(startOffset);
+    timelib_time_offset_dtor(endOffset);
+    return corr;
+}
+
+}  // namespace
+
+Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& timezone) {
+    auto utcTime = createTimelibTime();
+    timelib_unixtime2gmt(utcTime.get(), seconds(date));
+
+    // Check if an adjustment for the last day of month is necessary.
+    if (unit == TimeUnit::year || unit == TimeUnit::quarter || unit == TimeUnit::month) {
+        auto intervalInDays = [&]() {
+            if (timezone.isUtcZone()) {
+                return needsDayAdjustment(utcTime.get(), unit, amount);
+            }
+            // If a timezone is provided, the last day adjustment is computed in this timezone.
+            auto localTime = timezone.getTimelibTime(date);
+            return needsDayAdjustment(localTime.get(), unit, amount);
+        }();
+        if (intervalInDays) {
+            unit = TimeUnit::day;
+            amount = intervalInDays.get();
+        }
+    }
+
+    auto interval = getTimelibRelTime(unit, amount);
+
+    // Compute the result date in UTC and if needed later perform a DST correction for a timezone.
+    // The alternative computation in the associated timezone gives incorrect results when the
+    // computed date falls into the missing hour during the standard time-to-DST transition or
+    // falls into the repeated hour during the DST-to-standard time transition.
+    auto newTime = timelib_add(utcTime.get(), interval.get());
+
+    // Check the DST offsets in the given timezone and compute a correction if the time unit is
+    // a day or a larger unit. UTC and offset-based timezones do not have DST and do not need
+    // this correction.
+    if ((interval->d || interval->m || interval->y) && timezone.isTimeZoneIDZone()) {
+        newTime->sse += dateAddDSTCorrection(utcTime->sse, newTime->sse, timezone);
+    }
+
+    long long res;
+    if (overflow::mul(newTime->sse, 1000L, &res)) {
+        timelib_time_dtor(newTime);
+        uasserted(5166406, "dateAdd overflowed");
+    }
+    auto returnDate = Date_t::fromMillisSinceEpoch(
+        durationCount<Milliseconds>(Seconds(newTime->sse) + Microseconds(newTime->us)));
+    timelib_time_dtor(newTime);
+    return returnDate;
+}
+
 }  // namespace mongo

@@ -1681,4 +1681,317 @@ TEST_F(ExpressionDateDiffTest, AddsDependencies) {
          std::set<std::string>{"startDateField", "endDateField", "unitField", "timezoneField"}));
 }
 }  // namespace ExpressionDateDiffTest
+
+namespace ExpressionDateArithmeticsTest {
+using ExpressionDateArithmeticsTest = AggregationContextFixture;
+
+std::vector<StringData> dateArithmeticsExp = {"$dateAdd"_sd, "$dateSubtract"_sd};
+
+TEST_F(ExpressionDateArithmeticsTest, SerializesToObject) {
+    auto expCtx = getExpCtx();
+
+    for (auto&& expName : dateArithmeticsExp) {
+        BSONObj doc = BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                                       << "day"
+                                                       << "amount" << 1));
+        auto dateAddExp =
+            Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        auto expectedSerialization =
+            Value(Document{{expName,
+                            Document{{"startDate", Document{{"$const", Date_t{}}}},
+                                     {"unit", Document{{"$const", "day"_sd}}},
+                                     {"amount", Document{{"$const", 1}}}}}});
+        ASSERT_VALUE_EQ(dateAddExp->serialize(true), expectedSerialization);
+        ASSERT_VALUE_EQ(dateAddExp->serialize(false), expectedSerialization);
+
+        // with timezone
+        doc = BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                               << "day"
+                                               << "amount" << -1 << "timezone"
+                                               << "America/New_York"));
+        dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        expectedSerialization =
+            Value(Document{{expName,
+                            Document{{"startDate", Document{{"$const", Date_t{}}}},
+                                     {"unit", Document{{"$const", "day"_sd}}},
+                                     {"amount", Document{{"$const", -1}}},
+                                     {"timezone", Document{{"$const", "America/New_York"_sd}}}}}});
+        ASSERT_VALUE_EQ(dateAddExp->serialize(true), expectedSerialization);
+        ASSERT_VALUE_EQ(dateAddExp->serialize(false), expectedSerialization);
+    }
+}
+
+TEST_F(ExpressionDateArithmeticsTest, ParsesInvalidDocument) {
+    auto expCtx = getExpCtx();
+
+    struct TestCase {
+        BSONObj doc;
+        int errorCode;
+    };
+
+    for (auto&& expName : dateArithmeticsExp) {
+        std::vector<TestCase> testCases = {
+            {BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                              << "day")),
+             5166402},
+            {BSON(expName << BSON("startDate" << Date_t{} << "amount" << 1)), 5166402},
+
+            {BSON(expName << BSON("unit"
+                                  << "day"
+                                  << "amount" << 1 << "timezone"
+                                  << "Europe/London")),
+             5166402},
+            {BSON(expName << BSON("startDate" << Date_t{} << "timeUnit"
+                                              << "day"
+                                              << "amount" << 1 << "timezone"
+                                              << "Europe/London")),
+             5166401}};
+
+        for (auto&& testCase : testCases) {
+            ASSERT_THROWS_CODE(Expression::parseExpression(
+                                   expCtx.get(), testCase.doc, expCtx->variablesParseState),
+                               AssertionException,
+                               testCase.errorCode);
+        }
+    }
+}
+
+TEST_F(ExpressionDateArithmeticsTest, EvaluatesToNullWithNullInput) {
+    auto expCtx = getExpCtx();
+
+    for (auto&& expName : dateArithmeticsExp) {
+        auto testDocuments = {
+            BSON(expName << BSON("startDate" << BSONNULL << "unit"
+                                             << "day"
+                                             << "amount" << 1)),
+            BSON(expName << BSON("startDate"
+                                 << "$missingField"
+                                 << "unit"
+                                 << "day"
+                                 << "amount" << 1)),
+            BSON(expName << BSON("startDate" << Date_t{} << "unit" << BSONNULL << "amount" << 1)),
+            BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                             << "day"
+                                             << "amount"
+                                             << "$missingField")),
+            BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                             << "day"
+                                             << "amount" << 123 << "timezone" << BSONNULL)),
+        };
+
+        for (auto&& doc : testDocuments) {
+            auto dateAddExp =
+                Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+            ASSERT_VALUE_EQ(Value(BSONNULL), dateAddExp->evaluate({}, &expCtx->variables));
+        }
+    }
+}
+
+TEST_F(ExpressionDateArithmeticsTest, ThrowsExceptionOnInvalidInput) {
+    auto expCtx = getExpCtx();
+
+    struct TestCase {
+        BSONObj doc;
+        int errorCode;
+    };
+
+    for (auto&& expName : dateArithmeticsExp) {
+        std::vector<TestCase> testCases = {
+            {BSON(expName << BSON("startDate"
+                                  << "myDate"
+                                  << "unit" << 123 << "amount" << 1)),
+             5166403},
+            {BSON(expName << BSON("startDate" << Date_t{} << "unit" << 123 << "amount" << 1)),
+             5166404},
+            {BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                              << "decade"
+                                              << "amount" << 1)),
+             9},
+            {BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                              << "day"
+                                              << "amount" << 1.789)),
+             5166405},
+            {BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                              << "day"
+                                              << "amount" << 5 << "timezone" << 12)),
+             40517},
+            {BSON(expName << BSON("startDate" << Date_t{} << "unit"
+                                              << "day"
+                                              << "amount" << 5 << "timezone"
+                                              << "Unknown")),
+             40485},
+        };
+
+        for (auto&& testCase : testCases) {
+            auto dateAddExp = Expression::parseExpression(
+                expCtx.get(), testCase.doc, expCtx->variablesParseState);
+            ASSERT_THROWS_CODE(dateAddExp->evaluate({}, &expCtx->variables),
+                               AssertionException,
+                               testCase.errorCode);
+        }
+    }
+}
+
+TEST_F(ExpressionDateArithmeticsTest, RegularEvaluationDateAdd) {
+    auto expCtx = getExpCtx();
+    struct TestCase {
+        BSONObj doc;
+        Date_t expected;
+    };
+
+    const long long startInstant = 1604139005000LL;  // 2020-10-31T10:10:05
+    Date_t testDate = Date_t::fromMillisSinceEpoch(startInstant);
+    const auto objId = OID::gen();
+
+    std::vector<TestCase> testCases = {
+        {BSON("$dateAdd" << BSON("startDate" << testDate << "unit"
+                                             << "month"
+                                             << "amount" << 1)),
+         Date_t::fromMillisSinceEpoch(startInstant + 30LL * 24 * 60 * 60 * 1000)},
+        {BSON("$dateAdd" << BSON("startDate" << testDate << "unit"
+                                             << "day"
+                                             << "amount" << 1)),
+         Date_t::fromMillisSinceEpoch(startInstant + 24 * 60 * 60 * 1000)},
+        {BSON("$dateAdd" << BSON("startDate" << testDate << "unit"
+                                             << "hour"
+                                             << "amount" << -1)),
+         Date_t::fromMillisSinceEpoch(startInstant - 1 * 60 * 60 * 1000)},
+        {BSON("$dateAdd" << BSON("startDate" << testDate << "unit"
+                                             << "minute"
+                                             << "amount" << 5)),
+         Date_t::fromMillisSinceEpoch(startInstant + 5 * 60 * 1000)},
+        {BSON("$dateAdd" << BSON("startDate" << testDate << "unit"
+                                             << "day"
+                                             << "amount" << -7 << "timezone"
+                                             << "Europe/Amsterdam")),
+         // Subtracts additional 60 minutes due to crossing DST change in Ams zone.
+         Date_t::fromMillisSinceEpoch(startInstant - (7 * 24 + 1) * 60 * 60 * 1000)},
+        {BSON("$dateAdd" << BSON("startDate" << Timestamp(1605001115, 0) << "unit"
+                                             << "second"
+                                             << "amount" << 1)),
+         Date_t::fromMillisSinceEpoch(1605001116000)},
+        {BSON("$dateAdd" << BSON("startDate" << objId << "unit"
+                                             << "second"
+                                             << "amount" << 0)),
+         objId.asDateT()},
+    };
+
+    for (auto&& testCase : testCases) {
+        auto dateAddExp =
+            Expression::parseExpression(expCtx.get(), testCase.doc, expCtx->variablesParseState);
+        ASSERT_VALUE_EQ(Value(testCase.expected), dateAddExp->evaluate({}, &expCtx->variables));
+    }
+}
+
+TEST_F(ExpressionDateArithmeticsTest, RegularEvaluationDateSubtract) {
+    auto expCtx = getExpCtx();
+
+    struct TestCase {
+        BSONObj doc;
+        Date_t expected;
+    };
+    const long long startInstant = 1604139005000LL;  // 2020-10-31T10:10:05
+    Date_t testDate = Date_t::fromMillisSinceEpoch(startInstant);
+    std::vector<TestCase> testCases = {
+        {BSON("$dateSubtract" << BSON("startDate" << testDate << "unit"
+                                                  << "month"
+                                                  << "amount" << 1)),
+         Date_t::fromMillisSinceEpoch(startInstant - 31LL * 24 * 60 * 60 * 1000)},
+        {BSON("$dateSubtract" << BSON("startDate" << testDate << "unit"
+                                                  << "month"
+                                                  << "amount" << -1)),
+         // Adds 30 days for day adjustment to 2020-11-30.
+         Date_t::fromMillisSinceEpoch(startInstant + 30LL * 24 * 60 * 60 * 1000)},
+        {BSON("$dateSubtract" << BSON("startDate" << testDate << "unit"
+                                                  << "day"
+                                                  << "amount" << 3)),
+         Date_t::fromMillisSinceEpoch(startInstant - 3LL * 24 * 60 * 60 * 1000)},
+        {BSON("$dateSubtract" << BSON("startDate" << testDate << "unit"
+                                                  << "minute"
+                                                  << "amount" << 10)),
+         Date_t::fromMillisSinceEpoch(startInstant - 10 * 60 * 1000)},
+        {BSON("$dateSubtract" << BSON("startDate" << testDate << "unit"
+                                                  << "day"
+                                                  << "amount" << 7 << "timezone"
+                                                  << "Europe/Amsterdam")),
+         // Subtracts additional 60 minutes due to crossing DST change in Ams zone.
+         Date_t::fromMillisSinceEpoch(startInstant - (7 * 24 + 1) * 60 * 60 * 1000)}};
+
+    for (auto&& testCase : testCases) {
+        auto dateAddExp =
+            Expression::parseExpression(expCtx.get(), testCase.doc, expCtx->variablesParseState);
+        ASSERT_VALUE_EQ(Value(testCase.expected), dateAddExp->evaluate({}, &expCtx->variables));
+    }
+}
+
+TEST_F(ExpressionDateArithmeticsTest, OptimizesToConstant) {
+    auto expCtx = getExpCtx();
+    Date_t testDate = Date_t::fromMillisSinceEpoch(1604139115000);
+
+    for (auto&& expName : dateArithmeticsExp) {
+        BSONObj doc = BSON(expName << BSON("startDate" << testDate << "unit"
+                                                       << "day"
+                                                       << "amount" << 1));
+        auto dateAddExp =
+            Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        ASSERT(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
+
+        doc = BSON(expName << BSON("startDate" << testDate << "unit"
+                                               << "day"
+                                               << "amount" << 1 << "timezone"
+                                               << "Europe/London"));
+        dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        ASSERT(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
+
+        doc = BSON(expName << BSON("startDate"
+                                   << "$$NOW"
+                                   << "unit"
+                                   << "day"
+                                   << "amount" << 1));
+        dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        ASSERT(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
+
+
+        // Test that expression does not optimize to constant if some of the parameters is not a
+        // constant
+        doc = BSON(expName << BSON("startDate"
+                                   << "$sentDate"
+                                   << "unit"
+                                   << "day"
+                                   << "amount" << 1));
+        dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
+
+        doc = BSON(expName << BSON("startDate" << testDate << "unit"
+                                               << "$unit"
+                                               << "amount" << 100));
+        dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
+    }
+}
+
+TEST_F(ExpressionDateArithmeticsTest, AddsDependencies) {
+    auto expCtx = getExpCtx();
+    for (auto&& expName : dateArithmeticsExp) {
+        BSONObj doc = BSON(expName << BSON("startDate"
+                                           << "$date"
+                                           << "unit"
+                                           << "$unit"
+                                           << "amount"
+                                           << "$amount"
+                                           << "timezone"
+                                           << "$timezone"));
+        auto dateAddExp =
+            Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+        DepsTracker dependencies;
+        dateAddExp->addDependencies(&dependencies);
+        ASSERT_EQ(dependencies.fields.size(), 4UL);
+        ASSERT_EQ(dependencies.fields.count("date"), 1UL);
+        ASSERT_EQ(dependencies.fields.count("unit"), 1UL);
+        ASSERT_EQ(dependencies.fields.count("amount"), 1UL);
+        ASSERT_EQ(dependencies.fields.count("timezone"), 1UL);
+    }
+}
+}  // namespace ExpressionDateArithmeticsTest
+
 }  // namespace mongo

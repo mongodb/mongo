@@ -116,5 +116,70 @@ BENCHMARK(BM_DateDiffEvaluateMinute300Years);
 BENCHMARK(BM_DateDiffEvaluateMinute2Years);
 BENCHMARK(BM_DateDiffEvaluateMinute2YearsWithTimezone);
 BENCHMARK(BM_DateDiffEvaluateWeek);
+
+/**
+ * Tests performance of evaluate() method of $dateAdd
+ */
+void testDateAddExpression(long long startDate,
+                           std::string unit,
+                           long long amount,
+                           boost::optional<std::string> timezone,
+                           benchmark::State& state) {
+    QueryTestServiceContext testServiceContext;
+    auto opContext = testServiceContext.makeOperationContext();
+    NamespaceString nss("test.bm");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx =
+        new ExpressionContextForTest(opContext.get(), nss);
+
+    BSONObjBuilder objBuilder;
+    objBuilder << "startDate" << Date_t::fromMillisSinceEpoch(startDate) << "unit" << unit
+               << "amount" << amount;
+    if (timezone) {
+        objBuilder << "timezone" << *timezone;
+    }
+    auto doc = BSON("$dateAdd" << objBuilder.obj());
+    auto dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
+    auto variables = &(expCtx->variables);
+    Document document;
+
+    for (auto keepRunning : state) {
+        benchmark::DoNotOptimize(dateAddExp->evaluate(document, variables));
+        benchmark::ClobberMemory();
+    }
+}
+
+void BM_DateAddEvaluate10Days(benchmark::State& state) {
+    testDateAddExpression(1604131115000LL,
+                          "day",
+                          10LL,
+                          boost::none, /* timezone */
+                          state);
+}
+
+void BM_DateAddEvaluate100KSeconds(benchmark::State& state) {
+    testDateAddExpression(1604131115000LL,
+                          "second",
+                          100000LL,
+                          boost::none, /* timezone */
+                          state);
+}
+
+void BM_DateAddEvaluate100Years(benchmark::State& state) {
+    testDateAddExpression(1604131115000LL,
+                          "year",
+                          100LL,
+                          boost::none, /* timezone */
+                          state);
+}
+
+void BM_DateAddEvaluate12HoursWithTimezone(benchmark::State& state) {
+    testDateAddExpression(1604131115000LL, "hour", 12LL, std::string{"America/New_York"}, state);
+}
+
+BENCHMARK(BM_DateAddEvaluate10Days);
+BENCHMARK(BM_DateAddEvaluate100KSeconds);
+BENCHMARK(BM_DateAddEvaluate100Years);
+BENCHMARK(BM_DateAddEvaluate12HoursWithTimezone);
+
 }  // namespace
 }  // namespace mongo

@@ -481,6 +481,8 @@ public:
     void visit(ExpressionFunction* expr) final {}
     void visit(ExpressionRandom* expr) final {}
     void visit(ExpressionToHashedIndexKey* expr) final {}
+    void visit(ExpressionDateAdd* expr) final {}
+    void visit(ExpressionDateSubtract* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -677,6 +679,8 @@ public:
     void visit(ExpressionFunction* expr) final {}
     void visit(ExpressionRandom* expr) final {}
     void visit(ExpressionToHashedIndexKey* expr) final {}
+    void visit(ExpressionDateAdd* expr) final {}
+    void visit(ExpressionDateSubtract* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -2496,6 +2500,14 @@ public:
 
     void visit(ExpressionToHashedIndexKey* expr) final {
         unsupportedExpression("$toHashedIndexKey");
+    }
+
+    void visit(ExpressionDateAdd* expr) final {
+        unsupportedExpression("$dateAdd");
+    }
+
+    void visit(ExpressionDateSubtract* expr) final {
+        unsupportedExpression("$dateSubtract");
     }
 
 private:

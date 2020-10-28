@@ -6712,6 +6712,172 @@ void ExpressionToHashedIndexKey::_doAddDependencies(DepsTracker* deps) const {
     // Nothing to do
 }
 
+/* ------------------------- ExpressionDateArithmetics -------------------------- */
+namespace {
+auto commonDateArithmeticsParse(ExpressionContext* const expCtx,
+                                BSONElement expr,
+                                const VariablesParseState& vps,
+                                StringData opName) {
+    uassert(5166400,
+            str::stream() << opName << " expects an object as its argument",
+            expr.type() == BSONType::Object);
+
+    struct {
+        boost::intrusive_ptr<Expression> startDate;
+        boost::intrusive_ptr<Expression> unit;
+        boost::intrusive_ptr<Expression> amount;
+        boost::intrusive_ptr<Expression> timezone;
+    } parsedArgs;
+
+    const BSONObj args = expr.embeddedObject();
+    for (auto&& arg : args) {
+        auto field = arg.fieldNameStringData();
+
+        if (field == "startDate"_sd) {
+            parsedArgs.startDate = Expression::parseOperand(expCtx, arg, vps);
+        } else if (field == "unit"_sd) {
+            parsedArgs.unit = Expression::parseOperand(expCtx, arg, vps);
+        } else if (field == "amount"_sd) {
+            parsedArgs.amount = Expression::parseOperand(expCtx, arg, vps);
+        } else if (field == "timezone"_sd) {
+            parsedArgs.timezone = Expression::parseOperand(expCtx, arg, vps);
+        } else {
+            uasserted(5166401,
+                      str::stream()
+                          << "Unrecognized argument to " << opName << ": " << arg.fieldName()
+                          << ". Expected arguments are startDate, unit, amount, and optionally "
+                             "timezone.");
+        }
+    }
+    uassert(5166402,
+            str::stream() << opName << " requires startDate, unit, and amount to be present",
+            parsedArgs.startDate && parsedArgs.unit && parsedArgs.amount);
+
+    return parsedArgs;
+}
+}  // namespace
+
+void ExpressionDateArithmetics::_doAddDependencies(DepsTracker* deps) const {
+    _startDate->addDependencies(deps);
+    _unit->addDependencies(deps);
+    _amount->addDependencies(deps);
+    if (_timeZone) {
+        _timeZone->addDependencies(deps);
+    }
+}
+
+boost::intrusive_ptr<Expression> ExpressionDateArithmetics::optimize() {
+    _startDate = _startDate->optimize();
+    _unit = _unit->optimize();
+    _amount = _amount->optimize();
+    if (_timeZone) {
+        _timeZone = _timeZone->optimize();
+    }
+
+    if (ExpressionConstant::allNullOrConstant({_startDate, _unit, _amount, _timeZone})) {
+        return ExpressionConstant::create(
+            getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
+    }
+    return intrusive_ptr<Expression>(this);
+}
+
+Value ExpressionDateArithmetics::serialize(bool explain) const {
+    return Value(
+        Document{{_opName,
+                  Document{{"startDate", _startDate->serialize(explain)},
+                           {"unit", _unit->serialize(explain)},
+                           {"amount", _amount->serialize(explain)},
+                           {"timezone", _timeZone ? _timeZone->serialize(explain) : Value()}}}});
+}
+
+Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* variables) const {
+    const Value startDate = _startDate->evaluate(root, variables);
+    if (startDate.nullish()) {
+        return Value(BSONNULL);
+    }
+
+    uassert(5166403,
+            str::stream() << _opName << " requires startDate to be convertible to a date",
+            startDate.coercibleToDate());
+
+    // Get the TimeZone object for the timezone parameter, if it is specified, or UTC otherwise.
+    auto timezone =
+        makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+    if (!timezone) {
+        return Value(BSONNULL);
+    }
+
+    auto unitVal = _unit->evaluate(root, variables);
+    if (unitVal.nullish()) {
+        return Value(BSONNULL);
+    }
+    uassert(5166404,
+            str::stream() << _opName << " expects string defining the time unit",
+            unitVal.getType() == BSONType::String);
+    auto unit = parseTimeUnit(unitVal.getString());
+
+    auto amount = _amount->evaluate(root, variables);
+    if (amount.nullish()) {
+        return Value(BSONNULL);
+    }
+    uassert(5166405,
+            str::stream() << _opName << " expects integer amount of time units",
+            amount.integral64Bit());
+
+    return evaluateDateArithmetics(
+        startDate.coerceToDate(), unit, amount.coerceToLong(), timezone.get());
+}
+
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateAdd,
+                                     ExpressionDateAdd::parse,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+
+boost::intrusive_ptr<Expression> ExpressionDateAdd::parse(ExpressionContext* const expCtx,
+                                                          BSONElement expr,
+                                                          const VariablesParseState& vps) {
+    constexpr auto opName = "$dateAdd"_sd;
+    auto [startDate, unit, amount, timezone] =
+        commonDateArithmeticsParse(expCtx, expr, vps, opName);
+    return make_intrusive<ExpressionDateAdd>(expCtx,
+                                             std::move(startDate),
+                                             std::move(unit),
+                                             std::move(amount),
+                                             std::move(timezone),
+                                             opName);
+}
+
+Value ExpressionDateAdd::evaluateDateArithmetics(Date_t date,
+                                                 TimeUnit unit,
+                                                 long long amount,
+                                                 const TimeZone& timezone) const {
+    return Value(dateAdd(date, unit, amount, timezone));
+}
+
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateSubtract,
+                                     ExpressionDateSubtract::parse,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+
+boost::intrusive_ptr<Expression> ExpressionDateSubtract::parse(ExpressionContext* const expCtx,
+                                                               BSONElement expr,
+                                                               const VariablesParseState& vps) {
+    constexpr auto opName = "$dateSubtract"_sd;
+    auto [startDate, unit, amount, timezone] =
+        commonDateArithmeticsParse(expCtx, expr, vps, opName);
+    return make_intrusive<ExpressionDateSubtract>(expCtx,
+                                                  std::move(startDate),
+                                                  std::move(unit),
+                                                  std::move(amount),
+                                                  std::move(timezone),
+                                                  opName);
+}
+
+Value ExpressionDateSubtract::evaluateDateArithmetics(Date_t date,
+                                                      TimeUnit unit,
+                                                      long long amount,
+                                                      const TimeZone& timezone) const {
+    return Value(dateAdd(date, unit, -amount, timezone));
+}
+
 MONGO_INITIALIZER(expressionParserMap)(InitializerContext*) {
     // Nothing to do. This initializer exists to tie together all the individual initializers
     // defined by REGISTER_EXPRESSION / REGISTER_EXPRESSION_WITH_MIN_VERSION.
