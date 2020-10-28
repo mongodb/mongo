@@ -3652,7 +3652,7 @@ tasks:
 
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
-  exec_timeout_secs: 14400
+  exec_timeout_secs: 3600 # 1 hour timeout for the task overall
   commands:
     - func: "scons compile"
       vars:
@@ -3660,7 +3660,7 @@ tasks:
         compiling_for_test: true
     - command: shell.exec
       type: test
-      timeout_secs: 14400
+      timeout_secs: 3600 # 1 hour timeout for no output
       params:
         working_dir: "src"
         script: |
