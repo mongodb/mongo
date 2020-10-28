@@ -231,6 +231,9 @@ selector:
   # SERVER-51495 reenable after resharding M3
   - jstests/sharding/reshard_collection_basic.js
 
+  # SERVER-51805 splitChunk op is not idempotent
+  - jstests/sharding/mongos_get_shard_version.js
+
 executor:
   config:
     shell_options:
