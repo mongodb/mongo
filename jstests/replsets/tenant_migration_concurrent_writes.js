@@ -183,7 +183,7 @@ function runTest(
     primary, testCase, testFunc, dbName, collName, {useTransaction, useRetryableWrite} = {}) {
     const testOpts =
         makeTestOptions(primary, testCase, dbName, collName, useTransaction, useRetryableWrite);
-    jsTest.log("Testing command " + tojson(testOpts.command));
+    jsTest.log("Testing testOpts: " + tojson(testOpts) + " with testFunc " + testFunc.name);
 
     if (testCase.explicitlyCreateCollection) {
         createCollectionAndInsertDocs(testOpts.primaryDB, collName, testCase.isCapped);
