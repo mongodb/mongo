@@ -89,7 +89,3 @@ feature_flags:
         description: "When enabled, support for time-series collections"
         cpp_varname: feature_flags::gTimeseriesCollection
         default: false
-    featureFlagTimeSeriesCollection:
-        description: "DEPRECATED"
-        cpp_varname: feature_flags::gTimeSeriesCollectionDeprecated
-        default: false
