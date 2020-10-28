@@ -282,11 +282,7 @@ __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
      * busy and then opens a different file (in this case, the HS file), it can deadlock with a
      * thread waiting for the first file to drain from the eviction queue. See WT-5946 for details.
      */
-    if (session->hs_cursor == NULL && !F_ISSET(conn, WT_CONN_IN_MEMORY)) {
-        WT_RET(__wt_hs_cursor_open(session));
-        WT_RET(__wt_hs_cursor_close(session));
-    }
-
+    WT_RET(__wt_hs_cursor_cache(session));
     if (conn->evict_server_running && __wt_spin_trylock(session, &cache->evict_pass_lock) == 0) {
         /*
          * Cannot use WT_WITH_PASS_LOCK because this is a try lock. Fix when that is supported. We
@@ -2298,6 +2294,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
+    WT_CURSOR *hs_cursor_saved;
     WT_DECL_RET;
     WT_TRACK_OP_DECL;
     WT_TXN_GLOBAL *txn_global;
@@ -2308,11 +2305,29 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
 
     WT_TRACK_OP_INIT(session);
 
+    app_thread = false;
     conn = S2C(session);
     cache = conn->cache;
     time_start = time_stop = 0;
     txn_global = &conn->txn_global;
     txn_shared = WT_SESSION_TXN_SHARED(session);
+
+    /*
+     * If we have a history store cursor, save it. This ensures that if eviction needs to access the
+     * history store, it will get its own cursor, avoiding potential problems if it were to
+     * reposition or reset a history store cursor that we're in the middle of using for something
+     * else.
+     */
+    hs_cursor_saved = session->hs_cursor;
+    session->hs_cursor = NULL;
+
+    /*
+     * Before we enter the eviction generation, make sure this session has a cached history store
+     * cursor, otherwise we can deadlock with a session wanting exclusive access to a handle: that
+     * session will have a handle list write lock and will be waiting on eviction to drain, we'll be
+     * inside eviction waiting on a handle list read lock to open a history store cursor.
+     */
+    WT_ERR(__wt_hs_cursor_cache(session));
 
     /*
      * It is not safe to proceed if the eviction server threads aren't setup yet.
@@ -2412,6 +2427,13 @@ err:
 
 done:
     WT_TRACK_OP_END(session);
+
+    /* If the caller was using a history store cursor they should have closed it by now. */
+    WT_ASSERT(session, session->hs_cursor == NULL);
+
+    /* Restore the caller's history store cursor. */
+    session->hs_cursor = hs_cursor_saved;
+
     return (ret);
 }
 

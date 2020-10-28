@@ -77,6 +77,7 @@ __wt_page_release_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
     evict_flags = LF_ISSET(WT_READ_NO_SPLIT) ? WT_EVICT_CALL_NO_SPLIT : 0;
     FLD_SET(evict_flags, WT_EVICT_CALL_URGENT);
 
+    WT_RET(__wt_hs_cursor_cache(session));
     (void)__wt_atomic_addv32(&btree->evict_busy, 1);
     ret = __wt_evict(session, ref, previous_state, evict_flags);
     (void)__wt_atomic_subv32(&btree->evict_busy, 1);
@@ -92,7 +93,6 @@ int
 __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32_t flags)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_CURSOR *hs_cursor_saved;
     WT_DECL_RET;
     WT_PAGE *page;
     uint64_t time_start, time_stop;
@@ -108,43 +108,9 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     __wt_verbose(
       session, WT_VERB_EVICT, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
 
-    /*
-     * If we have a history store cursor, save it. This ensures that if eviction needs to access the
-     * history store, it will get its own cursor, avoiding potential problems if it were to
-     * reposition or reset a history store cursor that we're in the middle of using for something
-     * else.
-     */
-    hs_cursor_saved = session->hs_cursor;
-    session->hs_cursor = NULL;
-
     tree_dead = F_ISSET(session->dhandle, WT_DHANDLE_DEAD);
     if (tree_dead)
         LF_SET(WT_EVICT_CALL_NO_SPLIT);
-
-    /*
-     * Before we enter the eviction generation, make sure this session has a cached history store
-     * cursor, otherwise we can deadlock with a session wanting exclusive access to a handle: that
-     * session will have a handle list write lock and will be waiting on eviction to drain, we'll be
-     * inside eviction waiting on a handle list read lock to open a history store cursor.
-     *
-     * The test for the no-reconciliation flag is necessary because the session may already be doing
-     * history store operations and if we open/close the existing history store cursor, we can
-     * affect those already-running history store operations by changing the cursor state. When
-     * doing history store operations, we set the no-reconciliation flag, use it as short-hand to
-     * avoid that problem. This doesn't open up the window for the deadlock because setting the
-     * no-reconciliation flag limits eviction to in-memory splits.
-     *
-     * The test for the connection's default session is because there are known problems with using
-     * cached cursors from the default session.
-     *
-     * FIXME-WT-6037: This isn't reasonable and needs a better fix.
-     */
-    if (!WT_IS_METADATA(S2BT(session)->dhandle) && !F_ISSET(conn, WT_CONN_IN_MEMORY) &&
-      session->hs_cursor == NULL && !F_ISSET(session, WT_SESSION_NO_RECONCILE) &&
-      session != conn->default_session) {
-        WT_RET(__wt_hs_cursor_open(session));
-        WT_RET(__wt_hs_cursor_close(session));
-    }
 
     /*
      * Enter the eviction generation. If we re-enter eviction, leave the previous eviction
@@ -285,12 +251,6 @@ done:
     /* Leave any local eviction generation. */
     if (local_gen)
         __wt_session_gen_leave(session, WT_GEN_EVICT);
-
-    /* If the caller was using a history store cursor they should have closed it by now. */
-    WT_ASSERT(session, session->hs_cursor == NULL);
-
-    /* Restore caller's history store cursor. */
-    session->hs_cursor = hs_cursor_saved;
 
     return (ret);
 }

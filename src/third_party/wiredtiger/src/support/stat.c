@@ -948,7 +948,6 @@ static const char *const __stats_connection_desc[] = {
   "cache: history store table reads requiring squashed modifies",
   "cache: history store table truncation by rollback to stable to remove an unstable update",
   "cache: history store table truncation by rollback to stable to remove an update",
-  "cache: history store table truncation due to mixed timestamps that returned restart",
   "cache: history store table truncation to remove an update",
   "cache: history store table truncation to remove range of updates due to key being removed from "
   "the data page during reconciliation",
@@ -1466,7 +1465,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_hs_read_squash = 0;
     stats->cache_hs_key_truncate_rts_unstable = 0;
     stats->cache_hs_key_truncate_rts = 0;
-    stats->cache_hs_key_truncate_mix_ts_restart = 0;
     stats->cache_hs_key_truncate = 0;
     stats->cache_hs_key_truncate_onpage_removal = 0;
     stats->cache_hs_key_truncate_mix_ts = 0;
@@ -1963,8 +1961,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_hs_key_truncate_rts_unstable +=
       WT_STAT_READ(from, cache_hs_key_truncate_rts_unstable);
     to->cache_hs_key_truncate_rts += WT_STAT_READ(from, cache_hs_key_truncate_rts);
-    to->cache_hs_key_truncate_mix_ts_restart +=
-      WT_STAT_READ(from, cache_hs_key_truncate_mix_ts_restart);
     to->cache_hs_key_truncate += WT_STAT_READ(from, cache_hs_key_truncate);
     to->cache_hs_key_truncate_onpage_removal +=
       WT_STAT_READ(from, cache_hs_key_truncate_onpage_removal);

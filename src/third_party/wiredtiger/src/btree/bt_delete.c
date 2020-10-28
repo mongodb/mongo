@@ -71,6 +71,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
             return (0);
         }
 
+        WT_RET(__wt_hs_cursor_cache(session));
         (void)__wt_atomic_addv32(&S2BT(session)->evict_busy, 1);
         ret = __wt_evict(session, ref, previous_state, 0);
         (void)__wt_atomic_subv32(&S2BT(session)->evict_busy, 1);
