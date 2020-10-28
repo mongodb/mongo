@@ -28,6 +28,8 @@ selector:
   - jstests/sharding/index_and_collection_option_propagation.js
   # New feature in v3.6 mongos
   - jstests/sharding/logical_time_metadata.js
+  # New feature in v3.6 mongod.
+  - jstests/sharding/balancing_sessions_collection.js
   # New feature in v3.6 mongos and mongod.
   - jstests/sharding/advance_cluster_time_action_type.js
   - jstests/sharding/advance_logical_time_with_valid_signature.js

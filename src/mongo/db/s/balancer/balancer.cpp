@@ -367,9 +367,9 @@ void Balancer::_mainThread() {
                 OCCASIONALLY warnOnMultiVersion(
                     uassertStatusOK(_clusterStats->getStats(opCtx.get())));
 
-                Status status = _enforceTagRanges(opCtx.get());
+                Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
-                    warning() << "Failed to enforce tag ranges" << causedBy(status);
+                    warning() << "Failed to split chunks" << causedBy(status);
                 } else {
                     LOG(1) << "Done enforcing tag range boundaries.";
                 }
@@ -540,7 +540,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
     return true;
 }
 
-Status Balancer::_enforceTagRanges(OperationContext* opCtx) {
+Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
     auto chunksToSplitStatus = _chunkSelectionPolicy->selectChunksToSplit(opCtx);
     if (!chunksToSplitStatus.isOK()) {
         return chunksToSplitStatus.getStatus();
@@ -565,7 +565,7 @@ Status Balancer::_enforceTagRanges(OperationContext* opCtx) {
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);
         if (!splitStatus.isOK()) {
-            warning() << "Failed to enforce tag range for chunk " << redact(splitInfo.toString())
+            warning() << "Failed to split chunk " << redact(splitInfo.toString())
                       << causedBy(redact(splitStatus.getStatus()));
         }
     }

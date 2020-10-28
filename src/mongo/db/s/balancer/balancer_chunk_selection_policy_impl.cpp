@@ -39,6 +39,8 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/db/server_parameters.h"
+#include "mongo/platform/bits.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -50,6 +52,20 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+// The minimum number of chunks for config.system.sessions collection.
+MONGO_EXPORT_SERVER_PARAMETER(minNumChunksForSessionsCollection, int, 1024)
+    ->withValidator([](const int& newVal) {
+        if (newVal < 1) {
+            return Status(ErrorCodes::BadValue,
+                          "minNumChunksForSessionsCollection must not be less than 1");
+        }
+        if (newVal > 1000000) {
+            return Status(ErrorCodes::BadValue,
+                          "minNumChunksForSessionsCollection must not be greater than 1000000");
+        }
+        return Status::OK();
+    });
 
 using MigrateInfoVector = BalancerChunkSelectionPolicy::MigrateInfoVector;
 using SplitInfoVector = BalancerChunkSelectionPolicy::SplitInfoVector;
@@ -177,6 +193,95 @@ private:
     BSONObjIndexedMap<BalancerChunkSelectionPolicy::SplitInfo> _chunkSplitPoints;
 };
 
+/**
+ * Populates splitCandidates with chunk and splitPoint pairs for chunks that violate tag
+ * range boundaries.
+ */
+void getSplitCandidatesToEnforceTagRanges(const ChunkManager* cm,
+                                          const DistributionStatus& distribution,
+                                          SplitCandidatesBuffer* splitCandidates) {
+    const auto& globalMax = cm->getShardKeyPattern().getKeyPattern().globalMax();
+
+    // For each tag range, find chunks that need to be split.
+    for (const auto& tagRangeEntry : distribution.tagRanges()) {
+        const auto& tagRange = tagRangeEntry.second;
+
+        const auto chunkAtZoneMin = cm->findIntersectingChunkWithSimpleCollation(tagRange.min);
+        invariant(chunkAtZoneMin->getMax().woCompare(tagRange.min) > 0);
+
+        if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
+            splitCandidates->addSplitPoint(chunkAtZoneMin, tagRange.min);
+        }
+
+        // The global max key can never fall in the middle of a chunk.
+        if (!tagRange.max.woCompare(globalMax))
+            continue;
+
+        const auto chunkAtZoneMax = cm->findIntersectingChunkWithSimpleCollation(tagRange.max);
+
+        // We need to check that both the chunk's minKey does not match the zone's max and also that
+        // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
+        if (chunkAtZoneMax->getMin().woCompare(tagRange.max) &&
+            chunkAtZoneMax->getMax().woCompare(tagRange.max)) {
+            splitCandidates->addSplitPoint(chunkAtZoneMax, tagRange.max);
+        }
+    }
+}
+
+/**
+ * If the number of chunks as given by the ChunkManager is less than the configured minimum
+ * number of chunks for the sessions collection (minNumChunksForSessionsCollection), calculates
+ * split points that evenly partition the key space into N ranges (where N is
+ * minNumChunksForSessionsCollection rounded up to the next power of 2), and populates
+ * splitCandidates with chunk and splitPoint pairs for chunks that need to split.
+ */
+void getSplitCandidatesForSessionsCollection(OperationContext* opCtx,
+                                             const ChunkManager* cm,
+                                             SplitCandidatesBuffer* splitCandidates) {
+    const auto minNumChunks = minNumChunksForSessionsCollection.load();
+
+    if (cm->numChunks() >= minNumChunks) {
+        return;
+    }
+
+    // Use the next power of 2 as the target number of chunks.
+    const size_t numBits = 64 - countLeadingZeros64(minNumChunks - 1);
+    const uint32_t numChunks = 1 << numBits;
+
+    // Compute split points for _id.id that partition the UUID 128-bit data space into numChunks
+    // equal ranges. Since the numChunks is a power of 2, the split points are the permutations
+    // of the prefix numBits right-padded with 0's.
+    std::vector<BSONObj> splitPoints;
+    for (uint32_t i = 1; i < numChunks; i++) {
+        // Start with a buffer of 0's.
+        std::array<uint8_t, 16> buf{0b0};
+
+        // Left-shift i to fill the remaining bits in the prefix 32 bits with 0's.
+        const uint32_t high = i << (CHAR_BIT * 4 - numBits);
+
+        // Fill the prefix 4 bytes with high's bytes.
+        buf[0] = static_cast<uint8_t>(high >> CHAR_BIT * 3);
+        buf[1] = static_cast<uint8_t>(high >> CHAR_BIT * 2);
+        buf[2] = static_cast<uint8_t>(high >> CHAR_BIT * 1);
+        buf[3] = static_cast<uint8_t>(high);
+
+        ConstDataRange cdr(reinterpret_cast<const char*>(buf.data()), sizeof(buf));
+        splitPoints.push_back(BSON("_id" << BSON("id" << UUID::fromCDR(cdr))));
+    }
+
+    // For each split point, find a chunk that needs to be split.
+    for (auto& splitPoint : splitPoints) {
+        const auto chunkAtSplitPoint = cm->findIntersectingChunkWithSimpleCollation(splitPoint);
+        invariant(chunkAtSplitPoint->getMax().woCompare(splitPoint) > 0);
+
+        if (chunkAtSplitPoint->getMin().woCompare(splitPoint)) {
+            splitCandidates->addSplitPoint(chunkAtSplitPoint, splitPoint);
+        }
+    }
+
+    return;
+}
+
 }  // namespace
 
 BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats,
@@ -222,8 +327,13 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
             // Namespace got dropped before we managed to get to it, so just skip it
             continue;
         } else if (!candidatesStatus.isOK()) {
-            warning() << "Unable to enforce tag range policy for collection " << nss.ns()
-                      << causedBy(candidatesStatus.getStatus());
+            if (nss.ns() == "config.system.sessions") {
+                warning() << "Unable to split sessions collection chunks "
+                          << causedBy(candidatesStatus.getStatus());
+            } else {
+                warning() << "Unable to enforce tag range policy for collection " << nss.ns()
+                          << causedBy(candidatesStatus.getStatus());
+            }
             continue;
         }
 
@@ -377,8 +487,6 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
 
     const auto cm = routingInfoStatus.getValue().cm().get();
 
-    const auto& shardKeyPattern = cm->getShardKeyPattern().getKeyPattern();
-
     const auto collInfoStatus = createCollectionDistributionStatus(opCtx, shardStats, cm);
     if (!collInfoStatus.isOK()) {
         return collInfoStatus.getStatus();
@@ -389,28 +497,20 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::_getSplitCandidate
     // Accumulate split points for the same chunk together
     SplitCandidatesBuffer splitCandidates(nss, cm->getVersion());
 
-    for (const auto& tagRangeEntry : distribution.tagRanges()) {
-        const auto& tagRange = tagRangeEntry.second;
-
-        const auto chunkAtZoneMin = cm->findIntersectingChunkWithSimpleCollation(tagRange.min);
-        invariant(chunkAtZoneMin->getMax().woCompare(tagRange.min) > 0);
-
-        if (chunkAtZoneMin->getMin().woCompare(tagRange.min)) {
-            splitCandidates.addSplitPoint(chunkAtZoneMin, tagRange.min);
+    if (nss.ns() == "config.system.sessions") {
+        if (!distribution.tags().empty()) {
+            str::stream builder;
+            builder << "Ignoring zones for the sessions collection: ";
+            for (const auto& tag : distribution.tags()) {
+                builder << tag << ", ";
+            }
+            const std::string msg = builder;
+            warning() << msg;
         }
 
-        // The global max key can never fall in the middle of a chunk
-        if (!tagRange.max.woCompare(shardKeyPattern.globalMax()))
-            continue;
-
-        const auto chunkAtZoneMax = cm->findIntersectingChunkWithSimpleCollation(tagRange.max);
-
-        // We need to check that both the chunk's minKey does not match the zone's max and also that
-        // the max is not equal, which would only happen in the case of the zone ending in MaxKey.
-        if (chunkAtZoneMax->getMin().woCompare(tagRange.max) &&
-            chunkAtZoneMax->getMax().woCompare(tagRange.max)) {
-            splitCandidates.addSplitPoint(chunkAtZoneMax, tagRange.max);
-        }
+        getSplitCandidatesForSessionsCollection(opCtx, cm, &splitCandidates);
+    } else {
+        getSplitCandidatesToEnforceTagRanges(cm, distribution, &splitCandidates);
     }
 
     return splitCandidates.done();

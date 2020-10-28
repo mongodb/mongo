@@ -999,6 +999,14 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                         .length > 0);
         }
 
+        function argArrayContainsSetParameterValue(value) {
+            assert(value.endsWith("="),
+                   "Expected value argument to be of the form <parameterName>=");
+            return argArray.some(function(el) {
+                return typeof el === "string" && el.startsWith(value);
+            });
+        }
+
         // programName includes the version, e.g., mongod-3.2.
         // baseProgramName is the program name without any version information, e.g., mongod.
         let programName = argArray[0];
@@ -1071,6 +1079,16 @@ var MongoRunner, _startMongod, startMongoProgram, runMongoProgram, startMongoPro
                     (!programVersion || programMajorMinorVersion >= 300)) {
                     if (!argArrayContains("--storageEngine")) {
                         argArray.push(...['--storageEngine', jsTest.options().storageEngine]);
+                    }
+                }
+
+                // New mongod-specific options in 3.6.x
+                if (!programMajorMinorVersion || programMajorMinorVersion >= 360) {
+                    if ((jsTest.options().setParameters === undefined ||
+                         jsTest.options().setParameters['minNumChunksForSessionsCollection'] ===
+                             undefined) &&
+                        !argArrayContainsSetParameterValue('minNumChunksForSessionsCollection=')) {
+                        argArray.push(...['--setParameter', "minNumChunksForSessionsCollection=1"]);
                     }
                 }
 
