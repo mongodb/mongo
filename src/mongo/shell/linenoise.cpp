@@ -2611,6 +2611,11 @@ void linenoisePreloadBuffer(const char* preloadText) {
     }
 }
 
+static void printLongLineWarning(const char* context) {
+    printf("WARNING: %s truncated at %d bytes.\n", context, LINENOISE_MAX_LINE - 1);
+    fflush(stdout);
+}
+
 /**
  * linenoise is a readline replacement.
  *
@@ -2644,6 +2649,9 @@ char* linenoise(const char* prompt) {
                     --len;
                     buf8[len] = '\0';
                 }
+                if (len == LINENOISE_MAX_LINE - 1) {
+                    printLongLineWarning("input line");
+                }
                 return strdup(buf8.get());  // caller must free buffer
             } else {
                 char* buf8 = strdup(preloadedBufferContents.c_str());
@@ -2665,6 +2673,9 @@ char* linenoise(const char* prompt) {
             if (count == -1) {
                 return nullptr;
             }
+            if (count == LINENOISE_MAX_LINE - 1) {
+                printLongLineWarning("input line");
+            }
             size_t bufferSize = sizeof(UChar32) * ib.length() + 1;
             unique_ptr<UChar8[]> buf8(new UChar8[bufferSize]);
             copyString32to8(buf8.get(), buf32, bufferSize);
@@ -2681,6 +2692,9 @@ char* linenoise(const char* prompt) {
         if (count > 0 && buf8[count - 1] == '\n') {
             --count;
             buf8[count] = '\0';
+        }
+        if (count == LINENOISE_MAX_LINE - 1) {
+            printLongLineWarning("input line");
         }
         return strdup(buf8.get());  // caller must free buffer
     }
@@ -2823,6 +2837,7 @@ mongo::Status linenoiseHistoryLoad(const char* filename) {
         return linenoiseFileError(mongo::ErrorCodes::FileOpenFailed, "fopen()", filename, ewd);
     }
 
+    bool historyLinesTruncated = false;
     char buf[LINENOISE_MAX_LINE];
     while (fgets(buf, LINENOISE_MAX_LINE, fp) != nullptr) {
         char* p = strchr(buf, '\r');
@@ -2833,8 +2848,15 @@ mongo::Status linenoiseHistoryLoad(const char* filename) {
             *p = '\0';
         }
         if (p != buf) {
+            int count = strlen(buf);
+            if (count == LINENOISE_MAX_LINE - 1) {
+                historyLinesTruncated = true;
+            }
             linenoiseHistoryAdd(buf);
         }
+    }
+    if (historyLinesTruncated) {
+        printLongLineWarning("some history file lines were");
     }
     // fgets() returns NULL on error or EOF (with nothing read).
     // So if we aren't EOF, it must have been an error.
