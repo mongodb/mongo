@@ -100,7 +100,9 @@ Status _createView(OperationContext* opCtx,
             Top::get(serviceContext).collectionDropped(nss);
         });
 
-        Status status = db->userCreateNS(opCtx, nss, std::move(collectionOptions), true, idIndex);
+        // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
+        // because 'userCreateNS' may throw a WriteConflictException.
+        Status status = db->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
         if (!status.isOK()) {
             return status;
         }
@@ -162,7 +164,10 @@ Status _createTimeseries(OperationContext* opCtx,
 
         // Create the time-series view.
         options.viewOn = bucketsNs.coll().toString();
-        auto status = db->userCreateNS(opCtx, ns, std::move(options));
+
+        // Even though 'options' is passed by rvalue reference, it is not safe to move because
+        // 'userCreateNS' may throw a WriteConflictException.
+        auto status = db->userCreateNS(opCtx, ns, options);
         if (!status.isOK()) {
             return status.withContext(str::stream() << "Failed to create view on " << bucketsNs
                                                     << " for time-series collection " << ns);
@@ -214,8 +219,9 @@ Status _createCollection(OperationContext* opCtx,
             Top::get(serviceContext).collectionDropped(nss);
         });
 
-        Status status =
-            autoDb.getDb()->userCreateNS(opCtx, nss, std::move(collectionOptions), true, idIndex);
+        // Even though 'collectionOptions' is passed by rvalue reference, it is not safe to move
+        // because 'userCreateNS' may throw a WriteConflictException.
+        Status status = autoDb.getDb()->userCreateNS(opCtx, nss, collectionOptions, true, idIndex);
         if (!status.isOK()) {
             return status;
         }
