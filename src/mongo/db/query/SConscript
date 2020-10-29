@@ -105,6 +105,7 @@ env.Library(
         'distinct_command.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -345,7 +346,7 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/concurrency/lock_manager",
         "$BUILD_DIR/mongo/db/exec/sbe/sbe_plan_stage_test",
-        "$BUILD_DIR/mongo/db/pipeline/aggregation_request",
+        "$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper",
         "$BUILD_DIR/mongo/db/query_exec",
         "$BUILD_DIR/mongo/db/service_context_d",
         "$BUILD_DIR/mongo/db/service_context_d_test_fixture",

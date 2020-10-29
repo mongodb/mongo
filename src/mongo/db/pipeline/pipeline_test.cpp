@@ -122,7 +122,7 @@ void assertPipelineOptimizesAndSerializesTo(std::string inputPipeJson,
         ASSERT_EQUALS(stageElem.type(), BSONType::Object);
         rawPipeline.push_back(stageElem.embeddedObject());
     }
-    AggregationRequest request(kTestNss, rawPipeline);
+    AggregateCommand request(kTestNss, rawPipeline);
     intrusive_ptr<ExpressionContextForTest> ctx =
         new ExpressionContextForTest(opCtx.get(), request);
     ctx->mongoProcessInterface = std::make_shared<StubExplainInterface>();
@@ -2374,7 +2374,7 @@ public:
             ASSERT_EQUALS(stageElem.type(), BSONType::Object);
             rawPipeline.push_back(stageElem.embeddedObject());
         }
-        AggregationRequest request(kTestNss, rawPipeline);
+        AggregateCommand request(kTestNss, rawPipeline);
         intrusive_ptr<ExpressionContextForTest> ctx = createExpressionContext(request);
         TempDir tempDir("PipelineTest");
         ctx->tempDir = tempDir.path();
@@ -2404,7 +2404,7 @@ public:
     virtual ~Base() {}
 
     virtual intrusive_ptr<ExpressionContextForTest> createExpressionContext(
-        const AggregationRequest& request) {
+        const AggregateCommand& request) {
         return new ExpressionContextForTest(&_opCtx, request);
     }
 
@@ -2926,7 +2926,7 @@ class MergeWithUnshardedCollection : public ShardMergerBase {
 
 class MergeWithShardedCollection : public ShardMergerBase {
     intrusive_ptr<ExpressionContextForTest> createExpressionContext(
-        const AggregationRequest& request) override {
+        const AggregateCommand& request) override {
         class ProcessInterface : public StubMongoProcessInterface {
             bool isSharded(OperationContext* opCtx, const NamespaceString& ns) override {
                 return true;
@@ -3160,7 +3160,7 @@ TEST(PipelineInitialSource, GeoNearInitialQuery) {
     const std::vector<BSONObj> rawPipeline = {
         fromjson("{$geoNear: {distanceField: 'd', near: [0, 0], query: {a: 1}}}")};
     intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(
-        &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
+        &_opCtx, AggregateCommand(NamespaceString("a.collection"), rawPipeline));
     auto pipe = Pipeline::parse(rawPipeline, ctx);
     ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 1));
 }
@@ -3169,7 +3169,7 @@ TEST(PipelineInitialSource, MatchInitialQuery) {
     OperationContextNoop _opCtx;
     const std::vector<BSONObj> rawPipeline = {fromjson("{$match: {'a': 4}}")};
     intrusive_ptr<ExpressionContextForTest> ctx = new ExpressionContextForTest(
-        &_opCtx, AggregationRequest(NamespaceString("a.collection"), rawPipeline));
+        &_opCtx, AggregateCommand(NamespaceString("a.collection"), rawPipeline));
 
     auto pipe = Pipeline::parse(rawPipeline, ctx);
     ASSERT_BSONOBJ_EQ(pipe->getInitialQuery(), BSON("a" << 4));

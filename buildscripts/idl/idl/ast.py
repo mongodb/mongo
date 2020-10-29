@@ -107,6 +107,7 @@ class Struct(common.SourceLocation):
         self.inline_chained_structs = False  # type: bool
         self.generate_comparison_operators = False  # type: bool
         self.fields = []  # type: List[Field]
+        self.allow_global_collection_name = False  # type: bool
         super(Struct, self).__init__(file_name, line, column)
 
 

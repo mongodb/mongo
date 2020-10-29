@@ -418,14 +418,15 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
 
 Status ShardRemote::runAggregation(
     OperationContext* opCtx,
-    const AggregationRequest& aggRequest,
+    const AggregateCommand& aggRequest,
     std::function<bool(const std::vector<BSONObj>& batch)> callback) {
 
     BSONObj readPrefMetadata;
 
     ReadPreferenceSetting readPreference =
         uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(
-            aggRequest.getUnwrappedReadPref(), ReadPreference::SecondaryPreferred));
+            aggRequest.getUnwrappedReadPref().value_or(BSONObj()),
+            ReadPreference::SecondaryPreferred));
 
     auto swHost = _targeter->findHost(opCtx, readPreference);
     if (!swHost.isOK()) {
@@ -480,14 +481,14 @@ Status ShardRemote::runAggregation(
 
     Milliseconds requestTimeout(-1);
     if (aggRequest.getMaxTimeMS()) {
-        requestTimeout = Milliseconds(aggRequest.getMaxTimeMS());
+        requestTimeout = Milliseconds(aggRequest.getMaxTimeMS().value_or(0));
     }
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     Fetcher fetcher(executor.get(),
                     host,
-                    aggRequest.getNamespaceString().db().toString(),
-                    aggRequest.serializeToCommandObj().toBson(),
+                    aggRequest.getNamespace().db().toString(),
+                    aggregation_request_helper::serializeToCommandObj(aggRequest),
                     fetcherCallback,
                     readPrefMetadata,
                     requestTimeout, /* command network timeout */

@@ -61,13 +61,12 @@
 
 namespace mongo {
 
-class AggregationRequest;
 class Document;
 
 /**
  * Registers a DocumentSource to have the name 'key'.
  *
- * 'liteParser' takes an AggregationRequest and a BSONElement and returns a
+ * 'liteParser' takes an AggregateCommand and a BSONElement and returns a
  * LiteParsedDocumentSource. This is used for checks that need to happen before a full parse,
  * such as checks about which namespaces are referenced by this aggregation.
  *

@@ -34,7 +34,9 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/unittest/unittest.h"
@@ -48,10 +50,9 @@ protected:
         const auto inputBson = fromjson("{pipeline: " + jsonArray + "}");
 
         ASSERT_EQUALS(inputBson["pipeline"].type(), BSONType::Array);
-        auto rawPipeline =
-            uassertStatusOK(AggregationRequest::parsePipelineFromBSON(inputBson["pipeline"]));
+        auto rawPipeline = parsePipelineFromBSON(inputBson["pipeline"]);
         NamespaceString testNss("test", "collection");
-        AggregationRequest request(testNss, rawPipeline);
+        AggregateCommand request(testNss, rawPipeline);
 
         return Pipeline::parse(request.getPipeline(), getExpCtx());
     }

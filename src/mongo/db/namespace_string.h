@@ -395,6 +395,8 @@ public:
         return {db(), "$cmd"};
     }
 
+    void serializeCollectionName(BSONObjBuilder* builder, StringData fieldName) const;
+
     /**
      * @return true if the ns is an oplog one, otherwise false.
      */

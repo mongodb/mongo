@@ -33,6 +33,8 @@
 #include "sharded_agg_helpers.h"
 
 #include "mongo/db/curop.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -99,7 +101,7 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
                                              Timestamp startMonitoringAtTime) {
     const auto& configShard = Grid::get(expCtx->opCtx)->shardRegistry()->getConfigShard();
     // Pipeline: {$changeStream: {startAtOperationTime: [now], allowToRunOnConfigDB: true}}
-    AggregationRequest aggReq(
+    AggregateCommand aggReq(
         ShardType::ConfigNS,
         {BSON(DocumentSourceChangeStream::kStageName
               << BSON(DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName
@@ -108,13 +110,14 @@ RemoteCursor openChangeStreamNewShardMonitor(const boost::intrusive_ptr<Expressi
     aggReq.setFromMongos(true);
     aggReq.setNeedsMerge(true);
     aggReq.setBatchSize(0);
-    auto cmdObjWithRWC = applyReadWriteConcern(expCtx->opCtx,
-                                               true,             /* appendRC */
-                                               !expCtx->explain, /* appendWC */
-                                               aggReq.serializeToCommandObj().toBson());
+    auto cmdObjWithRWC =
+        applyReadWriteConcern(expCtx->opCtx,
+                              true,             /* appendRC */
+                              !expCtx->explain, /* appendWC */
+                              aggregation_request_helper::serializeToCommandObj(aggReq));
     auto configCursor = establishCursors(expCtx->opCtx,
                                          expCtx->mongoProcessInterface->taskExecutor,
-                                         aggReq.getNamespaceString(),
+                                         aggReq.getNamespace(),
                                          ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
                                          {{configShard->getId(), cmdObjWithRWC}},
                                          false);
@@ -141,19 +144,19 @@ BSONObj genericTransformForShards(MutableDocument&& cmdForShards,
         auto [legacyRuntimeConstants, unusedSerializedVariables] =
             expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
 
-        cmdForShards[AggregationRequest::kLegacyRuntimeConstantsName] =
+        cmdForShards[AggregateCommand::kLegacyRuntimeConstantsFieldName] =
             Value(legacyRuntimeConstants.toBSON());
     } else {
         // Either this is a "modern" cluster or we are a mongos and can assume the shards are
         // "modern" and will understand the 'let' parameter.
-        cmdForShards[AggregationRequest::kLetName] =
+        cmdForShards[AggregateCommand::kLetFieldName] =
             Value(expCtx->variablesParseState.serialize(expCtx->variables));
     }
 
-    cmdForShards[AggregationRequest::kFromMongosName] = Value(expCtx->inMongos);
+    cmdForShards[AggregateCommand::kFromMongosFieldName] = Value(expCtx->inMongos);
 
     if (!collationObj.isEmpty()) {
-        cmdForShards[AggregationRequest::kCollationName] = Value(collationObj);
+        cmdForShards[AggregateCommand::kCollationFieldName] = Value(collationObj);
     }
 
     // If this is a request for an aggregation explain, then we must wrap the aggregate inside an
@@ -597,16 +600,15 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
 
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregationRequest> targetRequest) {
+    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommand> targetRequest) {
     auto&& [aggRequest, pipeline] = [&] {
         return stdx::visit(
             visit_helper::Overloaded{
                 [&](std::unique_ptr<Pipeline, PipelineDeleter>&& pipeline) {
-                    return std::make_pair(
-                        AggregationRequest(expCtx->ns, pipeline->serializeToBson()),
-                        std::move(pipeline));
+                    return std::make_pair(AggregateCommand(expCtx->ns, pipeline->serializeToBson()),
+                                          std::move(pipeline));
                 },
-                [&](AggregationRequest&& aggRequest) {
+                [&](AggregateCommand&& aggRequest) {
                     auto rawPipeline = aggRequest.getPipeline();
                     return std::make_pair(std::move(aggRequest),
                                           Pipeline::parse(std::move(rawPipeline), expCtx));
@@ -617,7 +619,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
 
-    // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregationRequest may not match
+    // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregateCommand may not match
     // what was set on the originating command, so copy it from the ExpressionContext.
     aggRequest.setAllowDiskUse(expCtx->allowDiskUse);
 
@@ -628,8 +630,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto shardDispatchResults = dispatchShardPipeline(
-        aggRequest.serializeToCommandObj(), hasChangeStream, std::move(pipeline));
+    auto shardDispatchResults =
+        dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
+                              hasChangeStream,
+                              std::move(pipeline));
 
     std::vector<ShardId> targetedShards;
     targetedShards.reserve(shardDispatchResults.remoteCursors.size());
@@ -660,36 +664,36 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
 
 std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    AggregationRequest request,
+    AggregateCommand request,
     ShardId shardId) {
     invariant(!request.getExplain());
 
-    auto readPreference =
-        uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(request.getUnwrappedReadPref()));
+    auto readPreference = uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(
+        request.getUnwrappedReadPref().value_or(BSONObj())));
 
     auto* opCtx = expCtx->opCtx;
     auto* catalogCache = Grid::get(opCtx)->catalogCache();
-    auto cm = uassertStatusOK(
-        catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespaceString()));
+    auto cm =
+        uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespace()));
 
     auto versionedCmdObj = [&] {
         if (cm.isSharded()) {
-            return appendShardVersion(request.serializeToCommandObj().toBson(),
+            return appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
                                       cm.getVersion(shardId));
         } else {
             // The collection is unsharded. Don't append shard version info when contacting the
             // config servers.
             const auto cmdObjWithShardVersion = (shardId != ShardId::kConfigServerId)
-                ? appendShardVersion(request.serializeToCommandObj().toBson(),
+                ? appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
                                      ChunkVersion::UNSHARDED())
-                : request.serializeToCommandObj().toBson();
+                : aggregation_request_helper::serializeToCommandObj(request);
             return appendDbVersionIfPresent(std::move(cmdObjWithShardVersion), cm.dbVersion());
         }
     }();
 
     auto cursors = establishCursors(opCtx,
                                     expCtx->mongoProcessInterface->taskExecutor,
-                                    request.getNamespaceString(),
+                                    request.getNamespace(),
                                     std::move(readPreference),
                                     {{shardId, versionedCmdObj}},
                                     false /* allowPartialResults */,
@@ -784,7 +788,7 @@ BSONObj createPassthroughCommandForShard(
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
-        targetedCmd[AggregationRequest::kPipelineName] = Value(pipeline->serialize());
+        targetedCmd[AggregateCommand::kPipelineFieldName] = Value(pipeline->serialize());
     }
 
     return genericTransformForShards(
@@ -802,12 +806,12 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     // has defaulted any arguments or otherwise changed the spec. For example, $listSessions may
     // have detected a logged in user and appended that user name to the $listSessions spec to
     // send to the shards.
-    targetedCmd[AggregationRequest::kPipelineName] =
+    targetedCmd[AggregateCommand::kPipelineFieldName] =
         Value(splitPipeline.shardsPipeline->serialize());
 
     // When running on many shards with the exchange we may not need merging.
     if (needsMerge) {
-        targetedCmd[AggregationRequest::kNeedsMergeName] = Value(true);
+        targetedCmd[AggregateCommand::kNeedsMergeFieldName] = Value(true);
 
         // If there aren't any stages like $out in the pipeline being sent to the shards, remove the
         // write concern. The write concern should only be applied when there are writes performed
@@ -820,10 +824,10 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
         }
     }
 
-    targetedCmd[AggregationRequest::kCursorName] =
-        Value(DOC(AggregationRequest::kBatchSizeName << 0));
+    targetedCmd[AggregateCommand::kBatchSizeFieldName] =
+        Value(DOC(QueryRequest::kBatchSizeField << 0));
 
-    targetedCmd[AggregationRequest::kExchangeName] =
+    targetedCmd[AggregateCommand::kExchangeFieldName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();
 
     return genericTransformForShards(
@@ -1156,11 +1160,13 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
         return stages;
     }();
 
-    AggregationRequest aggRequest(expCtx->ns, rawStages);
+    AggregateCommand aggRequest(expCtx->ns, rawStages);
     LiteParsedPipeline liteParsedPipeline(aggRequest);
     auto hasChangeStream = liteParsedPipeline.hasChangeStream();
-    auto shardDispatchResults = dispatchShardPipeline(
-        aggRequest.serializeToCommandObj(), hasChangeStream, std::move(pipeline));
+    auto shardDispatchResults =
+        dispatchShardPipeline(aggregation_request_helper::serializeToCommandDoc(aggRequest),
+                              hasChangeStream,
+                              std::move(pipeline));
     BSONObjBuilder explainBuilder;
     auto appendStatus =
         appendExplainResults(std::move(shardDispatchResults), expCtx, &explainBuilder);

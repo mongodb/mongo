@@ -36,7 +36,7 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/remote_command_response.h"
@@ -217,7 +217,7 @@ public:
      */
     virtual Status runAggregation(
         OperationContext* opCtx,
-        const AggregationRequest& aggRequest,
+        const AggregateCommand& aggRequest,
         std::function<bool(const std::vector<BSONObj>& batch)> callback) = 0;
 
     /**

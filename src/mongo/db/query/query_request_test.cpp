@@ -38,7 +38,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -1288,13 +1288,14 @@ TEST(QueryRequestTest, ConvertToAggregationSucceeds) {
     auto agg = qr.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationOmitsExplain) {
@@ -1303,23 +1304,25 @@ TEST(QueryRequestTest, ConvertToAggregationOmitsExplain) {
     auto agg = qr.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT_FALSE(ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+    ASSERT_EQ(ar.getValue().getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithHintSucceeds) {
     QueryRequest qr(testns);
     qr.setHint(fromjson("{a_1: -1}"));
-    const auto aggCmd = qr.asAggregationCommand();
-    ASSERT_OK(aggCmd);
+    const auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
-    ASSERT_BSONOBJ_EQ(qr.getHint(), ar.getValue().getHint());
+    ASSERT_BSONOBJ_EQ(qr.getHint(), ar.getValue().getHint().value_or(BSONObj()));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMinFails) {
@@ -1420,12 +1423,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithPipeline) {
     auto agg = qr.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 
     std::vector<BSONObj> expectedPipeline{BSON("$match" << BSON("x" << 1)),
                                           BSON("$sort" << BSON("y" << -1)),
@@ -1445,12 +1449,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithBatchSize) {
     auto agg = qr.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
+    ASSERT_EQ(ar.getValue().getNamespace(), testns);
     ASSERT_EQ(ar.getValue().getBatchSize(), 4LL);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
@@ -1463,12 +1468,13 @@ TEST(QueryRequestTest, ConvertToAggregationWithMaxTimeMS) {
     const BSONObj cmdObj = agg.getValue();
     ASSERT_EQ(cmdObj["maxTimeMS"].Int(), 9);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, cmdObj);
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), cmdObj).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
-    ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSONObj());
+    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSONObj());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
@@ -1477,13 +1483,14 @@ TEST(QueryRequestTest, ConvertToAggregationWithCollationSucceeds) {
     auto agg = qr.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(!ar.getValue().getExplain());
     ASSERT(ar.getValue().getPipeline().empty());
-    ASSERT_EQ(ar.getValue().getBatchSize(), AggregationRequest::kDefaultBatchSize);
-    ASSERT_EQ(ar.getValue().getNamespaceString(), testns);
-    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation(), BSON("f" << 1));
+    ASSERT_EQ(ar.getValue().getBatchSize(), aggregation_request_helper::kDefaultBatchSize);
+    ASSERT_EQ(ar.getValue().getNamespace(), testns);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getCollation().value_or(BSONObj()), BSON("f" << 1));
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithReadOnceFails) {
@@ -1507,7 +1514,8 @@ TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
     auto agg = qr.asAggregationCommand();
     ASSERT_OK(agg);
 
-    auto ar = AggregationRequest::parseFromBSON(testns, agg.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
     ASSERT(ar.getValue().getLegacyRuntimeConstants().has_value());
     ASSERT_EQ(ar.getValue().getLegacyRuntimeConstants()->getLocalNow(), rtc.getLocalNow());
@@ -1517,23 +1525,25 @@ TEST(QueryRequestTest, ConvertToAggregationWithLegacyRuntimeConstantsSucceeds) {
 TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseTrueSucceeds) {
     QueryRequest qr(testns);
     qr.setAllowDiskUse(true);
-    const auto aggCmd = qr.asAggregationCommand();
-    ASSERT_OK(aggCmd.getStatus());
+    const auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg.getStatus());
 
-    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
-    ASSERT_EQ(true, ar.getValue().shouldAllowDiskUse());
+    ASSERT_EQ(true, ar.getValue().getAllowDiskUse());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithAllowDiskUseFalseSucceeds) {
     QueryRequest qr(testns);
     qr.setAllowDiskUse(false);
-    const auto aggCmd = qr.asAggregationCommand();
-    ASSERT_OK(aggCmd.getStatus());
+    const auto agg = qr.asAggregationCommand();
+    ASSERT_OK(agg.getStatus());
 
-    auto ar = AggregationRequest::parseFromBSON(testns, aggCmd.getValue());
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSON(testns, aggCmd);
     ASSERT_OK(ar.getStatus());
-    ASSERT_EQ(false, ar.getValue().shouldAllowDiskUse());
+    ASSERT_EQ(false, ar.getValue().getAllowDiskUse());
 }
 
 TEST(QueryRequestTest, ConvertToFindWithAllowDiskUseTrueSucceeds) {

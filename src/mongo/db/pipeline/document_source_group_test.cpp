@@ -42,8 +42,9 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -256,7 +257,7 @@ public:
     Base()
         : _opCtx(makeOperationContext()),
           _ctx(new ExpressionContextForTest(_opCtx.get(),
-                                            AggregationRequest(NamespaceString(ns), {}))),
+                                            AggregateCommand(NamespaceString(ns), {}))),
           _tempDir("DocumentSourceGroupTest") {}
 
 protected:
@@ -265,7 +266,7 @@ protected:
         BSONElement specElement = namedSpec.firstElement();
 
         intrusive_ptr<ExpressionContextForTest> expressionContext =
-            new ExpressionContextForTest(_opCtx.get(), AggregationRequest(NamespaceString(ns), {}));
+            new ExpressionContextForTest(_opCtx.get(), AggregateCommand(NamespaceString(ns), {}));
         // For $group, 'inShard' implies 'fromMongos' and 'needsMerge'.
         expressionContext->fromMongos = expressionContext->needsMerge = inShard;
         expressionContext->inMongos = inMongos;

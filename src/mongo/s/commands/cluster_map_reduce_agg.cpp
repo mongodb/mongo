@@ -113,22 +113,22 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
     MutableDocument translatedCmd;
 
     translatedCmd["aggregate"] = Value(parsedMr.getNamespace().coll());
-    translatedCmd[AggregationRequest::kPipelineName] = Value(pipeline->serialize());
-    translatedCmd[AggregationRequest::kCursorName] =
+    translatedCmd[AggregateCommand::kPipelineFieldName] = Value(pipeline->serialize());
+    translatedCmd[AggregateCommand::kBatchSizeFieldName] =
         Value(Document{{"batchSize", std::numeric_limits<long long>::max()}});
-    translatedCmd[AggregationRequest::kAllowDiskUseName] = Value(true);
-    translatedCmd[AggregationRequest::kFromMongosName] = Value(true);
-    translatedCmd[AggregationRequest::kLetName] = Value(
+    translatedCmd[AggregateCommand::kAllowDiskUseFieldName] = Value(true);
+    translatedCmd[AggregateCommand::kFromMongosFieldName] = Value(true);
+    translatedCmd[AggregateCommand::kLetFieldName] = Value(
         pipeline->getContext()->variablesParseState.serialize(pipeline->getContext()->variables));
-    translatedCmd[AggregationRequest::kIsMapReduceCommandName] = Value(true);
+    translatedCmd[AggregateCommand::kIsMapReduceCommandFieldName] = Value(true);
 
     if (shouldBypassDocumentValidationForCommand(originalCmd)) {
         translatedCmd[bypassDocumentValidationCommandOption()] = Value(true);
     }
 
-    if (originalCmd[AggregationRequest::kCollationName]) {
-        translatedCmd[AggregationRequest::kCollationName] =
-            Value(originalCmd[AggregationRequest::kCollationName]);
+    if (originalCmd[AggregateCommand::kCollationFieldName]) {
+        translatedCmd[AggregateCommand::kCollationFieldName] =
+            Value(originalCmd[AggregateCommand::kCollationFieldName]);
     }
 
     // Append generic command options.

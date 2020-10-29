@@ -196,7 +196,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     BSONObj sortObj,
     SkipThenLimit skipThenLimit,
     boost::optional<std::string> groupIdForDistinctScan,
-    const AggregationRequest* aggRequest,
+    const AggregateCommand* aggRequest,
     const size_t plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures) {
     auto qr = std::make_unique<QueryRequest>(nss);
@@ -208,7 +208,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     qr->setLimit(skipThenLimit.getLimit());
     if (aggRequest) {
         qr->setExplain(static_cast<bool>(aggRequest->getExplain()));
-        qr->setHint(aggRequest->getHint());
+        qr->setHint(aggRequest->getHint().value_or(BSONObj()));
     }
 
     // The collation on the ExpressionContext has been resolved to either the user-specified
@@ -318,7 +318,7 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutor(const CollectionPtr& collection,
                                    const NamespaceString& nss,
-                                   const AggregationRequest* aggRequest,
+                                   const AggregateCommand* aggRequest,
                                    Pipeline* pipeline) {
     auto expCtx = pipeline->getContext();
 
@@ -389,7 +389,7 @@ void PipelineD::attachInnerQueryExecutorToPipeline(
 
 void PipelineD::buildAndAttachInnerQueryExecutorToPipeline(const CollectionPtr& collection,
                                                            const NamespaceString& nss,
-                                                           const AggregationRequest* aggRequest,
+                                                           const AggregateCommand* aggRequest,
                                                            Pipeline* pipeline) {
 
     auto callback = PipelineD::buildInnerQueryExecutor(collection, nss, aggRequest, pipeline);
@@ -510,7 +510,7 @@ auto buildProjectionForPushdown(const DepsTracker& deps, Pipeline* pipeline) {
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
                                           const NamespaceString& nss,
-                                          const AggregationRequest* aggRequest,
+                                          const AggregateCommand* aggRequest,
                                           Pipeline* pipeline) {
     // Make a last effort to optimize pipeline stages before potentially detaching them to be pushed
     // down into the query executor.
@@ -599,7 +599,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
 std::pair<PipelineD::AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 PipelineD::buildInnerQueryExecutorGeoNear(const CollectionPtr& collection,
                                           const NamespaceString& nss,
-                                          const AggregationRequest* aggRequest,
+                                          const AggregateCommand* aggRequest,
                                           Pipeline* pipeline) {
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "$geoNear requires a geo index to run, but " << nss.ns()
@@ -667,7 +667,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     QueryMetadataBitSet unavailableMetadata,
     const BSONObj& queryObj,
     SkipThenLimit skipThenLimit,
-    const AggregationRequest* aggRequest,
+    const AggregateCommand* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
     bool* hasNoRequirements) {
     invariant(hasNoRequirements);

@@ -410,6 +410,7 @@ class Struct(common.SourceLocation):
         self.chained_types = None  # type: List[ChainedType]
         self.chained_structs = None  # type: List[ChainedStruct]
         self.fields = None  # type: List[Field]
+        self.allow_global_collection_name = False  # type: bool
 
         # Command only property
         self.cpp_name = None  # type: str

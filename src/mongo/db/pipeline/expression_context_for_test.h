@@ -31,6 +31,7 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -140,7 +141,7 @@ public:
      * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will
      * also resolve the ExpressionContextForTest's ServiceContext from the OperationContext.
      */
-    ExpressionContextForTest(OperationContext* opCtx, const AggregationRequest& request)
+    ExpressionContextForTest(OperationContext* opCtx, const AggregateCommand& request)
         : ExpressionContext(
               opCtx, request, nullptr, std::make_shared<StubMongoProcessInterface>(), {}, {}),
           _serviceContext(opCtx->getServiceContext()) {

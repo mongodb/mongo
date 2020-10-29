@@ -34,7 +34,7 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 
@@ -110,8 +110,7 @@ MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem) {
             elem.type() == BSONType::String || elem.type() == BSONType::Array);
 
     if (elem.type() == BSONType::Array) {
-        return {MergeWhenMatchedModeEnum::kPipeline,
-                uassertStatusOK(AggregationRequest::parsePipelineFromBSON(elem))};
+        return {MergeWhenMatchedModeEnum::kPipeline, parsePipelineFromBSON(elem)};
     }
 
     invariant(elem.type() == BSONType::String);

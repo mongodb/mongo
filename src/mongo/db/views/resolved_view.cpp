@@ -33,7 +33,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
@@ -87,8 +86,7 @@ std::shared_ptr<const ErrorExtraInfo> ResolvedView::parse(const BSONObj& cmdRepl
     return std::make_shared<ResolvedView>(fromBSON(cmdReply));
 }
 
-AggregationRequest ResolvedView::asExpandedViewAggregation(
-    const AggregationRequest& request) const {
+AggregateCommand ResolvedView::asExpandedViewAggregation(const AggregateCommand& request) const {
     // Perform the aggregation on the resolved namespace.  The new pipeline consists of two parts:
     // first, 'pipeline' in this ResolvedView; then, the pipeline in 'request'.
     std::vector<BSONObj> resolvedPipeline;
@@ -97,7 +95,7 @@ AggregationRequest ResolvedView::asExpandedViewAggregation(
     resolvedPipeline.insert(
         resolvedPipeline.end(), request.getPipeline().begin(), request.getPipeline().end());
 
-    AggregationRequest expandedRequest{_namespace, resolvedPipeline};
+    AggregateCommand expandedRequest{_namespace, resolvedPipeline};
 
     if (request.getExplain()) {
         expandedRequest.setExplain(request.getExplain());
@@ -109,10 +107,10 @@ AggregationRequest ResolvedView::asExpandedViewAggregation(
     expandedRequest.setMaxTimeMS(request.getMaxTimeMS());
     expandedRequest.setReadConcern(request.getReadConcern());
     expandedRequest.setUnwrappedReadPref(request.getUnwrappedReadPref());
-    expandedRequest.setBypassDocumentValidation(request.shouldBypassDocumentValidation());
-    expandedRequest.setAllowDiskUse(request.shouldAllowDiskUse());
+    expandedRequest.setBypassDocumentValidation(request.getBypassDocumentValidation());
+    expandedRequest.setAllowDiskUse(request.getAllowDiskUse());
     expandedRequest.setIsMapReduceCommand(request.getIsMapReduceCommand());
-    expandedRequest.setLetParameters(request.getLetParameters());
+    expandedRequest.setLet(request.getLet());
 
     // Operations on a view must always use the default collation of the view. We must have already
     // checked that if the user's request specifies a collation, it matches the collation of the

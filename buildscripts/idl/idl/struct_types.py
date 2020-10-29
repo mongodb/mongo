@@ -491,16 +491,25 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('invariant(!_nss.isEmpty());')
-        indented_writer.write_line('builder->append("%s"_sd, _nss.coll());' % (self._command.name))
+        if self._struct.allow_global_collection_name:
+            indented_writer.write_line(
+                '_nss.serializeCollectionName(builder, "%s"_sd);' % (self._command.name))
+        else:
+            indented_writer.write_line('invariant(!_nss.isEmpty());')
+            indented_writer.write_line(
+                'builder->append("%s"_sd, _nss.coll());' % (self._command.name))
         indented_writer.write_empty_line()
 
     def gen_namespace_check(self, indented_writer, db_name, element):
         # type: (writer.IndentedTextWriter, str, str) -> None
         # TODO: should the name of the first element be validated??
         indented_writer.write_line('invariant(_nss.isEmpty());')
-        indented_writer.write_line(
-            '_nss = ctxt.parseNSCollectionRequired(%s, %s);' % (db_name, element))
+        if self._struct.allow_global_collection_name:
+            indented_writer.write_line(
+                '_nss = ctxt.parseNSCollectionRequired(%s, %s, true);' % (db_name, element))
+        else:
+            indented_writer.write_line(
+                '_nss = ctxt.parseNSCollectionRequired(%s, %s, false);' % (db_name, element))
 
 
 class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):

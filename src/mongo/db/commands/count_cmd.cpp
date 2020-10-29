@@ -37,6 +37,7 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/count.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/count_command_as_aggregation_command.h"
 #include "mongo/db/query/explain.h"
@@ -157,8 +158,10 @@ public:
                 return viewAggregation.getStatus();
             }
 
+            auto viewAggCmd =
+                OpMsgRequest::fromDBAndBody(nss.db(), viewAggregation.getValue()).body;
             auto viewAggRequest =
-                AggregationRequest::parseFromBSON(nss, viewAggregation.getValue(), verbosity);
+                aggregation_request_helper::parseFromBSON(nss, viewAggCmd, verbosity);
             if (!viewAggRequest.isOK()) {
                 return viewAggRequest.getStatus();
             }
@@ -166,7 +169,7 @@ public:
             // An empty PrivilegeVector is acceptable because these privileges are only checked on
             // getMore and explain will not open a cursor.
             return runAggregate(opCtx,
-                                viewAggRequest.getValue().getNamespaceString(),
+                                viewAggRequest.getValue().getNamespace(),
                                 viewAggRequest.getValue(),
                                 viewAggregation.getValue(),
                                 PrivilegeVector(),

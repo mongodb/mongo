@@ -160,9 +160,12 @@ public:
     void throwAPIStrictErrorIfApplicable(BSONElement fieldName) const;
 
     /**
-     * Equivalent to CommandHelpers::parseNsCollectionRequired
+     * Equivalent to CommandHelpers::parseNsCollectionRequired.
+     * 'allowGlobalCollectionName' allows use of global collection name, e.g. {aggregate: 1}.
      */
-    static NamespaceString parseNSCollectionRequired(StringData dbName, const BSONElement& element);
+    static NamespaceString parseNSCollectionRequired(StringData dbName,
+                                                     const BSONElement& element,
+                                                     bool allowGlobalCollectionName);
 
     /**
      * Equivalent to CommandHelpers::parseNsOrUUID

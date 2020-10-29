@@ -50,6 +50,7 @@
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
@@ -762,8 +763,7 @@ private:
                 // which stages were being used.
                 auto& updateMod = update.getU();
                 if (updateMod.type() == write_ops::UpdateModification::Type::kPipeline) {
-                    AggregationRequest request(_batch.getNamespace(),
-                                               updateMod.getUpdatePipeline());
+                    AggregateCommand request(_batch.getNamespace(), updateMod.getUpdatePipeline());
                     LiteParsedPipeline pipeline(request);
                     pipeline.tickGlobalStageCounters();
                     _updateMetrics->incrementExecutedWithAggregationPipeline();

@@ -187,6 +187,14 @@ std::string NamespaceString::getSisterNS(StringData local) const {
     return db().toString() + "." + local.toString();
 }
 
+void NamespaceString::serializeCollectionName(BSONObjBuilder* builder, StringData fieldName) const {
+    if (isCollectionlessAggregateNS()) {
+        builder->append(fieldName, 1);
+    } else {
+        builder->append(fieldName, coll());
+    }
+}
+
 bool NamespaceString::isDropPendingNamespace() const {
     return coll().startsWith(dropPendingNSPrefix);
 }

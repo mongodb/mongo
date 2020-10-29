@@ -34,7 +34,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 
 namespace mongo {
 
@@ -57,7 +57,7 @@ public:
      * Convert an aggregation command on a view to the equivalent command against the view's
      * underlying collection.
      */
-    AggregationRequest asExpandedViewAggregation(const AggregationRequest& aggRequest) const;
+    AggregateCommand asExpandedViewAggregation(const AggregateCommand& aggRequest) const;
 
     const NamespaceString& getNamespace() const {
         return _namespace;

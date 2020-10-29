@@ -38,6 +38,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression.h"
@@ -194,7 +195,7 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
     auto pipelineElem = specObj["pipeline"];
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (pipelineElem) {
-        auto pipeline = uassertStatusOK(AggregationRequest::parsePipelineFromBSON(pipelineElem));
+        auto pipeline = parsePipelineFromBSON(pipelineElem);
         liteParsedPipeline = LiteParsedPipeline(fromNss, pipeline);
     }
 
@@ -877,13 +878,7 @@ intrusive_ptr<DocumentSource> DocumentSourceLookUp::createFromBson(
         const auto argName = argument.fieldNameStringData();
 
         if (argName == "pipeline") {
-            auto result = AggregationRequest::parsePipelineFromBSON(argument);
-            if (!result.isOK()) {
-                uasserted(ErrorCodes::FailedToParse,
-                          str::stream() << "invalid $lookup pipeline definition: "
-                                        << result.getStatus().toString());
-            }
-            pipeline = std::move(result.getValue());
+            pipeline = parsePipelineFromBSON(argument);
             hasPipeline = true;
             continue;
         }

@@ -132,8 +132,9 @@ public:
                 return aggCmdOnView.getStatus();
             }
 
+            auto viewAggCmd = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
             auto aggRequestOnView =
-                AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue(), verbosity);
+                aggregation_request_helper::parseFromBSON(nss, viewAggCmd, verbosity);
             if (!aggRequestOnView.isOK()) {
                 return aggRequestOnView.getStatus();
             }
@@ -206,11 +207,13 @@ public:
             auto aggCmdOnView = parsedDistinct.getValue().asAggregationCommand();
             uassertStatusOK(aggCmdOnView.getStatus());
 
-            auto aggRequestOnView = AggregationRequest::parseFromBSON(nss, aggCmdOnView.getValue());
+            auto viewAggCmd = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView.getValue()).body;
+            auto aggRequestOnView = aggregation_request_helper::parseFromBSON(nss, viewAggCmd);
             uassertStatusOK(aggRequestOnView.getStatus());
 
             auto resolvedAggRequest = ex->asExpandedViewAggregation(aggRequestOnView.getValue());
-            auto resolvedAggCmd = resolvedAggRequest.serializeToCommandObj().toBson();
+            auto resolvedAggCmd =
+                aggregation_request_helper::serializeToCommandObj(resolvedAggRequest);
 
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 txnRouter.onViewResolutionError(opCtx, nss);

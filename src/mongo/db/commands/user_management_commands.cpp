@@ -65,6 +65,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
@@ -1417,13 +1418,13 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UsersInfoReply, UMCInfoParams>::Inv
         DBDirectClient client(opCtx);
 
         rpc::OpMsgReplyBuilder replyBuilder;
-        AggregationRequest aggRequest(AuthorizationManager::usersCollectionNamespace,
-                                      std::move(pipeline));
+        AggregateCommand aggRequest(AuthorizationManager::usersCollectionNamespace,
+                                    std::move(pipeline));
         // Impose no cursor privilege requirements, as cursor is drained internally
         uassertStatusOK(runAggregate(opCtx,
                                      AuthorizationManager::usersCollectionNamespace,
                                      aggRequest,
-                                     aggRequest.serializeToCommandObj().toBson(),
+                                     aggregation_request_helper::serializeToCommandObj(aggRequest),
                                      PrivilegeVector(),
                                      &replyBuilder));
         auto bodyBuilder = replyBuilder.getBodyBuilder();

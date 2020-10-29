@@ -119,7 +119,7 @@ private:
      * Returns true if there's more work to do and the task should be rescheduled.
      */
     void _ensureCollection(Client* client, const NamespaceString nss);
-    AggregationRequest _makeAggregationRequest(Client* client);
+    AggregateCommand _makeAggregateCommand(Client* client);
     ExecutorFuture<void> _reschedule(std::shared_ptr<executor::TaskExecutor> executor,
                                      const CancelationToken& cancelToken);
 

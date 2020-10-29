@@ -34,7 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/document_source_group.h"
@@ -92,7 +92,7 @@ public:
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
     buildInnerQueryExecutor(const CollectionPtr& collection,
                             const NamespaceString& nss,
-                            const AggregationRequest* aggRequest,
+                            const AggregateCommand* aggRequest,
                             Pipeline* pipeline);
 
     /**
@@ -116,7 +116,7 @@ public:
      */
     static void buildAndAttachInnerQueryExecutorToPipeline(const CollectionPtr& collection,
                                                            const NamespaceString& nss,
-                                                           const AggregationRequest* aggRequest,
+                                                           const AggregateCommand* aggRequest,
                                                            Pipeline* pipeline);
 
     static Timestamp getLatestOplogTimestamp(const Pipeline* pipeline);
@@ -148,7 +148,7 @@ private:
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
     buildInnerQueryExecutorGeneric(const CollectionPtr& collection,
                                    const NamespaceString& nss,
-                                   const AggregationRequest* aggRequest,
+                                   const AggregateCommand* aggRequest,
                                    Pipeline* pipeline);
 
     /**
@@ -159,7 +159,7 @@ private:
     static std::pair<AttachExecutorCallback, std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
     buildInnerQueryExecutorGeoNear(const CollectionPtr& collection,
                                    const NamespaceString& nss,
-                                   const AggregationRequest* aggRequest,
+                                   const AggregateCommand* aggRequest,
                                    Pipeline* pipeline);
 
     /**
@@ -184,7 +184,7 @@ private:
         QueryMetadataBitSet metadataAvailable,
         const BSONObj& queryObj,
         SkipThenLimit skipThenLimit,
-        const AggregationRequest* aggRequest,
+        const AggregateCommand* aggRequest,
         const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
         bool* hasNoRequirements);
 };

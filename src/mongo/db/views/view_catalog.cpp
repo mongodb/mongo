@@ -43,7 +43,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -404,7 +404,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
     }
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
-                              AggregationRequest(viewDef.viewOn(), viewDef.pipeline()),
+                              AggregateCommand(viewDef.viewOn(), viewDef.pipeline()),
                               CollatorInterface::cloneCollator(viewDef.defaultCollator()),
                               // We can use a stub MongoProcessInterface because we are only parsing
                               // the Pipeline for validation here. We won't do anything with the

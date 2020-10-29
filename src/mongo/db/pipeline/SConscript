@@ -19,7 +19,7 @@ env.Library(
         'aggregation.cpp',
     ],
     LIBDEPS=[
-        'aggregation_request',
+        'aggregation_request_helper',
         'expression_context',
         'pipeline',
     ]
@@ -36,9 +36,10 @@ env.Library(
     )
 
 env.Library(
-    target='aggregation_request',
+    target='aggregation_request_helper',
     source=[
-        'aggregation_request.cpp',
+        'aggregation_request_helper.cpp',
+        env.Idlc('aggregate_command.idl')[0]
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -50,6 +51,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/write_concern_options',
+        '$BUILD_DIR/mongo/idl/idl_parser',
         'document_sources_idl',
     ]
 )
@@ -89,7 +91,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/intrusive_counter',
         '$BUILD_DIR/mongo/util/regex_util',
         '$BUILD_DIR/mongo/util/summation',
-        'aggregation_request',
+        'aggregation_request_helper',
         'dependencies',
         'variable_validation',
     ],
@@ -183,7 +185,7 @@ env.Library(
         ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/stats/counters',
-        'aggregation_request',
+        'aggregation_request_helper',
     ]
 )
 
@@ -431,7 +433,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'accumulator',
-        'aggregation_request',
+        'aggregation_request_helper',
         'document_source_mock',
         'document_sources_idl',
         'expression_context',

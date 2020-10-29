@@ -95,7 +95,7 @@ protected:
         NamespaceString nss{"a.collection"};
         auto client = getServiceContext()->makeClient("ClusterCmdClient");
         auto opCtx = client->makeOperationContext();
-        auto request = AggregationRequest::parseFromBSON(nss, inputBson);
+        auto request = aggregation_request_helper::parseFromBSON(nss, inputBson);
         if (request.getStatus() != Status::OK()) {
             return request.getStatus();
         }
@@ -130,25 +130,29 @@ TEST_F(ClusterAggregateTest, SnapshotReadConcernWithAfterClusterTime) {
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenFromMongosIsTrue) {
-    const BSONObj inputBson = fromjson("{pipeline: [], cursor: {}, fromMongos: true}");
+    const BSONObj inputBson =
+        fromjson("{aggregate: 'coll', pipeline: [], cursor: {}, fromMongos: true, $db: 'test'}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsFalse) {
-    const BSONObj inputBson =
-        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: false}");
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromMongos: false, $db: "
+        "'test'}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenNeedsMergeIstrueAndFromMongosIsTrue) {
-    const BSONObj inputBson =
-        fromjson("{pipeline: [], cursor: {}, needsMerge: true, fromMongos: true}");
+    const BSONObj inputBson = fromjson(
+        "{aggregate: 'coll', pipeline: [], cursor: {}, needsMerge: true, fromMongos: true, $db: "
+        "'test'}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51089);
 }
 
 TEST_F(ClusterAggregateTest, ShouldFailWhenExchengeIsPresent) {
     const BSONObj inputBson = fromjson(
-        "{pipeline: [], cursor: {}, exchange: {policy: 'roundrobin', consumers: NumberInt(2)}}");
+        "{aggregate: 'coll', pipeline: [], cursor: {}, exchange: {policy: 'roundrobin', consumers: "
+        "NumberInt(2)}, $db: 'test'}");
     ASSERT_THROWS_CODE(testRunAggregateEarlyExit(inputBson), AssertionException, 51028);
 }
 

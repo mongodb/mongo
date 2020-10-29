@@ -33,7 +33,7 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/ops/write_ops.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_oplog_entry_version.h"
 #include "mongo/util/assert_util.h"
@@ -259,7 +259,7 @@ write_ops::UpdateModification::UpdateModification(BSONElement update) {
             "Update argument must be either an object or an array",
             type == BSONType::Array);
 
-    _update = PipelineUpdate{uassertStatusOK(AggregationRequest::parsePipelineFromBSON(update))};
+    _update = PipelineUpdate{parsePipelineFromBSON(update)};
 }
 
 write_ops::UpdateModification::UpdateModification(const BSONObj& update, ClassicTag) {

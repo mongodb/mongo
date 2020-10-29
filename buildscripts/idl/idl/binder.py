@@ -260,6 +260,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.inline_chained_structs = struct.inline_chained_structs
     ast_struct.generate_comparison_operators = struct.generate_comparison_operators
     ast_struct.cpp_name = struct.name
+    ast_struct.allow_global_collection_name = struct.allow_global_collection_name
     if struct.cpp_name:
         ast_struct.cpp_name = struct.cpp_name
 

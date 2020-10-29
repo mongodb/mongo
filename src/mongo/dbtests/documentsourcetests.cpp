@@ -41,6 +41,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
@@ -76,7 +77,7 @@ class DocumentSourceCursorTest : public unittest::Test {
 public:
     DocumentSourceCursorTest()
         : client(_opCtx.get()),
-          _ctx(new ExpressionContextForTest(_opCtx.get(), AggregationRequest(nss, {}))) {
+          _ctx(new ExpressionContextForTest(_opCtx.get(), AggregateCommand(nss, {}))) {
         _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     }
 

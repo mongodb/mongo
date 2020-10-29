@@ -37,6 +37,8 @@
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/stats/fill_locker_info.h"
 
 namespace mongo {
@@ -64,9 +66,9 @@ public:
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
-    virtual StatusWith<CursorResponse> runAggregation(
-        OperationContext* opCtx, const AggregationRequest& request) const final {
-        auto aggCmdObj = request.serializeToCommandObj().toBson();
+    virtual StatusWith<CursorResponse> runAggregation(OperationContext* opCtx,
+                                                      const AggregateCommand& request) const final {
+        auto aggCmdObj = aggregation_request_helper::serializeToCommandObj(request);
 
         rpc::OpMsgReplyBuilder replyBuilder;
 
@@ -76,7 +78,7 @@ public:
         }
 
         auto status = runAggregate(opCtx,
-                                   request.getNamespaceString(),
+                                   request.getNamespace(),
                                    request,
                                    std::move(aggCmdObj),
                                    privileges,

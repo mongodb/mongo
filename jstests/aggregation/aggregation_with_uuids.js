@@ -95,7 +95,7 @@ assert.sameMembers(collNameRes.cursor.firstBatch, docs);
 assert.commandFailedWithCode(
     testDB.runCommand(
         {aggregate: collName, collectionUUID: "NotAUUID", pipeline: [{$match: {}}], cursor: {}}),
-    ErrorCodes.InvalidUUID);
+    ErrorCodes.TypeMismatch);
 
 // collectionUUID is not allowed with change streams.
 assert.commandFailedWithCode(

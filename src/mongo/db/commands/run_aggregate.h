@@ -34,7 +34,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 
@@ -53,7 +53,7 @@ namespace mongo {
  */
 Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& nss,
-                    const AggregationRequest& request,
+                    const AggregateCommand& request,
                     const LiteParsedPipeline& liteParsedPipeline,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
@@ -64,7 +64,7 @@ Status runAggregate(OperationContext* opCtx,
  */
 Status runAggregate(OperationContext* opCtx,
                     const NamespaceString& nss,
-                    const AggregationRequest& request,
+                    const AggregateCommand& request,
                     const BSONObj& cmdObj,
                     const PrivilegeVector& privileges,
                     rpc::ReplyBuilderInterface* result);

@@ -35,7 +35,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/read_concern_support_result.h"
 
@@ -53,8 +53,8 @@ public:
      * May throw a AssertionException if there is an invalid stage specification, although full
      * validation happens later, during Pipeline construction.
      */
-    LiteParsedPipeline(const AggregationRequest& request)
-        : LiteParsedPipeline(request.getNamespaceString(), request.getPipeline()) {}
+    LiteParsedPipeline(const AggregateCommand& request)
+        : LiteParsedPipeline(request.getNamespace(), request.getPipeline()) {}
 
     LiteParsedPipeline(const NamespaceString& nss, const std::vector<BSONObj>& pipelineStages) {
         _stageSpecs.reserve(pipelineStages.size());

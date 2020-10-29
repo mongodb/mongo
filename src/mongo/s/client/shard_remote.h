@@ -86,7 +86,7 @@ public:
                                  const BSONObj& cmdObj) final;
 
     Status runAggregation(OperationContext* opCtx,
-                          const AggregationRequest& aggRequest,
+                          const AggregateCommand& aggRequest,
                           std::function<bool(const std::vector<BSONObj>& batch)> callback);
 
 private:

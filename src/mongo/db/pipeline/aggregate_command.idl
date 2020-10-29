@@ -1,0 +1,164 @@
+# Copyright (C) 2020-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/pipeline/aggregation_request_helper.h"
+        - "mongo/db/query/count_request.h"
+        - "mongo/db/query/explain_options.h"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/pipeline/exchange_spec.idl"
+    - "mongo/db/pipeline/legacy_runtime_constants.idl"
+    - "mongo/db/query/hint.idl"
+    - "mongo/db/write_concern_options.idl"
+
+types:
+    pipeline:
+        bson_serialization_type: any
+        description: "An array of objects specifying the aggregation pipeline."
+        cpp_type: "std::vector<mongo::BSONObj>" 
+        deserializer: ::mongo::parsePipelineFromBSON
+    batchSize:
+        bson_serialization_type: any
+        description: "An int representing the cursor batch size."
+        cpp_type: "std::int64_t" 
+        serializer: ::mongo::serializeBatchSizeToBSON
+        deserializer: ::mongo::parseBatchSizeFromBSON
+    explainVerbosity:
+        bson_serialization_type: any
+        description: "The Verbosity value representing explain verbosity."
+        cpp_type: "mongo::ExplainOptions::Verbosity"
+        serializer: ::mongo::serializeExplainToBSON
+        deserializer: ::mongo::parseExplainModeFromBSON
+        
+commands:
+    aggregate:
+        description: "Represents the user-supplied options to the aggregate command."
+        cpp_name: AggregateCommand
+        command_name: aggregate
+        strict: true
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        fields:
+            pipeline:
+                description: "An unparsed version of the pipeline."
+                type: pipeline
+            explain:
+                description: "Specifies to return the information on the processing of the pipeline."
+                type: explainVerbosity
+                optional: true
+            allowDiskUse:
+                description: "Enables writing to temporary files."
+                type: optionalBool
+            cursor:
+                description: "To indicate a cursor with a non-default batch size."
+                cpp_name: "batchSize"
+                type: batchSize
+                default: 101
+                validator: { gte: 0 }
+            maxTimeMS:
+                description: "Specifies a time limit in milliseconds for processing operations on a cursor. If you do not specify a value for maxTimeMS, operations will not time out."
+                type: safeInt64
+                validator: { gte: 0 }
+                optional: true
+            bypassDocumentValidation:
+                description: "True if this should bypass the document validation."
+                type: safeBool
+                optional: true
+            readConcern:
+                description: "Specifies the read concern."
+                type: object_owned
+                optional: true
+            collation:
+                description: "Specifies the collation to use for the operation."
+                type: object_owned
+                optional: true
+            hint:
+                description: "The index name to use or the index specification document."
+                type: indexHint
+                optional: true
+            writeConcern:
+                description: "A document that expresses the write concern to use with the $out or $merge stage."
+                type: WriteConcern
+                optional: true
+            let:
+                description: "A document containing user-specified let parameter constants; i.e. values that do not change once computed."
+                type: object_owned
+                optional: true
+            needsMerge:
+                description: "True if this request represents the shards part of a split pipeline, and should produce mergeable output."
+                type: optionalBool
+            fromMongos:
+                description: "True if this request originated from a mongoS."
+                type: optionalBool
+
+            # TODO: Mark the undocumented parameters below as 'unstable'.
+            $queryOptions:
+                description: "The unwrapped readPreference object, if one was given to us by the mongos command processor. This object will be empty when no readPreference is specified or if the request does not originate from mongos."
+                cpp_name: unwrappedReadPref
+                type: object_owned
+                optional: true
+            $_requestReshardingResumeToken:
+                description: "True if this requests resharding resume token."
+                cpp_name: requestReshardingResumeToken
+                type: optionalBool
+            exchange:
+                description: "An optional exchange specification for this request. If set it means that the request represents a producer running as a part of the exchange machinery. This is an internal option; we do not expect it to be set on requests from users or drivers."
+                type: ExchangeSpec
+                optional: true
+            runtimeConstants:
+                description: "A legacy way to specify constant variables available during execution. 'let' is now preferred."
+                type: LegacyRuntimeConstants
+                cpp_name: legacyRuntimeConstants
+                optional: true
+            isMapReduceCommand:
+                description: "True if an aggregation was invoked by the MapReduce command."
+                type: optionalBool
+            collectionUUID:
+                description: "The expected UUID of the namespace the aggregation executes on."
+                type: uuid
+                optional: true
+            use44SortKeys:
+                # TODO SERVER-47065: A 5.0 node still has to accept the 'use44SortKeys' field, since it
+                # could be included in a command sent from a 4.4 mongos or 4.4 mongod. In 5.1, this
+                # code to tolerate the 'use44SortKeys' field can be deleted.
+                description: "If true, this aggregation will use the 4.4 sort key format."
+                type: bool
+                ignore: true
+            useNewUpsert:
+                # TODO SERVER-46751: we must retain the ability to ingest the 'useNewUpsert' field for
+                # 5.0 upgrade purposes, since a 4.4 mongoS will always send {useNewUpsert:true} to the
+                # shards. We do nothing with it because useNewUpsert will be automatically used in 5.0
+                # when appropriate. Remove this final vestige of useNewUpsert when 5.0 becomes
+                # last-lts.
+                description: "A flag to indicate wether or not to use new upsert option."
+                type: bool
+                ignore: true

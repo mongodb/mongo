@@ -43,6 +43,8 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_request.h"
 #include "mongo/db/query/query_request.h"
@@ -593,11 +595,11 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
 
 /* static */
 StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationRequest(
-    DBClientBase* client, AggregationRequest aggRequest, bool secondaryOk, bool useExhaust) {
+    DBClientBase* client, AggregateCommand aggRequest, bool secondaryOk, bool useExhaust) {
     BSONObj ret;
     try {
-        if (!client->runCommand(aggRequest.getNamespaceString().db().toString(),
-                                aggRequest.serializeToCommandObj().toBson(),
+        if (!client->runCommand(aggRequest.getNamespace().db().toString(),
+                                aggregation_request_helper::serializeToCommandObj(aggRequest),
                                 ret,
                                 secondaryOk ? QueryOption_SecondaryOk : 0)) {
             return {ErrorCodes::CommandFailed, ret.toString()};
@@ -612,7 +614,7 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
     }
 
     return {std::make_unique<DBClientCursor>(client,
-                                             aggRequest.getNamespaceString(),
+                                             aggRequest.getNamespace(),
                                              cursorId,
                                              0,
                                              useExhaust ? QueryOption_Exhaust : 0,

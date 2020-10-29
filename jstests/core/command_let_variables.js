@@ -118,12 +118,20 @@ if (!FixtureHelpers.isMongos(testDB)) {
     assert.eq(coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}}).toArray(),
               expectedResults);
 
-    assert.commandFailedWithCode(testDB.runCommand({
+    assert.commandWorked(testDB.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline_no_lets,
         runtimeConstants: constants,
         cursor: {},
         let : null
+    }));
+
+    assert.commandFailedWithCode(testDB.runCommand({
+        aggregate: coll.getName(),
+        pipeline: pipeline_no_lets,
+        runtimeConstants: constants,
+        cursor: {},
+        let : 1
     }),
                                  ErrorCodes.TypeMismatch);
 }

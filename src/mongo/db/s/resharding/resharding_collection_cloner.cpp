@@ -43,7 +43,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
@@ -161,7 +161,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
     OperationContext* opCtx, const Pipeline& pipeline) {
-    AggregationRequest request(_sourceNss, pipeline.serializeToBson());
+    AggregateCommand request(_sourceNss, pipeline.serializeToBson());
     request.setCollectionUUID(_sourceUUID);
     request.setHint(BSON("_id" << 1));
     request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName

@@ -63,6 +63,7 @@ std::string toCommaDelimitedList(const std::vector<BSONType>& types) {
 
 constexpr StringData IDLParserErrorContext::kOpMsgDollarDBDefault;
 constexpr StringData IDLParserErrorContext::kOpMsgDollarDB;
+constexpr auto collectionlessAggregateCursorCol = "$cmd.aggregate"_sd;
 
 bool IDLParserErrorContext::checkAndAssertTypeSlowPath(const BSONElement& element,
                                                        BSONType type) const {
@@ -236,13 +237,23 @@ void IDLParserErrorContext::throwAPIStrictErrorIfApplicable(StringData fieldName
 }
 
 NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbName,
-                                                                 const BSONElement& element) {
+                                                                 const BSONElement& element,
+                                                                 bool allowGlobalCollectionName) {
     const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
                          element.binDataType() == BinDataType::newUUID);
     uassert(ErrorCodes::BadValue,
             str::stream() << "Collection name must be provided. UUID is not valid in this "
                           << "context",
             !isUUID);
+
+    if (allowGlobalCollectionName && element.isNumber()) {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "Invalid command format: the '" << element.fieldNameStringData()
+                              << "' field must specify a collection name or 1",
+                element.number() == 1);
+        return NamespaceString(dbName, collectionlessAggregateCursorCol);
+    }
+
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(element.type()),
             element.canonicalType() == canonicalizeBSONType(mongo::String));
@@ -262,7 +273,7 @@ NamespaceStringOrUUID IDLParserErrorContext::parseNsOrUUID(StringData dbname,
         return {dbname.toString(), uassertStatusOK(UUID::parse(element))};
     } else {
         // Ensure collection identifier is not a Command
-        const NamespaceString nss(parseNSCollectionRequired(dbname, element));
+        const NamespaceString nss(parseNSCollectionRequired(dbname, element, false));
         return nss;
     }
 }

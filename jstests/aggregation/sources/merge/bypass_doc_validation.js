@@ -113,7 +113,8 @@ assertFailsValidation({bypassDocumentValidation: false});
     assert.eq([{_id: 0, a: 3}, {_id: 1, a: 4}], targetColl.find().sort({_id: 1}).toArray());
 }());
 
-// Test that the bypassDocumentValidation is casted to true if the value is non-boolean.
+// Test that the bypassDocumentValidation is casted to true if the value is an integer and the value
+// is not 0. Note that the value type can _not_ be string.
 (function testNonBooleanBypassDocValidationFlag() {
     assert.commandWorked(targetColl.remove({}));
     assert.commandWorked(testDB.runCommand({collMod: targetColl.getName(), validator: {a: 1}}));
@@ -123,13 +124,15 @@ assertFailsValidation({bypassDocumentValidation: false});
     sourceColl.aggregate([{$merge: targetColl.getName()}], {bypassDocumentValidation: 5});
     assert.eq([{_id: 0, a: 1}], targetColl.find().toArray());
 
-    sourceColl.aggregate(
-        [
+    assert.commandFailedWithCode(testDB.runCommand({
+        aggregate: sourceColl.getName(),
+        pipeline: [
             {$addFields: {a: 3}},
             {$merge: {into: targetColl.getName(), whenMatched: "replace", whenNotMatched: "insert"}}
         ],
-        {bypassDocumentValidation: "false"});
-    assert.eq([{_id: 0, a: 3}], targetColl.find().toArray());
+        bypassDocumentValidation: "false"
+    }),
+                                 ErrorCodes.TypeMismatch);
 }());
 
 // Test bypassDocumentValidation with $merge to a collection in a foreign database.

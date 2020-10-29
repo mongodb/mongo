@@ -42,6 +42,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/resharding_util.h"
@@ -238,7 +239,7 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client, const NamespaceSt
     });
 }
 
-AggregationRequest ReshardingOplogFetcher::_makeAggregationRequest(Client* client) {
+AggregateCommand ReshardingOplogFetcher::_makeAggregateCommand(Client* client) {
     auto opCtxRaii = client->makeOperationContext();
     auto opCtx = opCtxRaii.get();
     auto expCtx = _makeExpressionContext(opCtx);
@@ -248,8 +249,7 @@ AggregationRequest ReshardingOplogFetcher::_makeAggregationRequest(Client* clien
             expCtx, _startAt, _collUUID, _recipientShard, _doesDonorOwnMinKeyChunk)
             ->serializeToBson();
 
-    AggregationRequest aggRequest(NamespaceString::kRsOplogNamespace,
-                                  std::move(serializedPipeline));
+    AggregateCommand aggRequest(NamespaceString::kRsOplogNamespace, std::move(serializedPipeline));
     if (_useReadConcern) {
         auto readConcernArgs = repl::ReadConcernArgs(
             boost::optional<LogicalTime>(_startAt.getTs()),
@@ -261,7 +261,7 @@ AggregationRequest ReshardingOplogFetcher::_makeAggregationRequest(Client* clien
                                    ReadPreferenceSetting::kMinimalMaxStalenessValue);
     aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
 
-    aggRequest.setWriteConcern({});
+    aggRequest.setWriteConcern(WriteConcernOptions());
     aggRequest.setHint(BSON("$natural" << 1));
     aggRequest.setRequestReshardingResumeToken(true);
 
@@ -275,7 +275,7 @@ AggregationRequest ReshardingOplogFetcher::_makeAggregationRequest(Client* clien
 bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
     _ensureCollection(client, _toWriteInto);
 
-    auto aggRequest = _makeAggregationRequest(client);
+    auto aggRequest = _makeAggregateCommand(client);
 
     auto opCtxRaii = client->makeOperationContext();
     int batchesProcessed = 0;

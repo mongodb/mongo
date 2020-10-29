@@ -21,7 +21,7 @@ function assertCommandFailsWithCorrectError(command, code) {
 // Aggregate
 assertCommandFailsWithCorrectError(
     {aggregate: coll.getName(), pipeline: [], cursor: {}, jsonSchema: {}},
-    ErrorCodes.FailedToParse);
+    [ErrorCodes.FailedToParse, 4662500]);
 
 // Find
 assertCommandFailsWithCorrectError({find: coll.getName(), jsonSchema: {}},

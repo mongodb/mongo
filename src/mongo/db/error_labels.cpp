@@ -30,7 +30,7 @@
 #include "mongo/db/error_labels.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 
 namespace mongo {
@@ -101,7 +101,8 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.
     const auto swLitePipe = [&nss, &cmdObj]() -> StatusWith<LiteParsedPipeline> {
         try {
-            auto aggRequest = uassertStatusOK(AggregationRequest::parseFromBSON(nss, cmdObj));
+            auto aggRequest =
+                uassertStatusOK(aggregation_request_helper::parseFromBSON(nss, cmdObj));
             return LiteParsedPipeline(aggRequest);
         } catch (const DBException& ex) {
             return ex.toStatus();

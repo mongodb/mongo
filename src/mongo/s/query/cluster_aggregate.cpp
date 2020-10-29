@@ -101,7 +101,7 @@ auto resolveInvolvedNamespaces(stdx::unordered_set<NamespaceString> involvedName
 // collection UUID if provided.
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
-    const AggregationRequest& request,
+    const AggregateCommand& request,
     BSONObj collationObj,
     boost::optional<UUID> uuid,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces) {
@@ -191,7 +191,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
-                                      const AggregationRequest& request,
+                                      const AggregateCommand& request,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
     return runAggregate(opCtx, namespaces, request, {request}, privileges, result);
@@ -199,21 +199,21 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
 Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       const Namespaces& namespaces,
-                                      const AggregationRequest& request,
+                                      const AggregateCommand& request,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
                                       BSONObjBuilder* result) {
-    uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchangeSpec());
+    uassert(51028, "Cannot specify exchange option to a mongos", !request.getExchange());
     uassert(51143,
             "Cannot specify runtime constants option to a mongos",
             !request.getLegacyRuntimeConstants());
     uassert(51089,
-            str::stream() << "Internal parameter(s) [" << AggregationRequest::kNeedsMergeName
-                          << ", " << AggregationRequest::kFromMongosName
+            str::stream() << "Internal parameter(s) [" << AggregateCommand::kNeedsMergeFieldName
+                          << ", " << AggregateCommand::kFromMongosFieldName
                           << "] cannot be set to 'true' when sent to mongos",
-            !request.needsMerge() && !request.isFromMongos());
+            !request.getNeedsMerge() && !request.getFromMongos());
     uassert(4928902,
-            str::stream() << AggregationRequest::kCollectionUUIDName
+            str::stream() << AggregateCommand::kCollectionUUIDFieldName
                           << " is not supported on a mongos",
             !request.getCollectionUUID());
 
@@ -263,11 +263,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // database, the standard logic would attempt to resolve its non-existent UUID and
             // collation by sending a specious 'listCollections' command to the config servers.
             if (hasChangeStream) {
-                return {request.getCollation(), boost::none};
+                return {request.getCollation().value_or(BSONObj()), boost::none};
             }
 
             return cluster_aggregation_planner::getCollationAndUUID(
-                opCtx, cm, namespaces.executionNss, request.getCollation());
+                opCtx, cm, namespaces.executionNss, request.getCollation().value_or(BSONObj()));
         }();
 
         // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
@@ -298,7 +298,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         invariant(targeter.policy ==
                   cluster_aggregation_planner::AggregationTargeter::kPassthrough);
         expCtx = make_intrusive<ExpressionContext>(
-            opCtx, nullptr, namespaces.executionNss, boost::none, request.getLetParameters());
+            opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
     }
 
     if (request.getExplain()) {
@@ -315,7 +315,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                     namespaces,
                     *targeter.cm,
                     request.getExplain(),
-                    request.serializeToCommandObj(),
+                    aggregation_request_helper::serializeToCommandDoc(request),
                     privileges,
                     result);
             }
@@ -344,7 +344,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 return cluster_aggregation_planner::dispatchPipelineAndMerge(
                     opCtx,
                     std::move(targeter),
-                    request.serializeToCommandObj(),
+                    aggregation_request_helper::serializeToCommandDoc(request),
                     request.getBatchSize(),
                     namespaces,
                     privileges,
@@ -365,14 +365,14 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // Add 'command' object to explain output.
         if (expCtx->explain) {
             explain_common::appendIfRoom(
-                request.serializeToCommandObj().toBson(), "command", result);
+                aggregation_request_helper::serializeToCommandObj(request), "command", result);
         }
     }
     return status;
 }
 
 Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
-                                          const AggregationRequest& request,
+                                          const AggregateCommand& request,
                                           const ResolvedView& resolvedView,
                                           const NamespaceString& requestedNss,
                                           const PrivilegeVector& privileges,

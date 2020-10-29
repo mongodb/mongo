@@ -69,7 +69,7 @@ jsTest.log("Run aggregation pipeline on non-oplog with $_requestReshardingResume
 const resNotOplog = localDb.runCommand(
     {aggregate: ns, pipeline: [{limit: 100}], $_requestReshardingResumeToken: true, cursor: {}});
 
-assert.commandFailedWithCode(resNotOplog, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(resNotOplog, 40324);
 
 jsTest.log("Run aggregation pipeline on oplog with empty batch");
 const resEmpty = localDb.runCommand({

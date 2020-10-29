@@ -120,7 +120,7 @@ assert.commandFailedWithCode(coll.runCommand({
     cursor: {},
     allowPartialResults: true
 }),
-                             ErrorCodes.FailedToParse);
+                             [ErrorCodes.FailedToParse, 40415]);
 
 st.stop();
 }());

@@ -139,7 +139,7 @@ public:
     }
 
     StatusWith<PrivilegeVector> getPrivilegesForAggregate(const NamespaceString&,
-                                                          const AggregationRequest&,
+                                                          const AggregateCommand&,
                                                           bool) override {
         return PrivilegeVector();
     }

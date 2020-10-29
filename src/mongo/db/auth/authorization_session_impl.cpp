@@ -52,7 +52,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -90,10 +90,10 @@ Status checkAuthForCreateOrModifyView(AuthorizationSession* authzSession,
         return Status::OK();
     }
 
-    auto status = AggregationRequest::parseFromBSON(viewNs,
-                                                    BSON("aggregate" << viewOnNs.coll()
-                                                                     << "pipeline" << viewPipeline
-                                                                     << "cursor" << BSONObj()));
+    auto status = aggregation_request_helper::parseFromBSON(
+        viewNs,
+        BSON("aggregate" << viewOnNs.coll() << "pipeline" << viewPipeline << "cursor" << BSONObj()
+                         << "$db" << viewOnNs.db()));
     if (!status.isOK())
         return status.getStatus();
 
@@ -269,7 +269,7 @@ PrivilegeVector AuthorizationSessionImpl::getDefaultPrivileges() {
 }
 
 StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
-    const NamespaceString& nss, const AggregationRequest& request, bool isMongos) {
+    const NamespaceString& nss, const AggregateCommand& request, bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "Invalid input namespace, " << nss.ns());
@@ -306,7 +306,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::getPrivilegesForAggregate(
     for (auto&& pipelineStage : pipeline) {
         liteParsedDocSource = LiteParsedDocumentSource::parse(nss, pipelineStage);
         PrivilegeVector currentPrivs = liteParsedDocSource->requiredPrivileges(
-            isMongos, request.shouldBypassDocumentValidation());
+            isMongos, request.getBypassDocumentValidation().value_or(false));
         Privilege::addPrivilegesToPrivilegeVector(&privileges, currentPrivs);
     }
     return privileges;

@@ -40,6 +40,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -71,7 +72,7 @@ public:
         : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
           _opCtx(_queryServiceContext->makeOperationContext()),
           _ctx(new ExpressionContextForTest(_opCtx.get(),
-                                            AggregationRequest(NamespaceString(ns), {}))) {}
+                                            AggregateCommand(NamespaceString(ns), {}))) {}
 
     virtual ~CheckResultsBase() {}
 

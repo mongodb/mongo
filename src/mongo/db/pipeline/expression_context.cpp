@@ -46,7 +46,7 @@ ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
     : ns(std::move(ns)), pipeline(std::move(pipeline)) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
-                                     const AggregationRequest& request,
+                                     const AggregateCommand& request,
                                      std::unique_ptr<CollatorInterface> collator,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces,
@@ -54,18 +54,18 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      bool mayDbProfile)
     : ExpressionContext(opCtx,
                         request.getExplain(),
-                        request.isFromMongos(),
-                        request.needsMerge(),
-                        request.shouldAllowDiskUse(),
-                        request.shouldBypassDocumentValidation(),
+                        request.getFromMongos(),
+                        request.getNeedsMerge(),
+                        request.getAllowDiskUse(),
+                        request.getBypassDocumentValidation().value_or(false),
                         request.getIsMapReduceCommand(),
-                        request.getNamespaceString(),
+                        request.getNamespace(),
                         request.getLegacyRuntimeConstants(),
                         std::move(collator),
                         std::move(processInterface),
                         std::move(resolvedNamespaces),
                         std::move(collUUID),
-                        request.getLetParameters(),
+                        request.getLet(),
                         mayDbProfile) {
 
     if (request.getIsMapReduceCommand()) {

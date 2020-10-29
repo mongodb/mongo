@@ -46,6 +46,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
@@ -158,8 +159,10 @@ public:
                 return viewAggregation.getStatus();
             }
 
+            auto viewAggCmd =
+                OpMsgRequest::fromDBAndBody(nss.db(), viewAggregation.getValue()).body;
             auto viewAggRequest =
-                AggregationRequest::parseFromBSON(nss, viewAggregation.getValue(), verbosity);
+                aggregation_request_helper::parseFromBSON(nss, viewAggCmd, verbosity);
             if (!viewAggRequest.isOK()) {
                 return viewAggRequest.getStatus();
             }

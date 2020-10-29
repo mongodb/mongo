@@ -188,7 +188,7 @@ clientDriverEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/db/pipeline/aggregation_request',
+        '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
         '$BUILD_DIR/mongo/db/query/command_request_response',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/wire_version',

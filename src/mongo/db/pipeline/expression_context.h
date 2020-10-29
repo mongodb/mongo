@@ -42,7 +42,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
@@ -104,7 +104,7 @@ public:
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */
     ExpressionContext(OperationContext* opCtx,
-                      const AggregationRequest& request,
+                      const AggregateCommand& request,
                       std::unique_ptr<CollatorInterface> collator,
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
@@ -113,7 +113,7 @@ public:
 
     /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation. This version
-     * requires finer-grained parameters but does not require an AggregationRequest.
+     * requires finer-grained parameters but does not require an AggregateCommand.
      * 'resolvedNamespaces' maps collection names (not full namespaces) to ResolvedNamespaces.
      */
     ExpressionContext(OperationContext* opCtx,
