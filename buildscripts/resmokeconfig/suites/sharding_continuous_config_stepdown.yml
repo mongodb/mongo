@@ -157,6 +157,12 @@ selector:
   - jstests/sharding/regex_targeting.js
   # Test does not expect the primary config server node to step down.
   - jstests/sharding/shard_collection_sets_shard_version_on_retry.js
+  # This test runs removeShard repeatedly until the state is completed. Config server failover could
+  # cause each _configsvrRemoveShard command after the first one to fail the term number validation
+  # prior to waiting for write concern. The reason is that the command will not do any write so the
+  # term in the client opTime could be lower than the actual term. In v4.2 and after, this issue was
+  # fixed by SERVER-33727.
+  - jstests/sharding/balancing_sessions_collection.js
 
 executor:
   config:
