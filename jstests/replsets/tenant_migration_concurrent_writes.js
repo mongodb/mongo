@@ -268,9 +268,9 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
     // committed the abort decision. Otherwise, the command below is expected to block and then get
     // rejected.
     assert.soon(() => {
-        const mtab =
+        const mtabs =
             testOpts.primaryDB.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtab[tenantId].access === TenantMigrationUtil.accessState.kAllow;
+        return mtabs[tenantId].state === TenantMigrationUtil.accessState.kAborted;
     });
 
     runCommand(testOpts);

@@ -114,6 +114,11 @@ namespace mongo {
 class TenantMigrationAccessBlocker
     : public std::enable_shared_from_this<TenantMigrationAccessBlocker> {
 public:
+    /**
+     * The access states of an mtab.
+     */
+    enum class State { kAllow, kBlockWrites, kBlockWritesAndReads, kReject, kAborted };
+
     TenantMigrationAccessBlocker(ServiceContext* serviceContext,
                                  std::shared_ptr<executor::TaskExecutor> executor,
                                  std::string tenantId,
@@ -156,10 +161,10 @@ public:
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const;
 
+    std::string stateToString(State state) const;
+
 private:
     ExecutorFuture<void> _waitForOpTimeToMajorityCommit(repl::OpTime opTime);
-
-    enum class Access { kAllow, kBlockWrites, kBlockWritesAndReads, kReject };
 
     ServiceContext* _serviceContext;
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -169,7 +174,7 @@ private:
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlocker::_mutex");
 
-    Access _access{Access::kAllow};
+    State _state{State::kAllow};
 
     boost::optional<Timestamp> _blockTimestamp;
     boost::optional<repl::OpTime> _commitOrAbortOpTime;

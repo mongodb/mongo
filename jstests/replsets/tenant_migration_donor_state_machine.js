@@ -117,9 +117,9 @@ let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
     // Wait for the migration to enter the blocking state.
     blockingFp.wait();
 
-    let mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-    assert.eq(mtab[kTenantId].access, TenantMigrationUtil.accessState.kBlockingReadsAndWrites);
-    assert(mtab[kTenantId].blockTimestamp);
+    let mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+    assert.eq(mtabs[kTenantId].state, TenantMigrationUtil.accessState.kBlockWritesAndReads);
+    assert(mtabs[kTenantId].blockTimestamp);
 
     let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
     let blockOplogEntry = donorPrimary.getDB("local").oplog.rs.findOne(
@@ -145,10 +145,10 @@ let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
     assert.eq(donorDoc.commitOrAbortOpTime.ts, commitOplogEntry.ts);
 
     assert.soon(() => {
-        mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtab[kTenantId].access === TenantMigrationUtil.accessState.kReject;
+        mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+        return mtabs[kTenantId].state === TenantMigrationUtil.accessState.kReject;
     });
-    assert(mtab[kTenantId].commitOrAbortOpTime);
+    assert(mtabs[kTenantId].commitOrAbortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =
@@ -182,12 +182,12 @@ let configDonorsColl = donorPrimary.getCollection(kConfigDonorsNS);
     assert.eq(donorDoc.commitOrAbortOpTime.ts, abortOplogEntry.ts);
     assert.eq(donorDoc.abortReason.code, ErrorCodes.InternalError);
 
-    let mtab;
+    let mtabs;
     assert.soon(() => {
-        mtab = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtab[kTenantId].access === TenantMigrationUtil.accessState.kAllow;
+        mtabs = donorPrimary.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
+        return mtabs[kTenantId].state === TenantMigrationUtil.accessState.kAborted;
     });
-    assert(mtab[kTenantId].commitOrAbortOpTime);
+    assert(mtabs[kTenantId].commitOrAbortOpTime);
 
     expectedNumRecipientSyncDataCmdSent += 2;
     const recipientSyncDataMetrics =

@@ -86,13 +86,12 @@ if (donorDoc) {
         case "data sync":
             assert.soon(() => TenantMigrationUtil
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .access == TenantMigrationUtil.accessState.kAllow);
+                                  .state == TenantMigrationUtil.accessState.kAllow);
             break;
         case "blocking":
-            assert.soon(
-                () =>
-                    TenantMigrationUtil.getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                        .access == TenantMigrationUtil.accessState.kBlockingReadsAndWrites);
+            assert.soon(() => TenantMigrationUtil
+                                  .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
+                                  .state == TenantMigrationUtil.accessState.kBlockWritesAndReads);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
@@ -102,7 +101,7 @@ if (donorDoc) {
         case "committed":
             assert.soon(() => TenantMigrationUtil
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .access == TenantMigrationUtil.accessState.kReject);
+                                  .state == TenantMigrationUtil.accessState.kReject);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
@@ -117,7 +116,7 @@ if (donorDoc) {
         case "aborted":
             assert.soon(() => TenantMigrationUtil
                                   .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)
-                                  .access == TenantMigrationUtil.accessState.kAllow);
+                                  .state == TenantMigrationUtil.accessState.kAborted);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
                                         .getTenantMigrationAccessBlocker(initialSyncNode, kTenantId)

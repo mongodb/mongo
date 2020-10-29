@@ -15,14 +15,6 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-// An object that mirrors the access states for the TenantMigrationAccessBlocker.
-const accessState = {
-    kAllow: 0,
-    kBlockingWrites: 1,
-    kBlockingReadsAndWrites: 2,
-    kReject: 3
-};
-
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donor',
@@ -113,12 +105,12 @@ if (donorDoc) {
         case "data sync":
             assert.soon(
                 () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
-                          .access == TenantMigrationUtil.accessState.kAllow);
+                          .state == TenantMigrationUtil.accessState.kAllow);
             break;
         case "blocking":
             assert.soon(
                 () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
-                          .access == TenantMigrationUtil.accessState.kBlockingReadsAndWrites);
+                          .state == TenantMigrationUtil.accessState.kBlockWritesAndReads);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
                                         .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
@@ -128,7 +120,7 @@ if (donorDoc) {
         case "committed":
             assert.soon(
                 () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
-                          .access == TenantMigrationUtil.accessState.kReject);
+                          .state == TenantMigrationUtil.accessState.kReject);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
                                         .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
@@ -143,7 +135,7 @@ if (donorDoc) {
         case "aborted":
             assert.soon(
                 () => TenantMigrationUtil.getTenantMigrationAccessBlocker(donorPrimary, kTenantId)
-                          .access == TenantMigrationUtil.accessState.kAllow);
+                          .state == TenantMigrationUtil.accessState.kAborted);
             assert.soon(
                 () => bsonWoCompare(TenantMigrationUtil
                                         .getTenantMigrationAccessBlocker(donorPrimary, kTenantId)

@@ -3,7 +3,13 @@
  */
 var TenantMigrationUtil = (function() {
     // An object that mirrors the access states for the TenantMigrationAccessBlocker.
-    const accessState = {kAllow: 0, kBlockingWrites: 1, kBlockingReadsAndWrites: 2, kReject: 3};
+    const accessState = {
+        kAllow: "allow",
+        kBlockWrites: "blockWrites",
+        kBlockWritesAndReads: "blockWritesAndReads",
+        kReject: "reject",
+        kAborted: "aborted"
+    };
 
     /**
      * Runs the donorStartMigration command with the given migration options every 'intervalMS'
@@ -119,7 +125,7 @@ var TenantMigrationUtil = (function() {
             return false;
         }
         const mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[tenantId].access === TenantMigrationUtil.accessState.kReject;
+        return mtabs[tenantId].state === TenantMigrationUtil.accessState.kReject;
     }
 
     /**
@@ -132,7 +138,7 @@ var TenantMigrationUtil = (function() {
             return false;
         }
         const mtabs = node.adminCommand({serverStatus: 1}).tenantMigrationAccessBlocker;
-        return mtabs[tenantId].access === TenantMigrationUtil.accessState.kAllow;
+        return mtabs[tenantId].state === TenantMigrationUtil.accessState.kAborted;
     }
 
     /**
