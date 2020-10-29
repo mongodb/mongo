@@ -459,7 +459,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
             // The external sorter is not part of the storage engine and therefore does not need a
             // WriteUnitOfWork to write keys.
-            uassertStatusOK(insertSingleDocumentForInitialSyncOrRecovery(opCtx, objToIndex, loc));
+            uassertStatusOK(_insert(opCtx, objToIndex, loc));
 
             _failPointHangDuringBuild(opCtx,
                                       &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
@@ -552,6 +552,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(OperationContext* opCtx,
                                                                      const BSONObj& doc,
                                                                      const RecordId& loc) {
+    return _insert(opCtx, doc, loc);
+}
+
+Status MultiIndexBlock::_insert(OperationContext* opCtx, const BSONObj& doc, const RecordId& loc) {
     invariant(!_buildIsCleanedUp);
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {

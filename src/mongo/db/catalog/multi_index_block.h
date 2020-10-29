@@ -317,6 +317,8 @@ private:
                                             const CollectionPtr& collection,
                                             const IndexCatalogEntry* refIdx);
 
+    Status _insert(OperationContext* opCtx, const BSONObj& wholeDocument, const RecordId& loc);
+
     // Is set during init() and ensures subsequent function calls act on the same Collection.
     boost::optional<UUID> _collectionUUID;
 
