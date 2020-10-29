@@ -93,7 +93,15 @@ public:
 
     void attachCurOpErrInfo(OperationContext*, const BSONObj&) const override {}
 
-    void handleException(const Status& status, OperationContext* opCtx) const override {}
+    bool refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) const
+        noexcept override {
+        return false;
+    }
+
+    bool refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) const
+        noexcept override {
+        return false;
+    }
 
     void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {}
 

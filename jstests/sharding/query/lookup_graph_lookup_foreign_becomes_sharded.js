@@ -161,16 +161,6 @@ for (let testCase of testCases) {
     assert.eq(aggCmdRes.cursor.firstBatch.length, batchSize);
 }
 
-// Confirm that the profiler shows a single StaleConfig exception for the source namespace...
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: primaryDB,
-    filter: {
-        ns: sourceCollection.getFullName(),
-        errCode: ErrorCodes.StaleConfig,
-        errMsg: {$regex: `${sourceCollection.getFullName()} is not currently known`}
-    }
-});
-
 // ... and a single StaleConfig exception for the foreign namespace. Note that the 'ns' field of the
 // profiler entry is the source collection in both cases, because the $lookup's parent aggregation
 // produces the profiler entry, and it is always running on the source collection.

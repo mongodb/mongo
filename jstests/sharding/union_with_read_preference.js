@@ -54,7 +54,7 @@ assert.eq(mongosColl
 // Test that the union's sub-pipelines go to the primary.
 for (let rs of [st.rs0, st.rs1]) {
     const primaryDB = rs.getPrimary().getDB(dbName);
-    profilerHasSingleMatchingEntryOrThrow({
+    profilerHasAtLeastOneMatchingEntryOrThrow({
         profileDB: primaryDB,
         filter: {
             ns: unionedColl.getFullName(),
@@ -79,7 +79,7 @@ assert.eq(mongosColl
 // Test that the union's sub-pipelines go to the secondary.
 for (let rs of [st.rs0, st.rs1]) {
     const secondaryDB = rs.getSecondary().getDB(dbName);
-    profilerHasSingleMatchingEntryOrThrow({
+    profilerHasAtLeastOneMatchingEntryOrThrow({
         profileDB: secondaryDB,
         filter: {
             ns: unionedColl.getFullName(),
@@ -136,7 +136,7 @@ assert.eq(runAgg(), [{_id: -1, docNum: [0, 2, 4]}, {_id: 1, docNum: [1, 3, 5]}])
 for (let rs of [st.rs0, st.rs1]) {
     jsTestLog(`Testing profile on shard ${rs.getURL()}`);
     const secondaryDB = rs.getSecondary().getDB(dbName);
-    profilerHasSingleMatchingEntryOrThrow({
+    profilerHasAtLeastOneMatchingEntryOrThrow({
         profileDB: secondaryDB,
         filter: {
             ns: unionedColl.getFullName(),
@@ -148,7 +148,7 @@ for (let rs of [st.rs0, st.rs1]) {
             errCode: {$ne: ErrorCodes.StaleConfig}
         }
     });
-    profilerHasSingleMatchingEntryOrThrow({
+    profilerHasAtLeastOneMatchingEntryOrThrow({
         profileDB: secondaryDB,
         filter: {
             ns: secondTargetColl.getFullName(),

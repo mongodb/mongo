@@ -182,37 +182,6 @@ public:
         CurOp::get(opCtx)->debug().errInfo = getStatusFromCommandResult(replyObj);
     }
 
-    void handleException(const Status& status, OperationContext* opCtx) const override {
-        // If we got a stale config, wait in case the operation is stuck in a critical section
-        if (auto sce = status.extraInfo<StaleConfigInfo>()) {
-            // A config server acting as a router may return a StaleConfig exception, but a config
-            // server won't contain data for a sharded collection, so skip handling the exception.
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                return;
-            }
-
-            if (sce->getCriticalSectionSignal()) {
-                // Set migration critical section on operation sharding state: operation will wait
-                // for the migration to finish before returning.
-                auto& oss = OperationShardingState::get(opCtx);
-                oss.setMigrationCriticalSectionSignal(sce->getCriticalSectionSignal());
-            }
-
-            if (!opCtx->getClient()->isInDirectClient()) {
-                // We already have the StaleConfig exception, so just swallow any errors due to
-                // refresh
-                onShardVersionMismatchNoExcept(opCtx, sce->getNss(), sce->getVersionReceived())
-                    .ignore();
-            }
-        } else if (auto sce = status.extraInfo<StaleDbRoutingVersion>()) {
-            if (!opCtx->getClient()->isInDirectClient()) {
-                onDbVersionMismatchNoExcept(
-                    opCtx, sce->getDb(), sce->getVersionReceived(), sce->getVersionWanted())
-                    .ignore();
-            }
-        }
-    }
-
     // Called from the error contexts where request may not be available.
     void appendReplyMetadataOnError(OperationContext* opCtx,
                                     BSONObjBuilder* metadataBob) const override {
@@ -256,6 +225,18 @@ public:
             auto opTime = Grid::get(opCtx)->configOpTime();
             rpc::ConfigServerMetadata(opTime).writeToMetadata(metadataBob);
         }
+    }
+
+    bool refreshDatabase(OperationContext* opCtx, const StaleDbRoutingVersion& se) const
+        noexcept override {
+        return onDbVersionMismatchNoExcept(
+                   opCtx, se.getDb(), se.getVersionReceived(), se.getVersionWanted())
+            .isOK();
+    }
+
+    bool refreshCollection(OperationContext* opCtx, const StaleConfigInfo& se) const
+        noexcept override {
+        return onShardVersionMismatchNoExcept(opCtx, se.getNss(), se.getVersionReceived()).isOK();
     }
 
     void advanceConfigOpTimeFromRequestMetadata(OperationContext* opCtx) const override {

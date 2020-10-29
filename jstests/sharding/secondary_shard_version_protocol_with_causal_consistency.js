@@ -81,21 +81,6 @@ profilerHasSingleMatchingEntryOrThrow({
     }
 });
 
-// The recipient shard will then return a stale shard version error because it needs to refresh
-// its own routing table.
-profilerHasSingleMatchingEntryOrThrow({
-    profileDB: recipientShardSecondary.getDB(dbName),
-    filter: {
-        "ns": ns,
-        "command.count": collName,
-        "command.query": {x: 1},
-        "command.shardVersion": {"$exists": true},
-        "command.$readPreference": {"mode": "secondary"},
-        "command.readConcern.afterClusterTime": {"$exists": true},
-        "errCode": ErrorCodes.StaleConfig
-    }
-});
-
 // Finally, the command is retried on the recipient shard and succeeds.
 profilerHasSingleMatchingEntryOrThrow({
     profileDB: recipientShardSecondary.getDB(dbName),
