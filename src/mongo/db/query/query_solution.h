@@ -860,6 +860,11 @@ struct SortNode : public QuerySolutionNodeWithSortSet {
 
     bool addSortKeyMetadata = false;
 
+    // The maximum number of bytes of memory we're willing to use during execution of the sort. If
+    // this limit is exceeded and we're not allowed to spill to disk, the query will fail at
+    // execution time. Otherwise, the data will be spilled to disk.
+    uint64_t maxMemoryUsageBytes = internalQueryMaxBlockingSortMemoryUsageBytes.load();
+
 protected:
     void cloneSortData(SortNode* copy) const;
 

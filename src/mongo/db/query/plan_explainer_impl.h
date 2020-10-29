@@ -62,4 +62,20 @@ private:
  * found.
  */
 PlanStage* getStageByType(PlanStage* root, StageType type);
+
+/**
+ * Adds the path-level multikey information to the explain output in a field called "multiKeyPaths".
+ * The value associated with the "multiKeyPaths" field is an object with keys equal to those in the
+ * index key pattern and values equal to an array of strings corresponding to paths that cause the
+ * index to be multikey.
+ *
+ * For example, with the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause the
+ * index to be multikey, we'd have {'multiKeyPaths': {'a.b': ['a', 'a.b'], 'a.c': ['a']}}.
+ *
+ * This function should only be called if the associated index supports path-level multikey
+ * tracking.
+ */
+void appendMultikeyPaths(const BSONObj& keyPattern,
+                         const MultikeyPaths& multikeyPaths,
+                         BSONObjBuilder* bob);
 }  // namespace mongo

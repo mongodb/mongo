@@ -397,6 +397,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
 
         IndexEntry entry(BSON(fieldName << wildcardIndex.keyPattern.firstElement()),
                          IndexType::INDEX_WILDCARD,
+                         IndexDescriptor::kLatestIndexVersion,
                          isMultikey,
                          std::move(multikeyPaths),
                          // Expanded index entries always use the fixed-size multikey paths

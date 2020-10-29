@@ -248,6 +248,7 @@ std::pair<IndexEntry, std::unique_ptr<WildcardProjection>> makeWildcardEntry(BSO
         WildcardKeyGenerator::createProjectionExecutor(keyPattern, {}));
     return {IndexEntry(keyPattern,
                        IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       IndexDescriptor::kLatestIndexVersion,
                        false,  // multikey
                        {},
                        {},
@@ -903,6 +904,7 @@ protected:
         params.indices.push_back(
             IndexEntry(keyPattern,
                        IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       IndexDescriptor::kLatestIndexVersion,
                        multikey,
                        {},
                        {},
@@ -919,6 +921,7 @@ protected:
         params.indices.push_back(
             IndexEntry(keyPattern,
                        IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                       IndexDescriptor::kLatestIndexVersion,
                        multikey,
                        {},
                        {},
@@ -934,6 +937,7 @@ protected:
     void addIndex(BSONObj keyPattern, const std::string& indexName, CollatorInterface* collator) {
         IndexEntry entry(keyPattern,
                          IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                         IndexDescriptor::kLatestIndexVersion,
                          false,
                          {},
                          {},

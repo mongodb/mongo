@@ -315,7 +315,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolu
                                       std::move(values),
                                       sn->limit ? sn->limit
                                                 : std::numeric_limits<std::size_t>::max(),
-                                      internalQueryMaxBlockingSortMemoryUsageBytes.load(),
+                                      sn->maxMemoryUsageBytes,
                                       _cq.getExpCtx()->allowDiskUse,
                                       _data.trialRunProgressTracker.get(),
                                       root->nodeId());

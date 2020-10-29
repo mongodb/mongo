@@ -71,6 +71,7 @@ auto makeWildcardEntry(BSONObj keyPattern, const MatchExpression* filterExpr = n
         WildcardKeyGenerator::createProjectionExecutor(keyPattern, {}));
     return std::make_pair(IndexEntry(keyPattern,
                                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                                     IndexDescriptor::kLatestIndexVersion,
                                      false,  // multikey
                                      {},
                                      {},
@@ -91,6 +92,7 @@ TEST(PlanCacheIndexabilityTest, SparseIndexSimple) {
     state.updateDiscriminators(
         {IndexEntry(keyPattern,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},
@@ -131,6 +133,7 @@ TEST(PlanCacheIndexabilityTest, SparseIndexCompound) {
     state.updateDiscriminators(
         {IndexEntry(keyPattern,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},
@@ -178,6 +181,7 @@ TEST(PlanCacheIndexabilityTest, PartialIndexSimple) {
     state.updateDiscriminators(
         {IndexEntry(keyPattern,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},
@@ -227,6 +231,7 @@ TEST(PlanCacheIndexabilityTest, PartialIndexAnd) {
     state.updateDiscriminators(
         {IndexEntry(keyPattern,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},
@@ -289,6 +294,7 @@ TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
     state.updateDiscriminators(
         {IndexEntry(keyPattern_a,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern_a)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},
@@ -301,6 +307,7 @@ TEST(PlanCacheIndexabilityTest, MultiplePartialIndexes) {
                     nullptr),
          IndexEntry(keyPattern_b,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern_b)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},
@@ -374,6 +381,7 @@ TEST(PlanCacheIndexabilityTest, IndexNeitherSparseNorPartial) {
     state.updateDiscriminators(
         {IndexEntry(keyPattern,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},
@@ -395,6 +403,7 @@ TEST(PlanCacheIndexabilityTest, DiscriminatorForCollationIndicatesWhenCollations
     auto keyPattern = BSON("a" << 1);
     IndexEntry entry(keyPattern,
                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                     IndexDescriptor::kLatestIndexVersion,
                      false,  // multikey
                      {},
                      {},
@@ -485,6 +494,7 @@ TEST(PlanCacheIndexabilityTest, CompoundIndexCollationDiscriminator) {
     state.updateDiscriminators(
         {IndexEntry(keyPattern,
                     IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                    IndexDescriptor::kLatestIndexVersion,
                     false,  // multikey
                     {},
                     {},

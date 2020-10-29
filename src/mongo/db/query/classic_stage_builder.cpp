@@ -128,7 +128,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 _ws,
                 SortPattern{snDefault->pattern, _cq.getExpCtx()},
                 snDefault->limit,
-                internalQueryMaxBlockingSortMemoryUsageBytes.load(),
+                snDefault->maxMemoryUsageBytes,
                 snDefault->addSortKeyMetadata,
                 std::move(childStage));
         }
@@ -140,7 +140,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
                 _ws,
                 SortPattern{snSimple->pattern, _cq.getExpCtx()},
                 snSimple->limit,
-                internalQueryMaxBlockingSortMemoryUsageBytes.load(),
+                snSimple->maxMemoryUsageBytes,
                 snSimple->addSortKeyMetadata,
                 std::move(childStage));
         }

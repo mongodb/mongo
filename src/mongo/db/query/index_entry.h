@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
@@ -149,6 +150,7 @@ struct CoreIndexInfo {
 struct IndexEntry : CoreIndexInfo {
     IndexEntry(const BSONObj& kp,
                IndexType type,
+               IndexDescriptor::IndexVersion version,
                bool mk,
                const MultikeyPaths& mkp,
                std::set<FieldRef> multikeyPathSet,
@@ -160,6 +162,7 @@ struct IndexEntry : CoreIndexInfo {
                const CollatorInterface* ci,
                const WildcardProjection* wildcardProjection)
         : CoreIndexInfo(kp, type, sp, std::move(ident), fe, ci, wildcardProjection),
+          version(version),
           multikey(mk),
           multikeyPaths(mkp),
           multikeyPathSet(std::move(multikeyPathSet)),
@@ -224,6 +227,7 @@ struct IndexEntry : CoreIndexInfo {
             sizeof(*this);
     }
 
+    IndexDescriptor::IndexVersion version;
     bool multikey;
 
     // If non-empty, 'multikeyPaths' is a vector with size equal to the number of elements in the

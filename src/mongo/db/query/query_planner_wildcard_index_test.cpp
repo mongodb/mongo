@@ -75,6 +75,7 @@ protected:
 
         params.indices.push_back({std::move(keyPattern),
                                   IndexType::INDEX_WILDCARD,
+                                  IndexDescriptor::kLatestIndexVersion,
                                   isMultikey,
                                   {},  // multikeyPaths
                                   std::move(multikeyFieldRefs),

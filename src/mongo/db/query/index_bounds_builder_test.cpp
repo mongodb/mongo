@@ -961,6 +961,7 @@ TEST_F(IndexBoundsBuilderTest, ExistsTrueSparse) {
     IndexEntry testIndex =
         IndexEntry(keyPattern,
                    IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                   IndexDescriptor::kLatestIndexVersion,
                    false,  // multikey
                    {},
                    {},

@@ -71,6 +71,7 @@ void QueryPlannerTest::clearState() {
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey) {
     params.indices.push_back({keyPattern,
                               IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                              IndexDescriptor::kLatestIndexVersion,
                               multikey,
                               {},
                               {},
@@ -86,6 +87,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey) {
 void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
     params.indices.push_back({keyPattern,
                               IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                              IndexDescriptor::kLatestIndexVersion,
                               multikey,
                               {},
                               {},
@@ -102,6 +104,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse, 
     params.indices.push_back(
         {keyPattern,
          IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+         IndexDescriptor::kLatestIndexVersion,
          multikey,
          {},
          {},
@@ -117,6 +120,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, bool multikey, bool sparse, 
 void QueryPlannerTest::addIndex(BSONObj keyPattern, BSONObj infoObj) {
     params.indices.push_back({keyPattern,
                               IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                              IndexDescriptor::kLatestIndexVersion,
                               false,  // multikey
                               {},
                               {},
@@ -132,6 +136,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, BSONObj infoObj) {
 void QueryPlannerTest::addIndex(BSONObj keyPattern, MatchExpression* filterExpr) {
     params.indices.push_back({keyPattern,
                               IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
+                              IndexDescriptor::kLatestIndexVersion,
                               false,  // multikey
                               {},
                               {},
@@ -159,6 +164,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const MultikeyPaths& multike
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
+                     IndexDescriptor::kLatestIndexVersion,
                      multikey,
                      {},
                      {},
@@ -183,6 +189,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern, const CollatorInterface* col
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
+                     IndexDescriptor::kLatestIndexVersion,
                      multikey,
                      {},
                      {},
@@ -209,6 +216,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
+                     IndexDescriptor::kLatestIndexVersion,
                      multikey,
                      {},
                      {},
@@ -234,6 +242,7 @@ void QueryPlannerTest::addIndex(BSONObj keyPattern,
     const BSONObj infoObj;
     IndexEntry entry(keyPattern,
                      type,
+                     IndexDescriptor::kLatestIndexVersion,
                      multikey,
                      {},
                      {},

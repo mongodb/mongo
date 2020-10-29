@@ -166,40 +166,6 @@ size_t getDocsExamined(StageType type, const SpecificStats* specific) {
 }
 
 /**
- * Adds the path-level multikey information to the explain output in a field called "multiKeyPaths".
- * The value associated with the "multiKeyPaths" field is an object with keys equal to those in the
- * index key pattern and values equal to an array of strings corresponding to paths that cause the
- * index to be multikey.
- *
- * For example, with the index {'a.b': 1, 'a.c': 1} where the paths "a" and "a.b" cause the
- * index to be multikey, we'd have {'multiKeyPaths': {'a.b': ['a', 'a.b'], 'a.c': ['a']}}.
- *
- * This function should only be called if the associated index supports path-level multikey
- * tracking.
- */
-void appendMultikeyPaths(const BSONObj& keyPattern,
-                         const MultikeyPaths& multikeyPaths,
-                         BSONObjBuilder* bob) {
-    BSONObjBuilder subMultikeyPaths(bob->subobjStart("multiKeyPaths"));
-
-    size_t i = 0;
-    for (const auto& keyElem : keyPattern) {
-        const FieldRef path{keyElem.fieldNameStringData()};
-
-        BSONArrayBuilder arrMultikeyComponents(
-            subMultikeyPaths.subarrayStart(keyElem.fieldNameStringData()));
-        for (const auto& multikeyComponent : multikeyPaths[i]) {
-            arrMultikeyComponents.append(path.dottedSubstring(0, multikeyComponent + 1));
-        }
-        arrMultikeyComponents.doneFast();
-
-        ++i;
-    }
-
-    subMultikeyPaths.doneFast();
-}
-
-/**
  * Converts the stats tree 'stats' into a corresponding BSON object containing explain information.
  *
  * Generates the BSON stats at a verbosity specified by 'verbosity'.
@@ -211,10 +177,9 @@ void statsToBSON(const PlanStageStats& stats,
     invariant(bob);
     invariant(topLevelBob);
 
-    // Stop as soon as the BSON object we're building exceeds 10 MB.
-    static const int kMaxStatsBSONSize = 10 * 1024 * 1024;
-    if (topLevelBob->len() > kMaxStatsBSONSize) {
-        bob->append("warning", "stats tree exceeded 10 MB");
+    // Stop as soon as the BSON object we're building exceeds the limit.
+    if (topLevelBob->len() > kMaxExplainStatsBSONSizeMB) {
+        bob->append("warning", "stats tree exceeded BSON size limit for explain");
         return;
     }
 
@@ -337,8 +302,8 @@ void statsToBSON(const PlanStageStats& stats,
         bob->append("indexVersion", spec->indexVersion);
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
-        if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {
-            bob->append("warning", "index bounds omitted due to BSON size limit");
+        if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxExplainStatsBSONSizeMB) {
+            bob->append("warning", "index bounds omitted due to BSON size limit for explain");
         } else {
             bob->append("indexBounds", spec->indexBounds);
         }
@@ -403,8 +368,8 @@ void statsToBSON(const PlanStageStats& stats,
         bob->append("indexVersion", spec->indexVersion);
         bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
-        if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {
-            bob->append("warning", "index bounds omitted due to BSON size limit");
+        if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxExplainStatsBSONSizeMB) {
+            bob->append("warning", "index bounds omitted due to BSON size limit for explain");
         } else {
             bob->append("indexBounds", spec->indexBounds);
         }
@@ -548,6 +513,28 @@ PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats) {
     return summary;
 }
 }  // namespace
+
+void appendMultikeyPaths(const BSONObj& keyPattern,
+                         const MultikeyPaths& multikeyPaths,
+                         BSONObjBuilder* bob) {
+    BSONObjBuilder subMultikeyPaths(bob->subobjStart("multiKeyPaths"));
+
+    size_t i = 0;
+    for (const auto& keyElem : keyPattern) {
+        const FieldRef path{keyElem.fieldNameStringData()};
+
+        BSONArrayBuilder arrMultikeyComponents(
+            subMultikeyPaths.subarrayStart(keyElem.fieldNameStringData()));
+        for (const auto& multikeyComponent : multikeyPaths[i]) {
+            arrMultikeyComponents.append(path.dottedSubstring(0, multikeyComponent + 1));
+        }
+        arrMultikeyComponents.doneFast();
+
+        ++i;
+    }
+
+    subMultikeyPaths.doneFast();
+}
 
 bool PlanExplainerImpl::isMultiPlan() const {
     return getStageByType(_root, StageType::STAGE_MULTI_PLAN) != nullptr;

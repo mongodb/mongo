@@ -554,6 +554,7 @@ IndexBounds ChunkManager::getIndexBoundsForQuery(const BSONObj& key,
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
     IndexEntry indexEntry(key,
                           indexType,
+                          IndexDescriptor::kLatestIndexVersion,
                           // The shard key index cannot be multikey.
                           false,
                           // Empty multikey paths, since the shard key index cannot be multikey.

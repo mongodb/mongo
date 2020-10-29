@@ -226,6 +226,7 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
 
     return {desc->keyPattern(),
             desc->getIndexType(),
+            desc->version(),
             isMultikey,
             // The fixed-size vector of multikey paths stored in the index catalog.
             ice.getMultikeyPaths(opCtx),

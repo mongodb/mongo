@@ -55,6 +55,7 @@ public:
     IndexEntry buildSimpleIndexEntry(const BSONObj& kp = BSONObj()) {
         return {kp,
                 IndexNames::nameToType(IndexNames::findPluginName(kp)),
+                IndexDescriptor::kLatestIndexVersion,
                 false,
                 {},
                 {},
