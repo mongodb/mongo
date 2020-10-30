@@ -1849,6 +1849,151 @@ void ExpressionDateToString::_doAddDependencies(DepsTracker* deps) const {
     }
 }
 
+/* ----------------------- ExpressionDateDiff ---------------------------- */
+
+// TODO SERVER-53028: make the expression to be available for any FCV when 5.0 becomes last-lts.
+REGISTER_EXPRESSION_WITH_MIN_VERSION(dateDiff,
+                                     ExpressionDateDiff::parse,
+                                     ServerGlobalParams::FeatureCompatibility::Version::kVersion49);
+
+ExpressionDateDiff::ExpressionDateDiff(ExpressionContext* const expCtx,
+                                       boost::intrusive_ptr<Expression> startDate,
+                                       boost::intrusive_ptr<Expression> endDate,
+                                       boost::intrusive_ptr<Expression> unit,
+                                       boost::intrusive_ptr<Expression> timezone)
+    : Expression{expCtx,
+                 {std::move(startDate), std::move(endDate), std::move(unit), std::move(timezone)}},
+      _startDate{_children[0]},
+      _endDate{_children[1]},
+      _unit{_children[2]},
+      _timezone{_children[3]} {}
+
+boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* const expCtx,
+                                                           BSONElement expr,
+                                                           const VariablesParseState& vps) {
+    invariant(expr.fieldNameStringData() == "$dateDiff");
+    uassert(5166301,
+            "$dateDiff only supports an object as its argument",
+            expr.type() == BSONType::Object);
+    BSONElement startDateElement, endDateElement, unitElement, timezoneElem;
+    for (auto&& element : expr.embeddedObject()) {
+        auto field = element.fieldNameStringData();
+        if ("startDate"_sd == field) {
+            startDateElement = element;
+        } else if ("endDate"_sd == field) {
+            endDateElement = element;
+        } else if ("unit"_sd == field) {
+            unitElement = element;
+        } else if ("timezone"_sd == field) {
+            timezoneElem = element;
+        } else {
+            uasserted(5166302,
+                      str::stream()
+                          << "Unrecognized argument to $dateDiff: " << element.fieldName());
+        }
+    }
+    uassert(5166303, "Missing 'startDate' parameter to $dateDiff", startDateElement);
+    uassert(5166304, "Missing 'endDate' parameter to $dateDiff", endDateElement);
+    uassert(5166305, "Missing 'unit' parameter to $dateDiff", unitElement);
+    return new ExpressionDateDiff(expCtx,
+                                  parseOperand(expCtx, startDateElement, vps),
+                                  parseOperand(expCtx, endDateElement, vps),
+                                  parseOperand(expCtx, unitElement, vps),
+                                  timezoneElem ? parseOperand(expCtx, timezoneElem, vps) : nullptr);
+}
+
+boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
+    _startDate = _startDate->optimize();
+    _endDate = _endDate->optimize();
+    _unit = _unit->optimize();
+    if (_timezone) {
+        _timezone = _timezone->optimize();
+    }
+    if (ExpressionConstant::allNullOrConstant({_startDate, _endDate, _unit, _timezone})) {
+        // Everything is a constant, so we can turn into a constant.
+        return ExpressionConstant::create(
+            getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
+    }
+    return this;
+};
+
+Value ExpressionDateDiff::serialize(bool explain) const {
+    return Value{
+        Document{{"$dateDiff"_sd,
+                  Document{{"startDate"_sd, _startDate->serialize(explain)},
+                           {"endDate"_sd, _endDate->serialize(explain)},
+                           {"unit"_sd, _unit->serialize(explain)},
+                           {"timezone"_sd, _timezone ? _timezone->serialize(explain) : Value{}}}}}};
+};
+
+Date_t ExpressionDateDiff::convertToDate(const Value& value, StringData parameterName) {
+    uassert(5166307,
+            str::stream() << "$dateDiff requires '" << parameterName << "' to be a date, but got "
+                          << typeName(value.getType()),
+            value.coercibleToDate());
+    return value.coerceToDate();
+}
+
+/**
+ * Calls function 'function' with zero parameters and returns the result. If AssertionException is
+ * raised during the call of 'function', adds a context 'errorContext' to the exception.
+ */
+template <typename F>
+auto addContextToAssertionException(F&& function, StringData errorContext) {
+    try {
+        return function();
+    } catch (AssertionException& exception) {
+        exception.addContext(str::stream() << errorContext);
+        throw;
+    }
+}
+
+TimeUnit ExpressionDateDiff::convertToTimeUnit(const Value& value) {
+    uassert(5166306,
+            str::stream() << "$dateDiff requires 'unit' to be a string, but got "
+                          << typeName(value.getType()),
+            BSONType::String == value.getType());
+    return addContextToAssertionException([&]() { return parseTimeUnit(value.getString()); },
+                                          "$dateDiff parameter 'unit' value parsing failed"_sd);
+}
+
+Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) const {
+    const Value startDateValue = _startDate->evaluate(root, variables);
+    if (startDateValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    const Value endDateValue = _endDate->evaluate(root, variables);
+    if (endDateValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    const Value unitValue = _unit->evaluate(root, variables);
+    if (unitValue.nullish()) {
+        return Value(BSONNULL);
+    }
+    const auto timezone = addContextToAssertionException(
+        [&]() {
+            return makeTimeZone(
+                getExpressionContext()->timeZoneDatabase, root, _timezone.get(), variables);
+        },
+        "$dateDiff parameter 'timezone' value parsing failed"_sd);
+    if (!timezone) {
+        return Value(BSONNULL);
+    }
+    const Date_t startDate = convertToDate(startDateValue, "startDate"_sd);
+    const Date_t endDate = convertToDate(endDateValue, "endDate"_sd);
+    const TimeUnit unit = convertToTimeUnit(unitValue);
+    return Value{dateDiff(startDate, endDate, unit, *timezone)};
+}
+
+void ExpressionDateDiff::_doAddDependencies(DepsTracker* deps) const {
+    _startDate->addDependencies(deps);
+    _endDate->addDependencies(deps);
+    _unit->addDependencies(deps);
+    if (_timezone) {
+        _timezone->addDependencies(deps);
+    }
+}
+
 /* ----------------------- ExpressionDivide ---------------------------- */
 
 Value ExpressionDivide::evaluate(const Document& root, Variables* variables) const {
