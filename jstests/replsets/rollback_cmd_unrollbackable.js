@@ -49,6 +49,8 @@ options = {
 };
 // Inserts another oplog entry to set minValid ahead.
 assert.writeOK(b_conn.getDB(name).foo.insert({x: 123}));
+replTest.stop(BID);
+b_conn = replTest.start(BID, {noReplSet: true, noCleanData: true});
 var oplog_entry = b_conn.getDB("local").oplog.rs.find().sort({$natural: -1})[0];
 oplog_entry["ts"] = Timestamp(oplog_entry["ts"].t, oplog_entry["ts"].i + 1);
 oplog_entry["op"] = "c";
