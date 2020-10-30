@@ -163,8 +163,9 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
 
     // Mock the expected config server queries.
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-    expectGetCollection(kTestAggregateNss, epoch, shardKeyPattern);
+    expectGetCollection(kTestAggregateNss, epoch, uuid, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version(1, 0, epoch);
 
@@ -239,8 +240,9 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
     // Mock the expected config server queries. Update the distribution as if a chunk [0, 10] was
     // created and moved to the first shard.
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-    expectGetCollection(kTestAggregateNss, epoch, shardKeyPattern);
+    expectGetCollection(kTestAggregateNss, epoch, uuid, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version(1, 0, epoch);
 
@@ -329,8 +331,9 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     // Mock the expected config server queries. Update the distribution so that all chunks are on
     // the same shard.
     const OID epoch = OID::gen();
+    const UUID uuid = UUID::gen();
     const ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
-    expectGetCollection(kTestAggregateNss, epoch, shardKeyPattern);
+    expectGetCollection(kTestAggregateNss, epoch, uuid, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version(1, 0, epoch);
 

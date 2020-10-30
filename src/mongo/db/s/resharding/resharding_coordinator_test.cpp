@@ -97,19 +97,20 @@ protected:
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         OID epoch,
         Date_t lastUpdated) {
-        CollectionType collType;
-        collType.setNss(coordinatorDoc.getNss());
-
+        UUID uuid = UUID::gen();
+        BSONObj shardKey;
         if (coordinatorDoc.getState() >= CoordinatorStateEnum::kCommitted &&
             coordinatorDoc.getState() != CoordinatorStateEnum::kError) {
-            collType.setUUID(_reshardingUUID);
-            collType.setKeyPattern(_newShardKey.toBSON());
+            uuid = _reshardingUUID;
+            shardKey = _newShardKey.toBSON();
         } else {
-            collType.setUUID(_originalUUID);
-            collType.setKeyPattern(_oldShardKey.toBSON());
+            uuid = _originalUUID;
+            shardKey = _oldShardKey.toBSON();
         }
-        collType.setEpoch(std::move(epoch));
-        collType.setUpdatedAt(lastUpdated);
+
+        CollectionType collType(
+            coordinatorDoc.getNss(), std::move(epoch), lastUpdated, std::move(uuid));
+        collType.setKeyPattern(shardKey);
         collType.setUnique(false);
         collType.setDistributionMode(CollectionType::DistributionMode::kSharded);
         if (reshardingFields)
@@ -267,7 +268,7 @@ protected:
              expectedReshardingFields->getState() >= CoordinatorStateEnum::kCommitted &&
              expectedReshardingFields->getState() != CoordinatorStateEnum::kError)) {
             ASSERT_EQUALS(onDiskEntry.getNss(), _originalNss);
-            ASSERT(onDiskEntry.getUUID().get() == _reshardingUUID);
+            ASSERT(onDiskEntry.getUuid() == _reshardingUUID);
             ASSERT_EQUALS(onDiskEntry.getKeyPattern().toBSON().woCompare(_newShardKey.toBSON()), 0);
             ASSERT_NOT_EQUALS(onDiskEntry.getEpoch(), _originalEpoch);
         }

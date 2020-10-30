@@ -90,11 +90,9 @@ BSONObj getReplSecondaryOkMetadata() {
 TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType expectedColl;
-    expectedColl.setNss(NamespaceString("TestDB.TestNS"));
+    CollectionType expectedColl(
+        NamespaceString("TestDB.TestNS"), OID::gen(), Date_t::now(), UUID::gen());
     expectedColl.setKeyPattern(BSON("KeyName" << 1));
-    expectedColl.setUpdatedAt(Date_t());
-    expectedColl.setEpoch(OID::gen());
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -772,19 +770,16 @@ TEST_F(ShardingCatalogClientTest, RunUserManagementWriteCommandNotWritablePrimar
 TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType coll1;
-    coll1.setNss(NamespaceString{"test.coll1"});
-    coll1.setUpdatedAt(network()->now());
-    coll1.setUnique(false);
-    coll1.setEpoch(OID::gen());
+    CollectionType coll1(NamespaceString{"test.coll1"}, OID::gen(), network()->now(), UUID::gen());
     coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    coll1.setUnique(false);
 
-    CollectionType coll2;
-    coll2.setNss(NamespaceString{"anotherdb.coll1"});
-    coll2.setUpdatedAt(network()->now());
-    coll2.setUnique(false);
-    coll2.setEpoch(OID::gen());
+
+    CollectionType coll2(
+        NamespaceString{"anotherdb.coll1"}, OID::gen(), network()->now(), UUID::gen());
     coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    coll2.setUnique(false);
+
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -836,19 +831,13 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
 TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
     configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
 
-    CollectionType coll1;
-    coll1.setNss(NamespaceString{"test.coll1"});
-    coll1.setUpdatedAt(network()->now());
-    coll1.setUnique(true);
-    coll1.setEpoch(OID::gen());
+    CollectionType coll1(NamespaceString{"test.coll1"}, OID::gen(), network()->now(), UUID::gen());
     coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    coll1.setUnique(true);
 
-    CollectionType coll2;
-    coll2.setNss(NamespaceString{"test.coll2"});
-    coll2.setUpdatedAt(network()->now());
-    coll2.setUnique(false);
-    coll2.setEpoch(OID::gen());
+    CollectionType coll2(NamespaceString{"test.coll2"}, OID::gen(), network()->now(), UUID::gen());
     coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    coll2.setUnique(false);
 
     auto future = launchAsync([this] {
         const std::string dbName = "test";
@@ -893,12 +882,10 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         ASSERT_EQ(ErrorCodes::FailedToParse, swCollections.getStatus());
     });
 
-    CollectionType validColl;
-    validColl.setNss(NamespaceString{"test.coll1"});
-    validColl.setUpdatedAt(network()->now());
-    validColl.setUnique(true);
-    validColl.setEpoch(OID::gen());
+    CollectionType validColl(
+        NamespaceString{"test.coll1"}, OID::gen(), network()->now(), UUID::gen());
     validColl.setKeyPattern(KeyPattern{BSON("_id" << 1)});
+    validColl.setUnique(true);
 
     onFindCommand([this, validColl](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());

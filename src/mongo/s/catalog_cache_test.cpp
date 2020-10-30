@@ -158,9 +158,7 @@ protected:
     }
 
     CollectionType makeCollectionType(const ChunkVersion& collVersion) {
-        CollectionType coll;
-        coll.setNss(kNss);
-        coll.setEpoch(collVersion.epoch());
+        CollectionType coll(kNss, collVersion.epoch(), Date_t::now(), UUID::gen());
         coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
         coll.setUnique(false);
         return coll;

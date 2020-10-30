@@ -80,10 +80,7 @@ public:
         shard2Targeter->setFindHostReturnValue(HostAndPort(_shard2.getHost()));
 
         // insert documents into the config database
-        CollectionType shardedCollection;
-        shardedCollection.setNss(dropNS());
-        shardedCollection.setEpoch(OID::gen());
-        shardedCollection.setUpdatedAt(Date_t::now());
+        CollectionType shardedCollection(dropNS(), OID::gen(), Date_t::now(), UUID::gen());
         shardedCollection.setKeyPattern(BSON(_shardKey << 1));
         ASSERT_OK(insertToConfigCollection(
             operationContext(), CollectionType::ConfigNS, shardedCollection.toBSON()));

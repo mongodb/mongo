@@ -42,8 +42,13 @@ namespace mongo {
 
 const NamespaceString CollectionType::ConfigNS("config.collections");
 
-const BSONField<UUID> CollectionType::uuid("uuid");
 const BSONField<std::string> CollectionType::distributionMode("distributionMode");
+
+CollectionType::CollectionType(NamespaceString nss, OID epoch, Date_t updatedAt, UUID uuid)
+    : CollectionTypeBase(std::move(nss), std::move(updatedAt)) {
+    setEpoch(std::move(epoch));
+    setUuid(std::move(uuid));
+}
 
 CollectionType::CollectionType(const BSONObj& obj) {
     CollectionType::parseProtected(IDLParserErrorContext("CollectionType"), obj);
@@ -92,33 +97,12 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         }
     }
 
-    {
-        BSONElement uuidElem;
-        Status status = bsonExtractField(source, uuid.name(), &uuidElem);
-        if (status.isOK()) {
-            auto swUUID = UUID::parse(uuidElem);
-            if (!swUUID.isOK()) {
-                return swUUID.getStatus();
-            }
-            coll._uuid = swUUID.getValue();
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // UUID can be missing in 3.6, because featureCompatibilityVersion can be 3.4, in which
-            // case it remains boost::none.
-        } else {
-            return status;
-        }
-    }
-
     return StatusWith<CollectionType>(coll);
 }
 
 BSONObj CollectionType::toBSON() const {
     BSONObjBuilder builder;
     serialize(&builder);
-
-    if (_uuid.is_initialized()) {
-        _uuid->appendToBuilder(&builder, uuid.name());
-    }
 
     if (_distributionMode) {
         if (*_distributionMode == DistributionMode::kUnsharded) {
@@ -139,6 +123,10 @@ std::string CollectionType::toString() const {
 
 void CollectionType::setEpoch(OID epoch) {
     setPre22CompatibleEpoch(std::move(epoch));
+}
+
+void CollectionType::setUuid(UUID uuid) {
+    setPre50CompatibleUuid(std::move(uuid));
 }
 
 void CollectionType::setKeyPattern(KeyPattern keyPattern) {

@@ -85,7 +85,7 @@ TEST(CollectionType, AllFieldsPresent) {
              << CollectionType::kDefaultCollationFieldName
              << BSON("locale"
                      << "fr_CA")
-             << CollectionType::kUniqueFieldName << true << CollectionType::uuid() << uuid
+             << CollectionType::kUniqueFieldName << true << CollectionType::kUuidFieldName << uuid
              << CollectionType::kReshardingFieldsFieldName << reshardingFields.toBSON()));
     ASSERT_TRUE(status.isOK());
 
@@ -100,8 +100,7 @@ TEST(CollectionType, AllFieldsPresent) {
     ASSERT_EQUALS(coll.getUnique(), true);
     ASSERT_EQUALS(coll.getAllowBalance(), true);
     ASSERT_EQUALS(coll.getDropped(), false);
-    ASSERT_TRUE(coll.getUUID());
-    ASSERT_EQUALS(*coll.getUUID(), uuid);
+    ASSERT_EQUALS(coll.getUuid(), uuid);
     ASSERT(coll.getReshardingFields()->getState() == CoordinatorStateEnum::kUnused);
     ASSERT(coll.getReshardingFields()->getUuid() == reshardingUuid);
 }

@@ -157,14 +157,9 @@ public:
 
 protected:
     CollectionType createCollection(const OID& epoch) {
-        CollectionType coll;
-
-        coll.setNss(kNss);
-        coll.setEpoch(epoch);
+        CollectionType coll(kNss, epoch, Date_t::now(), UUID::gen());
         coll.setKeyPattern(BSON(kShardKey << 1));
         coll.setUnique(false);
-        coll.setUUID(UUID::gen());
-
         return coll;
     }
 

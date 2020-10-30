@@ -42,15 +42,15 @@ const auto catalogCacheLoaderDecoration =
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks() = default;
 
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
-    boost::optional<UUID> collUuid,
-    const OID& collEpoch,
+    OID collEpoch,
+    UUID collUuid,
     const BSONObj& collShardKeyPattern,
     const BSONObj& collDefaultCollation,
     bool collShardKeyIsUnique,
     boost::optional<TypeCollectionReshardingFields> collReshardingFields,
     std::vector<ChunkType> chunks)
-    : uuid(collUuid),
-      epoch(collEpoch),
+    : epoch(std::move(collEpoch)),
+      uuid(std::move(collUuid)),
       shardKeyPattern(collShardKeyPattern),
       defaultCollation(collDefaultCollation),
       shardKeyIsUnique(collShardKeyIsUnique),

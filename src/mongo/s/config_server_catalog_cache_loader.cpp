@@ -109,13 +109,13 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
             "No chunks were found for the collection",
             !changedChunks.empty());
 
-    return CollectionAndChangedChunks(coll.getUUID(),
-                                      coll.getEpoch(),
+    return CollectionAndChangedChunks{coll.getEpoch(),
+                                      coll.getUuid(),
                                       coll.getKeyPattern().toBSON(),
                                       coll.getDefaultCollation(),
                                       coll.getUnique(),
                                       coll.getReshardingFields(),
-                                      std::move(changedChunks));
+                                      std::move(changedChunks)};
 }
 
 }  // namespace

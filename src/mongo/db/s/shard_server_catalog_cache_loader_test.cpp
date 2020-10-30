@@ -186,10 +186,7 @@ ShardServerCatalogCacheLoaderTest::makeCombinedOriginalFiveChunksAndThreeNewChun
 
 CollectionType ShardServerCatalogCacheLoaderTest::makeCollectionType(
     const ChunkVersion& collVersion) {
-    CollectionType coll;
-    coll.setNss(kNss);
-    coll.setEpoch(collVersion.epoch());
-    coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(collVersion.toLong()));
+    CollectionType coll(kNss, collVersion.epoch(), Date_t::now(), UUID::gen());
     coll.setKeyPattern(kKeyPattern);
     coll.setUnique(false);
     return coll;

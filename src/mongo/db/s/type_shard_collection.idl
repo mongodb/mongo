@@ -92,8 +92,9 @@ structs:
                 optional: false
             uuid:
                 type: uuid
-                description: "The UUID of the collection, if known."
-                optional: true
+                description: "The UUID that will be used to create the local collection on each of
+                              the shards which have chunks."
+                optional: false
             key:
                 cpp_name: keyPattern
                 type: KeyPattern

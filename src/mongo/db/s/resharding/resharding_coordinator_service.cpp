@@ -382,11 +382,10 @@ CollectionType createTempReshardingCollectionType(
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const ChunkVersion& chunkVersion,
     const BSONObj& collation) {
-    CollectionType collType;
-    collType.setNss(coordinatorDoc.getTempReshardingNss());
-    collType.setUUID(coordinatorDoc.get_id());
-    collType.setEpoch(chunkVersion.epoch());
-    collType.setUpdatedAt(opCtx->getServiceContext()->getPreciseClockSource()->now());
+    CollectionType collType(coordinatorDoc.getTempReshardingNss(),
+                            chunkVersion.epoch(),
+                            opCtx->getServiceContext()->getPreciseClockSource()->now(),
+                            coordinatorDoc.get_id());
     collType.setKeyPattern(coordinatorDoc.getReshardingKey());
     collType.setDefaultCollation(collation);
     collType.setUnique(false);

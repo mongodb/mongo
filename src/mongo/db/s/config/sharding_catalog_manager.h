@@ -354,14 +354,6 @@ public:
     void ensureDropCollectionCompleted(OperationContext* opCtx, const NamespaceString& nss);
 
     /**
-     * Iterates through each entry in config.collections that does not have a UUID, generates a UUID
-     * for the collection, and updates the entry with the generated UUID.
-     *
-     * If this function is not necessary for SERVER-33247, it can be removed.
-     */
-    void generateUUIDsForExistingShardedCollections(OperationContext* opCtx);
-
-    /**
      * Refines the shard key of an existing collection with namespace 'nss'. Here, 'shardKey'
      * denotes the new shard key, which must contain the old shard key as a prefix.
      *

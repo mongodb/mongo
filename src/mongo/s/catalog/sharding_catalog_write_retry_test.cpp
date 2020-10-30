@@ -408,11 +408,8 @@ TEST_F(UpdateRetryTest, NotWritablePrimaryOnceSuccessAfterRetry) {
     HostAndPort host2("TestHost2");
     configTargeter()->setFindHostReturnValue(host1);
 
-    CollectionType collection;
-    collection.setNss(NamespaceString("db.coll"));
-    collection.setUpdatedAt(network()->now());
-    collection.setUnique(true);
-    collection.setEpoch(OID::gen());
+    CollectionType collection(
+        NamespaceString("db.coll"), OID::gen(), network()->now(), UUID::gen());
     collection.setKeyPattern(KeyPattern(BSON("_id" << 1)));
 
     BSONObj objToUpdate = BSON("_id" << 1 << "Value"

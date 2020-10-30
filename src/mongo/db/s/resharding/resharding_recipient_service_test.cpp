@@ -136,13 +136,9 @@ public:
         auto future = scheduleRoutingInfoForcedRefresh(tempNss);
 
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            CollectionType coll;
-            coll.setNss(tempNss);
-            coll.setEpoch(epoch);
-            coll.setUpdatedAt(Date_t::now());
+            CollectionType coll(tempNss, epoch, Date_t::now(), uuid);
             coll.setKeyPattern(skey.getKeyPattern());
             coll.setUnique(false);
-            coll.setUUID(uuid);
 
             TypeCollectionReshardingFields reshardingFields;
             reshardingFields.setUuid(uuid);

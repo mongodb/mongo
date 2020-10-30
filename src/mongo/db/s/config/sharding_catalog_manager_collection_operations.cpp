@@ -440,58 +440,6 @@ void ShardingCatalogManager::ensureDropCollectionCompleted(OperationContext* opC
     sendSSVToAllShards(opCtx, nss);
 }
 
-void ShardingCatalogManager::generateUUIDsForExistingShardedCollections(OperationContext* opCtx) {
-    // Retrieve all collections in config.collections that do not have a UUID. Some collections
-    // may already have a UUID if an earlier upgrade attempt failed after making some progress.
-    auto shardedColls =
-        uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
-                CollectionType::ConfigNS,
-                BSON(CollectionType::uuid.name() << BSON("$exists" << false) << "dropped" << false),
-                BSONObj(),   // sort
-                boost::none  // limit
-                ))
-            .docs;
-
-    if (shardedColls.empty()) {
-        LOGV2(21930, "all sharded collections already have UUIDs");
-
-        // We did a local read of the collections collection above and found that all sharded
-        // collections already have UUIDs. However, the data may not be majority committed (a
-        // previous setFCV attempt may have failed with a write concern error). Since the current
-        // Client doesn't know the opTime of the last write to the collections collection, make it
-        // wait for the last opTime in the system when we wait for writeConcern.
-        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-        return;
-    }
-
-    // Generate and persist a new UUID for each collection that did not have a UUID.
-    LOGV2(21931,
-          "Generating UUIDs for {collectionCount} sharded collections that do not yet have a UUID",
-          "Generating UUIDs for sharded collections that do not yet have a UUID",
-          "collectionCount"_attr = shardedColls.size());
-    for (auto& coll : shardedColls) {
-        auto collType = uassertStatusOK(CollectionType::fromBSON(coll));
-        invariant(!collType.getUUID());
-
-        auto uuid = CollectionUUID::gen();
-        collType.setUUID(uuid);
-
-        uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
-            opCtx, collType.getNss(), collType, false /* upsert */));
-        LOGV2_DEBUG(21932,
-                    2,
-                    "Updated entry in config.collections for sharded collection {namespace} "
-                    "with UUID {generatedUUID}",
-                    "Updated entry in config.collections for sharded collection",
-                    "namespace"_attr = collType.getNss(),
-                    "generatedUUID"_attr = uuid);
-    }
-}
-
 // Returns the pipeline updates to be used for updating a refined collection's chunk and tag
 // documents.
 //

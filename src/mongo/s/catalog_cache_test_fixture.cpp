@@ -138,10 +138,7 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
     }();
 
     const BSONObj collectionBSON = [&]() {
-        CollectionType coll;
-        coll.setNss(nss);
-        coll.setEpoch(version.epoch());
-        coll.setUpdatedAt(Date_t::now());
+        CollectionType coll(nss, version.epoch(), Date_t::now(), UUID::gen());
         coll.setKeyPattern(shardKeyPattern.getKeyPattern());
         coll.setUnique(unique);
 
@@ -198,19 +195,12 @@ void CatalogCacheTestFixture::expectGetDatabase(NamespaceString nss, std::string
 
 void CatalogCacheTestFixture::expectGetCollection(NamespaceString nss,
                                                   OID epoch,
-                                                  const ShardKeyPattern& shardKeyPattern,
-                                                  boost::optional<UUID> uuid) {
+                                                  UUID uuid,
+                                                  const ShardKeyPattern& shardKeyPattern) {
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        CollectionType collType;
-        collType.setNss(nss);
-        collType.setEpoch(epoch);
-        collType.setUpdatedAt(Date_t::now());
+        CollectionType collType(nss, epoch, Date_t::now(), uuid);
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);
-        if (uuid) {
-            collType.setUUID(*uuid);
-        }
-
         return std::vector<BSONObj>{collType.toBSON()};
     }());
 }
@@ -233,7 +223,7 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
     NamespaceString nss,
     const BSONObj& shardKey,
     boost::optional<std::string> primaryShardId,
-    boost::optional<UUID> uuid) {
+    UUID uuid) {
     const OID epoch = OID::gen();
     const ShardKeyPattern shardKeyPattern(shardKey);
 
@@ -247,7 +237,7 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
             expectGetDatabase(nss);
         }
     }
-    expectGetCollection(nss, epoch, shardKeyPattern, uuid);
+    expectGetCollection(nss, epoch, uuid, shardKeyPattern);
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
         ChunkVersion version(1, 0, epoch);
 

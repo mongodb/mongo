@@ -414,12 +414,9 @@ public:
     }
 
     CollectionType makeCollectionType(UUID uuid, OID epoch) {
-        CollectionType coll;
-        coll.setNss(kNss);
-        coll.setEpoch(epoch);
+        CollectionType coll(kNss, epoch, Date_t::now(), uuid);
         coll.setKeyPattern(kShardKeyPattern.getKeyPattern());
         coll.setUnique(true);
-        coll.setUUID(uuid);
         return coll;
     }
 

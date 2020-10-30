@@ -97,7 +97,7 @@ public:
 
         // Mock the expected config server queries.
         expectGetDatabase(nss);
-        expectGetCollection(nss, epoch, shardKey);
+        expectGetCollection(nss, epoch, UUID::gen(), shardKey);
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
             std::vector<BSONObj> response;
             for (auto&& chunk : chunkDistribution) {

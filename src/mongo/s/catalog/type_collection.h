@@ -85,6 +85,7 @@ public:
     static constexpr auto kEpochFieldName = CollectionTypeBase::kPre22CompatibleEpochFieldName;
     static constexpr auto kKeyPatternFieldName =
         CollectionTypeBase::kPre50CompatibleKeyPatternFieldName;
+    static constexpr auto kUuidFieldName = CollectionTypeBase::kPre50CompatibleUuidFieldName;
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
     using CollectionTypeBase::kUniqueFieldName;
@@ -103,10 +104,11 @@ public:
     // Name of the collections collection in the config server.
     static const NamespaceString ConfigNS;
 
-    static const BSONField<UUID> uuid;
     static const BSONField<std::string> distributionMode;
 
     CollectionType() = default;
+
+    CollectionType(NamespaceString nss, OID epoch, Date_t updatedAt, UUID uuid);
 
     explicit CollectionType(const BSONObj& obj);
 
@@ -139,6 +141,11 @@ public:
     }
     void setEpoch(OID epoch);
 
+    const UUID& getUuid() const {
+        return *getPre50CompatibleUuid();
+    }
+    void setUuid(UUID uuid);
+
     bool getDropped() const {
         return getPre50CompatibleDropped() ? *getPre50CompatibleDropped() : false;
     }
@@ -158,13 +165,6 @@ public:
         return !getNoBalance();
     }
 
-    boost::optional<UUID> getUUID() const {
-        return _uuid;
-    }
-    void setUUID(UUID uuid) {
-        _uuid = uuid;
-    }
-
     DistributionMode getDistributionMode() const {
         return _distributionMode.get_value_or(DistributionMode::kSharded);
     }
@@ -178,9 +178,6 @@ private:
     // New field in v4.4; optional in v4.4 for backwards compatibility with v4.2. Whether the
     // collection is unsharded or sharded. If missing, implies sharded.
     boost::optional<DistributionMode> _distributionMode;
-
-    // Optional in 3.6 binaries, because UUID does not exist in featureCompatibilityVersion=3.4.
-    boost::optional<UUID> _uuid;
 };
 
 }  // namespace mongo

@@ -45,51 +45,44 @@ const BSONObj kDefaultCollation = BSON("locale"
                                        << "fr_CA");
 
 TEST(ShardCollectionType, FromBSONEmptyShardKeyFails) {
-    BSONObjBuilder builder;
-    builder.append(ShardCollectionType::kNssFieldName, kNss.ns());
-    builder.append(ShardCollectionType::kEpochFieldName, OID::gen());
-    builder.append(ShardCollectionType::kKeyPatternFieldName, BSONObj());
-    builder.append(ShardCollectionType::kUniqueFieldName, true);
-
     ASSERT_THROWS_CODE(
-        ShardCollectionType(builder.obj()), DBException, ErrorCodes::ShardKeyNotFound);
+        ShardCollectionType(BSON(ShardCollectionType::kNssFieldName
+                                 << kNss.ns() << ShardCollectionType::kEpochFieldName << OID::gen()
+                                 << ShardCollectionType::kUuidFieldName << UUID::gen()
+                                 << ShardCollectionType::kKeyPatternFieldName << BSONObj()
+                                 << ShardCollectionType::kUniqueFieldName << true)),
+        DBException,
+        ErrorCodes::ShardKeyNotFound);
 }
 
 TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhenBSONTimestamp) {
     OID epoch = OID::gen();
 
-    BSONObjBuilder builder;
-    builder.append(ShardCollectionType::kNssFieldName, kNss.ns());
-    builder.append(ShardCollectionType::kEpochFieldName, epoch);
-    builder.append(ShardCollectionType::kKeyPatternFieldName, kKeyPattern);
-    builder.append(ShardCollectionType::kUniqueFieldName, true);
-    builder.append(ShardCollectionType::kLastRefreshedCollectionVersionFieldName, Timestamp());
-
-    ShardCollectionType shardCollType(builder.obj());
+    ShardCollectionType shardCollType(
+        BSON(ShardCollectionType::kNssFieldName
+             << kNss.ns() << ShardCollectionType::kEpochFieldName << epoch
+             << ShardCollectionType::kUuidFieldName << UUID::gen()
+             << ShardCollectionType::kKeyPatternFieldName << kKeyPattern
+             << ShardCollectionType::kUniqueFieldName << true
+             << ShardCollectionType::kLastRefreshedCollectionVersionFieldName << Timestamp()));
     ASSERT_EQ(epoch, shardCollType.getLastRefreshedCollectionVersion()->epoch());
 }
 
 TEST(ShardCollectionType, FromBSONEpochMatchesLastRefreshedCollectionVersionWhenDate) {
     OID epoch = OID::gen();
 
-    BSONObjBuilder builder;
-    builder.append(ShardCollectionType::kNssFieldName, kNss.ns());
-    builder.append(ShardCollectionType::kEpochFieldName, epoch);
-    builder.append(ShardCollectionType::kKeyPatternFieldName, kKeyPattern);
-    builder.append(ShardCollectionType::kUniqueFieldName, true);
-    builder.append(ShardCollectionType::kLastRefreshedCollectionVersionFieldName, Date_t());
-
-    ShardCollectionType shardCollType(builder.obj());
+    ShardCollectionType shardCollType(
+        BSON(ShardCollectionType::kNssFieldName
+             << kNss.ns() << ShardCollectionType::kEpochFieldName << epoch
+             << ShardCollectionType::kUuidFieldName << UUID::gen()
+             << ShardCollectionType::kKeyPatternFieldName << kKeyPattern
+             << ShardCollectionType::kUniqueFieldName << true
+             << ShardCollectionType::kLastRefreshedCollectionVersionFieldName << Date_t()));
     ASSERT_EQ(epoch, shardCollType.getLastRefreshedCollectionVersion()->epoch());
 }
 
 TEST(ShardCollectionType, ToBSONEmptyDefaultCollationNotIncluded) {
-    ShardCollectionType shardCollType;
-    shardCollType.setNss(kNss);
-    shardCollType.setEpoch(OID::gen());
-    shardCollType.setKeyPattern(kKeyPattern);
-    shardCollType.setUnique(true);
-
+    ShardCollectionType shardCollType(kNss, OID::gen(), UUID::gen(), kKeyPattern, true);
     BSONObj obj = shardCollType.toBSON();
 
     ASSERT_FALSE(obj.hasField(ShardCollectionType::kDefaultCollationFieldName));
@@ -101,11 +94,7 @@ TEST(ShardCollectionType, ToBSONEmptyDefaultCollationNotIncluded) {
 }
 
 TEST(ShardCollectionType, ReshardingFieldsIncluded) {
-    ShardCollectionType shardCollType;
-    shardCollType.setNss(kNss);
-    shardCollType.setEpoch(OID::gen());
-    shardCollType.setKeyPattern(kKeyPattern);
-    shardCollType.setUnique(true);
+    ShardCollectionType shardCollType(kNss, OID::gen(), UUID::gen(), kKeyPattern, true);
 
     TypeCollectionReshardingFields reshardingFields;
     const auto reshardingUuid = UUID::gen();

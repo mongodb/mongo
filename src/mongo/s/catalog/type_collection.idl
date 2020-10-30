@@ -62,6 +62,17 @@ structs:
                 description: "Contains the time of when the collection was either created, or if
                               dropped = true, when it was dropped."
                 optional: false
+            uuid:
+                cpp_name: pre50CompatibleUuid
+                type: uuid
+                description: "The UUID that will be used to create the local collection on each of
+                              the shards which have chunks.
+
+                              It is optional for parsing purposes, because in versions of MongoDB
+                              prior to 5.0, this value would be missing for entries where 'dropped'
+                              is set to true, because dropped collections' entries were being
+                              written as dropped with certain fields missing instead of deleted."
+                optional: true
             dropped:      # TODO (SERVER-51881): Remove this field after 5.0 is released
                 cpp_name: pre50CompatibleDropped
                 type: bool

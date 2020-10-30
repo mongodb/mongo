@@ -85,14 +85,9 @@ protected:
     }
 
     CollectionType getDefaultCollectionType(OID epoch, const ShardKeyPattern& shardKeyPattern) {
-        CollectionType collType;
-
-        collType.setNss(kNss);
-        collType.setEpoch(epoch);
-        collType.setUpdatedAt(Date_t::now());
+        CollectionType collType(kNss, epoch, Date_t::now(), UUID::gen());
         collType.setKeyPattern(shardKeyPattern.toBSON());
         collType.setUnique(false);
-
         return collType;
     }
 };

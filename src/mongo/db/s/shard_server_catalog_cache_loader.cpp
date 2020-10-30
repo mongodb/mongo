@@ -94,10 +94,13 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
                                          const CollectionAndChangedChunks& collAndChunks,
                                          const ChunkVersion& maxLoaderVersion) {
     // Update the collections collection entry for 'nss' in case there are any new updates.
-    ShardCollectionType update = ShardCollectionType(
-        nss, collAndChunks.epoch, collAndChunks.shardKeyPattern, collAndChunks.shardKeyIsUnique);
+    ShardCollectionType update = ShardCollectionType(nss,
+                                                     collAndChunks.epoch,
+                                                     *collAndChunks.uuid,
+                                                     collAndChunks.shardKeyPattern,
+                                                     collAndChunks.shardKeyIsUnique);
 
-    update.setUuid(collAndChunks.uuid);
+    update.setUuid(*collAndChunks.uuid);
     if (!collAndChunks.defaultCollation.isEmpty()) {
         update.setDefaultCollation(collAndChunks.defaultCollation.getOwned());
     }
@@ -233,8 +236,8 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
     auto changedChunks = uassertStatusOK(
         readShardChunks(opCtx, nss, diff.query, diff.sort, boost::none, startingVersion.epoch()));
 
-    return CollectionAndChangedChunks{shardCollectionEntry.getUuid(),
-                                      shardCollectionEntry.getEpoch(),
+    return CollectionAndChangedChunks{shardCollectionEntry.getEpoch(),
+                                      shardCollectionEntry.getUuid(),
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),
                                       shardCollectionEntry.getUnique(),

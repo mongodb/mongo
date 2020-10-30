@@ -60,10 +60,7 @@ public:
 
         setupShards({shard});
 
-        CollectionType shardedCollection;
-        shardedCollection.setNss(shardedNS());
-        shardedCollection.setEpoch(OID::gen());
-        shardedCollection.setUpdatedAt(Date_t::now());
+        CollectionType shardedCollection(shardedNS(), OID::gen(), Date_t::now(), UUID::gen());
         shardedCollection.setKeyPattern(BSON("x" << 1));
 
         ASSERT_OK(insertToConfigCollection(
@@ -257,10 +254,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysSho
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToFullShardKey) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection;
-    shardedCollection.setNss(ns);
-    shardedCollection.setEpoch(OID::gen());
-    shardedCollection.setUpdatedAt(Date_t::now());
+    CollectionType shardedCollection(ns, OID::gen(), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -277,10 +271,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinThatIsAShardKeyPrefixShouldConvertToF
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MaxThatIsAShardKeyPrefixShouldConvertToFullShardKey) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection;
-    shardedCollection.setNss(ns);
-    shardedCollection.setEpoch(OID::gen());
-    shardedCollection.setUpdatedAt(Date_t::now());
+    CollectionType shardedCollection(ns, OID::gen(), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -332,10 +323,7 @@ TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsNotAShardKeyPrefixShouldFail
 
 TEST_F(AssignKeyRangeToZoneTestFixture, MinMaxThatIsAShardKeyPrefixShouldSucceed) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection;
-    shardedCollection.setNss(ns);
-    shardedCollection.setEpoch(OID::gen());
-    shardedCollection.setUpdatedAt(Date_t::now());
+    CollectionType shardedCollection(ns, OID::gen(), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -472,10 +460,8 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingInsideExistingShoul
  *           0123456789
  */
 TEST_F(AssignKeyRangeWithOneRangeFixture, NewRangeOverlappingWithDifferentNSShouldSucceed) {
-    CollectionType shardedCollection;
-    shardedCollection.setNss(NamespaceString("other.coll"));
-    shardedCollection.setEpoch(OID::gen());
-    shardedCollection.setUpdatedAt(Date_t::now());
+    CollectionType shardedCollection(
+        NamespaceString("other.coll"), OID::gen(), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -693,10 +679,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithInvalidMaxShardKeyShouldFail
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection;
-    shardedCollection.setNss(ns);
-    shardedCollection.setEpoch(OID::gen());
-    shardedCollection.setUpdatedAt(Date_t::now());
+    CollectionType shardedCollection(ns, OID::gen(), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(
@@ -720,10 +703,7 @@ TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMinPrefixShouldRemove
 
 TEST_F(AssignKeyRangeWithOneRangeFixture, RemoveWithPartialMaxPrefixShouldRemoveRange) {
     NamespaceString ns("compound.shard");
-    CollectionType shardedCollection;
-    shardedCollection.setNss(ns);
-    shardedCollection.setEpoch(OID::gen());
-    shardedCollection.setUpdatedAt(Date_t::now());
+    CollectionType shardedCollection(ns, OID::gen(), Date_t::now(), UUID::gen());
     shardedCollection.setKeyPattern(BSON("x" << 1 << "y" << 1));
 
     ASSERT_OK(insertToConfigCollection(

@@ -89,13 +89,13 @@ CollectionAndChangedChunks getCollectionRefresh(
     std::vector<ChunkType> chunks;
     swChunksReturnValue.getValue().swap(chunks);
 
-    return CollectionAndChangedChunks(swCollectionReturnValue.getValue().getUUID(),
-                                      swCollectionReturnValue.getValue().getEpoch(),
+    return CollectionAndChangedChunks{swCollectionReturnValue.getValue().getEpoch(),
+                                      swCollectionReturnValue.getValue().getUuid(),
                                       swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
                                       swCollectionReturnValue.getValue().getDefaultCollation(),
                                       swCollectionReturnValue.getValue().getUnique(),
                                       reshardingFields,
-                                      std::move(chunks));
+                                      std::move(chunks)};
 }
 
 SemiFuture<CollectionAndChangedChunks> CatalogCacheLoaderMock::getChunksSince(

@@ -29,8 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <memory>
-
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 
 namespace mongo {
@@ -54,10 +52,7 @@ void MigrationTestFixture::setUpDatabase(const std::string& dbName, const ShardI
 }
 
 void MigrationTestFixture::setUpCollection(const NamespaceString& collName, ChunkVersion version) {
-    CollectionType coll;
-    coll.setNss(collName);
-    coll.setEpoch(version.epoch());
-    coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(version.toLong()));
+    CollectionType coll(collName, version.epoch(), Date_t::now(), UUID::gen());
     coll.setKeyPattern(kKeyPattern);
     coll.setUnique(false);
     ASSERT_OK(catalogClient()->insertConfigDocument(

@@ -43,9 +43,6 @@
 
 namespace mongo {
 
-class NamespaceString;
-class OperationContext;
-
 /**
  * Interface through which the sharding catalog cache requests the set of changed chunks to be
  * retrieved from the persisted metadata store.
@@ -69,8 +66,8 @@ public:
     struct CollectionAndChangedChunks {
         CollectionAndChangedChunks();
         CollectionAndChangedChunks(
-            boost::optional<UUID> uuid,
-            const OID& collEpoch,
+            OID collEpoch,
+            UUID uuid,
             const BSONObj& collShardKeyPattern,
             const BSONObj& collDefaultCollation,
             bool collShardKeyIsUnique,
@@ -78,8 +75,9 @@ public:
             std::vector<ChunkType> chunks);
 
         // Information about the entire collection
-        boost::optional<UUID> uuid;
         OID epoch;
+        boost::optional<UUID> uuid;  // This value can never be boost::none,
+                                     // except under the default constructor
         BSONObj shardKeyPattern;
         BSONObj defaultCollation;
         bool shardKeyIsUnique{false};

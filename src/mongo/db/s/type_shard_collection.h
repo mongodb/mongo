@@ -69,9 +69,8 @@ public:
     using ShardCollectionTypeBase::setUnique;
     using ShardCollectionTypeBase::setUuid;
 
-    ShardCollectionType(NamespaceString nss, OID epoch, KeyPattern keyPattern, bool unique)
-        : ShardCollectionTypeBase(std::move(nss), std::move(epoch), std::move(keyPattern), unique) {
-    }
+    ShardCollectionType(
+        NamespaceString nss, OID epoch, UUID uuid, KeyPattern keyPattern, bool unique);
 
     explicit ShardCollectionType(const BSONObj& obj);
 

@@ -118,8 +118,8 @@ boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
 
     const auto existingColl = uassertStatusOK(std::move(swCollStatus)).value;
 
-    CollectionType newColl;
-    newColl.setNss(*request.get_shardsvrShardCollection());
+    CollectionType newColl(
+        *request.get_shardsvrShardCollection(), OID::gen(), Date_t::now(), UUID::gen());
     newColl.setKeyPattern(KeyPattern(request.getKey()));
     newColl.setDefaultCollation(*request.getCollation());
     newColl.setUnique(request.getUnique());
@@ -478,11 +478,8 @@ void updateShardingCatalogEntryForCollection(
                                               ->makeFromBSON(defaultCollation));
     }
 
-    CollectionType coll;
-    coll.setNss(nss);
-    coll.setUUID(prerequisites.uuid);
-    coll.setEpoch(initialChunks.collVersion().epoch());
-    coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(initialChunks.collVersion().toLong()));
+    CollectionType coll(
+        nss, initialChunks.collVersion().epoch(), Date_t::now(), prerequisites.uuid);
     coll.setKeyPattern(prerequisites.shardKeyPattern.toBSON());
     if (defaultCollator) {
         coll.setDefaultCollation(defaultCollator->getSpec().toBSON());
@@ -539,10 +536,7 @@ UUID shardCollection(OperationContext* opCtx,
                      const ShardId& dbPrimaryShardId) {
     // Fast check for whether the collection is already sharded without taking any locks
     if (auto collectionOptional = checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
-        uassert(ErrorCodes::InvalidUUID,
-                str::stream() << "Collection " << nss << " is sharded without UUID",
-                collectionOptional->getUUID());
-        return *collectionOptional->getUUID();
+        return collectionOptional->getUuid();
     }
 
     auto writeChunkDocumentsAndRefreshShards =
@@ -586,10 +580,7 @@ UUID shardCollection(OperationContext* opCtx,
 
         if (auto collectionOptional =
                 checkIfCollectionAlreadyShardedWithSameOptions(opCtx, request)) {
-            uassert(ErrorCodes::InvalidUUID,
-                    str::stream() << "Collection " << nss << " is sharded without UUID",
-                    collectionOptional->getUUID());
-            return *collectionOptional->getUUID();
+            return collectionOptional->getUuid();
         }
 
         // Fail if there are partially written chunks from a previous failed shardCollection.
