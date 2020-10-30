@@ -112,9 +112,8 @@ function projectImmediatelyAfterMatch() {
                    {comment: kCommandComment})
         .itcount();
 }
-// TODO SERVER-50373: Once SBE supports covered plans, we should run this test case with SBE
-// enabled.
 runTestWithQuery(projectImmediatelyAfterMatch);
+runTestWithQuery(projectImmediatelyAfterMatch, kUseSbe);
 
 function sortImmediatelyAfterMatch() {
     coll.aggregate([{$match: {a: 1, b: 1, c: 1}}, {$sort: {a: 1}}], {comment: kCommandComment})
@@ -128,9 +127,8 @@ function sortAndProjectionImmediatelyAfterMatch() {
                    {comment: kCommandComment})
         .itcount();
 }
-// TODO SERVER-50373: Once SBE supports covered plans, we should run this test case with SBE
-// enabled.
 runTestWithQuery(sortAndProjectionImmediatelyAfterMatch);
+runTestWithQuery(sortAndProjectionImmediatelyAfterMatch, kUseSbe);
 
 MongoRunner.stopMongod(conn);
 }());
