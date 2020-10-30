@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/active_index_builds.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/index_build_oplog_entry.h"
@@ -90,10 +91,7 @@ public:
         ApplicationMode applicationMode = ApplicationMode::kNormal;
     };
 
-    /**
-     * Invariants that there are no index builds in-progress.
-     */
-    virtual ~IndexBuildsCoordinator();
+    virtual ~IndexBuildsCoordinator() = default;
 
     /**
      * Executes tasks that must be done prior to destruction of the instance.
@@ -366,12 +364,6 @@ public:
     void assertNoBgOpInProgForDb(StringData db) const;
 
     /**
-     * Waits for the index build with 'buildUUID' to finish before returning.
-     * Returns immediately if no such index build with 'buildUUID' is found.
-     */
-    void awaitIndexBuildFinished(OperationContext* opCtx, const UUID& buildUUID);
-
-    /**
      * Waits for all index builds on a specified collection to finish.
      */
     void awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
@@ -422,7 +414,7 @@ public:
 
     void sleepIndexBuilds_forTestOnly(bool sleep);
 
-    void verifyNoIndexBuilds_forTestOnly();
+    void verifyNoIndexBuilds_forTestOnly() const;
 
     /**
      * Helper function that adds collation defaults to 'indexSpecs', as well as filtering out
@@ -467,14 +459,6 @@ public:
 
 private:
     /**
-     * Registers an index build so that the rest of the system can discover it.
-     *
-     * If stopIndexBuildsOnNsOrDb has been called on the index build's collection or database, then
-     * an error will be returned.
-     */
-    Status _registerIndexBuild(WithLock, std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
-
-    /**
      * Sets up the in-memory and durable state of the index build.
      *
      * This function should only be called when in recovery mode, because we drop and replace
@@ -487,12 +471,6 @@ private:
                                        IndexBuildProtocol protocol);
 
 protected:
-    /**
-     * Unregisters the index build.
-     */
-    void _unregisterIndexBuild(WithLock lk,
-                               std::shared_ptr<ReplIndexBuildState> replIndexBuildState);
-
     /**
      * Sets up the in-memory state of the index build. Validates index specs and filters out
      * existing indexes from the list of specs.
@@ -769,30 +747,13 @@ protected:
      * Requires caller to lock '_mutex'.
      */
     using IndexBuildFilterFn = std::function<bool(const ReplIndexBuildState& replState)>;
-    std::vector<std::shared_ptr<ReplIndexBuildState>> _filterIndexBuilds_inlock(
-        WithLock lk, IndexBuildFilterFn indexBuildFilter) const;
-
-    void _awaitNoBgOpInProgForDb(stdx::unique_lock<Latch>& lk,
-                                 OperationContext* opCtx,
-                                 StringData db);
-
-    // Protects the below state.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("IndexBuildsCoordinator::_mutex");
-
-    // Build UUID to index build information map.
-    stdx::unordered_map<UUID, std::shared_ptr<ReplIndexBuildState>, UUID::Hash> _allIndexBuilds;
-
-    // Waiters are notified whenever one of the three maps above has something added or removed.
-    stdx::condition_variable _indexBuildsCondVar;
-
-    // Generation counter of completed index builds. Used in conjuction with the condition variable
-    // to receive notifications when an index build completes.
-    uint32_t _indexBuildsCompletedGen;
 
     // Handles actually building the indexes.
     IndexBuildsManager _indexBuildsManager;
 
-    bool _sleepForTest = false;
+    // Maintains data structures relating to activeIndexBuilds. Thread safe, unless a specific
+    // function specifies otherwise.
+    ActiveIndexBuilds activeIndexBuilds;
 };
 
 // These fail points are used to control index build progress. Declared here to be shared

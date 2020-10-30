@@ -927,6 +927,7 @@ env.Library(
     source=[
         "index_builds_coordinator.cpp",
         "repl_index_build_state.cpp",
+        "active_index_builds.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",

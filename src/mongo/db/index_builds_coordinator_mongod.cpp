@@ -180,7 +180,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                         replCoord->canAcceptWritesFor(opCtx, nssOrUuid));
             }
 
-            stdx::unique_lock<Latch> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_throttlingMutex);
             opCtx->waitForConditionOrInterrupt(_indexBuildFinished, lk, [&] {
                 const int maxActiveBuilds = maxNumActiveUserIndexBuilds.load();
                 if (_numActiveIndexBuilds < maxActiveBuilds) {
@@ -200,13 +200,13 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             });
         } else {
             // System index builds have no limit and never wait, but do consume a slot.
-            stdx::unique_lock<Latch> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_throttlingMutex);
             _numActiveIndexBuilds++;
         }
     }
 
     auto onScopeExitGuard = makeGuard([&] {
-        stdx::unique_lock<Latch> lk(_mutex);
+        stdx::unique_lock<Latch> lk(_throttlingMutex);
         _numActiveIndexBuilds--;
         _indexBuildFinished.notify_one();
     });
@@ -291,15 +291,14 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         resumeInfo
     ](auto status) mutable noexcept {
         auto onScopeExitGuard = makeGuard([&] {
-            stdx::unique_lock<Latch> lk(_mutex);
+            stdx::unique_lock<Latch> lk(_throttlingMutex);
             _numActiveIndexBuilds--;
             _indexBuildFinished.notify_one();
         });
 
         // Clean up if we failed to schedule the task.
         if (!status.isOK()) {
-            stdx::unique_lock<Latch> lk(_mutex);
-            _unregisterIndexBuild(lk, replState);
+            activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
             startPromise.setError(status);
             return;
         }
@@ -737,33 +736,31 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
 
     UUID collectionUUID = collection->uuid();
     std::shared_ptr<ReplIndexBuildState> replState;
-    {
-        stdx::unique_lock<Latch> lk(_mutex);
-        auto pred = [&](const auto& replState) {
-            if (collectionUUID != replState.collectionUUID) {
-                return false;
-            }
-            if (indexNames.size() != replState.indexNames.size()) {
-                return false;
-            }
-            // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
-            return std::equal(
-                replState.indexNames.begin(), replState.indexNames.end(), indexNames.begin());
-        };
-        auto collIndexBuilds = _filterIndexBuilds_inlock(lk, pred);
-        if (collIndexBuilds.empty()) {
-            return Status(ErrorCodes::IndexNotFound,
-                          str::stream() << "Cannot find an index build on collection '" << nss
-                                        << "' with the provided index names");
-        }
-        invariant(
-            1U == collIndexBuilds.size(),
-            str::stream() << "Found multiple index builds with the same index names on collection "
-                          << nss << " (" << collectionUUID
-                          << "): first index name: " << indexNames.front());
 
-        replState = collIndexBuilds.front();
+    auto pred = [&](const auto& replState) {
+        if (collectionUUID != replState.collectionUUID) {
+            return false;
+        }
+        if (indexNames.size() != replState.indexNames.size()) {
+            return false;
+        }
+        // Ensure the ReplIndexBuildState has the same indexes as 'indexNames'.
+        return std::equal(
+            replState.indexNames.begin(), replState.indexNames.end(), indexNames.begin());
+    };
+    auto collIndexBuilds = activeIndexBuilds.filterIndexBuilds(pred);
+    if (collIndexBuilds.empty()) {
+        return Status(ErrorCodes::IndexNotFound,
+                      str::stream() << "Cannot find an index build on collection '" << nss
+                                    << "' with the provided index names");
     }
+    invariant(
+        1U == collIndexBuilds.size(),
+        str::stream() << "Found multiple index builds with the same index names on collection "
+                      << nss << " (" << collectionUUID
+                      << "): first index name: " << indexNames.front());
+
+    replState = collIndexBuilds.front();
 
     // See if the new commit quorum is satisfiable.
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
