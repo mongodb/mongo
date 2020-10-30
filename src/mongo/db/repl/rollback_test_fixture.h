@@ -145,7 +145,9 @@ protected:
 
 class RollbackTest::StorageInterfaceRollback : public StorageInterfaceImpl {
 public:
-    void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) override {
+    void setStableTimestamp(ServiceContext* serviceCtx,
+                            Timestamp snapshotName,
+                            bool force = false) override {
         stdx::lock_guard<Latch> lock(_mutex);
         _stableTimestamp = snapshotName;
     }

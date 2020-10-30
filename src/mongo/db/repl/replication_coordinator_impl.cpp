@@ -4933,6 +4933,10 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
                 "Setting replication's stable optime",
                 "stableOpTime"_attr = stableOpTime);
 
+    // As arbiters aren't data bearing nodes, the all durable timestamp does not get advanced. To
+    // advance the all durable timestamp when setting the stable timestamp we use 'force=true'.
+    const bool force = _getMemberState_inlock().arbiter();
+
     // Update committed snapshot and wake up any threads waiting on read concern or
     // write concern.
     if (serverGlobalParams.enableMajorityReadConcern) {
@@ -4941,7 +4945,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
         // create a fake one.
         if (_updateCommittedSnapshot(lk, stableOpTime)) {
             // Update the stable timestamp for the storage engine.
-            _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp());
+            _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp(), force);
         }
     } else {
         const auto lastCommittedOpTime = _topCoord->getLastCommittedOpTime();
@@ -4961,7 +4965,7 @@ void ReplicationCoordinatorImpl::_setStableTimestampForStorage(WithLock lk) {
         // forward. If we are in rollback state, however, do not alter the stable timestamp,
         // since it may be moved backwards explicitly by the rollback-via-refetch process.
         if (!MONGO_unlikely(disableSnapshotting.shouldFail()) && !_memberState.rollback()) {
-            _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp());
+            _storage->setStableTimestamp(getServiceContext(), stableOpTime.getTimestamp(), force);
         }
     }
 }

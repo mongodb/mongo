@@ -1271,7 +1271,9 @@ StatusWith<OptionalCollectionUUID> StorageInterfaceImpl::getCollectionUUID(
     return collection->uuid();
 }
 
-void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) {
+void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx,
+                                              Timestamp snapshotName,
+                                              bool force) {
     auto newStableTimestamp = snapshotName;
     // Hold the stable timestamp back if this failpoint is enabled.
     holdStableTimestampAtSpecificTimestamp.execute([&](const BSONObj& dataObj) {
@@ -1287,7 +1289,7 @@ void StorageInterfaceImpl::setStableTimestamp(ServiceContext* serviceCtx, Timest
     StorageEngine* storageEngine = serviceCtx->getStorageEngine();
     Timestamp prevStableTimestamp = storageEngine->getStableTimestamp();
 
-    storageEngine->setStableTimestamp(newStableTimestamp);
+    storageEngine->setStableTimestamp(newStableTimestamp, force);
 
     Checkpointer* checkpointer = Checkpointer::get(serviceCtx);
     if (checkpointer && !checkpointer->hasTriggeredFirstStableCheckpoint()) {

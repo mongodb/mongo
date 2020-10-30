@@ -937,7 +937,7 @@ DEATH_TEST_REGEX(KVEngineTestHarness,
  * | Begin                       |                            |
  * | Write A 1                   |                            |
  * | Timestamp: commit 1         |                            |
- * |                             | Last Stable Timetamp: 2    |
+ * |                             | Last Stable Timetamp: 1    |
  * | Begin                       |                            |
  * | Write B 2                   |                            |
  * | Timestamp: commit 3         |                            |
@@ -975,15 +975,17 @@ TEST(KVEngineTestHarness, RollingBackToLastStable) {
     }
 
     {
-        // Set the stable timestamp to (2, 2).
+        // Set the stable timestamp to (1, 1) as it can't be set higher than the all durable
+        // timestamp, which is (1, 1) in this case.
         ASSERT(!engine->getLastStableRecoveryTimestamp());
-        engine->setStableTimestamp(Timestamp(2, 2), false);
+        ASSERT_EQUALS(engine->getAllDurableTimestamp(), Timestamp(1, 1));
+        engine->setStableTimestamp(Timestamp(1, 1), false);
         ASSERT(!engine->getLastStableRecoveryTimestamp());
 
         // Force a checkpoint to be taken. This should advance the last stable timestamp.
         MyOperationContext opCtx(engine);
         engine->flushAllFiles(&opCtx, false);
-        ASSERT_EQ(engine->getLastStableRecoveryTimestamp(), Timestamp(2, 2));
+        ASSERT_EQ(engine->getLastStableRecoveryTimestamp(), Timestamp(1, 1));
     }
 
     RecordId ridB;
@@ -1002,7 +1004,7 @@ TEST(KVEngineTestHarness, RollingBackToLastStable) {
         // Rollback to the last stable timestamp.
         MyOperationContext opCtx(engine);
         StatusWith<Timestamp> swTimestamp = engine->recoverToStableTimestamp(&opCtx);
-        ASSERT_EQ(swTimestamp.getValue(), Timestamp(2, 2));
+        ASSERT_EQ(swTimestamp.getValue(), Timestamp(1, 1));
 
         // Verify that we can find record A and can't find the record B inserted at Timestamp(3, 3)
         // in the collection any longer. 'numRecords' will still show two as it's the fast count and

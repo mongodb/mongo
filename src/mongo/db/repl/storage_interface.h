@@ -387,10 +387,14 @@ public:
                                                                  const NamespaceString& nss) = 0;
 
     /**
-     * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint.
-     * This timestamp can never decrease, and thus should be a timestamp that can never roll back.
+     * Sets the highest timestamp at which the storage engine is allowed to take a checkpoint. This
+     * timestamp must not decrease unless force=true is set, in which case we force the stable
+     * timestamp, the oldest timestamp, and the commit timestamp backward. Additionally when
+     * force=true is set, the all durable timestamp will be set to the stable timestamp.
      */
-    virtual void setStableTimestamp(ServiceContext* serviceCtx, Timestamp snapshotName) = 0;
+    virtual void setStableTimestamp(ServiceContext* serviceCtx,
+                                    Timestamp snapshotName,
+                                    bool force = false) = 0;
 
     /**
      * Tells the storage engine the timestamp of the data at startup. This is necessary because
