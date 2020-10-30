@@ -286,10 +286,10 @@ protected:
     /**
      * Owning container for all sub-Expressions.
      *
-     * Some derived classes contain named fields since they orginate from user syntax containing
+     * Some derived classes contain named fields since they originate from user syntax containing
      * field names. These classes contain alternate data structures or object members for accessing
-     * children. These structures or object memebers are expected to reference this data structure.
-     * In addition this structure should not be modified by named-field derivied classes to avoid
+     * children. These structures or object members are expected to reference this data structure.
+     * In addition this structure should not be modified by named-field derived classes to avoid
      * invalidating references.
      */
     ExpressionVector _children;
@@ -1346,6 +1346,62 @@ public:
     }
 };
 
+/**
+ * $dateDiff expression that determines a difference between two time instants.
+ */
+class ExpressionDateDiff final : public Expression {
+public:
+    /**
+     * startDate - an expression that resolves to a Value that is coercible to date.
+     * endDate - an expression that resolves to a Value that is coercible to date.
+     * unit - expression defining a length of time interval to measure the difference in that
+     * resolves to a string Value.
+     * timezone - expression defining a timezone to perform the operation in that resolves to a
+     * string Value. Can be nullptr.
+     */
+    ExpressionDateDiff(ExpressionContext* const expCtx,
+                       boost::intrusive_ptr<Expression> startDate,
+                       boost::intrusive_ptr<Expression> endDate,
+                       boost::intrusive_ptr<Expression> unit,
+                       boost::intrusive_ptr<Expression> timezone);
+    boost::intrusive_ptr<Expression> optimize() final;
+    Value serialize(bool explain) const final;
+    Value evaluate(const Document& root, Variables* variables) const final;
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* const expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+    void acceptVisitor(ExpressionVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+protected:
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+private:
+    /**
+     * Converts 'value' to Date_t type for $dateDiff expression for parameter 'parameterName'.
+     */
+    static Date_t convertToDate(const Value& value, StringData parameterName);
+
+    /**
+     * Converts 'value' to TimeUnit for $dateDiff expression parameter 'unit'.
+     */
+    static TimeUnit convertToTimeUnit(const Value& value);
+
+    // Starting time instant expression. Accepted types: Date_t, Timestamp, OID.
+    boost::intrusive_ptr<Expression>& _startDate;
+
+    // Ending time instant expression. Accepted types the same as for '_startDate'.
+    boost::intrusive_ptr<Expression>& _endDate;
+
+    // Length of time interval to measure the difference. Accepted type: std::string. Accepted
+    // values: enumerators from TimeUnit enumeration.
+    boost::intrusive_ptr<Expression>& _unit;
+
+    // Timezone to use for the difference calculation. Accepted type: std::string. If not specified,
+    // UTC is used.
+    boost::intrusive_ptr<Expression>& _timeZone;
+};
 
 class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {
 public:

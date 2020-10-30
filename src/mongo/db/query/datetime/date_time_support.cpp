@@ -40,6 +40,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/duration.h"
@@ -581,5 +582,149 @@ StatusWith<std::string> TimeZone::formatDate(StringData format, Date_t date) con
         return status;
     else
         return formatted.str();
+}
+
+namespace {
+auto const kMonthsInOneYear = 12LL;
+auto const kDaysInNonLeapYear = 365LL;
+auto const kHoursPerDay = 24LL;
+auto const kMinutesPerHour = 60LL;
+auto const kSecondsPerMinute = 60LL;
+auto const kDaysPerWeek = 7LL;
+auto const kQuartersPerYear = 4LL;
+auto const kQuarterLengthInMonths = 3LL;
+auto const kLeapYearReferencePoint = -1000000000L;
+
+/**
+ * Determines a number of leap years in a year range (leap year reference point; 'year'].
+ */
+inline long leapYearsSinceReferencePoint(long year) {
+    // Count a number of leap years that happened since the reference point, where a leap year is
+    // when year%4==0, excluding years when year%100==0, except when year%400==0.
+    auto yearsSinceReferencePoint = year - kLeapYearReferencePoint;
+    return yearsSinceReferencePoint / 4 - yearsSinceReferencePoint / 100 +
+        yearsSinceReferencePoint / 400;
+}
+
+/**
+ * Sums the number of days in the Gregorian calendar in years: 'startYear',
+ * 'startYear'+1, .., 'endYear'-1.
+ */
+inline long long daysBetweenYears(long startYear, long endYear) {
+    return leapYearsSinceReferencePoint(endYear - 1) - leapYearsSinceReferencePoint(startYear - 1) +
+        (endYear - startYear) * kDaysInNonLeapYear;
+}
+
+/**
+ * Determines a correction needed in number of hours when calculating passed hours between two time
+ * instants 'startInstant' and 'endInstant' due to the Daylight Savings Time. Returns 0, if both
+ * time instants 'startInstant' and 'endInstant' are either in Standard Time (ST) or in Daylight
+ * Saving Time (DST); returns 1, if 'endInstant' is in ST and 'startInstant' is in DST and
+ * 'endInstant' > 'startInstant' or 'endInstant' is in DST and 'startInstant' is in ST and
+ * 'endInstant' < 'startInstant'; otherwise returns -1.
+ */
+inline long long dstCorrection(timelib_time* startInstant, timelib_time* endInstant) {
+    return (startInstant->z - endInstant->z) / (kMinutesPerHour * kSecondsPerMinute);
+}
+
+inline long long dateDiffYear(timelib_time* startInstant, timelib_time* endInstant) {
+    return endInstant->y - startInstant->y;
+}
+
+/**
+ * Determines which quarter month 'month' belongs to. 'month' value range is 1..12. Returns a number
+ * of a quarter, where 0 corresponds to the first quarter.
+ */
+inline int quarter(int month) {
+    return (month - 1) / kQuarterLengthInMonths;
+}
+inline long long dateDiffQuarter(timelib_time* startInstant, timelib_time* endInstant) {
+    return quarter(endInstant->m) - quarter(startInstant->m) +
+        dateDiffYear(startInstant, endInstant) * kQuartersPerYear;
+}
+inline long long dateDiffMonth(timelib_time* startInstant, timelib_time* endInstant) {
+    return endInstant->m - startInstant->m +
+        dateDiffYear(startInstant, endInstant) * kMonthsInOneYear;
+}
+inline long long dateDiffDay(timelib_time* startInstant, timelib_time* endInstant) {
+    return timelib_day_of_year(endInstant->y, endInstant->m, endInstant->d) -
+        timelib_day_of_year(startInstant->y, startInstant->m, startInstant->d) +
+        daysBetweenYears(startInstant->y, endInstant->y);
+}
+inline long long dateDiffWeek(timelib_time* startInstant, timelib_time* endInstant) {
+    // We use 'timelib_iso_day_of_week()' since it considers Monday as the first day of the week.
+    return (dateDiffDay(startInstant, endInstant) +
+            timelib_iso_day_of_week(startInstant->y, startInstant->m, startInstant->d) -
+            timelib_iso_day_of_week(endInstant->y, endInstant->m, endInstant->d)) /
+        kDaysPerWeek;
+}
+inline long long dateDiffHour(timelib_time* startInstant, timelib_time* endInstant) {
+    return endInstant->h - startInstant->h + dateDiffDay(startInstant, endInstant) * kHoursPerDay +
+        dstCorrection(startInstant, endInstant);
+}
+inline long long dateDiffMinute(timelib_time* startInstant, timelib_time* endInstant) {
+    return endInstant->i - startInstant->i +
+        dateDiffHour(startInstant, endInstant) * kMinutesPerHour;
+}
+inline long long dateDiffSecond(timelib_time* startInstant, timelib_time* endInstant) {
+    return endInstant->s - startInstant->s +
+        dateDiffMinute(startInstant, endInstant) * kSecondsPerMinute;
+}
+inline long long dateDiffMillisecond(Date_t startDate, Date_t endDate) {
+    long long result;
+    uassert(5166308,
+            "dateDiff overflowed",
+            !overflow::sub(endDate.toMillisSinceEpoch(), startDate.toMillisSinceEpoch(), &result));
+    return result;
+}
+}  // namespace
+
+long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZone& timezone) {
+    if (TimeUnit::millisecond == unit) {
+        return dateDiffMillisecond(startDate, endDate);
+    }
+
+    // Translate the time instants to the given timezone.
+    auto startDateInTimeZone = timezone.getTimelibTime(startDate);
+    auto endDateInTimeZone = timezone.getTimelibTime(endDate);
+    switch (unit) {
+        case TimeUnit::year:
+            return dateDiffYear(startDateInTimeZone.get(), endDateInTimeZone.get());
+        case TimeUnit::quarter:
+            return dateDiffQuarter(startDateInTimeZone.get(), endDateInTimeZone.get());
+        case TimeUnit::month:
+            return dateDiffMonth(startDateInTimeZone.get(), endDateInTimeZone.get());
+        case TimeUnit::week:
+            return dateDiffWeek(startDateInTimeZone.get(), endDateInTimeZone.get());
+        case TimeUnit::day:
+            return dateDiffDay(startDateInTimeZone.get(), endDateInTimeZone.get());
+        case TimeUnit::hour:
+            return dateDiffHour(startDateInTimeZone.get(), endDateInTimeZone.get());
+        case TimeUnit::minute:
+            return dateDiffMinute(startDateInTimeZone.get(), endDateInTimeZone.get());
+        case TimeUnit::second:
+            return dateDiffSecond(startDateInTimeZone.get(), endDateInTimeZone.get());
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+TimeUnit parseTimeUnit(const std::string& unitName) {
+    static const StringMap<TimeUnit> timeUnitNameToTimeUnitMap{
+        {"year", TimeUnit::year},
+        {"quarter", TimeUnit::quarter},
+        {"month", TimeUnit::month},
+        {"week", TimeUnit::week},
+        {"day", TimeUnit::day},
+        {"hour", TimeUnit::hour},
+        {"minute", TimeUnit::minute},
+        {"second", TimeUnit::second},
+        {"millisecond", TimeUnit::millisecond},
+    };
+    auto iterator = timeUnitNameToTimeUnitMap.find(unitName);
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "unknown time unit value: " << unitName,
+            iterator != timeUnitNameToTimeUnitMap.end());
+    return iterator->second;
 }
 }  // namespace mongo

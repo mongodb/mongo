@@ -366,6 +366,7 @@ public:
     void visit(ExpressionCond* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
+    void visit(ExpressionDateDiff* expr) final {}
     void visit(ExpressionDateFromString* expr) final {}
     void visit(ExpressionDateFromParts* expr) final {}
     void visit(ExpressionDateToParts* expr) final {}
@@ -523,6 +524,7 @@ public:
     void visit(ExpressionCond* expr) final {
         _context->evalStack.emplaceFrame(EvalStage{});
     }
+    void visit(ExpressionDateDiff* expr) final {}
     void visit(ExpressionDateFromString* expr) final {}
     void visit(ExpressionDateFromParts* expr) final {}
     void visit(ExpressionDateToParts* expr) final {}
@@ -1183,6 +1185,9 @@ public:
     }
     void visit(ExpressionCond* expr) final {
         visitConditionalExpression(expr);
+    }
+    void visit(ExpressionDateDiff* expr) final {
+        unsupportedExpression("$dateDiff");
     }
     void visit(ExpressionDateFromString* expr) final {
         unsupportedExpression("$dateFromString");

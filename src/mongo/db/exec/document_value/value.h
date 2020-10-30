@@ -186,6 +186,13 @@ public:
      */
     bool integral64Bit() const;
 
+    /**
+     * Returns true if this value can be coerced to a Date, and false otherwise.
+     */
+    bool coercibleToDate() const {
+        return Date == getType() || bsonTimestamp == getType() || jstOID == getType();
+    }
+
     /// Get the BSON type of the field.
     BSONType getType() const {
         return _storage.bsonType();
