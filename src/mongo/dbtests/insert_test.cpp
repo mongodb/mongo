@@ -46,7 +46,7 @@ public:
           _lock(_opCtx.get()),
           _autoColl(_opCtx.get(), kInsertTestNss, MODE_IX) {}
 
-    const OperationContext* getOperationContext() const {
+    OperationContext* getOperationContext() const {
         return _opCtx.get();
     }
 
@@ -79,21 +79,21 @@ BSONArray makeNestedArray(size_t depth) {
 }
 
 TEST_F(InsertTest, FixDocumentForInsertAcceptsEmptyDocuments) {
-    ASSERT_OK(fixDocumentForInsert(getOperationContext()->getServiceContext(), BSONObj()));
+    ASSERT_OK(fixDocumentForInsert(getOperationContext(), BSONObj()));
 }
 
 TEST_F(InsertTest, FixDocumentForInsertAcceptsDocumentsAtStorageDepthLimit) {
-    ASSERT_OK(fixDocumentForInsert(getOperationContext()->getServiceContext(),
+    ASSERT_OK(fixDocumentForInsert(getOperationContext(),
                                    makeNestedObject(BSONDepth::getMaxDepthForUserStorage())));
-    ASSERT_OK(fixDocumentForInsert(getOperationContext()->getServiceContext(),
+    ASSERT_OK(fixDocumentForInsert(getOperationContext(),
                                    makeNestedArray(BSONDepth::getMaxDepthForUserStorage())));
 }
 
 TEST_F(InsertTest, FixDocumentForInsertFailsOnDeeplyNestedDocuments) {
-    ASSERT_EQ(fixDocumentForInsert(getOperationContext()->getServiceContext(),
+    ASSERT_EQ(fixDocumentForInsert(getOperationContext(),
                                    makeNestedObject(BSONDepth::getMaxDepthForUserStorage() + 1)),
               ErrorCodes::Overflow);
-    ASSERT_EQ(fixDocumentForInsert(getOperationContext()->getServiceContext(),
+    ASSERT_EQ(fixDocumentForInsert(getOperationContext(),
                                    makeNestedArray(BSONDepth::getMaxDepthForUserStorage() + 1)),
               ErrorCodes::Overflow);
 }

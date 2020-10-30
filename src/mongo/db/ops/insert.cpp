@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/bson/bson_depth.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -75,7 +76,10 @@ Status validateDepth(const BSONObj& obj) {
 }
 }  // namespace
 
-StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj& doc) {
+StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj& doc) {
+    if (DocumentValidationSettings::get(opCtx).isInternalValidationDisabled())
+        return StatusWith<BSONObj>(BSONObj());
+
     if (doc.objsize() > BSONObjMaxUserSize)
         return StatusWith<BSONObj>(ErrorCodes::BadValue,
                                    str::stream() << "object to insert too large"
@@ -163,7 +167,7 @@ StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj&
         if (hadId && e.fieldNameStringData() == "_id") {
             // no-op
         } else if (e.type() == bsonTimestamp && e.timestampValue() == 0) {
-            auto nextTime = VectorClockMutable::get(service)->tickClusterTime(1);
+            auto nextTime = VectorClockMutable::get(opCtx)->tickClusterTime(1);
             b.append(e.fieldName(), nextTime.asTimestamp());
         } else {
             b.append(e);

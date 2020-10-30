@@ -191,7 +191,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     OplogApplication::Mode oplogApplicationMode,
     IncrementOpsAppliedStatsFn incrementOpsAppliedStats,
     OpCounters* opCounters) {
-    invariant(documentValidationDisabled(opCtx));
+    invariant(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
 
     auto op = entryOrGroupedInserts.getOp();
     // Count each log op application as a separate operation, for reporting purposes

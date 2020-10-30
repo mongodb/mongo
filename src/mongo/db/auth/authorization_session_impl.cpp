@@ -340,7 +340,7 @@ Status AuthorizationSessionImpl::checkAuthForGetMore(const NamespaceString& ns,
 Status AuthorizationSessionImpl::checkAuthForInsert(OperationContext* opCtx,
                                                     const NamespaceString& ns) {
     ActionSet required{ActionType::insert};
-    if (documentValidationDisabled(opCtx)) {
+    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
         required.addAction(ActionType::bypassDocumentValidation);
     }
     if (!isAuthorizedForActionsOnNamespace(ns, required)) {
@@ -364,7 +364,7 @@ Status AuthorizationSessionImpl::checkAuthForUpdate(OperationContext* opCtx,
         operationType = "upsert"_sd;
     }
 
-    if (documentValidationDisabled(opCtx)) {
+    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled()) {
         required.addAction(ActionType::bypassDocumentValidation);
     }
 

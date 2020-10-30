@@ -221,7 +221,12 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         getGlobalServiceContext()->makeClient(str::stream() << nss.ns() << " loader"));
     auto opCtx = cc().makeOperationContext();
 
-    documentValidationDisabled(opCtx.get()) = true;
+    // DocumentValidationSettings::kDisableInternalValidation is currently inert.
+    // But, it's logically ok to disable internal validation as this function gets called
+    // only during initial sync.
+    DocumentValidationSettings::get(opCtx.get())
+        .setFlags(DocumentValidationSettings::kDisableSchemaValidation |
+                  DocumentValidationSettings::kDisableInternalValidation);
 
     std::unique_ptr<AutoGetCollection> autoColl;
     // Retry if WCE.

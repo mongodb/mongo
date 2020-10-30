@@ -69,6 +69,9 @@ struct WriteResult {
  * that case. This should generally be combined with LastError handling from parse failures.
  *
  * 'fromMigrate' indicates whether the operation was induced by a chunk migration
+ *
+ * Note: performInserts() gets called for both user and internal (like tenant collection cloner,
+ * and initial sync/tenant migration oplog buffer) inserts.
  */
 WriteResult performInserts(OperationContext* opCtx,
                            const write_ops::Insert& op,

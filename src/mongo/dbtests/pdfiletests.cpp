@@ -84,7 +84,7 @@ public:
         OpDebug* const nullOpDebug = nullptr;
         ASSERT(!coll->insertDocument(&_opCtx, InsertStatement(x), nullOpDebug, true).isOK());
 
-        StatusWith<BSONObj> fixed = fixDocumentForInsert(_opCtx.getServiceContext(), x);
+        StatusWith<BSONObj> fixed = fixDocumentForInsert(&_opCtx, x);
         ASSERT(fixed.isOK());
         x = fixed.getValue();
         ASSERT(x["_id"].type() == jstOID);
@@ -101,7 +101,7 @@ public:
         b.append("_id", 1);
         BSONObj o = b.done();
 
-        BSONObj fixed = fixDocumentForInsert(_opCtx.getServiceContext(), o).getValue();
+        BSONObj fixed = fixDocumentForInsert(&_opCtx, o).getValue();
         ASSERT_EQUALS(2, fixed.nFields());
         ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
         ASSERT(fixed.firstElement().number() == 1);
@@ -126,7 +126,7 @@ public:
             o = b.obj();
         }
 
-        BSONObj fixed = fixDocumentForInsert(_opCtx.getServiceContext(), o).getValue();
+        BSONObj fixed = fixDocumentForInsert(&_opCtx, o).getValue();
         ASSERT_EQUALS(3, fixed.nFields());
         ASSERT(fixed.firstElement().fieldNameStringData() == "_id");
         ASSERT(fixed.firstElement().number() == 1);
@@ -148,13 +148,10 @@ public:
 class ValidId : public Base {
 public:
     void run() {
-        ASSERT(fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << 5)).isOK());
-        ASSERT(
-            fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << BSON("x" << 5))).isOK());
-        ASSERT(!fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << BSON("$x" << 5)))
-                    .isOK());
-        ASSERT(!fixDocumentForInsert(_opCtx.getServiceContext(), BSON("_id" << BSON("$oid" << 5)))
-                    .isOK());
+        ASSERT(fixDocumentForInsert(&_opCtx, BSON("_id" << 5)).isOK());
+        ASSERT(fixDocumentForInsert(&_opCtx, BSON("_id" << BSON("x" << 5))).isOK());
+        ASSERT(!fixDocumentForInsert(&_opCtx, BSON("_id" << BSON("$x" << 5))).isOK());
+        ASSERT(!fixDocumentForInsert(&_opCtx, BSON("_id" << BSON("$oid" << 5))).isOK());
     }
 };
 }  // namespace Insert

@@ -33,12 +33,6 @@
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
-/**
- * If true, Collection should do no validation of writes from this OperationContext.
- *
- * Note that Decorations are value-constructed so this defaults to false.
- */
-extern const OperationContext::Decoration<bool> documentValidationDisabled;
 
 inline StringData bypassDocumentValidationCommandOption() {
     return "bypassDocumentValidation";
@@ -49,6 +43,64 @@ inline bool shouldBypassDocumentValidationForCommand(const BSONObj& cmdObj) {
 }
 
 /**
+ * This container decorates an OperationContext object. It stores the document validation
+ * settings for writes associated with an OperationContext. By default, document validation (both
+ * schema and internal) is enabled. DocumentValidationSettings objects are not thread-safe.
+ *
+ */
+class DocumentValidationSettings {
+public:
+    enum flag : std::uint8_t {
+        /*
+         * Enables document validation (both schema and internal).
+         */
+        kEnableValidation = 0x00,
+        /*
+         * Disables the schema validation during document inserts and updates.
+         * This flag should be enabled if WriteCommandBase::_bypassDocumentValidation
+         * is set to true.
+         */
+        kDisableSchemaValidation = 0x01,
+        /*
+         * Disables any internal validation (like fixDocumentForInsert()). This flag
+         * should be enabled only for trusted internal writes or internal writes that
+         * doesn't comply with internal validation rules.
+         */
+        kDisableInternalValidation = 0x02,
+    };
+
+    using Flags = std::uint8_t;
+
+    static const OperationContext::Decoration<DocumentValidationSettings> get;
+
+    DocumentValidationSettings() = default;
+
+    void setFlags(Flags flags) {
+        invariant(flags != kEnableValidation);
+        _flags |= flags;
+    }
+
+    void clearFlags() {
+        _flags = kEnableValidation;
+    }
+
+    bool isSchemaValidationDisabled() const {
+        return _flags & kDisableSchemaValidation;
+    }
+
+    bool isInternalValidationDisabled() const {
+        return _flags & kDisableInternalValidation;
+    }
+
+    bool isDocumentValidationEnabled() const {
+        return _flags == kEnableValidation;
+    }
+
+private:
+    Flags _flags = kEnableValidation;
+};
+
+/**
  * Disables document validation on a single OperationContext while in scope.
  * Resets to original value when leaving scope so they are safe to nest.
  */
@@ -57,31 +109,36 @@ class DisableDocumentValidation {
     DisableDocumentValidation& operator=(const DisableDocumentValidation&) = delete;
 
 public:
-    DisableDocumentValidation(OperationContext* opCtx)
-        : _opCtx(opCtx), _initialState(documentValidationDisabled(_opCtx)) {
-        documentValidationDisabled(_opCtx) = true;
+    DisableDocumentValidation(OperationContext* opCtx,
+                              DocumentValidationSettings::Flags flags =
+                                  DocumentValidationSettings::kDisableSchemaValidation)
+        : _opCtx(opCtx) {
+        auto& documentValidationSettings = DocumentValidationSettings::get(_opCtx);
+        _initialState = documentValidationSettings;
+        documentValidationSettings.setFlags(flags);
     }
 
     ~DisableDocumentValidation() {
-        documentValidationDisabled(_opCtx) = _initialState;
+        DocumentValidationSettings::get(_opCtx) = _initialState;
     }
 
 private:
     OperationContext* const _opCtx;
-    const bool _initialState;
+    DocumentValidationSettings _initialState;
 };
 
 /**
- * Disables document validation while in scope if the constructor is passed true.
+ * Disables document schema validation while in scope if the constructor is passed true.
  */
-class DisableDocumentValidationIfTrue {
+class DisableDocumentSchemaValidationIfTrue {
 public:
-    DisableDocumentValidationIfTrue(OperationContext* opCtx, bool shouldDisableValidation) {
-        if (shouldDisableValidation)
-            _documentValidationDisabler.emplace(opCtx);
+    DisableDocumentSchemaValidationIfTrue(OperationContext* opCtx,
+                                          bool shouldDisableSchemaValidation) {
+        if (shouldDisableSchemaValidation)
+            _documentSchemaValidationDisabler.emplace(opCtx);
     }
 
 private:
-    boost::optional<DisableDocumentValidation> _documentValidationDisabler;
+    boost::optional<DisableDocumentValidation> _documentSchemaValidationDisabler;
 };
 }  // namespace mongo

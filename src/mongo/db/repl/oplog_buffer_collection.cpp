@@ -40,7 +40,9 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/util/assert_util.h"
 
@@ -153,7 +155,7 @@ void OplogBufferCollection::push(OperationContext* opCtx,
         return;
     }
     size_t numDocs = std::distance(begin, end);
-    std::vector<InsertStatement> docsToInsert(numDocs);
+    std::vector<BSONObj> docsToInsert(numDocs);
     stdx::lock_guard<Latch> lk(_mutex);
     auto ts = _lastPushedTimestamp;
     std::transform(begin, end, docsToInsert.begin(), [&ts](const Value& value) {
@@ -164,11 +166,31 @@ void OplogBufferCollection::push(OperationContext* opCtx,
         invariant(ts > previousTimestamp,
                   str::stream() << "ts: " << ts.toString()
                                 << ", previous: " << previousTimestamp.toString());
-        return InsertStatement(doc);
+        return doc;
     });
 
-    auto status = _storageInterface->insertDocuments(opCtx, _nss, docsToInsert);
-    fassert(40161, status);
+    // Disabling internal document validation because the oplog buffer document inserts
+    // can violate max data size limit (which is BSONObjMaxUserSize 16MB) check. Since, the max
+    // user document size is 16MB, the oplog generated for those writes can exceed 16MB
+    // (16MB user data  + additional bytes for oplog fields like ’’op”, “ns”, “ui”).
+    DisableDocumentValidation documentValidationDisabler(
+        opCtx,
+        DocumentValidationSettings::kDisableSchemaValidation |
+            DocumentValidationSettings::kDisableInternalValidation);
+
+    write_ops::Insert insertOp(_nss);
+    insertOp.setDocuments(std::move(docsToInsert));
+    insertOp.setWriteCommandBase([] {
+        write_ops::WriteCommandBase wcb;
+        wcb.setOrdered(true);
+        return wcb;
+    }());
+
+    auto writeResult = write_ops_exec::performInserts(opCtx, insertOp);
+    invariant(!writeResult.results.empty());
+    // Since the writes are ordered, it's ok to check just the last writeOp result.
+    fassert(40161, writeResult.results.back());
+
 
     _lastPushedTimestamp = ts;
     _count += numDocs;

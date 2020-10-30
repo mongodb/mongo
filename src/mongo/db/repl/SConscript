@@ -345,6 +345,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         'storage_interface',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
+    ],
 )
 
 env.Library(
@@ -1030,6 +1034,7 @@ env.Library(
         'task_runner',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/rpc/metadata',

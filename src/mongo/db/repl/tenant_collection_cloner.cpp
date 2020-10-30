@@ -32,6 +32,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -361,20 +362,28 @@ void TenantCollectionCloner::insertDocumentsCallback(
         _progressMeter.hit(int(docs.size()));
     }
 
+    // Disabling the internal document validation for inserts on recipient side as those
+    // validation should have already been performed on donor's primary during tenant
+    // collection document insertion.
+    DisableDocumentValidation doumentValidationDisabler(
+        cbd.opCtx,
+        DocumentValidationSettings::kDisableSchemaValidation |
+            DocumentValidationSettings::kDisableInternalValidation);
+
     write_ops::Insert insertOp(_sourceNss);
     insertOp.setDocuments(std::move(docs));
     insertOp.setWriteCommandBase([] {
         write_ops::WriteCommandBase wcb;
         wcb.setOrdered(true);
-        wcb.setBypassDocumentValidation(true);
         return wcb;
     }());
 
     // write_ops_exec::PerformInserts() will handle limiting the batch size
     // that gets inserted in a single WUOW.
-    auto writeResults = write_ops_exec::performInserts(cbd.opCtx, insertOp);
+    auto writeResult = write_ops_exec::performInserts(cbd.opCtx, insertOp);
+    invariant(!writeResult.results.empty());
     // Since the writes are ordered, it's ok to check just the last writeOp result.
-    uassertStatusOKWithContext(writeResults.results.back(),
+    uassertStatusOKWithContext(writeResult.results.back(),
                                "Tenant collection cloner: insert documents");
 
     tenantMigrationHangDuringCollectionClone.executeIf(

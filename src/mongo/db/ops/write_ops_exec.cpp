@@ -548,7 +548,7 @@ WriteResult performInserts(OperationContext* opCtx,
 
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
-    DisableDocumentValidationIfTrue docValidationDisabler(
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
@@ -567,7 +567,7 @@ WriteResult performInserts(OperationContext* opCtx,
 
     for (auto&& doc : wholeOp.getDocuments()) {
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
-        auto fixedDoc = fixDocumentForInsert(opCtx->getServiceContext(), doc);
+        auto fixedDoc = fixDocumentForInsert(opCtx, doc);
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
             // correct order. In an ordered insert, if one of the docs ahead of us fails, we should
@@ -790,7 +790,7 @@ WriteResult performUpdates(OperationContext* opCtx, const write_ops::Update& who
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
-    DisableDocumentValidationIfTrue docValidationDisabler(
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 
@@ -953,7 +953,7 @@ WriteResult performDeletes(OperationContext* opCtx, const write_ops::Delete& who
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(wholeOp.getNamespace()));
 
-    DisableDocumentValidationIfTrue docValidationDisabler(
+    DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(
         opCtx, wholeOp.getWriteCommandBase().getBypassDocumentValidation());
     LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
 

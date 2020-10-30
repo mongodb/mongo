@@ -426,7 +426,7 @@ Status CollectionImpl::checkValidation(OperationContext* opCtx, const BSONObj& d
     if (_validationLevel == ValidationLevel::OFF)
         return Status::OK();
 
-    if (documentValidationDisabled(opCtx))
+    if (DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled())
         return Status::OK();
 
     if (ns().isTemporaryReshardingCollection()) {

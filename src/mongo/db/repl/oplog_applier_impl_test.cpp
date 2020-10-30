@@ -1532,7 +1532,7 @@ TEST_F(OplogApplierImplTest,
             onInsertsCalled = true;
             ASSERT_FALSE(opCtx->writesAreReplicated());
             ASSERT_FALSE(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication());
-            ASSERT_TRUE(documentValidationDisabled(opCtx));
+            ASSERT_TRUE(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
             return Status::OK();
         };
     createCollectionWithUuid(_opCtx.get(), nss);

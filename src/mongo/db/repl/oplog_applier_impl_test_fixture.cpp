@@ -173,7 +173,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
         ASSERT_TRUE(
             opCtx->lockState()->isCollectionLockedForMode(NamespaceString("test.t"), MODE_IX));
         ASSERT_FALSE(opCtx->writesAreReplicated());
-        ASSERT_TRUE(documentValidationDisabled(opCtx));
+        ASSERT_TRUE(DocumentValidationSettings::get(opCtx).isSchemaValidationDisabled());
     };
 
     _opObserver->onInsertsFn =

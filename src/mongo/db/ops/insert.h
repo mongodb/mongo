@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-class ServiceContext;
+class OperationContext;
 
 /**
  * Validates that 'doc' is legal for insertion, possibly with some modifications.
@@ -42,7 +42,7 @@ class ServiceContext;
  *  - an empty BSONObj if 'doc' can be inserted as-is; or
  *  - a non-empty BSONObj representing what should be inserted instead of 'doc'.
  */
-StatusWith<BSONObj> fixDocumentForInsert(ServiceContext* service, const BSONObj& doc);
+StatusWith<BSONObj> fixDocumentForInsert(OperationContext* opCtx, const BSONObj& doc);
 
 
 /**
