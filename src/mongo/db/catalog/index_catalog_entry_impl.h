@@ -69,6 +69,8 @@ public:
         return _ident;
     }
 
+    std::shared_ptr<Ident> getSharedIdent() const final;
+
     IndexDescriptor* descriptor() final {
         return _descriptor.get();
     }

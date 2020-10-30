@@ -1071,32 +1071,26 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
     }
 
     CollectionQueryInfo::get(_collection).droppedIndex(opCtx, _collection, indexName);
-    entry = nullptr;
-    deleteIndexFromDisk(opCtx, indexName);
+    _deleteIndexFromDisk(opCtx, indexName, entry->getSharedIdent());
 
     return Status::OK();
 }
 
 void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx, const string& indexName) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(_collection->ns(), MODE_X));
+    _deleteIndexFromDisk(opCtx, indexName, nullptr);
+}
 
-    // The index catalog entry may not exist in the catalog depending on how far an index build may
-    // have gotten before needing to abort. If the catalog entry cannot be found, then there are no
-    // concurrent operations still using the index.
-    auto ident = [&]() -> std::shared_ptr<Ident> {
-        auto indexDesc = findIndexByName(opCtx, indexName, true /* includeUnfinishedIndexes */);
-        if (!indexDesc) {
-            return nullptr;
-        }
-        return getEntry(indexDesc)->accessMethod()->getSharedIdent();
-    }();
-
+void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx,
+                                            const string& indexName,
+                                            std::shared_ptr<Ident> ident) {
+    invariant(!findIndexByName(opCtx, indexName, true /* includeUnfinishedIndexes*/));
     catalog::removeIndex(opCtx,
                          indexName,
                          _collection->getCatalogId(),
                          _collection->uuid(),
                          _collection->ns(),
-                         ident);
+                         std::move(ident));
 }
 
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,

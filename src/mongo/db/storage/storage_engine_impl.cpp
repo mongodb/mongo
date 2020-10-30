@@ -764,7 +764,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
                                  coll->getCatalogId(),
                                  coll->uuid(),
                                  coll->ns(),
-                                 ice->accessMethod()->getSharedIdent());
+                                 ice->getSharedIdent());
         }
 
         Status result = catalog::dropCollection(

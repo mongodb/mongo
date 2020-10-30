@@ -319,6 +319,10 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
     return Status::OK();
 }
 
+std::shared_ptr<Ident> IndexCatalogEntryImpl::getSharedIdent() const {
+    return {shared_from_this(), _accessMethod->getSortedDataInterface()};  // aliasing constructor
+}
+
 // ----
 
 NamespaceString IndexCatalogEntryImpl::getNSSFromCatalog(OperationContext* opCtx) const {

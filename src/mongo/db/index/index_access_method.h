@@ -376,11 +376,6 @@ public:
      * documents into an index, except for testing purposes.
      */
     virtual SortedDataInterface* getSortedDataInterface() const = 0;
-
-    /**
-     * Fetches the Ident for this index.
-     */
-    virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
 };
 
 /**
@@ -571,8 +566,6 @@ public:
 
     SortedDataInterface* getSortedDataInterface() const override final;
 
-    std::shared_ptr<Ident> getSharedIdent() const override final;
-
 protected:
     /**
      * Fills 'keys' with the keys that should be generated for 'obj' on this index.
@@ -620,7 +613,7 @@ private:
                                const KeyString::Value& dataKey,
                                const RecordIdHandlerFn& onDuplicateRecord);
 
-    const std::shared_ptr<SortedDataInterface> _newInterface;
+    const std::unique_ptr<SortedDataInterface> _newInterface;
 };
 
 }  // namespace mongo

@@ -360,6 +360,14 @@ private:
                         int64_t* keysDeletedOut);
 
     /**
+     * Helper to remove the index from disk.
+     * The index should be removed from the in-memory catalog beforehand.
+     */
+    void _deleteIndexFromDisk(OperationContext* opCtx,
+                              const std::string& indexName,
+                              std::shared_ptr<Ident> ident);
+
+    /**
      * Applies a set of transformations to the user-provided index object 'spec' to make it
      * conform to the standard for insertion.  Removes the '_id' field if it exists, applies
      * plugin-level transformations if appropriate, etc.
