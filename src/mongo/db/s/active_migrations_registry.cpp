@@ -109,7 +109,6 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
             return {ScopedDonateChunk(nullptr, false, _activeMoveChunkState->notification)};
         }
 
-        // TODO: SERVER-50047
         LOGV2(5004700,
               "registerDonateChunk ",
               "currentKeys"_attr = ChunkRange(_activeMoveChunkState->args.getMinKey(),
