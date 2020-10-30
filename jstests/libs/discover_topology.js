@@ -13,7 +13,7 @@ var DiscoverTopology = (function() {
     const kDefaultConnectFn = (host) => new Mongo(host);
 
     function getDataMemberConnectionStrings(conn) {
-        const res = conn.adminCommand({isMaster: 1});
+        const res = assert.commandWorked(conn.adminCommand({isMaster: 1}));
 
         if (!res.hasOwnProperty('setName')) {
             // 'conn' represents a connection to a stand-alone mongod.
@@ -117,7 +117,7 @@ var DiscoverTopology = (function() {
      * shard or a replica set shard.
      */
     function findConnectedNodes(conn, options = {connectFn: kDefaultConnectFn}) {
-        const isMongod = conn.adminCommand({isMaster: 1}).msg !== 'isdbgrid';
+        const isMongod = assert.commandWorked(conn.adminCommand({isMaster: 1})).msg !== 'isdbgrid';
 
         if (isMongod) {
             return getDataMemberConnectionStrings(conn);
