@@ -78,3 +78,28 @@ structs:
                               is set to true, because dropped collections' entries were being
                               written as dropped with certain fields missing instead of deleted."
                 optional: true
+            defaultCollation:
+                cpp_name: pre50CompatibleDefaultCollation
+                type: object_owned
+                description: "Optional collection default collation. If missing or set to the empty
+                              BSON, implies simple collation.
+
+                              It is optional for serialisation purposes, because in versions of
+                              MongoDB prior to 5.0, this value must be missing for the default
+                              (empty BSON) collation."
+                optional: true
+            unique:
+                type: bool
+                description: "Uniqueness of the sharding key."
+                default: false
+            noBalance:
+                type: bool
+                description: "Consulted by the Balancer only and indicates whether this collection
+                              should be considered for balancing or not."
+                default: false
+            reshardingFields:
+                type: TypeCollectionReshardingFields
+                description: "Resharding-related fields. Only set when this collection is either the
+                              original collection undergoing a resharding operation or this
+                              collection is the temporary resharding collection."
+                optional: true

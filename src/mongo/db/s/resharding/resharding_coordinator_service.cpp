@@ -402,8 +402,6 @@ CollectionType createTempReshardingCollectionType(
     emplaceFetchTimestampIfExists(recipient, coordinatorDoc.getFetchTimestamp());
     tempEntryReshardingFields.setRecipientFields(recipient);
     collType.setReshardingFields(std::move(tempEntryReshardingFields));
-
-    invariant(collType.validate().isOK());
     return collType;
 }
 

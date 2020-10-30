@@ -32,7 +32,7 @@
 #include <memory>
 
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"

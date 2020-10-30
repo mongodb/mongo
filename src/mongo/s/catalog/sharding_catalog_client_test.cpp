@@ -778,7 +778,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     coll1.setUnique(false);
     coll1.setEpoch(OID::gen());
     coll1.setKeyPattern(KeyPattern{BSON("_id" << 1)});
-    ASSERT_OK(coll1.validate());
 
     CollectionType coll2;
     coll2.setNss(NamespaceString{"anotherdb.coll1"});
@@ -786,7 +785,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
     coll2.setUnique(false);
     coll2.setEpoch(OID::gen());
     coll2.setKeyPattern(KeyPattern{BSON("_id" << 1)});
-    ASSERT_OK(coll2.validate());
 
     const OpTime newOpTime(Timestamp(7, 6), 5);
 
@@ -901,7 +899,6 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     validColl.setUnique(true);
     validColl.setEpoch(OID::gen());
     validColl.setKeyPattern(KeyPattern{BSON("_id" << 1)});
-    ASSERT_OK(validColl.validate());
 
     onFindCommand([this, validColl](const RemoteCommandRequest& request) {
         const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());

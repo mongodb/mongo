@@ -167,8 +167,6 @@ Status ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
     const NamespaceString& nss,
     const CollectionType& coll,
     const bool upsert) {
-    fassert(28634, coll.validate());
-
     auto status = _updateConfigDocument(opCtx,
                                         CollectionType::ConfigNS,
                                         BSON(CollectionType::kNssFieldName << nss.ns()),

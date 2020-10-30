@@ -40,7 +40,7 @@
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharded_chunk_gen.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"

@@ -39,19 +39,11 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-namespace {
-
-const BSONField<bool> kNoBalance("noBalance");
-
-}  // namespace
 
 const NamespaceString CollectionType::ConfigNS("config.collections");
 
-const BSONField<BSONObj> CollectionType::defaultCollation("defaultCollation");
-const BSONField<bool> CollectionType::unique("unique");
 const BSONField<UUID> CollectionType::uuid("uuid");
 const BSONField<std::string> CollectionType::distributionMode("distributionMode");
-const BSONField<ReshardingFields> CollectionType::reshardingFields("reshardingFields");
 
 CollectionType::CollectionType(const BSONObj& obj) {
     CollectionType::parseProtected(IDLParserErrorContext("CollectionType"), obj);
@@ -101,34 +93,6 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
     }
 
     {
-        BSONElement collDefaultCollation;
-        Status status =
-            bsonExtractTypedField(source, defaultCollation.name(), Object, &collDefaultCollation);
-        if (status.isOK()) {
-            BSONObj obj = collDefaultCollation.Obj();
-            if (obj.isEmpty()) {
-                return Status(ErrorCodes::BadValue, "empty defaultCollation");
-            }
-
-            coll._defaultCollation = obj.getOwned();
-        } else if (status != ErrorCodes::NoSuchKey) {
-            return status;
-        }
-    }
-
-    {
-        bool collUnique;
-        Status status = bsonExtractBooleanField(source, unique.name(), &collUnique);
-        if (status.isOK()) {
-            coll._unique = collUnique;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // Key uniqueness can be missing in which case it is presumed false
-        } else {
-            return status;
-        }
-    }
-
-    {
         BSONElement uuidElem;
         Status status = bsonExtractField(source, uuid.name(), &uuidElem);
         if (status.isOK()) {
@@ -145,52 +109,15 @@ StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
         }
     }
 
-    {
-        bool collNoBalance;
-        Status status = bsonExtractBooleanField(source, kNoBalance.name(), &collNoBalance);
-        if (status.isOK()) {
-            coll._allowBalance = !collNoBalance;
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // No balance can be missing in which case it is presumed as false
-        } else {
-            return status;
-        }
-    }
-
-    {
-        const auto reshardingFieldsElem = source.getField(reshardingFields.name());
-        if (reshardingFieldsElem) {
-            coll._reshardingFields =
-                ReshardingFields::parse(IDLParserErrorContext("TypeCollectionReshardingFields"),
-                                        reshardingFieldsElem.Obj());
-        }
-    }
-
     return StatusWith<CollectionType>(coll);
-}
-
-Status CollectionType::validate() const {
-    return Status::OK();
 }
 
 BSONObj CollectionType::toBSON() const {
     BSONObjBuilder builder;
     serialize(&builder);
 
-    if (!_defaultCollation.isEmpty()) {
-        builder.append(defaultCollation.name(), _defaultCollation);
-    }
-
-    if (_unique.is_initialized()) {
-        builder.append(unique.name(), _unique.get());
-    }
-
     if (_uuid.is_initialized()) {
         _uuid->appendToBuilder(&builder, uuid.name());
-    }
-
-    if (_allowBalance.is_initialized()) {
-        builder.append(kNoBalance.name(), !_allowBalance.get());
     }
 
     if (_distributionMode) {
@@ -201,10 +128,6 @@ BSONObj CollectionType::toBSON() const {
         } else {
             MONGO_UNREACHABLE;
         }
-    }
-
-    if (_reshardingFields) {
-        builder.append(reshardingFields.name(), _reshardingFields->toBSON());
     }
 
     return builder.obj();
@@ -222,17 +145,18 @@ void CollectionType::setKeyPattern(KeyPattern keyPattern) {
     setPre50CompatibleKeyPattern(std::move(keyPattern));
 }
 
-void CollectionType::setReshardingFields(boost::optional<ReshardingFields> reshardingFields) {
-    _reshardingFields = std::move(reshardingFields);
+void CollectionType::setDefaultCollation(const BSONObj& defaultCollation) {
+    if (!defaultCollation.isEmpty())
+        setPre50CompatibleDefaultCollation(defaultCollation);
 }
 
 bool CollectionType::hasSameOptions(const CollectionType& other) const {
     return getNss() == other.getNss() &&
         SimpleBSONObjComparator::kInstance.evaluate(getKeyPattern().toBSON() ==
                                                     other.getKeyPattern().toBSON()) &&
-        SimpleBSONObjComparator::kInstance.evaluate(_defaultCollation ==
+        SimpleBSONObjComparator::kInstance.evaluate(getDefaultCollation() ==
                                                     other.getDefaultCollation()) &&
-        *_unique == other.getUnique() && getDistributionMode() == other.getDistributionMode();
+        getUnique() == other.getUnique() && getDistributionMode() == other.getDistributionMode();
 }
 
 }  // namespace mongo

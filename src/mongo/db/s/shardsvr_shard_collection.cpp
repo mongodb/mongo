@@ -484,7 +484,9 @@ void updateShardingCatalogEntryForCollection(
     coll.setEpoch(initialChunks.collVersion().epoch());
     coll.setUpdatedAt(Date_t::fromMillisSinceEpoch(initialChunks.collVersion().toLong()));
     coll.setKeyPattern(prerequisites.shardKeyPattern.toBSON());
-    coll.setDefaultCollation(defaultCollator ? defaultCollator->getSpec().toBSON() : BSONObj());
+    if (defaultCollator) {
+        coll.setDefaultCollation(defaultCollator->getSpec().toBSON());
+    }
     coll.setUnique(unique);
     coll.setDistributionMode(CollectionType::DistributionMode::kSharded);
 

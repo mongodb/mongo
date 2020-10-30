@@ -90,7 +90,6 @@ TEST(ShardCollectionType, ToBSONEmptyDefaultCollationNotIncluded) {
     shardCollType.setKeyPattern(kKeyPattern);
     shardCollType.setUnique(true);
 
-    shardCollType.setDefaultCollation(BSONObj());
     BSONObj obj = shardCollType.toBSON();
 
     ASSERT_FALSE(obj.hasField(ShardCollectionType::kDefaultCollationFieldName));

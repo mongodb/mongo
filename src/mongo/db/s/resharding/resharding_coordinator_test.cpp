@@ -47,6 +47,7 @@
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+namespace {
 
 class ReshardingCoordinatorPersistenceTest : public ConfigServerTestFixture {
 protected:
@@ -109,7 +110,6 @@ protected:
         }
         collType.setEpoch(std::move(epoch));
         collType.setUpdatedAt(lastUpdated);
-        collType.setDefaultCollation(BSONObj());
         collType.setUnique(false);
         collType.setDistributionMode(CollectionType::DistributionMode::kSharded);
         if (reshardingFields)
@@ -665,4 +665,5 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
                        ErrorCodes::NamespaceNotFound);
 }
 
+}  // namespace
 }  // namespace mongo

@@ -101,10 +101,9 @@ structs:
                 optional: false
             defaultCollation:
                 type: object_owned
+                description: "Optional collection default collation. If missing or set to the empty
+                              BSON, implies simple collation."
                 default: BSONObj()
-                description: "Optional collection default collation. If empty, implies simple
-                              collation."
-                optional: false
             unique:
                 type: bool
                 description: "Uniqueness of the sharding key."

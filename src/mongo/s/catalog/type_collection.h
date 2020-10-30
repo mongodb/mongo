@@ -29,10 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/keypattern.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_collection_gen.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -83,26 +80,31 @@ using ReshardingFields = TypeCollectionReshardingFields;
 class CollectionType : private CollectionTypeBase {
 public:
     // Make field names accessible.
-    using CollectionTypeBase::kNssFieldName;
+    static constexpr auto kDefaultCollationFieldName =
+        CollectionTypeBase::kPre50CompatibleDefaultCollationFieldName;
     static constexpr auto kEpochFieldName = CollectionTypeBase::kPre22CompatibleEpochFieldName;
-    using CollectionTypeBase::kUpdatedAtFieldName;
     static constexpr auto kKeyPatternFieldName =
         CollectionTypeBase::kPre50CompatibleKeyPatternFieldName;
+    using CollectionTypeBase::kNssFieldName;
+    using CollectionTypeBase::kReshardingFieldsFieldName;
+    using CollectionTypeBase::kUniqueFieldName;
+    using CollectionTypeBase::kUpdatedAtFieldName;
 
     // Make getters and setters accessible.
     using CollectionTypeBase::getNss;
+    using CollectionTypeBase::getReshardingFields;
+    using CollectionTypeBase::getUnique;
     using CollectionTypeBase::getUpdatedAt;
     using CollectionTypeBase::setNss;
+    using CollectionTypeBase::setReshardingFields;
+    using CollectionTypeBase::setUnique;
     using CollectionTypeBase::setUpdatedAt;
 
     // Name of the collections collection in the config server.
     static const NamespaceString ConfigNS;
 
-    static const BSONField<BSONObj> defaultCollation;
-    static const BSONField<bool> unique;
     static const BSONField<UUID> uuid;
     static const BSONField<std::string> distributionMode;
-    static const BSONField<ReshardingFields> reshardingFields;
 
     CollectionType() = default;
 
@@ -121,12 +123,6 @@ public:
         kUnsharded,
         kSharded,
     };
-
-    /**
-     * Returns OK if all fields have been set. Otherwise returns NoSuchKey and information
-     * about what is the first field which is missing.
-     */
-    Status validate() const;
 
     /**
      * Returns the BSON representation of the entry.
@@ -152,18 +148,14 @@ public:
     }
     void setKeyPattern(KeyPattern keyPattern);
 
-    const BSONObj& getDefaultCollation() const {
-        return _defaultCollation;
+    BSONObj getDefaultCollation() const {
+        return getPre50CompatibleDefaultCollation() ? *getPre50CompatibleDefaultCollation()
+                                                    : BSONObj();
     }
-    void setDefaultCollation(const BSONObj& collation) {
-        _defaultCollation = collation.getOwned();
-    }
+    void setDefaultCollation(const BSONObj& defaultCollation);
 
-    bool getUnique() const {
-        return _unique.get_value_or(false);
-    }
-    void setUnique(bool unique) {
-        _unique = unique;
+    bool getAllowBalance() const {
+        return !getNoBalance();
     }
 
     boost::optional<UUID> getUUID() const {
@@ -173,21 +165,12 @@ public:
         _uuid = uuid;
     }
 
-    bool getAllowBalance() const {
-        return _allowBalance.get_value_or(true);
-    }
-
     DistributionMode getDistributionMode() const {
         return _distributionMode.get_value_or(DistributionMode::kSharded);
     }
     void setDistributionMode(DistributionMode distributionMode) {
         _distributionMode = distributionMode;
     }
-
-    const boost::optional<ReshardingFields>& getReshardingFields() const {
-        return _reshardingFields;
-    }
-    void setReshardingFields(boost::optional<ReshardingFields> reshardingFields);
 
     bool hasSameOptions(const CollectionType& other) const;
 
@@ -196,20 +179,8 @@ private:
     // collection is unsharded or sharded. If missing, implies sharded.
     boost::optional<DistributionMode> _distributionMode;
 
-    // Optional collection default collation. If empty, implies simple collation.
-    BSONObj _defaultCollation;
-
-    // Optional uniqueness of the sharding key. If missing, implies false.
-    boost::optional<bool> _unique;
-
     // Optional in 3.6 binaries, because UUID does not exist in featureCompatibilityVersion=3.4.
     boost::optional<UUID> _uuid;
-
-    // Optional whether balancing is allowed for this collection. If missing, implies true.
-    boost::optional<bool> _allowBalance;
-
-    // Fields on the collection entry specific to resharding.
-    boost::optional<ReshardingFields> _reshardingFields;
 };
 
 }  // namespace mongo

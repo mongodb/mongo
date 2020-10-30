@@ -749,8 +749,6 @@ void ShardingCatalogManager::updateShardingCatalogEntryForCollectionInTxn(
     const bool upsert,
     const bool startTransaction,
     TxnNumber txnNumber) {
-    fassert(51249, coll.validate());
-
     auto status = getStatusFromCommandResult(
         writeToConfigDocumentInTxn(opCtx,
                                    CollectionType::ConfigNS,
