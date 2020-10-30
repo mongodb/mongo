@@ -22,8 +22,9 @@ const collName = jsTestName();
 let coll = primary.getDB(dbName)[collName];
 const newReplSetName = "newTestSet";
 
-// Make sure a write can be replicated to every node in the set.
-assert.commandWorked(coll.insert({a: 1}, {"writeConcern": {"w": 2}}));
+// Make sure a write can be replicated to every node in the set. We set journaling to true to ensure
+// this write is durable before restarting the nodes below.
+assert.commandWorked(coll.insert({a: 1}, {"writeConcern": {"w": 2, "j": true}}));
 
 // Restart all nodes in the set as standalones.
 nodes = replTest.restart(nodes, {noReplSet: true});
