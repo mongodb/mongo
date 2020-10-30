@@ -182,6 +182,7 @@ public:
     using ReplSetConfigBase::getProtocolVersion;
     using ReplSetConfigBase::getReplSetName;
     using ReplSetConfigBase::getWriteConcernMajorityShouldJournal;
+    using ReplSetConfigBase::serialize;
     using ReplSetConfigBase::toBSON;
 
     /**

@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/constants.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/duration.h"
 
@@ -69,29 +70,28 @@ auto mapLog(It begin, It end);
 
 namespace detail {
 
+template <template <class...> class Template, typename... Args>
+struct IsInstantiationOf : std::false_type {};
+template <template <class...> class Template, typename... Args>
+struct IsInstantiationOf<Template, Template<Args...>> : std::true_type {};
+template <template <class...> class Template, typename... Args>
+constexpr bool isInstantiationOf = IsInstantiationOf<Template, Args...>::value;
+
 // Helper traits to figure out capabilities on custom types
 template <class T>
-struct IsOptional : std::false_type {};
+constexpr bool isOptional = isInstantiationOf<boost::optional, T>;
 
 template <class T>
-struct IsOptional<boost::optional<T>> : std::true_type {};
-
-template <class T>
-struct IsDuration : std::false_type {};
-
-template <class T>
-struct IsDuration<Duration<T>> : std::true_type {};
-
-template <class T, typename = void>
-struct IsContainer : std::false_type {};
-
-template <class T, typename = void>
-struct HasMappedType : std::false_type {};
+constexpr bool isDuration = isInstantiationOf<Duration, T>;
 
 template <typename T>
-struct HasMappedType<T, std::void_t<typename T::mapped_type>> : std::true_type {};
+using HasMappedTypeOp = typename T::mapped_type;
+template <typename T>
+constexpr bool hasMappedType = stdx::is_detected_v<HasMappedTypeOp, T>;
 
 // Trait to detect container, common interface for both std::array and std::forward_list
+template <class T, typename = void>
+struct IsContainer : std::false_type {};
 template <typename T>
 struct IsContainer<T,
                    std::void_t<typename T::value_type,
@@ -101,80 +101,57 @@ struct IsContainer<T,
                                decltype(std::declval<T>().empty()),
                                decltype(std::declval<T>().begin()),
                                decltype(std::declval<T>().end())>> : std::true_type {};
+template <typename T>
+constexpr bool isContainer = IsContainer<T>::value;
 
-template <class T, class = void>
-struct HasToBSON : std::false_type {};
+template <typename T>
+using HasToBSONOp = decltype(std::declval<T>().toBSON());
+template <typename T>
+constexpr bool hasToBSON = stdx::is_detected_v<HasToBSONOp, T>;
 
-template <class T>
-struct HasToBSON<T, std::void_t<decltype(std::declval<T>().toBSON())>> : std::true_type {};
+template <typename T>
+using HasToBSONArrayOp = decltype(std::declval<T>().toBSONArray());
+template <typename T>
+constexpr bool hasToBSONArray = stdx::is_detected_v<HasToBSONArrayOp, T>;
 
-template <class T, class = void>
-struct HasToBSONArray : std::false_type {};
+template <typename T>
+using HasBSONSerializeOp = decltype(std::declval<T>().serialize(std::declval<BSONObjBuilder*>()));
+template <typename T>
+constexpr bool hasBSONSerialize = stdx::is_detected_v<HasBSONSerializeOp, T>;
 
-template <class T>
-struct HasToBSONArray<T, std::void_t<decltype(std::declval<T>().toBSONArray())>> : std::true_type {
-};
+template <typename T>
+using HasBSONBuilderAppendOp =
+    decltype(std::declval<BSONObjBuilder>().append(std::declval<StringData>(), std::declval<T>()));
+template <typename T>
+constexpr bool hasBSONBuilderAppend = stdx::is_detected_v<HasBSONBuilderAppendOp, T>;
 
-template <class T, class = void>
-struct HasBSONSerialize : std::false_type {};
+template <typename T>
+using HasStringSerializeOp =
+    decltype(std::declval<T>().serialize(std::declval<fmt::memory_buffer&>()));
+template <typename T>
+constexpr bool hasStringSerialize = stdx::is_detected_v<HasStringSerializeOp, T>;
 
-template <class T>
-struct HasBSONSerialize<
-    T,
-    std::void_t<decltype(std::declval<T>().serialize(std::declval<BSONObjBuilder*>()))>>
-    : std::true_type {};
+template <typename T>
+using HasToStringOp = std::remove_cv_t<decltype(std::declval<T>().toString())>;
+template <typename T>
+constexpr bool hasToString = stdx::is_detected_exact_v<std::string, HasToStringOp, T>;
+template <typename T>
+constexpr bool hasToStringReturnStringData =
+    stdx::is_detected_convertible_v<StringData, HasToStringOp, T>;
 
-template <class T, class = void>
-struct HasBSONBuilderAppend : std::false_type {};
+template <typename T>
+using HasNonMemberToStringOp = decltype(toString(std::declval<T>()));
+template <typename T>
+constexpr bool hasNonMemberToString =
+    stdx::is_detected_exact_v<std::string, HasNonMemberToStringOp, T>;
+template <typename T>
+constexpr bool hasNonMemberToStringReturnStringData =
+    stdx::is_detected_convertible_v<StringData, HasNonMemberToStringOp, T>;
 
-template <class T>
-struct HasBSONBuilderAppend<T,
-                            std::void_t<decltype(std::declval<BSONObjBuilder>().append(
-                                std::declval<StringData>(), std::declval<T>()))>> : std::true_type {
-};
-
-template <class T, class = void>
-struct HasStringSerialize : std::false_type {};
-
-template <class T>
-struct HasStringSerialize<
-    T,
-    std::void_t<decltype(std::declval<T>().serialize(std::declval<fmt::memory_buffer&>()))>>
-    : std::true_type {};
-
-template <class T, class = void>
-struct HasToString : std::false_type {};
-
-template <class T>
-struct HasToString<T, std::void_t<decltype(std::declval<T>().toString())>>
-    : std::is_same<std::remove_cv_t<decltype(std::declval<T>().toString())>, std::string> {};
-
-template <class T, class = void>
-struct HasToStringReturnStringData : std::false_type {};
-
-template <class T>
-struct HasToStringReturnStringData<T, std::void_t<decltype(std::declval<T>().toString())>>
-    : std::is_convertible<decltype(std::declval<T>().toString()), StringData> {};
-
-template <class T, class = void>
-struct HasNonMemberToString : std::false_type {};
-
-template <class T>
-struct HasNonMemberToString<T, std::void_t<decltype(toString(std::declval<T>()))>>
-    : std::is_same<decltype(toString(std::declval<T>())), std::string> {};
-
-template <class T, class = void>
-struct HasNonMemberToStringReturnStringData : std::false_type {};
-
-template <class T>
-struct HasNonMemberToStringReturnStringData<T, std::void_t<decltype(toString(std::declval<T>()))>>
-    : std::is_convertible<decltype(toString(std::declval<T>())), StringData> {};
-
-template <class T, class = void>
-struct HasNonMemberToBSON : std::false_type {};
-
-template <class T>
-struct HasNonMemberToBSON<T, std::void_t<decltype(toBSON(std::declval<T>()))>> : std::true_type {};
+template <typename T>
+using HasNonMemberToBSONOp = decltype(toBSON(std::declval<T>()));
+template <typename T>
+constexpr bool hasNonMemberToBSON = stdx::is_detected_v<HasNonMemberToBSONOp, T>;
 
 // Mapping functions on how to map a logged value to how it is stored in variant (reused by
 // container support)
@@ -245,18 +222,18 @@ inline CustomAttributeValue mapValue(boost::none_t val) {
     return custom;
 }
 
-template <typename T, std::enable_if_t<IsDuration<T>::value, int> = 0>
+template <typename T, std::enable_if_t<isDuration<T>, int> = 0>
 auto mapValue(T val) {
     return val;
 }
 
 template <typename T, std::enable_if_t<std::is_enum_v<T>, int> = 0>
 auto mapValue(T val) {
-    if constexpr (HasNonMemberToString<T>::value) {
+    if constexpr (hasNonMemberToString<T>) {
         CustomAttributeValue custom;
         custom.toString = [val]() { return toString(val); };
         return custom;
-    } else if constexpr (HasNonMemberToStringReturnStringData<T>::value) {
+    } else if constexpr (hasNonMemberToStringReturnStringData<T>) {
         CustomAttributeValue custom;
         custom.stringSerialize = [val](fmt::memory_buffer& buffer) {
             StringData sd = toString(val);
@@ -268,7 +245,7 @@ auto mapValue(T val) {
     }
 }
 
-template <typename T, std::enable_if_t<IsContainer<T>::value && !HasMappedType<T>::value, int> = 0>
+template <typename T, std::enable_if_t<isContainer<T> && !hasMappedType<T>, int> = 0>
 CustomAttributeValue mapValue(const T& val) {
     CustomAttributeValue custom;
     custom.toBSONArray = [&val]() { return seqLog(val).toBSONArray(); };
@@ -276,7 +253,7 @@ CustomAttributeValue mapValue(const T& val) {
     return custom;
 }
 
-template <typename T, std::enable_if_t<IsContainer<T>::value && HasMappedType<T>::value, int> = 0>
+template <typename T, std::enable_if_t<isContainer<T> && hasMappedType<T>, int> = 0>
 CustomAttributeValue mapValue(const T& val) {
     CustomAttributeValue custom;
     custom.BSONSerialize = [&val](BSONObjBuilder& builder) { mapLog(val).serialize(&builder); };
@@ -284,54 +261,51 @@ CustomAttributeValue mapValue(const T& val) {
     return custom;
 }
 
-template <
-    typename T,
-    std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T> && !std::is_enum_v<T> &&
-                         !IsDuration<T>::value && !IsContainer<T>::value,
-                     int> = 0>
+template <typename T,
+          std::enable_if_t<!std::is_integral_v<T> && !std::is_floating_point_v<T> &&
+                               !std::is_enum_v<T> && !isDuration<T> && !isContainer<T>,
+                           int> = 0>
 CustomAttributeValue mapValue(const T& val) {
-    static_assert(HasToString<T>::value || HasToStringReturnStringData<T>::value ||
-                      HasStringSerialize<T>::value || HasNonMemberToString<T>::value ||
-                      HasNonMemberToStringReturnStringData<T>::value ||
-                      HasBSONBuilderAppend<T>::value || HasBSONSerialize<T>::value ||
-                      HasToBSON<T>::value || HasToBSONArray<T>::value ||
-                      HasNonMemberToBSON<T>::value,
+    static_assert(hasToString<T> || hasToStringReturnStringData<T> || hasStringSerialize<T> ||
+                      hasNonMemberToString<T> || hasNonMemberToStringReturnStringData<T> ||
+                      hasBSONBuilderAppend<T> || hasBSONSerialize<T> || hasToBSON<T> ||
+                      hasToBSONArray<T> || hasNonMemberToBSON<T>,
                   "custom type needs toBSON(), toBSONArray(), serialize(BSONObjBuilder*), "
                   "toString() or serialize(fmt::memory_buffer&) implementation");
 
     CustomAttributeValue custom;
-    if constexpr (HasBSONBuilderAppend<T>::value) {
+    if constexpr (hasBSONBuilderAppend<T>) {
         custom.BSONAppend = [&val](BSONObjBuilder& builder, StringData fieldName) {
             builder.append(fieldName, val);
         };
     }
 
-    if constexpr (HasBSONSerialize<T>::value) {
+    if constexpr (hasBSONSerialize<T>) {
         custom.BSONSerialize = [&val](BSONObjBuilder& builder) { val.serialize(&builder); };
-    } else if constexpr (HasToBSON<T>::value) {
+    } else if constexpr (hasToBSON<T>) {
         custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
             builder.appendElements(val.toBSON());
         };
-    } else if constexpr (HasToBSONArray<T>::value) {
+    } else if constexpr (hasToBSONArray<T>) {
         custom.toBSONArray = [&val]() { return val.toBSONArray(); };
-    } else if constexpr (HasNonMemberToBSON<T>::value) {
+    } else if constexpr (hasNonMemberToBSON<T>) {
         custom.BSONSerialize = [&val](BSONObjBuilder& builder) {
             builder.appendElements(toBSON(val));
         };
     }
 
-    if constexpr (HasStringSerialize<T>::value) {
+    if constexpr (hasStringSerialize<T>) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) { val.serialize(buffer); };
-    } else if constexpr (HasToString<T>::value) {
+    } else if constexpr (hasToString<T>) {
         custom.toString = [&val]() { return val.toString(); };
-    } else if constexpr (HasToStringReturnStringData<T>::value) {
+    } else if constexpr (hasToStringReturnStringData<T>) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
             StringData sd = val.toString();
             buffer.append(sd.begin(), sd.end());
         };
-    } else if constexpr (HasNonMemberToString<T>::value) {
+    } else if constexpr (hasNonMemberToString<T>) {
         custom.toString = [&val]() { return toString(val); };
-    } else if constexpr (HasNonMemberToStringReturnStringData<T>::value) {
+    } else if constexpr (hasNonMemberToStringReturnStringData<T>) {
         custom.stringSerialize = [&val](fmt::memory_buffer& buffer) {
             StringData sd = toString(val);
             buffer.append(sd.begin(), sd.end());
@@ -371,7 +345,7 @@ public:
                     } else {
                         builder.append(val.toString());
                     }
-                } else if constexpr (IsDuration<std::decay_t<V>>::value) {
+                } else if constexpr (isDuration<std::decay_t<V>>) {
                     builder.append(val.toBSON());
                 } else if constexpr (std::is_same_v<std::decay_t<V>, unsigned int>) {
                     builder.append(static_cast<long long>(val));
@@ -381,7 +355,7 @@ public:
             };
 
             using item_t = std::decay_t<decltype(item)>;
-            if constexpr (IsOptional<item_t>::value) {
+            if constexpr (isOptional<item_t>) {
                 if (item) {
                     append(mapValue(*item));
                 } else {
@@ -410,7 +384,7 @@ public:
                         fmt::format_to(buffer, "{}", val.toString());
                     }
 
-                } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
+                } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
                     fmt::format_to(buffer, "{}", val.toString());
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
                     val.jsonStringBuffer(JsonStringFormat::ExtendedRelaxedV2_0_0, 0, false, buffer);
@@ -422,7 +396,7 @@ public:
             };
 
             using item_t = std::decay_t<decltype(item)>;
-            if constexpr (IsOptional<item_t>::value) {
+            if constexpr (isOptional<item_t>) {
                 if (item) {
                     append(mapValue(*item));
                 } else {
@@ -472,7 +446,7 @@ public:
                     } else {
                         builder->append(key, val.toString());
                     }
-                } else if constexpr (IsDuration<std::decay_t<V>>::value) {
+                } else if constexpr (isDuration<std::decay_t<V>>) {
                     builder->append(key, val.toBSON());
                 } else if constexpr (std::is_same_v<std::decay_t<V>, unsigned int>) {
                     builder->append(key, static_cast<long long>(val));
@@ -482,7 +456,7 @@ public:
             };
             auto key = mapValue(item.first);
             using value_t = std::decay_t<decltype(item.second)>;
-            if constexpr (IsOptional<value_t>::value) {
+            if constexpr (isOptional<value_t>) {
                 if (item.second) {
                     append(key, mapValue(*item.second));
                 } else {
@@ -510,7 +484,7 @@ public:
                     } else {
                         fmt::format_to(buffer, "{}: {}", key, val.toString());
                     }
-                } else if constexpr (IsDuration<std::decay_t<decltype(val)>>::value) {
+                } else if constexpr (isDuration<std::decay_t<decltype(val)>>) {
                     fmt::format_to(buffer, "{}: {}", key, val.toString());
                 } else if constexpr (std::is_same_v<std::decay_t<decltype(val)>, BSONObj>) {
                     fmt::format_to(buffer, "{}: ", key);
@@ -525,7 +499,7 @@ public:
 
             auto key = mapValue(item.first);
             using value_t = std::decay_t<decltype(item.second)>;
-            if constexpr (IsOptional<value_t>::value) {
+            if constexpr (isOptional<value_t>) {
                 if (item.second) {
                     append(key, mapValue(*item.second));
                 } else {
@@ -616,7 +590,7 @@ public:
     template <size_t N,
               typename T,
               std::enable_if_t<std::is_arithmetic_v<T> || std::is_pointer_v<T> ||
-                                   std::is_enum_v<T> || detail::IsDuration<T>::value,
+                                   std::is_enum_v<T> || detail::isDuration<T>,
                                int> = 0>
     void add(const char (&name)[N], T value) {
         _attributes.emplace_back(StringData(name, N - 1), value);
@@ -636,14 +610,14 @@ public:
 
     template <size_t N,
               typename T,
-              std::enable_if_t<std::is_class_v<T> && !detail::IsDuration<T>::value, int> = 0>
+              std::enable_if_t<std::is_class_v<T> && !detail::isDuration<T>, int> = 0>
     void add(const char (&name)[N], const T& value) {
         _attributes.emplace_back(StringData(name, N - 1), value);
     }
 
     template <size_t N,
               typename T,
-              std::enable_if_t<std::is_class_v<T> && !detail::IsDuration<T>::value, int> = 0>
+              std::enable_if_t<std::is_class_v<T> && !detail::isDuration<T>, int> = 0>
     void add(const char (&name)[N], T&& value) = delete;
 
     template <size_t N>
