@@ -131,19 +131,24 @@ try {
     // If the ReplicaSetMonitor cannot find a primary because it has stepped down or
     // been killed, it may take longer than 15 seconds for a new primary to step up.
     // Ignore this error until we find a new primary.
-    const kReplicaSetMonitorError =
-        /^Could not find host matching read preference.*mode: "primary"/;
+    const kReplicaSetMonitorErrors = [
+        /^Could not find host matching read preference.*mode: "primary"/,
+        /^can't connect to new replica set primary/
+    ];
 
     if (isNetworkError(e)) {
         jsTestLog("Ignoring network error" + tojson(e));
-    } else if (e.message.match(kReplicaSetMonitorError)) {
-        jsTestLog("Ignoring read preference primary error" + tojson(e));
+    } else if (kReplicaSetMonitorErrors.some((regex) => {
+                   return regex.test(e.message);
+               })) {
+        jsTestLog("Ignoring replica set monitor error" + tojson(e));
     } else if (e.code === ErrorCodes.ShutdownInProgress) {
         // When a node is being shutdown, it is possible to fail isMaster requests with
         // ShutdownInProgress. If we encounter this error, ignore it and find a new
         // primary.
         jsTestLog("Ignoring ShutdownInProgress error" + tojson(e));
     } else {
+        jsTestLog(`run_reconfig_background unexpected error: ${tojson(e)}`);
         throw e;
     }
 
