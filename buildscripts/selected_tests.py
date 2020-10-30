@@ -41,6 +41,7 @@ from buildscripts.evergreen_generate_resmoke_tasks import (
     GenerateSubSuites,
     remove_gen_suffix,
     write_file_dict,
+    Suite,
 )
 from buildscripts.patch_builds.selected_tests_service import SelectedTestsService
 
@@ -461,6 +462,7 @@ def run(evg_api: EvergreenApi, evg_conf: EvergreenProjectConfig,
                                              selected_tests_variant_expansions["version_id"])
 
         for task_config in task_configs.values():
+            Suite.reset_current_index()
             config_options = SelectedTestsConfigOptions.from_file(
                 origin_variant_expansions,
                 selected_tests_variant_expansions,
