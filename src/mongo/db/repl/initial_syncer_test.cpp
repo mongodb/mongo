@@ -79,6 +79,7 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 
+
 namespace mongo {
 namespace repl {
 
@@ -123,6 +124,15 @@ const BSONObj kListDatabasesFailPointData = BSON("cloner"
                                                  << "listDatabases");
 
 BSONObj makeListDatabasesResponse(std::vector<std::string> databaseNames);
+BSONObj makeRollbackCheckerResponse(int rollbackId);
+BSONObj makeOplogEntryObj(int t,
+                          OpTypeEnum opType = OpTypeEnum::kInsert,
+                          int version = OplogEntry::kOplogVersion);
+RemoteCommandResponse makeCursorResponse(CursorId cursorId,
+                                         const NamespaceString& nss,
+                                         std::vector<BSONObj> docs,
+                                         bool isFirstBatch = true,
+                                         int rbid = 1);
 
 struct CollectionCloneInfo {
     std::shared_ptr<CollectionMockStats> stats = std::make_shared<CollectionMockStats>();
@@ -361,6 +371,16 @@ protected:
 
         _target = HostAndPort{"localhost:12346"};
         _mockServer = std::make_unique<MockRemoteDBServer>(_target.toString());
+        _mock = std::make_unique<MockNetwork>(getNet());
+        // Default behavior for all tests using this mock.
+        _mock->defaultExpect("replSetGetRBID", makeRollbackCheckerResponse(1));
+        _mock->defaultExpect(
+            [](auto& request) { return request["find"].str() == "oplog.rs"; },
+            makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
+        _mock->defaultExpect(
+            [](auto& request) { return request["find"].str() == "transactions"; },
+            makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
+
         // Usually we're just skipping the cloners in this test, so we provide an empty list
         // of databases.
         _mockServer->setCommandReply("listDatabases", makeListDatabasesResponse({}));
@@ -465,6 +485,7 @@ protected:
         _dbWorkThreadPool.reset();
         _replicationProcess.reset();
         _storageInterface.reset();
+        _mock.reset();
     }
 
     /**
@@ -500,6 +521,7 @@ protected:
     std::unique_ptr<StorageInterfaceMock> _storageInterface;
     HostAndPort _target;
     std::unique_ptr<MockRemoteDBServer> _mockServer;
+    std::unique_ptr<MockNetwork> _mock;
     CollectionOptions _options1;
     std::unique_ptr<ReplicationProcess> _replicationProcess;
     std::unique_ptr<ThreadPool> _dbWorkThreadPool;
@@ -551,8 +573,8 @@ BSONObj makeRollbackCheckerResponse(int rollbackId) {
 RemoteCommandResponse makeCursorResponse(CursorId cursorId,
                                          const NamespaceString& nss,
                                          std::vector<BSONObj> docs,
-                                         bool isFirstBatch = true,
-                                         int rbid = 1) {
+                                         bool isFirstBatch,
+                                         int rbid) {
     OpTime futureOpTime(Timestamp(1000, 1000), 1000);
     Date_t futureWallTime = Date_t() + Seconds(futureOpTime.getSecs());
     rpc::OplogQueryMetadata oqMetadata({futureOpTime, futureWallTime}, futureOpTime, rbid, 0, 0);
@@ -623,9 +645,7 @@ OplogEntry makeOplogEntry(int t,
                       boost::none);  // _id
 }
 
-BSONObj makeOplogEntryObj(int t,
-                          OpTypeEnum opType = OpTypeEnum::kInsert,
-                          int version = OplogEntry::kOplogVersion) {
+BSONObj makeOplogEntryObj(int t, OpTypeEnum opType, int version) {
     return makeOplogEntry(t, opType, version).toBSON();
 }
 
@@ -1717,35 +1737,25 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherScheduleError) {
 
 // This is to demonstrate the unit testing mock framework. The logic is the same as the following
 // test.
+// (Generic FCV reference): This FCV reference should exist across LTS binary versions.
 TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError_Mock) {
     auto initialSyncer = &getInitialSyncer();
     auto opCtx = makeOpCtx();
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
 
-    MockNetwork mock(getNet());
-
-    // Set up default behavior.
-    mock.expect("replSetGetRBID", makeRollbackCheckerResponse(1));
-
-    mock.expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
-                makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
-
-    mock.expect(
-        [](auto& request) { return request["find"].str() == "transactions"; },
-        makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
-
     // This is what we want to test.
-    mock.expect([](auto& request) { return request["find"].str() == "system.version"; },
-                RemoteCommandResponse(ErrorCodes::OperationFailed,
-                                      "find command failed at sync source"))
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 RemoteCommandResponse(ErrorCodes::OperationFailed,
+                                       "find command failed at sync source"))
         .times(1);
 
     // Start the real work.
     ASSERT_OK(initialSyncer->startup(opCtx.get(), maxAttempts));
 
     // Run mock.
-    mock.runUntilExpectationsSatisfied();
+    _mock->runUntilExpectationsSatisfied();
 
     initialSyncer->join();
     ASSERT_EQUALS(ErrorCodes::OperationFailed, _lastApplied);
@@ -1995,25 +2005,14 @@ TEST_F(
 
     auto lastOp = makeOplogEntry(2);
 
-    MockNetwork mock(getNet());
-
-    // Set up default behavior.
-    mock.expect("replSetGetRBID", makeRollbackCheckerResponse(1));
-
-    mock.expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
-                makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}))
-        .times(2);
-
-    mock.expect([](auto& request) { return request["find"].str() == "transactions"; },
-                makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}));
-
     // This is what we want to test.
-    FeatureCompatibilityVersionDocument fcvDoc;
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
+    FeatureCompatibilityVersionDocument fcvDoc;
     fcvDoc.setVersion(ServerGlobalParams::FeatureCompatibility::kLastLTS);
-    mock.expect([](auto& request) { return request["find"].str() == "system.version"; },
-                makeCursorResponse(
-                    0LL, NamespaceString::kServerConfigurationNamespace, {fcvDoc.toBSON()}))
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+                 makeCursorResponse(
+                     0LL, NamespaceString::kServerConfigurationNamespace, {fcvDoc.toBSON()}))
         .times(1);
 
     FailPointEnableBlock skipReconstructPreparedTransactions("skipReconstructPreparedTransactions");
@@ -2023,18 +2022,19 @@ TEST_F(
     // Start the real work.
     ASSERT_OK(initialSyncer->startup(opCtx.get(), initialSyncMaxAttempts));
 
-    mock.runUntilExpectationsSatisfied();
+    _mock->runUntilExpectationsSatisfied();
 
     // Simulate response to OplogFetcher so it has enough operations to reach end timestamp.
     getOplogFetcher()->receiveBatch(1LL, {makeOplogEntryObj(1), lastOp.toBSON()});
     // Simulate a network error response that restarts the OplogFetcher.
     getOplogFetcher()->simulateResponseError(Status(ErrorCodes::NetworkTimeout, "network error"));
 
-    mock.expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
-                makeCursorResponse(0LL, _options.localOplogNS, {lastOp.toBSON()}))
+    _mock
+        ->expect([](auto& request) { return request["find"].str() == "oplog.rs"; },
+                 makeCursorResponse(0LL, _options.localOplogNS, {lastOp.toBSON()}))
         .times(1);
 
-    mock.runUntilExpectationsSatisfied();
+    _mock->runUntilExpectationsSatisfied();
 
     initialSyncer->join();
     ASSERT_OK(_lastApplied.getStatus());

@@ -95,11 +95,7 @@ public:
     public:
         Expectation(Matcher matcher, Action action)
             : _matcher(std::move(matcher)), _action(std::move(action)) {}
-
-        Expectation& times(int t) {
-            _allowedTimes = t;
-            return *this;
-        }
+        virtual ~Expectation() {}
 
         bool match(const BSONObj& request) {
             return _matcher(request);
@@ -112,7 +108,7 @@ public:
             return _action(request);
         }
 
-        bool isDefault() const {
+        virtual bool isDefault() const {
             return _allowedTimes == std::numeric_limits<int>::max();
         }
 
@@ -120,20 +116,104 @@ public:
             return _allowedTimes == 0;
         }
 
+        // May throw.
+        virtual void checkSatisfied() {}
+
+    protected:
+        int _allowedTimes = std::numeric_limits<int>::max();
+
     private:
         Matcher _matcher;
         Action _action;
-        int _allowedTimes = std::numeric_limits<int>::max();
+    };
+
+    class UserExpectation : public Expectation {
+    public:
+        UserExpectation(Matcher matcher, Action action) : Expectation(matcher, action) {
+            // Default value, may be overriden by calling times().
+            _allowedTimes = 1;
+        }
+
+        Expectation& times(int t) {
+            _allowedTimes = t;
+            return *this;
+        }
+
+        bool isDefault() const override {
+            return false;
+        }
+
+        void checkSatisfied() override {
+            uassert(5015501, "UserExpectation not satisfied", isSatisfied());
+        }
+    };
+
+    class DefaultExpectation : public Expectation {
+    public:
+        DefaultExpectation(Matcher matcher, Action action) : Expectation(matcher, action) {}
+
+        bool isDefault() const override {
+            return true;
+        }
     };
 
     explicit MockNetwork(executor::NetworkInterfaceMock* net) : _net(net) {}
 
     // Accept anything that Matcher's and Action's constructors allow.
+    // Use expect() to mandate the exact calls each test expects. They must all be satisfied
+    // or the test fails.
     template <typename MatcherType>
-    Expectation& expect(MatcherType&& matcher, Action action) {
-        _expectations.emplace_back(Matcher(std::forward<MatcherType>(matcher)), std::move(action));
-        return _expectations.back();
+    UserExpectation& expect(MatcherType&& matcher, Action action) {
+        auto exp = std::make_unique<UserExpectation>(Matcher(std::forward<MatcherType>(matcher)),
+                                                     std::move(action));
+        auto& ref = *exp;
+        _expectations.emplace_back(std::move(exp));
+        return ref;
     }
+
+    // Accept anything that Matcher's and Action's constructors allow.
+    // Use defaultExpect() to specify shared behavior in test fixtures. This is best for
+    // uninteresting calls common to a class of tests.
+    // For these reasons, you are not allowed to declare further default expecations after
+    // having already enqueued user expectations.
+    template <typename MatcherType>
+    DefaultExpectation& defaultExpect(MatcherType&& matcher, Action action) {
+        auto order = std::none_of(_expectations.begin(), _expectations.end(), [](const auto& exp) {
+            return !exp->isDefault();
+        });
+        uassert(
+            5015502, "All default expectations must be declared before user expectations.", order);
+
+        auto exp = std::make_unique<DefaultExpectation>(Matcher(std::forward<MatcherType>(matcher)),
+                                                        std::move(action));
+        auto& ref = *exp;
+        _expectations.emplace_back(std::move(exp));
+        return ref;
+    }
+
+    void verifyExpectations() {
+        for (auto& exp : _expectations) {
+            // This expectation will throw if it has not been met.
+            exp->checkSatisfied();
+        }
+    }
+
+    // Removes user expectations only.
+    void clearExpectations() {
+        _expectations.erase(std::remove_if(_expectations.begin(),
+                                           _expectations.end(),
+                                           [&](auto& exp) { return !exp->isDefault(); }),
+                            _expectations.end());
+    }
+
+    // Carries over default expectations but clears user expectations. Checks that the latter
+    // have all been satisfied in the process.
+    void verifyAndClearExpectations() {
+        // May throw.
+        verifyExpectations();
+        clearExpectations();
+    }
+
 
     // Advance time to the target. Run network operations and process requests along the way.
     void runUntil(Date_t targetTime);
@@ -146,7 +226,7 @@ private:
     void _runUntilIdle();
     bool _allExpectationsSatisfied() const;
 
-    std::vector<Expectation> _expectations;
+    std::vector<std::unique_ptr<Expectation>> _expectations;
     executor::NetworkInterfaceMock* _net;
 };
 

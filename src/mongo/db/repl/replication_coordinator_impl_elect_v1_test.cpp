@@ -47,6 +47,7 @@
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -63,6 +64,57 @@ using executor::NetworkInterfaceMock;
 using executor::RemoteCommandRequest;
 using executor::RemoteCommandResponse;
 using ApplierState = ReplicationCoordinator::ApplierState;
+
+class ReplCoordMockTest : public ReplCoordTest {
+public:
+    void setUp() override {
+        ReplCoordTest::setUp();
+        BSONObj configObj = BSON("_id"
+                                 << "mySet"
+                                 << "version" << 1 << "members"
+                                 << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                          << "node1:12345")
+                                               << BSON("_id" << 2 << "host"
+                                                             << "node2:12345")
+                                               << BSON("_id" << 3 << "host"
+                                                             << "node3:12345"))
+                                 << "protocolVersion" << 1);
+        assertStartSuccess(configObj, HostAndPort("node1", 12345));
+        ReplSetConfig config = assertMakeRSConfig(configObj);
+
+        OperationContextNoop opCtx;
+        OpTime time1(Timestamp(100, 1), 0);
+        replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+        replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
+        ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+
+        simulateEnoughHeartbeatsForAllNodesUp();
+
+        _mock = std::make_unique<MockNetwork>(getNet());
+
+        // Heartbeat default behavior.
+        OpTime lastApplied(Timestamp(100, 1), 0);
+        ReplSetHeartbeatResponse hbResp;
+        auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
+        hbResp.setSetName(rsConfig.getReplSetName());
+        hbResp.setState(MemberState::RS_SECONDARY);
+        hbResp.setConfigVersion(rsConfig.getConfigVersion());
+        hbResp.setConfigTerm(rsConfig.getConfigTerm());
+        hbResp.setAppliedOpTimeAndWallTime(
+            {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+        hbResp.setDurableOpTimeAndWallTime(
+            {lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
+
+        _mock->defaultExpect("replSetHeartbeat", hbResp.toBSON());
+    };
+    void tearDown() override {
+        ReplCoordTest::tearDown();
+        _mock.reset();
+    };
+
+protected:
+    std::unique_ptr<MockNetwork> _mock;
+};
 
 TEST(LastVote, LastVoteAcceptsUnknownField) {
     auto lastVoteBSON =
@@ -342,30 +394,47 @@ TEST_F(ReplCoordTest, ElectionSucceedsWhenMaxSevenNodesVoteYea) {
     ASSERT_EQUALS(1, countTextFormatLogLinesContaining("Election succeeded"));
 }
 
-// This is to demonstrate the unit testing mock framework. The logic is the same as the following
+// This is to demonstrate the unit testing mock framework. The logic is the same as the original
 // test.
-TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun_Mock) {
+TEST_F(ReplCoordMockTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun_Mock) {
     startCapturingLogMessages();
-    BSONObj configObj = BSON("_id"
-                             << "mySet"
-                             << "version" << 1 << "members"
-                             << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                      << "node1:12345")
-                                           << BSON("_id" << 2 << "host"
-                                                         << "node2:12345")
-                                           << BSON("_id" << 3 << "host"
-                                                         << "node3:12345"))
-                             << "protocolVersion" << 1);
-    assertStartSuccess(configObj, HostAndPort("node1", 12345));
-    ReplSetConfig config = assertMakeRSConfig(configObj);
 
-    OperationContextNoop opCtx;
-    OpTime time1(Timestamp(100, 1), 0);
-    replCoordSetMyLastAppliedOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    replCoordSetMyLastDurableOpTime(time1, Date_t() + Seconds(time1.getSecs()));
-    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    // Check that the node's election candidate metrics are unset before it becomes primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
 
-    simulateEnoughHeartbeatsForAllNodesUp();
+    auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
+    ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
+    LOGV2(2145400,
+          "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
+          "electionTimeoutWhen"_attr = electionTimeoutWhen);
+
+    _mock
+        ->expect("replSetRequestVotes",
+                 BSON("ok" << 1 << "term" << 0 << "voteGranted" << false << "reason"
+                           << "don't like him much"))
+        .times(2);
+
+    // Trigger election.
+    _mock->runUntil(electionTimeoutWhen);
+
+    _mock->runUntilExpectationsSatisfied();
+
+    stopCapturingLogMessages();
+    ASSERT_EQUALS(1,
+                  countTextFormatLogLinesContaining(
+                      "Not running for primary, we received insufficient votes"));
+
+    // Check that the node's election candidate metrics have been cleared, since it lost the dry-run
+    // election and will not become primary.
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(), ReplicationMetrics::get(getServiceContext()).getElectionCandidateMetricsBSON());
+}
+
+// This is to showcase the mock's behavior when we have extraneous, unsatisfied expectations.
+TEST_F(ReplCoordMockTest,
+       ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun_MockExtraExpectation) {
+    startCapturingLogMessages();
 
     // Check that the node's election candidate metrics are unset before it becomes primary.
     ASSERT_BSONOBJ_EQ(
@@ -377,30 +446,29 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun_
           "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
           "electionTimeoutWhen"_attr = electionTimeoutWhen);
 
-    MockNetwork mock(getNet());
-
-    // Heartbeat default behavior.
-    OpTime lastApplied(Timestamp(100, 1), 0);
-    ReplSetHeartbeatResponse hbResp;
-    auto rsConfig = getReplCoord()->getReplicaSetConfig_forTest();
-    hbResp.setSetName(rsConfig.getReplSetName());
-    hbResp.setState(MemberState::RS_SECONDARY);
-    hbResp.setConfigVersion(rsConfig.getConfigVersion());
-    hbResp.setConfigTerm(rsConfig.getConfigTerm());
-    hbResp.setAppliedOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
-    hbResp.setDurableOpTimeAndWallTime({lastApplied, Date_t() + Seconds(lastApplied.getSecs())});
-
-    mock.expect("replSetHeartbeat", hbResp.toBSON());
-
-    mock.expect("replSetRequestVotes",
-                BSON("ok" << 1 << "term" << 0 << "voteGranted" << false << "reason"
-                          << "don't like him much"))
+    // This will be satisfied.
+    _mock
+        ->expect("replSetRequestVotes",
+                 BSON("ok" << 1 << "term" << 0 << "voteGranted" << false << "reason"
+                           << "don't like him much"))
         .times(2);
 
-    // Trigger election.
-    mock.runUntil(electionTimeoutWhen);
+    // This will NOT be satisfied.
+    _mock->expect("someothercommand", BSON("ok" << 1)).times(42);
 
-    mock.runUntilExpectationsSatisfied();
+    // Trigger election. This will also satisfy our original expectation.
+    _mock->runUntil(electionTimeoutWhen);
+
+    // This will throw, as we have an unsatisfied expectation.
+    ASSERT_THROWS_CODE(_mock->verifyExpectations(), DBException, (ErrorCodes::Error)5015501);
+
+    // Clear expectations so we can end the test.
+    // (You should normally aim to meet all of your expectations.)
+    _mock->clearExpectations();
+
+    // Alternatively, calling this first will hang until everything has been satisfied.
+    // In our case, this will trivially succeed as we cleared all expectations above.
+    _mock->runUntilExpectationsSatisfied();
 
     stopCapturingLogMessages();
     ASSERT_EQUALS(1,
@@ -442,7 +510,7 @@ TEST_F(ReplCoordTest, ElectionFailsWhenInsufficientVotesAreReceivedDuringDryRun)
 
     auto electionTimeoutWhen = getReplCoord()->getElectionTimeout_forTest();
     ASSERT_NOT_EQUALS(Date_t(), electionTimeoutWhen);
-    LOGV2(21454,
+    LOGV2(2145402,
           "Election timeout scheduled at {electionTimeoutWhen} (simulator time)",
           "electionTimeoutWhen"_attr = electionTimeoutWhen);
 

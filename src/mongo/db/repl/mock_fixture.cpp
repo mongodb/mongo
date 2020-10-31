@@ -41,8 +41,8 @@ namespace test {
 namespace mock {
 
 bool MockNetwork::_allExpectationsSatisfied() const {
-    return std::all_of(_expectations.begin(), _expectations.end(), [](const Expectation& exp) {
-        return exp.isDefault() || exp.isSatisfied();
+    return std::all_of(_expectations.begin(), _expectations.end(), [](const auto& exp) {
+        return exp->isDefault() || exp->isSatisfied();
     });
 }
 
@@ -80,15 +80,19 @@ void MockNetwork::_runUntilIdle() {
             auto noi = _net->getFrontOfUnscheduledQueue();
             auto request = noi->getRequest().cmdObj;
 
-            // We ignore the next request if it's not expected.
-            auto exp = std::find_if(_expectations.begin(), _expectations.end(), [&](auto& exp) {
-                return !exp.isSatisfied() && exp.match(request);
-            });
+            // We ignore the next request if it's not expected (or already satisfied).
+            // Default expectations are always the oldest in the vector, so matching expectations
+            // in LIFO order allows us to always see the overrides first.
+            // (Iterating a vector backwards is much cheaper than pushing to its front.)
+            auto const& exp =
+                std::find_if(_expectations.rbegin(), _expectations.rend(), [&](const auto& exp) {
+                    return !exp->isSatisfied() && exp->match(request);
+                });
 
-            if (exp != _expectations.end()) {
+            if (exp != _expectations.rend()) {
                 // Consume the next request and execute the action.
                 noi = _net->getNextReadyRequest();
-                auto response = exp->run(request);
+                auto response = (*exp)->run(request);
                 LOGV2_DEBUG(5015401,
                             1,
                             "mock reply ",
