@@ -78,6 +78,7 @@ structs:
     ShardCollectionTypeBase:
         description: "Represents the layout and contents of documents contained in the shard 
                       server's config.cache.collections collection."
+        strict: false
         fields:
             _id:
                 cpp_name: nss
