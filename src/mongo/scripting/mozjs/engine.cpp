@@ -93,25 +93,25 @@ void MozJSScriptEngine::interrupt(unsigned opId) {
     OpIdToScopeMap::iterator iScope = _opToScopeMap.find(opId);
     if (iScope == _opToScopeMap.end()) {
         // got interrupt request for a scope that no longer exists
-        if (shouldLog(logv2::LogSeverity::Debug(2))) {
-            // This log record gets extra attributes when the log severity is at Debug(2)
-            // but we still log the record at log severity Debug(1). Simplify this if SERVER-48671
+        if (shouldLog(logv2::LogSeverity::Debug(3))) {
+            // This log record gets extra attributes when the log severity is at Debug(3)
+            // but we still log the record at log severity Debug(2). Simplify this if SERVER-48671
             // gets done
             LOGV2_DEBUG(22783,
-                        1,
+                        2,
                         "Received interrupt request for unknown op",
                         "opId"_attr = opId,
                         "knownOps"_attr = knownOps());
         } else {
-            LOGV2_DEBUG(22790, 1, "Received interrupt request for unknown op", "opId"_attr = opId);
+            LOGV2_DEBUG(22790, 2, "Received interrupt request for unknown op", "opId"_attr = opId);
         }
         return;
     }
-    if (shouldLog(logv2::LogSeverity::Debug(2))) {
-        // Like above, this log record gets extra attributes when the log severity is at Debug(2)
-        LOGV2_DEBUG(22809, 1, "Interrupting op", "opId"_attr = opId, "knownOps"_attr = knownOps());
+    if (shouldLog(logv2::LogSeverity::Debug(3))) {
+        // Like above, this log record gets extra attributes when the log severity is at Debug(3)
+        LOGV2_DEBUG(22809, 2, "Interrupting op", "opId"_attr = opId, "knownOps"_attr = knownOps());
     } else {
-        LOGV2_DEBUG(22808, 1, "Interrupting op", "opId"_attr = opId);
+        LOGV2_DEBUG(22808, 2, "Interrupting op", "opId"_attr = opId);
     }
     iScope->second->kill();
 }
