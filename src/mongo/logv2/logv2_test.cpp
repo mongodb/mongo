@@ -127,11 +127,6 @@ struct TypeWithBSON : TypeWithoutBSON {
     }
 };
 
-struct TypeWithOnlyBSON : private TypeWithBSON {
-    using TypeWithBSON::toBSON;
-    using TypeWithBSON::TypeWithBSON;
-};
-
 struct TypeWithBSONSerialize : TypeWithoutBSON {
     using TypeWithoutBSON::TypeWithoutBSON;
 
@@ -1799,7 +1794,12 @@ TEST_F(UnstructuredLoggingTest, UserToString) {
 }
 
 TEST_F(UnstructuredLoggingTest, UserToBSON) {
-    TypeWithOnlyBSON arg(1.0, 2.0);
+    struct TypeWithOnlyBSON {
+        BSONObj toBSON() const {
+            return BSONObjBuilder{}.append("x", 1).append("y", 2).obj();
+        }
+    };
+    TypeWithOnlyBSON arg;
     logd("{}", arg);  // NOLINT
     validate([&arg](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(), arg.toBSON().toString());
