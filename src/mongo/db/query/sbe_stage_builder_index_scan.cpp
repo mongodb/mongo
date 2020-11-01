@@ -45,7 +45,6 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/union.h"
-#include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -775,8 +774,17 @@ generateIndexScan(OperationContext* opCtx,
     }();
 
     if (ixn->shouldDedup) {
-        stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(recordIdSlot), ixn->nodeId());
+        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> forwardedVarSlots;
+        for (auto varSlot : indexKeySlots) {
+            forwardedVarSlots.insert(
+                {varSlot,
+                 sbe::makeE<sbe::EFunction>("first",
+                                            sbe::makeEs(sbe::makeE<sbe::EVariable>(varSlot)))});
+        }
+        stage = sbe::makeS<sbe::HashAggStage>(std::move(stage),
+                                              sbe::makeSV(recordIdSlot),
+                                              std::move(forwardedVarSlots),
+                                              ixn->nodeId());
     }
 
     if (returnKeySlot) {

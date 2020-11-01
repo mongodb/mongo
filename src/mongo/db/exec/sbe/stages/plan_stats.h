@@ -119,19 +119,6 @@ struct LimitSkipStats final : public SpecificStats {
     boost::optional<long long> skip;
 };
 
-struct UniqueStats : public SpecificStats {
-    SpecificStats* clone() const final {
-        return new UniqueStats(*this);
-    }
-
-    uint64_t estimateObjectSizeInBytes() const final {
-        return sizeof(*this);
-    }
-
-    unsigned int dupsTested = 0;
-    unsigned int dupsDropped = 0;
-};
-
 /**
  * Calculates the total number of physical reads in the given plan stats tree. If a stage can do
  * a physical read (e.g. COLLSCAN or IXSCAN), then its 'numReads' stats is added to the total.

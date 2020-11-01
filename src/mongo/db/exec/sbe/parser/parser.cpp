@@ -47,10 +47,8 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
-#include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
-#include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
@@ -70,7 +68,7 @@ static constexpr auto kSyntax = R"(
                 OPERATOR <- PLAN_NODE_ID? (SCAN / PSCAN / SEEK / IXSCAN / IXSEEK / PROJECT / FILTER / CFILTER /
                             MKOBJ / GROUP / HJOIN / NLJOIN / LIMIT / SKIP / COSCAN / TRAVERSE /
                             EXCHANGE / SORT / UNWIND / UNION / BRANCH / SIMPLE_PROJ / PFO /
-                            ESPOOL / LSPOOL / CSPOOL / SSPOOL / UNIQUE / SORTED_MERGE)
+                            ESPOOL / LSPOOL / CSPOOL / SSPOOL)
 
                 FORWARD_FLAG <- <'true'> / <'false'>
 
@@ -148,12 +146,6 @@ static constexpr auto kSyntax = R"(
                 UNION_BRANCH_LIST <- '[' (UNION_BRANCH (',' UNION_BRANCH)* )?']'
                 UNION_BRANCH <- IDENT_LIST OPERATOR
 
-                SORTED_MERGE <- 'smerge' IDENT_LIST SORT_DIR_LIST SORTED_MERGE_BRANCH_LIST
-                SORTED_MERGE_BRANCH_LIST <- '[' (SORTED_MERGE_BRANCH (',' SORTED_MERGE_BRANCH)* )?']'
-                SORTED_MERGE_BRANCH <- IDENT_LIST # key slots
-                                       IDENT_LIST # value slots
-                                       OPERATOR
-
                 BRANCH <- 'branch' '{' EXPR '}' # boolean condition/switch
                                    IDENT_LIST # output of the operator
                                    IDENT_LIST # output of the then branch
@@ -188,9 +180,6 @@ static constexpr auto kSyntax = R"(
 
                 SSPOOL <- 'sspool' IDENT # buffer
                                    IDENT_LIST # slots
-
-                UNIQUE <- 'unique' IDENT_LIST # slots
-                                   OPERATOR # input
 
                 PROJECT_LIST <- '[' (ASSIGN (',' ASSIGN)* )?']'
                 ASSIGN <- IDENT '=' EXPR
@@ -238,9 +227,6 @@ static constexpr auto kSyntax = R"(
 
                 ESC_IDENT <- < '@' '"' (!'"' .)* '"' >
 
-                SORT_DIR <- <'asc'> / <'desc'>
-                SORT_DIR_LIST <- '[' (SORT_DIR (',' SORT_DIR)* )? ']'
-
                 %whitespace  <-  ([ \t\r\n]* ('#' (!'\n' .)* '\n' [ \t\r\n]*)*)
                 %word        <-  [a-z]+
         )";
@@ -267,20 +253,6 @@ std::pair<IndexKeysInclusionSet, sbe::value::SlotVector> Parser::lookupIndexKeyR
     }
 
     return {indexKeysInclusion, std::move(slots)};
-}
-
-std::vector<sbe::value::SortDirection> parseSortDirList(const AstQuery& ast) {
-    std::vector<value::SortDirection> dirs;
-    for (const auto& node : ast.nodes) {
-        if (node->token == "asc") {
-            dirs.push_back(value::SortDirection::Ascending);
-        } else if (node->token == "desc") {
-            dirs.push_back(value::SortDirection::Descending);
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
-    return dirs;
 }
 
 void Parser::walkChildren(AstQuery& ast) {
@@ -821,52 +793,6 @@ void Parser::walkUnionBranch(AstQuery& ast) {
     ast.stage = std::move(ast.nodes[1]->stage);
 }
 
-void Parser::walkSortedMerge(AstQuery& ast) {
-    walkChildren(ast);
-
-    std::vector<std::unique_ptr<PlanStage>> inputStages;
-    std::vector<value::SlotVector> inputKeys;
-    std::vector<value::SlotVector> inputVals;
-    value::SlotVector outputVals{lookupSlots(ast.nodes[0]->identifiers)};
-
-    auto dirs = parseSortDirList(*ast.nodes[1]);
-
-    const int kBranchesIdx = 2;
-    for (size_t idx = 0; idx < ast.nodes[kBranchesIdx]->nodes.size(); idx++) {
-        inputKeys.push_back(
-            lookupSlots(ast.nodes[kBranchesIdx]->nodes[idx]->nodes[0]->identifiers));
-        inputVals.push_back(
-            lookupSlots(ast.nodes[kBranchesIdx]->nodes[idx]->nodes[1]->identifiers));
-        inputStages.push_back(std::move(ast.nodes[kBranchesIdx]->nodes[idx]->stage));
-    }
-
-    uassert(ErrorCodes::FailedToParse,
-            "SortedMerge output values and input values mismatch",
-            std::all_of(
-                inputVals.begin(), inputVals.end(), [size = outputVals.size()](const auto& slots) {
-                    return slots.size() == size;
-                }));
-    uassert(ErrorCodes::FailedToParse,
-            "SortedMerge dirs/keys mismatch",
-            std::all_of(inputKeys.begin(),
-                        inputKeys.end(),
-                        [size = dirs.size()](const auto& slots) { return slots.size() == size; }));
-
-    ast.stage = makeS<SortedMergeStage>(std::move(inputStages),
-                                        std::move(inputKeys),
-                                        std::move(dirs),
-                                        std::move(inputVals),
-                                        std::move(outputVals),
-                                        getCurrentPlanNodeId());
-}
-
-void Parser::walkSortedMergeBranch(AstQuery& ast) {
-    walkChildren(ast);
-
-    ast.stage = std::move(ast.nodes[2]->stage);
-    invariant(ast.stage);
-}
-
 void Parser::walkUnwind(AstQuery& ast) {
     walkChildren(ast);
 
@@ -1403,14 +1329,6 @@ void Parser::walkPlanNodeId(AstQuery& ast) {
     planNodeIdStack.push(id);
 }
 
-void Parser::walkUnique(AstQuery& ast) {
-    walkChildren(ast);
-
-    ast.stage = makeS<UniqueStage>(std::move(ast.nodes[1]->stage),
-                                   lookupSlots(ast.nodes[0]->identifiers),
-                                   getCurrentPlanNodeId());
-}
-
 void Parser::walk(AstQuery& ast) {
     using namespace peg::udl;
 
@@ -1466,15 +1384,6 @@ void Parser::walk(AstQuery& ast) {
             break;
         case "UNION_BRANCH"_:
             walkUnionBranch(ast);
-            break;
-        case "SORTED_MERGE"_:
-            walkSortedMerge(ast);
-            break;
-        case "SORTED_MERGE_BRANCH_LIST"_:
-            walkChildren(ast);
-            break;
-        case "SORTED_MERGE_BRANCH"_:
-            walkSortedMergeBranch(ast);
             break;
         case "UNWIND"_:
             walkUnwind(ast);
@@ -1584,9 +1493,6 @@ void Parser::walk(AstQuery& ast) {
         case "PLAN_NODE_ID"_:
             walkPlanNodeId(ast);
             break;
-        case "UNIQUE"_:
-            walkUnique(ast);
-            break;
         default:
             walkChildren(ast);
     }
@@ -1615,7 +1521,7 @@ std::unique_ptr<PlanStage> Parser::parse(OperationContext* opCtx,
     _defaultDb = defaultDb.toString();
 
     auto result = _parser.parse_n(line.rawData(), line.size(), ast);
-    uassert(4885904, str::stream() << "Syntax error in query: " << line, result);
+    uassert(4885904, "Syntax error in query.", result);
 
     walk(*ast);
     uassert(4885905, "Query does not have the root.", ast->stage);

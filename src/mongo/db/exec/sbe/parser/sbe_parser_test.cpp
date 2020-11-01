@@ -44,11 +44,9 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
-#include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
-#include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -156,40 +154,7 @@ protected:
                 sbe::SpoolId{1}, sbe::makeSV(1, 2), planNodeId),
             // SSPOOL
             sbe::makeS<sbe::SpoolConsumerStage<true>>(
-                sbe::SpoolId{1}, sbe::makeSV(1, 2), planNodeId),
-
-            // UNIQUE
-            sbe::makeS<sbe::UniqueStage>(
-                sbe::makeS<sbe::CoScanStage>(planNodeId), sbe::makeSV(1, 2), planNodeId),
-
-            // UNION
-            sbe::makeS<sbe::UnionStage>(
-                ([this]() {
-                    std::vector<std::unique_ptr<sbe::PlanStage>> ret;
-                    ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
-                    ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
-                    return ret;
-                }()),
-                std::vector<sbe::value::SlotVector>{sbe::makeSV(1, 2), sbe::makeSV(3, 4)},
-                sbe::makeSV(5, 6),
-                planNodeId),
-
-            // SORTED_MERGE
-            sbe::makeS<sbe::SortedMergeStage>(
-                ([this]() {
-                    std::vector<std::unique_ptr<sbe::PlanStage>> ret;
-                    ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
-                    ret.push_back(sbe::makeS<sbe::CoScanStage>(planNodeId));
-                    return ret;
-                }()),
-                std::vector<sbe::value::SlotVector>{sbe::makeSV(1, 2), sbe::makeSV(3, 4)},
-                std::vector<sbe::value::SortDirection>{sbe::value::SortDirection::Ascending,
-                                                       sbe::value::SortDirection::Ascending},
-                std::vector<sbe::value::SlotVector>{sbe::makeSV(1, 2), sbe::makeSV(3, 4)},
-                sbe::makeSV(5, 6),
-                planNodeId)
-
-        );
+                sbe::SpoolId{1}, sbe::makeSV(1, 2), planNodeId));
     }
 
     PlanNodeId planNodeId;

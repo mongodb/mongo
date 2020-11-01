@@ -41,11 +41,9 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
-#include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/text_match.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
-#include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
@@ -225,8 +223,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolu
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
 
     for (const auto& part : sortPattern) {
-        uassert(5073801, "Sorting by expression not supported", !part.expression);
-        uassert(5073802,
+        uassert(4822881, "Sorting by expression not supported", !part.expression);
+        uassert(4822882,
                 "Sorting by dotted paths not supported",
                 part.fieldPath && part.fieldPath->getPathLength() == 1);
 
@@ -324,82 +322,6 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSort(const QuerySolu
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSortKeyGeneraror(
     const QuerySolutionNode* root) {
     uasserted(4822883, "Sort key generator in not supported in SBE yet");
-}
-
-std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildSortMerge(
-    const QuerySolutionNode* root) {
-    using namespace std::literals;
-    auto mergeSortNode = static_cast<const MergeSortNode*>(root);
-
-    uassert(5073803,
-            "SORT_MERGE stage with unfetched children not supported",
-            mergeSortNode->fetched());
-
-    const auto sortPattern = SortPattern{mergeSortNode->sort, _cq.getExpCtx()};
-    std::vector<sbe::value::SortDirection> direction;
-
-    for (const auto& part : sortPattern) {
-        uassert(4822881, "Sorting by expression not supported", !part.expression);
-        uassert(4822882,
-                "Sorting by dotted paths not supported",
-                part.fieldPath && part.fieldPath->getPathLength() == 1);
-
-        direction.push_back(part.isAscending ? sbe::value::SortDirection::Ascending
-                                             : sbe::value::SortDirection::Descending);
-    }
-
-    std::vector<std::unique_ptr<sbe::PlanStage>> inputStages;
-    std::vector<sbe::value::SlotVector> inputKeys;
-    std::vector<sbe::value::SlotVector> inputVals;
-
-    for (auto&& child : mergeSortNode->children) {
-        auto childExecTree = build(child);
-
-        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
-        sbe::value::SlotVector inputKeysForChild;
-
-        for (const auto& part : sortPattern) {
-            // Slot holding the sort key.
-            auto sortFieldSlot{_slotIdGenerator.generate()};
-            inputKeysForChild.push_back(sortFieldSlot);
-
-            auto fieldName = part.fieldPath->getFieldName(0);
-            auto fieldNameSV = std::string_view{fieldName.rawData(), fieldName.size()};
-            projectMap.emplace(sortFieldSlot,
-                               sbe::makeE<sbe::EFunction>(
-                                   "getField"sv,
-                                   sbe::makeEs(sbe::makeE<sbe::EVariable>(*_data.resultSlot),
-                                               sbe::makeE<sbe::EConstant>(fieldNameSV))));
-        }
-
-        childExecTree = sbe::makeS<sbe::ProjectStage>(
-            std::move(childExecTree), std::move(projectMap), root->nodeId());
-
-        inputStages.push_back(std::move(childExecTree));
-
-        invariant(_data.resultSlot);
-        invariant(_data.recordIdSlot);
-
-        inputKeys.push_back(std::move(inputKeysForChild));
-        inputVals.push_back(sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot));
-    }
-
-    _data.resultSlot = _slotIdGenerator.generate();
-    _data.recordIdSlot = _slotIdGenerator.generate();
-    auto stage =
-        sbe::makeS<sbe::SortedMergeStage>(std::move(inputStages),
-                                          std::move(inputKeys),
-                                          std::move(direction),
-                                          std::move(inputVals),
-                                          sbe::makeSV(*_data.resultSlot, *_data.recordIdSlot),
-                                          root->nodeId());
-
-    if (mergeSortNode->dedup) {
-        stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(*_data.recordIdSlot), root->nodeId());
-    }
-
-    return stage;
 }
 
 std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildProjectionSimple(
@@ -536,8 +458,8 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildOr(const QuerySoluti
                                              root->nodeId());
 
     if (orn->dedup) {
-        stage = sbe::makeS<sbe::UniqueStage>(
-            std::move(stage), sbe::makeSV(*_data.recordIdSlot), root->nodeId());
+        stage = sbe::makeS<sbe::HashAggStage>(
+            std::move(stage), sbe::makeSV(*_data.recordIdSlot), sbe::makeEM(), root->nodeId());
     }
 
     if (orn->filter) {
@@ -627,11 +549,11 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::buildText(const QuerySolu
     // TODO: If text score metadata is requested, then we should sum over the text scores inside the
     // index keys for a given document. This will require expression evaluation to be able to
     // extract the score directly from the key string.
-    auto uniqueStage = sbe::makeS<sbe::UniqueStage>(
-        std::move(unionStage), sbe::makeSV(*_data.recordIdSlot), root->nodeId());
+    auto hashAggStage = sbe::makeS<sbe::HashAggStage>(
+        std::move(unionStage), sbe::makeSV(*_data.recordIdSlot), sbe::makeEM(), root->nodeId());
 
     auto nljStage =
-        makeLoopJoinForFetch(std::move(uniqueStage), *_data.recordIdSlot, root->nodeId());
+        makeLoopJoinForFetch(std::move(hashAggStage), *_data.recordIdSlot, root->nodeId());
 
     // Add a special stage to apply 'ftsQuery' to matching documents, and then add a FilterStage to
     // discard documents which do not match.
@@ -785,8 +707,7 @@ std::unique_ptr<sbe::PlanStage> SlotBasedStageBuilder::build(const QuerySolution
             {STAGE_OR, &SlotBasedStageBuilder::buildOr},
             {STAGE_TEXT, &SlotBasedStageBuilder::buildText},
             {STAGE_RETURN_KEY, &SlotBasedStageBuilder::buildReturnKey},
-            {STAGE_EOF, &SlotBasedStageBuilder::buildEof},
-            {STAGE_SORT_MERGE, &SlotBasedStageBuilder::buildSortMerge}};
+            {STAGE_EOF, &SlotBasedStageBuilder::buildEof}};
 
     uassert(4822884,
             str::stream() << "Can't build exec tree for node: " << root->toString(),
