@@ -497,19 +497,19 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericMod(value::Type
                 return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(result)};
             }
             case value::TypeTags::NumberInt64: {
-                assertNonZero(numericCast<int32_t>(rhsTag, rhsValue) != 0);
+                assertNonZero(numericCast<int64_t>(rhsTag, rhsValue) != 0);
                 auto result = overflow::safeMod(numericCast<int64_t>(lhsTag, lhsValue),
                                                 numericCast<int64_t>(rhsTag, rhsValue));
                 return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
             }
             case value::TypeTags::NumberDouble: {
-                assertNonZero(numericCast<int32_t>(rhsTag, rhsValue) != 0);
+                assertNonZero(numericCast<double>(rhsTag, rhsValue) != 0);
                 auto result = fmod(numericCast<double>(lhsTag, lhsValue),
                                    numericCast<double>(rhsTag, rhsValue));
                 return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
             }
             case value::TypeTags::NumberDecimal: {
-                assertNonZero(numericCast<Decimal128>(rhsTag, rhsValue).isZero());
+                assertNonZero(!numericCast<Decimal128>(rhsTag, rhsValue).isZero());
                 auto result = numericCast<Decimal128>(lhsTag, lhsValue)
                                   .modulo(numericCast<Decimal128>(rhsTag, rhsValue));
                 auto [tag, val] = value::makeCopyDecimal(result);
