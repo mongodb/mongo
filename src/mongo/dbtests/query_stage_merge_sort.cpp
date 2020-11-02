@@ -191,7 +191,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -260,7 +261,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -329,7 +331,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -404,7 +407,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -475,7 +479,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -533,7 +538,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -826,7 +832,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -899,8 +906,13 @@ public:
         ms->addChild(
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
 
-        auto statusWithPlanExecutor = plan_executor_factory::make(
-            _expCtx, std::move(ws), std::move(ms), &coll, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        auto statusWithPlanExecutor =
+            plan_executor_factory::make(_expCtx,
+                                        std::move(ws),
+                                        std::move(ms),
+                                        &coll,
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 

@@ -35,53 +35,57 @@
 #include "mongo/util/str.h"
 
 namespace mongo::sbe {
-MakeObjStage::MakeObjStage(std::unique_ptr<PlanStage> input,
-                           value::SlotId objSlot,
-                           boost::optional<value::SlotId> rootSlot,
-                           std::vector<std::string> restrictFields,
-                           std::vector<std::string> projectFields,
-                           value::SlotVector projectVars,
-                           bool forceNewObject,
-                           bool returnOldObject,
-                           PlanNodeId planNodeId)
-    : PlanStage("mkobj"_sd, planNodeId),
+template <MakeObjOutputType O>
+MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
+                                      value::SlotId objSlot,
+                                      boost::optional<value::SlotId> rootSlot,
+                                      boost::optional<FieldBehavior> fieldBehavior,
+                                      std::vector<std::string> fields,
+                                      std::vector<std::string> projectFields,
+                                      value::SlotVector projectVars,
+                                      bool forceNewObject,
+                                      bool returnOldObject,
+                                      PlanNodeId planNodeId)
+    : PlanStage(O == MakeObjOutputType::object ? "mkobj"_sd : "mkbson"_sd, planNodeId),
       _objSlot(objSlot),
       _rootSlot(rootSlot),
-      _restrictFields(std::move(restrictFields)),
+      _fieldBehavior(fieldBehavior),
+      _fields(std::move(fields)),
       _projectFields(std::move(projectFields)),
       _projectVars(std::move(projectVars)),
       _forceNewObject(forceNewObject),
       _returnOldObject(returnOldObject) {
     _children.emplace_back(std::move(input));
     invariant(_projectVars.size() == _projectFields.size());
+    invariant(static_cast<bool>(rootSlot) == static_cast<bool>(fieldBehavior));
 }
 
-std::unique_ptr<PlanStage> MakeObjStage::clone() const {
-    return std::make_unique<MakeObjStage>(_children[0]->clone(),
-                                          _objSlot,
-                                          _rootSlot,
-                                          _restrictFields,
-                                          _projectFields,
-                                          _projectVars,
-                                          _forceNewObject,
-                                          _returnOldObject,
-                                          _commonStats.nodeId);
+template <MakeObjOutputType O>
+std::unique_ptr<PlanStage> MakeObjStageBase<O>::clone() const {
+    return std::make_unique<MakeObjStageBase<O>>(_children[0]->clone(),
+                                                 _objSlot,
+                                                 _rootSlot,
+                                                 _fieldBehavior,
+                                                 _fields,
+                                                 _projectFields,
+                                                 _projectVars,
+                                                 _forceNewObject,
+                                                 _returnOldObject,
+                                                 _commonStats.nodeId);
 }
 
-void MakeObjStage::prepare(CompileCtx& ctx) {
+template <MakeObjOutputType O>
+void MakeObjStageBase<O>::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
 
     if (_rootSlot) {
         _root = _children[0]->getAccessor(ctx, *_rootSlot);
     }
-    for (auto& p : _restrictFields) {
-        if (p.empty()) {
-            _restrictAllFields = true;
-        } else {
-            auto [it, inserted] = _restrictFieldsSet.emplace(p);
-            uassert(4822818, str::stream() << "duplicate field: " << p, inserted);
-        }
+    for (auto& p : _fields) {
+        auto [it, inserted] = _fieldSet.emplace(p);
+        uassert(4822818, str::stream() << "duplicate field: " << p, inserted);
     }
+
     for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
         auto& p = _projectFields[idx];
 
@@ -92,7 +96,8 @@ void MakeObjStage::prepare(CompileCtx& ctx) {
     _compiled = true;
 }
 
-value::SlotAccessor* MakeObjStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
+template <MakeObjOutputType O>
+value::SlotAccessor* MakeObjStageBase<O>::getAccessor(CompileCtx& ctx, value::SlotId slot) {
     if (_compiled && slot == _objSlot) {
         return &_obj;
     } else {
@@ -100,7 +105,8 @@ value::SlotAccessor* MakeObjStage::getAccessor(CompileCtx& ctx, value::SlotId sl
     }
 }
 
-void MakeObjStage::projectField(value::Object* obj, size_t idx) {
+template <MakeObjOutputType O>
+void MakeObjStageBase<O>::projectField(value::Object* obj, size_t idx) {
     const auto& p = _projects[idx];
 
     auto [tag, val] = p.second->getViewOfValue();
@@ -110,98 +116,185 @@ void MakeObjStage::projectField(value::Object* obj, size_t idx) {
     }
 }
 
-void MakeObjStage::open(bool reOpen) {
+template <MakeObjOutputType O>
+void MakeObjStageBase<O>::projectField(UniqueBSONObjBuilder* bob, size_t idx) {
+    const auto& p = _projects[idx];
+
+    auto [tag, val] = p.second->getViewOfValue();
+    bson::appendValueToBsonObj(*bob, p.first, tag, val);
+}
+
+template <MakeObjOutputType O>
+void MakeObjStageBase<O>::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
 }
 
-PlanState MakeObjStage::getNext() {
+template <>
+void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
+    auto [tag, val] = value::makeNewObject();
+    auto obj = value::getObjectView(val);
+    absl::flat_hash_set<size_t> alreadyProjected;
+
+    _obj.reset(tag, val);
+
+    if (_root) {
+        auto [tag, val] = _root->getViewOfValue();
+
+        if (tag == value::TypeTags::bsonObject) {
+            auto be = value::bitcastTo<const char*>(val);
+            auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
+            auto end = be + size;
+            // Simple heuristic to determine number of fields.
+            obj->reserve(size / 16);
+            // Skip document length.
+            be += 4;
+            while (*be != 0) {
+                auto sv = bson::fieldNameView(be);
+
+                if (auto it = _projectFieldsMap.find(sv); it != _projectFieldsMap.end()) {
+                    projectField(obj, it->second);
+                    alreadyProjected.insert(it->second);
+                } else if (!isFieldRestricted(sv)) {
+                    auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
+                    auto [copyTag, copyVal] = value::copyValue(tag, val);
+                    obj->push_back(sv, copyTag, copyVal);
+                }
+                be = bson::advance(be, sv.size());
+            }
+        } else if (tag == value::TypeTags::Object) {
+            auto objRoot = value::getObjectView(val);
+            obj->reserve(objRoot->size());
+            for (size_t idx = 0; idx < objRoot->size(); ++idx) {
+                std::string_view sv(objRoot->field(idx));
+
+                if (auto it = _projectFieldsMap.find(sv); it != _projectFieldsMap.end()) {
+                    projectField(obj, it->second);
+                    alreadyProjected.insert(it->second);
+                } else if (!isFieldRestricted(sv)) {
+                    auto [tag, val] = objRoot->getAt(idx);
+                    auto [copyTag, copyVal] = value::copyValue(tag, val);
+                    obj->push_back(sv, copyTag, copyVal);
+                }
+            }
+        } else {
+            for (size_t idx = 0; idx < _projects.size(); ++idx) {
+                if (alreadyProjected.count(idx) == 0) {
+                    projectField(obj, idx);
+                }
+            }
+            // If the result is non empty object return it.
+            if (obj->size() || _forceNewObject) {
+                return;
+            }
+            // Now we have to make a decision - return Nothing or the original _root.
+            if (!_returnOldObject) {
+                _obj.reset(false, value::TypeTags::Nothing, 0);
+            } else {
+                // _root is not an object return it unmodified.
+                _obj.reset(false, tag, val);
+            }
+            return;
+        }
+    }
+    for (size_t idx = 0; idx < _projects.size(); ++idx) {
+        if (alreadyProjected.count(idx) == 0) {
+            projectField(obj, idx);
+        }
+    }
+}
+
+template <>
+void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
+    UniqueBSONObjBuilder bob;
+    absl::flat_hash_set<size_t> alreadyProjected;
+
+    auto finish = [this, &bob]() {
+        bob.doneFast();
+        char* data = bob.bb().release().release();
+        _obj.reset(value::TypeTags::bsonObject, value::bitcastFrom<char*>(data));
+    };
+
+    if (_root) {
+        auto [tag, val] = _root->getViewOfValue();
+
+        if (tag == value::TypeTags::bsonObject) {
+            auto be = value::bitcastTo<const char*>(val);
+            // Skip document length.
+            be += 4;
+            while (*be != 0) {
+                auto sv = bson::fieldNameView(be);
+
+                if (auto it = _projectFieldsMap.find(sv); it != _projectFieldsMap.end()) {
+                    projectField(&bob, it->second);
+                    alreadyProjected.insert(it->second);
+                } else if (!isFieldRestricted(sv)) {
+                    bob.append(BSONElement(be, sv.size() + 1, -1, BSONElement::CachedSizeTag{}));
+                }
+
+                be = bson::advance(be, sv.size());
+            }
+        } else if (tag == value::TypeTags::Object) {
+            auto objRoot = value::getObjectView(val);
+            for (size_t idx = 0; idx < objRoot->size(); ++idx) {
+                std::string_view sv(objRoot->field(idx));
+
+                if (auto it = _projectFieldsMap.find(sv); it != _projectFieldsMap.end()) {
+                    projectField(&bob, it->second);
+                    alreadyProjected.insert(it->second);
+                } else if (!isFieldRestricted(sv)) {
+                    auto [tag, val] = objRoot->getAt(idx);
+                    bson::appendValueToBsonObj(bob, sv, tag, val);
+                }
+            }
+        } else {
+            for (size_t idx = 0; idx < _projects.size(); ++idx) {
+                if (alreadyProjected.count(idx) == 0) {
+                    projectField(&bob, idx);
+                }
+            }
+            // If the result is non empty object return it.
+            if (!bob.asTempObj().isEmpty() || _forceNewObject) {
+                finish();
+                return;
+            }
+            // Now we have to make a decision - return Nothing or the original _root.
+            if (!_returnOldObject) {
+                _obj.reset(false, value::TypeTags::Nothing, 0);
+            } else {
+                // _root is not an object return it unmodified.
+                _obj.reset(false, tag, val);
+            }
+
+            return;
+        }
+    }
+    for (size_t idx = 0; idx < _projects.size(); ++idx) {
+        if (alreadyProjected.count(idx) == 0) {
+            projectField(&bob, idx);
+        }
+    }
+    finish();
+}
+
+template <MakeObjOutputType O>
+PlanState MakeObjStageBase<O>::getNext() {
     auto state = _children[0]->getNext();
 
     if (state == PlanState::ADVANCED) {
-        auto [tag, val] = value::makeNewObject();
-        auto obj = value::getObjectView(val);
-        absl::flat_hash_set<size_t> alreadyProjected;
-
-        _obj.reset(tag, val);
-
-        if (_root) {
-            auto [tag, val] = _root->getViewOfValue();
-
-            if (tag == value::TypeTags::bsonObject) {
-                auto be = value::bitcastTo<const char*>(val);
-                auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
-                auto end = be + size;
-                // Simple heuristic to determine number of fields.
-                obj->reserve(size / 16);
-                // Skip document length.
-                be += 4;
-                while (*be != 0) {
-                    auto sv = bson::fieldNameView(be);
-
-                    if (auto it = _projectFieldsMap.find(sv);
-                        !isFieldRestricted(sv) && it == _projectFieldsMap.end()) {
-                        auto [tag, val] = bson::convertFrom(true, be, end, sv.size());
-                        auto [copyTag, copyVal] = value::copyValue(tag, val);
-                        obj->push_back(sv, copyTag, copyVal);
-                    } else if (it != _projectFieldsMap.end()) {
-                        projectField(obj, it->second);
-                        alreadyProjected.insert(it->second);
-                    }
-
-                    be = bson::advance(be, sv.size());
-                }
-            } else if (tag == value::TypeTags::Object) {
-                auto objRoot = value::getObjectView(val);
-                obj->reserve(objRoot->size());
-                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-                    std::string_view sv(objRoot->field(idx));
-
-                    if (auto it = _projectFieldsMap.find(sv);
-                        !isFieldRestricted(sv) && it == _projectFieldsMap.end()) {
-                        auto [tag, val] = objRoot->getAt(idx);
-                        auto [copyTag, copyVal] = value::copyValue(tag, val);
-                        obj->push_back(sv, copyTag, copyVal);
-                    } else if (it != _projectFieldsMap.end()) {
-                        projectField(obj, it->second);
-                        alreadyProjected.insert(it->second);
-                    }
-                }
-            } else {
-                for (size_t idx = 0; idx < _projects.size(); ++idx) {
-                    if (alreadyProjected.count(idx) == 0) {
-                        projectField(obj, idx);
-                    }
-                }
-                // If the result is non empty object return it.
-                if (obj->size() || _forceNewObject) {
-                    return trackPlanState(state);
-                }
-                // Now we have to make a decision - return Nothing or the original _root.
-                if (!_returnOldObject) {
-                    _obj.reset(false, value::TypeTags::Nothing, 0);
-                } else {
-                    // _root is not an object return it unmodified.
-                    _obj.reset(false, tag, val);
-                }
-                return trackPlanState(state);
-            }
-        }
-        for (size_t idx = 0; idx < _projects.size(); ++idx) {
-            if (alreadyProjected.count(idx) == 0) {
-                projectField(obj, idx);
-            }
-        }
+        produceObject();
     }
     return trackPlanState(state);
 }
 
-void MakeObjStage::close() {
+template <MakeObjOutputType O>
+void MakeObjStageBase<O>::close() {
     _commonStats.closes++;
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> MakeObjStage::getStats(bool includeDebugInfo) const {
+template <MakeObjOutputType O>
+std::unique_ptr<PlanStageStats> MakeObjStageBase<O>::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
 
     if (includeDebugInfo) {
@@ -210,7 +303,10 @@ std::unique_ptr<PlanStageStats> MakeObjStage::getStats(bool includeDebugInfo) co
         if (_rootSlot) {
             bob.appendIntOrLL("rootSlot", *_rootSlot);
         }
-        bob.append("restrictFields", _restrictFields);
+        if (_fieldBehavior) {
+            bob.append("fieldBehavior", *_fieldBehavior == FieldBehavior::drop ? "drop" : "keep");
+        }
+        bob.append("fields", _fields);
         bob.append("projectFields", _projectFields);
         bob.append("projectSlots", _projectVars);
         bob.append("forceNewObject", _forceNewObject);
@@ -222,11 +318,13 @@ std::unique_ptr<PlanStageStats> MakeObjStage::getStats(bool includeDebugInfo) co
     return ret;
 }
 
-const SpecificStats* MakeObjStage::getSpecificStats() const {
+template <MakeObjOutputType O>
+const SpecificStats* MakeObjStageBase<O>::getSpecificStats() const {
     return nullptr;
 }
 
-std::vector<DebugPrinter::Block> MakeObjStage::debugPrint() const {
+template <MakeObjOutputType O>
+std::vector<DebugPrinter::Block> MakeObjStageBase<O>::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
     DebugPrinter::addIdentifier(ret, _objSlot);
@@ -235,14 +333,16 @@ std::vector<DebugPrinter::Block> MakeObjStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, *_rootSlot);
 
         ret.emplace_back(DebugPrinter::Block("[`"));
-        for (size_t idx = 0; idx < _restrictFields.size(); ++idx) {
+        for (size_t idx = 0; idx < _fields.size(); ++idx) {
             if (idx) {
                 ret.emplace_back(DebugPrinter::Block("`,"));
             }
 
-            DebugPrinter::addIdentifier(ret, _restrictFields[idx]);
+            DebugPrinter::addIdentifier(ret, _fields[idx]);
         }
         ret.emplace_back(DebugPrinter::Block("`]"));
+
+        ret.emplace_back(*_fieldBehavior == FieldBehavior::drop ? "drop" : "keep");
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));
@@ -265,4 +365,8 @@ std::vector<DebugPrinter::Block> MakeObjStage::debugPrint() const {
 
     return ret;
 }
+
+// Explicit template instantiations.
+template class MakeObjStageBase<MakeObjOutputType::object>;
+template class MakeObjStageBase<MakeObjOutputType::bsonObject>;
 }  // namespace mongo::sbe

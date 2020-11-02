@@ -125,6 +125,10 @@ struct QueryPlannerParams {
         // in other states, e.g. during initial sync. Internal operations, on the other hand, can
         // use this flag to exempt themselves from this repl set note state requirement.
         OMIT_REPL_STATE_PERMITS_READS_CHECK = 1 << 13,
+
+        // Ensure that any plan generated returns data that is "owned." That is, all BSONObjs are
+        // in an "owned" state and are not pointing to data that belongs to the storage engine.
+        RETURN_OWNED_DATA = 1 << 14,
     };
 
     // See Options enum above.

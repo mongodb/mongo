@@ -480,10 +480,8 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
 }
 
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba) {
-    int numBytes = ba.objsize();
-    uint8_t* data = new uint8_t[numBytes];
-    memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
-    return {sbe::value::TypeTags::bsonArray, sbe::value::bitcastFrom<uint8_t*>(data)};
+    return sbe::value::copyValue(sbe::value::TypeTags::bsonArray,
+                                 sbe::value::bitcastFrom<const char*>(ba.objdata()));
 }
 
 uint32_t dateTypeMask() {

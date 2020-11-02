@@ -114,6 +114,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    unique_ptr<CanonicalQuery> cq,
                                    const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                    const CollectionPtr& collection,
+                                   bool returnOwnedBson,
                                    NamespaceString nss,
                                    PlanYieldPolicy::YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
@@ -123,6 +124,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
       _qs(std::move(qs)),
       _root(std::move(rt)),
       _planExplainer(plan_explainer_factory::make(_root.get())),
+      _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)),
       // There's no point in yielding if the collection doesn't exist.
       _yieldPolicy(
@@ -400,10 +402,16 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
             if (hasRequestedData) {
                 // transfer the metadata from the WSM to Document.
-                if (objOut && member->metadata()) {
-                    MutableDocument md(std::move(objOut->value()));
-                    md.setMetadata(member->releaseMetadata());
-                    objOut->setValue(md.freeze());
+                if (objOut) {
+                    if (_mustReturnOwnedBson) {
+                        objOut->value() = objOut->value().getOwned();
+                    }
+
+                    if (member->metadata()) {
+                        MutableDocument md(std::move(objOut->value()));
+                        md.setMetadata(member->releaseMetadata());
+                        objOut->setValue(md.freeze());
+                    }
                 }
                 _workingSet->free(id);
                 return PlanExecutor::ADVANCED;

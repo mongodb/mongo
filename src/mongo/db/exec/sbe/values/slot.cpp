@@ -130,19 +130,12 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             val = objIdVal;
             break;
         }
-        case TypeTags::bsonObject: {
-            auto size = buf.peek<LittleEndian<uint32_t>>();
-            auto bson = new uint8_t[size];
-            memcpy(bson, buf.skip(size), size);
-            val = bitcastFrom<uint8_t*>(bson);
-            break;
-        }
+        case TypeTags::bsonObject:
         case TypeTags::bsonArray: {
             auto size = buf.peek<LittleEndian<uint32_t>>();
-            auto arr = new uint8_t[size];
-            memcpy(arr, buf.skip(size), size);
-            val = bitcastFrom<uint8_t*>(arr);
-            break;
+            auto buffer = UniqueBuffer::allocate(size);
+            memcpy(buffer.get(), buf.skip(size), size);
+            return {tag, bitcastFrom<char*>(buffer.release())};
         }
         case TypeTags::bsonBinData: {
             auto binDataSize = buf.peek<LittleEndian<uint32_t>>();

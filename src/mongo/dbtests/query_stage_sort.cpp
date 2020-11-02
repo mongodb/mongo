@@ -132,8 +132,13 @@ public:
 
         // The PlanExecutor will be automatically registered on construction due to the auto
         // yield policy, so it can receive invalidations when we remove documents later.
-        auto statusWithPlanExecutor = plan_executor_factory::make(
-            _expCtx, std::move(ws), std::move(ss), &coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        auto statusWithPlanExecutor =
+            plan_executor_factory::make(_expCtx,
+                                        std::move(ws),
+                                        std::move(ss),
+                                        &coll,
+                                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                        QueryPlannerParams::DEFAULT);
         invariant(statusWithPlanExecutor.isOK());
         return std::move(statusWithPlanExecutor.getValue());
     }
@@ -180,7 +185,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
@@ -611,7 +617,8 @@ public:
                                         std::move(ws),
                                         std::move(fetchStage),
                                         &coll,
-                                        PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                        PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT);
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         ASSERT_THROWS_CODE(exec->getNext(static_cast<BSONObj*>(nullptr), nullptr),

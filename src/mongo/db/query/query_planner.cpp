@@ -182,6 +182,9 @@ string optionString(size_t options) {
             case QueryPlannerParams::OMIT_REPL_STATE_PERMITS_READS_CHECK:
                 ss << "OMIT_REPL_STATE_PERMITS_READS_CHECK";
                 break;
+            case QueryPlannerParams::RETURN_OWNED_DATA:
+                ss << "RETURN_OWNED_DATA ";
+                break;
             case QueryPlannerParams::DEFAULT:
                 MONGO_UNREACHABLE;
                 break;

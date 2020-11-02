@@ -123,6 +123,14 @@ public:
     }
 
     /**
+     * Asserts the two values are equal. Will write a log message and abort() if they are not.
+     */
+    void assertValuesEqual(value::TypeTags lhsTag,
+                           value::Value lhsVal,
+                           value::TypeTags rhsTag,
+                           value::Value rhsVal);
+
+    /**
      * This method takes an SBE array and returns an output slot and a unwind/project/limit/coscan
      * subtree that streams out the elements of the array one at a time via the output slot over a
      * series of calls to getNext(), mimicking the output of a collection scan or an index scan.

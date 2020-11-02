@@ -717,6 +717,8 @@ private:
     friend Super;
 
 public:
+    using ArrayBuilder = BSONArrayBuilder;
+
     BSONObjBuilder() : Super(kDefaultSize), _s(this) {}
 
     BSONObjBuilder(int initsize) : Super(initsize), _s(this) {}
@@ -827,6 +829,7 @@ private:
  * This should only be used when you care about having direct ownership over the BSONObj's
  * underlying memory.
  */
+class UniqueBSONArrayBuilder;
 class UniqueBSONObjBuilder : public BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder> {
 private:
     using Super = BSONObjBuilderBase<UniqueBSONObjBuilder, UniqueBufBuilder>;
@@ -834,6 +837,7 @@ private:
 
 public:
     using Super::BSONObjBuilderBase;
+    using ArrayBuilder = UniqueBSONArrayBuilder;
 
     /**
      * Creates a new UniqueBSONObjBuilder prefixed with the fields in 'prefix'.
@@ -1043,6 +1047,8 @@ protected:
  */
 class BSONArrayBuilder : public BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder> {
 public:
+    using ObjBuilder = BSONObjBuilder;
+
     using BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>::BSONArrayBuilderBase;
     BSONArrayBuilder(BufBuilder& bufBuilder)
         : BSONArrayBuilderBase<BSONArrayBuilder, BSONObjBuilder>(bufBuilder) {}
@@ -1054,7 +1060,11 @@ public:
 class UniqueBSONArrayBuilder
     : public BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder> {
 public:
+    using ObjBuilder = UniqueBSONObjBuilder;
+
     using BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>::BSONArrayBuilderBase;
+    UniqueBSONArrayBuilder(UniqueBufBuilder& bufBuilder)
+        : BSONArrayBuilderBase<UniqueBSONArrayBuilder, UniqueBSONObjBuilder>(bufBuilder) {}
 };
 
 template <class Derived, class B>

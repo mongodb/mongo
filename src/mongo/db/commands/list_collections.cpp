@@ -375,13 +375,14 @@ public:
                 }
             }
 
-            exec =
-                uassertStatusOK(plan_executor_factory::make(expCtx,
-                                                            std::move(ws),
-                                                            std::move(root),
-                                                            &CollectionPtr::null,
-                                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                            cursorNss));
+            exec = uassertStatusOK(
+                plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(root),
+                                            &CollectionPtr::null,
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            false, /* whether owned BSON must be returned */
+                                            cursorNss));
 
             long long batchSize = std::numeric_limits<long long>::max();
             if (parsed.getCursor() && parsed.getCursor()->getBatchSize()) {

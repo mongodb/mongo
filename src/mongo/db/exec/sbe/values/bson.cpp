@@ -228,7 +228,9 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             return {value::TypeTags::Nothing, 0};
     }
 }
-void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
+
+template <class ArrayBuilder>
+void convertToBsonObj(ArrayBuilder& builder, value::ArrayEnumerator arr) {
     for (; !arr.atEnd(); arr.advance()) {
         auto [tag, val] = arr.getViewOfValue();
 
@@ -268,19 +270,19 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
                 break;
             }
             case value::TypeTags::Array: {
-                BSONArrayBuilder subarrBuilder(builder.subarrayStart());
+                ArrayBuilder subarrBuilder(builder.subarrayStart());
                 convertToBsonObj(subarrBuilder, value::ArrayEnumerator{tag, val});
                 subarrBuilder.doneFast();
                 break;
             }
             case value::TypeTags::ArraySet: {
-                BSONArrayBuilder subarrBuilder(builder.subarrayStart());
+                ArrayBuilder subarrBuilder(builder.subarrayStart());
                 convertToBsonObj(subarrBuilder, value::ArrayEnumerator{tag, val});
                 subarrBuilder.doneFast();
                 break;
             }
             case value::TypeTags::Object: {
-                BSONObjBuilder subobjBuilder(builder.subobjStart());
+                typename ArrayBuilder::ObjBuilder subobjBuilder(builder.subobjStart());
                 convertToBsonObj(subobjBuilder, value::getObjectView(val));
                 subobjBuilder.doneFast();
                 break;
@@ -318,102 +320,137 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
         }
     }
 }
-void convertToBsonObj(BSONArrayBuilder& builder, value::Array* arr) {
+
+// Explicit instantiations
+template void convertToBsonObj<BSONArrayBuilder>(BSONArrayBuilder&, value::ArrayEnumerator);
+template void convertToBsonObj<UniqueBSONArrayBuilder>(UniqueBSONArrayBuilder&,
+                                                       value::ArrayEnumerator);
+
+template <class ArrayBuilder>
+void convertToBsonObj(ArrayBuilder& builder, value::Array* arr) {
     return convertToBsonObj(
         builder,
         value::ArrayEnumerator{value::TypeTags::Array, value::bitcastFrom<value::Array*>(arr)});
 }
-void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
+
+template void convertToBsonObj<BSONArrayBuilder>(BSONArrayBuilder& builder, value::Array* arr);
+template void convertToBsonObj<UniqueBSONArrayBuilder>(UniqueBSONArrayBuilder& builder,
+                                                       value::Array* arr);
+
+template <class ObjBuilder>
+void convertToBsonObj(ObjBuilder& builder, value::Object* obj) {
     for (size_t idx = 0; idx < obj->size(); ++idx) {
         auto [tag, val] = obj->getAt(idx);
         const auto& name = obj->field(idx);
-
-        switch (tag) {
-            case value::TypeTags::Nothing:
-                break;
-            case value::TypeTags::NumberInt32:
-                builder.append(name, value::bitcastTo<int32_t>(val));
-                break;
-            case value::TypeTags::RecordId:
-            case value::TypeTags::NumberInt64:
-                builder.append(name, value::bitcastTo<int64_t>(val));
-                break;
-            case value::TypeTags::NumberDouble:
-                builder.append(name, value::bitcastTo<double>(val));
-                break;
-            case value::TypeTags::NumberDecimal:
-                builder.append(name, value::bitcastTo<Decimal128>(val));
-                break;
-            case value::TypeTags::Date:
-                builder.append(name, Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(val)));
-                break;
-            case value::TypeTags::Timestamp:
-                builder.append(name, Timestamp(value::bitcastTo<uint64_t>(val)));
-                break;
-            case value::TypeTags::Boolean:
-                builder.append(name, value::bitcastTo<bool>(val));
-                break;
-            case value::TypeTags::Null:
-                builder.appendNull(name);
-                break;
-            case value::TypeTags::StringSmall:
-            case value::TypeTags::StringBig:
-            case value::TypeTags::bsonString: {
-                auto sv = value::getStringView(tag, val);
-                builder.append(name, StringData{sv.data(), sv.size()});
-                break;
-            }
-            case value::TypeTags::Array: {
-                BSONArrayBuilder subarrBuilder(builder.subarrayStart(name));
-                convertToBsonObj(subarrBuilder, value::ArrayEnumerator{tag, val});
-                subarrBuilder.doneFast();
-                break;
-            }
-            case value::TypeTags::ArraySet: {
-                BSONArrayBuilder subarrBuilder(builder.subarrayStart(name));
-                convertToBsonObj(subarrBuilder, value::ArrayEnumerator{tag, val});
-                subarrBuilder.doneFast();
-                break;
-            }
-            case value::TypeTags::Object: {
-                BSONObjBuilder subobjBuilder(builder.subobjStart(name));
-                convertToBsonObj(subobjBuilder, value::getObjectView(val));
-                subobjBuilder.doneFast();
-                break;
-            }
-            case value::TypeTags::ObjectId:
-                builder.append(name, OID::from(value::getObjectIdView(val)->data()));
-                break;
-            case value::TypeTags::MinKey:
-                builder.appendMinKey(name);
-                break;
-            case value::TypeTags::MaxKey:
-                builder.appendMaxKey(name);
-                break;
-            case value::TypeTags::bsonObject:
-                builder.appendObject(name, value::bitcastTo<const char*>(val));
-                break;
-            case value::TypeTags::bsonArray:
-                builder.appendArray(name, BSONObj{value::bitcastTo<const char*>(val)});
-                break;
-            case value::TypeTags::bsonObjectId:
-                builder.append(name, OID::from(value::bitcastTo<const char*>(val)));
-                break;
-            case value::TypeTags::bsonBinData: {
-                builder.appendBinData(name,
-                                      value::getBSONBinDataSize(tag, val),
-                                      value::getBSONBinDataSubtype(tag, val),
-                                      value::getBSONBinData(tag, val));
-                break;
-            }
-            case value::TypeTags::bsonUndefined:
-                builder.appendUndefined(name);
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
+        appendValueToBsonObj(builder, name, tag, val);
     }
 }
+
+template void convertToBsonObj<BSONObjBuilder>(BSONObjBuilder& builder, value::Object* obj);
+template void convertToBsonObj<UniqueBSONObjBuilder>(UniqueBSONObjBuilder& builder,
+                                                     value::Object* obj);
+
+template <class ObjBuilder>
+void appendValueToBsonObj(ObjBuilder& builder,
+                          std::string_view nameSV,
+                          value::TypeTags tag,
+                          value::Value val) {
+    StringData name{nameSV.data(), nameSV.size()};
+
+    switch (tag) {
+        case value::TypeTags::Nothing:
+            break;
+        case value::TypeTags::NumberInt32:
+            builder.append(name, value::bitcastTo<int32_t>(val));
+            break;
+        case value::TypeTags::RecordId:
+        case value::TypeTags::NumberInt64:
+            builder.append(name, value::bitcastTo<int64_t>(val));
+            break;
+        case value::TypeTags::NumberDouble:
+            builder.append(name, value::bitcastTo<double>(val));
+            break;
+        case value::TypeTags::NumberDecimal:
+            builder.append(name, value::bitcastTo<Decimal128>(val));
+            break;
+        case value::TypeTags::Date:
+            builder.append(name, Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(val)));
+            break;
+        case value::TypeTags::Timestamp:
+            builder.append(name, Timestamp(value::bitcastTo<uint64_t>(val)));
+            break;
+        case value::TypeTags::Boolean:
+            builder.append(name, value::bitcastTo<bool>(val));
+            break;
+        case value::TypeTags::Null:
+            builder.appendNull(name);
+            break;
+        case value::TypeTags::StringSmall:
+        case value::TypeTags::StringBig:
+        case value::TypeTags::bsonString: {
+            auto sv = value::getStringView(tag, val);
+            builder.append(name, StringData{sv.data(), sv.size()});
+            break;
+        }
+        case value::TypeTags::Array: {
+            typename ObjBuilder::ArrayBuilder subarrBuilder(builder.subarrayStart(name));
+            convertToBsonObj(subarrBuilder, value::ArrayEnumerator{tag, val});
+            subarrBuilder.doneFast();
+            break;
+        }
+        case value::TypeTags::ArraySet: {
+            typename ObjBuilder::ArrayBuilder subarrBuilder(builder.subarrayStart(name));
+            convertToBsonObj(subarrBuilder, value::ArrayEnumerator{tag, val});
+            subarrBuilder.doneFast();
+            break;
+        }
+        case value::TypeTags::Object: {
+            ObjBuilder subobjBuilder(builder.subobjStart(name));
+            convertToBsonObj(subobjBuilder, value::getObjectView(val));
+            subobjBuilder.doneFast();
+            break;
+        }
+        case value::TypeTags::ObjectId:
+            builder.append(name, OID::from(value::getObjectIdView(val)->data()));
+            break;
+        case value::TypeTags::MinKey:
+            builder.appendMinKey(name);
+            break;
+        case value::TypeTags::MaxKey:
+            builder.appendMaxKey(name);
+            break;
+        case value::TypeTags::bsonObject:
+            builder.appendObject(name, value::bitcastTo<const char*>(val));
+            break;
+        case value::TypeTags::bsonArray:
+            builder.appendArray(name, BSONObj{value::bitcastTo<const char*>(val)});
+            break;
+        case value::TypeTags::bsonObjectId:
+            builder.append(name, OID::from(value::bitcastTo<const char*>(val)));
+            break;
+        case value::TypeTags::bsonBinData: {
+            builder.appendBinData(name,
+                                  value::getBSONBinDataSize(tag, val),
+                                  value::getBSONBinDataSubtype(tag, val),
+                                  value::getBSONBinData(tag, val));
+            break;
+        }
+        case value::TypeTags::bsonUndefined:
+            builder.appendUndefined(name);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+template void appendValueToBsonObj<BSONObjBuilder>(BSONObjBuilder& builder,
+                                                   std::string_view name,
+                                                   value::TypeTags tag,
+                                                   value::Value val);
+template void appendValueToBsonObj<UniqueBSONObjBuilder>(UniqueBSONObjBuilder& builder,
+                                                         std::string_view name,
+                                                         value::TypeTags tag,
+                                                         value::Value val);
 }  // namespace bson
 }  // namespace sbe
 }  // namespace mongo

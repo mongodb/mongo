@@ -86,6 +86,7 @@ public:
                                         std::move(queuedDataStage),
                                         &CollectionPtr::null,
                                         PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                        QueryPlannerParams::DEFAULT,
                                         kTestNss));
     }
 

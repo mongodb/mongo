@@ -58,6 +58,9 @@ enum class EvalMode {
     // Field should be excluded from the resulting object.
     RestrictField,
 
+    // Field should be included in the resulting object with no modification.
+    KeepField,
+
     // We do not need to do anything with the field (neither exclude nor include).
     IgnoreField,
 
@@ -275,8 +278,9 @@ private:
 namespace {
 using FieldVector = std::vector<std::string>;
 
-std::tuple<sbe::value::SlotVector, FieldVector, FieldVector, PlanStageType> prepareFieldEvals(
-    ProjectionTraversalVisitorContext* context, const projection_ast::ProjectionPathASTNode* node) {
+std::tuple<sbe::value::SlotVector, FieldVector, FieldVector, FieldVector, PlanStageType>
+prepareFieldEvals(ProjectionTraversalVisitorContext* context,
+                  const projection_ast::ProjectionPathASTNode* node) {
     // Ensure that there is eval for each of the field names.
     auto& evals = context->topLevelEvals();
     const auto& fieldNames = node->fieldNames();
@@ -293,6 +297,7 @@ std::tuple<sbe::value::SlotVector, FieldVector, FieldVector, PlanStageType> prep
     sbe::value::SlotVector projectSlots;
     std::vector<std::string> projectFields;
     std::vector<std::string> restrictFields;
+    std::vector<std::string> keepFields;
     for (size_t i = 0; i < fieldNames.size(); i++) {
         auto& fieldName = fieldNames[i];
         auto& eval = evals[i];
@@ -305,6 +310,9 @@ std::tuple<sbe::value::SlotVector, FieldVector, FieldVector, PlanStageType> prep
                 // This is an exclusion projection and we need put the field name to the vector of
                 // restricted fields.
                 restrictFields.push_back(fieldName);
+                break;
+            case EvalMode::KeepField:
+                keepFields.push_back(fieldName);
                 break;
             case EvalMode::EvaluateField: {
                 // We need to evaluate value and add a field with it in the resulting object.
@@ -330,6 +338,7 @@ std::tuple<sbe::value::SlotVector, FieldVector, FieldVector, PlanStageType> prep
     return {std::move(projectSlots),
             std::move(projectFields),
             std::move(restrictFields),
+            std::move(keepFields),
             std::move(evalStage)};
 }
 
@@ -347,14 +356,8 @@ public:
     void visit(const projection_ast::BooleanConstantASTNode* node) final {
         using namespace std::literals;
 
-        // If this is an inclusion projection, extract the field and push a getField expression on
-        // top of the 'evals' stack. For an exclusion projection just push an empty optional.
         if (node->value()) {
-            _context->topLevelEvals().emplace_back(
-                _context->slotIdGenerator->generate(),
-                makeFunction("getField"sv,
-                             sbe::makeE<sbe::EVariable>(_context->topLevel().inputSlot),
-                             makeConstant(_context->topFrontField())));
+            _context->topLevelEvals().emplace_back(EvalMode::KeepField);
         } else {
             _context->topLevelEvals().emplace_back(EvalMode::RestrictField);
         }
@@ -385,7 +388,7 @@ public:
         _context->popFrontField();
         invariant(_context->topLevel().fields.empty());
 
-        auto [projectSlots, projectFields, restrictFields, childLevelStage] =
+        auto [projectSlots, projectFields, restrictFields, keepFields, childLevelStage] =
             prepareFieldEvals(_context, node);
 
         // Finally, inject an mkobj stage to generate a document for the current nested level. For
@@ -395,27 +398,30 @@ public:
         auto childLevelResultSlot = _context->slotIdGenerator->generate();
         if (_context->projectType == projection_ast::ProjectType::kInclusion) {
             childLevelStage = sbe::makeS<sbe::FilterStage<true>>(
-                sbe::makeS<sbe::MakeObjStage>(std::move(childLevelStage),
-                                              childLevelResultSlot,
-                                              boost::none,
-                                              std::vector<std::string>{},
-                                              std::move(projectFields),
-                                              std::move(projectSlots),
-                                              true,
-                                              false,
-                                              _context->planNodeId),
+                sbe::makeS<sbe::MakeBsonObjStage>(std::move(childLevelStage),
+                                                  childLevelResultSlot,
+                                                  childLevelInputSlot,
+                                                  sbe::MakeBsonObjStage::FieldBehavior::keep,
+                                                  keepFields,
+                                                  std::move(projectFields),
+                                                  std::move(projectSlots),
+                                                  true,
+                                                  false,
+                                                  _context->planNodeId),
                 makeFunction("isObject"sv, sbe::makeE<sbe::EVariable>(childLevelInputSlot)),
                 _context->planNodeId);
         } else {
-            childLevelStage = sbe::makeS<sbe::MakeObjStage>(std::move(childLevelStage),
-                                                            childLevelResultSlot,
-                                                            childLevelInputSlot,
-                                                            std::move(restrictFields),
-                                                            std::move(projectFields),
-                                                            std::move(projectSlots),
-                                                            false,
-                                                            true,
-                                                            _context->planNodeId);
+            childLevelStage =
+                sbe::makeS<sbe::MakeBsonObjStage>(std::move(childLevelStage),
+                                                  childLevelResultSlot,
+                                                  childLevelInputSlot,
+                                                  sbe::MakeBsonObjStage::FieldBehavior::drop,
+                                                  std::move(restrictFields),
+                                                  std::move(projectFields),
+                                                  std::move(projectSlots),
+                                                  false,
+                                                  true,
+                                                  _context->planNodeId);
         }
 
         // We are done with the child level. Now we need to extract corresponding field from parent
@@ -657,12 +663,13 @@ public:
 
         // All field paths without $slice operator are marked using 'EvalMode::IgnoreField' (see
         // other methods of this visitor). This makes 'prepareFieldEvals' function to populate
-        // 'projectSlots' and 'projectFields' only with evals for $slice operators if there are any.
-        // We do not restrict any fields in this visitor, so the third returned value is simply
-        // ignored.
-        auto [projectSlots, projectFields, restrictFields, childLevelStage] =
+        // 'projectSlots' and 'projectFields' only with evals for $slice operators if there are
+        // any.  We do not remove any fields in the plan generated by this visitor, so the
+        // 'restrictFields' and 'keepFields' return values are not used.
+        auto [projectSlots, projectFields, restrictFields, keepFields, childLevelStage] =
             prepareFieldEvals(_context, node);
         invariant(restrictFields.empty());
+        invariant(keepFields.empty());
 
         if (projectSlots.empty()) {
             // Current sub-tree does not contain any $slice operators, so there is no need to change
@@ -706,15 +713,17 @@ public:
         // 'projectSlots') to the already constructed object from all previous operators.
         auto childLevelInputSlot = _context->topLevel().inputSlot;
         auto childLevelObjSlot = _context->slotIdGenerator->generate();
-        childLevelStage = sbe::makeS<sbe::MakeObjStage>(std::move(childLevelStage),
-                                                        childLevelObjSlot,
-                                                        childLevelInputSlot,
-                                                        std::vector<std::string>{},
-                                                        std::move(projectFields),
-                                                        std::move(projectSlots),
-                                                        false,
-                                                        false,
-                                                        _context->planNodeId);
+        childLevelStage =
+            sbe::makeS<sbe::MakeBsonObjStage>(std::move(childLevelStage),
+                                              childLevelObjSlot,
+                                              childLevelInputSlot,
+                                              sbe::MakeBsonObjStage::FieldBehavior::drop,
+                                              std::vector<std::string>{},
+                                              std::move(projectFields),
+                                              std::move(projectSlots),
+                                              false,
+                                              false,
+                                              _context->planNodeId);
 
         // Create a branch stage which executes mkobj stage if current element in traversal is an
         // object and returns the input unchanged if it has some other type.

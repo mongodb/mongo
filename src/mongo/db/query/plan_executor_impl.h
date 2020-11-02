@@ -60,6 +60,7 @@ public:
                      std::unique_ptr<CanonicalQuery> cq,
                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const CollectionPtr& collection,
+                     bool returnOwnedBson,
                      NamespaceString nss,
                      PlanYieldPolicy::YieldPolicy yieldPolicy);
 
@@ -151,6 +152,9 @@ private:
     // If _killStatus has a non-OK value, then we have been killed and the value represents the
     // reason for the kill.
     Status _killStatus = Status::OK();
+
+    // Whether the executor must return owned BSON.
+    const bool _mustReturnOwnedBson;
 
     // What namespace are we operating over?
     NamespaceString _nss;

@@ -169,8 +169,12 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createRandomCursorEx
         trialStage = static_cast<TrialStage*>(root.get());
     }
 
-    auto exec = plan_executor_factory::make(
-        expCtx, std::move(ws), std::move(root), &coll, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    auto exec = plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(root),
+                                            &coll,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            QueryPlannerParams::RETURN_OWNED_DATA);
 
     // For sharded collections, the root of the plan tree is a TrialStage that may have chosen
     // either a random-sampling cursor trial plan or a COLLSCAN backup plan. We can only optimize
@@ -674,7 +678,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     bool* hasNoRequirements) {
     invariant(hasNoRequirements);
 
-    size_t plannerOpts = QueryPlannerParams::DEFAULT;
+    // Any data returned from the inner executor must be owned.
+    size_t plannerOpts = QueryPlannerParams::DEFAULT | QueryPlannerParams::RETURN_OWNED_DATA;
 
     if (pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage()) {
         invariant(expCtx->tailableMode == TailableModeEnum::kTailableAndAwaitData);

@@ -30,6 +30,7 @@
 /**
  * This file contains a test framework for testing sbe::PlanStages.
  */
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 #include "mongo/platform/basic.h"
 
@@ -37,8 +38,22 @@
 
 #include <string_view>
 
+#include "mongo/logv2/log.h"
+
 namespace mongo::sbe {
 
+void PlanStageTestFixture::assertValuesEqual(value::TypeTags lhsTag,
+                                             value::Value lhsVal,
+                                             value::TypeTags rhsTag,
+                                             value::Value rhsVal) {
+    const auto equal = valueEquals(lhsTag, lhsVal, rhsTag, rhsVal);
+    if (!equal) {
+        std::stringstream ss;
+        ss << std::make_pair(lhsTag, lhsVal) << " != " << std::make_pair(rhsTag, rhsVal);
+        LOGV2(5075401, "{msg}", "msg"_attr = ss.str());
+    }
+    ASSERT_TRUE(equal);
+}
 std::pair<value::SlotId, std::unique_ptr<PlanStage>> PlanStageTestFixture::generateVirtualScan(
     const BSONArray& array) {
     auto [arrTag, arrVal] = stage_builder::makeValue(array);
@@ -144,7 +159,7 @@ void PlanStageTestFixture::runTest(value::TypeTags inputTag,
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
     // Compare the results produced with the expected output and assert that they match.
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
 }
 
 void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
@@ -173,7 +188,7 @@ void PlanStageTestFixture::runTestMulti(int32_t numInputSlots,
     value::ValueGuard resultGuard{resultsTag, resultsVal};
 
     // Compare the results produced with the expected output and assert that they match.
-    ASSERT_TRUE(valueEquals(resultsTag, resultsVal, expectedTag, expectedVal));
+    assertValuesEqual(resultsTag, resultsVal, expectedTag, expectedVal);
 }
 
 }  // namespace mongo::sbe

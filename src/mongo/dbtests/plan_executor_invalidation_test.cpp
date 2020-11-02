@@ -92,7 +92,8 @@ public:
                                         std::move(ws),
                                         std::move(scan),
                                         &collection(),
-                                        PlanYieldPolicy::YieldPolicy::YIELD_MANUAL);
+                                        PlanYieldPolicy::YieldPolicy::YIELD_MANUAL,
+                                        QueryPlannerParams::DEFAULT);
 
         ASSERT_OK(statusWithPlanExecutor.getStatus());
         return std::move(statusWithPlanExecutor.getValue());

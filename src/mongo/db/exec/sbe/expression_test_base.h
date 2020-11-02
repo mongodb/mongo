@@ -91,10 +91,8 @@ protected:
     }
 
     static std::pair<value::TypeTags, value::Value> makeBsonArray(const BSONArray& ba) {
-        int numBytes = ba.objsize();
-        uint8_t* data = new uint8_t[numBytes];
-        memcpy(data, reinterpret_cast<const uint8_t*>(ba.objdata()), numBytes);
-        return {value::TypeTags::bsonArray, value::bitcastFrom<uint8_t*>(data)};
+        return value::copyValue(value::TypeTags::bsonArray,
+                                value::bitcastFrom<const char*>(ba.objdata()));
     }
 
     static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {

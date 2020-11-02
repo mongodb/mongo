@@ -69,7 +69,8 @@ bool DocumentSourceCursor::Batch::isEmpty() const {
 void DocumentSourceCursor::Batch::enqueue(Document&& doc) {
     switch (_type) {
         case CursorType::kRegular: {
-            _batchOfDocs.push_back(doc.getOwned());
+            invariant(doc.isOwned());
+            _batchOfDocs.push_back(std::move(doc));
             _memUsageBytes += _batchOfDocs.back().getApproximateSize();
             break;
         }

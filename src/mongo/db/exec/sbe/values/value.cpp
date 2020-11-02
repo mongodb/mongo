@@ -120,12 +120,16 @@ void releaseValue(TypeTags tag, Value val) noexcept {
             delete getObjectIdView(val);
             break;
         case TypeTags::StringBig:
-        case TypeTags::bsonObject:
-        case TypeTags::bsonArray:
         case TypeTags::bsonObjectId:
         case TypeTags::bsonBinData:
             delete[] getRawPointerView(val);
             break;
+
+        case TypeTags::bsonArray:
+        case TypeTags::bsonObject: {
+            UniqueBuffer::reclaim(getRawPointerView(val));
+            break;
+        }
         case TypeTags::ksValue:
             delete getKeyStringView(val);
             break;

@@ -69,6 +69,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<PlanStage> rt,
     const CollectionPtr* collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
+    size_t plannerOptions,
     NamespaceString nss = NamespaceString(),
     std::unique_ptr<QuerySolution> qs = nullptr);
 
@@ -85,6 +86,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<PlanStage> rt,
     const CollectionPtr* collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
+    size_t plannerOptions,
     NamespaceString nss = NamespaceString(),
     std::unique_ptr<QuerySolution> qs = nullptr);
 
@@ -96,6 +98,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<CanonicalQuery> cq,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const CollectionPtr* collection,
+    size_t plannerOptions,
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy);
 
@@ -109,6 +112,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<QuerySolution> solution,
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> root,
     const CollectionPtr* collection,
+    size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 
@@ -122,6 +126,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<CanonicalQuery> cq,
     sbe::CandidatePlans candidates,
     const CollectionPtr* collection,
+    size_t plannerOptions,
     NamespaceString nss,
     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
 

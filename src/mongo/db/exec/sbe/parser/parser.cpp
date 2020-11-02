@@ -68,7 +68,7 @@ static constexpr auto kSyntax = R"(
                 PLAN_NODE_ID <- ('['([0-9])+']')
 
                 OPERATOR <- PLAN_NODE_ID? (SCAN / PSCAN / SEEK / IXSCAN / IXSEEK / PROJECT / FILTER / CFILTER /
-                            MKOBJ / GROUP / HJOIN / NLJOIN / LIMIT / SKIP / COSCAN / TRAVERSE /
+                            MKOBJ / MKBSON / GROUP / HJOIN / NLJOIN / LIMIT / SKIP / COSCAN / TRAVERSE /
                             EXCHANGE / SORT / UNWIND / UNION / BRANCH / SIMPLE_PROJ / PFO /
                             ESPOOL / LSPOOL / CSPOOL / SSPOOL / UNIQUE / SORTED_MERGE)
 
@@ -117,7 +117,27 @@ static constexpr auto kSyntax = R"(
 
                 FILTER <- 'filter' '{' EXPR '}' OPERATOR
                 CFILTER <- 'cfilter' '{' EXPR '}' OPERATOR
-                MKOBJ <- 'mkobj' IDENT (IDENT IDENT_LIST)? IDENT_LIST_WITH_RENAMES OPERATOR
+
+                MKOBJ_FLAG <- <'true'> / <'false'>
+                MKOBJ_DROP_KEEP_FLAG <- <'drop'> / <'keep'>
+                MKOBJ <- 'mkobj' IDENT
+                                 (IDENT # Old root
+                                  IDENT_LIST # field names
+                                  MKOBJ_DROP_KEEP_FLAG)? # drop or keep
+                                 IDENT_LIST_WITH_RENAMES # project list
+                                 MKOBJ_FLAG # Force new object
+                                 MKOBJ_FLAG # Return old object
+                                 OPERATOR # child
+
+                MKBSON <- 'mkbson' IDENT
+                                   (IDENT # Old root
+                                    IDENT_LIST # field names
+                                    MKOBJ_DROP_KEEP_FLAG)? # drop or keep
+                                   IDENT_LIST_WITH_RENAMES # project list
+                                   MKOBJ_FLAG # Force new object
+                                   MKOBJ_FLAG # Return old object
+                                   OPERATOR # child
+
                 GROUP <- 'group' IDENT_LIST PROJECT_LIST OPERATOR
                 HJOIN <- 'hj' LEFT RIGHT
                 LEFT <- 'left' IDENT_LIST IDENT_LIST OPERATOR
@@ -281,6 +301,13 @@ std::vector<sbe::value::SortDirection> parseSortDirList(const AstQuery& ast) {
         }
     }
     return dirs;
+}
+
+template <class MkObjType>
+typename MkObjType::FieldBehavior parseFieldBehavior(StringData val) {
+    const auto drop = MkObjType::FieldBehavior::drop;
+    const auto keep = MkObjType::FieldBehavior::keep;
+    return val == "drop" ? drop : keep;
 }
 
 void Parser::walkChildren(AstQuery& ast) {
@@ -879,33 +906,61 @@ void Parser::walkUnwind(AstQuery& ast) {
 }
 
 void Parser::walkMkObj(AstQuery& ast) {
+    using namespace peg::udl;
+    using namespace std::literals;
+
     walkChildren(ast);
 
     std::string newRootName = ast.nodes[0]->identifier;
     std::string oldRootName;
-    std::vector<std::string> restrictFields;
+    std::vector<std::string> fields;
+    size_t dropKeepPos;
 
-    size_t projectListPos;
-    size_t inputPos;
-    if (ast.nodes.size() == 3) {
-        projectListPos = 1;
-        inputPos = 2;
-    } else {
+    size_t projectListPos = 1;
+    size_t forceNewObjPos = 2;
+    size_t retOldObjPos = 3;
+    size_t inputPos = 4;
+
+
+    if (ast.nodes.size() != 5) {
         oldRootName = ast.nodes[1]->identifier;
-        restrictFields = std::move(ast.nodes[2]->identifiers);
-        projectListPos = 3;
-        inputPos = 4;
+        fields = std::move(ast.nodes[2]->identifiers);
+        dropKeepPos = 3;
+        projectListPos = 4;
+        forceNewObjPos = 5;
+        retOldObjPos = 6;
+        inputPos = 7;
     }
 
-    ast.stage = makeS<MakeObjStage>(std::move(ast.nodes[inputPos]->stage),
-                                    lookupSlotStrict(newRootName),
-                                    lookupSlot(oldRootName),
-                                    std::move(restrictFields),
-                                    std::move(ast.nodes[projectListPos]->renames),
-                                    lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
-                                    false,
-                                    true,
-                                    getCurrentPlanNodeId());
+
+    const bool forceNewObj = ast.nodes[forceNewObjPos]->token == "true";
+    const bool retOldObj = ast.nodes[retOldObjPos]->token == "true";
+
+    if (ast.tag == "MKOBJ"_) {
+        ast.stage =
+            makeS<MakeObjStage>(std::move(ast.nodes[inputPos]->stage),
+                                lookupSlotStrict(newRootName),
+                                lookupSlot(oldRootName),
+                                parseFieldBehavior<MakeObjStage>(ast.nodes[dropKeepPos]->token),
+                                std::move(fields),
+                                std::move(ast.nodes[projectListPos]->renames),
+                                lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
+                                forceNewObj,
+                                retOldObj,
+                                getCurrentPlanNodeId());
+    } else {
+        ast.stage = makeS<MakeBsonObjStage>(
+            std::move(ast.nodes[inputPos]->stage),
+            lookupSlotStrict(newRootName),
+            lookupSlot(oldRootName),
+            parseFieldBehavior<MakeBsonObjStage>(ast.nodes[dropKeepPos]->token),
+            std::move(fields),
+            std::move(ast.nodes[projectListPos]->renames),
+            lookupSlots(std::move(ast.nodes[projectListPos]->identifiers)),
+            forceNewObj,
+            retOldObj,
+            getCurrentPlanNodeId());
+    }
 }
 
 void Parser::walkGroup(AstQuery& ast) {
@@ -1316,6 +1371,7 @@ std::unique_ptr<PlanStage> Parser::walkPath(AstQuery& ast,
     stage = makeS<MakeObjStage>(std::move(stage),
                                 outputSlot,
                                 inputSlot,
+                                sbe::MakeObjStage::FieldBehavior::drop,
                                 std::move(fieldRestrictNames),
                                 std::move(fieldNames),
                                 std::move(fieldVars),
@@ -1479,6 +1535,7 @@ void Parser::walk(AstQuery& ast) {
             walkUnwind(ast);
             break;
         case "MKOBJ"_:
+        case "MKBSON"_:
             walkMkObj(ast);
             break;
         case "GROUP"_:

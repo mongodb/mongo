@@ -611,31 +611,19 @@ SlotBasedStageBuilder::buildProjectionSimple(const QuerySolutionNode* root,
     auto childReqs = reqs.copy().set(kResult);
     auto [inputStage, outputs] = build(pn->children[0], childReqs);
 
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
-    sbe::value::SlotVector fieldSlots;
-
-    for (const auto& field : pn->proj.getRequiredFields()) {
-        fieldSlots.push_back(_slotIdGenerator.generate());
-        projections.emplace(
-            fieldSlots.back(),
-            sbe::makeE<sbe::EFunction>("getField"sv,
-                                       sbe::makeEs(sbe::makeE<sbe::EVariable>(outputs.get(kResult)),
-                                                   sbe::makeE<sbe::EConstant>(std::string_view{
-                                                       field.c_str(), field.size()}))));
-    }
+    const auto childResult = outputs.get(kResult);
 
     outputs.set(kResult, _slotIdGenerator.generate());
-    inputStage = sbe::makeS<sbe::MakeObjStage>(sbe::makeS<sbe::ProjectStage>(std::move(inputStage),
-                                                                             std::move(projections),
-                                                                             root->nodeId()),
-                                               outputs.get(kResult),
-                                               boost::none,
-                                               std::vector<std::string>{},
-                                               pn->proj.getRequiredFields(),
-                                               fieldSlots,
-                                               true,
-                                               false,
-                                               root->nodeId());
+    inputStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(inputStage),
+                                                   outputs.get(kResult),
+                                                   childResult,
+                                                   sbe::MakeBsonObjStage::FieldBehavior::keep,
+                                                   pn->proj.getRequiredFields(),
+                                                   std::vector<std::string>{},
+                                                   sbe::value::SlotVector{},
+                                                   true,
+                                                   false,
+                                                   root->nodeId());
 
     return {std::move(inputStage), std::move(outputs)};
 }
@@ -661,7 +649,7 @@ SlotBasedStageBuilder::buildProjectionCovered(const QuerySolutionNode* root,
                                 pn->proj.getRequiredFields().end()};
 
     // The child must produce all of the slots required by the parent of this ProjectionNodeSimple,
-    // except for 'resultSlot' which will be produced by the MakeObjStage below. In addition to
+    // except for 'resultSlot' which will be produced by the MakeBsonObjStage below. In addition to
     // that, the child must produce the index key slots that are needed by this covered projection.
     //
     // pn->coveredKeyObj is the "index.keyPattern" from the child (which is either an IndexScanNode
@@ -690,15 +678,16 @@ SlotBasedStageBuilder::buildProjectionCovered(const QuerySolutionNode* root,
     auto indexKeySlots = *outputs.extractIndexKeySlots();
 
     outputs.set(kResult, _slotIdGenerator.generate());
-    inputStage = sbe::makeS<sbe::MakeObjStage>(std::move(inputStage),
-                                               outputs.get(kResult),
-                                               boost::none,
-                                               std::vector<std::string>{},
-                                               std::move(keyFieldNames),
-                                               std::move(indexKeySlots),
-                                               true,
-                                               false,
-                                               root->nodeId());
+    inputStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(inputStage),
+                                                   outputs.get(kResult),
+                                                   boost::none,
+                                                   boost::none,
+                                                   std::vector<std::string>{},
+                                                   std::move(keyFieldNames),
+                                                   std::move(indexKeySlots),
+                                                   true,
+                                                   false,
+                                                   root->nodeId());
 
     return {std::move(inputStage), std::move(outputs)};
 }
@@ -1066,6 +1055,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto shardKeyObjStage = sbe::makeS<sbe::MakeObjStage>(
         sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projections), root->nodeId()),
         shardKeySlot,
+        boost::none,
         boost::none,
         std::vector<std::string>{},
         projectFields,

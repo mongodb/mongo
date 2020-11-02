@@ -139,6 +139,7 @@ env.CppUnitTest(
         'sbe_key_string_test.cpp',
         'sbe_limit_skip_test.cpp',
         'sbe_math_builtins_test.cpp',
+        'sbe_mkobj_test.cpp',
         'sbe_numeric_convert_test.cpp',
         'sbe_sort_test.cpp',
         'sbe_sorted_merge_test.cpp',

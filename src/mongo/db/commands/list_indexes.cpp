@@ -193,13 +193,14 @@ public:
                 root->pushBack(id);
             }
 
-            exec =
-                uassertStatusOK(plan_executor_factory::make(expCtx,
-                                                            std::move(ws),
-                                                            std::move(root),
-                                                            &CollectionPtr::null,
-                                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
-                                                            nss));
+            exec = uassertStatusOK(
+                plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(root),
+                                            &CollectionPtr::null,
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            false, /* whether returned BSON must be owned */
+                                            nss));
 
             int bytesBuffered = 0;
             for (long long objCount = 0; objCount < batchSize; objCount++) {

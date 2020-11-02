@@ -60,14 +60,16 @@ bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
                                resultSlot,
                                recordIdSlot,
                                &obj,
-                               recordIdSlot ? &recordId : nullptr);
+                               recordIdSlot ? &recordId : nullptr,
+                               true /* must return owned BSON */);
         if (state == PlanState::IS_EOF) {
             candidate->root->close();
             return true;
         }
 
         invariant(state == PlanState::ADVANCED);
-        candidate->results.push({obj.getOwned(), {recordIdSlot != nullptr, recordId}});
+        invariant(obj.isOwned());
+        candidate->results.push({obj, {recordIdSlot != nullptr, recordId}});
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
         candidate->exitedEarly = true;
         return true;

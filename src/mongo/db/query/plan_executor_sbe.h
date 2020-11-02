@@ -46,6 +46,7 @@ public:
                     std::unique_ptr<CanonicalQuery> cq,
                     sbe::CandidatePlans candidates,
                     const CollectionPtr& collection,
+                    bool returnOwnedBson,
                     NamespaceString nss,
                     bool isOpen,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy);
@@ -133,6 +134,7 @@ private:
     OperationContext* _opCtx;
 
     NamespaceString _nss;
+    const bool _mustReturnOwnedBson;
 
     // CompileCtx owns the instance pointed by _env, so we must keep it around.
     sbe::RuntimeEnvironment* _env{nullptr};
@@ -174,5 +176,6 @@ sbe::PlanState fetchNext(sbe::PlanStage* root,
                          sbe::value::SlotAccessor* resultSlot,
                          sbe::value::SlotAccessor* recordIdSlot,
                          BSONObj* out,
-                         RecordId* dlOut);
+                         RecordId* dlOut,
+                         bool returnOwnedBson);
 }  // namespace mongo

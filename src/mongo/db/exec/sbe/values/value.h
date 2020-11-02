@@ -851,12 +851,16 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
         case TypeTags::ObjectId: {
             return makeCopyObjectId(*getObjectIdView(val));
         }
+        case TypeTags::bsonArray:
         case TypeTags::bsonObject: {
             auto bson = getRawPointerView(val);
             auto size = ConstDataView(bson).read<LittleEndian<uint32_t>>();
-            auto dst = new uint8_t[size];
-            memcpy(dst, bson, size);
-            return {TypeTags::bsonObject, reinterpret_cast<Value>(dst)};
+
+            // Owned BSON memory is managed through a UniqueBuffer for compatibility
+            // with the BSONObj/BSONArray class.
+            auto buffer = UniqueBuffer::allocate(size);
+            memcpy(buffer.get(), bson, size);
+            return {tag, reinterpret_cast<Value>(buffer.release())};
         }
         case TypeTags::bsonObjectId: {
             auto bson = getRawPointerView(val);
@@ -864,13 +868,6 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             auto dst = new uint8_t[size];
             memcpy(dst, bson, size);
             return {TypeTags::bsonObjectId, reinterpret_cast<Value>(dst)};
-        }
-        case TypeTags::bsonArray: {
-            auto bson = getRawPointerView(val);
-            auto size = ConstDataView(bson).read<LittleEndian<uint32_t>>();
-            auto dst = new uint8_t[size];
-            memcpy(dst, bson, size);
-            return {TypeTags::bsonArray, reinterpret_cast<Value>(dst)};
         }
         case TypeTags::bsonBinData: {
             auto binData = getRawPointerView(val);
