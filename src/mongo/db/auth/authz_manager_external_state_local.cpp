@@ -102,6 +102,14 @@ void serializeResolvedRoles(BSONObjBuilder* user,
 
     if (data.privileges) {
         BSONArrayBuilder privsBuilder(user->subarrayStart("inheritedPrivileges"));
+        if (roleDoc) {
+            auto privs = roleDoc.get()["privileges"];
+            if (privs) {
+                for (const auto& privilege : privs.Obj()) {
+                    privsBuilder.append(privilege);
+                }
+            }
+        }
         for (const auto& privilege : data.privileges.get()) {
             privsBuilder.append(privilege.toBSON());
         }
@@ -338,7 +346,7 @@ Status AuthzManagerExternalStateLocal::getUserDescription(OperationContext* opCt
         directRoles = filterAndMapRole(&resultBuilder, userDoc, ResolveRoleOption::kAll, false);
     } else {
         // We are able to artifically construct the external user from the request
-        resultBuilder.append("_id", userName.getUser());
+        resultBuilder.append("_id", str::stream() << userName.getDB() << '.' << userName.getUser());
         resultBuilder.append("user", userName.getUser());
         resultBuilder.append("db", userName.getDB());
         resultBuilder.append("credentials", BSON("external" << true));
@@ -542,16 +550,16 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
                         auth::addPrivilegesForBuiltinRole(role, &privs));
 
                 BSONObjBuilder builtinBuilder;
-                builtinBuilder.append("_id",
-                                      str::stream() << role.getDB() << '.' << role.getRole());
                 builtinBuilder.append("db", role.getDB());
                 builtinBuilder.append("role", role.getRole());
                 builtinBuilder.append("roles", BSONArray());
-                BSONArrayBuilder builtinPrivs(builtinBuilder.subarrayStart("privileges"));
-                for (const auto& priv : privs) {
-                    builtinPrivs.append(priv.toBSON());
+                if (showPrivileges == PrivilegeFormat::kShowSeparate) {
+                    BSONArrayBuilder builtinPrivs(builtinBuilder.subarrayStart("privileges"));
+                    for (const auto& priv : privs) {
+                        builtinPrivs.append(priv.toBSON());
+                    }
+                    builtinPrivs.doneFast();
                 }
-                builtinPrivs.doneFast();
 
                 roleDoc = builtinBuilder.obj();
             } else {
@@ -568,6 +576,7 @@ Status AuthzManagerExternalStateLocal::getRolesDescription(
             auto data = uassertStatusOK(resolveRoles(opCtx, subRoles, option));
             data.roles->insert(subRoles.cbegin(), subRoles.cend());
             serializeResolvedRoles(&roleBuilder, data, roleDoc);
+            roleBuilder.append("isBuiltin", auth::isBuiltinRole(role));
 
             result->push_back(roleBuilder.obj());
         } catch (const AssertionException& ex) {
