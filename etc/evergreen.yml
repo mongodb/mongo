@@ -393,7 +393,7 @@ variables:
   - enterprise-rhel-82-arm64
   - enterprise-ubuntu1604-64
   - enterprise-ubuntu1804-64
-  - enterprise-windows-required
+  - enterprise-windows
 
 # List of all variants that use the packages.tgz
 - package_variants: &package_variants
