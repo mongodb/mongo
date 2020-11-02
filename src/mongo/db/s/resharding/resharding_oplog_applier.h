@@ -85,6 +85,12 @@ private:
 
     enum class Stage { kStarted, kErrorOccurred, kReachedCloningTS, kFinished };
 
+    struct RetryableOpsList {
+    public:
+        TxnNumber txnNum{kUninitializedTxnNumber};
+        std::vector<repl::OplogEntry*> ops;
+    };
+
     /**
      * Schedule to collect and apply the next batch of oplog entries.
      */
@@ -99,10 +105,9 @@ private:
     /**
      * Partition the currently buffered oplog entries so they can be applied in parallel.
      */
-    std::vector<std::vector<const repl::OplogEntry*>> _fillWriterVectors(
-        OperationContext* opCtx,
-        OplogBatch* batch,
-        std::vector<std::vector<repl::OplogEntry>>* derivedOps);
+    std::vector<std::vector<const repl::OplogEntry*>> _fillWriterVectors(OperationContext* opCtx,
+                                                                         OplogBatch* batch,
+                                                                         OplogBatch* derivedOps);
 
     /**
      * Apply a slice of oplog entries from the current batch for a worker thread.
@@ -189,6 +194,9 @@ private:
 
     // (R) Buffer for the current batch of oplog entries to apply.
     OplogBatch _currentBatchToApply;
+
+    // (R) Buffer for internally generated oplog entries that needs to be processed for this batch.
+    OplogBatch _currentDerivedOps;
 
     // (R) A temporary scratch pad that contains pointers to oplog entries in _currentBatchToApply
     // that is used by the writer vector when applying oplog in parallel.

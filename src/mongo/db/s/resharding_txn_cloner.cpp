@@ -179,8 +179,8 @@ void configTxnsMergerForResharding(OperationContext* opCtx, BSONObj donorBsonTra
         auto ocs = std::make_unique<MongoDOperationContextSession>(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
-        // Which error code should this be? what message?
         uassert(4989900, "Failed to get transaction Participant", txnParticipant);
+
         try {
             txnParticipant.beginOrContinue(
                 opCtx, donorTransaction.getTxnNum(), boost::none, boost::none);
