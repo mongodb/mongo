@@ -71,7 +71,7 @@ void ClientStrand::_setCurrent() noexcept {
     if (oldThreadName != threadName) {
         _oldThreadName = oldThreadName.toString();
         setThreadName(threadName);
-        LOGV2_DEBUG(4910701, kDiagnosticLogLevel, "Set thread name", "name"_attr = threadName);
+        LOGV2_DEBUG(4910703, kDiagnosticLogLevel, "Set thread name", "name"_attr = threadName);
     }
 }
 

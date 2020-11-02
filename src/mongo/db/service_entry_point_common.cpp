@@ -602,7 +602,7 @@ private:
             return _initiateCommand()
                 .then([this] { return _commandExec(); })
                 .onError([this, anchor = shared_from_this()](Status status) {
-                    return _handleFailure(std::move(status));
+                    _handleFailure(std::move(status));
                 });
         });
     }

@@ -103,6 +103,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/executor/async_request_executor',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',

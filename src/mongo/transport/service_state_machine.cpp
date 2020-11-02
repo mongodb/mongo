@@ -305,12 +305,6 @@ private:
     boost::optional<MessageCompressorId> _compressorId;
     Message _inMessage;
     Message _outMessage;
-
-    // Owns the instance of OperationContext that is used to process ingress requests (i.e.,
-    // `handleRequest`). It also allows delegating destruction of opCtx to another function to
-    // potentially remove its cost from the critical path. This is currently only used in
-    // `processMessage()`.
-    ServiceContext::UniqueOperationContext _opCtx;
 };
 
 Future<void> ServiceStateMachine::Impl::sourceMessage() {
@@ -448,20 +442,24 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
     networkCounter.hitLogicalIn(_inMessage.size());
 
     // Pass sourced Message to handler to generate response.
-    invariant(!_opCtx);
-    _opCtx = Client::getCurrent()->makeOperationContext();
+    auto opCtx = Client::getCurrent()->makeOperationContext();
     if (_inExhaust) {
-        _opCtx->markKillOnClientDisconnect();
+        opCtx->markKillOnClientDisconnect();
     }
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
-    return _sep->handleRequest(_opCtx.get(), _inMessage)
-        .then([this, &compressorMgr = compressorMgr](DbResponse dbresponse) mutable -> void {
+    return _sep->handleRequest(opCtx.get(), _inMessage)
+        .then([this, &compressorMgr = compressorMgr, opCtx = std::move(opCtx)](
+                  DbResponse dbresponse) mutable -> void {
             // opCtx must be killed and delisted here so that the operation cannot show up in
-            // currentOp results after the response reaches the client. The destruction is postponed
-            // for later to mitigate its performance impact on the critical path of execution.
-            _serviceContext->killAndDelistOperation(_opCtx.get(),
+            // currentOp results after the response reaches the client. Destruction of the already
+            // killed opCtx is postponed for later (i.e., after completion of the future-chain) to
+            // mitigate its performance impact on the critical path of execution.
+            // Note that destroying futures after execution, rather that postponing the destruction
+            // until completion of the future-chain, would expose the cost of destroying opCtx to
+            // the critical path and result in serious performance implications.
+            _serviceContext->killAndDelistOperation(opCtx.get(),
                                                     ErrorCodes::OperationIsKilledAndDelisted);
 
             // Format our response, if we have one
@@ -552,11 +550,6 @@ void ServiceStateMachine::Impl::runOnce() {
             return sinkMessage();
         })
         .getAsync([this](Status status) {
-            // Destroy the opCtx (already killed) here, to potentially use the delay between
-            // clients' requests to hide the destruction cost.
-            if (MONGO_likely(_opCtx)) {
-                _opCtx.reset();
-            }
             if (!status.isOK()) {
                 _state.store(State::EndSession);
                 // The service executor failed to schedule the task. This could for example be that
@@ -659,12 +652,6 @@ void ServiceStateMachine::Impl::setCleanupHook(std::function<void()> hook) {
 
 void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
     LOGV2_INFO(5127900, "Ending session", "error"_attr = status);
-
-    // Ensure the delayed destruction of opCtx always happens before doing the cleanup.
-    if (MONGO_likely(_opCtx)) {
-        _opCtx.reset();
-    }
-    invariant(!_opCtx);
 
     cleanupExhaustResources();
 
