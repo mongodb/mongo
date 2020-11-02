@@ -16,6 +16,8 @@
 
 #include "kms_crypto.h"
 
+#ifndef KMS_MESSAGE_ENABLE_CRYPTO
+
 int
 kms_crypto_init ()
 {
@@ -48,3 +50,5 @@ kms_sha256_hmac (void *unused_ctx,
    /* only gets called if hooks were mistakenly not set */
    return false;
 }
+
+#endif /* KMS_MESSAGE_ENABLE_CRYPTO */

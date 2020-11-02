@@ -25,11 +25,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#include <basetsd.h>
-typedef SSIZE_T ssize_t;
-#endif // _WIN32
-
 typedef struct {
    char *str;
    size_t len;

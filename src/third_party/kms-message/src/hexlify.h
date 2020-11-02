@@ -19,5 +19,3 @@
 
 char *
 hexlify (const uint8_t *buf, size_t len);
-uint8_t *
-unhexlify (const char *hex_chars, size_t *len);

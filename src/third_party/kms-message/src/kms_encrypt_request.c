@@ -47,7 +47,7 @@ kms_encrypt_request_new (const uint8_t *plaintext,
    if (!(b64 = malloc (b64_len))) {
       KMS_ERROR (request,
                  "Could not allocate %d bytes for base64-encoding payload",
-                 b64_len);
+                 (int) b64_len);
       goto done;
    }
 

@@ -24,6 +24,8 @@ char *
 hexlify (const uint8_t *buf, size_t len)
 {
    char *hex_chars = malloc (len * 2 + 1);
+   KMS_ASSERT (hex_chars);
+
    char *p = hex_chars;
    size_t i;
 
@@ -34,23 +36,4 @@ hexlify (const uint8_t *buf, size_t len)
    *p = '\0';
 
    return hex_chars;
-}
-
-uint8_t *
-unhexlify (const char *hex_chars, size_t *len)
-{
-   uint8_t *buf;
-   uint8_t *pos;
-
-   *len = strlen (hex_chars) / 2;
-   buf = malloc (*len);
-   pos = buf;
-
-   while (*hex_chars) {
-      KMS_ASSERT (1 == sscanf (hex_chars, "%2hhx", pos));
-      pos++;
-      hex_chars += 2;
-   }
-
-   return buf;
 }
