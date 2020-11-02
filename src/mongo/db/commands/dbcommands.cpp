@@ -85,14 +85,17 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/stats/storage_stats.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/executor/async_request_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/version.h"
@@ -844,6 +847,26 @@ public:
 
 } cmdDBStats;
 
+// Provides the means to asynchronously run `buildinfo` commands.
+class BuildInfoExecutor final : public AsyncRequestExecutor {
+public:
+    BuildInfoExecutor() : AsyncRequestExecutor("BuildInfoExecutor") {}
+
+    Status handleRequest(std::shared_ptr<RequestExecutionContext> rec) {
+        auto result = rec->getReplyBuilder()->getBodyBuilder();
+        VersionInfoInterface::instance().appendBuildInfo(&result);
+        appendStorageEngineList(rec->getOpCtx()->getServiceContext(), &result);
+        return Status::OK();
+    }
+
+    static BuildInfoExecutor* get(ServiceContext* svc);
+};
+
+const auto getBuildInfoExecutor = ServiceContext::declareDecoration<BuildInfoExecutor>();
+BuildInfoExecutor* BuildInfoExecutor::get(ServiceContext* svc) {
+    return const_cast<BuildInfoExecutor*>(&getBuildInfoExecutor(svc));
+}
+
 class CmdBuildInfo : public BasicCommand {
 public:
     CmdBuildInfo() : BasicCommand("buildInfo", "buildinfo") {}
@@ -877,6 +900,11 @@ public:
         VersionInfoInterface::instance().appendBuildInfo(&result);
         appendStorageEngineList(opCtx->getServiceContext(), &result);
         return true;
+    }
+
+    Future<void> runAsync(std::shared_ptr<RequestExecutionContext> rec, std::string) override {
+        auto opCtx = rec->getOpCtx();
+        return BuildInfoExecutor::get(opCtx->getServiceContext())->schedule(std::move(rec));
     }
 
 } cmdBuildInfo;

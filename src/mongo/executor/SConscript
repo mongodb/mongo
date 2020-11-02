@@ -280,6 +280,19 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='async_request_executor',
+    source=[
+        'async_request_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/fail_point',
+    ],
+)
+
 env.CppUnitTest(
     target='executor_test',
     source=[
