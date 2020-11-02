@@ -287,7 +287,8 @@ selector:
   - jstests/core/list_namespaces_invalidation.js
   - jstests/core/list_sessions.js
   - jstests/core/min_max_key.js
-  - jstests/core/mod1.js
+  - jstests/core/mod.js
+  - jstests/core/mod_with_where.js
   - jstests/core/mod_overflow.js
   - jstests/core/mr_correctness.js
   - jstests/core/mr_merge.js
@@ -601,7 +602,8 @@ selector:
   - jstests/core/list_collections_filter.js
   - jstests/core/list_databases.js
   - jstests/core/list_namespaces_invalidation.js
-  - jstests/core/mod1.js
+  - jstests/core/mod.js
+  - jstests/core/mod_with_where.js
   - jstests/core/mod_overflow.js
   - jstests/core/not2.js
   - jstests/core/optimized_match_explain.js

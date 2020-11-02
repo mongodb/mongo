@@ -880,6 +880,14 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinFloor(ArityType
     return genericFloor(tagOperand, valOperand);
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrunc(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [_, tagOperand, valOperand] = getFromStack(0);
+
+    return genericTrunc(tagOperand, valOperand);
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinExp(ArityType arity) {
     invariant(arity == 1);
 
@@ -1959,6 +1967,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinCeil(arity);
         case Builtin::floor:
             return builtinFloor(arity);
+        case Builtin::trunc:
+            return builtinTrunc(arity);
         case Builtin::exp:
             return builtinExp(arity);
         case Builtin::ln:

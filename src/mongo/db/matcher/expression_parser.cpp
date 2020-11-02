@@ -524,8 +524,8 @@ StatusWithMatchExpression parseMOD(StringData name,
 
     return {std::make_unique<ModMatchExpression>(
         name,
-        divisor.numberInt(),
-        remainder.numberInt(),
+        ModMatchExpression::truncateToLong(divisor),
+        ModMatchExpression::truncateToLong(remainder),
         doc_validation_error::createAnnotation(
             expCtx, elem.fieldNameStringData().toString(), BSON(name << elem.wrap())))};
 }

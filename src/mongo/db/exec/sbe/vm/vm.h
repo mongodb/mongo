@@ -192,6 +192,7 @@ enum class Builtin : uint8_t {
     abs,         // absolute value
     ceil,
     floor,
+    trunc,
     exp,
     ln,
     log10,
@@ -391,6 +392,8 @@ private:
                                                                 value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericFloor(value::TypeTags operandTag,
                                                                  value::Value operandValue);
+    std::tuple<bool, value::TypeTags, value::Value> genericTrunc(value::TypeTags operandTag,
+                                                                 value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericExp(value::TypeTags operandTag,
                                                                value::Value operandValue);
     std::tuple<bool, value::TypeTags, value::Value> genericLn(value::TypeTags operandTag,
@@ -540,6 +543,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinAbs(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCeil(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinFloor(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinTrunc(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinExp(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinLn(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinLog10(ArityType arity);

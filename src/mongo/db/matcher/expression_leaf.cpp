@@ -298,8 +298,8 @@ void RegexMatchExpression::shortDebugString(StringBuilder& debug) const {
 // ---------
 
 ModMatchExpression::ModMatchExpression(StringData path,
-                                       int divisor,
-                                       int remainder,
+                                       long long divisor,
+                                       long long remainder,
                                        clonable_ptr<ErrorAnnotation> annotation)
     : LeafMatchExpression(MOD, path, std::move(annotation)),
       _divisor(divisor),
@@ -310,7 +310,7 @@ ModMatchExpression::ModMatchExpression(StringData path,
 bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (!e.isNumber())
         return false;
-    return overflow::safeMod(e.numberLong(), static_cast<long long>(_divisor)) == _remainder;
+    return overflow::safeMod(truncateToLong(e), _divisor) == _remainder;
 }
 
 void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {

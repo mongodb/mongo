@@ -1152,11 +1152,16 @@ public:
         // to the given remainder.
         auto makePredicate = [expr](sbe::value::SlotId inputSlot,
                                     EvalStage inputStage) -> EvalExprStagePair {
+            auto truncatedArgument = sbe::makeE<sbe::ENumericConvert>(
+                sbe::makeE<sbe::EFunction>("trunc",
+                                           sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
+                sbe::value::TypeTags::NumberInt64);
+
             return {makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(
                         sbe::EPrimBinary::eq,
                         sbe::makeE<sbe::EFunction>(
                             "mod",
-                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
+                            sbe::makeEs(std::move(truncatedArgument),
                                         sbe::makeE<sbe::EConstant>(
                                             sbe::value::TypeTags::NumberInt64,
                                             sbe::value::bitcastFrom<int64_t>(expr->getDivisor())))),

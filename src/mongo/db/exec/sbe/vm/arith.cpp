@@ -620,10 +620,12 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericCeil(value::Typ
                 auto [tag, value] = value::makeCopyDecimal(result);
                 return {true, tag, value};
             }
-            default: {
+            case value::TypeTags::NumberInt32:
+            case value::TypeTags::NumberInt64:
                 // Ceil on integer values is the identity function.
                 return {false, operandTag, operandValue};
-            }
+            default:
+                MONGO_UNREACHABLE;
         }
     }
 
@@ -645,14 +647,45 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericFloor(value::Ty
                 auto [tag, value] = value::makeCopyDecimal(result);
                 return {true, tag, value};
             }
-            default: {
+            case value::TypeTags::NumberInt32:
+            case value::TypeTags::NumberInt64:
                 // Floor on integer values is the identity function.
                 return {false, operandTag, operandValue};
-            }
+            default:
+                MONGO_UNREACHABLE;
         }
     }
 
     return {false, value::TypeTags::Nothing, 0};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericTrunc(value::TypeTags operandTag,
+                                                                       value::Value operandValue) {
+    if (!isNumber(operandTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    switch (operandTag) {
+        case value::TypeTags::NumberDouble: {
+            auto truncatedValue = std::trunc(value::bitcastTo<double>(operandValue));
+            return {
+                false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(truncatedValue)};
+        }
+        case value::TypeTags::NumberDecimal: {
+            auto value = value::bitcastTo<Decimal128>(operandValue);
+            if (!value.isNaN() && value.isFinite()) {
+                value = value.quantize(Decimal128::kNormalizedZero, Decimal128::kRoundTowardZero);
+            }
+            auto [resultTag, resultValue] = value::makeCopyDecimal(value);
+            return {true, resultTag, resultValue};
+        }
+        case value::TypeTags::NumberInt32:
+        case value::TypeTags::NumberInt64:
+            // Trunc on integer values is the identity function.
+            return {false, operandTag, operandValue};
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::genericExp(value::TypeTags operandTag,

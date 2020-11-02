@@ -1,39 +1,94 @@
 // Tests the behavior of $mod for match expressions.
-// @tags: [
-//   assumes_balancer_off,
-//   # Uses $where operator
-//   requires_scripting,
-//   sbe_incompatible,
-// ]
 
 (function() {
 "use strict";
 
-const coll = db.mod1;
+const coll = db.mod;
 coll.drop();
 
-assert.commandWorked(coll.insert([{a: 1}, {a: 2}, {a: 11}, {a: 20}, {a: "asd"}, {a: "adasdas"}]));
+function assertDocumentsFromMod(divider, remainder, expectedDocuments) {
+    const actualDocuments = coll.find({a: {$mod: [divider, remainder]}}).sort({_id: 1}).toArray();
+    assert.eq(expectedDocuments, actualDocuments);
+}
 
-// Check basic mod usage.
-assert.eq(2, coll.find("this.a % 10 == 1").itcount(), "A1");
-assert.eq(2, coll.find({a: {$mod: [10, 1]}}).itcount(), "A2");
-assert.eq(
-    0,
-    coll.find({a: {$mod: [10, 1]}}).explain("executionStats").executionStats.totalKeysExamined,
-    "A3");
+// Check mod with divisor and remainder which do not fit into int type.
+assert.commandWorked(coll.insert([
+    {_id: 1, a: 4000000000},
+    {_id: 2, a: 15000000000},
+    {_id: 3, a: -4000000000},
+    {_id: 4, a: -15000000000},
+    {_id: 5, a: 4000000000.12345},
+    {_id: 6, a: 15000000000.12345},
+    {_id: 7, a: -4000000000.12345},
+    {_id: 8, a: -15000000000.12345},
+    {_id: 9, a: NumberDecimal(4000000000.12345)},
+    {_id: 10, a: NumberDecimal(15000000000.12345)},
+    {_id: 11, a: NumberDecimal(-4000000000.12345)},
+    {_id: 12, a: NumberDecimal(-15000000000.12345)},
+]));
 
-assert.commandWorked(coll.createIndex({a: 1}));
+assertDocumentsFromMod(4000000000, 0, [
+    {_id: 1, a: 4000000000},
+    {_id: 3, a: -4000000000},
+    {_id: 5, a: 4000000000.12345},
+    {_id: 7, a: -4000000000.12345},
+    {_id: 9, a: NumberDecimal(4000000000.12345)},
+    {_id: 11, a: NumberDecimal(-4000000000.12345)},
+]);
 
-// Check mod with an index.
-assert.eq(2, coll.find("this.a % 10 == 1").itcount(), "B1");
-assert.eq(2, coll.find({a: {$mod: [10, 1]}}).itcount(), "B2");
-assert.eq(1, coll.find("this.a % 10 == 0").itcount(), "B3");
-assert.eq(1, coll.find({a: {$mod: [10, 0]}}).itcount(), "B4");
-assert.eq(
-    4,
-    coll.find({a: {$mod: [10, 1]}}).explain("executionStats").executionStats.totalKeysExamined,
-    "B5");
-assert.eq(1, coll.find({a: {$gt: 5, $mod: [10, 1]}}).itcount());
+assertDocumentsFromMod(-4000000000, 0, [
+    {_id: 1, a: 4000000000},
+    {_id: 3, a: -4000000000},
+    {_id: 5, a: 4000000000.12345},
+    {_id: 7, a: -4000000000.12345},
+    {_id: 9, a: NumberDecimal(4000000000.12345)},
+    {_id: 11, a: NumberDecimal(-4000000000.12345)},
+]);
+
+assertDocumentsFromMod(10000000000, 5000000000, [
+    {_id: 2, a: 15000000000},
+    {_id: 6, a: 15000000000.12345},
+    {_id: 10, a: NumberDecimal(15000000000.12345)},
+]);
+
+assertDocumentsFromMod(10000000000, -5000000000, [
+    {_id: 4, a: -15000000000},
+    {_id: 8, a: -15000000000.12345},
+    {_id: 12, a: NumberDecimal(-15000000000.12345)},
+]);
+
+assertDocumentsFromMod(-10000000000, 5000000000, [
+    {_id: 2, a: 15000000000},
+    {_id: 6, a: 15000000000.12345},
+    {_id: 10, a: NumberDecimal(15000000000.12345)},
+]);
+
+assertDocumentsFromMod(-10000000000, -5000000000, [
+    {_id: 4, a: -15000000000},
+    {_id: 8, a: -15000000000.12345},
+    {_id: 12, a: NumberDecimal(-15000000000.12345)},
+]);
+
+assert(coll.drop());
+
+// Check truncation of input argument for mod operator.
+assert.commandWorked(coll.insert([
+    {_id: 1, a: 4.2},
+    {_id: 2, a: 4.5},
+    {_id: 3, a: 4.7},
+    {_id: 4, a: NumberDecimal(4.2)},
+    {_id: 5, a: NumberDecimal(4.5)},
+    {_id: 6, a: NumberDecimal(4.7)},
+]));
+
+assertDocumentsFromMod(4, 0, [
+    {_id: 1, a: 4.2},
+    {_id: 2, a: 4.5},
+    {_id: 3, a: 4.7},
+    {_id: 4, a: NumberDecimal(4.2)},
+    {_id: 5, a: NumberDecimal(4.5)},
+    {_id: 6, a: NumberDecimal(4.7)},
+]);
 
 assert(coll.drop());
 
@@ -83,10 +138,6 @@ assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$
                              ErrorCodes.BadValue);
 assert.commandFailedWithCode(db.runCommand({find: coll.getName(), filter: {a: {$mod: [0, 0]}}}),
                              ErrorCodes.BadValue);
-assert.commandFailedWithCode(
-    db.runCommand(
-        {find: coll.getName(), filter: {a: {$mod: [NumberLong(-9223372036854775808), 0]}}}),
-    ErrorCodes.BadValue);
 
 // Check failures with different data types.
 assert.commandFailedWithCode(

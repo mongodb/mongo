@@ -459,8 +459,8 @@ private:
 class ModMatchExpression : public LeafMatchExpression {
 public:
     ModMatchExpression(StringData path,
-                       int divisor,
-                       int remainder,
+                       long long divisor,
+                       long long remainder,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
@@ -480,10 +480,10 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    int getDivisor() const {
+    long long getDivisor() const {
         return _divisor;
     }
-    int getRemainder() const {
+    long long getRemainder() const {
         return _remainder;
     }
 
@@ -495,13 +495,20 @@ public:
         visitor->visit(this);
     }
 
+    static long long truncateToLong(const BSONElement& element) {
+        if (element.type() == BSONType::NumberDecimal) {
+            return element.numberDecimal().toLong(Decimal128::kRoundTowardZero);
+        }
+        return element.numberLong();
+    }
+
 private:
     ExpressionOptimizerFunc getOptimizer() const final {
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
     }
 
-    int _divisor;
-    int _remainder;
+    long long _divisor;
+    long long _remainder;
 };
 
 class ExistsMatchExpression : public LeafMatchExpression {
