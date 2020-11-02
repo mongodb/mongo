@@ -29,6 +29,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 
+#include <memory>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/service_entry_point_mongos.h"
@@ -40,12 +42,12 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/request_execution_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/cluster_last_error_info.h"
 #include "mongo/s/commands/strategy.h"
-#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -60,16 +62,50 @@ BSONObj buildErrReply(const DBException& ex) {
 
 }  // namespace
 
+// Allows for decomposing `handleRequest` into parts and simplifies composing the future-chain.
+struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
+    struct OpRunnerBase;
 
-Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
-                                                          const Message& message) noexcept try {
-    const int32_t msgId = message.header().getId();
-    const NetworkOp op = message.operation();
+    HandleRequest(OperationContext* opCtx, const Message& message)
+        : rec(std::make_shared<RequestExecutionContext>(opCtx, message)),
+          op(message.operation()),
+          msgId(message.header().getId()),
+          nsString(getNamespaceString(rec->getDbMessage())) {}
+
+    // Prepares the environment for handling the request (e.g., setting up `ClusterLastErrorInfo`).
+    void setupEnvironment();
+
+    // Returns a future that does the heavy lifting of running client commands.
+    Future<DbResponse> handleRequest();
+
+    // Runs on successful execution of the future returned by `handleRequest`.
+    void onSuccess(const DbResponse&);
+
+    // Returns a future-chain to handle the request and prepare the response.
+    Future<DbResponse> run();
+
+    static NamespaceString getNamespaceString(const DbMessage& dbmsg) {
+        if (!dbmsg.messageShouldHaveNs())
+            return {};
+        return NamespaceString(dbmsg.getns());
+    }
+
+    const std::shared_ptr<RequestExecutionContext> rec;
+    const NetworkOp op;
+    const int32_t msgId;
+    const NamespaceString nsString;
+
+    boost::optional<long long> slowMsOverride;
+};
+
+void HandleRequest::setupEnvironment() {
+    using namespace fmt::literals;
+    auto opCtx = rec->getOpCtx();
 
     // This exception will not be returned to the caller, but will be logged and will close the
     // connection
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Message type " << op << " is not supported.",
+            "Message type {} is not supported."_format(op),
             isSupportedRequestNetworkOp(op) &&
                 op != dbCompressed);  // Decompression should be handled above us.
 
@@ -84,116 +120,175 @@ Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCt
     AuthorizationSession::get(opCtx->getClient())->startRequest(opCtx);
 
     CurOp::get(opCtx)->ensureStarted();
+}
 
-    DbMessage dbm(message);
+// The base for various operation runners that handle the request, and often generate a DbResponse.
+struct HandleRequest::OpRunnerBase {
+    explicit OpRunnerBase(std::shared_ptr<HandleRequest> hr) : hr(std::move(hr)) {}
+    virtual ~OpRunnerBase() = default;
+    virtual Future<DbResponse> run() = 0;
+    const std::shared_ptr<HandleRequest> hr;
+};
 
-    // This is before the try block since it handles all exceptions that should not cause the
-    // connection to close.
-    if (op == dbMsg || (op == dbQuery && NamespaceString(dbm.getns()).isCommand())) {
-        auto dbResponse = Strategy::clientCommand(opCtx, message);
+struct CommandOpRunner final : public HandleRequest::OpRunnerBase {
+    using HandleRequest::OpRunnerBase::OpRunnerBase;
+    Future<DbResponse> run() override {
+        return Strategy::clientCommand(hr->rec).tap([hr = hr](const DbResponse&) {
+            // The hello/isMaster commands should take kMaxAwaitTimeMs at most, log if it takes
+            // twice that.
+            if (auto command = CurOp::get(hr->rec->getOpCtx())->getCommand();
+                command && (command->getName() == "hello" || command->getName() == "isMaster")) {
+                hr->slowMsOverride =
+                    2 * durationCount<Milliseconds>(SingleServerDiscoveryMonitor::kMaxAwaitTime);
+            }
+        });
+    }
+};
 
-        // The hello/isMaster commands should take kMaxAwaitTimeMs at most, log if it takes twice
-        // that.
-        boost::optional<long long> slowMsOverride;
-        if (auto command = CurOp::get(opCtx)->getCommand();
-            command && (command->getName() == "hello" || command->getName() == "isMaster")) {
-            slowMsOverride =
-                2 * durationCount<Milliseconds>(SingleServerDiscoveryMonitor::kMaxAwaitTime);
-        }
+// The base for operations that may throw exceptions, but should not cause the connection to close.
+struct OpRunner : public HandleRequest::OpRunnerBase {
+    using HandleRequest::OpRunnerBase::OpRunnerBase;
+    virtual DbResponse runOperation() = 0;
+    Future<DbResponse> run() override;
+};
 
-        // Mark the op as complete, populate the response length, and log it if appropriate.
-        CurOp::get(opCtx)->completeAndLogOperation(
-            opCtx, logv2::LogComponent::kCommand, dbResponse.response.size(), slowMsOverride);
+Future<DbResponse> OpRunner::run() try {
+    using namespace fmt::literals;
+    const NamespaceString& nss = hr->nsString;
+    const DbMessage& dbm = hr->rec->getDbMessage();
 
-        return Future<DbResponse>::makeReady(std::move(dbResponse));
+    if (dbm.messageShouldHaveNs()) {
+        uassert(ErrorCodes::InvalidNamespace, "Invalid ns [{}]"_format(nss.ns()), nss.isValid());
+
+        uassert(ErrorCodes::IllegalOperation,
+                "Can't use 'local' database through mongos",
+                nss.db() != NamespaceString::kLocalDb);
     }
 
-    NamespaceString nss;
-    DbResponse dbResponse;
-    try {
-        if (dbm.messageShouldHaveNs()) {
-            nss = NamespaceString(StringData(dbm.getns()));
+    LOGV2_DEBUG(22867,
+                3,
+                "Request::process begin ns: {namespace} msg id: {msgId} op: {operation}",
+                "Starting operation",
+                "namespace"_attr = nss,
+                "msgId"_attr = hr->msgId,
+                "operation"_attr = networkOpToString(hr->op));
 
-            uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid ns [" << nss.ns() << "]",
-                    nss.isValid());
+    auto dbResponse = runOperation();
 
-            uassert(ErrorCodes::IllegalOperation,
-                    "Can't use 'local' database through mongos",
-                    nss.db() != NamespaceString::kLocalDb);
-        }
-
-
-        LOGV2_DEBUG(22867,
-                    3,
-                    "Request::process begin ns: {namespace} msg id: {msgId} op: {operation}",
-                    "Starting operation",
-                    "namespace"_attr = nss,
-                    "msgId"_attr = msgId,
-                    "operation"_attr = networkOpToString(op));
-
-        switch (op) {
-            case dbQuery:
-                // Commands are handled above through Strategy::clientCommand().
-                invariant(!nss.isCommand());
-                opCtx->markKillOnClientDisconnect();
-                dbResponse = Strategy::queryOp(opCtx, nss, &dbm);
-                break;
-
-            case dbGetMore:
-                dbResponse = Strategy::getMore(opCtx, nss, &dbm);
-                break;
-
-            case dbKillCursors:
-                Strategy::killCursors(opCtx, &dbm);  // No Response.
-                break;
-
-            case dbInsert:
-            case dbUpdate:
-            case dbDelete:
-                Strategy::writeOp(opCtx, &dbm);  // No Response.
-                break;
-
-            default:
-                MONGO_UNREACHABLE;
-        }
-
-        LOGV2_DEBUG(22868,
-                    3,
-                    "Request::process end ns: {namespace} msg id: {msgId} op: {operation}",
-                    "Done processing operation",
-                    "namespace"_attr = nss,
-                    "msgId"_attr = msgId,
-                    "operation"_attr = networkOpToString(op));
-
-    } catch (const DBException& ex) {
-        LOGV2_DEBUG(22869,
-                    1,
-                    "Exception thrown while processing {operation} op for {namespace}: {error}",
-                    "Got an error while processing operation",
-                    "operation"_attr = networkOpToString(op),
-                    "namespace"_attr = nss.ns(),
-                    "error"_attr = ex);
-
-        if (op == dbQuery || op == dbGetMore) {
-            dbResponse = replyToQuery(buildErrReply(ex), ResultFlag_ErrSet);
-        } else {
-            // No Response.
-        }
-
-        // We *always* populate the last error for now
-        LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.what());
-        CurOp::get(opCtx)->debug().errInfo = ex.toStatus();
-    }
-
-    // Mark the op as complete, populate the response length, and log it if appropriate.
-    CurOp::get(opCtx)->completeAndLogOperation(
-        opCtx, logv2::LogComponent::kCommand, dbResponse.response.size());
+    LOGV2_DEBUG(22868,
+                3,
+                "Request::process end ns: {namespace} msg id: {msgId} op: {operation}",
+                "Done processing operation",
+                "namespace"_attr = nss,
+                "msgId"_attr = hr->msgId,
+                "operation"_attr = networkOpToString(hr->op));
 
     return Future<DbResponse>::makeReady(std::move(dbResponse));
-} catch (const DBException& e) {
-    LOGV2(4879803, "Failed to handle request", "error"_attr = redact(e));
-    return e.toStatus();
+} catch (const DBException& ex) {
+    LOGV2_DEBUG(22869,
+                1,
+                "Exception thrown while processing {operation} op for {namespace}: {error}",
+                "Got an error while processing operation",
+                "operation"_attr = networkOpToString(hr->op),
+                "namespace"_attr = hr->nsString.ns(),
+                "error"_attr = ex);
+
+    DbResponse dbResponse;
+    if (hr->op == dbQuery || hr->op == dbGetMore) {
+        dbResponse = replyToQuery(buildErrReply(ex), ResultFlag_ErrSet);
+    } else {
+        // No Response.
+    }
+
+    // We *always* populate the last error for now
+    auto opCtx = hr->rec->getOpCtx();
+    LastError::get(opCtx->getClient()).setLastError(ex.code(), ex.what());
+
+    CurOp::get(opCtx)->debug().errInfo = ex.toStatus();
+
+    return Future<DbResponse>::makeReady(std::move(dbResponse));
+}
+
+struct QueryOpRunner final : public OpRunner {
+    using OpRunner::OpRunner;
+    DbResponse runOperation() override {
+        // Commands are handled through CommandOpRunner and Strategy::clientCommand().
+        invariant(!hr->nsString.isCommand());
+        hr->rec->getOpCtx()->markKillOnClientDisconnect();
+        return Strategy::queryOp(hr->rec->getOpCtx(), hr->nsString, &hr->rec->getDbMessage());
+    }
+};
+
+struct GetMoreOpRunner final : public OpRunner {
+    using OpRunner::OpRunner;
+    DbResponse runOperation() override {
+        return Strategy::getMore(hr->rec->getOpCtx(), hr->nsString, &hr->rec->getDbMessage());
+    }
+};
+
+struct KillCursorsOpRunner final : public OpRunner {
+    using OpRunner::OpRunner;
+    DbResponse runOperation() override {
+        Strategy::killCursors(hr->rec->getOpCtx(), &hr->rec->getDbMessage());  // No Response.
+        return {};
+    }
+};
+
+struct WriteOpRunner final : public OpRunner {
+    using OpRunner::OpRunner;
+    DbResponse runOperation() override {
+        Strategy::writeOp(hr->rec);  // No Response.
+        return {};
+    }
+};
+
+Future<DbResponse> HandleRequest::handleRequest() {
+    switch (op) {
+        case dbQuery:
+            if (!nsString.isCommand())
+                return std::make_unique<QueryOpRunner>(shared_from_this())->run();
+        // FALLTHROUGH: it's a query containing a command
+        case dbMsg:
+            return std::make_unique<CommandOpRunner>(shared_from_this())->run();
+        case dbGetMore:
+            return std::make_unique<GetMoreOpRunner>(shared_from_this())->run();
+        case dbKillCursors:
+            return std::make_unique<KillCursorsOpRunner>(shared_from_this())->run();
+        case dbInsert:
+        case dbUpdate:
+        case dbDelete:
+            return std::make_unique<WriteOpRunner>(shared_from_this())->run();
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void HandleRequest::onSuccess(const DbResponse& dbResponse) {
+    auto opCtx = rec->getOpCtx();
+    // Mark the op as complete, populate the response length, and log it if appropriate.
+    CurOp::get(opCtx)->completeAndLogOperation(
+        opCtx, logv2::LogComponent::kCommand, dbResponse.response.size(), slowMsOverride);
+}
+
+Future<DbResponse> HandleRequest::run() {
+    auto fp = makePromiseFuture<void>();
+    auto future = std::move(fp.future)
+                      .then([this, anchor = shared_from_this()] { setupEnvironment(); })
+                      .then([this, anchor = shared_from_this()] { return handleRequest(); })
+                      .tap([this, anchor = shared_from_this()](const DbResponse& dbResponse) {
+                          onSuccess(dbResponse);
+                      })
+                      .tapError([](Status status) {
+                          LOGV2(4879803, "Failed to handle request", "error"_attr = redact(status));
+                      });
+    fp.promise.emplaceValue();
+    return future;
+}
+
+Future<DbResponse> ServiceEntryPointMongos::handleRequest(OperationContext* opCtx,
+                                                          const Message& message) noexcept {
+    auto hr = std::make_shared<HandleRequest>(opCtx, message);
+    return hr->run();
 }
 
 }  // namespace mongo

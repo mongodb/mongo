@@ -141,10 +141,7 @@ struct HandleRequest {
         ExecutionContext(OperationContext* opCtx,
                          Message msg,
                          std::unique_ptr<const ServiceEntryPointCommon::Hooks> hooks)
-            : RequestExecutionContext(opCtx), behaviors(std::move(hooks)) {
-            // It also initializes dbMessage, which is accessible via getDbMessage()
-            setMessage(std::move(msg));
-        }
+            : RequestExecutionContext(opCtx, std::move(msg)), behaviors(std::move(hooks)) {}
         ~ExecutionContext() = default;
 
         Client& client() const {

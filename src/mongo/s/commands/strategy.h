@@ -33,6 +33,7 @@
 
 #include "mongo/client/connection_string.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/request_execution_context.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {
@@ -74,7 +75,7 @@ public:
      * with the result from the operation. Doesn't send any response back and does not throw on
      * errors.
      */
-    static void writeOp(OperationContext* opCtx, DbMessage* dbm);
+    static void writeOp(std::shared_ptr<RequestExecutionContext> rec);
 
     /**
      * Executes a command from either OP_QUERY or OP_MSG wire protocols.
@@ -82,7 +83,7 @@ public:
      * Catches StaleConfigException errors and retries the command automatically after refreshing
      * the metadata for the failing namespace.
      */
-    static DbResponse clientCommand(OperationContext* opCtx, const Message& message);
+    static Future<DbResponse> clientCommand(std::shared_ptr<RequestExecutionContext> rec);
 
     /**
      * Helper to run an explain of a find operation on the shards. Fills 'out' with the result of
