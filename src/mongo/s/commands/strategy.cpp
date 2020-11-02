@@ -1028,7 +1028,9 @@ DbResponse Strategy::queryOp(OperationContext* opCtx, const NamespaceString& nss
                                          cursorId)};
 }
 
-DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
+Future<DbResponse> Strategy::clientCommand(std::shared_ptr<RequestExecutionContext> rec) try {
+    auto opCtx = rec->getOpCtx();
+    const Message& m = rec->getMessage();
     auto reply = rpc::makeReplyBuilder(rpc::protocolForMessage(m));
     BSONObjBuilder errorBuilder;
 
@@ -1098,7 +1100,7 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
     }
 
     if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
-        return {};  // Don't reply.
+        return DbResponse{};  // Don't reply.
     }
 
     DbResponse dbResponse;
@@ -1112,6 +1114,8 @@ DbResponse Strategy::clientCommand(OperationContext* opCtx, const Message& m) {
     dbResponse.response = reply->done();
 
     return dbResponse;
+} catch (const DBException& e) {
+    return e.toStatus();
 }
 
 DbResponse Strategy::getMore(OperationContext* opCtx, const NamespaceString& nss, DbMessage* dbm) {

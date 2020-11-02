@@ -57,22 +57,21 @@ public:
     RequestExecutionContext(const RequestExecutionContext&) = delete;
     RequestExecutionContext(RequestExecutionContext&&) = delete;
 
-    explicit RequestExecutionContext(OperationContext* opCtx) : _opCtx(opCtx) {}
+    RequestExecutionContext(OperationContext* opCtx, Message message)
+        : _opCtx(opCtx),
+          _message(std::move(message)),
+          _dbmsg(std::make_unique<DbMessage>(_message.get())) {}
 
     auto getOpCtx() const {
         invariant(_isOnClientThread());
         return _opCtx;
     }
 
-    void setMessage(Message message) {
-        invariant(_isOnClientThread() && !_message);
-        _message = std::move(message);
-        _dbmsg = std::make_unique<DbMessage>(_message.get());
-    }
     const Message& getMessage() const {
         invariant(_isOnClientThread() && _message);
         return _message.get();
     }
+
     DbMessage& getDbMessage() const {
         invariant(_isOnClientThread() && _dbmsg);
         return *_dbmsg.get();
