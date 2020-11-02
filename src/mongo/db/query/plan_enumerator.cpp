@@ -42,10 +42,10 @@
 namespace {
 
 using namespace mongo;
+using std::unique_ptr;
 using std::endl;
 using std::set;
 using std::string;
-using std::unique_ptr;
 using std::vector;
 
 std::string getPathPrefix(std::string path) {
@@ -259,7 +259,6 @@ PlanEnumerator::PlanEnumerator(const PlanEnumeratorParams& params)
     : _root(params.root),
       _indices(params.indices),
       _ixisect(params.intersect),
-      _enumerateOrChildrenLockstep(params.enumerateOrChildrenLockstep),
       _orLimit(params.maxSolutionsPerOr),
       _intersectLimit(params.maxIntersectPerAnd) {}
 
@@ -320,7 +319,8 @@ string PlanEnumerator::NodeAssignment::toString() const {
         }
         ss << "]";
         return ss;
-    } else if (nullptr != orAssignment) {
+    } else {
+        verify(NULL != orAssignment);
         mongoutils::str::stream ss;
         ss << "ALL OF: [ ";
         for (size_t i = 0; i < orAssignment->subnodes.size(); ++i) {
@@ -328,26 +328,7 @@ string PlanEnumerator::NodeAssignment::toString() const {
         }
         ss << "]";
         return ss;
-    } else if (nullptr != lockstepOrAssignment) {
-        mongoutils::str::stream ss;
-        ss << "ALL OF (lockstep): {";
-        ss << "\n\ttotalEnumerated: " << lockstepOrAssignment->totalEnumerated;
-        ss << "\n\tsubnodes: [ ";
-        for (auto&& node : lockstepOrAssignment->subnodes) {
-            ss << "\n\t\t{";
-            ss << "memoId: " << node.memoId << ", ";
-            ss << "iterationCount: " << node.iterationCount << ", ";
-            if (node.maxIterCount) {
-                ss << "maxIterCount: " << node.maxIterCount;
-            } else {
-                ss << "maxIterCount: none";
-            }
-            ss << "},";
-        }
-        ss << "\n]";
-        return ss;
     }
-    MONGO_UNREACHABLE;
 }
 
 PlanEnumerator::MemoID PlanEnumerator::memoIDForNode(MatchExpression* node) {
@@ -440,19 +421,11 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         NodeAssignment* assign;
         allocateAssignment(node, &assign, &myMemoID);
 
-        if (_enumerateOrChildrenLockstep) {
-            LockstepOrAssignment* newOrAssign = new LockstepOrAssignment();
-            for (size_t i = 0; i < node->numChildren(); ++i) {
-                newOrAssign->subnodes.push_back({memoIDForNode(node->getChild(i)), 0, boost::none});
-            }
-            assign->lockstepOrAssignment.reset(newOrAssign);
-        } else {
-            OrAssignment* orAssignment = new OrAssignment();
-            for (size_t i = 0; i < node->numChildren(); ++i) {
-                orAssignment->subnodes.push_back(memoIDForNode(node->getChild(i)));
-            }
-            assign->orAssignment.reset(orAssignment);
+        OrAssignment* orAssignment = new OrAssignment();
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            orAssignment->subnodes.push_back(memoIDForNode(node->getChild(i)));
         }
+        assign->orAssignment.reset(orAssignment);
         return true;
     } else if (Indexability::arrayUsesIndexOnChildren(node)) {
         // Add each of our children as a subnode.  We enumerate through each subnode one at a
@@ -1599,12 +1572,7 @@ void PlanEnumerator::tagMemo(size_t id) {
         for (size_t i = 0; i < oa->subnodes.size(); ++i) {
             tagMemo(oa->subnodes[i]);
         }
-    } else if (nullptr != assign->lockstepOrAssignment) {
-        LockstepOrAssignment* oa = assign->lockstepOrAssignment.get();
-        for (auto&& node : oa->subnodes) {
-            tagMemo(node.memoId);
-        }
-    } else if (nullptr != assign->arrayAssignment) {
+    } else if (NULL != assign->arrayAssignment) {
         ArrayAssignment* aa = assign->arrayAssignment.get();
         tagMemo(aa->subnodes[aa->counter]);
     } else if (NULL != assign->andAssignment) {
@@ -1647,117 +1615,6 @@ void PlanEnumerator::tagMemo(size_t id) {
     }
 }
 
-bool PlanEnumerator::LockstepOrAssignment::allIdentical() const {
-    const auto firstCounter = subnodes[0].iterationCount;
-    for (auto&& subnode : subnodes) {
-        if (subnode.iterationCount != firstCounter) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool PlanEnumerator::LockstepOrAssignment::shouldResetBeforeProceeding(
-    size_t totalEnumerated) const {
-    if (totalEnumerated == 0 || !exhaustedLockstepIteration) {
-        return false;
-    }
-
-    size_t totalPossibleEnumerations = 1;
-    for (auto&& subnode : subnodes) {
-        if (!subnode.maxIterCount) {
-            return false;  // Haven't yet looped over this child entirely, not ready yet.
-        }
-        totalPossibleEnumerations *= subnode.maxIterCount.get();
-    }
-
-    // If we're able to compute a total number expected enumerations, we must have already cycled
-    // through each of the subnodes at least once. So if we've done that and then iterated all
-    // possible enumerations, we're about to repeat ourselves.
-    return totalEnumerated % totalPossibleEnumerations == 0;
-}
-
-bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
-    PlanEnumerator::LockstepOrAssignment* assignment) {
-
-    if (!assignment->exhaustedLockstepIteration) {
-        // We have not yet finished advancing all children simultaneously, so we'll loop over
-        // each child and advance it.
-
-        // Because we're doing things in a special order, we have to be careful to not duplicate
-        // ourselves. If each child has the same number of alternatives, we will eventually
-        // "carry" or roll over each child back to the beginning. When this happens, we should
-        // not return that plan again.
-        bool everyoneRolledOver = true;
-
-        for (auto&& node : assignment->subnodes) {
-            ++node.iterationCount;
-            const bool wrappedAround = nextMemo(node.memoId);
-            if (wrappedAround) {
-                node.maxIterCount = node.iterationCount;
-                node.iterationCount = 0;
-                // We ran out of "lockstep runway" of sorts. At least one of the subnodes was
-                // exhausted, so this will be our last time advancing all children in lockstep.
-                assignment->exhaustedLockstepIteration = true;
-            } else {
-                everyoneRolledOver = false;
-            }
-        }
-        // Edge case: if every child has only one option available, we are already finished
-        // enumerating.
-        if (assignment->shouldResetBeforeProceeding(assignment->totalEnumerated)) {
-            assignment->exhaustedLockstepIteration = false;
-            return true;  // We're back at the beginning, no need to reset.
-        }
-        if (!everyoneRolledOver) {
-            // Either there's more lockstep iteration to come, or the subnodes have different
-            // amounts of options. In either case, we are now in a new enumeration state so just
-            // return.
-            return false;
-        }
-        // Otherwise we just rolled over and went back to the first enumeration state, so we need to
-        // keep going to avoid duplicating that state. Fall through to below to start "normal", not
-        // lockstep iteration.
-    }
-
-    auto advanceOnce = [this, assignment]() {
-        for (auto&& node : assignment->subnodes) {
-            ++node.iterationCount;
-            const bool wrappedAround = nextMemo(node.memoId);
-            if (!wrappedAround) {
-                return;
-            }
-            node.maxIterCount = node.iterationCount;
-            node.iterationCount = 0;
-        }
-    };
-    advanceOnce();
-    while (assignment->allIdentical()) {
-        // All sub-nodes have the same enumeration state, skip this one since we already did
-        // it above. This is expected to happen pretty often. For example, if we have two subnodes
-        // each enumerating two states, we'd expect the order to be: 00, 11 (these two iterated
-        // above), then 00 (skipped by falling through above after finishing lockstep iteration),
-        // then 10, 11 (skipped here), 00 (skipped here), then finally 01.
-        advanceOnce();
-    }
-
-    // This special ordering is tricky to reset. Because it iterates the sub nodes in such a
-    // unique order, it can be difficult to know when it has actually finished iterating. Our
-    // strategy is just to compute a total and go back to the beginning once we hit that total.
-    if (!assignment->shouldResetBeforeProceeding(assignment->totalEnumerated)) {
-        return false;
-    }
-    // Reset!
-    for (auto&& subnode : assignment->subnodes) {
-        while (!nextMemo(subnode.memoId)) {
-            // Keep advancing till it rolls over.
-        }
-        subnode.iterationCount = 0;
-    }
-    assignment->exhaustedLockstepIteration = false;
-    return true;
-}
-
 bool PlanEnumerator::nextMemo(size_t id) {
     NodeAssignment* assign = _memo[id];
     verify(NULL != assign);
@@ -1765,18 +1622,16 @@ bool PlanEnumerator::nextMemo(size_t id) {
     if (NULL != assign->orAssignment) {
         OrAssignment* oa = assign->orAssignment.get();
 
-        // Limit the number of OR enumerations.
+        // Limit the number of OR enumerations
         oa->counter++;
         if (oa->counter >= _orLimit) {
-            LOG(1)
-                << "plan enumerator exceeded threshold for OR enumerations. orEnumerationLimit = "
-                << _orLimit;
             return true;
         }
 
-        // OR just walks through telling its children to move forward.
+        // OR just walks through telling its children to
+        // move forward.
         for (size_t i = 0; i < oa->subnodes.size(); ++i) {
-            // If there's no carry, we just stop. If there's a carry, we move the next child
+            // If there's no carry, we just stop.  If there's a carry, we move the next child
             // forward.
             if (!nextMemo(oa->subnodes[i])) {
                 return false;
@@ -1784,19 +1639,7 @@ bool PlanEnumerator::nextMemo(size_t id) {
         }
         // If we're here, the last subnode had a carry, therefore the OR has a carry.
         return true;
-    } else if (nullptr != assign->lockstepOrAssignment) {
-        LockstepOrAssignment* assignment = assign->lockstepOrAssignment.get();
-
-        // Limit the number of OR enumerations.
-        ++assignment->totalEnumerated;
-        if (assignment->totalEnumerated >= _orLimit) {
-            LOG(1)
-                << "plan enumerator exceeded threshold for OR enumerations. orEnumerationLimit = "
-                << _orLimit;
-            return true;
-        }
-        return _nextMemoForLockstepOrAssignment(assignment);
-    } else if (nullptr != assign->arrayAssignment) {
+    } else if (NULL != assign->arrayAssignment) {
         ArrayAssignment* aa = assign->arrayAssignment.get();
         // moving to next on current subnode is OK
         if (!nextMemo(aa->subnodes[aa->counter])) {
@@ -1828,9 +1671,11 @@ bool PlanEnumerator::nextMemo(size_t id) {
         }
         aa->counter = 0;
         return true;
-    } else {
-        MONGO_UNREACHABLE;
     }
+
+    // This shouldn't happen.
+    verify(0);
+    return false;
 }
 
 }  // namespace mongo

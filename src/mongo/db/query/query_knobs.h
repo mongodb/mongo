@@ -81,21 +81,6 @@ extern AtomicDouble internalQueryCacheEvictionRatio;
 // How many indexed solutions will QueryPlanner::plan output?
 extern AtomicInt32 internalQueryPlannerMaxIndexedSolutions;
 
-// If set to true, instructs the plan enumerator to enumerate contained $ors in a special order. $or
-// enumeration can generate an exponential number of plans, and is therefore limited at some
-// arbitrary cutoff controlled by a parameter. When this limit is hit, the order of enumeration is
-// important. For example, a query like the following has a 'contained $or' (within an $and): {a: 1,
-// $or: [{b: 1, c: 1}, {b: 2, c: 2}]} For this query if there are indexes a_b={a: 1, b: 1} and
-// a_c={a: 1, c: 1}, the normal enumeration order would output assignments [a_b, a_b], [a_c, a_b],
-// [a_b, a_c], then [a_c, a_c]. This flag will instruct the enumerator to instead prefer a different
-// order. It's hard to summarize, but perhaps the phrases 'lockstep enumeration', 'simultaneous
-// advancement', or 'parallel iteration' will help the reader. The effect is to give earlier
-// enumeration to plans which use the same choice across all branches. In this order, we would get
-// assignments [a_b, a_b], [a_c, a_c], [a_c, a_b], then [a_b, a_c]. This is thought to be helpful in
-// general, but particularly in cases where all children of the $or use the same fields and have the
-// same indexes available, as in this example.
-extern AtomicBool internalQueryEnumerationPreferLockstepOrEnumeration;
-
 // How many solutions will the enumerator consider at each OR?
 extern AtomicInt32 internalQueryEnumerationMaxOrSolutions;
 

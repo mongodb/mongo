@@ -151,7 +151,7 @@ void addEqualityFieldSorts(const BSONObj& sortPattern,
         sortsOut->insert(prefixBob.obj());
     }
 }
-}  // namespace
+}
 
 string QuerySolutionNode::toString() const {
     mongoutils::str::stream ss;
@@ -528,7 +528,6 @@ void IndexScanNode::appendToString(mongoutils::str::stream* ss, int indent) cons
     *ss << "IXSCAN\n";
     addIndent(ss, indent + 1);
     *ss << "indexName = " << index.name << '\n';
-    addIndent(ss, indent + 1);
     *ss << "keyPattern = " << index.keyPattern << '\n';
     if (NULL != filter) {
         addIndent(ss, indent + 1);
