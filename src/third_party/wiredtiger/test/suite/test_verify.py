@@ -29,10 +29,6 @@
 import os, struct
 from suite_subprocess import suite_subprocess
 import wiredtiger, wttest
-try:
-    xrange
-except NameError:  #python3
-    xrange = range
 
 # test_verify.py
 #    Utilities: wt verify
@@ -46,7 +42,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         """
         cursor = self.session.open_cursor('table:' + tablename, None, None)
         key = ''
-        for i in xrange(0, self.nentries):
+        for i in range(0, self.nentries):
             key += str(i)
             cursor[key] = key + key
         cursor.close()
@@ -134,7 +130,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, params)
         self.populate(self.tablename)
         with self.open_and_position(self.tablename, 75) as f:
-            for i in xrange(0, 4096):
+            for i in range(0, 4096):
                 f.write(struct.pack('B', 0))
 
         # open_and_position closed the session/connection, reopen them now.
@@ -153,7 +149,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, params)
         self.populate(self.tablename)
         with self.open_and_position(self.tablename, 75) as f:
-            for i in xrange(0, 4096):
+            for i in range(0, 4096):
                 f.write(struct.pack('B', 0))
         self.runWt(["verify", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
@@ -168,7 +164,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, params)
         self.populate(self.tablename)
         with self.open_and_position(self.tablename, 25) as f:
-            for i in xrange(0, 100):
+            for i in range(0, 100):
                 f.write(b'\x01\xff\x80')
         self.runWt(["verify", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
@@ -186,7 +182,9 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             f.truncate(0)
         self.runWt(["verify", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
-        self.check_non_empty_file("verifyerr.out")
+        # The test may output the following error message while opening a file that
+        # does not exist. Ignore that.
+        self.ignoreStderrPatternIfExists('No such file or directory')
 
     def test_verify_process_zero_length(self):
         """
@@ -199,7 +197,9 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             f.truncate(0)
         self.runWt(["verify", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
-        self.check_non_empty_file("verifyerr.out")
+        # The test may output the following error message while opening a file that
+        # does not exist. Ignore that.
+        self.ignoreStderrPatternIfExists('No such file or directory')
 
 if __name__ == '__main__':
     wttest.run()

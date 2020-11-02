@@ -332,32 +332,26 @@ copy_database(const char *sfx)
 }
 
 /*
- * wt_open_corrupt --
+ * open_with_corruption --
  *     Call wiredtiger_open and expect a corruption error.
  */
-static void wt_open_corrupt(const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void
-wt_open_corrupt(const char *sfx)
+open_with_corruption(const char *sfx)
 {
     WT_CONNECTION *conn;
     WT_DECL_RET;
     char buf[1024];
 
-    /* The child should not abort the test in the message handler. Set it here, don't inherit. */
+    /* We should not abort the test in the message handler. Set it here, don't inherit. */
     test_abort = false;
     if (sfx != NULL)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.%s", home, sfx));
     else
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", home));
 
-    /*
-     * Opening the database may cause a panic and core dump. Change dir to database directory so the
-     * core will be left someplace we will clean up.
-     */
-    if (chdir(buf) != 0)
-        testutil_die(errno, "Child chdir: %s", home);
+    /* Don't abort in the diagnostic builds on detecting corruption. */
+    ret = wiredtiger_open(buf, &event_handler, "debug_mode=(corruption_abort=false)", &conn);
 
-    ret = wiredtiger_open(NULL, &event_handler, NULL, &conn);
     /*
      * Not all out of sync combinations lead to corruption. We keep the previous checkpoint in the
      * file so some combinations of future or old turtle files and metadata files will succeed.
@@ -365,31 +359,9 @@ wt_open_corrupt(const char *sfx)
     if (ret != WT_TRY_SALVAGE && ret != 0)
         fprintf(stderr, "OPEN_CORRUPT: wiredtiger_open returned %d\n", ret);
     testutil_assert(ret == WT_TRY_SALVAGE || ret == 0);
-    exit(EXIT_SUCCESS);
-}
 
-static int
-open_with_error(const char *sfx)
-{
-    pid_t pid;
-    int status;
-
-    /*
-     * Call wiredtiger_open. We expect to see a corruption panic so we run this in a forked process.
-     * In diagnostic mode, the panic will cause an abort and core dump. So we want to catch that and
-     * continue running with salvage.
-     */
-    printf("=== open corrupt in child ===\n");
-    if ((pid = fork()) < 0)
-        testutil_die(errno, "fork");
-    if (pid == 0) { /* child */
-        wt_open_corrupt(sfx);
-        return (EXIT_SUCCESS);
-    }
-    /* parent */
-    if (waitpid(pid, &status, 0) == -1)
-        testutil_die(errno, "waitpid");
-    return (EXIT_SUCCESS);
+    if (ret == 0)
+        testutil_check(conn->close(conn, NULL));
 }
 
 static void
@@ -443,7 +415,7 @@ open_normal(const char *sfx, TABLE_INFO *table_data)
 static void
 run_all_verification(const char *sfx, TABLE_INFO *t)
 {
-    testutil_check(open_with_error(sfx));
+    open_with_corruption(sfx);
     open_with_salvage(sfx, t);
     open_normal(sfx, t);
 }
@@ -470,6 +442,10 @@ main(int argc, char *argv[])
     TEST_OPTS *opts, _opts;
     WT_DECL_RET;
     char buf[1024];
+
+    /* Bypass this test for ASAN builds */
+    if (testutil_is_flag_set("TESTUTIL_BYPASS_ASAN"))
+        return (EXIT_SUCCESS);
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));

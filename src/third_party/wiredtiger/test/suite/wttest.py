@@ -46,8 +46,6 @@ def shortenWithEllipsis(s, maxlen):
         s = s[0:maxlen-3] + '...'
     return s
 
-_python3 = (sys.version_info >= (3, 0, 0))
-
 class CapturedFd(object):
     """
     CapturedFd encapsulates a file descriptor (e.g. 1 or 2) that is diverted
@@ -529,6 +527,10 @@ class WiredTigerTestCase(unittest.TestCase):
         if self.captureout.hasUnexpectedOutput(self):
             self.captureout.checkAdditionalPattern(self, pat)
 
+    def ignoreStderrPatternIfExists(self, pat):
+        if self.captureerr.hasUnexpectedOutput(self):
+            self.captureerr.checkAdditionalPattern(self, pat)
+
     def assertRaisesWithMessage(self, exceptionType, expr, message):
         """
         Like TestCase.assertRaises(), but also checks to see
@@ -693,25 +695,7 @@ class WiredTigerTestCase(unittest.TestCase):
         """
         return a recno key
         """
-        if _python3:
-            return i
-        else:
-            return long(i)
-
-    def ord_byte(self, b):
-        """
-        return the 'ord' of a single byte.
-        In Python2 a set of bytes is represented as a string, and a single
-        byte is a string of length one.  In Python3, bytes are an array of
-        ints, so no explicit ord() call is needed.
-        """
-        if _python3:
-            return b
-        else:
-            return ord(b)
-
-    def is_python3(self):
-        return _python3
+        return i
 
     # print directly to tty, useful for debugging
     def tty(self, message):

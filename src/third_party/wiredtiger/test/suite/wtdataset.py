@@ -27,9 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 import sys
-_python3 = (sys.version_info >= (3, 0, 0))
-if _python3:
-    xrange = range
 
 class BaseDataSet(object):
     """
@@ -54,7 +51,7 @@ class BaseDataSet(object):
 
     def fill(self):
         c = self.testcase.session.open_cursor(self.uri, None)
-        for i in xrange(1, self.rows + 1):
+        for i in range(1, self.rows + 1):
             c[self.key(i)] = self.value(i)
         c.close()
 
@@ -77,9 +74,9 @@ class BaseDataSet(object):
     def key_by_format(i, key_format):
         if key_format == 'i' or key_format == 'r':
             return i
-        elif _python3 and key_format == 'u':
+        elif key_format == 'u':
             return bytes(('%015d' % i).encode())
-        elif key_format == 'S' or key_format == 'u':
+        elif key_format == 'S':
             return str('%015d' % i)
         else:
             raise AssertionError(
@@ -90,9 +87,9 @@ class BaseDataSet(object):
     def value_by_format(i, value_format):
         if value_format == 'i' or value_format == 'r':
             return i
-        elif _python3 and value_format == 'u':
+        elif value_format == 'u':
             return bytes((str(i) + ': abcdefghijklmnopqrstuvwxyz').encode())
-        elif value_format == 'S' or value_format == 'u':
+        elif value_format == 'S':
             return str(i) + ': abcdefghijklmnopqrstuvwxyz'
         elif value_format == '8t':
             value = (
@@ -180,7 +177,7 @@ class SimpleIndexDataSet(SimpleDataSet):
 
         # Check values in the index.
         idxcursor = self.testcase.session.open_cursor(self.indexname)
-        for i in xrange(1, self.rows + 1):
+        for i in range(1, self.rows + 1):
             k = self.key(i)
             v = self.value(i)
             ik = (v, k)  # The index key is columns=(v,k).
@@ -368,7 +365,7 @@ class ProjectionIndexDataSet(BaseDataSet):
         self.testcase.assertEqual(i, self.rows)
 
     def check_index_cursor(self, cursor):
-        for i in xrange(1, self.rows + 1):
+        for i in range(1, self.rows + 1):
             k = self.key(i)
             v = self.value(i)
             ik = (v[2], v[1])  # The index key is (v2,v2)

@@ -399,7 +399,6 @@ struct __wt_connection_stats {
     int64_t cache_hs_read_squash;
     int64_t cache_hs_key_truncate_rts_unstable;
     int64_t cache_hs_key_truncate_rts;
-    int64_t cache_hs_key_truncate_mix_ts_restart;
     int64_t cache_hs_key_truncate;
     int64_t cache_hs_key_truncate_onpage_removal;
     int64_t cache_hs_key_truncate_mix_ts;

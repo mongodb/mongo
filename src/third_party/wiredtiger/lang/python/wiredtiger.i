@@ -251,7 +251,7 @@ from packing import pack, unpack
 }
 
 /* Internal _set_key, _set_value methods take a 'bytes' object as parameter. */
-%pybuffer_binary(void *data, int);
+%pybuffer_binary(unsigned char *data, int);
 
 /* Throw away references after close. */
 %define DESTRUCTOR(class, method)
@@ -548,11 +548,7 @@ OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, equals, (self, other))
 OVERRIDE_METHOD(__wt_cursor, WT_CURSOR, search_near, (self))
 
 /* SWIG magic to turn Python byte strings into data / size. */
-#if PY_MAJOR_VERSION >= 3
-	%apply (char *STRING, int LENGTH) { (char *data, int size) };
-#else
-%apply (char *STRING, int LENGTH) { (void *data, int size) };
-#endif
+%apply (char *STRING, int LENGTH) { (char *data, int size) };
 
 /* Handle binary data returns from get_key/value -- avoid cstring.i: it creates a list of returns. */
 %typemap(in,numinputs=0) (char **datap, int *sizep) (char *data, int size) { $1 = &data; $2 = &size; }
@@ -588,7 +584,7 @@ typedef int int_void;
 
 %extend __wt_cursor {
 	/* Get / set keys and values */
-	void _set_key(void *data, int size) {
+	void _set_key(unsigned char *data, int size) {
 		WT_ITEM k;
 		k.data = data;
 		k.size = (uint32_t)size;
@@ -617,7 +613,7 @@ typedef int int_void;
 		return (ret);
 	}
 
-	void _set_value(void *data, int size) {
+	void _set_value(unsigned char *data, int size) {
 		WT_ITEM v;
 		v.data = data;
 		v.size = (uint32_t)size;

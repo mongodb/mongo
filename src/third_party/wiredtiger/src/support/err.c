@@ -339,7 +339,10 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
   ...) WT_GCC_FUNC_ATTRIBUTE((cold)) WT_GCC_FUNC_ATTRIBUTE((format(printf, 5, 6)))
   WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
+    WT_CONNECTION_IMPL *conn;
     va_list ap;
+
+    conn = S2C(session);
 
     /*
      * Ignore error returns from underlying event handlers, we already have an error value to
@@ -355,7 +358,7 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      *
      * If the connection has already panicked, just return the error.
      */
-    if (session != NULL && F_ISSET(S2C(session), WT_CONN_PANIC))
+    if (session != NULL && F_ISSET(conn, WT_CONN_PANIC))
         return (WT_PANIC);
 
     /*
@@ -369,15 +372,20 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
       __eventv(session, false, WT_PANIC, func, line, "the process must exit and restart", ap));
     va_end(ap);
 
-/*
- * Confusing #ifdef structure because gcc/clang knows the abort call won't return, and Visual Studio
- * doesn't.
- */
 #if defined(HAVE_DIAGNOSTIC)
-    __wt_abort(session); /* Drop core if testing. */
-                         /* NOTREACHED */
+    /*
+     * In the diagnostic builds, we want to drop core in case of panics that are not due to data
+     * corruption. A core could be useful in debugging.
+     *
+     * In the case of corruption, we want to be able to test the application's capability to salvage
+     * by returning an error code. But we do not want to lose the ability to drop core if required.
+     * Hence in the diagnostic mode, the application can set the debug flag to choose between
+     * dropping a core and returning an error.
+     */
+    if (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) ||
+      FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT))
+        __wt_abort(session);
 #endif
-#if !defined(HAVE_DIAGNOSTIC) || defined(_WIN32)
     /*
      * !!!
      * This function MUST handle a NULL WT_SESSION_IMPL handle.
@@ -385,7 +393,7 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      * Panic the connection;
      */
     if (session != NULL)
-        F_SET(S2C(session), WT_CONN_PANIC);
+        F_SET(conn, WT_CONN_PANIC);
 
     /*
      * !!!
@@ -394,7 +402,6 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      * Order shall return.
      */
     return (WT_PANIC);
-#endif
 }
 
 /*

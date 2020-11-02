@@ -92,11 +92,10 @@ class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
                 cur_logs = fnmatch.filter(os.listdir(homedir), "*gerLog*")
                 scur = set(cur_logs)
                 sorig = set(orig_logs)
-                # There should never be overlap with the log files that
-                # were there originally.  Mostly this checks that after
-                # opening with logging disabled and then re-enabled, we
-                # don't see log file 1.
-                self.assertEqual(scur.isdisjoint(sorig), True)
+                # There can be overlap with the log files that were
+                # there originally. Because some pages are rolled back
+                # as part of RTS.
+                self.assertEqual(scur.isdisjoint(sorig), False)
                 if loop > 1:
                     # We should be creating the same log files each time.
                     for l in cur_logs:

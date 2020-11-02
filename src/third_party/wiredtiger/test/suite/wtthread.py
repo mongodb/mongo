@@ -26,11 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-try:
-    import Queue as queue  # python2
-except ImportError:
-    import queue
-import os, shutil, sys, threading, time, wiredtiger, wttest
+import os, queue, shutil, sys, threading, time, wiredtiger, wttest
 from helper import compare_tables
 
 class checkpoint_thread(threading.Thread):

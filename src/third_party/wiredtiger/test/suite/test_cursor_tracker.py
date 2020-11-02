@@ -188,7 +188,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             if high < 0:
                 high = 0
             diff = high - low
-            nextra = (self.ord_byte(md5[4]) % (diff + 1)) + low
+            nextra = (md5[4] % (diff + 1)) + low
             extra = sha224.hexdigest()
             while len(extra) < nextra:
                 extra = extra + extra
