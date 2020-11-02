@@ -404,7 +404,7 @@ StatusWith<ResolvedRoleData> AuthzManagerExternalStateLocal::resolveRoles(
 
             if (auth::isBuiltinRole(role)) {
                 if (processPrivs) {
-                    auth::addPrivilegesForBuiltinRole(role, &inheritedPrivileges);
+                    invariant(auth::addPrivilegesForBuiltinRole(role, &inheritedPrivileges));
                 }
                 continue;
             }
@@ -594,7 +594,7 @@ Status AuthzManagerExternalStateLocal::getRoleDescriptionsForDB(
             if (showPrivileges == PrivilegeFormat::kShowSeparate) {
                 BSONArrayBuilder privsBuilder(roleBuilder.subarrayStart("privileges"));
                 PrivilegeVector privs;
-                auth::addPrivilegesForBuiltinRole(roleName, &privs);
+                invariant(auth::addPrivilegesForBuiltinRole(roleName, &privs));
                 for (const auto& privilege : privs) {
                     privsBuilder.append(privilege.toBSON());
                 }
