@@ -121,8 +121,22 @@ public:
                                                     bool forward = true) const final;
 
     /**
-     * Deletes the document with the given RecordId from the collection.
-     *
+     * Deletes the document with the given RecordId from the collection. For a description of
+     * the parameters, see the overloaded function below.
+     */
+    void deleteDocument(
+        OperationContext* opCtx,
+        StmtId stmtId,
+        RecordId loc,
+        OpDebug* opDebug,
+        bool fromMigrate = false,
+        bool noWarn = false,
+        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off) const final;
+
+    /**
+     * Deletes the document from the collection.
+
+     * 'doc' the document to be deleted.
      * 'stmtId' the statement id for this delete operation. Pass in kUninitializedStmtId if not
      * applicable.
      * 'fromMigrate' indicates whether the delete was induced by a chunk migration, and
@@ -137,6 +151,7 @@ public:
      */
     void deleteDocument(
         OperationContext* opCtx,
+        Snapshotted<BSONObj> doc,
         StmtId stmtId,
         RecordId loc,
         OpDebug* opDebug,

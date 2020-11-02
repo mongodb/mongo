@@ -121,6 +121,18 @@ public:
         std::abort();
     }
 
+    void deleteDocument(
+        OperationContext* opCtx,
+        Snapshotted<BSONObj> doc,
+        StmtId stmtId,
+        RecordId loc,
+        OpDebug* opDebug,
+        bool fromMigrate = false,
+        bool noWarn = false,
+        Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off) const {
+        std::abort();
+    }
+
     Status insertDocuments(OperationContext* opCtx,
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
