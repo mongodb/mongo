@@ -697,7 +697,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             ReplicaSetAwareServiceRegistry::get(_service).onBecomeArbiter();
         }
 
-        if (!isArbiter && isFirstConfig) {
+        if (!isArbiter && myIndex.isOK() && myIndex.getValue() != -1) {
             shouldStartDataReplication = true;
         }
 

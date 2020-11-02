@@ -218,7 +218,7 @@ function reconfigWithRetry(primary, config, force) {
         const newVersion =
             assert.commandWorked(admin.runCommand({replSetGetConfig: 1})).config.version + 1;
         reconfigCommand.replSetReconfig.version = newVersion;
-        const res = admin.runCommand(reconfigCommand);
+        let res = admin.runCommand(reconfigCommand);
 
         // Retry reconfig if quorum check failed because not enough voting nodes responded. One
         // reason for this is if the connections used for heartbeats get closed on the destination
