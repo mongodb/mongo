@@ -41,7 +41,7 @@ for (let readMode of ["commands", "legacy"]) {
                 const secondaryOkErr = assert.throws(() => cursor.itcount(), [], tojson(testType));
                 assert.commandFailedWithCode(secondaryOkErr, ErrorCodes.NotPrimaryNoSecondaryOk);
             } else {
-                // Succeeds for all non-primary readPrefs, and for no readPref iff slaveOk.
+                // Succeeds for all non-primary readPrefs, and for no readPref iff secondaryOk.
                 const docCount = assert.doesNotThrow(() => cursor.itcount(), [], tojson(testType));
                 assert.eq(docCount, 1);
             }

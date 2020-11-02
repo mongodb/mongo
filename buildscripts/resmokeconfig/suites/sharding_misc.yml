@@ -58,10 +58,10 @@ selector:
   - jstests/sharding/mongos_shard_failure_tolerance.js
   - jstests/sharding/index_and_collection_option_propagation.js
   - jstests/sharding/change_stream_update_lookup_read_concern.js
-  - jstests/sharding/count_slaveok.js
+  - jstests/sharding/count_secondaryok.js
   - jstests/sharding/rename.js
   - jstests/sharding/shard_identity_config_update.js
-  - jstests/sharding/recovering_slaveok.js
+  - jstests/sharding/recovering_secondaryok.js
   - jstests/sharding/all_config_servers_blackholed_from_mongos.js
   - jstests/sharding/authCommands.js
   - jstests/sharding/addshard4.js
@@ -94,7 +94,7 @@ selector:
   - jstests/sharding/migrateBig.js
   - jstests/sharding/change_stream_chunk_migration.js
   - jstests/sharding/large_chunk.js
-  - jstests/sharding/auth_slaveok_routing.js
+  - jstests/sharding/auth_secondaryok_routing.js
   - jstests/sharding/balancer_window.js
   - jstests/sharding/change_streams_primary_shard_unaware.js
   - jstests/sharding/diffservers1.js
@@ -319,7 +319,7 @@ selector:
   - jstests/sharding/authmr.js
   - jstests/sharding/sessions_collection_auto_healing.js
   - jstests/sharding/read_does_not_create_namespaces.js
-  - jstests/sharding/ismaster.js
+  - jstests/sharding/hello_response_validation.js
   - jstests/sharding/balancer_shell_commands.js
   - jstests/sharding/auth_sharding_cmd_metadata.js
   - jstests/sharding/autodiscover_config_rs_from_secondary.js

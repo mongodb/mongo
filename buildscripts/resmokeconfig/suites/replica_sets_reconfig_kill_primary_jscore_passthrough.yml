@@ -49,11 +49,11 @@ selector:
   - jstests/core/fsync.js
   - jstests/core/killop_drop_collection.js
 
-  # Assert on the ismaster field of an isMaster response. If a primary steps down after accepting
-  # an isMaster command and returns before its connection is closed, the response can contain
-  # ismaster: false.
+  # Assert on the isWritablePrimary field of a hello response. If a primary steps down after
+  # accepting a hello command and returns before its connection is closed, the response can
+  # contain isWritablePrimary: false.
   - jstests/core/dbadmin.js
-  - jstests/core/ismaster.js
+  - jstests/core/hello_response_validation.js
 
   # Spawns new mongo shells, which don't retry connecting on stepdown errors.
   - jstests/core/shell_connection_strings.js

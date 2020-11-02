@@ -1,4 +1,6 @@
-// Tests the internalValidateFeaturesAsMaster server parameter.
+// Tests that the internalValidateFeaturesAsMaster server parameter works properly even though
+// it is deprecated. The preferred parameter is internalValidateFeaturesAsPrimary, which is
+// tested in internal_validate_features_as_primary.js.
 
 (function() {
 "use strict";

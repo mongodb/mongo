@@ -41,15 +41,15 @@ all:
   - ticket: SERVER-50140
     test_file: jstests/replsets/initial_sync_fails_unclean_restart.js
   - ticket: SERVER-49987
-    test_file: jstests/core/ismaster.js
+    test_file: jstests/core/hello_response_validation.js
   - ticket: SERVER-49987
-    test_file: jstests/replsets/ismaster1.js
+    test_file: jstests/replsets/check_replication_hello_response_fields.js
   - ticket: SERVER-50640
     test_file: jstests/core/views/views_all_commands.js
   - ticket: SERVER-50640
     test_file: jstests/sharding/database_versioning_all_commands.js
   - ticket: SERVER-49988
-    test_file: jstests/sharding/ismaster.js
+    test_file: jstests/sharding/hello_response_validation.js
   - ticket: SERVER-50640
     test_file: jstests/sharding/read_write_concern_defaults_application.js
   - ticket: SERVER-50640
@@ -71,7 +71,7 @@ all:
   - ticket: SERVER-50417
     test_file: jstests/replsets/no_disconnect_on_stepdown.js
   - ticket: SERVER-50417
-    test_file: jstests/replsets/not_master_unacknowledged_write.js
+    test_file: jstests/replsets/not_primary_unacknowledged_write.js
   - ticket: SERVER-50417
     test_file: jstests/replsets/read_operations_during_step_down.js
   - ticket: SERVER-50417
@@ -79,7 +79,7 @@ all:
   - ticket: SERVER-50320
     test_file: jstests/replsets/change_sync_source_in_initial_sync.js
   - ticket: SERVER-50415
-    test_file: jstests/sharding/awaitable_isMaster_primary_failures.js
+    test_file: jstests/sharding/awaitable_hello_primary_failures.js
   - ticket: SERVER-50420
     test_file: jstests/replsets/server_status_repl_is_writable_primary.js
   - ticket: SERVER-51262
@@ -89,15 +89,15 @@ all:
   - ticket: SERVER-43904
     test_file: jstests/replsets/election_handoff_skips_unelectable_nodes.js
   - ticket: SERVER-51259
-    test_file: jstests/replsets/awaitable_ismaster_errors_on_horizon_change.js
+    test_file: jstests/replsets/awaitable_hello_errors_on_horizon_change.js
   - ticket: SERVER-51259
-    test_file: jstests/replsets/awaitable_ismaster_fcv_change.js
+    test_file: jstests/replsets/awaitable_hello_fcv_change.js
   - ticket: SERVER-51259
-    test_file: jstests/replsets/awaitable_ismaster_metrics_on_state_change.js
+    test_file: jstests/replsets/awaitable_hello_metrics_on_state_change.js
   - ticket: SERVER-51259
-    test_file: jstests/replsets/awaitable_ismaster_on_nodes_with_invalid_configs.js
+    test_file: jstests/replsets/awaitable_hello_on_nodes_with_invalid_configs.js
   - ticket: SERVER-51259
-    test_file: jstests/replsets/awaitable_ismaster_stepdown_stepup.js
+    test_file: jstests/replsets/awaitable_hello_stepdown_stepup.js
   - ticket: SERVER-51259
     test_file: jstests/replsets/quiesce_mode.js
   - ticket: SERVER-51259
