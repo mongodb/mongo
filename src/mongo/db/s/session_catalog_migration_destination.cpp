@@ -188,13 +188,15 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
 
     if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
         // Note: Oplog is already no-op type, no need to nest.
-        // There are two types of type 'n' oplog format expected here:
+        // There are three types of type 'n' oplog format expected here:
         // (1) Oplog entries that has been transformed by a previous migration into a
         //     nested oplog. In this case, o field contains {$sessionMigrateInfo: 1}
         //     and o2 field contains the details of the original oplog.
         // (2) Oplog entries that contains the pre/post-image information of a
         //     findAndModify operation. In this case, o field contains the relevant info
         //     and o2 will be empty.
+        // (3) Oplog entries that are a dead sentinel, which the donor sent over as the replacement
+        //     for a prepare oplog entry or unprepared transaction commit oplog entry.
 
         BSONObj object2;
         if (oplogEntry.getObject2()) {
