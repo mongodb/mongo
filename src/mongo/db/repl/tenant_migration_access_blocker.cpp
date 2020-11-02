@@ -71,7 +71,7 @@ void TenantMigrationAccessBlocker::checkIfCanWriteOrThrow() {
     }
 }
 
-Status TenantMigrationAccessBlocker::waitUntilCommittedOrAbortedNoThrow(OperationContext* opCtx) {
+Status TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx) {
     stdx::unique_lock<Latch> ul(_mutex);
 
     auto canWrite = [&]() { return _state == State::kAllow || _state == State::kAborted; };
@@ -83,10 +83,6 @@ Status TenantMigrationAccessBlocker::waitUntilCommittedOrAbortedNoThrow(Operatio
     opCtx->waitForConditionOrInterrupt(
         _transitionOutOfBlockingCV, ul, [&]() { return canWrite() || _state == State::kReject; });
     return onCompletion().getNoThrow();
-}
-
-void TenantMigrationAccessBlocker::waitUntilCommittedOrAborted(OperationContext* opCtx) {
-    uassertStatusOK(waitUntilCommittedOrAbortedNoThrow(opCtx));
 }
 
 void TenantMigrationAccessBlocker::checkIfCanDoClusterTimeReadOrBlock(

@@ -174,7 +174,7 @@ void serializeReply(OperationContext* opCtx,
 
                 auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
 
-                auto migrationStatus = mtab->waitUntilCommittedOrAbortedNoThrow(opCtx);
+                auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
                 error.append("code", static_cast<int>(migrationStatus.code()));
 
                 // We want to append an empty errmsg for the errors after the first one, so let the

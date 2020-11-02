@@ -112,7 +112,7 @@ void migrationConflictHandler(OperationContext* opCtx,
         invariant(migrationConflictInfo);
 
         if (auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker()) {
-            mtab->waitUntilCommittedOrAborted(opCtx);
+            uassertStatusOK(mtab->waitUntilCommittedOrAborted(opCtx));
         }
     }
 }
