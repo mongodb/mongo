@@ -45,6 +45,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/two_phase_index_build_knobs_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
@@ -317,6 +318,14 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
         while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail())) {
             sleepmillis(100);
+        }
+
+        // Start collecting metrics for the index build. The metrics for this operation will only be
+        // aggregated globally if the node commits or aborts while it is primary.
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx.get());
+        if (ResourceConsumption::shouldCollectMetricsForDatabase(dbName) &&
+            ResourceConsumption::isMetricsCollectionEnabled()) {
+            metricsCollector.beginScopedCollecting(dbName);
         }
 
         // Index builds should never take the PBWM lock, even on a primary. This allows the

@@ -88,56 +88,46 @@ ResourceConsumption::MetricsCollector& ResourceConsumption::MetricsCollector::ge
     return getMetricsCollector(opCtx);
 }
 
-void ResourceConsumption::Metrics::toBson(BSONObjBuilder* builder) const {
+void ResourceConsumption::ReadMetrics::toBson(BSONObjBuilder* builder) const {
+    builder->appendNumber(kDocBytesRead, docBytesRead);
+    builder->appendNumber(kDocUnitsRead, docUnitsRead);
+    builder->appendNumber(kIdxEntryBytesRead, idxEntryBytesRead);
+    builder->appendNumber(kIdxEntryUnitsRead, idxEntryUnitsRead);
+    builder->appendNumber(kKeysSorted, keysSorted);
+    builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
+}
+
+void ResourceConsumption::WriteMetrics::toBson(BSONObjBuilder* builder) const {
+    builder->appendNumber(kDocBytesWritten, docBytesWritten);
+    builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
+    builder->appendNumber(kIdxEntryBytesWritten, idxEntryBytesWritten);
+    builder->appendNumber(kIdxEntryUnitsWritten, idxEntryUnitsWritten);
+}
+
+void ResourceConsumption::AggregatedMetrics::toBson(BSONObjBuilder* builder) const {
     {
         BSONObjBuilder primaryBuilder = builder->subobjStart(kPrimaryMetrics);
-        primaryBuilder.appendNumber(kDocBytesRead, primaryMetrics.docBytesRead);
-        primaryBuilder.appendNumber(kDocUnitsRead, primaryMetrics.docUnitsRead);
-        primaryBuilder.appendNumber(kIdxEntryBytesRead, primaryMetrics.idxEntryBytesRead);
-        primaryBuilder.appendNumber(kIdxEntryUnitsRead, primaryMetrics.idxEntryUnitsRead);
-        primaryBuilder.appendNumber(kKeysSorted, primaryMetrics.keysSorted);
-        primaryBuilder.appendNumber(kDocUnitsReturned, primaryMetrics.docUnitsReturned);
+        primaryReadMetrics.toBson(&primaryBuilder);
         primaryBuilder.done();
     }
 
     {
         BSONObjBuilder secondaryBuilder = builder->subobjStart(kSecondaryMetrics);
-        secondaryBuilder.appendNumber(kDocBytesRead, secondaryMetrics.docBytesRead);
-        secondaryBuilder.appendNumber(kDocUnitsRead, secondaryMetrics.docUnitsRead);
-        secondaryBuilder.appendNumber(kIdxEntryBytesRead, secondaryMetrics.idxEntryBytesRead);
-        secondaryBuilder.appendNumber(kIdxEntryUnitsRead, secondaryMetrics.idxEntryUnitsRead);
-        secondaryBuilder.appendNumber(kKeysSorted, secondaryMetrics.keysSorted);
-        secondaryBuilder.appendNumber(kDocUnitsReturned, secondaryMetrics.docUnitsReturned);
+        secondaryReadMetrics.toBson(&secondaryBuilder);
         secondaryBuilder.done();
     }
 
+    writeMetrics.toBson(builder);
     builder->appendNumber(kCpuMillis, cpuMillis);
-    builder->appendNumber(kDocBytesWritten, docBytesWritten);
-    builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
-    builder->appendNumber(kIdxEntryBytesWritten, idxEntryBytesWritten);
-    builder->appendNumber(kIdxEntryUnitsWritten, idxEntryUnitsWritten);
 }
 
-void ResourceConsumption::Metrics::toFlatBsonAllFields(BSONObjBuilder* builder) const {
-    // Report all read metrics together to generate a flat object.
-    auto readMetrics = primaryMetrics + secondaryMetrics;
-    builder->appendNumber(kDocBytesRead, readMetrics.docBytesRead);
-    builder->appendNumber(kDocUnitsRead, readMetrics.docUnitsRead);
-    builder->appendNumber(kIdxEntryBytesRead, readMetrics.idxEntryBytesRead);
-    builder->appendNumber(kIdxEntryUnitsRead, readMetrics.idxEntryUnitsRead);
-    builder->appendNumber(kKeysSorted, readMetrics.keysSorted);
-    builder->appendNumber(kDocUnitsReturned, readMetrics.docUnitsReturned);
-
+void ResourceConsumption::OperationMetrics::toBson(BSONObjBuilder* builder) const {
+    readMetrics.toBson(builder);
+    writeMetrics.toBson(builder);
     builder->appendNumber(kCpuMillis, cpuMillis);
-    builder->appendNumber(kDocBytesWritten, docBytesWritten);
-    builder->appendNumber(kDocUnitsWritten, docUnitsWritten);
-    builder->appendNumber(kIdxEntryBytesWritten, idxEntryBytesWritten);
-    builder->appendNumber(kIdxEntryUnitsWritten, idxEntryUnitsWritten);
 }
 
-void ResourceConsumption::Metrics::toFlatBsonNonZeroFields(BSONObjBuilder* builder) const {
-    // Report all read metrics together to generate a flat object.
-    auto readMetrics = primaryMetrics + secondaryMetrics;
+void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* builder) const {
     appendNonZeroMetric(builder, kDocBytesRead, readMetrics.docBytesRead);
     appendNonZeroMetric(builder, kDocUnitsRead, readMetrics.docUnitsRead);
     appendNonZeroMetric(builder, kIdxEntryBytesRead, readMetrics.idxEntryBytesRead);
@@ -146,10 +136,10 @@ void ResourceConsumption::Metrics::toFlatBsonNonZeroFields(BSONObjBuilder* build
     appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docUnitsReturned);
 
     appendNonZeroMetric(builder, kCpuMillis, cpuMillis);
-    appendNonZeroMetric(builder, kDocBytesWritten, docBytesWritten);
-    appendNonZeroMetric(builder, kDocUnitsWritten, docUnitsWritten);
-    appendNonZeroMetric(builder, kIdxEntryBytesWritten, idxEntryBytesWritten);
-    appendNonZeroMetric(builder, kIdxEntryUnitsWritten, idxEntryUnitsWritten);
+    appendNonZeroMetric(builder, kDocBytesWritten, writeMetrics.docBytesWritten);
+    appendNonZeroMetric(builder, kDocUnitsWritten, writeMetrics.docUnitsWritten);
+    appendNonZeroMetric(builder, kIdxEntryBytesWritten, writeMetrics.idxEntryBytesWritten);
+    appendNonZeroMetric(builder, kIdxEntryUnitsWritten, writeMetrics.idxEntryUnitsWritten);
 }
 
 template <typename Func>
@@ -160,65 +150,47 @@ inline void ResourceConsumption::MetricsCollector::_doIfCollecting(Func&& func) 
     func();
 }
 
-void ResourceConsumption::MetricsCollector::_updateReadMetrics(OperationContext* opCtx,
-                                                               ReadMetricsFunc&& updateFunc) {
-    _doIfCollecting([&] {
-        // The RSTL is normally required to check the replication state, but callers may not always
-        // be holding it. Since we need to attribute this metric to some replication state, and an
-        // inconsistent state is not impactful for the purposes of metrics collection, perform a
-        // best-effort check so that we can record metrics for this operation.
-        if (repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
-                opCtx, NamespaceString::kAdminDb)) {
-            updateFunc(_metrics.primaryMetrics);
-        } else {
-            updateFunc(_metrics.secondaryMetrics);
-        }
-    });
-}
-
 void ResourceConsumption::MetricsCollector::incrementOneDocRead(OperationContext* opCtx,
                                                                 size_t docBytesRead) {
-    _updateReadMetrics(opCtx, [&](ReadMetrics& readMetrics) {
+    _doIfCollecting([&]() {
         size_t docUnits = std::ceil(docBytesRead / static_cast<float>(gDocumentUnitSizeBytes));
-        readMetrics.docBytesRead += docBytesRead;
-        readMetrics.docUnitsRead += docUnits;
+        _metrics.readMetrics.docBytesRead += docBytesRead;
+        _metrics.readMetrics.docUnitsRead += docUnits;
     });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(OperationContext* opCtx,
                                                                      size_t bytesRead) {
-    _updateReadMetrics(opCtx, [&](ReadMetrics& readMetrics) {
+    _doIfCollecting([&]() {
         size_t units = std::ceil(bytesRead / static_cast<float>(gIndexEntryUnitSizeBytes));
-        readMetrics.idxEntryBytesRead += bytesRead;
-        readMetrics.idxEntryUnitsRead += units;
+        _metrics.readMetrics.idxEntryBytesRead += bytesRead;
+        _metrics.readMetrics.idxEntryUnitsRead += units;
     });
 }
 
 void ResourceConsumption::MetricsCollector::incrementKeysSorted(OperationContext* opCtx,
                                                                 size_t keysSorted) {
-    _updateReadMetrics(opCtx,
-                       [&](ReadMetrics& readMetrics) { readMetrics.keysSorted += keysSorted; });
+    _doIfCollecting([&]() { _metrics.readMetrics.keysSorted += keysSorted; });
 }
 
 void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(OperationContext* opCtx,
                                                                       size_t returned) {
-    _updateReadMetrics(opCtx,
-                       [&](ReadMetrics& readMetrics) { readMetrics.docUnitsReturned += returned; });
+    _doIfCollecting([&]() { _metrics.readMetrics.docUnitsReturned += returned; });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneDocWritten(size_t bytesWritten) {
     _doIfCollecting([&] {
         size_t docUnits = std::ceil(bytesWritten / static_cast<float>(gDocumentUnitSizeBytes));
-        _metrics.docBytesWritten += bytesWritten;
-        _metrics.docUnitsWritten += docUnits;
+        _metrics.writeMetrics.docBytesWritten += bytesWritten;
+        _metrics.writeMetrics.docUnitsWritten += docUnits;
     });
 }
 
 void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(size_t bytesWritten) {
     _doIfCollecting([&] {
         size_t idxUnits = std::ceil(bytesWritten / static_cast<float>(gIndexEntryUnitSizeBytes));
-        _metrics.idxEntryBytesWritten += bytesWritten;
-        _metrics.idxEntryUnitsWritten += idxUnits;
+        _metrics.writeMetrics.idxEntryBytesWritten += bytesWritten;
+        _metrics.writeMetrics.idxEntryUnitsWritten += idxUnits;
     });
 }
 
@@ -259,16 +231,12 @@ ResourceConsumption::ScopedMetricsCollector::~ScopedMetricsCollector() {
         return;
     }
 
-    if (collector.getDbName().empty()) {
-        return;
-    }
-
     if (!isMetricsAggregationEnabled()) {
         return;
     }
 
     auto& globalResourceConsumption = ResourceConsumption::get(_opCtx);
-    globalResourceConsumption.add(collector);
+    globalResourceConsumption.merge(_opCtx, collector.getDbName(), collector.getMetrics());
 }
 
 ResourceConsumption& ResourceConsumption::get(ServiceContext* svcCtx) {
@@ -279,10 +247,31 @@ ResourceConsumption& ResourceConsumption::get(OperationContext* opCtx) {
     return getGlobalResourceConsumption(opCtx->getServiceContext());
 }
 
-void ResourceConsumption::add(const MetricsCollector& collector) {
-    invariant(!collector.getDbName().empty());
+void ResourceConsumption::merge(OperationContext* opCtx,
+                                const std::string& dbName,
+                                const OperationMetrics& metrics) {
+    invariant(!dbName.empty());
+
+    // All metrics over the duration of this operation will be attributed to the current state, even
+    // if it ran accross state transitions.
+    // The RSTL is normally required to check the replication state, but callers may not always be
+    // holding it. Since we need to attribute this metric to some replication state, and an
+    // inconsistent state is not impactful for the purposes of metrics collection, perform a
+    // best-effort check so that we can record metrics for this operation.
+    auto isPrimary = repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
+        opCtx, NamespaceString::kAdminDb);
+
+    // Add all metrics into the the globally-aggregated metrics.
     stdx::unique_lock<Mutex> lk(_mutex);
-    _metrics[collector.getDbName()] += collector.getMetrics();
+    auto& elem = _metrics[dbName];
+
+    if (isPrimary) {
+        elem.primaryReadMetrics += metrics.readMetrics;
+    } else {
+        elem.secondaryReadMetrics += metrics.readMetrics;
+    }
+    elem.writeMetrics += metrics.writeMetrics;
+    elem.cpuMillis += metrics.cpuMillis;
 }
 
 ResourceConsumption::MetricsMap ResourceConsumption::getMetrics() const {

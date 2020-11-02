@@ -110,8 +110,8 @@ const operations = [
         profileAssert: (profileDoc) => {
             // The size of the collection document in the _mdb_catalog may not be the same every
             // test run, so only assert this is non-zero.
-            // TODO (SERVER-50865): This does not collect metrics for all documents read. Collect
-            // metrics for index builds.
+            // Index builds run on a separate thread and don't report their metrics with the
+            // createIndex command, so we don't make any assertions.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
@@ -533,8 +533,8 @@ const operations = [
         profileAssert: (profileDoc) => {
             // The size of the collection document in the _mdb_catalog may not be the same every
             // test run, so only assert this is non-zero.
-            // TODO (SERVER-50865): This does not collect metrics for all documents read. Collect
-            // metrics for index builds.
+            // Index builds run on a separate thread and don't report their metrics with the
+            // createIndex command, so we don't make any assertions.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);

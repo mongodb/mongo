@@ -2589,6 +2589,22 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         replState->onOplogCommit(isPrimary);
     }
 
+    // While we are still holding the RSTL and before returning, ensure the metrics collected for
+    // this index build are attributed to the primary that commits or aborts the index build.
+    auto metricsGuard = makeGuard([&]() {
+        if (!isPrimary) {
+            return;
+        }
+
+        auto& collector = ResourceConsumption::MetricsCollector::get(opCtx);
+        bool wasCollecting = collector.endScopedCollecting();
+        if (!wasCollecting || !ResourceConsumption::isMetricsAggregationEnabled()) {
+            return;
+        }
+
+        ResourceConsumption::get(opCtx).merge(opCtx, collector.getDbName(), collector.getMetrics());
+    });
+
     // The collection object should always exist while an index build is registered.
     CollectionWriter collection(opCtx, replState->collectionUUID);
     invariant(collection,

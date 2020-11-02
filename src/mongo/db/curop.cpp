@@ -556,7 +556,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
         _debug.prepareConflictDurationMillis =
             duration_cast<Milliseconds>(prepareConflictDurationMicros);
 
-        auto operationMetricsPtr = [&]() -> ResourceConsumption::Metrics* {
+        auto operationMetricsPtr = [&]() -> ResourceConsumption::OperationMetrics* {
             auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             if (metricsCollector.hasCollectedMetrics()) {
                 return &metricsCollector.getMetrics();
@@ -938,7 +938,7 @@ string OpDebug::report(OperationContext* opCtx, const SingleThreadedLockStats* l
 
 void OpDebug::report(OperationContext* opCtx,
                      const SingleThreadedLockStats* lockStats,
-                     const ResourceConsumption::Metrics* operationMetrics,
+                     const ResourceConsumption::OperationMetrics* operationMetrics,
                      logv2::DynamicAttributes* pAttrs) const {
     Client* client = opCtx->getClient();
     auto& curop = *CurOp::get(opCtx);
@@ -1081,7 +1081,7 @@ void OpDebug::report(OperationContext* opCtx,
 
     if (operationMetrics) {
         BSONObjBuilder builder;
-        operationMetrics->toFlatBsonNonZeroFields(&builder);
+        operationMetrics->toBsonNonZeroFields(&builder);
         pAttrs->add("operationMetrics", builder.obj());
     }
 
@@ -1516,7 +1516,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(args.opCtx);
         if (metricsCollector.hasCollectedMetrics()) {
             BSONObjBuilder metricsBuilder(b.subobjStart(field));
-            metricsCollector.getMetrics().toFlatBsonAllFields(&metricsBuilder);
+            metricsCollector.getMetrics().toBson(&metricsBuilder);
         }
     });
 

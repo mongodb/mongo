@@ -167,7 +167,7 @@ public:
 
     void report(OperationContext* opCtx,
                 const SingleThreadedLockStats* lockStats,
-                const ResourceConsumption::Metrics* operationMetrics,
+                const ResourceConsumption::OperationMetrics* operationMetrics,
                 logv2::DynamicAttributes* pAttrs) const;
 
     /**

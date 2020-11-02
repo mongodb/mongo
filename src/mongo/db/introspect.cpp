@@ -71,7 +71,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
     if (metricsCollector.hasCollectedMetrics()) {
         BSONObjBuilder metricsBuilder = b.subobjStart("operationMetrics");
         const auto& metrics = metricsCollector.getMetrics();
-        metrics.toFlatBsonAllFields(&metricsBuilder);
+        metrics.toBson(&metricsBuilder);
         metricsBuilder.done();
     }
 
