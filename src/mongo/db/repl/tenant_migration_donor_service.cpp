@@ -45,6 +45,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/future_util.h"
 
 namespace mongo {
@@ -427,33 +428,13 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                                                               nullptr,
                                                               kRecipientSyncDataTimeout);
 
-                       auto recipientSyncDataResponsePF =
-                           makePromiseFuture<executor::TaskExecutor::RemoteCommandCallbackArgs>();
-                       auto promisePtr = std::make_shared<
-                           Promise<executor::TaskExecutor::RemoteCommandCallbackArgs>>(
-                           std::move(recipientSyncDataResponsePF.promise));
-
-                       auto scheduleResult =
-                           (**executor)
-                               ->scheduleRemoteCommand(std::move(request),
-                                                       [promisePtr](const auto& args) {
-                                                           promisePtr->emplaceValue(args);
-                                                       });
-
-                       if (!scheduleResult.isOK()) {
-                           // Since the command failed to be scheduled, the callback above did not
-                           // and will not run. Thus, it is safe to fulfill the promise here without
-                           // worrying about synchronizing access with the executor's thread.
-                           promisePtr->setError(scheduleResult.getStatus());
-                       }
-
-                       return std::move(recipientSyncDataResponsePF.future)
-                           .thenRunOn(**executor)
-                           .then([this, self = shared_from_this()](auto args) -> Status {
-                               if (!args.response.status.isOK()) {
-                                   return args.response.status;
+                       return (**executor)
+                           ->scheduleRemoteCommand(std::move(request), _source.token())
+                           .then([this, self = shared_from_this()](const auto& response) -> Status {
+                               if (!response.isOK()) {
+                                   return response.status;
                                }
-                               return getStatusFromCommandResult(args.response.data);
+                               return getStatusFromCommandResult(response.data);
                            });
                    });
            })
