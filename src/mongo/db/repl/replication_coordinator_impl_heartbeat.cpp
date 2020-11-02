@@ -654,7 +654,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             }
         }
 
-        if (!isArbiter && isFirstConfig) {
+        if (!isArbiter && myIndex.isOK() && myIndex.getValue() != -1) {
             shouldStartDataReplication = true;
         }
 

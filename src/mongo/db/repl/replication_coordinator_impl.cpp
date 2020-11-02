@@ -672,7 +672,7 @@ void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
     LOGV2_DEBUG(21320, 1, "Current term is now {term}", "Updated term", "term"_attr = term);
     _performPostMemberStateUpdateAction(action);
 
-    if (!isArbiter) {
+    if (!isArbiter && myIndex.getValue() != -1) {
         _externalState->startThreads(_settings);
         _startDataReplication(opCtx.get());
     }
@@ -708,6 +708,12 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
 
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                                                        std::function<void()> startCompleted) {
+    if (_startedSteadyStateReplication.load()) {
+        return;
+    }
+
+    _startedSteadyStateReplication.store(true);
+
     // Check to see if we need to do an initial sync.
     const auto lastOpTime = getMyLastAppliedOpTime();
     const auto needsInitialSync =
