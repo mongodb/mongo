@@ -15,7 +15,8 @@ rst.startSet();
 rst.initiateWithHighElectionTimeout();
 
 let conn = rst.getPrimary();
-assert.commandWorked(conn.getDB("test").coll.insert({_id: 0, a: 0}));
+assert.commandWorked(
+    conn.getDB("test").coll.insert({_id: 0, a: 0}, {writeConcern: {w: "majority"}}));
 
 let oplog = conn.getDB("local").oplog.rs;
 
