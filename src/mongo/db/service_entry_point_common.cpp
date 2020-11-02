@@ -102,6 +102,7 @@
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/net/socket_utils.h"
 
 namespace mongo {
 
@@ -269,6 +270,7 @@ void generateErrorResponse(OperationContext* opCtx,
     // so we need to reset it to a clean state just to be sure.
     replyBuilder->reset();
     replyBuilder->setCommandReply(exception.toStatus(), extraFields);
+    replyBuilder->getBodyBuilder().append("host", getHostNameCachedAndPort());
     replyBuilder->getBodyBuilder().appendElements(replyMetadata);
 }
 
