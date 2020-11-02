@@ -457,6 +457,7 @@ def _parse_struct(ctxt, spec, name, node):
             "inline_chained_structs": _RuleDesc("bool_scalar"),
             "immutable": _RuleDesc('bool_scalar'),
             "generate_comparison_operators": _RuleDesc("bool_scalar"),
+            "non_const_getter": _RuleDesc('bool_scalar'),
         })
 
     spec.symbols.add_struct(ctxt, struct)
@@ -637,6 +638,7 @@ def _parse_command(ctxt, spec, name, node):
             "immutable": _RuleDesc('bool_scalar'),
             "generate_comparison_operators": _RuleDesc("bool_scalar"),
             "allow_global_collection_name": _RuleDesc('bool_scalar'),
+            "non_const_getter": _RuleDesc('bool_scalar'),
         })
 
     valid_commands = [

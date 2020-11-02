@@ -1845,7 +1845,8 @@ TEST_F(QueryPlannerWildcardTest, CanProduceSortMergePlanWithWildcardIndex) {
     internalQueryEnumerationMaxOrSolutions.store(5);
     addWildcardIndex(BSON("$**" << 1));
     addIndex(BSON("a" << 1 << "b" << 1));
-    runQueryAsCommand(fromjson("{filter: {$or: [{a: 1, b: 1}, {b: 2}]}, sort: {b: -1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {$or: [{a: 1, b: 1}, {b: 2}]}, sort: {b: -1}}"));
     assertNumSolutions(3U);
     assertSolutionExists(
         "{fetch: {filter: null, node: {mergeSort: {nodes: ["

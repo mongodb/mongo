@@ -379,7 +379,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         qr.setFilter(query);
         qr.setSort(sort);
         qr.setReadConcern(readConcernObj);
-        qr.setLimit(limit);
+        qr.setLimit(limit ? static_cast<boost::optional<std::int64_t>>(*limit) : boost::none);
 
         if (maxTimeMS < Milliseconds::max()) {
             qr.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));

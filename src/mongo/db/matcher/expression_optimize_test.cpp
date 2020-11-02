@@ -283,8 +283,9 @@ TEST(ExpressionOptimizeTest, IsValidGeoNearNaturalHint) {
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortIndexHint) {
     const bool isExplain = false;
-    auto qr = assertGet(QueryRequest::makeFromFindCommand(
-        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}}"), isExplain));
+    auto qr = QueryRequest::makeFromFindCommand(
+        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {a: 1}, '$db': 'test'}"),
+        isExplain);
 
     // Invalid: {$natural: 1} sort order and index hint.
     ASSERT_NOT_OK(isValid("{}", *qr));
@@ -292,8 +293,9 @@ TEST(ExpressionOptimizeTest, IsValidNaturalSortIndexHint) {
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHint) {
     const bool isExplain = false;
-    auto qr = assertGet(QueryRequest::makeFromFindCommand(
-        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}}"), isExplain));
+    auto qr = QueryRequest::makeFromFindCommand(
+        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: 1}, '$db': 'test'}"),
+        isExplain);
 
     // Valid: {$natural: 1} sort order and {$natural: 1} hint.
     ASSERT_OK(isValid("{}", *qr));
@@ -301,8 +303,9 @@ TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHint) {
 
 TEST(ExpressionOptimizeTest, IsValidNaturalSortNaturalHintDifferentDirections) {
     const bool isExplain = false;
-    auto qr = assertGet(QueryRequest::makeFromFindCommand(
-        nss, fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}}"), isExplain));
+    auto qr = QueryRequest::makeFromFindCommand(
+        fromjson("{find: 'testcoll', sort: {$natural: 1}, hint: {$natural: -1}, '$db': 'test'}"),
+        isExplain);
 
     // Invalid: {$natural: 1} sort order and {$natural: -1} hint.
     ASSERT_NOT_OK(isValid("{}", *qr));

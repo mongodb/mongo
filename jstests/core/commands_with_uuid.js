@@ -4,7 +4,7 @@
  *
  * @tags: [
  *    requires_fastcount,
- *
+ *    requires_fcv_49,
  *    incompatible_with_embedded,
  * ]
  */
@@ -58,7 +58,7 @@ cmd = {
 };
 res = db.runCommand(cmd);
 assert.commandFailed(res, 'expected ' + tojson(cmd) + ' to fail.');
-assert(res.errmsg.includes('field must be of BSON type string'),
+assert(res.errmsg.includes('collection name has invalid type double'),
        'expected the error message of ' + tojson(res) + ' to include string type');
 
 // Ensure passing a missing UUID to commands taking UUIDs uasserts that the UUID is not found.

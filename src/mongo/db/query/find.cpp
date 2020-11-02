@@ -86,7 +86,7 @@ bool shouldSaveCursor(OperationContext* opCtx,
                       PlanExecutor::ExecState finalState,
                       PlanExecutor* exec) {
     const QueryRequest& qr = exec->getCanonicalQuery()->getQueryRequest();
-    if (!qr.wantMore()) {
+    if (qr.isSingleBatch()) {
         return false;
     }
 
@@ -718,7 +718,7 @@ bool runQuery(OperationContext* opCtx,
                 LOGV2_DEBUG(20915,
                             5,
                             "Enough for first batch",
-                            "wantMore"_attr = qr.wantMore(),
+                            "wantMore"_attr = !qr.isSingleBatch(),
                             "numToReturn"_attr = qr.getNToReturn().value_or(0),
                             "numResults"_attr = numResults);
                 break;

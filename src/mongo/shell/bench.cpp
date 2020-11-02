@@ -244,7 +244,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
     int count = cursorResponse.getBatch().size();
 
     if (objOut) {
-        invariant(qr->getLimit() && *qr->getLimit() == 1 && !qr->wantMore());
+        invariant(qr->getLimit() && *qr->getLimit() == 1 && qr->isSingleBatch());
         // Since this is a "single batch" query, we can simply grab the first item in the result set
         // and return here.
         *objOut = (count > 0) ? cursorResponse.getBatch()[0] : BSONObj();
@@ -294,7 +294,7 @@ Timestamp getLatestClusterTime(DBClientBase* conn) {
     auto qr = std::make_unique<QueryRequest>(NamespaceString("local.oplog.rs"));
     qr->setSort(BSON("$natural" << -1));
     qr->setLimit(1LL);
-    qr->setWantMore(false);
+    qr->setSingleBatchField(true);
     invariant(qr->validate());
     const auto dbName = qr->nss().db().toString();
 
@@ -995,7 +995,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 qr->setFilter(fixedQuery);
                 qr->setProj(this->projection);
                 qr->setLimit(1LL);
-                qr->setWantMore(false);
+                qr->setSingleBatchField(true);
                 if (config.useSnapshotReads) {
                     qr->setReadConcern(readConcernSnapshot);
                 }

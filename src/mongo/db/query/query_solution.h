@@ -362,9 +362,6 @@ public:
      */
     void setRoot(std::unique_ptr<QuerySolutionNode> root);
 
-    // Any filters in root or below point into this object.  Must be owned.
-    BSONObj filterData;
-
     // There are two known scenarios in which a query solution might potentially block:
     //
     // Sort stage:

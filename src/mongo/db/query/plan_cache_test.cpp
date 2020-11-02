@@ -1048,8 +1048,7 @@ protected:
         solns.clear();
 
         const bool isExplain = false;
-        std::unique_ptr<QueryRequest> qr(
-            assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+        std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmdObj, isExplain));
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto statusWithCQ =
@@ -1758,8 +1757,9 @@ TEST_F(CachePlanSelectionTest, Or2DNonNearNotCached) {
 TEST_F(CachePlanSelectionTest, MatchingCollation) {
     CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
     addIndex(BSON("x" << 1), "x_1", &collator);
-    runQueryAsCommand(fromjson(
-        "{find: 'testns', filter: {x: 'foo'}, collation: {locale: 'mock_reverse_string'}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'testns', filter: {x: 'foo'}, collation: {locale: 'mock_reverse_string'}, "
+                 "'$db': 'test'}"));
 
     assertPlanCacheRecoversSolution(BSON("x"
                                          << "bar"),

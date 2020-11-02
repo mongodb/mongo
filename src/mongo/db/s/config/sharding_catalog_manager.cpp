@@ -103,7 +103,7 @@ void startTransactionWithNoopFind(OperationContext* opCtx,
     BSONObjBuilder findCmdBuilder;
     QueryRequest qr(nss);
     qr.setBatchSize(0);
-    qr.setWantMore(false);
+    qr.setSingleBatchField(true);
     qr.asFindCommand(&findCmdBuilder);
 
     auto res = runCommandInLocalTxn(

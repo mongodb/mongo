@@ -332,7 +332,7 @@ void QueryPlannerTest::runQueryFull(const BSONObj& query,
         if (ntoreturn < 0) {
             ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
             ntoreturn = -ntoreturn;
-            qr->setWantMore(false);
+            qr->setSingleBatchField(true);
         }
         qr->setNToReturn(ntoreturn);
     }
@@ -412,7 +412,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
         if (ntoreturn < 0) {
             ASSERT_NE(ntoreturn, std::numeric_limits<long long>::min());
             ntoreturn = -ntoreturn;
-            qr->setWantMore(false);
+            qr->setSingleBatchField(true);
         }
         qr->setNToReturn(ntoreturn);
     }
@@ -433,14 +433,17 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
     ASSERT_NOT_OK(plannerStatus);
 }
 
+
 void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
     clearState();
 
     invariant(nss.isValid());
 
     const bool isExplain = false;
-    std::unique_ptr<QueryRequest> qr(
-        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+
+    // If there is no '$db', append it.
+    auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
+    std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmd, isExplain, nss));
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),
@@ -462,8 +465,10 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
     invariant(nss.isValid());
 
     const bool isExplain = false;
-    std::unique_ptr<QueryRequest> qr(
-        assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain)));
+
+    // If there is no '$db', append it.
+    auto cmd = OpMsgRequest::fromDBAndBody(nss.db(), cmdObj).body;
+    std::unique_ptr<QueryRequest> qr(QueryRequest::makeFromFindCommand(cmd, isExplain, nss));
 
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx.get(),

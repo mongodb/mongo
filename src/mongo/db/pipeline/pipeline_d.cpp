@@ -204,8 +204,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     qr->setFilter(queryObj);
     qr->setProj(projectionObj);
     qr->setSort(sortObj);
-    qr->setSkip(skipThenLimit.getSkip());
-    qr->setLimit(skipThenLimit.getLimit());
+    if (auto skip = skipThenLimit.getSkip()) {
+        qr->setSkip(static_cast<std::int64_t>(*skip));
+    }
+    if (auto limit = skipThenLimit.getLimit()) {
+        qr->setLimit(static_cast<std::int64_t>(*limit));
+    }
+
     if (aggRequest) {
         qr->setExplain(static_cast<bool>(aggRequest->getExplain()));
         qr->setHint(aggRequest->getHint().value_or(BSONObj()));

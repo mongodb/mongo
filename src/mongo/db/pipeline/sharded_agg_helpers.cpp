@@ -825,7 +825,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
     }
 
     targetedCmd[AggregateCommand::kBatchSizeFieldName] =
-        Value(DOC(QueryRequest::kBatchSizeField << 0));
+        Value(DOC(aggregation_request_helper::kBatchSizeField << 0));
 
     targetedCmd[AggregateCommand::kExchangeFieldName] =
         exchangeSpec ? Value(exchangeSpec->exchangeSpec.toBSON()) : Value();

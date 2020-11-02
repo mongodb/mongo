@@ -1,0 +1,197 @@
+# Copyright(C) 2020 - present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This IDL file describes the BSON format for find command. Note that the legacy OP_MSG request
+# parameters are not represented in the structre.
+
+global:
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/namespace_string.h"
+
+imports:
+    - "mongo/db/logical_session_id.idl"
+    - "mongo/db/pipeline/legacy_runtime_constants.idl"
+    - "mongo/idl/basic_types.idl"
+    - "mongo/db/query/hint.idl"
+
+types:
+    boolNoOpSerializer:
+      bson_serialization_type: any
+      description: "Bool data type field which doesn't produce any data when serialized."
+      cpp_type: "bool"
+      deserializer: "::mongo::parseBoolean"
+      serializer: "::mongo::noOpSerializer"
+    object_owned_nonempty_serialize:
+        bson_serialization_type: any
+        description: "An owned BSONObj, which gets serialized only when the BSON is not empty. 
+        The object is ignored if empty, null or missing."
+        cpp_type: "mongo::BSONObj"
+        serializer: "::mongo::serializeBSONWhenNotEmpty"
+        deserializer: "::mongo::parseOwnedBSON"
+        default: mongo::BSONObj()
+    maxTimeMS:
+        bson_serialization_type: any
+        description: "An int representing max time ms."
+        cpp_type: "std::int32_t"
+        deserializer: "::mongo::QueryRequest::parseMaxTimeMSForIDL"
+
+commands:
+  find:
+    cpp_name: FindCommand
+    command_name: find
+    description: "A struct representing the find command"
+    strict: true
+    namespace: concatenate_with_db_or_uuid
+    non_const_getter: true
+    fields:
+      filter:
+        description: "The query predicate. If unspecified, then all documents in the collection
+        will match the predicate."
+        type: object_owned_nonempty_serialize
+      projection:
+        description: "The projection specification to determine which fields to include in the
+        returned documents."
+        type: object_owned_nonempty_serialize
+      sort:
+        description: "The sort specification for the ordering of the results."
+        type: object_owned_nonempty_serialize
+      hint:
+        description: "Specify either the index name as a string or the index key pattern. If
+        specified, then the query system will only consider plans using the hinted index."
+        type: indexHint
+        default: mongo::BSONObj()
+      collation:
+        description: "Specifies the collation to use for the operation."
+        type: object_owned_nonempty_serialize
+      skip:
+        description: "Number of documents to skip."
+        type: safeInt64
+        optional: true
+      limit:
+        description: "The maximum number of documents to return."
+        type: safeInt64
+        optional: true
+      batchSize:
+        description: "The number of documents to return in the first batch."
+        type: safeInt64
+        optional: true
+      ntoreturn:
+        description: "Deprecated. Should use batchSize."
+        type: safeInt64
+        optional: true
+      singleBatch:
+        description: "Determines whether to close the cursor after the first batch."
+        type: optionalBool
+      allowDiskUse:
+        description: "Use allowDiskUse to allow MongoDB to use temporary files on disk to store
+        data exceeding the 100 megabyte memory limit while processing a blocking sort operation."
+        type: optionalBool
+      min:
+        description: "The inclusive lower bound for a specific index."
+        type: object_owned_nonempty_serialize
+      max:
+        description: "The exclusive upper bound for a specific index."
+        type: object_owned_nonempty_serialize
+      returnKey:
+        description: "If true, returns only the index keys in the resulting documents."
+        type: optionalBool
+      showRecordId:
+        description: "Determines whether to return the record identifier for each document."
+        type: optionalBool
+      $queryOptions:
+        description: "Deprecated. A mechanism to specify readPreference."
+        cpp_name: unwrappedReadPref
+        type: object_owned_nonempty_serialize
+      tailable:
+        description: "Returns a tailable cursor for a capped collections."
+        type: optionalBool
+      oplogReplay:
+        description: "Deprecated. An internal command for replaying a replica set’s oplog."
+        type: boolNoOpSerializer
+        optional: true
+      noCursorTimeout:
+        description: "Prevents the server from timing out idle cursors after an inactivity period."
+        type: optionalBool
+      awaitData:
+        description: "Use in conjunction with the tailable option to block a getMore command on the
+        cursor temporarily if at the end of data rather than returning no data."
+        type: optionalBool
+      allowPartialResults:
+        description: "For queries against a sharded collection, allows the command (or subsequent
+        getMore commands) to return partial results, rather than an error, if one or more queried
+        shards are unavailable."
+        type: optionalBool
+      let:
+        description: "Allows user defined variables to be used inside $expr."
+        type: object_owned
+        optional: true
+      options:
+        description: "Deprecated."
+        type: object_owned
+        optional: true
+      term:
+        description: "Deprecated."
+        type: safeInt64
+        optional: true
+      readOnce:
+        description: "Deprecated."
+        type: optionalBool
+      allowSpeculativeMajorityRead:
+        description: "Deprecated."
+        type: optionalBool
+      $_requestResumeToken:
+        description: "Deprecated."
+        cpp_name: requestResumeToken
+        type: optionalBool
+      $_resumeAfter:
+        description: "Deprecated."
+        cpp_name: resumeAfter
+        type: object_owned_nonempty_serialize
+        default: mongo::BSONObj()
+      _use44SortKeys:
+        description: "An internal parameter used to determine the serialization format for sort 
+        keys. TODO SERVER-47065: A 4.7+ node still has to accept the '_use44SortKeys' field, since
+        it could be included in a command sent from a 4.4 mongos. When 5.0 becomes last-lts, this
+        code to tolerate the '_use44SortKeys' field can be deleted."
+        type: bool
+        optional: true
+      maxTimeMS:
+        description: "The cumulative time limit in milliseconds for processing operations on the
+        cursor."
+        type: maxTimeMS
+        optional: true
+      readConcern:
+        description: "Specifies the read concern."
+        type: object_owned
+        optional: true
+      runtimeConstants:
+        description: "A collection of values that do not change once computed."
+        cpp_name: legacyRuntimeConstants
+        type: LegacyRuntimeConstants
+        optional: true

@@ -325,6 +325,23 @@ std::string NamespaceStringOrUUID::toString() const {
         return _uuid->toString();
 }
 
+void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, StringData fieldName) const {
+    invariant(_uuid || _nss);
+    if (_preferNssForSerialization) {
+        if (_nss) {
+            builder->append(fieldName, _nss->coll());
+        } else {
+            _uuid->appendToBuilder(builder, fieldName);
+        }
+    } else {
+        if (_uuid) {
+            _uuid->appendToBuilder(builder, fieldName);
+        } else {
+            builder->append(fieldName, _nss->coll());
+        }
+    }
+}
+
 std::ostream& operator<<(std::ostream& stream, const NamespaceString& nss) {
     return stream << nss.toString();
 }

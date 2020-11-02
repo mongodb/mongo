@@ -88,7 +88,7 @@ StringMap<std::vector<ShardId>> buildTagsToShardIdsMap(OperationContext* opCtx,
                                              ShardType::ConfigNS,
                                              BSONObj(),
                                              BSONObj(),
-                                             0));
+                                             boost::none));
     uassert(50986, str::stream() << "Could not find any shard documents", !shardDocs.docs.empty());
 
     for (const auto& tag : tags) {

@@ -21,37 +21,39 @@ assertSchemaMatch(coll, {my_keyword: "ignored", minProperties: 2}, {_id: 0, a: 1
 assertSchemaMatch(
     coll, {properties: {a: {my_keyword: "ignored", minProperties: 1}}}, {a: {b: 1}}, true);
 
-// Test that the same query knob does not change the behavior for unsupported keywords.
+// Test that the same query knob does not change the behavior for unsupported keywords. A 4.4 node
+// would have thrown 'FailedToParse' error, where as the last node would return 40415 error code. So
+// we assert for both the error codes.
 {
     let res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {default: {_id: 0}}}});
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
     res = coll.runCommand({
         find: coll.getName(),
         query: {$jsonSchema: {definitions: {numberField: {type: "number"}}}}
     });
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
     res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {format: "email"}}});
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
     res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {id: "someschema.json"}}});
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
     res = coll.runCommand({
         find: coll.getName(),
         query: {$jsonSchema: {properties: {a: {$ref: "#/definitions/positiveInt"}}}}
     });
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
     res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {$schema: "hyper-schema"}}});
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
     res = coll.runCommand({
         find: coll.getName(),
         query: {$jsonSchema: {$schema: "http://json-schema.org/draft-04/schema#"}}
     });
-    assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+    assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 }
 
 MongoRunner.stopMongod(conn);

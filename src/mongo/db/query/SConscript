@@ -99,17 +99,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='distinct_command_idl',
-    source=[
-        'distinct_command.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
 # Shared mongod/mongos query code.
 env.Library(
     target="query_common",
@@ -124,7 +113,6 @@ env.Library(
         "collation/collator_factory_icu",
         "collation/collator_icu",
         "datetime/init_timezone_data",
-        "distinct_command_idl",
         "explain_options",
         "query_planner",
         "query_request",
@@ -187,6 +175,8 @@ env.Library(
 env.Library(
     target="query_request",
     source=[
+        "distinct_command.idl",
+        "find_command.idl",
         "query_request.cpp",
         "tailable_mode.cpp",
         "tailable_mode.idl",
@@ -200,6 +190,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/commands/test_commands_enabled",
         "$BUILD_DIR/mongo/db/pipeline/runtime_constants_idl",
         "$BUILD_DIR/mongo/db/repl/read_concern_args",
+        "hint_parser",
     ],
 )
 

@@ -95,7 +95,9 @@ protected:
         BSONObj cmdObj = fromjson(findCmd);
 
         bool isExplain = false;
-        auto qr = unittest::assertGet(QueryRequest::makeFromFindCommand(nss, cmdObj, isExplain));
+        // If there is no '$db', append it.
+        auto cmd = OpMsgRequest::fromDBAndBody("test", cmdObj).body;
+        auto qr = QueryRequest::makeFromFindCommand(cmd, isExplain, NamespaceString());
 
         auto cq = unittest::assertGet(
             CanonicalQuery::canonicalize(opCtx(),

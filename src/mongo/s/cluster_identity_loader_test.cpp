@@ -76,10 +76,8 @@ public:
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss.ns(), "config.version");
-
-            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
             ASSERT_EQ(query->nss().ns(), "config.version");
             ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());

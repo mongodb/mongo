@@ -540,7 +540,7 @@ bool canUseSimpleSort(const QuerySolutionNode& solnRoot,
                       const CanonicalQuery& cq,
                       const QueryPlannerParams& plannerParams) {
     const bool splitLimitedSortEligible = cq.getQueryRequest().getNToReturn() &&
-        cq.getQueryRequest().wantMore() &&
+        !cq.getQueryRequest().isSingleBatch() &&
         plannerParams.options & QueryPlannerParams::SPLIT_LIMITED_SORT;
 
     // The simple sort stage discards any metadata other than sort key metadata. It can only be used
@@ -857,7 +857,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         // One way to handle the ambiguity of a limited OR stage is to use the SPLIT_LIMITED_SORT
         // hack.
         //
-        // If wantMore is false (meaning that 'ntoreturn' was initially passed to the server as a
+        // If singleBatch is true (meaning that 'ntoreturn' was initially passed to the server as a
         // negative value), then we treat numToReturn as a limit.  Since there is no limit-batchSize
         // ambiguity in this case, we do not use the SPLIT_LIMITED_SORT hack.
         //
@@ -876,7 +876,7 @@ QuerySolutionNode* QueryPlannerAnalysis::analyzeSort(const CanonicalQuery& query
         //
         // Not allowed for geo or text, because we assume elsewhere that those stages appear just
         // once.
-        if (qr.wantMore() && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT &&
+        if (!qr.isSingleBatch() && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO) &&
             !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
@@ -913,7 +913,6 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     const QueryPlannerParams& params,
     std::unique_ptr<QuerySolutionNode> solnRoot) {
     auto soln = std::make_unique<QuerySolution>();
-    soln->filterData = query.getQueryObj();
     soln->indexFilterApplied = params.indexFiltersApplied;
 
     solnRoot->computeProperties();
@@ -1018,7 +1017,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             limit->limit = *qr.getLimit();
             limit->children.push_back(solnRoot.release());
             solnRoot.reset(limit);
-        } else if (qr.getNToReturn() && !qr.wantMore()) {
+        } else if (qr.getNToReturn() && qr.isSingleBatch()) {
             // We have a "legacy limit", i.e. a negative ntoreturn value from an OP_QUERY style
             // find.
             LimitNode* limit = new LimitNode();

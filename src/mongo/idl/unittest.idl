@@ -674,6 +674,14 @@ commands:
             field1: int
             field2: string
 
+    BasicNamespaceConstGetterCommand:
+        description: UnitTest for a basic concatenate_with_db_or_uuid command
+        command_name: BasicNamespaceConstGetterCommand
+        namespace: concatenate_with_db_or_uuid
+        non_const_getter: true
+        fields:
+            field1: int
+
     KnownFieldCommand:
         description: UnitTest for a command that has a field that is special known generic command field
         command_name: KnownFieldCommand

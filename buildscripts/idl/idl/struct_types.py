@@ -484,6 +484,8 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
         indented_writer.write_line('const NamespaceString& getNamespace() const { return _nss; }')
+        if self._struct.non_const_getter:
+            indented_writer.write_line('NamespaceString& getNamespace() { return _nss; }')
 
     def gen_member(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -558,6 +560,9 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
         # type: (writer.IndentedTextWriter) -> None
         indented_writer.write_line(
             'const NamespaceStringOrUUID& getNamespaceOrUUID() const { return _nssOrUUID; }')
+        if self._struct.non_const_getter:
+            indented_writer.write_line(
+                'NamespaceStringOrUUID& getNamespaceOrUUID() { return _nssOrUUID; }')
 
     def gen_member(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -565,14 +570,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def gen_serializer(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        indented_writer.write_line('invariant(_nssOrUUID.nss() || _nssOrUUID.uuid());')
-        # Prefer the uuid over the nss for serialization
-        with writer.IndentedScopedBlock(indented_writer, "if( _nssOrUUID.uuid() ) {", "}"):
-            indented_writer.write_line(
-                '_nssOrUUID.uuid().get().appendToBuilder(builder, "%s"_sd);' % (self._command.name))
-        with writer.IndentedScopedBlock(indented_writer, "else {", "}"):
-            indented_writer.write_line(
-                'builder->append("%s"_sd, _nssOrUUID.nss().get().coll());' % (self._command.name))
+        indented_writer.write_line('_nssOrUUID.serialize(builder, "%s"_sd);' % (self._command.name))
         indented_writer.write_empty_line()
 
     def gen_namespace_check(self, indented_writer, db_name, element):

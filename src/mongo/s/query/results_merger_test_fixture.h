@@ -70,8 +70,9 @@ protected:
 
 
         if (findCmd) {
-            const auto qr = unittest::assertGet(
-                QueryRequest::makeFromFindCommand(kTestNss, *findCmd, false /* isExplain */));
+            // If there is no '$db', append it.
+            auto cmd = OpMsgRequest::fromDBAndBody(kTestNss.db(), *findCmd).body;
+            const auto qr = QueryRequest::makeFromFindCommand(cmd, false /* isExplain */, kTestNss);
             if (!qr->getSort().isEmpty()) {
                 params.setSort(qr->getSort().getOwned());
             }

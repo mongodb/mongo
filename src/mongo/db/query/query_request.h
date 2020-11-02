@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/tailable_mode.h"
 
 namespace mongo {
@@ -52,44 +53,15 @@ class StatusWith;
  */
 class QueryRequest {
 public:
-    // Find command field names.
-    static constexpr auto kFilterField = "filter";
-    static constexpr auto kProjectionField = "projection";
-    static constexpr auto kSortField = "sort";
-    static constexpr auto kHintField = "hint";
-    static constexpr auto kCollationField = "collation";
-    static constexpr auto kSkipField = "skip";
-    static constexpr auto kLimitField = "limit";
-    static constexpr auto kBatchSizeField = "batchSize";
-    static constexpr auto kNToReturnField = "ntoreturn";
-    static constexpr auto kSingleBatchField = "singleBatch";
-    static constexpr auto kMaxField = "max";
-    static constexpr auto kMinField = "min";
-    static constexpr auto kReturnKeyField = "returnKey";
-    static constexpr auto kShowRecordIdField = "showRecordId";
-    static constexpr auto kTailableField = "tailable";
-    static constexpr auto kOplogReplayField = "oplogReplay";
-    static constexpr auto kNoCursorTimeoutField = "noCursorTimeout";
-    static constexpr auto kAwaitDataField = "awaitData";
-    static constexpr auto kPartialResultsField = "allowPartialResults";
-    static constexpr auto kLegacyRuntimeConstantsField = "runtimeConstants";
-    static constexpr auto kLetField = "let";
-    static constexpr auto kTermField = "term";
-    static constexpr auto kOptionsField = "options";
-    static constexpr auto kReadOnceField = "readOnce";
-    static constexpr auto kAllowSpeculativeMajorityReadField = "allowSpeculativeMajorityRead";
-    static constexpr auto kRequestResumeTokenField = "$_requestResumeToken";
-    static constexpr auto kResumeAfterField = "$_resumeAfter";
-    static constexpr auto kUse44SortKeys = "_use44SortKeys";
     static constexpr auto kMaxTimeMSOpOnlyField = "maxTimeMSOpOnly";
 
     // Field names for sorting options.
     static constexpr auto kNaturalSortField = "$natural";
 
-    static constexpr auto kFindCommandName = "find";
     static constexpr auto kShardVersionField = "shardVersion";
 
-    explicit QueryRequest(NamespaceStringOrUUID nss);
+    explicit QueryRequest(NamespaceStringOrUUID nss, bool preferNssForSerialization = true);
+    explicit QueryRequest(FindCommand findCommand);
 
     /**
      * Returns a non-OK status if any property of the QR has a bad value (e.g. a negative skip
@@ -106,23 +78,29 @@ public:
      * Returns a heap allocated QueryRequest on success or an error if 'cmdObj' is not well
      * formed.
      */
-    static StatusWith<std::unique_ptr<QueryRequest>> makeFromFindCommand(NamespaceString nss,
-                                                                         const BSONObj& cmdObj,
-                                                                         bool isExplain);
+    static std::unique_ptr<QueryRequest> makeFromFindCommand(
+        const BSONObj& cmdObj, bool isExplain, boost::optional<NamespaceString> nss = boost::none);
 
     /**
      * If _uuid exists for this QueryRequest, update the value of _nss.
      */
     void refreshNSS(const NamespaceString& nss);
 
+    void setNSS(const NamespaceString& nss) {
+        auto& nssOrUuid = _findCommand.getNamespaceOrUUID();
+        nssOrUuid.setNss(nss);
+    }
+
     /**
      * Converts this QR into a find command.
      * The withUuid variants make a UUID-based find command instead of a namespace-based ones.
      */
     BSONObj asFindCommand() const;
-    BSONObj asFindCommandWithUuid() const;
+
+    /**
+     * Common code for UUID and namespace-based find commands.
+     */
     void asFindCommand(BSONObjBuilder* cmdBuilder) const;
-    void asFindCommandWithUuid(BSONObjBuilder* cmdBuilder) const;
 
     /**
      * Converts this QR into an aggregation using $match. If this QR has options that cannot be
@@ -142,6 +120,8 @@ public:
      * only allowed to be provided for internal intra-cluster requests.
      */
     static StatusWith<int> parseMaxTimeMS(BSONElement maxTimeMSElt);
+
+    static int32_t parseMaxTimeMSForIDL(BSONElement maxTimeMSElt);
 
     /**
      * Helper function to identify text search sort key
@@ -180,120 +160,120 @@ public:
     static constexpr auto kMaxTimeMSOpOnlyMaxPadding = 100LL;
 
     const NamespaceString& nss() const {
-        return _nss;
-    }
-
-    boost::optional<UUID> uuid() const {
-        return _uuid;
-    }
-
-    const BSONObj& getFilter() const {
-        return _filter;
-    }
-
-    void setFilter(BSONObj filter) {
-        _filter = filter.getOwned();
-    }
-
-    const BSONObj& getProj() const {
-        return _proj;
-    }
-
-    void setProj(BSONObj proj) {
-        _proj = proj.getOwned();
-    }
-
-    const BSONObj& getSort() const {
-        return _sort;
-    }
-
-    void setSort(BSONObj sort) {
-        _sort = sort.getOwned();
-    }
-
-    const BSONObj& getHint() const {
-        return _hint;
-    }
-
-    void setHint(BSONObj hint) {
-        _hint = hint.getOwned();
-    }
-
-    const BSONObj& getReadConcern() const {
-        if (_readConcern) {
-            return *_readConcern;
+        if (_findCommand.getNamespaceOrUUID().nss()) {
+            return *_findCommand.getNamespaceOrUUID().nss();
         } else {
-            static const auto empty = BSONObj();
-            return empty;
+            static NamespaceString nss = NamespaceString();
+            return nss;
         }
     }
 
+    boost::optional<UUID> uuid() const {
+        return _findCommand.getNamespaceOrUUID().uuid();
+    }
+
+    const BSONObj& getFilter() const {
+        return _findCommand.getFilter();
+    }
+
+    void setFilter(BSONObj filter) {
+        _findCommand.setFilter(filter.getOwned());
+    }
+
+    const BSONObj& getProj() const {
+        return _findCommand.getProjection();
+    }
+
+    void setProj(BSONObj proj) {
+        _findCommand.setProjection(proj.getOwned());
+    }
+
+    const BSONObj& getSort() const {
+        return _findCommand.getSort();
+    }
+
+    void setSort(BSONObj sort) {
+        _findCommand.setSort(sort.getOwned());
+    }
+
+    const BSONObj& getHint() const {
+        return _findCommand.getHint();
+    }
+
+    void setHint(BSONObj hint) {
+        _findCommand.setHint(hint.getOwned());
+    }
+
+    boost::optional<BSONObj> getReadConcern() const {
+        return _findCommand.getReadConcern();
+    }
+
     void setReadConcern(BSONObj readConcern) {
-        _readConcern = readConcern.getOwned();
+        _findCommand.setReadConcern(readConcern.getOwned());
     }
 
     const BSONObj& getCollation() const {
-        return _collation;
+        return _findCommand.getCollation();
     }
 
     void setCollation(BSONObj collation) {
-        _collation = collation.getOwned();
+        _findCommand.setCollation(collation.getOwned());
     }
 
     static constexpr auto kDefaultBatchSize = 101ll;
 
-    boost::optional<long long> getSkip() const {
-        return _skip;
+    boost::optional<std::int64_t> getSkip() const {
+        return _findCommand.getSkip();
     }
 
-    void setSkip(boost::optional<long long> skip) {
-        _skip = skip;
+    void setSkip(boost::optional<std::int64_t> skip) {
+        _findCommand.setSkip(skip);
     }
 
-    boost::optional<long long> getLimit() const {
-        return _limit;
+    boost::optional<std::int64_t> getLimit() const {
+        return _findCommand.getLimit();
     }
 
-    void setLimit(boost::optional<long long> limit) {
-        _limit = limit;
+    void setLimit(boost::optional<std::int64_t> limit) {
+        _findCommand.setLimit(limit);
     }
 
-    boost::optional<long long> getBatchSize() const {
-        return _batchSize;
+    boost::optional<std::int64_t> getBatchSize() const {
+        return _findCommand.getBatchSize();
     }
 
-    void setBatchSize(boost::optional<long long> batchSize) {
-        _batchSize = batchSize;
+    void setBatchSize(boost::optional<std::int64_t> batchSize) {
+        _findCommand.setBatchSize(batchSize);
     }
 
-    boost::optional<long long> getNToReturn() const {
-        return _ntoreturn;
+    boost::optional<std::int64_t> getNToReturn() const {
+        return _findCommand.getNtoreturn();
     }
 
-    void setNToReturn(boost::optional<long long> ntoreturn) {
-        _ntoreturn = ntoreturn;
+    void setNToReturn(boost::optional<std::int64_t> ntoreturn) {
+        _findCommand.setNtoreturn(ntoreturn);
     }
 
     /**
      * Returns batchSize or ntoreturn value if either is set. If neither is set,
      * returns boost::none.
      */
-    boost::optional<long long> getEffectiveBatchSize() const;
+    boost::optional<std::int64_t> getEffectiveBatchSize() const;
 
-    bool wantMore() const {
-        return _wantMore;
+    bool isSingleBatch() const {
+        return _findCommand.getSingleBatch();
     }
 
-    void setWantMore(bool wantMore) {
-        _wantMore = wantMore;
+    void setSingleBatchField(bool singleBatch) {
+        _findCommand.setSingleBatch(singleBatch);
     }
 
     bool allowDiskUse() const {
-        return _allowDiskUse;
+        return _findCommand.getAllowDiskUse();
     }
 
     void setAllowDiskUse(bool allowDiskUse) {
-        _allowDiskUse = allowDiskUse;
+        _findCommand.setAllowDiskUse(allowDiskUse);
     }
 
     bool isExplain() const {
@@ -305,51 +285,51 @@ public:
     }
 
     const BSONObj& getUnwrappedReadPref() const {
-        return _unwrappedReadPref;
+        return _findCommand.getUnwrappedReadPref();
     }
 
     void setUnwrappedReadPref(BSONObj unwrappedReadPref) {
-        _unwrappedReadPref = unwrappedReadPref.getOwned();
+        _findCommand.setUnwrappedReadPref(unwrappedReadPref.getOwned());
     }
 
     int getMaxTimeMS() const {
-        return _maxTimeMS;
+        return _findCommand.getMaxTimeMS() ? static_cast<int>(*_findCommand.getMaxTimeMS()) : 0;
     }
 
     void setMaxTimeMS(int maxTimeMS) {
-        _maxTimeMS = maxTimeMS;
+        _findCommand.setMaxTimeMS(maxTimeMS);
     }
 
     const BSONObj& getMin() const {
-        return _min;
+        return _findCommand.getMin();
     }
 
     void setMin(BSONObj min) {
-        _min = min.getOwned();
+        _findCommand.setMin(min.getOwned());
     }
 
     const BSONObj& getMax() const {
-        return _max;
+        return _findCommand.getMax();
     }
 
     void setMax(BSONObj max) {
-        _max = max.getOwned();
+        _findCommand.setMax(max.getOwned());
     }
 
     bool returnKey() const {
-        return _returnKey;
+        return _findCommand.getReturnKey();
     }
 
     void setReturnKey(bool returnKey) {
-        _returnKey = returnKey;
+        _findCommand.setReturnKey(returnKey);
     }
 
     bool showRecordId() const {
-        return _showRecordId;
+        return _findCommand.getShowRecordId();
     }
 
     void setShowRecordId(bool showRecordId) {
-        _showRecordId = showRecordId;
+        _findCommand.setShowRecordId(showRecordId);
     }
 
     bool hasReadPref() const {
@@ -371,6 +351,12 @@ public:
 
     void setTailableMode(TailableModeEnum tailableMode) {
         _tailableMode = tailableMode;
+        if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+            _findCommand.setAwaitData(true);
+            _findCommand.setTailable(true);
+        } else if (_tailableMode == TailableModeEnum::kTailable) {
+            _findCommand.setTailable(true);
+        }
     }
 
     TailableModeEnum getTailableMode() const {
@@ -378,19 +364,27 @@ public:
     }
 
     void setLegacyRuntimeConstants(LegacyRuntimeConstants runtimeConstants) {
-        _legacyRuntimeConstants = std::move(runtimeConstants);
+        _findCommand.setLegacyRuntimeConstants(std::move(runtimeConstants));
     }
 
     const boost::optional<LegacyRuntimeConstants>& getLegacyRuntimeConstants() const {
-        return _legacyRuntimeConstants;
+        return _findCommand.getLegacyRuntimeConstants();
+    }
+
+    bool getTailable() const {
+        return _findCommand.getTailable();
+    }
+
+    bool getAwaitData() const {
+        return _findCommand.getAwaitData();
     }
 
     void setLetParameters(BSONObj letParams) {
-        _letParameters = std::move(letParams);
+        _findCommand.setLet(std::move(letParams));
     }
 
     const boost::optional<BSONObj>& getLetParameters() const {
-        return _letParameters;
+        return _findCommand.getLet();
     }
 
     bool isSlaveOk() const {
@@ -402,11 +396,11 @@ public:
     }
 
     bool isNoCursorTimeout() const {
-        return _noCursorTimeout;
+        return _findCommand.getNoCursorTimeout();
     }
 
     void setNoCursorTimeout(bool noCursorTimeout) {
-        _noCursorTimeout = noCursorTimeout;
+        _findCommand.setNoCursorTimeout(noCursorTimeout);
     }
 
     bool isExhaust() const {
@@ -418,51 +412,51 @@ public:
     }
 
     bool isAllowPartialResults() const {
-        return _allowPartialResults;
+        return _findCommand.getAllowPartialResults();
     }
 
     void setAllowPartialResults(bool allowPartialResults) {
-        _allowPartialResults = allowPartialResults;
+        _findCommand.setAllowPartialResults(allowPartialResults);
     }
 
-    boost::optional<long long> getReplicationTerm() const {
-        return _replicationTerm;
+    boost::optional<std::int64_t> getReplicationTerm() const {
+        return _findCommand.getTerm();
     }
 
-    void setReplicationTerm(boost::optional<long long> replicationTerm) {
-        _replicationTerm = replicationTerm;
+    void setReplicationTerm(boost::optional<std::int64_t> replicationTerm) {
+        _findCommand.setTerm(replicationTerm);
     }
 
     bool isReadOnce() const {
-        return _readOnce;
+        return _findCommand.getReadOnce();
     }
 
     void setReadOnce(bool readOnce) {
-        _readOnce = readOnce;
+        _findCommand.setReadOnce(readOnce);
     }
 
     void setAllowSpeculativeMajorityRead(bool allowSpeculativeMajorityRead) {
-        _allowSpeculativeMajorityRead = allowSpeculativeMajorityRead;
+        _findCommand.setAllowSpeculativeMajorityRead(allowSpeculativeMajorityRead);
     }
 
     bool allowSpeculativeMajorityRead() const {
-        return _allowSpeculativeMajorityRead;
+        return _findCommand.getAllowSpeculativeMajorityRead();
     }
 
     bool getRequestResumeToken() const {
-        return _requestResumeToken;
+        return _findCommand.getRequestResumeToken();
     }
 
     void setRequestResumeToken(bool requestResumeToken) {
-        _requestResumeToken = requestResumeToken;
+        _findCommand.setRequestResumeToken(requestResumeToken);
     }
 
     const BSONObj& getResumeAfter() const {
-        return _resumeAfter;
+        return _findCommand.getResumeAfter();
     }
 
     void setResumeAfter(BSONObj resumeAfter) {
-        _resumeAfter = resumeAfter;
+        _findCommand.setResumeAfter(resumeAfter.getOwned());
     }
 
     /**
@@ -519,88 +513,19 @@ private:
      */
     void addMetaProjection();
 
-    /**
-     * Common code for UUID and namespace-based find commands.
-     */
-    void asFindCommandInternal(BSONObjBuilder* cmdBuilder) const;
-
-    NamespaceString _nss;
-    OptionalCollectionUUID _uuid;
-
-    BSONObj _filter;
-    BSONObj _proj;
-    BSONObj _sort;
-    // The hint provided, if any.  If the hint was by index key pattern, the value of '_hint' is
-    // the key pattern hinted.  If the hint was by index name, the value of '_hint' is
-    // {$hint: <String>}, where <String> is the index name hinted.
-    BSONObj _hint;
-    // The read concern is parsed elsewhere.
-    boost::optional<BSONObj> _readConcern;
-    // The collation is parsed elsewhere.
-    BSONObj _collation;
-
-    // The unwrapped readPreference object, if one was given to us by the mongos command processor.
-    // This object will be empty when no readPreference is specified or if the request does not
-    // originate from mongos.
-    BSONObj _unwrappedReadPref;
-
-    // If true, each cursor response will include a 'postBatchResumeToken' field containing the
-    // RecordID of the last observed document.
-    bool _requestResumeToken = false;
-    // If non-empty, instructs the query to resume from the RecordId given by the object's $recordId
-    // field.
-    BSONObj _resumeAfter;
-
-    bool _wantMore = true;
-
-    // Must be either unset or positive. Negative skip is illegal and a skip of zero received from
-    // the client is interpreted as the absence of a skip value.
-    boost::optional<long long> _skip;
-
-    // Must be either unset or positive. Negative limit is illegal and a limit value of zero
-    // received from the client is interpreted as the absence of a limit value.
-    boost::optional<long long> _limit;
-
-    // Must be either unset or non-negative. Negative batchSize is illegal but batchSize of 0 is
-    // allowed.
-    boost::optional<long long> _batchSize;
-
-    bool _allowDiskUse = false;
-
-    // Set only when parsed from an OP_QUERY find message. The value is computed by driver or shell
-    // and is set to be a min of batchSize and limit provided by user. QR can have set either
-    // ntoreturn or batchSize / limit.
-    boost::optional<long long> _ntoreturn;
+    // TODO SERVER-53060: This additional nesting can be avoided if we move the below fields
+    // (_explain, _tailableMode, etc.) into the CanonicalQuery class.
+    FindCommand _findCommand;
 
     bool _explain = false;
-
-    // A user-specified maxTimeMS limit, or a value of '0' if not specified.
-    int _maxTimeMS = 0;
-
-    BSONObj _min;
-    BSONObj _max;
-
-    bool _returnKey = false;
-    bool _showRecordId = false;
-    bool _hasReadPref = false;
-
-    // Runtime constants which may be referenced by $expr, if present.
-    boost::optional<LegacyRuntimeConstants> _legacyRuntimeConstants;
-
-    // A document containing user-specified constants. For a find query, these are accessed only
-    // inside $expr.
-    boost::optional<BSONObj> _letParameters;
 
     // Options that can be specified in the OP_QUERY 'flags' header.
     TailableModeEnum _tailableMode = TailableModeEnum::kNormal;
     bool _slaveOk = false;
-    bool _noCursorTimeout = false;
     bool _exhaust = false;
-    bool _allowPartialResults = false;
-    bool _readOnce = false;
-    bool _allowSpeculativeMajorityRead = false;
 
-    boost::optional<long long> _replicationTerm;
+    // Parameters used only by the legacy query request.
+    bool _hasReadPref = false;
 };
 
 }  // namespace mongo

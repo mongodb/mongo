@@ -90,7 +90,7 @@ const char kFindCmdName[] = "find";
 StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     const QueryRequest& qr, bool appendGeoNearDistanceProjection) {
     // If there is a limit, we forward the sum of the limit and the skip.
-    boost::optional<long long> newLimit;
+    boost::optional<int64_t> newLimit;
     if (qr.getLimit()) {
         long long newLimitValue;
         if (overflow::add(*qr.getLimit(), qr.getSkip().value_or(0), &newLimitValue)) {
@@ -104,11 +104,12 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     }
 
     // Similarly, if nToReturn is set, we forward the sum of nToReturn and the skip.
-    boost::optional<long long> newNToReturn;
+    boost::optional<int64_t> newNToReturn;
     if (qr.getNToReturn()) {
-        // !wantMore and ntoreturn mean the same as !wantMore and limit, so perform the conversion.
-        if (!qr.wantMore()) {
-            long long newLimitValue;
+        // 'singleBatch' and ntoreturn mean the same as 'singleBatch' and limit, so perform the
+        // conversion.
+        if (qr.isSingleBatch()) {
+            int64_t newLimitValue;
             if (overflow::add(*qr.getNToReturn(), qr.getSkip().value_or(0), &newLimitValue)) {
                 return Status(ErrorCodes::Overflow,
                               str::stream()
@@ -118,7 +119,7 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
             }
             newLimit = newLimitValue;
         } else {
-            long long newNToReturnValue;
+            int64_t newNToReturnValue;
             if (overflow::add(*qr.getNToReturn(), qr.getSkip().value_or(0), &newNToReturnValue)) {
                 return Status(ErrorCodes::Overflow,
                               str::stream()
@@ -153,10 +154,10 @@ StatusWith<std::unique_ptr<QueryRequest>> transformQueryForShards(
     newQR->setLimit(newLimit);
     newQR->setNToReturn(newNToReturn);
 
-    // Even if the client sends us singleBatch=true (wantMore=false), we may need to retrieve
+    // Even if the client sends us singleBatch=true, we may need to retrieve
     // multiple batches from a shard in order to return the single requested batch to the client.
-    // Therefore, we must always send singleBatch=false (wantMore=true) to the shards.
-    newQR->setWantMore(true);
+    // Therefore, we must always send singleBatch=false to the shards.
+    newQR->setSingleBatchField(false);
 
     // Any expansion of the 'showRecordId' flag should have already happened on mongos.
     newQR->setShowRecordId(false);
@@ -379,7 +380,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
     ccc->detachFromOperationContext();
 
-    if (!query.getQueryRequest().wantMore() && !ccc->isTailable()) {
+    if (query.getQueryRequest().isSingleBatch() && !ccc->isTailable()) {
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 

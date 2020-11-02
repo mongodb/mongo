@@ -3068,5 +3068,49 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeField) {
     }
 }
 
+TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) {
+    IDLParserErrorContext ctxt("root");
+    const auto uuid = UUID::gen();
+    auto testDoc =
+        BSON(BasicNamespaceConstGetterCommand::kCommandName << uuid << "field1" << 3 << "$db"
+                                                            << "db");
+
+    auto testStruct = BasicNamespaceConstGetterCommand::parse(ctxt, makeOMR(testDoc));
+    ASSERT_EQUALS(testStruct.getField1(), 3);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().get(), uuid);
+
+    // Verify that both const and non-const getters are generated.
+    assert_same_types<decltype(
+                          std::declval<BasicNamespaceConstGetterCommand>().getNamespaceOrUUID()),
+                      NamespaceStringOrUUID&>();
+    assert_same_types<
+        decltype(std::declval<const BasicNamespaceConstGetterCommand>().getNamespaceOrUUID()),
+        const NamespaceStringOrUUID&>();
+
+    // Test we can roundtrip from the just parsed document.
+    {
+        BSONObjBuilder builder;
+        OpMsgRequest reply = testStruct.serialize(BSONObj());
+
+        ASSERT_BSONOBJ_EQ(testDoc, reply.body);
+    }
+
+    // Test mutable getter modifies the command object.
+    {
+        auto& nssOrUuid = testStruct.getNamespaceOrUUID();
+        const auto nss = NamespaceString("test.coll");
+        nssOrUuid.setNss(nss);
+        nssOrUuid.preferNssForSerialization();
+
+        BSONObjBuilder builder;
+        testStruct.serialize(BSONObj(), &builder);
+
+        // Verify that nss was used for serialization over uuid.
+        ASSERT_BSONOBJ_EQ(builder.obj(),
+                          BSON(BasicNamespaceConstGetterCommand::kCommandName << "coll"
+                                                                              << "field1" << 3));
+    }
+}
+
 }  // namespace
 }  // namespace mongo

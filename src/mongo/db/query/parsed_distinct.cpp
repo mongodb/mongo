@@ -231,9 +231,9 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
         aggregationBuilder.append(QueryRequest::cmdOptionMaxTimeMS, qr.getMaxTimeMS());
     }
 
-    if (!qr.getReadConcern().isEmpty()) {
+    if (qr.getReadConcern() && !qr.getReadConcern()->isEmpty()) {
         aggregationBuilder.append(repl::ReadConcernArgs::kReadConcernFieldName,
-                                  qr.getReadConcern());
+                                  *qr.getReadConcern());
     }
 
     if (!qr.getUnwrappedReadPref().isEmpty()) {

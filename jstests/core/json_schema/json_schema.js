@@ -254,32 +254,32 @@ assert.eq([{_id: 0}],
 // - $ref
 // - $schema
 let res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {default: {_id: 0}}}});
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
 res = coll.runCommand(
     {find: coll.getName(), query: {$jsonSchema: {definitions: {numberField: {type: "number"}}}}});
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
 res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {format: "email"}}});
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
 res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {id: "someschema.json"}}});
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
 res = coll.runCommand({
     find: coll.getName(),
     query: {$jsonSchema: {properties: {a: {$ref: "#/definitions/positiveInt"}}}}
 });
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
 res = coll.runCommand({find: coll.getName(), query: {$jsonSchema: {$schema: "hyper-schema"}}});
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
 res = coll.runCommand({
     find: coll.getName(),
     query: {$jsonSchema: {$schema: "http://json-schema.org/draft-04/schema#"}}
 });
-assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, 40415]);
 
 // Test that the following whitelisted keywords are verified as strings but otherwise ignored
 // in a top-level schema:

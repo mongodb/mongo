@@ -61,9 +61,8 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
                                                            NamespaceString nss,
                                                            BSONObj cmdObj,
                                                            bool isExplain) {
-    auto qr = uassertStatusOK(
-        QueryRequest::makeFromFindCommand(std::move(nss), std::move(cmdObj), isExplain));
-    if (qr->getReadConcern().isEmpty()) {
+    auto qr = QueryRequest::makeFromFindCommand(std::move(cmdObj), isExplain, std::move(nss));
+    if (!qr->getReadConcern()) {
         if (opCtx->isStartingMultiDocumentTransaction() || !opCtx->inMultiDocumentTransaction()) {
             // If there is no explicit readConcern in the cmdObj, and this is either the first
             // operation in a transaction, or not running in a transaction, then use the readConcern

@@ -99,10 +99,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss, CollectionType::ConfigNS);
-
-            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
             // Ensure the query is correct
             ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
@@ -168,13 +166,11 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
     });
 
     onFindWithMetadataCommand([this, &expectedDb, newOpTime](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, DatabaseType::ConfigNS);
-
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), DatabaseType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(DatabaseType::name(expectedDb.getName())));
@@ -302,10 +298,8 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, ShardType::ConfigNS);
-
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), ShardType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
@@ -401,10 +395,8 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss, ChunkType::ConfigNS);
-
-            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
             ASSERT_EQ(query->nss(), ChunkType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
@@ -460,10 +452,8 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSNoSortNoLimit) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, ChunkType::ConfigNS);
-
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), ChunkType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
@@ -774,10 +764,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, CollectionType::ConfigNS);
-
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
@@ -823,10 +811,8 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, CollectionType::ConfigNS);
-
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         {
@@ -859,13 +845,11 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
     validColl.setUnique(true);
 
     onFindCommand([this, validColl](const RemoteCommandRequest& request) {
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, CollectionType::ConfigNS);
-
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), CollectionType::ConfigNS);
         {
@@ -900,10 +884,8 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, DatabaseType::ConfigNS);
-
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), DatabaseType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
@@ -970,10 +952,8 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
         ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                           rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(nss, TagsType::ConfigNS);
-
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         ASSERT_EQ(query->nss(), TagsType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
@@ -1317,10 +1297,9 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
         ASSERT_EQ("config:123", request.target.toString());
         ASSERT_EQ("admin", request.dbname);
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(KeysCollectionDocument::ConfigNS, nss);
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
 
         BSONObj expectedQuery(
             fromjson("{purpose: 'none',"
@@ -1370,10 +1349,8 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
         ASSERT_EQ("config:123", request.target.toString());
         ASSERT_EQ("admin", request.dbname);
 
-        const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-        ASSERT_EQ(KeysCollectionDocument::ConfigNS, nss);
-
-        auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
         BSONObj expectedQuery(
             fromjson("{purpose: 'none',"

@@ -133,15 +133,16 @@ Message DBClientCursor::_assembleInit() {
                 // Legacy queries don't handle readOnce.
                 qr.getValue()->setReadOnce(true);
             }
-            if (query.getBoolField("$_requestResumeToken")) {
+            if (query.getBoolField(FindCommand::kRequestResumeTokenFieldName)) {
                 // Legacy queries don't handle requestResumeToken.
                 qr.getValue()->setRequestResumeToken(true);
             }
-            if (query.hasField("$_resumeAfter")) {
+            if (query.hasField(FindCommand::kResumeAfterFieldName)) {
                 // Legacy queries don't handle resumeAfter.
-                qr.getValue()->setResumeAfter(query.getObjectField("$_resumeAfter"));
+                qr.getValue()->setResumeAfter(
+                    query.getObjectField(FindCommand::kResumeAfterFieldName));
             }
-            if (auto replTerm = query[QueryRequest::kTermField]) {
+            if (auto replTerm = query[FindCommand::kTermFieldName]) {
                 // Legacy queries don't handle term.
                 qr.getValue()->setReplicationTerm(replTerm.numberLong());
             }
@@ -152,8 +153,8 @@ Message DBClientCursor::_assembleInit() {
             } else if (_readConcernObj) {
                 qr.getValue()->setReadConcern(*_readConcernObj);
             }
-            BSONObj cmd = _nsOrUuid.uuid() ? qr.getValue()->asFindCommandWithUuid()
-                                           : qr.getValue()->asFindCommand();
+            BSONObj cmd = qr.getValue()->asFindCommand();
+
             if (auto readPref = query["$readPreference"]) {
                 // QueryRequest doesn't handle $readPreference.
                 cmd = BSONObjBuilder(std::move(cmd)).append(readPref).obj();

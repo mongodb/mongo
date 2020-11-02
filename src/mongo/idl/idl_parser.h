@@ -249,4 +249,12 @@ std::vector<std::string> transformVector(const std::vector<StringData>& input);
 std::vector<ConstDataRange> transformVector(const std::vector<std::vector<std::uint8_t>>& input);
 std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDataRange>& input);
 
+void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob);
+
+void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob);
+
+BSONObj parseOwnedBSON(BSONElement element);
+
+bool parseBoolean(BSONElement element);
+
 }  // namespace mongo

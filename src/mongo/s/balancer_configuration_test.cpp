@@ -79,10 +79,8 @@ protected:
             ASSERT_BSONOBJ_EQ(getReplSecondaryOkMetadata(),
                               rpc::TrackingMetadata::removeTrackingData(request.metadata));
 
-            const NamespaceString nss(request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss.ns(), "config.settings");
-
-            auto query = assertGet(QueryRequest::makeFromFindCommand(nss, request.cmdObj, false));
+            auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+            auto query = QueryRequest::makeFromFindCommand(opMsg.body, false);
 
             ASSERT_EQ(query->nss().ns(), "config.settings");
             ASSERT_BSONOBJ_EQ(query->getFilter(), BSON("_id" << key));

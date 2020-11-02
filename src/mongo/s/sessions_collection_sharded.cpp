@@ -167,8 +167,12 @@ LogicalSessionIdSet SessionsCollectionSharded::findRemovedSessions(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
 
     auto send = [&](BSONObj toSend) -> BSONObj {
-        auto qr = uassertStatusOK(QueryRequest::makeFromFindCommand(
-            NamespaceString::kLogicalSessionsNamespace, toSend, false));
+        // If there is no '$db', append it.
+        toSend =
+            OpMsgRequest::fromDBAndBody(NamespaceString::kLogicalSessionsNamespace.db(), toSend)
+                .body;
+        auto qr = QueryRequest::makeFromFindCommand(
+            toSend, false, NamespaceString::kLogicalSessionsNamespace);
 
         const boost::intrusive_ptr<ExpressionContext> expCtx;
         auto cq = uassertStatusOK(

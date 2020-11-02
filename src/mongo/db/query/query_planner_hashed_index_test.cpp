@@ -391,7 +391,8 @@ TEST_F(QueryPlannerHashedTest, CannotCoverQueryWhenHashedFieldIsPrefix) {
     // projection doesn't include the hashed field. This is to avoid the possibility of hash
     // collision. If two different fields produce the same hash value, there is no way to
     // distinguish them without fetching the document.
-    runQueryAsCommand(fromjson("{filter: {x : {$eq: 5}}, projection:{_id: 0, y: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {x : {$eq: 5}}, projection:{_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, y: 1}, node: {fetch: {filter: {x : {$eq: 5}}, node: {ixscan: "
@@ -400,7 +401,8 @@ TEST_F(QueryPlannerHashedTest, CannotCoverQueryWhenHashedFieldIsPrefix) {
 
     // Verify that queries cannot be covered with hashed field is a prefix, despite query and
     // projection not using hashed fields.
-    runQueryAsCommand(fromjson("{filter: {y : {$eq: 5}}, projection:{_id: 0, y: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {y : {$eq: 5}}, projection:{_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists("{proj: {spec: {_id: 0, y: 1}, node: {cscan: {dir: 1}} }}");
 }
@@ -411,7 +413,8 @@ TEST_F(QueryPlannerHashedTest, CanCoverQueryWhenHashedFieldIsNotPrefix) {
                       << "z" << -1));
 
     // Verify that query gets covered when neither query nor project use hashed field.
-    runQueryAsCommand(fromjson("{filter: {x: {$gt: 24, $lt: 27}}, projection:{_id: 0, z: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {x: {$gt: 24, $lt: 27}}, projection:{_id: 0, z: 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -420,7 +423,7 @@ TEST_F(QueryPlannerHashedTest, CanCoverQueryWhenHashedFieldIsNotPrefix) {
         "[['MaxKey','MinKey',true,true]] }}}}}");
 
     // Verify that query doesn't get covered when query is on a hashed field.
-    runQueryAsCommand(fromjson("{filter: {x: 1, y: 1}, projection:{_id: 0, z: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1, y: 1}, projection:{_id: 0, z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, z: 1}, node: {fetch: {filter: {y : {$eq: 1}}, node: {ixscan: "
@@ -428,7 +431,7 @@ TEST_F(QueryPlannerHashedTest, CanCoverQueryWhenHashedFieldIsNotPrefix) {
         getHashedBound(1) + "] , z: [['MaxKey','MinKey',true,true]]} }} }} }}");
 
     // Verify that the query doesn't get covered when projection is on a hashed field.
-    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, y: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1}, projection:{_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, y: 1}, node: {fetch: {filter: null, node: {ixscan: {filter: null, "
@@ -448,7 +451,8 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexAndShardKeyBothPro
                                << "hashed");
 
     // Verify that query gets covered when neither query nor project use hashed field.
-    runQueryAsCommand(fromjson("{filter: {x: {$gt: 24, $lt: 27}}, projection:{_id: 0, z: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {x: {$gt: 24, $lt: 27}}, projection:{_id: 0, z: 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -466,7 +470,7 @@ TEST_F(QueryPlannerHashedTest,
                                << "hashed");
 
     // Verify that the query doesn't get covered when projection is on a hashed field.
-    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, y: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1}, projection:{_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, y: 1}, node: {fetch: {filter: null, node: {sharding_filter: {node: "
@@ -476,7 +480,7 @@ TEST_F(QueryPlannerHashedTest,
 
     // Verify that query doesn't get covered when query is on a hashed field, even though the
     // projection does not include the hashed field.
-    runQueryAsCommand(fromjson("{filter: {x: 1, y: 1}, projection:{_id: 0, z: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1, y: 1}, projection:{_id: 0, z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, z: 1}, node: {sharding_filter: {node: {fetch: {filter: {y : {$eq: "
@@ -496,7 +500,7 @@ TEST_F(QueryPlannerHashedTest,
     // shard key field is hashed.
     params.shardKey = BSON("x" << 1 << "z"
                                << "hashed");
-    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, z: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1}, projection:{_id: 0, z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, z: 1}, node: {sharding_filter: {node: {ixscan: {filter: null, "
@@ -513,7 +517,7 @@ TEST_F(QueryPlannerHashedTest,
     // Cannot cover the query when index provides hashed value for a field ('y'), but the
     // corresponding shard key field is a range field.
     params.shardKey = BSON("x" << 1 << "y" << 1);
-    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, x: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1}, projection:{_id: 0, x: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {sharding_filter: {node: {fetch: {filter: null, node: "
@@ -533,7 +537,7 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexDoesNotHaveAllShar
     params.shardKey = BSON("x" << 1 << "y"
                                << "hashed"
                                << "newField" << 1);
-    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, x: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1}, projection:{_id: 0, x: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {sharding_filter: {node: {fetch: {filter: null, node: "
@@ -543,7 +547,7 @@ TEST_F(QueryPlannerHashedTest, CompoundHashedShardKeyWhenIndexDoesNotHaveAllShar
 
     params.shardKey = BSON("x" << 1 << "newField"
                                << "hashed");
-    runQueryAsCommand(fromjson("{filter: {x: 1}, projection:{_id: 0, x: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1}, projection:{_id: 0, x: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, x: 1}, node: {sharding_filter: {node: {fetch: {filter: null, node: "
@@ -561,13 +565,13 @@ TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
                   << "y" << -1 << "z" << 1));
 
     // Verify that sort on a hashed field results in collection scan.
-    runQueryAsCommand(fromjson("{filter: {}, sort: {x: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {}, sort: {x: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, node: {cscan: {dir: 1}} }}");
 
     // Verify that a list of exact match predicates on hashed field (prefix) and sort with an
     // immediate range field can use 'SORT_MERGE'.
-    runQueryAsCommand(fromjson("{filter: {x: {$in: [1, 2]}}, sort: {y: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: {$in: [1, 2]}}, sort: {y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {x: {$in: [1,2]}}, node: {mergeSort: {nodes: [{ixscan: {pattern: {x: "
@@ -580,7 +584,7 @@ TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
 
     // Verify that an equality predicate on hashed field (prefix) and sort with an immediate
     // range field can be sorted by the index.
-    runQueryAsCommand(fromjson("{filter: {x: 1}, sort: {y: 1, z: -1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 1}, sort: {y: 1, z: -1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: 1}}, node: {ixscan: {pattern: {x: "
@@ -590,7 +594,8 @@ TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
 
     // {$exists: false} is treated as a point-interval in BSONNULL. Hence index can provide the
     // sort.
-    runQueryAsCommand(fromjson("{filter: {x: {$exists: false}}, sort: {y: 1, z: -1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {x: {$exists: false}}, sort: {y: 1, z: -1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {x: {$exists: false}}, node: {ixscan: {pattern: {x: 'hashed', y: -1, z: "
@@ -600,7 +605,7 @@ TEST_F(QueryPlannerHashedTest, SortWhenHashedFieldIsPrefix) {
 
     // Sort on any index field other than the one immediately following the hashed field will use a
     // blocking sort.
-    runQueryAsCommand(fromjson("{filter: {x: 3}, sort: {z: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 3}, sort: {z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{sort: {pattern: {z:1}, limit: 0, type: 'simple', node: {fetch: {filter: {x: {$eq: "
@@ -615,14 +620,14 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
                       << "a" << 1));
 
     // Verify that sort on a hashed field results in collection scan.
-    runQueryAsCommand(fromjson("{filter: {}, sort: {x: 1, y: -1, z: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {}, sort: {x: 1, y: -1, z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{sort: {pattern: {x: 1, y: -1, z: 1}, limit: 0, node: {cscan: {dir: 1}} }}");
 
     // Verify that a list of exact match predicates on range field (prefix) and sort with an
     // immediate range field can use 'SORT_MERGE'.
-    runQueryAsCommand(fromjson("{filter: {x: {$in: [1, 2]}}, sort: {y: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: {$in: [1, 2]}}, sort: {y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: null, node: {mergeSort: {nodes: [{ixscan: {pattern: {x: "
@@ -636,7 +641,8 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
     // Verify that an exact match predicate on range field (prefix) and sort with an immediate range
     // field doesn't require any additional sort stages. The entire operation can be answered by the
     // index.
-    runQueryAsCommand(fromjson("{filter: {x: 1}, sort: {y: -1}, projection: {_id: 0, a: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {x: 1}, sort: {y: -1}, projection: {_id: 0, a: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, a: 1}, node: {ixscan: {pattern: {x: "
@@ -647,7 +653,8 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
     // Verify that query predicate and sort on non-hashed fields can be answered without fetching
     // the document, but require a sort stage, if the 'sort' field is not immediately after 'query'
     // field in the index.
-    runQueryAsCommand(fromjson("{filter: {x: 3}, sort: {a: 1}, projection: {_id: 0, y: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {x: 3}, sort: {a: 1}, projection: {_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, y: 1}, node: "
@@ -657,7 +664,8 @@ TEST_F(QueryPlannerHashedTest, SortWhenNonHashedFieldIsPrefix) {
         "[['MinKey','MaxKey',true,true]], a: [['MinKey','MaxKey',true,true]]} }} }} }}");
 
     //  Verify that sort on a hashed field requires a fetch and a blocking sort stage.
-    runQueryAsCommand(fromjson("{filter: {x: 3}, sort: {z: 1}, projection: {_id: 0, y: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {x: 3}, sort: {z: 1}, projection: {_id: 0, y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, y: 1}, node: "
@@ -675,8 +683,8 @@ TEST_F(QueryPlannerHashedTest, SortWithMissingOrIrrelevantQueryPredicate) {
     // Verify that a sort on non-hashed fields doesn't require any additional sort stages. The
     // entire operation can be answered by the index. Also verify that if the projection only
     // includes non-hashed index fields, plan does not use a fetch stage.
-    runQueryAsCommand(
-        fromjson("{filter: {}, sort: {x: 1, y: -1}, projection: {_id: 0, x: 1, y: 1, a: 1}}"));
+    runQueryAsCommand(fromjson(
+        "{find: 'test', filter: {}, sort: {x: 1, y: -1}, projection: {_id: 0, x: 1, y: 1, a: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, x: 1, y: 1, a: 1}, node: {ixscan: {pattern: {x: 1, y: -1, z: "
@@ -686,7 +694,7 @@ TEST_F(QueryPlannerHashedTest, SortWithMissingOrIrrelevantQueryPredicate) {
 
     // Verify that a sort on non-hashed fields with a query predicate on fields irrelevant to the
     // index, doesn't require any additional sort stages.
-    runQueryAsCommand(fromjson("{filter: {p: 5}, sort: {x: 1, y: -1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {p: 5}, sort: {x: 1, y: -1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {p: {$eq: 5}}, node: {ixscan: {pattern: {x: 1, y: -1, z: 'hashed', a: "
@@ -696,8 +704,8 @@ TEST_F(QueryPlannerHashedTest, SortWithMissingOrIrrelevantQueryPredicate) {
     // Verify that a sort on non-hashed fields doesn't require any additional sort stages. The
     // entire operation can be answered by the index. Also verify that if the projection includes
     // hashed fields, the operation will require a fetch stage.
-    runQueryAsCommand(
-        fromjson("{filter: {}, sort: {x: 1, y: -1}, projection: {_id: 0, x: 1, z: 1}}"));
+    runQueryAsCommand(fromjson(
+        "{find: 'test', filter: {}, sort: {x: 1, y: -1}, projection: {_id: 0, x: 1, z: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{proj: {spec: {_id: 0, x: 1, z: 1}, node: {fetch: {filter: null, node: {ixscan: "
@@ -794,7 +802,7 @@ TEST_F(QueryPlannerHashedTest, ChooseHashedIndexHint) {
                   << "y" << 1));
 
     addIndex(BSON("x" << 1));
-    runQueryAsCommand(fromjson("{filter: {x: 3}, hint: {x: 'hashed', y: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 3}, hint: {x: 'hashed', y: 1}}"));
 
 
     assertNumSolutions(1U);
@@ -808,7 +816,8 @@ TEST_F(QueryPlannerHashedTest, ChooseHashedIndexHintWithOr) {
 
     addIndex(BSON("y" << 1));
 
-    runQueryAsCommand(fromjson("{filter: {$or: [{x: 1}, {y: 1}]}, hint: {x: 'hashed', y: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {$or: [{x: 1}, {y: 1}]}, hint: {x: 'hashed', y: 1}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {$or: [{x: 1}, {y: 1}]}, node: {ixscan: {pattern: {x: 'hashed', y: 1}, "
@@ -925,7 +934,7 @@ TEST_F(QueryPlannerHashedTest, BasicSkip) {
                   << "hashed"
                   << "y" << 1));
 
-    runQueryAsCommand(fromjson("{filter: {x: 5}, skip: 8}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 5}, skip: 8}"));
     assertNumSolutions(1U);
 
     // Verify that the plan has 'skip' stage and uses index.
@@ -941,7 +950,7 @@ TEST_F(QueryPlannerHashedTest, BasicLimit) {
                   << "hashed"
                   << "y" << 1));
 
-    runQueryAsCommand(fromjson("{filter: {x: 5}, limit: 5}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {x: 5}, limit: 5}"));
     assertNumSolutions(1U);
 
     // Verify that the plan has 'limit' stage and uses index.
@@ -971,9 +980,9 @@ TEST_F(QueryPlannerHashedTest, MinMaxParameter) {
                               fromjson("{x: 1}")  // max.
     );
 
-    runQueryAsCommand(
-        fromjson("{filter: {x: 5}, hint: {x: 'hashed', y: 1}, min: {x: NumberLong(1), y: 2}, "
-                 "max: {x: NumberLong(2), y: 2}}"));
+    runQueryAsCommand(fromjson(
+        "{find: 'test', filter: {x: 5}, hint: {x: 'hashed', y: 1}, min: {x: NumberLong(1), y: 2}, "
+        "max: {x: NumberLong(2), y: 2}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {x: {$eq: 5}}, node: {ixscan: {filter: null, pattern: {x: 'hashed', y: "
@@ -993,9 +1002,9 @@ TEST_F(QueryPlannerHashedTest, MinMaxParameter) {
                               fromjson("{x: 1}")  // max.
     );
 
-    runQueryAsCommand(
-        fromjson("{filter: {x: 5}, hint: {x: 1, y: 'hashed'}, min: {x: NumberLong(1), y: 2}, "
-                 "max: {x: NumberLong(2), y: 2}}"));
+    runQueryAsCommand(fromjson(
+        "{find: 'test', filter: {x: 5}, hint: {x: 1, y: 'hashed'}, min: {x: NumberLong(1), y: 2}, "
+        "max: {x: NumberLong(2), y: 2}}"));
     assertNumSolutions(1U);
     assertSolutionExists(
         "{fetch: {filter: {x : {$eq: 5}}, node: {ixscan: {filter: null, pattern: {x: 1, y: "

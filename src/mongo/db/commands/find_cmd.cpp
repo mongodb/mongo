@@ -70,8 +70,7 @@ std::unique_ptr<QueryRequest> parseCmdObjectToQueryRequest(OperationContext* opC
                                                            NamespaceString nss,
                                                            BSONObj cmdObj,
                                                            bool isExplain) {
-    auto qr = uassertStatusOK(
-        QueryRequest::makeFromFindCommand(std::move(nss), std::move(cmdObj), isExplain));
+    auto qr = QueryRequest::makeFromFindCommand(std::move(cmdObj), isExplain, std::move(nss));
     if (!qr->getLegacyRuntimeConstants()) {
         qr->setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
     }

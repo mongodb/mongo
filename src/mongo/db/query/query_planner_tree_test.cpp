@@ -1188,7 +1188,8 @@ TEST_F(QueryPlannerTest, CompoundAndNonCompoundIndices) {
 //
 TEST_F(QueryPlannerTest, SortOrderOnEqualitiesDoesNotMatter) {
     addIndex(BSON("a" << 1 << "b" << 1 << "c" << 1));
-    runQueryAsCommand(fromjson("{filter: {a: 1, b: 'b'}, sort:{a: -1, b: -1, c: 1}}"));
+    runQueryAsCommand(
+        fromjson("{find: 'test', filter: {a: 1, b: 'b'}, sort:{a: -1, b: -1, c: 1}}"));
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     // Verify that the solution doesn't require a sort stage.
@@ -1200,7 +1201,7 @@ TEST_F(QueryPlannerTest, SortOrderOnEqualitiesDoesNotMatter) {
 
 TEST_F(QueryPlannerTest, NonIndexEqualitiesNotProvided) {
     addIndex(BSON("a" << 1));
-    runQueryAsCommand(fromjson("{filter: {a: 1, b: 1}, sort:{a: 1, b: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'test', filter: {a: 1, b: 1}, sort:{a: 1, b: 1}}"));
 
     ASSERT_EQUALS(getNumSolutions(), 2U);
     // Verify that we use 'sort' stage because 'b' is not part of the index.

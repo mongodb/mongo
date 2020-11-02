@@ -132,7 +132,7 @@ public:
     MatchExpression* root() const {
         return _root.get();
     }
-    BSONObj getQueryObj() const {
+    const BSONObj& getQueryObj() const {
         return _qr->getFilter();
     }
     const QueryRequest& getQueryRequest() const {

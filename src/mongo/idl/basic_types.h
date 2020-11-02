@@ -47,7 +47,7 @@ namespace mongo {
 class OptionalBool {
 public:
     static OptionalBool parseFromBSON(BSONElement element) {
-        uassert(ErrorCodes::BadValue,
+        uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "Field '" << element.fieldNameStringData()
                               << "' should be a boolean value, but found: " << element.type(),
                 !element || element.type() == BSONType::Bool);

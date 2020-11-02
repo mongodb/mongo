@@ -2423,7 +2423,7 @@ TEST_F(QueryPlannerTest, MultikeyIndexScanWithMinKeyMaxKeyBoundsCanProvideSort) 
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}};
     addIndex(BSON("a" << 1), multikeyPaths);
-    runQueryAsCommand(fromjson("{sort: {a: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'testns', sort: {a: 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -2435,7 +2435,7 @@ TEST_F(QueryPlannerTest, MultikeyIndexScanWithBoundsOnIndexWithoutSharedPrefixCa
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
-    runQueryAsCommand(fromjson("{filter: {b : {$gte: 3}}, sort: {a: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {b : {$gte: 3}}, sort: {a: 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -2448,7 +2448,7 @@ TEST_F(QueryPlannerTest,
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a" << 1 << "b" << 1), multikeyPaths);
-    runQueryAsCommand(fromjson("{filter: {a : {$eq: 3}}, sort: {b: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {a : {$eq: 3}}, sort: {b: 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -2461,7 +2461,7 @@ TEST_F(QueryPlannerTest,
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U}, {0U}};
     addIndex(BSON("a" << 1 << "a.b" << 1), multikeyPaths);
-    runQueryAsCommand(fromjson("{filter: {a : {$gte: 3}}, sort: {'a.b': 1}}"));
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {a : {$gte: 3}}, sort: {'a.b': 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(
@@ -2475,7 +2475,7 @@ TEST_F(QueryPlannerTest,
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     MultikeyPaths multikeyPaths{{0U, 1U}, {0U}};
     addIndex(BSON("a.b" << 1 << "a" << 1), multikeyPaths);
-    runQueryAsCommand(fromjson("{filter: {'a.b' : {$gte: 3}}, sort: {a: 1}}"));
+    runQueryAsCommand(fromjson("{find: 'testns', filter: {'a.b' : {$gte: 3}}, sort: {a: 1}}"));
 
     assertNumSolutions(1U);
     assertSolutionExists(

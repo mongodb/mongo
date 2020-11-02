@@ -25,7 +25,7 @@ assertCommandFailsWithCorrectError(
 
 // Find
 assertCommandFailsWithCorrectError({find: coll.getName(), jsonSchema: {}},
-                                   ErrorCodes.FailedToParse);
+                                   [ErrorCodes.FailedToParse, 4662500]);
 
 // FindAndModify
 assertCommandFailsWithCorrectError(
@@ -48,5 +48,5 @@ assertCommandFailsWithCorrectError(
 
 // Explain
 assertCommandFailsWithCorrectError({explain: {count: coll.getName()}, jsonSchema: {}},
-                                   ErrorCodes.FailedToParse);
+                                   [ErrorCodes.FailedToParse, 40415]);
 }());

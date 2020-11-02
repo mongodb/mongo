@@ -609,8 +609,8 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     // recreated it with different epoch and chunks.
     expectGetCollection(oldVersion.epoch(), shardKeyPattern);
     onFindCommand([&](const RemoteCommandRequest& request) {
-        const auto diffQuery =
-            assertGet(QueryRequest::makeFromFindCommand(kNss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto diffQuery = QueryRequest::makeFromFindCommand(opMsg.body, false);
         ASSERT_BSONOBJ_EQ(BSON("ns" << kNss.ns() << "lastmod"
                                     << BSON("$gte" << Timestamp(oldVersion.majorVersion(),
                                                                 oldVersion.minorVersion()))),
@@ -641,8 +641,8 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
     onFindCommand([&](const RemoteCommandRequest& request) {
         // Ensure it is a differential query but starting from version zero (to fetch all the
         // chunks) since the incremental refresh above produced a different version
-        const auto diffQuery =
-            assertGet(QueryRequest::makeFromFindCommand(kNss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto diffQuery = QueryRequest::makeFromFindCommand(opMsg.body, false);
         ASSERT_BSONOBJ_EQ(BSON("ns" << kNss.ns() << "lastmod" << BSON("$gte" << Timestamp(0, 0))),
                           diffQuery->getFilter());
 
@@ -695,8 +695,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
     // Return set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
         // Ensure it is a differential query but starting from version zero
-        const auto diffQuery =
-            assertGet(QueryRequest::makeFromFindCommand(kNss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto diffQuery = QueryRequest::makeFromFindCommand(opMsg.body, false);
         ASSERT_BSONOBJ_EQ(BSON("ns" << kNss.ns() << "lastmod" << BSON("$gte" << Timestamp(0, 0))),
                           diffQuery->getFilter());
 
@@ -741,8 +741,8 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
     // Return set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
         // Ensure it is a differential query
-        const auto diffQuery =
-            assertGet(QueryRequest::makeFromFindCommand(kNss, request.cmdObj, false));
+        auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+        auto diffQuery = QueryRequest::makeFromFindCommand(opMsg.body, false);
         ASSERT_BSONOBJ_EQ(
             BSON("ns" << kNss.ns() << "lastmod"
                       << BSON("$gte" << Timestamp(version.majorVersion(), version.minorVersion()))),

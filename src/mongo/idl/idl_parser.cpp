@@ -335,4 +335,29 @@ std::vector<std::vector<std::uint8_t>> transformVector(const std::vector<ConstDa
 
     return output;
 }
+
+void noOpSerializer(bool, StringData fieldName, BSONObjBuilder* bob) {}
+
+void serializeBSONWhenNotEmpty(BSONObj obj, StringData fieldName, BSONObjBuilder* bob) {
+    if (!obj.isEmpty()) {
+        bob->append(fieldName, obj);
+    }
+}
+
+BSONObj parseOwnedBSON(BSONElement element) {
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Expected field " << element.fieldNameStringData()
+                          << "to be of type object",
+            element.type() == BSONType::Object);
+    return element.Obj().getOwned();
+}
+
+bool parseBoolean(BSONElement element) {
+    uassert(ErrorCodes::TypeMismatch,
+            str::stream() << "Expected field " << element.fieldNameStringData()
+                          << "to be of type object",
+            element.type() == BSONType::Bool);
+    return element.boolean();
+}
+
 }  // namespace mongo
