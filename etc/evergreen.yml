@@ -1559,20 +1559,9 @@ functions:
           set -o verbose
 
           # Only run on master branch
-          if [[ "${project}" != "mongodb-mongo-master" ]]; then
-
-            if [ "${is_patch}" = "true" ]; then
-              echo "Not on master, skipping selected_tests_gen task"
-              exit 1
-            else
-              exit 0
-            fi
-
-          else
-
+          if [[ "${project}" == "mongodb-mongo-master" -a "${is_patch}" == "true" ]]; then
             ${activate_virtualenv}
             PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --selected-tests-config .selected_tests.yml
-
           fi
     - command: archive.targz_pack
       params:
