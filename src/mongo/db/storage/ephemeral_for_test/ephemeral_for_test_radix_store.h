@@ -897,7 +897,7 @@ private:
         }
 
     protected:
-        NodeType _nodeType;
+        NodeType _nodeType = NodeType::LEAF;
         uint16_t _numChildren = 0;
         unsigned int _depth = 0;
         std::vector<uint8_t> _trieKey;
