@@ -1366,10 +1366,7 @@ Status WiredTigerKVEngine::recoverOrphanedIdent(OperationContext* opCtx,
         return status;
     }
 
-    LOGV2(22334,
-          "Moving orphaned data file back as {file}",
-          "Restoring orphaned data file"
-          "file"_attr = identFilePath->generic_string());
+    LOGV2(22334, "Restoring orphaned data file", "file"_attr = identFilePath->generic_string());
 
     boost::filesystem::remove(*identFilePath, ec);
     if (ec) {
