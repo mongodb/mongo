@@ -2,6 +2,9 @@
  * Sets up a test for replica set tags sets.
  *
  * https://docs.mongodb.com/v3.0/tutorial/configure-replica-set-tag-sets/
+ *
+ * TODO SERVER-52599: to remove this tag.
+ * @tags: [requires_wiredtiger]
  */
 var TagsTest = function(options) {
     'use strict';
