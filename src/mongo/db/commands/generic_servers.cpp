@@ -247,7 +247,10 @@ public:
                                     << val.toString(false) << " of type " << typeName(val.type()));
         }
 
-        hangInGetLog.pauseWhileSet();
+        if (MONGO_unlikely(hangInGetLog.shouldFail())) {
+            LOGV2(5113600, "Hanging in getLog");
+            hangInGetLog.pauseWhileSet();
+        }
 
         std::string p = val.String();
         if (p == "*") {

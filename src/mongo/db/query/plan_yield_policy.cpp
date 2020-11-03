@@ -39,6 +39,7 @@
 namespace mongo {
 namespace {
 MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHang);
+MONGO_FAIL_POINT_DEFINE(setYieldAllLocksHangSecond);
 MONGO_FAIL_POINT_DEFINE(setYieldAllLocksWait);
 }  // namespace
 
@@ -89,19 +90,24 @@ Status PlanYieldPolicy::yieldOrInterrupt(OperationContext* opCtx,
 
 void PlanYieldPolicy::handleDuringYieldFailpoints(OperationContext* opCtx,
                                                   const NamespaceString& planExecNs) {
-    setYieldAllLocksHang.executeIf(
-        [opCtx](const BSONObj& config) {
-            setYieldAllLocksHang.pauseWhileSet();
+    auto failPointHang = [opCtx, &planExecNs](FailPoint* fp) {
+        fp->executeIf(
+            [opCtx, fp, &planExecNs](const BSONObj& config) {
+                fp->pauseWhileSet();
 
-            if (config.getField("checkForInterruptAfterHang").trueValue()) {
-                // Throws.
-                opCtx->checkForInterrupt();
-            }
-        },
-        [&](const BSONObj& config) {
-            StringData ns = config.getStringField("namespace");
-            return ns.empty() || ns == planExecNs.ns();
-        });
+                if (config.getField("checkForInterruptAfterHang").trueValue()) {
+                    // Throws.
+                    opCtx->checkForInterrupt();
+                }
+            },
+            [&planExecNs](const BSONObj& config) {
+                StringData ns = config.getStringField("namespace");
+                return ns.empty() || ns == planExecNs.ns();
+            });
+    };
+    failPointHang(&setYieldAllLocksHang);
+    failPointHang(&setYieldAllLocksHangSecond);
+
     setYieldAllLocksWait.executeIf(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); },
         [&](const BSONObj& config) {

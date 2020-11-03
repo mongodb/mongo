@@ -5,24 +5,36 @@ const RollbackResumableIndexBuildTest = class {
     /**
      * Runs a resumable index build rollback test.
      *
-     * 'rollbackStartFailPointName' specifies the phase that the index build will be in when
-     *   rollback starts.
+     * 'indexSpecs' is a 2d array that specifies all indexes that should be built. The first
+     *   dimension indicates separate calls to the createIndexes command, while the second dimension
+     *   is for indexes that are built together using one call to createIndexes.
      *
-     * 'rollbackEndFailPointName' specifies the phase that the index build resume from after
-     *   rollback completes.
+     * 'rollbackStartFailPoints' specifies the phases that the index builds will be in when rollback
+     *   starts. It is an array of objects that contain two fields: 'name', which specifies the name
+     *   of the failpoint, and exactly one of 'logIdWithBuildUUID' and 'logIdWithIndexName'. The
+     *   former is used for failpoints whose log message includes the build UUID, and the latter is
+     *   used for failpoints whose log message includes the index name. The array must either
+     *   contain one element, in which case that one element will be applied to all index builds
+     *   specified above, or it must be exactly the length of 'indexSpecs'.
      *
-     * 'locksYieldedFailPointName' specifies a point during the index build between
+     * 'rollbackEndFailPoints' specifies the phases that the index builds resume from after rollback
+     *   completes. It follows the same roles as 'rollbackStartFailPoints'.
+     *
+     * 'locksYieldedFailPointNames' is an array of strings with the same length as the first
+     *   dimension of 'indexSpecs'. It specifies a point for respective each index build between
      *   'rollbackEndFailPointName' and 'rollbackStartFailPointName' at which its locks are yielded.
      *
-     * 'expectedResumePhase' is a string which specifies the name of the phase that the index build
-     *   is expected to resume in.
+     * 'expectedResumePhases' is an array of strings that specify the name of the phases that each
+     *   index build is expected to resume in. The array must either contain one string, in which
+     *   case all index builds will be expected to resume from that phase, or it must be exactly
+     *   the length of 'indexSpecs'.
      *
-     * 'resumeCheck' is an object which contains exactly one of 'numScannedAferResume' and
-     *   'skippedPhaseLogID'. The former is used to verify that the index build scanned the
-     *   expected number of documents in the collection scan after resuming. The latter is used for
-     *   phases which do not perform a collection scan after resuming, to verify that the index
-     *   index build did not resume from an earlier phase than expected. The log message must
-     *   contain the buildUUID attribute.
+     * 'resumeChecks' is an array of objects that contain exactly one of 'numScannedAferResume' and
+     *   'skippedPhaseLogID'. The former is used to verify that the index build scanned the expected
+     *   number of documents in the collection scan after resuming. The latter is used for phases
+     *   which do not perform a collection scan after resuming, to verify that the index build did
+     *   not resume from an earlier phase than expected. The log message must contain the buildUUID
+     *   attribute.
      *
      * 'insertsToBeRolledBack' is documents which are inserted after transitioning to rollback
      *   operations and will be rolled back.
@@ -33,15 +45,16 @@ const RollbackResumableIndexBuildTest = class {
      */
     static run(rollbackTest,
                dbName,
-               collName,
-               indexSpec,
-               rollbackStartFailPointName,
-               rollbackStartFailPointIteration,
-               rollbackEndFailPointName,
-               rollbackEndFailPointIteration,
-               locksYieldedFailPointName,
-               expectedResumePhase,
-               resumeCheck,
+               collNameSuffix,
+               docs,
+               indexSpecs,
+               rollbackStartFailPoints,
+               rollbackStartFailPointsIteration,
+               rollbackEndFailPoints,
+               rollbackEndFailPointsIteration,
+               locksYieldedFailPointNames,
+               expectedResumePhases,
+               resumeChecks,
                insertsToBeRolledBack,
                sideWrites = []) {
         const originalPrimary = rollbackTest.getPrimary();
@@ -57,119 +70,167 @@ const RollbackResumableIndexBuildTest = class {
             originalPrimary.adminCommand({setParameter: 1, logComponentVerbosity: {index: 1}}));
 
         // Set internalQueryExecYieldIterations to 0 and maxIndexBuildDrainBatchSize to 1 so that
-        // the index build is guaranteed to yield its locks between the rollback end and start
+        // the index builds are guaranteed to yield their locks between the rollback end and start
         // failpoints.
         assert.commandWorked(
             originalPrimary.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 0}));
         assert.commandWorked(
             originalPrimary.adminCommand({setParameter: 1, maxIndexBuildDrainBatchSize: 1}));
 
-        const coll = originalPrimary.getDB(dbName).getCollection(collName);
-        const indexName = "rollback_resumable_index_build";
+        configureFailPoint(originalPrimary, "hangBeforeBuildingIndexSecond");
 
-        const awaitCreateIndex = ResumableIndexBuildTest.createIndexWithSideWrites(
-            rollbackTest, function(collName, indexSpec, indexName) {
-                assert.commandFailedWithCode(
-                    db.getCollection(collName).createIndex(indexSpec, {name: indexName}),
-                    ErrorCodes.InterruptedDueToReplStateChange);
-            }, coll, indexSpec, indexName, sideWrites, {hangBeforeBuildingIndex: true});
+        const indexNames = ResumableIndexBuildTest.generateIndexNames(indexSpecs);
+        const awaitCreateIndexes = new Array(indexSpecs.length);
+        const buildUUIDs = new Array(indexSpecs.length);
+        const colls = new Array(indexSpecs.length);
+        for (let i = 0; i < indexSpecs.length; i++) {
+            colls[i] = originalPrimary.getDB(dbName).getCollection(jsTestName() + collNameSuffix +
+                                                                   "_" + i);
+            assert.commandWorked(colls[i].insert(docs));
 
-        const buildUUID = extractUUIDFromObject(
-            IndexBuildTest
-                .assertIndexes(coll, 2, ["_id_"], [indexName], {includeBuildUUIDs: true})[indexName]
-                .buildUUID);
+            awaitCreateIndexes[i] = ResumableIndexBuildTest.createIndexWithSideWrites(
+                rollbackTest, function(collName, indexSpecs, indexNames) {
+                    load("jstests/noPassthrough/libs/index_build.js");
+                    ResumableIndexBuildTest.createIndexesFails(
+                        db, collName, indexSpecs, indexNames);
+                }, colls[i], indexSpecs[i], indexNames[i], sideWrites);
 
-        const rollbackEndFp = configureFailPoint(originalPrimary, rollbackEndFailPointName, {
-            buildUUIDs: [buildUUID],
-            indexNames: [indexName],
-            iteration: rollbackEndFailPointIteration
-        });
-        const rollbackStartFp = configureFailPoint(originalPrimary, rollbackStartFailPointName, {
-            buildUUIDs: [buildUUID],
-            indexNames: [indexName],
-            iteration: rollbackStartFailPointIteration
-        });
+            buildUUIDs[i] = ResumableIndexBuildTest.generateFailPointsData(
+                colls[i],
+                [rollbackStartFailPoints[rollbackStartFailPoints.length === 1 ? 0 : i]],
+                rollbackStartFailPointsIteration,
+                [indexNames[i]])[0];
+            ResumableIndexBuildTest.generateFailPointsData(
+                colls[i],
+                [rollbackEndFailPoints[rollbackEndFailPoints.length === 1 ? 0 : i]],
+                rollbackEndFailPointsIteration,
+                [indexNames[i]]);
+        }
 
-        assert.commandWorked(originalPrimary.adminCommand(
-            {configureFailPoint: "hangBeforeBuildingIndex", mode: "off"}));
+        for (const rollbackStartFailPoint of rollbackStartFailPoints) {
+            configureFailPoint(
+                originalPrimary, rollbackStartFailPoint.name, rollbackStartFailPoint.data);
+        }
+        for (const rollbackEndFailPoint of rollbackEndFailPoints) {
+            configureFailPoint(
+                originalPrimary, rollbackEndFailPoint.name, rollbackEndFailPoint.data);
+        }
 
-        // Wait until we've completed the last operation that won't be rolled back so that we can
-        // begin the operations that will be rolled back.
-        rollbackEndFp.wait();
+        // Wait until the index builds have completed their last operations that won't be rolled
+        // back so that we can begin the operations that will be rolled back.
+        ResumableIndexBuildTest.waitForFailPoints(
+            originalPrimary, ["hangBeforeBuildingIndexSecond"], rollbackEndFailPoints);
 
         rollbackTest.transitionToRollbackOperations();
 
-        assert.commandWorked(coll.insert(insertsToBeRolledBack));
-
-        // Move the index build forward to a point at which its locks are yielded. This allows the
+        // Move the index builds forward to points at which their locks are yielded. This allows the
         // primary to step down during the call to transitionToSyncSourceOperationsBeforeRollback()
         // below.
-        let locksYieldedFp = configureFailPoint(
-            originalPrimary, locksYieldedFailPointName, {namespace: coll.getFullName()});
-        rollbackEndFp.off();
-        locksYieldedFp.wait();
+        const locksYieldedFps = new Array(colls.length);
+        for (let i = 0; i < colls.length; i++) {
+            assert.commandWorked(colls[i].insert(insertsToBeRolledBack));
+            locksYieldedFps[i] = configureFailPoint(originalPrimary,
+                                                    locksYieldedFailPointNames[i],
+                                                    {namespace: colls[i].getFullName()});
+        }
+        for (const rollbackEndFailPoint of rollbackEndFailPoints) {
+            assert.commandWorked(originalPrimary.adminCommand(
+                {configureFailPoint: rollbackEndFailPoint.name, mode: "off"}));
+            delete rollbackEndFailPoint.data;
+        }
+        for (const locksYieldedFp of locksYieldedFps) {
+            locksYieldedFp.wait();
+        }
 
         rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
 
-        // The index creation will report as having failed due to InterruptedDueToReplStateChange,
-        // but it is still building in the background.
-        awaitCreateIndex();
+        // The index creation commands will report as having failed due to
+        // InterruptedDueToReplStateChange, but they are still building in the background.
+        for (const awaitCreateIndex of awaitCreateIndexes) {
+            awaitCreateIndex();
+        }
 
-        // Wait until the index build reaches the desired starting point for the rollback.
-        locksYieldedFp.off();
-        rollbackStartFp.wait();
+        // Wait until the index builds reach the desired starting points for the rollback.
+        ResumableIndexBuildTest.waitForFailPoints(
+            originalPrimary, locksYieldedFailPointNames, rollbackStartFailPoints);
 
-        // Let the index build yield its locks so that it can be aborted for rollback.
-        locksYieldedFp = configureFailPoint(
-            originalPrimary, locksYieldedFailPointName, {namespace: coll.getFullName()});
-        rollbackStartFp.off();
-        locksYieldedFp.wait();
+        // Let the index builds yield their locks so that they can be aborted for rollback.
+        for (let i = 0; i < colls.length; i++) {
+            locksYieldedFps[i] = configureFailPoint(originalPrimary,
+                                                    locksYieldedFailPointNames[i],
+                                                    {namespace: colls[i].getFullName()});
+        }
+        for (const rollbackStartFailPoint of rollbackStartFailPoints) {
+            assert.commandWorked(originalPrimary.adminCommand(
+                {configureFailPoint: rollbackStartFailPoint.name, mode: "off"}));
+            delete rollbackStartFailPoint.data;
+        }
+        for (const locksYieldedFp of locksYieldedFps) {
+            locksYieldedFp.wait();
+        }
 
-        // Clear the log so that we can verify that the index build resumes from the correct phase
+        // Clear the log so that we can verify that the index builds resume from the correct phases
         // after rollback.
         assert.commandWorked(originalPrimary.adminCommand({clearLog: "global"}));
 
-        // The parallel shell performs a checkLog, so use this failpoint to synchronize starting
-        // the parallel shell with rollback.
+        // The parallel shells run checkLog, so use this failpoint to synchronize starting the
+        // parallel shells with rollback.
         const getLogFp = configureFailPoint(originalPrimary, "hangInGetLog");
+        clearRawMongoProgramOutput();
 
-        const awaitDisableFailPoint = startParallelShell(
-            funWithArgs(function(buildUUID, locksYieldedFailPointName) {
-                // Wait for the index build to be aborted for rollback.
-                checkLog.containsJson(db.getMongo(), 465611, {
-                    buildUUID: function(uuid) {
-                        return uuid["uuid"]["$uuid"] === buildUUID;
-                    }
-                });
+        const awaitDisableFailPoints = new Array(buildUUIDs.length);
+        for (let i = 0; i < buildUUIDs.length; i++) {
+            awaitDisableFailPoints[i] = startParallelShell(
+                funWithArgs(function(buildUUID, locksYieldedFailPointName) {
+                    // Wait for the index build to be aborted for rollback.
+                    checkLog.containsJson(db.getMongo(), 465611, {
+                        buildUUID: function(uuid) {
+                            return uuid["uuid"]["$uuid"] === buildUUID;
+                        }
+                    });
 
-                // Disable the failpoint so that the builder thread can exit and rollback can
-                // continue.
-                assert.commandWorked(
-                    db.adminCommand({configureFailPoint: locksYieldedFailPointName, mode: "off"}));
-            }, buildUUID, locksYieldedFailPointName), originalPrimary.port);
+                    // Disable the failpoint so that the builder thread can exit.
+                    assert.commandWorked(db.adminCommand(
+                        {configureFailPoint: locksYieldedFailPointName, mode: "off"}));
+                }, buildUUIDs[i], locksYieldedFailPointNames[i]), originalPrimary.port);
+        }
 
-        getLogFp.wait();
+        // Wait until the parallel shells have all started.
+        assert.soon(() => {
+            return (rawMongoProgramOutput().match(/5113600/g) || []).length === buildUUIDs.length;
+        });
         getLogFp.off();
 
         rollbackTest.transitionToSyncSourceOperationsDuringRollback();
-        awaitDisableFailPoint();
+        for (const awaitDisableFailPoint of awaitDisableFailPoints) {
+            awaitDisableFailPoint();
+        }
 
-        // Ensure that the index build was interrupted for rollback.
-        checkLog.containsJson(originalPrimary, 20347, {
-            buildUUID: function(uuid) {
-                return uuid["uuid"]["$uuid"] === buildUUID;
-            }
-        });
+        // Ensure that the index builds were interrupted for rollback.
+        for (const buildUUID of buildUUIDs) {
+            checkLog.containsJson(originalPrimary, 20347, {
+                buildUUID: function(uuid) {
+                    return uuid["uuid"]["$uuid"] === buildUUID;
+                }
+            });
+        }
 
         rollbackTest.transitionToSteadyStateOperations();
 
-        // Ensure that the index build completed after rollback.
-        ResumableIndexBuildTest.assertCompleted(originalPrimary, coll, [buildUUID], [indexName]);
+        // Ensure that the index builds completed after rollback.
+        for (let i = 0; i < colls.length; i++) {
+            ResumableIndexBuildTest.assertCompleted(
+                originalPrimary, colls[i], [buildUUIDs[i]], indexNames[i]);
+        }
 
         ResumableIndexBuildTest.checkResume(
-            originalPrimary, [buildUUID], [expectedResumePhase], [resumeCheck]);
+            originalPrimary, buildUUIDs, expectedResumePhases, resumeChecks);
 
-        ResumableIndexBuildTest.checkIndexes(
-            rollbackTest.getTestFixture(), dbName, collName, [indexName], []);
+        for (let i = 0; i < colls.length; i++) {
+            ResumableIndexBuildTest.checkIndexes(
+                rollbackTest, dbName, colls[i].getName(), indexNames[i], []);
+            assert.commandWorked(
+                rollbackTest.getPrimary().getDB(dbName).runCommand({drop: colls[i].getName()}));
+        }
     }
 };

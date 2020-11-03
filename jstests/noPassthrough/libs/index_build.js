@@ -228,6 +228,112 @@ const ResumableIndexBuildTest = class {
     }
 
     /**
+     * Generates index names based on the shape of 'indexSpecs'.
+     */
+    static generateIndexNames(indexSpecs) {
+        const indexNames = new Array(indexSpecs.length);
+        for (let i = 0; i < indexSpecs.length; i++) {
+            indexNames[i] = new Array(indexSpecs[i].length);
+            for (let j = 0; j < indexSpecs[i].length; j++) {
+                indexNames[i][j] = "resumable_index_build_" + i + "_" + j;
+            }
+        }
+        return indexNames;
+    }
+
+    /**
+     * Generates the fail point data and appends it to the 'data' field of each element in
+     * 'failPoints'. Returns the build UUIDs of the index builds on the given collection.
+     */
+    static generateFailPointsData(coll, failPoints, failPointsIteration, indexNames) {
+        const indexNamesFlat = ResumableIndexBuildTest.flatten(indexNames);
+        const indexNamesFlatSinglePerBuild = new Array(indexNames.length);
+        const buildUUIDs = new Array(indexNames.length);
+        for (let i = 0; i < indexNames.length; i++) {
+            indexNamesFlatSinglePerBuild[i] = indexNames[i][0];
+            buildUUIDs[i] = extractUUIDFromObject(
+                IndexBuildTest
+                    .assertIndexes(coll, indexNamesFlat.length + 1, ["_id_"], indexNamesFlat, {
+                        includeBuildUUIDs: true
+                    })[indexNames[i][0]]
+                    .buildUUID);
+        }
+
+        // If there is only one failpoint, its data must include all build UUIDs and index names.
+        // Otherwise, each failpoint should only have its respective build UUID and index name(s).
+        for (let i = 0; i < failPoints.length; i++) {
+            const data = {
+                buildUUIDs: failPoints.length === 1 ? buildUUIDs : [buildUUIDs[i]],
+                indexNames: failPoints.length === 1 ? indexNamesFlatSinglePerBuild
+                                                    : [indexNames[i][0]],
+                iteration: failPointsIteration
+            };
+            if (failPoints[i].data) {
+                failPoints[i].data.buildUUIDs =
+                    failPoints[i].data.buildUUIDs.concat(data.buildUUIDs);
+                failPoints[i].data.indexNames =
+                    failPoints[i].data.indexNames.concat(data.indexNames);
+            } else {
+                failPoints[i].data = data;
+            }
+        }
+
+        return buildUUIDs;
+    }
+
+    /**
+     * Disables the fail points specified by 'failPointsToDisable' and then waits for the fail
+     * points specified by 'failPoints' to be reached.
+     */
+    static waitForFailPoints(conn, failPointsToDisable, failPoints, failPointForSingleIndexBuild) {
+        assert.commandWorked(conn.adminCommand({clearLog: "global"}));
+        for (const fp of failPointsToDisable) {
+            assert.commandWorked(conn.adminCommand({configureFailPoint: fp, mode: "off"}));
+        }
+
+        // Wait for the index builds to reach their respective failpoints.
+        for (const failPoint of failPoints) {
+            if (failPoint.logIdWithBuildUUID) {
+                for (const buildUUID of failPoint.data.buildUUIDs) {
+                    checkLog.containsJson(conn, failPoint.logIdWithBuildUUID, {
+                        buildUUID: function(uuid) {
+                            return uuid["uuid"]["$uuid"] === buildUUID;
+                        }
+                    });
+                }
+            } else if (failPoint.logIdWithIndexName) {
+                for (const indexName of failPoint.data.indexNames) {
+                    checkLog.containsJson(conn, failPoint.logIdWithIndexName, {index: indexName});
+                }
+            } else if (failPoint.useWaitForFailPointForSingleIndexBuild) {
+                assert.eq(
+                    failPoints.length,
+                    1,
+                    "Can only use useWaitForFailPointForSingleIndexBuild with a single index build");
+                failPointForSingleIndexBuild.wait();
+            } else {
+                assert(false,
+                       "Must specify one of logIdWithBuildUUID, logIdWithIndexName, and " +
+                           "useWaitForFailPointForSingleIndexBuild");
+            }
+        }
+    }
+
+    /**
+     * Runs the createIndexes command with the given index specs and corresponding index names and
+     * expects it to fail with InterruptedDueToReplStateChange.
+     */
+    static createIndexesFails(db, collName, indexSpecs, indexNames) {
+        const indexes = new Array(indexSpecs.length);
+        for (let i = 0; i < indexSpecs.length; i++) {
+            indexes[i] = {key: indexSpecs[i], name: indexNames[i]};
+        }
+
+        assert.commandFailedWithCode(db.runCommand({createIndexes: collName, indexes: indexes}),
+                                     ErrorCodes.InterruptedDueToReplStateChange);
+    }
+
+    /**
      * Runs createIndexFn in a parellel shell to create indexes, inserting the documents specified
      * by sideWrites into the side writes table.
      *
@@ -344,29 +450,8 @@ const ResumableIndexBuildTest = class {
                    runBeforeStartup) {
         clearRawMongoProgramOutput();
 
-        const indexNamesFlat = ResumableIndexBuildTest.flatten(indexNames);
-        const indexNamesFlatSinglePerBuild = new Array(indexNames.length);
-        const buildUUIDs = new Array(indexNames.length);
-        for (let i = 0; i < indexNames.length; i++) {
-            indexNamesFlatSinglePerBuild[i] = indexNames[i][0];
-            buildUUIDs[i] = extractUUIDFromObject(
-                IndexBuildTest
-                    .assertIndexes(coll, indexNamesFlat.length + 1, ["_id_"], indexNamesFlat, {
-                        includeBuildUUIDs: true
-                    })[indexNames[i][0]]
-                    .buildUUID);
-        }
-
-        // If there is only one failpoint, its data must include all build UUIDs and index names.
-        // Otherwise, each failpoint should only have its respecctive build UUID and index name(s).
-        for (let i = 0; i < failPoints.length; i++) {
-            failPoints[i].data = {
-                buildUUIDs: failPoints.length === 1 ? buildUUIDs : [buildUUIDs[i]],
-                indexNames: failPoints.length === 1 ? indexNamesFlatSinglePerBuild
-                                                    : [indexNames[i][0]],
-                iteration: failPointsIteration
-            };
-        }
+        const buildUUIDs = ResumableIndexBuildTest.generateFailPointsData(
+            coll, failPoints, failPointsIteration, indexNames);
 
         // Don't interrupt the index builds for shutdown until they are at the desired point.
         const shutdownFpTimesEntered = configureFailPoint(conn, "hangBeforeShutdown").timesEntered;
@@ -374,6 +459,7 @@ const ResumableIndexBuildTest = class {
         const awaitContinueShutdown = startParallelShell(
             funWithArgs(function(failPoints, shutdownFpTimesEntered) {
                 load("jstests/libs/fail_point_util.js");
+                load("jstests/noPassthrough/libs/index_build.js");
 
                 // Wait until we hang before shutdown to ensure that we do not move the index builds
                 // forward before the step down process is complete.
@@ -385,40 +471,16 @@ const ResumableIndexBuildTest = class {
 
                 // Move the index builds forward to the points that we want them to be interrupted
                 // for shutdown at.
-                let fp;
+                let failPointForSingleIndexBuild;
                 for (const failPoint of failPoints) {
-                    fp = configureFailPoint(db.getMongo(), failPoint.name, failPoint.data);
+                    failPointForSingleIndexBuild =
+                        configureFailPoint(db.getMongo(), failPoint.name, failPoint.data);
                 }
-                assert.commandWorked(
-                    db.adminCommand({configureFailPoint: "hangBeforeBuildingIndex", mode: "off"}));
 
-                // Wait for the index builds to reach their respective failpoints.
-                for (const failPoint of failPoints) {
-                    if (failPoint.logIdWithBuildUUID) {
-                        for (const buildUUID of failPoint.data.buildUUIDs) {
-                            checkLog.containsJson(db.getMongo(), failPoint.logIdWithBuildUUID, {
-                                buildUUID: function(uuid) {
-                                    return uuid["uuid"]["$uuid"] === buildUUID;
-                                }
-                            });
-                        }
-                    } else if (failPoint.logIdWithIndexName) {
-                        for (const indexName of failPoint.data.indexNames) {
-                            checkLog.containsJson(
-                                db.getMongo(), failPoint.logIdWithIndexName, {index: indexName});
-                        }
-                    } else if (failPoint.useWaitForFailPointForSingleIndexBuild) {
-                        assert.eq(
-                            failPoints.length,
-                            1,
-                            "Can only use useWaitForFailPointForSingleIndexBuild with a single index build");
-                        fp.wait();
-                    } else {
-                        assert(
-                            false,
-                            "Must specify one of logIdWithBuildUUID, logIdWithIndexName, and useWaitForFailPointForSingleIndexBuild");
-                    }
-                }
+                ResumableIndexBuildTest.waitForFailPoints(db.getMongo(),
+                                                          ["hangBeforeBuildingIndex"],
+                                                          failPoints,
+                                                          failPointForSingleIndexBuild);
 
                 // Disabling this failpoint will allow shutdown to continue and cause the operation
                 // context to be killed. This will cause the failpoint specified by failPointName
@@ -450,7 +512,12 @@ const ResumableIndexBuildTest = class {
 
         if (shouldComplete) {
             // Ensure that the index builds were completed upon the node starting back up.
-            ResumableIndexBuildTest.assertCompleted(conn, coll, buildUUIDs, indexNamesFlat);
+            ResumableIndexBuildTest.assertCompleted(
+                conn, coll, buildUUIDs, ResumableIndexBuildTest.flatten(indexNames));
+        }
+
+        for (const fp of failPoints) {
+            delete fp.data;
         }
 
         return buildUUIDs;
@@ -460,15 +527,15 @@ const ResumableIndexBuildTest = class {
      * Makes sure that inserting into a collection outside of an index build works properly,
      * validates indexes on all nodes in the replica set, and drops the index at the end.
      */
-    static checkIndexes(rst, dbName, collName, indexNames, postIndexBuildInserts) {
-        const primary = rst.getPrimary();
+    static checkIndexes(test, dbName, collName, indexNames, postIndexBuildInserts) {
+        const primary = test.getPrimary();
         const coll = primary.getDB(dbName).getCollection(collName);
 
-        rst.awaitReplication();
+        test.awaitReplication();
 
         assert.commandWorked(coll.insert(postIndexBuildInserts));
 
-        for (const node of rst.nodes) {
+        for (const node of test.nodes ? test.nodes : test.getTestFixture().nodes) {
             const res = node.getDB(dbName).getCollection(collName).validate();
             assert(res.valid, "Index validation failed: " + tojson(res));
         }
@@ -568,25 +635,12 @@ const ResumableIndexBuildTest = class {
         }
 
         const coll = primary.getDB(dbName).getCollection(collName);
-
-        const indexNames = new Array(indexSpecs.length);
-        for (let i = 0; i < indexSpecs.length; i++) {
-            indexNames[i] = new Array(indexSpecs[i].length);
-            for (let j = 0; j < indexSpecs[i].length; j++) {
-                indexNames[i][j] = "resumable_index_build_" + i + "_" + j;
-            }
-        }
+        const indexNames = ResumableIndexBuildTest.generateIndexNames(indexSpecs);
 
         const awaitCreateIndexes = ResumableIndexBuildTest.createIndexesWithSideWrites(
             rst, function(collName, indexSpecs, indexNames) {
-                const indexes = new Array(indexSpecs.length);
-                for (let i = 0; i < indexSpecs.length; i++) {
-                    indexes[i] = {key: indexSpecs[i], name: indexNames[i]};
-                }
-
-                assert.commandFailedWithCode(
-                    db.runCommand({createIndexes: collName, indexes: indexes}),
-                    ErrorCodes.InterruptedDueToReplStateChange);
+                load("jstests/noPassthrough/libs/index_build.js");
+                ResumableIndexBuildTest.createIndexesFails(db, collName, indexSpecs, indexNames);
             }, coll, indexSpecs, indexNames, sideWrites, {hangBeforeBuildingIndex: true});
 
         const buildUUIDs = ResumableIndexBuildTest.restart(

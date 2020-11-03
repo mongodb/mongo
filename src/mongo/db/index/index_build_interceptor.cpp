@@ -53,6 +53,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYield);
+MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYieldSecond);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhase);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhaseSecond);
 
@@ -382,15 +383,19 @@ void IndexBuildInterceptor::_yield(OperationContext* opCtx, const Yieldable* yie
     // Track the number of yields in CurOp.
     CurOp::get(opCtx)->yielded();
 
-    hangDuringIndexBuildDrainYield.executeIf(
-        [&](auto&&) {
-            LOGV2(20690, "Hanging index build during drain yield");
-            hangDuringIndexBuildDrainYield.pauseWhileSet();
-        },
-        [&](auto&& config) {
-            return config.getStringField("namespace") ==
-                _indexCatalogEntry->getNSSFromCatalog(opCtx).ns();
-        });
+    auto failPointHang = [opCtx, indexCatalogEntry = _indexCatalogEntry](FailPoint* fp) {
+        fp->executeIf(
+            [fp](auto&&) {
+                LOGV2(20690, "Hanging index build during drain yield");
+                fp->pauseWhileSet();
+            },
+            [opCtx, indexCatalogEntry](auto&& config) {
+                return config.getStringField("namespace") ==
+                    indexCatalogEntry->getNSSFromCatalog(opCtx).ns();
+            });
+    };
+    failPointHang(&hangDuringIndexBuildDrainYield);
+    failPointHang(&hangDuringIndexBuildDrainYieldSecond);
 
     locker->restoreLockState(opCtx, snapshot);
     yieldable->restore();
