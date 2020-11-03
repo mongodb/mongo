@@ -1,7 +1,8 @@
 /**
  * Tests command output from the $operationMetrics aggregation stage.
  * @tags: [
- *   requires_replication
+ *   requires_replication,
+ *   requires_wiredtiger,
  * ]
  */
 (function() {
