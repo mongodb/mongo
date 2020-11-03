@@ -90,6 +90,11 @@ public:
         return _collator.get();
     }
 
+    /**
+     * Returns true if this view represents a time-series collection.
+     */
+    bool isTimeseries() const;
+
     void setViewOn(const NamespaceString& viewOnNss);
 
     /**

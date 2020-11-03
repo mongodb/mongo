@@ -35,6 +35,7 @@ for (let i = 0; i < 100; i++) {
     const t = ISODate();
     const oid = ObjectId();
     const doc = {
+        _id: oid,
         control: {
             version: 1,
             min: {
@@ -72,7 +73,11 @@ for (let i = 0; i < 100; i++) {
         },
     };
 
-    jsTestLog('Inserting doc into buckets collection: ' + i + ': ' + tojson(doc));
-    assert.commandWorked(bucketsColl.insert(doc));
+    jsTestLog('Inserting doc into time-series collection: ' + i + ': ' + tojson(doc));
+    assert.commandWorked(coll.insert(doc));
+    assert(coll.findOne({_id: oid}),
+           'ns: ' + coll.getFullName() + '; i: ' + i + '; doc: ' + tojson(doc));
+    assert(bucketsColl.findOne({_id: oid}),
+           'ns: ' + bucketsColl.getFullName() + '; i: ' + i + '; doc: ' + tojson(doc));
 }
 })();

@@ -63,6 +63,11 @@ ViewDefinition& ViewDefinition::operator=(const ViewDefinition& other) {
     return *this;
 }
 
+bool ViewDefinition::isTimeseries() const {
+    auto bucketsNs = _viewNss.makeTimeseriesBucketsNamespace();
+    return bucketsNs == _viewOnNss;
+}
+
 void ViewDefinition::setViewOn(const NamespaceString& viewOnNss) {
     invariant(_viewNss.db() == viewOnNss.db());
     _viewOnNss = viewOnNss;

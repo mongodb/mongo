@@ -59,6 +59,7 @@
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
@@ -89,6 +90,23 @@ bool shouldSkipOutput(OperationContext* opCtx) {
     return writeConcern.wMode.empty() && writeConcern.wNumNodes == 0 &&
         (writeConcern.syncMode == WriteConcernOptions::SyncMode::NONE ||
          writeConcern.syncMode == WriteConcernOptions::SyncMode::UNSET);
+}
+
+/**
+ * Returns true if 'ns' refers to a time-series collection.
+ */
+bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, ns.db());
+    if (!viewCatalog) {
+        return false;
+    }
+
+    auto view = viewCatalog->lookupWithoutValidatingDurableViews(opCtx, ns.ns());
+    if (!view) {
+        return false;
+    }
+
+    return view->isTimeseries();
 }
 
 enum class ReplyStyle { kUpdate, kNotUpdate };  // update has extra fields.
@@ -349,7 +367,41 @@ private:
             auth::checkAuthForInsertCommand(authzSession, getBypass(), _batch);
         }
 
+        /**
+         * Writes to the underlying system.buckets collection.
+         */
+        void _performTimeseriesWrites(OperationContext* opCtx, BSONObjBuilder& result) const {
+            auto ns = _batch.getNamespace();
+            auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
+
+            BSONObjBuilder builder;
+            builder.append("insert"_sd, bucketsNs.coll());
+            builder.appendElementsUnique(_batch.toBSON({}));
+            auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
+
+            auto timeseriesInsertBatch = InsertOp::parse(request);
+
+            auto reply = write_ops_exec::performInserts(opCtx, timeseriesInsertBatch);
+            serializeReply(opCtx,
+                           ReplyStyle::kNotUpdate,
+                           !timeseriesInsertBatch.getWriteCommandBase().getOrdered(),
+                           timeseriesInsertBatch.getDocuments().size(),
+                           std::move(reply),
+                           &result);
+        }
+
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
+            if (isTimeseries(opCtx, ns())) {
+                // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
+                // constructor.
+                try {
+                    _performTimeseriesWrites(opCtx, result);
+                } catch (DBException& ex) {
+                    ex.addContext(str::stream() << "time-series insert failed: " << ns().ns());
+                    throw;
+                }
+                return;
+            }
             auto reply = write_ops_exec::performInserts(opCtx, _batch);
             serializeReply(opCtx,
                            ReplyStyle::kNotUpdate,
