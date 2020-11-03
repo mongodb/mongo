@@ -35,9 +35,7 @@
 
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_request.h"
 #include "mongo/db/s/balancer/type_migration.h"
-#include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -88,24 +86,9 @@ OpMsg runCommandInLocalTxn(OperationContext* opCtx,
             .response);
 }
 
-void startTransactionWithNoopFind(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  TxnNumber txnNumber) {
-    BSONObjBuilder findCmdBuilder;
-    QueryRequest qr(nss);
-    qr.setBatchSize(0);
-    qr.setWantMore(false);
-    qr.asFindCommand(&findCmdBuilder);
-
-    auto res = runCommandInLocalTxn(
-                   opCtx, nss.db(), true /*startTransaction*/, txnNumber, findCmdBuilder.done())
-                   .body;
-    uassertStatusOK(getStatusFromCommandResult(res));
-}
-
-BSONObj commitOrAbortTransaction(OperationContext* opCtx,
-                                 TxnNumber txnNumber,
-                                 std::string cmdName) {
+BSONObj runCommitOrAbortTxnForConfigDocument(OperationContext* opCtx,
+                                             TxnNumber txnNumber,
+                                             std::string cmdName) {
     // Swap out the clients in order to get a fresh opCtx. Previous operations in this transaction
     // that have been run on this opCtx would have set the timeout in the locker on the opCtx, but
     // commit should not have a lock timeout.
@@ -139,24 +122,6 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
                               .get()
                               .response);
     return replyOpMsg.body;
-}
-
-// Runs commit for the transaction with 'txnNumber'.
-void commitTransaction(OperationContext* opCtx, TxnNumber txnNumber) {
-    auto response = commitOrAbortTransaction(opCtx, txnNumber, "commitTransaction");
-    uassertStatusOK(getStatusFromCommandResult(response));
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
-}
-
-// Runs abort for the transaction with 'txnNumber'.
-void abortTransaction(OperationContext* opCtx, TxnNumber txnNumber) {
-    auto response = commitOrAbortTransaction(opCtx, txnNumber, "abortTransaction");
-
-    auto status = getStatusFromCommandResult(response);
-    if (status.code() != ErrorCodes::NoSuchTransaction) {
-        uassertStatusOK(status);
-        uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
-    }
 }
 
 }  // namespace
@@ -501,21 +466,17 @@ StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
 BSONObj ShardingCatalogManager::writeToConfigDocumentInTxn(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            const BatchedCommandRequest& request,
+                                                           bool startTransaction,
                                                            TxnNumber txnNumber) {
     invariant(nss.db() == NamespaceString::kConfigDb);
-    auto response = runCommandInLocalTxn(
-                        opCtx, nss.db(), false /* startTransaction */, txnNumber, request.toBSON())
-                        .body;
-
-    uassertStatusOK(getStatusFromCommandResult(response));
-    uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
-
-    return response;
+    return runCommandInLocalTxn(opCtx, nss.db(), startTransaction, txnNumber, request.toBSON())
+        .body;
 }
 
 void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         std::vector<BSONObj> docs,
+                                                        bool startTransaction,
                                                         TxnNumber txnNumber) {
     invariant(nss.db() == NamespaceString::kConfigDb);
 
@@ -530,7 +491,8 @@ void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
             return insertOp;
         }());
 
-        writeToConfigDocumentInTxn(opCtx, nss, request, txnNumber);
+        uassertStatusOK(getStatusFromWriteCommandReply(
+            writeToConfigDocumentInTxn(opCtx, nss, request, startTransaction, txnNumber)));
     };
 
     while (!docs.empty()) {
@@ -558,29 +520,22 @@ void ShardingCatalogManager::insertConfigDocumentsInTxn(OperationContext* opCtx,
         doBatchInsert();
 }
 
-void ShardingCatalogManager::withTransaction(
-    OperationContext* opCtx,
-    const NamespaceString& namespaceForInitialFind,
-    unique_function<void(OperationContext*, TxnNumber)> func) {
-    AlternativeSessionRegion asr(opCtx);
-    AuthorizationSession::get(asr.opCtx()->getClient())
-        ->grantInternalAuthorization(asr.opCtx()->getClient());
-    TxnNumber txnNumber = 0;
+void ShardingCatalogManager::commitTxnForConfigDocument(OperationContext* opCtx,
+                                                        TxnNumber txnNumber) {
+    auto response = runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "commitTransaction");
+    uassertStatusOK(getStatusFromCommandResult(response));
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
+}
 
-    auto guard = makeGuard([opCtx = asr.opCtx(), txnNumber] {
-        try {
-            abortTransaction(opCtx, txnNumber);
-        } catch (DBException& e) {
-            LOGV2_WARNING(5192100,
-                          "Failed to abort transaction in AlternativeSessionRegion",
-                          "error"_attr = redact(e));
-        }
-    });
+void ShardingCatalogManager::abortTxnForConfigDocument(OperationContext* opCtx,
+                                                       TxnNumber txnNumber) {
+    auto response = runCommitOrAbortTxnForConfigDocument(opCtx, txnNumber, "abortTransaction");
 
-    startTransactionWithNoopFind(asr.opCtx(), namespaceForInitialFind, txnNumber);
-    func(asr.opCtx(), txnNumber);
-    commitTransaction(asr.opCtx(), txnNumber);
-    guard.dismiss();
+    auto status = getStatusFromCommandResult(response);
+    if (status.code() != ErrorCodes::NoSuchTransaction) {
+        uassertStatusOK(status);
+        uassertStatusOK(getWriteConcernStatusFromCommandResult(response));
+    }
 }
 
 }  // namespace mongo

@@ -30,9 +30,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/s/config/namespace_serializer.h"
 #include "mongo/executor/task_executor.h"
@@ -185,28 +183,14 @@ public:
      */
     Lock::ExclusiveLock lockZoneMutex(OperationContext* opCtx);
 
-    //
-    // General utilities related to the ShardingCatalogManager
-    //
-
-    /**
-     * Starts and commits a transaction on the config server, with a no-op find on the specified
-     * namespace in order to internally start the transaction. All writes done inside the
-     * passed-in function must assume that they are run inside a transaction that will be commited
-     * after the function itself has completely finished.
-     */
-    static void withTransaction(OperationContext* opCtx,
-                                const NamespaceString& namespaceForInitialFind,
-                                unique_function<void(OperationContext*, TxnNumber)> func);
-
     /**
      * Runs the write 'request' on namespace 'nss' in a transaction with 'txnNumber'. Write must be
-     * on a collection in the config database. If expectedNumModified is specified, the number of
-     * documents modified must match expectedNumModified - throws otherwise.
+     * on a collection in the config database.
      */
     BSONObj writeToConfigDocumentInTxn(OperationContext* opCtx,
                                        const NamespaceString& nss,
                                        const BatchedCommandRequest& request,
+                                       bool startTransaction,
                                        TxnNumber txnNumber);
 
     /**
@@ -217,7 +201,18 @@ public:
     void insertConfigDocumentsInTxn(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     std::vector<BSONObj> docs,
+                                    bool startTransaction,
                                     TxnNumber txnNumber);
+
+    /**
+     * Runs commit for the transaction with 'txnNumber'.
+     */
+    void commitTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber);
+
+    /**
+     * Runs abort for the transaction with 'txnNumber'.
+     */
+    void abortTxnForConfigDocument(OperationContext* opCtx, TxnNumber txnNumber);
 
     //
     // Chunk Operations
@@ -287,20 +282,6 @@ public:
                                          const BSONObj& minKey,
                                          const BSONObj& maxKey,
                                          const ChunkVersion& version);
-
-    /**
-     * In a single transaction, effectively bumps the shard version for each shard in the collection
-     * to be the current collection version's major version + 1 inside an already-running
-     * transaction.
-     *
-     * Note: it's the responsibility of the caller to ensure that the list of shards is stable,
-     * as any shards added after the shard ids have been passed in will be missed.
-     */
-    void bumpCollShardVersionsAndChangeMetadataInTxn(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const std::vector<ShardId>& shardIds,
-        unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc);
 
     //
     // Database Operations
@@ -400,6 +381,7 @@ public:
                                                       const NamespaceString& nss,
                                                       const CollectionType& coll,
                                                       const bool upsert,
+                                                      const bool startTransaction,
                                                       TxnNumber txnNumber);
 
     /**
