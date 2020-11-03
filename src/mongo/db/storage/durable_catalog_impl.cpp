@@ -939,7 +939,6 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     {
         const std::string collectionIdent = catalogEntry["ident"].String();
 
-        // TODO SERVER-51144: Additional sanity checks to validate the metadata for indexes.
         for (const auto& indexIdent : catalogEntry["idxIdent"].Obj()) {
             indexIdents.insert(indexIdent.String());
         }
