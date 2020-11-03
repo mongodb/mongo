@@ -114,6 +114,7 @@ def generate(env):
         else None)
     env["IDLCSUFFIX"] = ".idl"
 
+    global IDL_GLOBAL_DEPS
     IDL_GLOBAL_DEPS = env.Glob("#buildscripts/idl/*.py") + env.Glob(
         "#buildscripts/idl/idl/*.py"
     )
