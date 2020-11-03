@@ -67,7 +67,7 @@ namespace {
 UUID getCollectionUuid(OperationContext* opCtx, const NamespaceString& nss) {
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
 
-    auto uuid = CollectionCatalog::get(opCtx).lookupUUIDByNSS(opCtx, nss);
+    auto uuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
     invariant(uuid);
 
     return *uuid;
@@ -317,7 +317,7 @@ void createSlimOplogView(OperationContext* opCtx, Database* db) {
             {
                 // Create 'system.views' in a separate WUOW if it does not exist.
                 WriteUnitOfWork wuow(opCtx);
-                CollectionPtr coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                CollectionPtr coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, NamespaceString(db->getSystemViewsName()));
                 if (!coll) {
                     coll = db->createCollection(opCtx, NamespaceString(db->getSystemViewsName()));

@@ -437,7 +437,8 @@ CollectionUUID _getCollectionUuid(OperationContext* opCtx, const NamespaceString
  * Get collection namespace by UUID.
  */
 NamespaceString _getCollectionNssFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    const CollectionPtr& source = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
+    const CollectionPtr& source =
+        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
     return source ? source->ns() : NamespaceString();
 }
 
@@ -502,7 +503,7 @@ CollectionPtr _getCollection_inlock(OperationContext* opCtx, const NamespaceStri
     if (!db) {
         return nullptr;
     }
-    return CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    return CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {
@@ -680,7 +681,7 @@ TEST_F(RenameCollectionTest, RenameCollectionForApplyOpsDropTargetByUUIDTargetEx
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
     const auto& tmpB =
-        CollectionCatalog::get(_opCtx.get()).lookupNSSByUUID(_opCtx.get(), collBUUID);
+        CollectionCatalog::get(_opCtx.get())->lookupNSSByUUID(_opCtx.get(), collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
     ASSERT_TRUE(*tmpB != collB);
@@ -713,7 +714,7 @@ TEST_F(RenameCollectionTest,
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
     const auto& tmpB =
-        CollectionCatalog::get(_opCtx.get()).lookupNSSByUUID(_opCtx.get(), collBUUID);
+        CollectionCatalog::get(_opCtx.get())->lookupNSSByUUID(_opCtx.get(), collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(*tmpB != collB);
     ASSERT_TRUE(tmpB->coll().startsWith("tmp"));
@@ -739,7 +740,7 @@ TEST_F(RenameCollectionTest,
     ASSERT_TRUE(_collectionExists(_opCtx.get(), collB));
     // The original B should exist too, but with a temporary name
     const auto& tmpB =
-        CollectionCatalog::get(_opCtx.get()).lookupNSSByUUID(_opCtx.get(), collBUUID);
+        CollectionCatalog::get(_opCtx.get())->lookupNSSByUUID(_opCtx.get(), collBUUID);
     ASSERT(tmpB);
     ASSERT_TRUE(*tmpB != collB);
     ASSERT_TRUE(tmpB->coll().startsWith("tmp"));

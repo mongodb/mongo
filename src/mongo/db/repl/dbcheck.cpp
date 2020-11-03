@@ -234,11 +234,11 @@ std::string hashCollectionInfo(const DbCheckCollectionInformation& info) {
 
 std::pair<boost::optional<UUID>, boost::optional<UUID>> getPrevAndNextUUIDs(
     OperationContext* opCtx, const CollectionPtr& collection) {
-    const CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
     const UUID uuid = collection->uuid();
 
     std::vector<CollectionUUID> collectionUUIDs =
-        catalog.getAllCollectionUUIDsFromDb(collection->ns().db());
+        catalog->getAllCollectionUUIDsFromDb(collection->ns().db());
     auto uuidIt = std::find(collectionUUIDs.begin(), collectionUUIDs.end(), uuid);
     invariant(uuidIt != collectionUUIDs.end());
 
@@ -386,7 +386,7 @@ AutoGetCollectionForDbCheck::AutoGetCollectionForDbCheck(OperationContext* opCtx
     std::string msg;
 
     _collection = _agd.getDb()
-        ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)
+        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)
         : nullptr;
 
     // If the collection gets deleted after the check is launched, record that in the health log.
@@ -461,7 +461,7 @@ Status dbCheckDatabaseOnSecondary(OperationContext* opCtx,
                                   const DbCheckOplogCollection& entry) {
     // dbCheckCollectionResult-specific stuff.
     auto uuid = uassertStatusOK(UUID::parse(entry.getUuid().toString()));
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
 
     if (!collection) {
         Status status(ErrorCodes::NamespaceNotFound, "Could not find collection for dbCheck");

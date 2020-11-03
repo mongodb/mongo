@@ -261,7 +261,8 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     AutoGetCollectionViewMode viewMode,
-    Date_t deadline) {
+    Date_t deadline)
+    : _catalogStash(opCtx) {
     // Supported lock-free reads should never have an open storage snapshot prior to calling
     // this helper. The storage snapshot and in-memory state fetched here must be consistent.
     invariant(supportsLockFreeRead(opCtx) && !opCtx->recoveryUnit()->isActive());
@@ -271,6 +272,7 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
         // state. Therefore we must fetch the repl state beforehand, to compare with afterwards.
         long long replTerm = repl::ReplicationCoordinator::get(opCtx)->getTerm();
 
+        auto catalog = CollectionCatalog::get(opCtx);
         _autoGetCollectionForReadBase.emplace(opCtx, nsOrUUID, viewMode, deadline);
 
         // A lock request does not always find a collection to lock.
@@ -297,15 +299,17 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
             opCtx->recoveryUnit()->preallocateSnapshot();
         }
 
-        auto newCollection = CollectionCatalog::get(opCtx).lookupCollectionByUUIDForRead(
+        auto newCatalog = CollectionCatalog::get(opCtx);
+        auto newCollection = newCatalog->lookupCollectionByUUIDForRead(
             opCtx, _autoGetCollectionForReadBase.get()->uuid());
 
         // The collection may have been dropped since the previous lookup, run the loop one more
         // time to cleanup if newCollection is nullptr
-        if (newCollection &&
+        if (newCollection && catalog == newCatalog &&
             _autoGetCollectionForReadBase.get()->getMinimumVisibleSnapshot() ==
                 newCollection->getMinimumVisibleSnapshot() &&
             replTerm == repl::ReplicationCoordinator::get(opCtx)->getTerm()) {
+            _catalogStash.stash(std::move(catalog));
             break;
         }
 
@@ -367,7 +371,7 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
           _autoCollForRead.getNss(),
           Top::LockType::ReadLocked,
           logMode,
-          CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_autoCollForRead.getNss().db()),
+          CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_autoCollForRead.getNss().db()),
           deadline) {
 
     if (!_autoCollForRead.getView()) {
@@ -401,7 +405,7 @@ OldClientContext::OldClientContext(OperationContext* opCtx, const std::string& n
 
     stdx::lock_guard<Client> lk(*_opCtx->getClient());
     currentOp->enter_inlock(ns.c_str(),
-                            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_db->name()));
+                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_db->name()));
 }
 
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(

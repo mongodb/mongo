@@ -388,8 +388,8 @@ int _testRollbackDelete(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, "test");
     ASSERT_TRUE(db);
-    auto collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, NamespaceString("test.t"));
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+        opCtx, NamespaceString("test.t"));
     if (!collection) {
         return -1;
     }
@@ -540,7 +540,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommand) {
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = CollectionCatalog::get(_opCtx.get())
-                                .lookupCollectionByNamespace(_opCtx.get(), nss)
+                                ->lookupCollectionByNamespace(_opCtx.get(), nss)
                                 ->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -585,7 +585,7 @@ TEST_F(RSRollbackTest, RollbackCreateIndexCommandIndexNotInCatalog) {
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = CollectionCatalog::get(_opCtx.get())
-                                .lookupCollectionByNamespace(_opCtx.get(), nss)
+                                ->lookupCollectionByNamespace(_opCtx.get(), nss)
                                 ->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -624,7 +624,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithOneIndex) {
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = CollectionCatalog::get(_opCtx.get())
-                                .lookupCollectionByNamespace(_opCtx.get(), nss)
+                                ->lookupCollectionByNamespace(_opCtx.get(), nss)
                                 ->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -666,7 +666,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexCommandWithMultipleIndexes) {
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = CollectionCatalog::get(_opCtx.get())
-                                .lookupCollectionByNamespace(_opCtx.get(), nss)
+                                ->lookupCollectionByNamespace(_opCtx.get(), nss)
                                 ->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(3, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -711,7 +711,7 @@ TEST_F(RSRollbackTest, RollingBackCreateAndDropOfSameIndexIgnoresBothCommands) {
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = CollectionCatalog::get(_opCtx.get())
-                                .lookupCollectionByNamespace(_opCtx.get(), nss)
+                                ->lookupCollectionByNamespace(_opCtx.get(), nss)
                                 ->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(1, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -807,7 +807,7 @@ TEST_F(RSRollbackTest, RollingBackDropAndCreateOfSameIndexNameWithDifferentSpecs
     {
         Lock::DBLock dbLock(_opCtx.get(), nss.db(), MODE_S);
         auto indexCatalog = CollectionCatalog::get(_opCtx.get())
-                                .lookupCollectionByNamespace(_opCtx.get(), nss)
+                                ->lookupCollectionByNamespace(_opCtx.get(), nss)
                                 ->getIndexCatalog();
         ASSERT(indexCatalog);
         ASSERT_EQUALS(2, indexCatalog->numIndexesReady(_opCtx.get()));
@@ -930,7 +930,7 @@ TEST_F(RSRollbackTest, RollbackDropIndexOnCollectionWithTwoExistingIndexes) {
         numIndexesOnColl(
             _opCtx.get(),
             nss,
-            CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss)));
+            CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss)));
 }
 
 TEST_F(RSRollbackTest, RollbackTwoIndexDropsPrecededByTwoIndexCreationsOnSameCollection) {
@@ -967,7 +967,7 @@ TEST_F(RSRollbackTest, RollbackTwoIndexDropsPrecededByTwoIndexCreationsOnSameCol
         numIndexesOnColl(
             _opCtx.get(),
             nss,
-            CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss)));
+            CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss)));
 }
 
 TEST_F(RSRollbackTest, RollbackMultipleCreateIndexesOnSameCollection) {
@@ -1009,7 +1009,7 @@ TEST_F(RSRollbackTest, RollbackMultipleCreateIndexesOnSameCollection) {
         numIndexesOnColl(
             _opCtx.get(),
             nss,
-            CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss)));
+            CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss)));
 }
 
 TEST_F(RSRollbackTest, RollbackCreateDropRecreateIndexOnCollection) {
@@ -1054,7 +1054,7 @@ TEST_F(RSRollbackTest, RollbackCreateDropRecreateIndexOnCollection) {
         numIndexesOnColl(
             _opCtx.get(),
             nss,
-            CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss)));
+            CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss)));
 }
 
 TEST_F(RSRollbackTest, RollbackCommitIndexBuild) {
@@ -1102,7 +1102,7 @@ TEST_F(RSRollbackTest, RollbackCommitIndexBuild) {
                            _replicationProcess.get()));
 
     auto collAfterRollback =
-        CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss);
+        CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss);
 
     // Make sure the collection indexes are in the proper state post-rollback.
     ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, collAfterRollback));
@@ -1160,7 +1160,7 @@ TEST_F(RSRollbackTest, RollbackAbortIndexBuild) {
                            _replicationProcess.get()));
 
     auto collAfterRollback =
-        CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss);
+        CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss);
 
     // Make sure the collection indexes are in the proper state post-rollback.
     ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, collAfterRollback));
@@ -1223,7 +1223,7 @@ TEST_F(RSRollbackTest, AbortedIndexBuildsAreRestarted) {
                            _replicationProcess.get()));
 
     auto collAfterRollback =
-        CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss);
+        CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss);
 
     // Make sure the collection indexes are in the proper state post-rollback.
     ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, collAfterRollback));
@@ -1281,7 +1281,7 @@ TEST_F(RSRollbackTest, AbortedIndexBuildsAreNotRestartedWhenStartIsRolledBack) {
                            _replicationProcess.get()));
 
     auto collAfterRollback =
-        CollectionCatalog::get(_opCtx.get()).lookupCollectionByNamespace(_opCtx.get(), nss);
+        CollectionCatalog::get(_opCtx.get())->lookupCollectionByNamespace(_opCtx.get(), nss);
 
     // The aborted index build should have been dropped.
     ASSERT_EQUALS(1, numIndexesOnColl(_opCtx.get(), nss, collAfterRollback));
@@ -1820,7 +1820,7 @@ TEST_F(RSRollbackTest, RollbackApplyOpsCommand) {
         AutoGetOrCreateDb autoDb(_opCtx.get(), "test", MODE_X);
         mongo::WriteUnitOfWork wuow(_opCtx.get());
         coll = CollectionCatalog::get(_opCtx.get())
-                   .lookupCollectionByNamespace(_opCtx.get(), NamespaceString("test.t"));
+                   ->lookupCollectionByNamespace(_opCtx.get(), NamespaceString("test.t"));
         if (!coll) {
             coll =
                 autoDb.getDb()->createCollection(_opCtx.get(), NamespaceString("test.t"), options);
@@ -1968,7 +1968,7 @@ TEST_F(RSRollbackTest, RollbackCreateCollectionCommand) {
         auto db = databaseHolder->getDb(_opCtx.get(), "test");
         ASSERT_TRUE(db);
         ASSERT_FALSE(CollectionCatalog::get(_opCtx.get())
-                         .lookupCollectionByNamespace(_opCtx.get(), NamespaceString("test.t")));
+                         ->lookupCollectionByNamespace(_opCtx.get(), NamespaceString("test.t")));
     }
 }
 

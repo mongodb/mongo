@@ -84,7 +84,7 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
         NamespaceString::kRsOplogNamespace,
         Top::LockType::ReadLocked,
         AutoStatsTracker::LogMode::kUpdateTop,
-        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(NamespaceString::kLocalDb),
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(NamespaceString::kLocalDb),
         Date_t::max());
 
     auto exec = uassertStatusOK(

@@ -243,7 +243,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     invariant(!opCtx->lockState()->isRSTLExclusive(), buildUUID.toString());
 
-    const auto nss = CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
+    const auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUuid);
 
     auto& oss = OperationShardingState::get(opCtx);
     const auto shardVersion = oss.getShardVersion(nss);

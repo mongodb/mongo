@@ -44,8 +44,11 @@
 
 namespace mongo {
 namespace {
-const ServiceContext::Decoration<CollectionCatalog> getCatalog =
-    ServiceContext::declareDecoration<CollectionCatalog>();
+struct LatestCollectionCatalog {
+    std::shared_ptr<CollectionCatalog> catalog = std::make_shared<CollectionCatalog>();
+};
+const ServiceContext::Decoration<LatestCollectionCatalog> getCatalog =
+    ServiceContext::declareDecoration<LatestCollectionCatalog>();
 
 /**
  * Decoration on OperationContext to store cloned Collections until they are committed or rolled
@@ -53,7 +56,7 @@ const ServiceContext::Decoration<CollectionCatalog> getCatalog =
  */
 class UncommittedWritableCollections {
 public:
-    using CommitFn = std::function<void(boost::optional<Timestamp>)>;
+    using CommitFn = std::function<void(CollectionCatalog&, boost::optional<Timestamp>)>;
 
     /**
      * Lookup of Collection by UUID
@@ -155,23 +158,28 @@ const OperationContext::Decoration<UncommittedWritableCollections>
     getUncommittedWritableCollections =
         OperationContext::declareDecoration<UncommittedWritableCollections>();
 
+const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
+    OperationContext::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
+
 class FinishDropCollectionChange : public RecoveryUnit::Change {
 public:
-    FinishDropCollectionChange(CollectionCatalog* catalog,
+    FinishDropCollectionChange(OperationContext* opCtx,
                                std::shared_ptr<Collection> coll,
                                CollectionUUID uuid)
-        : _catalog(catalog), _coll(std::move(coll)), _uuid(uuid) {}
+        : _opCtx(opCtx), _coll(std::move(coll)), _uuid(uuid) {}
 
     void commit(boost::optional<Timestamp>) override {
         _coll.reset();
     }
 
     void rollback() override {
-        _catalog->registerCollection(_uuid, std::move(_coll));
+        CollectionCatalog::write(_opCtx, [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(_uuid, std::move(_coll));
+        });
     }
 
 private:
-    CollectionCatalog* _catalog;
+    OperationContext* _opCtx;
     std::shared_ptr<Collection> _coll;
     CollectionUUID _uuid;
 };
@@ -180,12 +188,10 @@ private:
 
 CollectionCatalog::iterator::iterator(OperationContext* opCtx,
                                       StringData dbName,
-                                      uint64_t genNum,
                                       const CollectionCatalog& catalog)
-    : _opCtx(opCtx), _dbName(dbName), _genNum(genNum), _catalog(&catalog) {
+    : _opCtx(opCtx), _dbName(dbName), _catalog(&catalog) {
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
-    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
     _mapIter = _catalog->_orderedCollections.lower_bound(std::make_pair(_dbName, minUuid));
 
     // Start with the first collection that is visible outside of its transaction.
@@ -201,13 +207,10 @@ CollectionCatalog::iterator::iterator(OperationContext* opCtx,
 CollectionCatalog::iterator::iterator(OperationContext* opCtx,
                                       std::map<std::pair<std::string, CollectionUUID>,
                                                std::shared_ptr<Collection>>::const_iterator mapIter,
-                                      uint64_t genNum,
                                       const CollectionCatalog& catalog)
-    : _opCtx(opCtx), _genNum(genNum), _mapIter(mapIter), _catalog(&catalog) {}
+    : _opCtx(opCtx), _mapIter(mapIter), _catalog(&catalog) {}
 
 CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*() {
-    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
-    _repositionIfNeeded();
     if (_exhausted()) {
         return CollectionPtr();
     }
@@ -217,7 +220,7 @@ CollectionCatalog::iterator::value_type CollectionCatalog::iterator::operator*()
 
 Collection* CollectionCatalog::iterator::getWritableCollection(OperationContext* opCtx,
                                                                LifetimeMode mode) {
-    return CollectionCatalog::get(opCtx).lookupCollectionByUUIDForMetadataWrite(
+    return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(
         opCtx, mode, operator*()->uuid());
 }
 
@@ -226,11 +229,7 @@ boost::optional<CollectionUUID> CollectionCatalog::iterator::uuid() {
 }
 
 CollectionCatalog::iterator CollectionCatalog::iterator::operator++() {
-    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
-
-    if (!_repositionIfNeeded()) {
-        _mapIter++;  // If the position was not updated, increment iterator to next element.
-    }
+    _mapIter++;
 
     // Skip any collections that are not yet visible outside of their respective transactions.
     while (!_exhausted() && !_mapIter->second->isCommitted()) {
@@ -256,8 +255,7 @@ CollectionCatalog::iterator CollectionCatalog::iterator::operator++(int) {
 }
 
 bool CollectionCatalog::iterator::operator==(const iterator& other) {
-    stdx::lock_guard<Latch> lock(_catalog->_catalogLock);
-
+    invariant(_catalog == other._catalog);
     if (other._mapIter == _catalog->_orderedCollections.end()) {
         return _uuid == boost::none;
     }
@@ -269,56 +267,158 @@ bool CollectionCatalog::iterator::operator!=(const iterator& other) {
     return !(*this == other);
 }
 
-bool CollectionCatalog::iterator::_repositionIfNeeded() {
-    if (_genNum == _catalog->_generationNumber) {
-        return false;
-    }
-
-    _genNum = _catalog->_generationNumber;
-    // If the map has been modified, find the entry the iterator was on, or the one right after it.
-    // The entry the iterator was on must have been for a collection visible outside of its
-    // transaction.
-    _mapIter = _catalog->_orderedCollections.lower_bound(std::make_pair(_dbName, *_uuid));
-
-    while (!_exhausted() && !_mapIter->second->isCommitted()) {
-        _mapIter++;
-    }
-
-    if (_exhausted()) {
-        return true;
-    }
-
-    // If the old pair matches the previous DB name and UUID, the iterator was not repositioned.
-    auto dbUuidPair = _mapIter->first;
-    bool repositioned = !(dbUuidPair.first == _dbName && dbUuidPair.second == _uuid);
-    _uuid = dbUuidPair.second;
-
-    return repositioned;
-}
-
 bool CollectionCatalog::iterator::_exhausted() {
     return _mapIter == _catalog->_orderedCollections.end() || _mapIter->first.first != _dbName;
 }
 
-CollectionCatalog& CollectionCatalog::get(ServiceContext* svcCtx) {
-    return getCatalog(svcCtx);
+std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(ServiceContext* svcCtx) {
+    return atomic_load(&getCatalog(svcCtx).catalog);
 }
-CollectionCatalog& CollectionCatalog::get(OperationContext* opCtx) {
-    return getCatalog(opCtx->getServiceContext());
+
+std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext* opCtx) {
+    const auto& stashed = stashedCatalog(opCtx);
+    if (stashed)
+        return stashed;
+    return get(opCtx->getServiceContext());
 }
+
+void CollectionCatalog::stash(OperationContext* opCtx,
+                              std::shared_ptr<const CollectionCatalog> catalog) {
+    stashedCatalog(opCtx) = std::move(catalog);
+}
+
+void CollectionCatalog::write(ServiceContext* svcCtx, CatalogWriteFn job) {
+    // It is potentially expensive to copy the collection catalog so we batch the operations by only
+    // having one concurrent thread copying the catalog and executing all the write jobs.
+
+    struct JobEntry {
+        JobEntry(CatalogWriteFn write) : job(std::move(write)) {}
+
+        CatalogWriteFn job;
+
+        struct CompletionInfo {
+            // Used to wait for job to complete by worker thread
+            Mutex mutex;
+            stdx::condition_variable cv;
+
+            // Exception storage if we threw during job execution, so we can transfer the exception
+            // back to the calling thread
+            std::exception_ptr exception;
+
+            // The job is completed when the catalog we modified has been committed back to the
+            // storage or if we threw during its execution
+            bool completed = false;
+        };
+
+        // Shared state for completion info as JobEntry's gets deleted when we are finished
+        // executing. No shared state means that this job belongs to the same thread executing them.
+        std::shared_ptr<CompletionInfo> completion;
+    };
+
+    static std::list<JobEntry> queue;
+    static bool workerExists = false;
+    static Mutex mutex =
+        MONGO_MAKE_LATCH("CollectionCatalog::write");  // Protecting the two globals above
+
+    invariant(job);
+
+    // Current batch of jobs to execute
+    std::list<JobEntry> pending;
+    {
+        stdx::unique_lock lock(mutex);
+        queue.emplace_back(std::move(job));
+
+        // If worker already exists, then wait on our condition variable until the job is completed
+        if (workerExists) {
+            auto completion = std::make_shared<JobEntry::CompletionInfo>();
+            queue.back().completion = completion;
+            lock.unlock();
+
+            stdx::unique_lock completionLock(completion->mutex);
+            const bool& completed = completion->completed;
+            completion->cv.wait(completionLock, [&completed]() { return completed; });
+
+            // Throw any exception that was caught during execution of our job
+            if (completion->exception)
+                std::rethrow_exception(completion->exception);
+            return;
+        }
+
+        // No worker existed, then we take this responsibility
+        workerExists = true;
+        pending.splice(pending.end(), queue);
+    }
+
+    // Implementation for thread with worker responsibility below, only one thread at a time can be
+    // in here. Keep track of completed jobs so we can notify them when we've written back the
+    // catalog to storage
+    std::list<JobEntry> completed;
+    std::exception_ptr myException;
+
+    auto& storage = getCatalog(svcCtx);
+    // hold onto base so if we need to delete it we can do it outside of the lock
+    auto base = atomic_load(&storage.catalog);
+    // copy the collection catalog, this could be expensive, but we will only have one pending
+    // collection in flight at a given time
+    auto clone = std::make_shared<CollectionCatalog>(*base);
+
+    // Execute jobs until we drain the queue
+    while (true) {
+        for (auto&& current : pending) {
+            // Store any exception thrown during job execution so we can notify the calling thread
+            try {
+                current.job(*clone);
+            } catch (...) {
+                if (current.completion)
+                    current.completion->exception = std::current_exception();
+                else
+                    myException = std::current_exception();
+            }
+        }
+        // Transfer the jobs we just executed to the completed list
+        completed.splice(completed.end(), pending);
+
+        stdx::lock_guard lock(mutex);
+        if (queue.empty()) {
+            // Queue is empty, store catalog and relinquish responsibility of being worker thread
+            atomic_store(&storage.catalog, std::move(clone));
+            workerExists = false;
+            break;
+        }
+
+        // Transfer jobs in queue to the pending list
+        pending.splice(pending.end(), queue);
+    }
+
+    for (auto&& entry : completed) {
+        if (!entry.completion) {
+            continue;
+        }
+
+        stdx::lock_guard completionLock(entry.completion->mutex);
+        entry.completion->completed = true;
+        entry.completion->cv.notify_one();
+    }
+    LOGV2_DEBUG(
+        5255601, 1, "Finished writing to the CollectionCatalog", "jobs"_attr = completed.size());
+    if (myException)
+        std::rethrow_exception(myException);
+}
+
+void CollectionCatalog::write(OperationContext* opCtx,
+                              std::function<void(CollectionCatalog&)> job) {
+    write(opCtx->getServiceContext(), std::move(job));
+}
+
 
 void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
                                                Collection* coll,
                                                const NamespaceString& fromCollection,
-                                               const NamespaceString& toCollection) {
+                                               const NamespaceString& toCollection) const {
     // Rather than maintain, in addition to the UUID -> Collection* mapping, an auxiliary
     // data structure with the UUID -> namespace mapping, the CollectionCatalog relies on
     // Collection::ns() to provide UUID to namespace lookup. In addition, the CollectionCatalog
     // does not require callers to hold locks.
-    //
-    // This means that Collection::ns() may be called while only '_catalogLock' (and no lock
-    // manager locks) are held. The purpose of this function is ensure that we write to the
-    // Collection's namespace string under '_catalogLock'.
     invariant(coll);
     coll->setNs(toCollection);
 
@@ -326,14 +426,15 @@ void CollectionCatalog::setCollectionNamespace(OperationContext* opCtx,
     uncommittedWritableCollections.rename(
         coll,
         fromCollection,
-        [this, coll, fromCollection, toCollection](boost::optional<Timestamp> commitTime) {
-            _collections.erase(fromCollection);
+        [opCtx, coll, fromCollection, toCollection](CollectionCatalog& writableCatalog,
+                                                    boost::optional<Timestamp> commitTime) {
+            writableCatalog._collections.erase(fromCollection);
 
             ResourceId oldRid = ResourceId(RESOURCE_COLLECTION, fromCollection.ns());
             ResourceId newRid = ResourceId(RESOURCE_COLLECTION, toCollection.ns());
 
-            removeResource(oldRid, fromCollection.ns());
-            addResource(newRid, toCollection.ns());
+            writableCatalog.removeResource(oldRid, fromCollection.ns());
+            writableCatalog.addResource(newRid, toCollection.ns());
 
             // Ban reading from this collection on committed reads on snapshots before now.
             if (commitTime) {
@@ -371,7 +472,6 @@ void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, std::string dbN
 
 void CollectionCatalog::onCloseCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
-    stdx::lock_guard<Latch> lock(_catalogLock);
     invariant(!_shadowCatalog);
     _shadowCatalog.emplace();
     for (auto& entry : _catalog)
@@ -380,7 +480,6 @@ void CollectionCatalog::onCloseCatalog(OperationContext* opCtx) {
 
 void CollectionCatalog::onOpenCatalog(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isW());
-    stdx::lock_guard<Latch> lock(_catalogLock);
     invariant(_shadowCatalog);
     _shadowCatalog.reset();
     ++_epoch;
@@ -396,14 +495,13 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRe
         return coll;
     }
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
-    auto coll = _lookupCollectionByUUID(lock, uuid);
+    auto coll = _lookupCollectionByUUID(uuid);
     return (coll && coll->isCommitted()) ? coll : nullptr;
 }
 
 Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
                                                                       LifetimeMode mode,
-                                                                      CollectionUUID uuid) {
+                                                                      CollectionUUID uuid) const {
     if (mode == LifetimeMode::kInplace) {
         return const_cast<Collection*>(lookupCollectionByUUID(opCtx, uuid).get());
     }
@@ -418,14 +516,10 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
         return coll.get();
     }
 
-    std::shared_ptr<Collection> coll;
-    {
-        stdx::lock_guard<Latch> lock(_catalogLock);
-        coll = _lookupCollectionByUUID(lock, uuid);
+    std::shared_ptr<Collection> coll = _lookupCollectionByUUID(uuid);
 
-        if (!coll || !coll->isCommitted())
-            return nullptr;
-    }
+    if (!coll || !coll->isCommitted())
+        return nullptr;
 
     if (coll->ns().isOplog())
         return coll.get();
@@ -436,12 +530,19 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
 
     if (mode == LifetimeMode::kManagedInWriteUnitOfWork) {
         opCtx->recoveryUnit()->onCommit(
-            [this, &uncommittedWritableCollections, clonedPtr = cloned.get()](
+            [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
                 boost::optional<Timestamp> commitTime) {
                 auto [collection, commitHandlers] =
                     uncommittedWritableCollections.remove(clonedPtr);
                 if (collection) {
-                    _commitWritableClone(std::move(collection), commitTime, commitHandlers);
+                    CollectionCatalog::write(
+                        opCtx,
+                        [collection = std::move(collection),
+                         &commitTime,
+                         commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
+                            catalog._commitWritableClone(
+                                std::move(collection), commitTime, *commitHandlers);
+                        });
                 }
             });
         opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
@@ -463,27 +564,18 @@ CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
         return {opCtx, coll.get(), LookupCollectionForYieldRestore()};
     }
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
-    auto coll = _lookupCollectionByUUID(lock, uuid);
+    auto coll = _lookupCollectionByUUID(uuid);
     return (coll && coll->isCommitted())
         ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore())
         : CollectionPtr();
 }
 
-void CollectionCatalog::makeCollectionVisible(CollectionUUID uuid) {
-    stdx::lock_guard<Latch> lock(_catalogLock);
-    auto coll = _lookupCollectionByUUID(lock, uuid);
-    coll->setCommitted(true);
-}
-
 bool CollectionCatalog::isCollectionAwaitingVisibility(CollectionUUID uuid) const {
-    stdx::lock_guard<Latch> lock(_catalogLock);
-    auto coll = _lookupCollectionByUUID(lock, uuid);
+    auto coll = _lookupCollectionByUUID(uuid);
     return coll && !coll->isCommitted();
 }
 
-std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(WithLock,
-                                                                       CollectionUUID uuid) const {
+std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(CollectionUUID uuid) const {
     auto foundIt = _catalog.find(uuid);
     return foundIt == _catalog.end() ? nullptr : foundIt->second;
 }
@@ -494,14 +586,13 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespace
         return coll;
     }
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
     return (coll && coll->isCommitted()) ? coll : nullptr;
 }
 
 Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
-    OperationContext* opCtx, LifetimeMode mode, const NamespaceString& nss) {
+    OperationContext* opCtx, LifetimeMode mode, const NamespaceString& nss) const {
     if (mode == LifetimeMode::kInplace || nss.isOplog()) {
         return const_cast<Collection*>(lookupCollectionByNamespace(opCtx, nss).get());
     }
@@ -517,15 +608,11 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
         return coll.get();
     }
 
-    std::shared_ptr<Collection> coll;
-    {
-        stdx::lock_guard<Latch> lock(_catalogLock);
-        auto it = _collections.find(nss);
-        coll = (it == _collections.end() ? nullptr : it->second);
+    auto it = _collections.find(nss);
+    auto coll = (it == _collections.end() ? nullptr : it->second);
 
-        if (!coll || !coll->isCommitted())
-            return nullptr;
-    }
+    if (!coll || !coll->isCommitted())
+        return nullptr;
 
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
     auto cloned = coll->clone();
@@ -533,12 +620,19 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
 
     if (mode == LifetimeMode::kManagedInWriteUnitOfWork) {
         opCtx->recoveryUnit()->onCommit(
-            [this, &uncommittedWritableCollections, clonedPtr = cloned.get()](
+            [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
                 boost::optional<Timestamp> commitTime) {
                 auto [collection, commitHandlers] =
                     uncommittedWritableCollections.remove(clonedPtr);
                 if (collection) {
-                    _commitWritableClone(std::move(collection), commitTime, commitHandlers);
+                    CollectionCatalog::write(
+                        opCtx,
+                        [collection = std::move(collection),
+                         &commitTime,
+                         commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
+                            catalog._commitWritableClone(
+                                std::move(collection), commitTime, *commitHandlers);
+                        });
                 }
             });
         opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
@@ -561,7 +655,6 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
         return {opCtx, coll.get(), LookupCollectionForYieldRestore()};
     }
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
     return (coll && coll->isCommitted())
@@ -579,7 +672,6 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
         return coll->ns();
     }
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
     auto foundIt = _catalog.find(uuid);
     if (foundIt != _catalog.end()) {
         boost::optional<NamespaceString> ns = foundIt->second->ns();
@@ -611,7 +703,6 @@ boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
         return coll->uuid();
     }
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
     auto it = _collections.find(nss);
     if (it != _collections.end()) {
         boost::optional<CollectionUUID> uuid = it->second->uuid();
@@ -620,8 +711,8 @@ boost::optional<CollectionUUID> CollectionCatalog::lookupUUIDByNSS(
     return boost::none;
 }
 
-NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(OperationContext* opCtx,
-                                                                NamespaceStringOrUUID nsOrUUID) {
+NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
+    OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID) const {
     if (auto& nss = nsOrUUID.nss()) {
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Namespace " << *nss << " is not a valid collection name",
@@ -647,8 +738,7 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
                                                      CollectionInfoFn predicate) const {
     invariant(predicate);
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
-    auto collection = _lookupCollectionByUUID(lock, uuid);
+    auto collection = _lookupCollectionByUUID(uuid);
 
     if (!collection) {
         return false;
@@ -659,7 +749,6 @@ bool CollectionCatalog::checkIfCollectionSatisfiable(CollectionUUID uuid,
 
 std::vector<CollectionUUID> CollectionCatalog::getAllCollectionUUIDsFromDb(
     StringData dbName) const {
-    stdx::lock_guard<Latch> lock(_catalogLock);
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
     auto it = _orderedCollections.lower_bound(std::make_pair(dbName.toString(), minUuid));
 
@@ -677,7 +766,6 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
     OperationContext* opCtx, StringData dbName) const {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_S));
 
-    stdx::lock_guard<Latch> lock(_catalogLock);
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 
     std::vector<NamespaceString> ret;
@@ -693,7 +781,6 @@ std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
 
 std::vector<std::string> CollectionCatalog::getAllDbNames() const {
     std::vector<std::string> ret;
-    stdx::lock_guard<Latch> lock(_catalogLock);
     auto maxUuid = UUID::parse("FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF").getValue();
     auto iter = _orderedCollections.upper_bound(std::make_pair("", maxUuid));
     while (iter != _orderedCollections.end()) {
@@ -714,13 +801,11 @@ std::vector<std::string> CollectionCatalog::getAllDbNames() const {
 
 void CollectionCatalog::setDatabaseProfileSettings(
     StringData dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
-    stdx::lock_guard<Latch> lock(_profileSettingsLock);
     _databaseProfileSettings[dbName] = newProfileSettings;
 }
 
 CollectionCatalog::ProfileSettings CollectionCatalog::getDatabaseProfileSettings(
     StringData dbName) const {
-    stdx::lock_guard<Latch> lock(_profileSettingsLock);
     auto it = _databaseProfileSettings.find(dbName);
     if (it != _databaseProfileSettings.end()) {
         return it->second;
@@ -730,13 +815,11 @@ CollectionCatalog::ProfileSettings CollectionCatalog::getDatabaseProfileSettings
 }
 
 void CollectionCatalog::clearDatabaseProfileSettings(StringData dbName) {
-    stdx::lock_guard<Latch> lock(_profileSettingsLock);
     _databaseProfileSettings.erase(dbName);
 }
 
 void CollectionCatalog::registerCollection(CollectionUUID uuid, std::shared_ptr<Collection> coll) {
     auto ns = coll->ns();
-    stdx::lock_guard<Latch> lock(_catalogLock);
     if (_collections.find(ns) != _collections.end()) {
         LOGV2(20279,
               "Conflicted creating a collection. ns: {coll_ns} ({coll_uuid}).",
@@ -772,8 +855,6 @@ void CollectionCatalog::registerCollection(CollectionUUID uuid, std::shared_ptr<
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationContext* opCtx,
                                                                     CollectionUUID uuid) {
-    stdx::lock_guard<Latch> lock(_catalogLock);
-
     invariant(_catalog.find(uuid) != _catalog.end());
 
     auto coll = std::move(_catalog[uuid]);
@@ -800,21 +881,15 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
     removeResource(collRid, ns.ns());
 
-    // Removal from an ordered map will invalidate iterators and potentially references to the
-    // erased element.
-    _generationNumber++;
-
     return coll;
 }
 
 std::unique_ptr<RecoveryUnit::Change> CollectionCatalog::makeFinishDropCollectionChange(
-    std::shared_ptr<Collection> coll, CollectionUUID uuid) {
-    return std::make_unique<FinishDropCollectionChange>(this, std::move(coll), uuid);
+    OperationContext* opCtx, std::shared_ptr<Collection> coll, CollectionUUID uuid) {
+    return std::make_unique<FinishDropCollectionChange>(opCtx, std::move(coll), uuid);
 }
 
 void CollectionCatalog::deregisterAllCollections() {
-    stdx::lock_guard<Latch> lock(_catalogLock);
-
     LOGV2(20282, "Deregistering all the collections");
     for (auto& entry : _catalog) {
         auto uuid = entry.first;
@@ -832,30 +907,26 @@ void CollectionCatalog::deregisterAllCollections() {
     _orderedCollections.clear();
     _catalog.clear();
 
-    stdx::lock_guard<Latch> resourceLock(_resourceLock);
     _resourceInformation.clear();
-
-    _generationNumber++;
 }
 
 CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx, StringData db) const {
-    return iterator(opCtx, db, _generationNumber, *this);
+    return iterator(opCtx, db, *this);
 }
 
 CollectionCatalog::iterator CollectionCatalog::end(OperationContext* opCtx) const {
-    return iterator(opCtx, _orderedCollections.end(), _generationNumber, *this);
+    return iterator(opCtx, _orderedCollections.end(), *this);
 }
 
-boost::optional<std::string> CollectionCatalog::lookupResourceName(const ResourceId& rid) {
+boost::optional<std::string> CollectionCatalog::lookupResourceName(const ResourceId& rid) const {
     invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
-    stdx::lock_guard<Latch> lock(_resourceLock);
 
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
         return boost::none;
     }
 
-    std::set<std::string>& namespaces = search->second;
+    const std::set<std::string>& namespaces = search->second;
 
     // When there are multiple namespaces mapped to the same ResourceId, return boost::none as the
     // ResourceId does not identify a single namespace.
@@ -868,7 +939,6 @@ boost::optional<std::string> CollectionCatalog::lookupResourceName(const Resourc
 
 void CollectionCatalog::removeResource(const ResourceId& rid, const std::string& entry) {
     invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
-    stdx::lock_guard<Latch> lock(_resourceLock);
 
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
@@ -886,7 +956,6 @@ void CollectionCatalog::removeResource(const ResourceId& rid, const std::string&
 
 void CollectionCatalog::addResource(const ResourceId& rid, const std::string& entry) {
     invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
-    stdx::lock_guard<Latch> lock(_resourceLock);
 
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
@@ -906,8 +975,8 @@ void CollectionCatalog::addResource(const ResourceId& rid, const std::string& en
 void CollectionCatalog::_commitWritableClone(
     std::shared_ptr<Collection> cloned,
     boost::optional<Timestamp> commitTime,
-    const std::vector<std::function<void(boost::optional<Timestamp>)>>& commitHandlers) {
-    stdx::lock_guard<Latch> lock(_catalogLock);
+    const std::vector<std::function<void(CollectionCatalog&, boost::optional<Timestamp>)>>&
+        commitHandlers) {
 
     _collections[cloned->ns()] = cloned;
     _catalog[cloned->uuid()] = cloned;
@@ -915,7 +984,7 @@ void CollectionCatalog::_commitWritableClone(
     _orderedCollections[dbIdPair] = cloned;
 
     for (auto&& commitHandler : commitHandlers) {
-        commitHandler(commitTime);
+        commitHandler(*this, commitTime);
     }
 }
 
@@ -923,7 +992,12 @@ void CollectionCatalog::commitUnmanagedClone(OperationContext* opCtx, Collection
     auto& uncommittedWritableCollections = getUncommittedWritableCollections(opCtx);
     auto [cloned, commitHandlers] = uncommittedWritableCollections.remove(collection);
     if (cloned) {
-        _commitWritableClone(std::move(cloned), boost::none, commitHandlers);
+        CollectionCatalog::write(opCtx,
+                                 [cloned = std::move(cloned),
+                                  commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
+                                     catalog._commitWritableClone(
+                                         std::move(cloned), boost::none, *commitHandlers);
+                                 });
     }
 }
 
@@ -932,9 +1006,38 @@ void CollectionCatalog::discardUnmanagedClone(OperationContext* opCtx, Collectio
     uncommittedWritableCollections.remove(collection);
 }
 
+CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx)
+    : _opCtx(opCtx), _stashed(false) {}
+CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx,
+                                                   std::shared_ptr<const CollectionCatalog> catalog)
+    : _opCtx(opCtx), _stashed(true) {
+    invariant(catalog);
+    CollectionCatalog::stash(_opCtx, std::move(catalog));
+}
+CollectionCatalogStasher::~CollectionCatalogStasher() {
+    reset();
+}
+
+CollectionCatalogStasher::CollectionCatalogStasher(CollectionCatalogStasher&& other)
+    : _opCtx(other._opCtx), _stashed(other._stashed) {
+    other._stashed = false;
+}
+
+void CollectionCatalogStasher::stash(std::shared_ptr<const CollectionCatalog> catalog) {
+    CollectionCatalog::stash(_opCtx, std::move(catalog));
+    _stashed = true;
+}
+
+void CollectionCatalogStasher::reset() {
+    if (_stashed) {
+        CollectionCatalog::stash(_opCtx, nullptr);
+        _stashed = false;
+    }
+}
+
 const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* opCtx,
                                                               CollectionUUID uuid) const {
-    return CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid).get();
+    return CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid).get();
 }
 
 }  // namespace mongo

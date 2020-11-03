@@ -441,7 +441,7 @@ public:
         if (_dbprofile <= 0)
             return false;
 
-        if (CollectionCatalog::get(opCtx).getDatabaseProfileSettings(getNSS().db()).filter)
+        if (CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(getNSS().db()).filter)
             return true;
 
         return elapsedTimeExcludingPauses() >= Milliseconds{serverGlobalParams.slowMS};

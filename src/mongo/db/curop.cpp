@@ -493,7 +493,7 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
     bool shouldLogSlowOp, shouldProfileAtLevel1;
 
     if (auto filter =
-            CollectionCatalog::get(opCtx).getDatabaseProfileSettings(getNSS().db()).filter) {
+            CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(getNSS().db()).filter) {
         bool passesFilter = filter->matches(opCtx, _debug, *this);
 
         shouldLogSlowOp = passesFilter;

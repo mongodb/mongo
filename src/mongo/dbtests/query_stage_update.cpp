@@ -276,7 +276,7 @@ public:
             OpDebug* opDebug = &curOp.debug();
             UpdateDriver driver(_expCtx);
             CollectionPtr coll =
-                CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
+                CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
             ASSERT(coll);
 
             // Get the RecordIds that would be returned by an in-order scan.

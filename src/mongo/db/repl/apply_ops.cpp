@@ -150,7 +150,8 @@ Status _applyOps(OperationContext* opCtx,
             // NamespaceNotFound.
             // Additionally for inserts, we fail early on non-existent collections.
             Lock::CollectionLock collectionLock(opCtx, nss, MODE_IX);
-            auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+            auto collection =
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
             if (!collection && (*opType == 'i' || *opType == 'u')) {
                 uasserted(
                     ErrorCodes::AtomicityFailure,
@@ -316,7 +317,7 @@ Status _checkPrecondition(OperationContext* opCtx,
             return {ErrorCodes::NamespaceNotFound, "database in ns does not exist: " + nss.ns()};
         }
         CollectionPtr collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
             return {ErrorCodes::NamespaceNotFound, "collection in ns does not exist: " + nss.ns()};
         }

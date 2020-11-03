@@ -181,7 +181,7 @@ protected:
         client.createCollection(kNss.ns());
         client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
 
-        ReshardingEnv env(CollectionCatalog::get(opCtx).lookupUUIDByNSS(opCtx, kNss).value());
+        ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
         env.version = ChunkVersion(1, 0, OID::gen());
         env.dbVersion = databaseVersion::makeNew();

@@ -57,9 +57,9 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
         opCtx->getServiceContext()->getStorageEngine()->listDatabases();
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& dbName : allDbs) {
-        const auto db = databaseHolder->getDb(opCtx, dbName);
-        for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+        for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
             auto coll = *collIt;
             if (!coll) {
                 break;
@@ -83,13 +83,17 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     }
 
     // Need to mark the CollectionCatalog as open if we our closeAll fails, dismissed if successful.
-    auto reopenOnFailure =
-        makeGuard([opCtx] { CollectionCatalog::get(opCtx).onOpenCatalog(opCtx); });
+    auto reopenOnFailure = makeGuard([opCtx] {
+        CollectionCatalog::write(opCtx,
+                                 [&](CollectionCatalog& catalog) { catalog.onOpenCatalog(opCtx); });
+    });
     // Closing CollectionCatalog: only lookupNSSByUUID will fall back to using pre-closing state to
     // allow authorization for currently unknown UUIDs. This is needed because authorization needs
     // to work before acquiring locks, and might otherwise spuriously regard a UUID as unknown
     // while reloading the catalog.
-    CollectionCatalog::get(opCtx).onCloseCatalog(opCtx);
+    CollectionCatalog::write(opCtx,
+                             [&](CollectionCatalog& catalog) { catalog.onCloseCatalog(opCtx); });
+
     LOGV2_DEBUG(20270, 1, "closeCatalog: closing collection catalog");
 
     // Close all databases.
@@ -154,10 +158,11 @@ void openCatalog(OperationContext* opCtx,
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
     }
 
+    auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& entry : nsToIndexNameObjMap) {
         NamespaceString collNss(entry.first);
 
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collNss);
+        auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
         invariant(collection, str::stream() << "couldn't get collection " << collNss.toString());
 
         for (const auto& indexName : entry.second.first) {
@@ -188,12 +193,10 @@ void openCatalog(OperationContext* opCtx,
             23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName);
-        for (auto&& collNss :
-             CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName)) {
+        for (auto&& collNss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
-            auto collection =
-                CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(
-                    opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
+            auto collection = catalog->lookupCollectionByNamespaceForMetadataWrite(
+                opCtx, CollectionCatalog::LifetimeMode::kInplace, collNss);
             invariant(collection,
                       str::stream()
                           << "failed to get valid collection pointer for namespace " << collNss);
@@ -224,7 +227,8 @@ void openCatalog(OperationContext* opCtx,
 
     // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
     // catalog. Clear the pre-closing state.
-    CollectionCatalog::get(opCtx).onOpenCatalog(opCtx);
+    CollectionCatalog::write(opCtx,
+                             [&](CollectionCatalog& catalog) { catalog.onOpenCatalog(opCtx); });
     opCtx->getServiceContext()->incrementCatalogGeneration();
     LOGV2(20278, "openCatalog: finished reloading collection catalog");
 }

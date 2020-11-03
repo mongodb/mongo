@@ -112,14 +112,6 @@ public:
 
     void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const final;
 
-    CollectionCatalog::iterator begin(OperationContext* opCtx) const final {
-        return CollectionCatalog::get(opCtx).begin(opCtx, _name);
-    }
-
-    CollectionCatalog::iterator end(OperationContext* opCtx) const final {
-        return CollectionCatalog::get(opCtx).end(opCtx);
-    }
-
 private:
     /**
      * Throws if there is a reason 'ns' cannot be created as a user collection. Namespace pattern

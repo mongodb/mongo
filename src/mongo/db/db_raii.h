@@ -198,6 +198,7 @@ public:
 private:
     boost::optional<AutoGetCollectionForReadBase<AutoGetCollectionLockFree>>
         _autoGetCollectionForReadBase;
+    CollectionCatalogStasher _catalogStash;
 };
 
 /**

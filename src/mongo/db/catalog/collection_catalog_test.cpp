@@ -294,6 +294,7 @@ public:
     }
 
     void tearDown() {
+        std::vector<CollectionUUID> collectionsToDeregister;
         for (auto it = catalog.begin(&opCtx, "resourceDb"); it != catalog.end(&opCtx); ++it) {
             auto coll = *it;
             auto uuid = coll->uuid();
@@ -301,6 +302,10 @@ public:
                 break;
             }
 
+            collectionsToDeregister.push_back(uuid);
+        }
+
+        for (auto&& uuid : collectionsToDeregister) {
             catalog.deregisterCollection(&opCtx, uuid);
         }
 
@@ -399,70 +404,6 @@ TEST_F(CollectionCatalogIterationTest, InvalidateEntry) {
         auto coll = *it;
         ASSERT(coll && coll->ns().ns() != "bar.coll1");
     }
-}
-
-// Delete the entry pointed to by the iterator and dereference the iterator.
-TEST_F(CollectionCatalogIterationTest, InvalidateAndDereference) {
-    auto it = catalog.begin(&opCtx, "bar");
-    auto collsIt = collsIterator("bar");
-    auto uuid = collsIt->first;
-    catalog.deregisterCollection(&opCtx, uuid);
-    ++collsIt;
-
-    ASSERT(it != catalog.end(&opCtx));
-    auto catalogColl = *it;
-    ASSERT(catalogColl != nullptr);
-    ASSERT_EQUALS(catalogColl->ns(), collsIt->second->ns());
-
-    dropColl("bar", uuid);
-}
-
-// Delete the last entry for a database while pointing to it and dereference the iterator.
-TEST_F(CollectionCatalogIterationTest, InvalidateLastEntryAndDereference) {
-    auto it = catalog.begin(&opCtx, "bar");
-    NamespaceString lastNs;
-    boost::optional<CollectionUUID> uuid;
-    for (auto collsIt = collsIterator("bar"); collsIt != collsIteratorEnd("bar"); ++collsIt) {
-        lastNs = collsIt->second->ns();
-        uuid = collsIt->first;
-    }
-
-    // Increment until it points to the last collection.
-    for (; it != catalog.end(&opCtx); ++it) {
-        auto coll = *it;
-        ASSERT(coll != nullptr);
-        if (coll->ns() == lastNs) {
-            break;
-        }
-    }
-
-    catalog.deregisterCollection(&opCtx, *uuid);
-    dropColl("bar", *uuid);
-    ASSERT(*it == nullptr);
-}
-
-// Delete the last entry in the map while pointing to it and dereference the iterator.
-TEST_F(CollectionCatalogIterationTest, InvalidateLastEntryInMapAndDereference) {
-    auto it = catalog.begin(&opCtx, "foo");
-    NamespaceString lastNs;
-    boost::optional<CollectionUUID> uuid;
-    for (auto collsIt = collsIterator("foo"); collsIt != collsIteratorEnd("foo"); ++collsIt) {
-        lastNs = collsIt->second->ns();
-        uuid = collsIt->first;
-    }
-
-    // Increment until it points to the last collection.
-    for (; it != catalog.end(&opCtx); ++it) {
-        auto coll = *it;
-        ASSERT(coll != nullptr);
-        if (coll->ns() == lastNs) {
-            break;
-        }
-    }
-
-    catalog.deregisterCollection(&opCtx, *uuid);
-    dropColl("foo", *uuid);
-    ASSERT(*it == nullptr);
 }
 
 TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {

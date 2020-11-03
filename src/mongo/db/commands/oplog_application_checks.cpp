@@ -65,9 +65,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
     if (oplogEntry.hasField("ui"_sd)) {
         // ns by UUID overrides the ns specified if they are different.
-        auto& catalog = CollectionCatalog::get(opCtx);
+        auto catalog = CollectionCatalog::get(opCtx);
         boost::optional<NamespaceString> uuidCollNS =
-            catalog.lookupNSSByUUID(opCtx, getUUIDFromOplogEntry(oplogEntry));
+            catalog->lookupNSSByUUID(opCtx, getUUIDFromOplogEntry(oplogEntry));
         if (uuidCollNS && *uuidCollNS != ns)
             ns = *uuidCollNS;
     }

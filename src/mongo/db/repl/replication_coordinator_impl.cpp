@@ -2842,7 +2842,7 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
         } else {
             auto uuid = nsOrUUID.uuid();
             invariant(uuid, nsOrUUID.toString());
-            if (auto ns = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, *uuid)) {
+            if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid)) {
                 if (!ns->isSystemDotProfile()) {
                     return false;
                 }

@@ -406,35 +406,6 @@ private:
 };
 
 /**
- * RAII-style class. Hides changes to the CollectionCatalog for the life of the object, so that
- * calls to CollectionCatalog::lookupNSSByUUID will return results as before the RAII object was
- * instantiated.
- *
- * The caller must hold the global exclusive lock for the life of the instance.
- */
-class ConcealCollectionCatalogChangesBlock {
-    ConcealCollectionCatalogChangesBlock(const ConcealCollectionCatalogChangesBlock&) = delete;
-    ConcealCollectionCatalogChangesBlock& operator=(const ConcealCollectionCatalogChangesBlock&) =
-        delete;
-
-public:
-    /**
-     * Conceals future CollectionCatalog changes and stashes a pointer to the opCtx for the
-     * destructor to use.
-     */
-    ConcealCollectionCatalogChangesBlock(OperationContext* opCtx);
-
-    /**
-     * Reveals CollectionCatalog changes.
-     */
-    ~ConcealCollectionCatalogChangesBlock();
-
-private:
-    // Needed for the destructor to access the CollectionCatalog in order to call onOpenCatalog.
-    OperationContext* _opCtx;
-};
-
-/**
  * RAII type to set and restore the timestamp read source on the recovery unit.
  *
  * Snapshot is abandoned in constructor and destructor, so it can only be used before

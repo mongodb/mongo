@@ -103,7 +103,7 @@ public:
         dbtests::WriteContextForTests ctx(&_opCtx, ns());
         Database* db = ctx.db();
         CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());
@@ -170,7 +170,7 @@ public:
         OldClientContext ctx(&_opCtx, ns());
         Database* db = ctx.db();
         CollectionPtr coll =
-            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss());
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss());
         if (!coll) {
             WriteUnitOfWork wuow(&_opCtx);
             coll = db->createCollection(&_opCtx, nss());

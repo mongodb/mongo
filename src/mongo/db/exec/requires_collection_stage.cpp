@@ -69,8 +69,8 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
         // If we didn't get a valid collection but can still find the UUID in the catalog then we
         // treat this as a rename.
         if (!coll) {
-            const CollectionCatalog& catalog = CollectionCatalog::get(opCtx());
-            auto newNss = catalog.lookupNSSByUUID(opCtx(), _collectionUUID);
+            auto catalog = CollectionCatalog::get(opCtx());
+            auto newNss = catalog->lookupNSSByUUID(opCtx(), _collectionUUID);
             if (newNss && *newNss != _nss) {
                 collectionRenamed(*newNss);
             }

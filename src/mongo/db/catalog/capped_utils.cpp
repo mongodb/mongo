@@ -122,7 +122,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                              long long size,
                              bool temp) {
     CollectionPtr fromCollection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss);
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss);
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
@@ -140,7 +140,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "cloneCollectionAsCapped failed - destination collection " << toNss
                           << " already exists. source collection: " << fromNss,
-            !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss));
+            !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss));
 
     // create new collection
     {
@@ -161,7 +161,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
     }
 
     CollectionPtr toCollection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss);
     invariant(toCollection);  // we created above
 
     // how much data to ignore because it won't fit anyway
@@ -279,7 +279,7 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
                               << " to a capped collection");
 
             collLock.emplace(opCtx, tmpNameResult.getValue(), MODE_X);
-            if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+            if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, tmpNameResult.getValue())) {
                 return std::move(tmpNameResult.getValue());
             }

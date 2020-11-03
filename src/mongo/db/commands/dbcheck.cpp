@@ -138,7 +138,8 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
     int64_t max = std::numeric_limits<int64_t>::max();
     auto rate = invocation.getMaxCountPerSecond();
 
-    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+    auto catalog = CollectionCatalog::get(opCtx);
+    for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx); ++collIt) {
         auto coll = *collIt;
         if (!coll) {
             break;
@@ -334,7 +335,7 @@ private:
         }
 
         auto collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, info.nss);
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, info.nss);
         if (!collection) {
             return false;
         }

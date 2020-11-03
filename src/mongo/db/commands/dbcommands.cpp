@@ -835,7 +835,7 @@ public:
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
                 // TODO: OldClientContext legacy, needs to be removed
                 CurOp::get(opCtx)->enter_inlock(
-                    dbname.c_str(), CollectionCatalog::get(opCtx).getDatabaseProfileLevel(dbname));
+                    dbname.c_str(), CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
             }
 
             db->getStats(opCtx, &result, scale);

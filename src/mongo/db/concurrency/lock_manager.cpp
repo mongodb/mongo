@@ -954,8 +954,8 @@ std::string ResourceId::toString() const {
     }
 
     if (getType() == RESOURCE_DATABASE || getType() == RESOURCE_COLLECTION) {
-        CollectionCatalog& catalog = CollectionCatalog::get(getGlobalServiceContext());
-        boost::optional<std::string> resourceName = catalog.lookupResourceName(*this);
+        auto catalog = CollectionCatalog::get(getGlobalServiceContext());
+        boost::optional<std::string> resourceName = catalog->lookupResourceName(*this);
         if (resourceName) {
             ss << ", " << *resourceName;
         }

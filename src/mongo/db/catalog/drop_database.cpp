@@ -221,7 +221,9 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
         }
 
         std::vector<NamespaceString> collectionsToDrop;
-        for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+        auto catalog = CollectionCatalog::get(opCtx);
+        for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx);
+             ++collIt) {
             auto collection = *collIt;
             if (!collection) {
                 break;
@@ -267,7 +269,7 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
 
             if (!abortIndexBuilds) {
                 IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)->uuid());
+                    catalog->lookupCollectionByNamespace(opCtx, nss)->uuid());
             }
 
             writeConflictRetry(opCtx, "dropDatabase_collection", nss.ns(), [&] {

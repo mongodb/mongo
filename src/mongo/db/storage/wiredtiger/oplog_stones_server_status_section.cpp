@@ -76,7 +76,7 @@ public:
                 NamespaceString::kRsOplogNamespace,
                 Top::LockType::ReadLocked,
                 AutoStatsTracker::LogMode::kUpdateTop,
-                CollectionCatalog::get(opCtx).getDatabaseProfileLevel(NamespaceString::kLocalDb));
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(NamespaceString::kLocalDb));
             oplog->getRecordStore()->getOplogTruncateStats(builder);
         }
         return builder.obj();

@@ -136,7 +136,8 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         EnforcePrepareConflictsBlock enforcePrepare(opCtx);
 
         uassertStatusOK(createProfileCollection(opCtx, db));
-        auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
+        auto coll =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, dbProfilingNS);
 
         invariant(!opCtx->shouldParticipateInFlowControl());
         WriteUnitOfWork wuow(opCtx);
@@ -166,7 +167,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
     // and see the collection exists in order to break free.
     return writeConflictRetry(opCtx, "createProfileCollection", dbProfilingNS.ns(), [&] {
         const CollectionPtr collection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, dbProfilingNS);
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, dbProfilingNS);
         if (collection) {
             if (!collection->isCapped()) {
                 return Status(ErrorCodes::NamespaceExists,

@@ -118,14 +118,14 @@ public:
     }
 
     const CollectionPtr& collection() const {
-        _coll = CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
+        _coll = CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
         return _coll;
     }
 
     void truncateCollection() const {
         WriteUnitOfWork wunit(&_opCtx);
         auto collection =
-            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespaceForMetadataWrite(
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespaceForMetadataWrite(
                 &_opCtx, CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork, nss);
         ASSERT_OK(collection->truncate(&_opCtx));
         wunit.commit();

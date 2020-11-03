@@ -178,7 +178,7 @@ protected:
 private:
     const IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
         CollectionPtr collection =
-            CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
+            CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
         std::vector<const IndexDescriptor*> indexes;
         collection->getIndexCatalog()->findIndexesByKeyPattern(&_opCtx, obj, false, &indexes);
         ASSERT_LTE(indexes.size(), 1U);
@@ -312,7 +312,7 @@ protected:
         insert(BSON("_id" << 3 << "a" << 3));
         insert(BSON("_id" << 4 << "a" << 4));
 
-        return CollectionCatalog::get(&_opCtx).lookupCollectionByNamespace(&_opCtx, nss);
+        return CollectionCatalog::get(&_opCtx)->lookupCollectionByNamespace(&_opCtx, nss);
     }
 
     /**

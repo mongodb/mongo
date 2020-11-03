@@ -903,7 +903,7 @@ void dropIndex(OperationContext* opCtx,
 void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::string> indexNames) {
 
     boost::optional<NamespaceString> nss =
-        CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
+        CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
     invariant(nss);
     Lock::DBLock dbLock(opCtx, nss->db(), MODE_X);
     CollectionWriter collection(opCtx, uuid);
@@ -966,13 +966,12 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
 void rollbackDropIndexes(OperationContext* opCtx,
                          UUID uuid,
                          std::map<std::string, BSONObj> indexNames) {
-    boost::optional<NamespaceString> nss =
-        CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
+    auto catalog = CollectionCatalog::get(opCtx);
+    boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
     invariant(nss);
     Lock::DBLock dbLock(opCtx, nss->db(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, *nss, MODE_X);
-    CollectionPtr collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, *nss);
+    CollectionPtr collection = catalog->lookupCollectionByNamespace(opCtx, *nss);
 
     // If we cannot find the collection, we skip over dropping the index.
     if (!collection) {
@@ -1082,7 +1081,7 @@ void renameOutOfTheWay(OperationContext* opCtx, RenameCollectionInfo info, Datab
 
     // Finds the UUID of the collection that we are renaming out of the way.
     auto collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, info.renameTo);
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, info.renameTo);
     invariant(collection);
 
     // The generated unique collection name is only guaranteed to exist if the database is
@@ -1319,7 +1318,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
 
     // UUID -> doc id -> doc
     stdx::unordered_map<UUID, std::map<DocID, BSONObj>, UUID::Hash> goodVersions;
-    auto& catalog = CollectionCatalog::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
 
     // Fetches all the goodVersions of each document from the current sync source.
     unsigned long long numFetched = 0;
@@ -1330,7 +1329,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         invariant(!doc._id.eoo());  // This is checked when we insert to the set.
 
         UUID uuid = doc.uuid;
-        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(opCtx, uuid);
+        boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
 
         try {
             if (nss) {
@@ -1480,8 +1479,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                fixUpInfo.indexBuildsToRestart.end(),
                                [&](auto build) { return build.second.collUUID == uuid; }));
 
-        boost::optional<NamespaceString> nss =
-            CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
+        boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
         // Do not attempt to acquire the database lock with an empty namespace. We should survive
         // an attempt to drop a non-existent collection.
         if (!nss) {
@@ -1500,7 +1498,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
             Database* db = dbLock.getDb();
             if (db) {
                 CollectionPtr collection =
-                    CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, uuid);
+                    CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid);
                 dropCollection(opCtx, *nss, collection, db);
                 LOGV2_DEBUG(21698,
                             1,
@@ -1558,8 +1556,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         // occurs and then the collection is dropped. If we do not first re-create the
         // collection, we will not be able to retrieve the collection's catalog entries.
         for (auto uuid : fixUpInfo.collectionsToResyncMetadata) {
-            boost::optional<NamespaceString> nss =
-                CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
+            boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
             invariant(nss);
 
             LOGV2(21702,
@@ -1689,7 +1686,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         unique_ptr<RemoveSaver> removeSaver;
         invariant(!fixUpInfo.collectionsToDrop.count(uuid));
 
-        boost::optional<NamespaceString> nss = catalog.lookupNSSByUUID(opCtx, uuid);
+        boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
         if (!nss) {
             nss = NamespaceString();
         }
@@ -1949,8 +1946,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
         Lock::DBLock oplogDbLock(opCtx, oplogNss.db(), MODE_IX);
         Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
         OldClientContext ctx(opCtx, oplogNss.ns());
-        auto oplogCollection =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogNss);
+        auto oplogCollection = catalog->lookupCollectionByNamespace(opCtx, oplogNss);
         if (!oplogCollection) {
             fassertFailedWithStatusNoTrace(
                 40495,

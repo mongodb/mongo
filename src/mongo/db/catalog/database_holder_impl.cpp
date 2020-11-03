@@ -154,7 +154,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx, StringData ns, boo
     // block.
     lk.unlock();
 
-    if (CollectionCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty()) {
+    if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbname).empty()) {
         audit::logCreateDatabase(opCtx->getClient(), dbname);
         if (justCreated)
             *justCreated = true;
@@ -192,7 +192,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));
 
-    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+    auto catalog = CollectionCatalog::get(opCtx);
+    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
         auto coll = *collIt;
         if (!coll) {
             break;
@@ -208,7 +209,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     auto const serviceContext = opCtx->getServiceContext();
 
-    for (auto collIt = db->begin(opCtx); collIt != db->end(opCtx); ++collIt) {
+    for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
         auto coll = *collIt;
         if (!coll) {
             break;
@@ -218,7 +219,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     }
 
     // Clean up the in-memory database state.
-    CollectionCatalog::get(opCtx).clearDatabaseProfileSettings(name);
+    CollectionCatalog::write(
+        opCtx, [&](CollectionCatalog& catalog) { catalog.clearDatabaseProfileSettings(name); });
     close(opCtx, name);
 
     auto const storageEngine = serviceContext->getStorageEngine();
@@ -239,7 +241,9 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, StringData ns) {
     }
 
     auto db = it->second;
-    CollectionCatalog::get(opCtx).onCloseDatabase(opCtx, dbName.toString());
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        catalog.onCloseDatabase(opCtx, dbName.toString());
+    });
 
     delete db;
     db = nullptr;
@@ -269,7 +273,8 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
         LOGV2_DEBUG(20311, 2, "DatabaseHolder::closeAll name:{name}", "name"_attr = name);
 
         Database* db = _dbs[name];
-        CollectionCatalog::get(opCtx).onCloseDatabase(opCtx, name);
+        CollectionCatalog::write(
+            opCtx, [&](CollectionCatalog& catalog) { catalog.onCloseDatabase(opCtx, name); });
         delete db;
 
         _dbs.erase(name);

@@ -187,11 +187,11 @@ void _testDropCollection(OperationContext* opCtx,
 
         WriteUnitOfWork wuow(opCtx);
         if (!createCollectionBeforeDrop) {
-            ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss));
+            ASSERT_FALSE(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
         }
 
         ASSERT_OK(db->dropCollection(opCtx, nss, dropOpTime));
-        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss));
+        ASSERT_FALSE(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
         wuow.commit();
     });
 }
@@ -355,15 +355,15 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
     ASSERT_TRUE(db);
 
     auto fromUuid = UUID::gen();
-    auto& catalog = CollectionCatalog::get(opCtx);
     writeConflictRetry(opCtx, "create", fromNss.ns(), [&] {
-        ASSERT_EQUALS(boost::none, catalog.lookupNSSByUUID(opCtx, fromUuid));
+        auto catalog = CollectionCatalog::get(opCtx);
+        ASSERT_EQUALS(boost::none, catalog->lookupNSSByUUID(opCtx, fromUuid));
 
         WriteUnitOfWork wuow(opCtx);
         CollectionOptions fromCollectionOptions;
         fromCollectionOptions.uuid = fromUuid;
         ASSERT_TRUE(db->createCollection(opCtx, fromNss, fromCollectionOptions));
-        ASSERT_EQUALS(fromNss, *catalog.lookupNSSByUUID(opCtx, fromUuid));
+        ASSERT_EQUALS(fromNss, *catalog->lookupNSSByUUID(opCtx, fromUuid));
         wuow.commit();
     });
 
@@ -372,8 +372,9 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         auto stayTemp = false;
         ASSERT_OK(db->renameCollection(opCtx, fromNss, toNss, stayTemp));
 
-        ASSERT_FALSE(CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, fromNss));
-        auto toCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss);
+        auto catalog = CollectionCatalog::get(opCtx);
+        ASSERT_FALSE(catalog->lookupCollectionByNamespace(opCtx, fromNss));
+        auto toCollection = catalog->lookupCollectionByNamespace(opCtx, toNss);
         ASSERT_TRUE(toCollection);
 
         auto toCollectionOptions =
@@ -383,7 +384,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
         ASSERT_TRUE(toUuid);
         ASSERT_EQUALS(fromUuid, *toUuid);
 
-        ASSERT_EQUALS(toNss, *catalog.lookupNSSByUUID(opCtx, *toUuid));
+        ASSERT_EQUALS(toNss, *catalog->lookupNSSByUUID(opCtx, *toUuid));
 
         wuow.commit();
     });

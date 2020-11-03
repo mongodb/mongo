@@ -191,7 +191,7 @@ boost::optional<ReshardingDonorOplogId> ReshardingOplogFetcher::iterate(
     // Create the destination collection if necessary.
     writeConflictRetry(opCtx, "createReshardingLocalOplogBuffer", toWriteToNss.toString(), [&] {
         const CollectionPtr toWriteTo =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toWriteToNss);
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toWriteToNss);
         if (toWriteTo) {
             return;
         }

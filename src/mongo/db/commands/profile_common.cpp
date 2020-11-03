@@ -123,7 +123,7 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
         // newSettings.level may differ from profilingLevel: profilingLevel is part of the request,
         // and if the request specifies {profile: -1, ...} then we want to show the unchanged value
         // (0, 1, or 2).
-        auto newSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
+        auto newSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
         newState.append("level"_sd, newSettings.level);
         newState.append("slowms"_sd, serverGlobalParams.slowMS);
         newState.append("sampleRate"_sd, serverGlobalParams.sampleRate);

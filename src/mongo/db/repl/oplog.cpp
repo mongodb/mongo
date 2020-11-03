@@ -136,7 +136,7 @@ void abortIndexBuilds(OperationContext* opCtx,
                commandType == OplogEntry::CommandType::kDropIndexes ||
                commandType == OplogEntry::CommandType::kRenameCollection) {
         const boost::optional<UUID> collUUID =
-            CollectionCatalog::get(opCtx).lookupUUIDByNSS(opCtx, nss);
+            CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
         invariant(collUUID);
 
         indexBuildsCoordinator->abortCollectionIndexBuilds(opCtx, nss, *collUUID, reason);
@@ -182,7 +182,7 @@ void createIndexForApplyOps(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, indexNss.ns());
     auto indexCollection =
-        db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, indexNss) : nullptr;
+        db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss) : nullptr;
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
             indexCollection);
@@ -584,7 +584,7 @@ void createOplog(OperationContext* opCtx,
 
     OldClientContext ctx(opCtx, oplogCollectionName.ns());
     CollectionPtr collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, oplogCollectionName);
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogCollectionName);
 
     if (collection) {
         if (replSettings.getOplogSizeBytes() != 0) {
@@ -671,8 +671,8 @@ std::pair<OptionalCollectionUUID, NamespaceString> extractCollModUUIDAndNss(
         return std::pair<OptionalCollectionUUID, NamespaceString>(boost::none, extractNs(ns, cmd));
     }
     CollectionUUID uuid = ui.get();
-    auto& catalog = CollectionCatalog::get(opCtx);
-    const auto nsByUUID = catalog.lookupNSSByUUID(opCtx, uuid);
+    auto catalog = CollectionCatalog::get(opCtx);
+    const auto nsByUUID = catalog->lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Failed to apply operation due to missing collection (" << uuid
                           << "): " << redact(cmd.toString()),
@@ -681,8 +681,8 @@ std::pair<OptionalCollectionUUID, NamespaceString> extractCollModUUIDAndNss(
 }
 
 NamespaceString extractNsFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    auto& catalog = CollectionCatalog::get(opCtx);
-    auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), nss);
     return *nss;
 }
@@ -1046,8 +1046,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
     NamespaceString requestNss;
     CollectionPtr collection = nullptr;
     if (auto uuid = op.getUuid()) {
-        CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
-        collection = catalog.lookupCollectionByUUID(opCtx, uuid.get());
+        auto catalog = CollectionCatalog::get(opCtx);
+        collection = catalog->lookupCollectionByUUID(opCtx, uuid.get());
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply operation due to missing collection ("
                               << uuid.get() << "): " << redact(opOrGroupedInserts.toBSON()),
@@ -1059,7 +1059,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         invariant(requestNss.coll().size());
         dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX),
                 requestNss.ns());
-        collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, requestNss);
+        collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, requestNss);
     }
 
     BSONObj o = op.getObject();
@@ -1536,7 +1536,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
         Lock::DBLock lock(opCtx, nss.db(), MODE_IS);
         auto databaseHolder = DatabaseHolder::get(opCtx);
         auto db = databaseHolder->getDb(opCtx, nss.ns());
-        if (db && !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) &&
+        if (db && !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) &&
             ViewCatalog::get(db)->lookup(opCtx, nss.ns())) {
             return {ErrorCodes::CommandNotSupportedOnView,
                     str::stream() << "applyOps not supported on view:" << nss.ns()};

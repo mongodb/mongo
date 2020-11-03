@@ -856,7 +856,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
     invariant(nss.coll().size() > 0);
 
-    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
+    if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
         throw WriteConflictException();
     }
 
@@ -905,7 +905,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
 
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "Collection already exists. NS: " << nss,
-            !CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss));
+            !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
 
     BSONCollectionCatalogEntry::MetaData md;
     const BSONElement mdElement = metadata["md"];

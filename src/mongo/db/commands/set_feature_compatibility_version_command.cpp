@@ -363,12 +363,12 @@ private:
      * TODO SERVER-51871: This method can be removed once 5.0 becomes last-lts.
      */
     void _deleteHaystackIndexesOnUpgrade(OperationContext* opCtx) {
-        auto& collCatalog = CollectionCatalog::get(opCtx);
-        for (const auto& db : collCatalog.getAllDbNames()) {
-            for (auto collIt = collCatalog.begin(opCtx, db); collIt != collCatalog.end(opCtx);
+        auto collCatalog = CollectionCatalog::get(opCtx);
+        for (const auto& db : collCatalog->getAllDbNames()) {
+            for (auto collIt = collCatalog->begin(opCtx, db); collIt != collCatalog->end(opCtx);
                  ++collIt) {
                 NamespaceStringOrUUID collName(
-                    collCatalog.lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
+                    collCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
                 AutoGetCollectionForRead coll(opCtx, collName);
                 auto idxCatalog = coll->getIndexCatalog();
                 std::vector<const IndexDescriptor*> haystackIndexes;

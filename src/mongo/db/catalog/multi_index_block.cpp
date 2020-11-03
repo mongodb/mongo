@@ -688,7 +688,7 @@ Status MultiIndexBlock::drainBackgroundWrites(
     ReadSourceScope readSourceScope(opCtx, readSource);
 
     const CollectionPtr& coll =
-        CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, _collectionUUID.get());
+        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, _collectionUUID.get());
 
     // Drain side-writes table for each index. This only drains what is visible. Assuming intent
     // locks are held on the user collection, more writes can come in after this drain completes.

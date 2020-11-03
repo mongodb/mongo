@@ -564,10 +564,10 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
 void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
     // This function explicitly does not check for shutdown since a clean shutdown post oplog
     // truncation is not allowed to occur until the record store counts are corrected.
-    const auto& catalog = CollectionCatalog::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& uiCount : _newCounts) {
         const auto uuid = uiCount.first;
-        const auto coll = catalog.lookupCollectionByUUID(opCtx, uuid);
+        const auto coll = catalog->lookupCollectionByUUID(opCtx, uuid);
         invariant(coll,
                   str::stream() << "The collection with UUID " << uuid
                                 << " is unexpectedly missing in the CollectionCatalog");
@@ -665,7 +665,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
 }
 
 Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
-    const auto& catalog = CollectionCatalog::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
 
     LOGV2(21604, "Finding record store counts");
@@ -676,7 +676,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
             continue;
         }
 
-        auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
+        auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
         StorageInterface::CollectionCount oldCount = 0;
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
@@ -1131,11 +1131,11 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
 }
 
 Status RollbackImpl::_writeRollbackFiles(OperationContext* opCtx) {
-    const auto& catalog = CollectionCatalog::get(opCtx);
+    auto catalog = CollectionCatalog::get(opCtx);
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
     for (auto&& entry : _observerInfo.rollbackDeletedIdsMap) {
         const auto& uuid = entry.first;
-        const auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
+        const auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
 
         // Drop-pending collections are not visible to rollback via the catalog when they are
         // managed by the storage engine. See StorageEngine::supportsPendingDrops().

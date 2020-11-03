@@ -130,7 +130,7 @@ bool Helpers::findById(OperationContext* opCtx,
 
     // TODO ForRead?
     CollectionPtr collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, NamespaceString(ns));
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, NamespaceString(ns));
     if (!collection) {
         return false;
     }
@@ -307,7 +307,7 @@ void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& ns
     OldClientContext context(opCtx, nss.ns());
     repl::UnreplicatedWritesBlock uwb(opCtx);
     CollectionPtr collection = context.db()
-        ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)
+        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)
         : nullptr;
     deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }

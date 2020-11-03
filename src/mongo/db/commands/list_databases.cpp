@@ -179,7 +179,7 @@ public:
 
                 b.appendBool(
                     "empty",
-                    CollectionCatalog::get(opCtx).getAllCollectionUUIDsFromDb(dbname).empty());
+                    CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbname).empty());
             }
             BSONObj curDbObj = b.obj();
 

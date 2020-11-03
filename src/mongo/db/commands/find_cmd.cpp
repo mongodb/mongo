@@ -227,7 +227,7 @@ public:
 
             const auto hasTerm = _request.body.hasField(kTermField);
             uassertStatusOK(authSession->checkAuthForFind(
-                CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(
+                CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
                     opCtx, CommandHelpers::parseNsOrUUID(_dbName, _request.body)),
                 hasTerm));
         }

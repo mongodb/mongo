@@ -74,7 +74,7 @@ private:
                                  nss,
                                  Top::LockType::NotLocked,
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                                 CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nss.db()));
+                                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
         }
 
         auto cursorManager = CursorManager::get(opCtx);

@@ -473,7 +473,7 @@ public:
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->enter_inlock(
                 nsString.ns().c_str(),
-                CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nsString.db()));
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.db()));
         }
 
         assertCanWrite(opCtx, nsString);
@@ -532,7 +532,7 @@ public:
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             CurOp::get(opCtx)->enter_inlock(
                 nsString.ns().c_str(),
-                CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nsString.db()));
+                CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.db()));
         }
 
         assertCanWrite(opCtx, nsString);
@@ -547,7 +547,7 @@ public:
             assertCanWrite(opCtx, nsString);
 
             createdCollection =
-                CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString);
 
             // If someone else beat us to creating the collection, do nothing
             if (!createdCollection) {
@@ -558,7 +558,7 @@ public:
                 wuow.commit();
 
                 createdCollection =
-                    CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nsString);
+                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString);
             }
 
             invariant(createdCollection);

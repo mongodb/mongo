@@ -556,7 +556,7 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
 
     ASSERT_NOT_EQUALS(
         *options.uuid,
-        *CollectionCatalog::get(_opCtx.get()).lookupUUIDByNSS(_opCtx.get(), outputNss))
+        *CollectionCatalog::get(_opCtx.get())->lookupUUIDByNSS(_opCtx.get(), outputNss))
         << "Output collection " << outputNss << " was not replaced";
 
     _assertTemporaryCollectionsAreDropped();

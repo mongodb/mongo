@@ -63,7 +63,7 @@ bool killCursorIfAuthorized(OperationContext* opCtx, CursorId id) {
                              nss,
                              Top::LockType::NotLocked,
                              AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                             CollectionCatalog::get(opCtx).getDatabaseProfileLevel(nss.db()));
+                             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.db()));
     }
 
     AuthorizationSession* as = AuthorizationSession::get(opCtx->getClient());

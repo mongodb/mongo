@@ -63,7 +63,7 @@ CachedCollectionProperties::getCollectionPropertiesImpl(OperationContext* opCtx,
                                                         const NamespaceString& nss) {
     CollectionProperties collProperties;
 
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
 
     if (!collection) {
         return collProperties;
@@ -169,8 +169,8 @@ NamespaceString OplogApplierUtils::parseUUIDOrNs(OperationContext* opCtx,
     }
 
     const auto& uuid = optionalUuid.get();
-    auto& catalog = CollectionCatalog::get(opCtx);
-    auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "No namespace with UUID " << uuid.toString(),
             nss);

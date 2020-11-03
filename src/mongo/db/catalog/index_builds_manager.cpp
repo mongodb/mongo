@@ -391,9 +391,9 @@ StatusWith<int> IndexBuildsManager::_moveRecordToLostAndFound(
     RecordId dupRecord) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
-    auto originalCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-    CollectionPtr localCollection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, lostAndFoundNss);
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto originalCollection = catalog->lookupCollectionByNamespace(opCtx, nss);
+    CollectionPtr localCollection = catalog->lookupCollectionByNamespace(opCtx, lostAndFoundNss);
 
     // Create the collection if it doesn't exist.
     if (!localCollection) {

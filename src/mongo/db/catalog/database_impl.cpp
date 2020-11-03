@@ -171,8 +171,8 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
         uasserted(10028, status.toString());
     }
 
-    auto& catalog = CollectionCatalog::get(opCtx);
-    for (const auto& uuid : catalog.getAllCollectionUUIDsFromDb(_name)) {
+    auto catalog = CollectionCatalog::get(opCtx);
+    for (const auto& uuid : catalog->getAllCollectionUUIDsFromDb(_name)) {
         CollectionWriter collection(
             opCtx,
             uuid,
@@ -336,7 +336,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
     // Cannot drop uncommitted collections.
     invariant(!UncommittedCollections::getForTxn(opCtx, nss));
 
-    if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
+    if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
         // Collection doesn't exist so don't bother validating if it can be dropped.
         return Status::OK();
     }
@@ -345,7 +345,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     if (nss.isSystem()) {
         if (nss.isSystemDotProfile()) {
-            if (CollectionCatalog::get(opCtx).getDatabaseProfileLevel(_name) != 0)
+            if (CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(_name) != 0)
                 return Status(ErrorCodes::IllegalOperation,
                               "turn off profiling before dropping system.profile collection");
         } else if (!(nss.isSystemDotViews() || nss.isHealthlog() ||
@@ -516,9 +516,12 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
     if (!status.isOK())
         return status;
 
-    auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(opCtx, uuid);
+    std::shared_ptr<Collection> removedColl;
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        removedColl = catalog.deregisterCollection(opCtx, uuid);
+    });
     opCtx->recoveryUnit()->registerChange(
-        CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(std::move(removedColl), uuid));
+        CollectionCatalog::makeFinishDropCollectionChange(opCtx, std::move(removedColl), uuid));
 
     return Status::OK();
 }
@@ -534,7 +537,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 
     invariant(fromNss.db() == _name);
     invariant(toNss.db() == _name);
-    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, toNss)) {
+    if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss)) {
         return Status(ErrorCodes::NamespaceExists,
                       str::stream() << "Cannot rename '" << fromNss << "' to '" << toNss
                                     << "' because the destination namespace already exists");
@@ -563,7 +566,9 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     // because the CollectionCatalog mutex synchronizes concurrent access to the collection's
     // namespace for callers that may not hold a collection lock.
     auto writableCollection = collToRename.getWritableCollection();
-    CollectionCatalog::get(opCtx).setCollectionNamespace(opCtx, writableCollection, fromNss, toNss);
+
+    CollectionCatalog::get(opCtx)->setCollectionNamespace(
+        opCtx, writableCollection, fromNss, toNss);
 
     return status;
 }
@@ -571,7 +576,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
 void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                                              const NamespaceString& nss,
                                              const CollectionOptions& options) const {
-    if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
+    if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
         if (options.isView()) {
             uasserted(17399,
                       str::stream()
@@ -794,7 +799,7 @@ StatusWith<NamespaceString> DatabaseImpl::makeUniqueCollectionNamespace(
                        replacePercentSign);
 
         NamespaceString nss(_name, collectionName);
-        if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
+        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
             return nss;
         }
     }
@@ -814,8 +819,8 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         return;
     }
 
-    for (const auto& nss :
-         CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, _name)) {
+    auto catalog = CollectionCatalog::get(opCtx);
+    for (const auto& nss : catalog->getAllCollectionNamesFromDb(opCtx, _name)) {
         if (nss.isDropPendingNamespace()) {
             auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
             LOGV2(20321,
@@ -830,8 +835,7 @@ void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* 
         if (nss.isSystem())
             continue;
 
-        const CollectionPtr& coll =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+        const CollectionPtr& coll = catalog->lookupCollectionByNamespace(opCtx, nss);
         if (!coll)
             continue;
 

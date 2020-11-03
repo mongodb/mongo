@@ -480,7 +480,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
         AutoGetOrCreateDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
         auto db = databaseWriteGuard.getDb();
         invariant(db);
-        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss)) {
+        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
             return Status(ErrorCodes::NamespaceExists,
                           str::stream() << "Collection " << nss.ns() << " already exists.");
         }
@@ -1352,13 +1352,13 @@ Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
         return Status::OK();
     }
 
-    CollectionPtr usersCollection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-        opCtx, AuthorizationManager::usersCollectionNamespace);
+    auto catalog = CollectionCatalog::get(opCtx);
+    CollectionPtr usersCollection =
+        catalog->lookupCollectionByNamespace(opCtx, AuthorizationManager::usersCollectionNamespace);
     const bool hasUsers =
         usersCollection && !Helpers::findOne(opCtx, usersCollection, BSONObj(), false).isNull();
-    CollectionPtr adminVersionCollection =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
-            opCtx, AuthorizationManager::versionCollectionNamespace);
+    CollectionPtr adminVersionCollection = catalog->lookupCollectionByNamespace(
+        opCtx, AuthorizationManager::versionCollectionNamespace);
     BSONObj authSchemaVersionDocument;
     if (!adminVersionCollection ||
         !Helpers::findOne(opCtx,

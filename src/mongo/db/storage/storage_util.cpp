@@ -128,58 +128,60 @@ Status dropCollection(OperationContext* opCtx,
     // RecoveryUnit throughout but not the same OperationContext.
     auto recoveryUnit = opCtx->recoveryUnit();
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    const auto& collectionCatalog = CollectionCatalog::get(opCtx);
+
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successuflly committed.
-    opCtx->recoveryUnit()->onCommit([recoveryUnit, storageEngine, &collectionCatalog, nss, ident](
-                                        boost::optional<Timestamp> commitTimestamp) {
-        StorageEngine::DropIdentCallback onDrop = [storageEngine, &collectionCatalog, ns = nss] {
-            // Nothing to do if not using directoryperdb or there are still collections in the
-            // database.
-            if (!storageEngine->isUsingDirectoryPerDb() ||
-                collectionCatalog.begin(nullptr, ns.db()) != collectionCatalog.end(nullptr)) {
-                return;
-            }
+    opCtx->recoveryUnit()->onCommit(
+        [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
+            boost::optional<Timestamp> commitTimestamp) {
+            StorageEngine::DropIdentCallback onDrop = [svcCtx, storageEngine, ns = nss] {
+                // Nothing to do if not using directoryperdb or there are still collections in the
+                // database.
+                auto collectionCatalog = CollectionCatalog::get(svcCtx);
+                if (!storageEngine->isUsingDirectoryPerDb() ||
+                    collectionCatalog->begin(nullptr, ns.db()) != collectionCatalog->end(nullptr)) {
+                    return;
+                }
 
-            boost::system::error_code ec;
-            boost::filesystem::remove(storageEngine->getFilesystemPathForDb(ns.db().toString()),
-                                      ec);
+                boost::system::error_code ec;
+                boost::filesystem::remove(storageEngine->getFilesystemPathForDb(ns.db().toString()),
+                                          ec);
 
-            if (!ec) {
-                LOGV2(4888200, "Removed empty database directory", "db"_attr = ns.db());
-            } else if (collectionCatalog.begin(nullptr, ns.db()) ==
-                       collectionCatalog.end(nullptr)) {
-                // It is possible for a new collection to be created in the database between
-                // when we check whether the database is empty and actually attempting to
-                // remove the directory. In this case, don't log that the removal failed
-                // because it is expected.
-                LOGV2(4888201,
-                      "Failed to remove database directory",
-                      "db"_attr = ns.db(),
-                      "error"_attr = ec.message());
-            }
-        };
+                if (!ec) {
+                    LOGV2(4888200, "Removed empty database directory", "db"_attr = ns.db());
+                } else if (collectionCatalog->begin(nullptr, ns.db()) ==
+                           collectionCatalog->end(nullptr)) {
+                    // It is possible for a new collection to be created in the database between
+                    // when we check whether the database is empty and actually attempting to
+                    // remove the directory. In this case, don't log that the removal failed
+                    // because it is expected.
+                    LOGV2(4888201,
+                          "Failed to remove database directory",
+                          "db"_attr = ns.db(),
+                          "error"_attr = ec.message());
+                }
+            };
 
-        if (storageEngine->supportsPendingDrops()) {
-            if (!commitTimestamp) {
-                // Standalone mode will not provide a timestamp.
-                commitTimestamp = Timestamp::min();
+            if (storageEngine->supportsPendingDrops()) {
+                if (!commitTimestamp) {
+                    // Standalone mode will not provide a timestamp.
+                    commitTimestamp = Timestamp::min();
+                }
+                LOGV2(22214,
+                      "Deferring table drop for collection",
+                      logAttrs(nss),
+                      "ident"_attr = ident->getIdent(),
+                      "commitTimestamp"_attr = commitTimestamp);
+                storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, std::move(onDrop));
+            } else {
+                // Intentionally ignoring failure here. Since we've removed the metadata pointing to
+                // the collection, we should never see it again anyway.
+                storageEngine->getEngine()
+                    ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
+                    .ignore();
             }
-            LOGV2(22214,
-                  "Deferring table drop for collection",
-                  logAttrs(nss),
-                  "ident"_attr = ident->getIdent(),
-                  "commitTimestamp"_attr = commitTimestamp);
-            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, std::move(onDrop));
-        } else {
-            // Intentionally ignoring failure here. Since we've removed the metadata pointing to
-            // the collection, we should never see it again anyway.
-            storageEngine->getEngine()
-                ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
-                .ignore();
-        }
-    });
+        });
 
     return Status::OK();
 }

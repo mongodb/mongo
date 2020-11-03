@@ -803,8 +803,8 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
 
 namespace {
 NamespaceString getNsFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    auto& catalog = CollectionCatalog::get(opCtx);
-    auto nss = catalog.lookupNSSByUUID(opCtx, uuid);
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound, "No namespace with UUID " + uuid.toString(), nss);
     return *nss;
 }
@@ -1347,6 +1347,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
     OperationContext* opCtx,
     const IndexBuilds& buildsToRestart,
     const std::vector<ResumeIndexInfo>& buildsToResume) {
+    auto catalog = CollectionCatalog::get(opCtx);
 
     stdx::unordered_set<UUID, UUID::Hash> successfullyResumed;
 
@@ -1355,7 +1356,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
         auto collUUID = resumeInfo.getCollectionUUID();
 
         boost::optional<NamespaceString> nss =
-            CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, resumeInfo.getCollectionUUID());
+            catalog->lookupNSSByUUID(opCtx, resumeInfo.getCollectionUUID());
         invariant(nss);
 
         std::vector<BSONObj> indexSpecs;
@@ -1418,8 +1419,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
             continue;
         }
 
-        boost::optional<NamespaceString> nss =
-            CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, build.collUUID);
+        boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, build.collUUID);
         invariant(nss);
 
         LOGV2(20660,
@@ -1657,7 +1657,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     // case when an index builds is restarted during recovery.
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
     Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
     invariant(collection);
     const auto& nss = collection->ns();
     const auto protocol = IndexBuildProtocol::kTwoPhase;
@@ -2092,7 +2092,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // dropped while the index build is still registered for the collection -- until abortIndexBuild
     // is called. The collection can be renamed, but it is OK for the name to be stale just for
     // logging purposes.
-    auto collectionSharedPtr = CollectionCatalog::get(opCtx).lookupCollectionByUUIDForRead(
+    auto collectionSharedPtr = CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForRead(
         opCtx, replState->collectionUUID);
     CollectionPtr collection(collectionSharedPtr.get(), CollectionPtr::NoYieldTag{});
     invariant(collection,
@@ -2321,7 +2321,7 @@ CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeys
     invariant(_indexBuildsManager.isBackgroundBuilding(replState->buildUUID));
 
     auto collection =
-        CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, replState->collectionUUID);
+        CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, replState->collectionUUID);
     invariant(collection);
 
     // Set up the thread's currentOp information to display createIndexes cmd information.

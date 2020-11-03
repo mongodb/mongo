@@ -62,8 +62,8 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, const string& ns) {
-    return (bool)CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx,
-                                                                           NamespaceString(ns));
+    return (bool)CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
+                                                                            NamespaceString(ns));
 }
 
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
@@ -90,12 +90,12 @@ Status truncateCollection(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 void insertRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     OpDebug* const nullOpDebug = nullptr;
     ASSERT_OK(coll->insertDocument(opCtx, InsertStatement(data), nullOpDebug, false));
 }
 void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& data) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     auto cursor = coll->getCursor(opCtx);
 
     auto record = cursor->next();
@@ -105,15 +105,15 @@ void assertOnlyRecord(OperationContext* opCtx, const NamespaceString& nss, const
     ASSERT(!cursor->next());
 }
 void assertEmpty(OperationContext* opCtx, const NamespaceString& nss) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     ASSERT(!coll->getCursor(opCtx)->next());
 }
 bool indexExists(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, true) != nullptr;
 }
 bool indexReady(OperationContext* opCtx, const NamespaceString& nss, const string& idxName) {
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     return coll->getIndexCatalog()->findIndexByName(opCtx, idxName, false) != nullptr;
 }
 size_t getNumIndexEntries(OperationContext* opCtx,
@@ -121,7 +121,7 @@ size_t getNumIndexEntries(OperationContext* opCtx,
                           const string& idxName) {
     size_t numEntries = 0;
 
-    auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     const IndexCatalog* catalog = coll->getIndexCatalog();
     auto desc = catalog->findIndexByName(opCtx, idxName, false);
 

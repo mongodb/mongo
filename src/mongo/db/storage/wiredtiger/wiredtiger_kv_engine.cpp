@@ -1477,7 +1477,7 @@ Status WiredTigerKVEngine::createGroupedSortedDataInterface(OperationContext* op
     }
     // Some unittests use a OperationContextNoop that can't support such lookups.
     auto ns = collOptions.uuid
-        ? *CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, *collOptions.uuid)
+        ? *CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *collOptions.uuid)
         : NamespaceString();
 
     StatusWith<std::string> result = WiredTigerIndex::generateCreateString(

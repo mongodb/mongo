@@ -112,7 +112,7 @@ Status _setProfileSettings(OperationContext* opCtx,
                            mongo::CollectionCatalog::ProfileSettings newSettings) {
     invariant(db);
 
-    auto currSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
+    auto currSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
 
     if (currSettings == newSettings) {
         return Status::OK();
@@ -120,7 +120,9 @@ Status _setProfileSettings(OperationContext* opCtx,
 
     if (newSettings.level == 0) {
         // No need to create the profile collection.
-        CollectionCatalog::get(opCtx).setDatabaseProfileSettings(dbName, newSettings);
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            catalog.setDatabaseProfileSettings(dbName, newSettings);
+        });
         return Status::OK();
     }
 
@@ -135,7 +137,9 @@ Status _setProfileSettings(OperationContext* opCtx,
         return status;
     }
 
-    CollectionCatalog::get(opCtx).setDatabaseProfileSettings(dbName, newSettings);
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        catalog.setDatabaseProfileSettings(dbName, newSettings);
+    });
 
     return Status::OK();
 }
@@ -175,7 +179,7 @@ protected:
 
         // Fetches the database profiling level + filter or the server default if the db does not
         // exist.
-        auto oldSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
+        auto oldSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
 
         if (!readOnly) {
             if (!db) {

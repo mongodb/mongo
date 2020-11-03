@@ -74,9 +74,6 @@ public:
     inline Database(Database&&) = delete;
     inline Database& operator=(Database&&) = delete;
 
-    virtual CollectionCatalog::iterator begin(OperationContext* opCtx) const = 0;
-    virtual CollectionCatalog::iterator end(OperationContext* opCtx) const = 0;
-
     /**
      * Sets up internal memory structures.
      */

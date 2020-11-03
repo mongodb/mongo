@@ -440,7 +440,7 @@ bool CommonMongodProcessInterface::fieldsHaveSupportingUniqueIndex(
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto db = databaseHolder->getDb(opCtx, nss.db());
     auto collection =
-        db ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss) : nullptr;
+        db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss) : nullptr;
     if (!collection) {
         return fieldPaths == std::set<FieldPath>{"_id"};
     }

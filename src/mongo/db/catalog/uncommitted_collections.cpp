@@ -125,7 +125,10 @@ void UncommittedCollections::erase(UUID uuid, NamespaceString nss, UncommittedCo
 void UncommittedCollections::rollback(OperationContext* opCtx,
                                       CollectionUUID uuid,
                                       UncommittedCollectionsMap* map) {
-    auto collPtr = CollectionCatalog::get(opCtx).deregisterCollection(opCtx, uuid);
+    std::shared_ptr<Collection> collPtr;
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        collPtr = catalog.deregisterCollection(opCtx, uuid);
+    });
     auto nss = collPtr.get()->ns();
     map->_collections[uuid] = std::move(collPtr);
     map->_nssIndex.insert({nss, uuid});
@@ -144,7 +147,9 @@ void UncommittedCollections::commit(OperationContext* opCtx,
     auto collPtr = it->second.get();
 
     auto nss = it->second->ns();
-    CollectionCatalog::get(opCtx).registerCollection(uuid, it->second);
+    CollectionCatalog::write(
+        opCtx, [&](CollectionCatalog& catalog) { catalog.registerCollection(uuid, it->second); });
+
     map->_collections.erase(it);
     map->_nssIndex.erase(nss);
     auto collListUnowned = getUncommittedCollections(opCtx).getResources();
@@ -153,7 +158,7 @@ void UncommittedCollections::commit(OperationContext* opCtx,
         UncommittedCollections::rollback(opCtx, uuid, collListUnowned.lock().get());
     });
     opCtx->recoveryUnit()->onCommit([opCtx, uuid, collPtr](boost::optional<Timestamp> commitTs) {
-        CollectionCatalog::get(opCtx).makeCollectionVisible(uuid);
+        collPtr->setCommitted(true);
         // If a commitTs exists, by this point a collection should have a minimum visible snapshot
         // equal to `commitTs`.
         invariant(!commitTs ||

@@ -99,7 +99,7 @@ Status _dropView(OperationContext* opCtx,
         collectionName,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(collectionName.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(collectionName.db()));
 
     if (opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName)) {
@@ -135,7 +135,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
     opCtx->recoveryUnit()->abandonSnapshot();
 
     CollectionPtr coll =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, startingNss);
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startingNss);
     Status status = _checkNssAndReplState(opCtx, coll);
     if (!status.isOK()) {
         return status;
@@ -153,7 +153,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         startingNss,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(startingNss.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(startingNss.db()));
 
     IndexBuildsCoordinator* indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     const UUID collectionUUID = coll->uuid();
@@ -185,7 +185,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         // disk state, which may have changed when we released the collection lock temporarily.
         opCtx->recoveryUnit()->abandonSnapshot();
 
-        coll = CollectionCatalog::get(opCtx).lookupCollectionByUUID(opCtx, collectionUUID);
+        coll = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
         status = _checkNssAndReplState(opCtx, coll);
         if (!status.isOK()) {
             return status;
@@ -233,7 +233,7 @@ Status _dropCollection(OperationContext* opCtx,
                        BSONObjBuilder* result) {
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     const CollectionPtr& coll =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collectionName);
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
     Status status = _checkNssAndReplState(opCtx, coll);
     if (!status.isOK()) {
         return status;
@@ -251,7 +251,7 @@ Status _dropCollection(OperationContext* opCtx,
         collectionName,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(collectionName.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(collectionName.db()));
 
     WriteUnitOfWork wunit(opCtx);
 
@@ -294,7 +294,7 @@ Status dropCollection(OperationContext* opCtx,
                 return Status(ErrorCodes::NamespaceNotFound, "ns not found");
             }
 
-            if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collectionName)) {
+            if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName)) {
                 return _abortIndexBuildsAndDrop(
                     opCtx,
                     std::move(autoDb),
@@ -378,7 +378,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         }
 
         const CollectionPtr& coll =
-            CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, collectionName);
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
 
         BSONObjBuilder unusedBuilder;
         if (!coll) {

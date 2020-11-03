@@ -126,7 +126,7 @@ public:
 
         const auto hasTerm = false;
         return authSession->checkAuthForFind(
-            CollectionCatalog::get(opCtx).resolveNamespaceStringOrUUID(
+            CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
                 opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
             hasTerm);
     }

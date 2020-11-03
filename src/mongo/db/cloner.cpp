@@ -103,7 +103,8 @@ struct Cloner::Fun {
         // Make sure database still exists after we resume from the temp release
         auto databaseHolder = DatabaseHolder::get(opCtx);
         auto db = databaseHolder->openDb(opCtx, _dbName);
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
             writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
                 opCtx->checkForInterrupt();
@@ -117,7 +118,7 @@ struct Cloner::Fun {
                           str::stream()
                               << "collection creation failed during clone [" << nss << "]");
                 wunit.commit();
-                collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+                collection = catalog->lookupCollectionByNamespace(opCtx, nss);
                 invariant(collection,
                           str::stream() << "Missing collection during clone [" << nss << "]");
             });
@@ -153,7 +154,7 @@ struct Cloner::Fun {
                         str::stream() << "Database " << _dbName << " dropped while cloning",
                         db != nullptr);
 
-                collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+                collection = catalog->lookupCollectionByNamespace(opCtx, nss);
                 uassert(28594,
                         str::stream() << "Collection " << nss << " dropped while cloning",
                         collection);
@@ -349,6 +350,7 @@ Status Cloner::_createCollectionsForDb(
     auto db = databaseHolder->openDb(opCtx, dbName);
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
+    auto catalog = CollectionCatalog::get(opCtx);
     auto collCount = 0;
     for (auto&& params : createCollectionParams) {
         if (MONGO_unlikely(movePrimaryFailPoint.shouldFail()) && collCount > 0) {
@@ -366,8 +368,7 @@ Status Cloner::_createCollectionsForDb(
             opCtx->checkForInterrupt();
             WriteUnitOfWork wunit(opCtx);
 
-            CollectionPtr collection =
-                CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+            CollectionPtr collection = catalog->lookupCollectionByNamespace(opCtx, nss);
             if (collection) {
                 if (!params.shardedColl) {
                     // If the collection is unsharded then we want to fail when a collection

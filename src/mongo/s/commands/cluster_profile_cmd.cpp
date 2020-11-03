@@ -64,7 +64,7 @@ protected:
                 "values",
                 profilingLevel == -1 || profilingLevel == 0);
 
-        const auto oldSettings = CollectionCatalog::get(opCtx).getDatabaseProfileSettings(dbName);
+        const auto oldSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
 
         if (auto filterOrUnset = request.getFilter()) {
             auto newSettings = oldSettings;
@@ -73,7 +73,9 @@ protected:
             } else {
                 newSettings.filter = nullptr;
             }
-            CollectionCatalog::get(opCtx).setDatabaseProfileSettings(dbName, newSettings);
+            CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+                catalog.setDatabaseProfileSettings(dbName, newSettings);
+            });
         }
 
         return oldSettings;

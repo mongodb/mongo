@@ -72,7 +72,7 @@ Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   StorageEngine* engine) {
     opCtx->checkForInterrupt();
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     auto swIndexNameObjs = getIndexNameObjs(opCtx, collection->getCatalogId());
     if (!swIndexNameObjs.isOK())
         return swIndexNameObjs.getStatus();
@@ -122,7 +122,7 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, const CollectionPtr& colle
 Status repairCollections(OperationContext* opCtx,
                          StorageEngine* engine,
                          const std::string& dbName) {
-    auto colls = CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, dbName);
+    auto colls = CollectionCatalog::get(opCtx)->getAllCollectionNamesFromDb(opCtx, dbName);
 
     for (const auto& nss : colls) {
         auto status = repair::repairCollection(opCtx, engine, nss);
@@ -191,14 +191,14 @@ Status repairCollection(OperationContext* opCtx,
 
     Status status = Status::OK();
     {
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+        auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         status = engine->repairRecordStore(opCtx, collection->getCatalogId(), nss);
     }
 
 
     // Need to lookup from catalog again because the old collection object was invalidated by
     // repairRecordStore.
-    auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespaceForMetadataWrite(
+    auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
         opCtx, CollectionCatalog::LifetimeMode::kInplace, nss);
 
     // If data was modified during repairRecordStore, we know to rebuild indexes without needing

@@ -86,7 +86,7 @@ protected:
 private:
     // This can only be called when the plan stage is attached to an operation context.
     uint64_t getCatalogEpoch() const {
-        return CollectionCatalog::get(opCtx()).getEpoch();
+        return CollectionCatalog::get(opCtx())->getEpoch();
     }
 
     // Pointer to a CollectionPtr that is stored at a high level in a AutoGetCollection or other

@@ -570,7 +570,7 @@ bool runCreateIndexesWithCoordinator(OperationContext* opCtx,
                          ns,
                          Top::LockType::WriteLocked,
                          AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
-                         CollectionCatalog::get(opCtx).getDatabaseProfileLevel(ns.db()));
+                         CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.db()));
 
     auto buildUUID = UUID::gen();
     ReplIndexBuildState::IndexCatalogStats stats;

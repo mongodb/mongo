@@ -96,8 +96,9 @@ public:
         RecordId catalogId = coll.first;
 
         std::shared_ptr<Collection> collection = std::make_shared<CollectionMock>(nss, catalogId);
-        CollectionCatalog::get(operationContext())
-            .registerCollection(options.uuid.get(), std::move(collection));
+        CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
+            catalog.registerCollection(options.uuid.get(), std::move(collection));
+        });
 
         wuow.commit();
 

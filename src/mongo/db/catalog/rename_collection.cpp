@@ -67,7 +67,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(writeConflictInRenameCollCopyToTmp);
 
 boost::optional<NamespaceString> getNamespaceFromUUID(OperationContext* opCtx, const UUID& uuid) {
-    return CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuid);
+    return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
 }
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
@@ -110,8 +110,8 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
                       str::stream()
                           << "Database " << source.db() << " does not exist or is drop pending");
 
-    const auto sourceColl =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
+    auto catalog = CollectionCatalog::get(opCtx);
+    const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     if (!sourceColl) {
         if (ViewCatalog::get(db)->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
@@ -122,8 +122,7 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
 
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
-    const auto targetColl =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
+    const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
 
     if (!targetColl) {
         if (ViewCatalog::get(db)->lookup(opCtx, target.ns()))
@@ -316,17 +315,16 @@ Status renameCollectionWithinDB(OperationContext* opCtx,
         return status;
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
-    const auto sourceColl =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
-    const auto targetColl =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
+    auto catalog = CollectionCatalog::get(opCtx);
+    const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
+    const auto targetColl = catalog->lookupCollectionByNamespace(opCtx, target);
 
     AutoStatsTracker statsTracker(
         opCtx,
         source,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.db()));
 
     if (!targetColl) {
         return renameCollectionDirectly(opCtx, db, sourceColl->uuid(), source, target, options);
@@ -360,17 +358,17 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
 
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.db());
     const auto sourceColl =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
+        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, source);
 
     AutoStatsTracker statsTracker(
         opCtx,
         source,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.db()));
 
     return writeConflictRetry(opCtx, "renameCollection", target.ns(), [&] {
-        auto targetColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target);
+        auto targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, target);
         WriteUnitOfWork wuow(opCtx);
         if (targetColl) {
             if (sourceColl->uuid() == targetColl->uuid()) {
@@ -414,7 +412,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
             auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.get());
             if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
                 invariant(collToDropBasedOnUUID->db() == target.db());
-                targetColl = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+                targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                     opCtx, *collToDropBasedOnUUID);
             }
         }
@@ -485,10 +483,10 @@ Status renameBetweenDBs(OperationContext* opCtx,
         source,
         Top::LockType::NotLocked,
         AutoStatsTracker::LogMode::kUpdateCurOp,
-        CollectionCatalog::get(opCtx).getDatabaseProfileLevel(source.db()));
+        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(source.db()));
 
-    const auto sourceColl =
-        CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, source);
+    auto catalog = CollectionCatalog::get(opCtx);
+    const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);
     if (!sourceColl) {
         if (sourceDB && ViewCatalog::get(sourceDB)->lookup(opCtx, source.ns()))
             return Status(ErrorCodes::CommandNotSupportedOnView,
@@ -511,9 +509,8 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Check if the target namespace exists and if dropTarget is true.
     // Return a non-OK status if target exists and dropTarget is not true or if the collection
     // is sharded.
-    const auto targetColl = targetDB
-        ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, target)
-        : nullptr;
+    const auto targetColl =
+        targetDB ? catalog->lookupCollectionByNamespace(opCtx, target) : nullptr;
     if (targetColl) {
         if (sourceColl->uuid() == targetColl->uuid()) {
             invariant(source == target);
@@ -730,7 +727,7 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     BSONObj originalCollectionOptions) {
     AutoGetDb dbLock(opCtx, targetNs.db(), MODE_X);
     auto collection = dbLock.getDb()
-        ? CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, targetNs)
+        ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, targetNs)
         : nullptr;
     BSONObj collectionOptions = {};
     if (collection) {
@@ -865,7 +862,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     NamespaceString sourceNss(sourceNsElt.valueStringData());
     NamespaceString targetNss(targetNsElt.valueStringData());
     if (uuidToRename) {
-        auto nss = CollectionCatalog::get(opCtx).lookupNSSByUUID(opCtx, uuidToRename.get());
+        auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuidToRename.get());
         if (nss)
             sourceNss = *nss;
     }

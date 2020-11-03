@@ -287,8 +287,9 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     auto collectionFactory = Collection::Factory::get(getGlobalServiceContext());
     auto collection = collectionFactory->make(opCtx, nss, catalogId, uuid, std::move(rs));
 
-    auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    collectionCatalog.registerCollection(uuid, std::move(collection));
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        catalog.registerCollection(uuid, std::move(collection));
+    });
 }
 
 void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
@@ -297,7 +298,9 @@ void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
         LOGV2_FOR_RECOVERY(4615632, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
     }
-    CollectionCatalog::get(opCtx).deregisterAllCollections();
+
+    CollectionCatalog::write(
+        opCtx, [&](CollectionCatalog& catalog) { catalog.deregisterAllCollections(); });
 
     _catalog.reset();
     _catalogRecordStore.reset();
@@ -663,7 +666,9 @@ void StorageEngineImpl::cleanShutdown() {
         _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 
-    CollectionCatalog::get(getGlobalServiceContext()).deregisterAllCollections();
+    CollectionCatalog::write(getGlobalServiceContext(), [](CollectionCatalog& catalog) {
+        catalog.deregisterAllCollections();
+    });
 
     _catalog.reset();
     _catalogRecordStore.reset();
@@ -698,7 +703,7 @@ RecoveryUnit* StorageEngineImpl::newRecoveryUnit() {
 }
 
 std::vector<std::string> StorageEngineImpl::listDatabases() const {
-    return CollectionCatalog::get(getGlobalServiceContext()).getAllDbNames();
+    return CollectionCatalog::get(getGlobalServiceContext())->getAllDbNames();
 }
 
 Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, StringData db) {
@@ -707,15 +712,15 @@ Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, StringData db) 
 }
 
 Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, StringData db) {
+    auto catalog = CollectionCatalog::get(opCtx);
     {
-        auto dbs = CollectionCatalog::get(opCtx).getAllDbNames();
+        auto dbs = catalog->getAllDbNames();
         if (std::count(dbs.begin(), dbs.end(), db.toString()) == 0) {
             return Status(ErrorCodes::NamespaceNotFound, "db not found to drop");
         }
     }
 
-    std::vector<NamespaceString> toDrop =
-        CollectionCatalog::get(opCtx).getAllCollectionNamesFromDb(opCtx, db);
+    std::vector<NamespaceString> toDrop = catalog->getAllCollectionNamesFromDb(opCtx, db);
 
     // Do not timestamp any of the following writes. This will remove entries from the catalog as
     // well as drop any underlying tables. It's not expected for dropping tables to be reversible
@@ -750,8 +755,9 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
 
     Status firstError = Status::OK();
     WriteUnitOfWork untimestampedDropWuow(opCtx);
+    auto collectionCatalog = CollectionCatalog::get(opCtx);
     for (auto& nss : toDrop) {
-        auto coll = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
+        auto coll = collectionCatalog->lookupCollectionByNamespace(opCtx, nss);
 
         // No need to remove the indexes from the IndexCatalog because eliminating the Collection
         // will have the same effect.
@@ -773,10 +779,12 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             firstError = result;
         }
 
-        auto removedColl = CollectionCatalog::get(opCtx).deregisterCollection(opCtx, coll->uuid());
-        opCtx->recoveryUnit()->registerChange(
-            CollectionCatalog::get(opCtx).makeFinishDropCollectionChange(std::move(removedColl),
-                                                                         coll->uuid()));
+        std::shared_ptr<Collection> removedColl;
+        CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+            removedColl = catalog.deregisterCollection(opCtx, coll->uuid());
+        });
+        opCtx->recoveryUnit()->registerChange(CollectionCatalog::makeFinishDropCollectionChange(
+            opCtx, std::move(removedColl), coll->uuid()));
     }
 
     untimestampedDropWuow.commit();
@@ -857,9 +865,10 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
     }
 
     // After repairing, re-initialize the collection with a valid RecordStore.
-    auto& collectionCatalog = CollectionCatalog::get(getGlobalServiceContext());
-    auto uuid = collectionCatalog.lookupUUIDByNSS(opCtx, nss).get();
-    collectionCatalog.deregisterCollection(opCtx, uuid);
+    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+        auto uuid = catalog.lookupUUIDByNSS(opCtx, nss).get();
+        catalog.deregisterCollection(opCtx, uuid);
+    });
     _initCollection(opCtx, catalogId, nss, false);
 
     return status;

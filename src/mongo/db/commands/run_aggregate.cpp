@@ -292,7 +292,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             // views, simply assume that the namespace is a collection.
             resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
         } else if (!db ||
-                   CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, involvedNs)) {
+                   CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, involvedNs)) {
             // If the aggregation database exists and 'involvedNs' refers to a collection namespace,
             // then we resolve it as an empty pipeline in order to read directly from the underlying
             // collection. If the database doesn't exist, then we still resolve it as an empty
@@ -342,8 +342,9 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
     if (!viewCatalog) {
         return Status::OK();
     }
+    auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& potentialViewNs : liteParsedPipeline.getInvolvedNamespaces()) {
-        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, potentialViewNs)) {
+        if (catalog->lookupCollectionByNamespace(opCtx, potentialViewNs)) {
             continue;
         }
 

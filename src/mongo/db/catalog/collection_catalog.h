@@ -46,12 +46,10 @@ namespace mongo {
  * collection lookup by UUID.
  */
 using CollectionUUID = UUID;
+class CollectionCatalog;
 class Database;
 
 class CollectionCatalog {
-    CollectionCatalog(const CollectionCatalog&) = delete;
-    CollectionCatalog& operator=(const CollectionCatalog&) = delete;
-
     friend class iterator;
 
 public:
@@ -75,14 +73,10 @@ public:
     public:
         using value_type = CollectionPtr;
 
-        iterator(OperationContext* opCtx,
-                 StringData dbName,
-                 uint64_t genNum,
-                 const CollectionCatalog& catalog);
+        iterator(OperationContext* opCtx, StringData dbName, const CollectionCatalog& catalog);
         iterator(OperationContext* opCtx,
                  std::map<std::pair<std::string, CollectionUUID>,
                           std::shared_ptr<Collection>>::const_iterator mapIter,
-                 uint64_t genNum,
                  const CollectionCatalog& catalog);
         value_type operator*();
         iterator operator++();
@@ -99,21 +93,11 @@ public:
         bool operator!=(const iterator& other);
 
     private:
-        /**
-         * Check if _mapIter has been invalidated due to a change in the _orderedCollections map. If
-         * it has, restart iteration through a call to lower_bound. If the element that the iterator
-         * is currently pointing to has been deleted, the iterator will be repositioned to the
-         * element that follows it.
-         *
-         * Returns true if iterator got repositioned.
-         */
-        bool _repositionIfNeeded();
         bool _exhausted();
 
         OperationContext* _opCtx;
         std::string _dbName;
         boost::optional<CollectionUUID> _uuid;
-        uint64_t _genNum;
         std::map<std::pair<std::string, CollectionUUID>,
                  std::shared_ptr<Collection>>::const_iterator _mapIter;
         const CollectionCatalog* _catalog;
@@ -139,9 +123,31 @@ public:
         }
     };
 
-    static CollectionCatalog& get(ServiceContext* svcCtx);
-    static CollectionCatalog& get(OperationContext* opCtx);
-    CollectionCatalog() = default;
+    static std::shared_ptr<const CollectionCatalog> get(ServiceContext* svcCtx);
+    static std::shared_ptr<const CollectionCatalog> get(OperationContext* opCtx);
+
+    /**
+     * Stashes provided CollectionCatalog pointer on the OperationContext.
+     * Will cause get() to return it for this OperationContext.
+     */
+    static void stash(OperationContext* opCtx, std::shared_ptr<const CollectionCatalog> catalog);
+
+    /**
+     * Perform a write to the catalog using copy-on-write. A catalog previously returned by get()
+     * will not be modified.
+     *
+     * This call will block until the modified catalog has been committed. Concurrant writes are
+     * batched together and will thus block each other. It is important to not perform blocking
+     * operations such as acquiring locks or waiting for I/O in the write job as that would also
+     * block other writers.
+     *
+     * The provided job is allowed to throw which will be propagated through this call.
+     *
+     * The write job may execute on a different thread.
+     */
+    using CatalogWriteFn = std::function<void(CollectionCatalog&)>;
+    static void write(ServiceContext* svcCtx, CatalogWriteFn job);
+    static void write(OperationContext* opCtx, CatalogWriteFn job);
 
     /**
      * This function is responsible for safely setting the namespace string inside 'coll' to the
@@ -153,7 +159,7 @@ public:
     void setCollectionNamespace(OperationContext* opCtx,
                                 Collection* coll,
                                 const NamespaceString& fromCollection,
-                                const NamespaceString& toCollection);
+                                const NamespaceString& toCollection) const;
 
     void onCloseDatabase(OperationContext* opCtx, std::string dbName);
 
@@ -170,8 +176,8 @@ public:
     /**
      * Returns the RecoveryUnit's Change for dropping the collection
      */
-    std::unique_ptr<RecoveryUnit::Change> makeFinishDropCollectionChange(
-        std::shared_ptr<Collection>, CollectionUUID uuid);
+    static std::unique_ptr<RecoveryUnit::Change> makeFinishDropCollectionChange(
+        OperationContext* opCtx, std::shared_ptr<Collection>, CollectionUUID uuid);
 
     /**
      * Deregister all the collection objects.
@@ -187,13 +193,10 @@ public:
      */
     Collection* lookupCollectionByUUIDForMetadataWrite(OperationContext* opCtx,
                                                        LifetimeMode mode,
-                                                       CollectionUUID uuid);
+                                                       CollectionUUID uuid) const;
     CollectionPtr lookupCollectionByUUID(OperationContext* opCtx, CollectionUUID uuid) const;
     std::shared_ptr<const Collection> lookupCollectionByUUIDForRead(OperationContext* opCtx,
                                                                     CollectionUUID uuid) const;
-
-
-    void makeCollectionVisible(CollectionUUID uuid);
 
     /**
      * Returns true if the collection has been registered in the CollectionCatalog but not yet made
@@ -210,7 +213,7 @@ public:
      */
     Collection* lookupCollectionByNamespaceForMetadataWrite(OperationContext* opCtx,
                                                             LifetimeMode mode,
-                                                            const NamespaceString& nss);
+                                                            const NamespaceString& nss) const;
     CollectionPtr lookupCollectionByNamespace(OperationContext* opCtx,
                                               const NamespaceString& nss) const;
     std::shared_ptr<const Collection> lookupCollectionByNamespaceForRead(
@@ -236,7 +239,7 @@ public:
      * can be resolved, but the resulting collection is in the wrong database.
      */
     NamespaceString resolveNamespaceStringOrUUID(OperationContext* opCtx,
-                                                 NamespaceStringOrUUID nsOrUUID);
+                                                 NamespaceStringOrUUID nsOrUUID) const;
 
     /**
      * Returns whether the collection with 'uuid' satisfies the provided 'predicate'. If the
@@ -338,7 +341,7 @@ public:
      * the same ResourceId entry, we return the boost::none for those namespaces until there is
      * only one namespace in the set. If the ResourceId is not found, boost::none is returned.
      */
-    boost::optional<std::string> lookupResourceName(const ResourceId& rid);
+    boost::optional<std::string> lookupResourceName(const ResourceId& rid) const;
 
     /**
      * Removes an existing ResourceId 'rid' with namespace 'entry' from the map.
@@ -354,18 +357,18 @@ public:
      * Commit unmanaged Collection that was acquired by lookupCollectionBy***ForMetadataWrite and
      * lifetime mode kUnmanagedClone.
      */
-    void commitUnmanagedClone(OperationContext* opCtx, Collection* collection);
+    static void commitUnmanagedClone(OperationContext* opCtx, Collection* collection);
 
     /**
      * Discard unmanaged Collection that was acquired by lookupCollectionBy***ForMetadataWrite and
      * lifetime mode kUnmanagedClone.
      */
-    void discardUnmanagedClone(OperationContext* opCtx, Collection* collection);
+    static void discardUnmanagedClone(OperationContext* opCtx, Collection* collection);
 
 private:
     friend class CollectionCatalog::iterator;
 
-    std::shared_ptr<Collection> _lookupCollectionByUUID(WithLock, CollectionUUID uuid) const;
+    std::shared_ptr<Collection> _lookupCollectionByUUID(CollectionUUID uuid) const;
 
     /**
      * Helper to commit a cloned Collection into the catalog. It takes a vector of commit handlers
@@ -375,11 +378,8 @@ private:
     void _commitWritableClone(
         std::shared_ptr<Collection> cloned,
         boost::optional<Timestamp> commitTime,
-        const std::vector<std::function<void(boost::optional<Timestamp>)>>& commitHandlers);
-
-    const std::vector<CollectionUUID>& _getOrdering_inlock(const StringData& db,
-                                                           const stdx::lock_guard<Latch>&);
-    mutable mongo::Mutex _catalogLock;
+        const std::vector<std::function<void(CollectionCatalog&, boost::optional<Timestamp>)>>&
+            commitHandlers);
 
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
@@ -401,11 +401,6 @@ private:
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair
     NamespaceCollectionMap _collections;
 
-    /**
-     * Generation number to track changes to the catalog that could invalidate iterators.
-     */
-    uint64_t _generationNumber = 0;
-
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).
     //
@@ -418,23 +413,51 @@ private:
     // global lock in at least MODE_IS to read it.
     uint64_t _epoch = 0;
 
-    // Protects _resourceInformation.
-    mutable Mutex _resourceLock = MONGO_MAKE_LATCH("CollectionCatalog::_resourceLock");
-
     // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
     std::map<ResourceId, std::set<std::string>> _resourceInformation;
-
-    // Protects _databaseProfileSettings.
-    mutable Mutex _profileSettingsLock =
-        MONGO_MAKE_LATCH("CollectionCatalog::_profileSettingsLock");
 
     /**
      * Contains non-default database profile settings. New collections, current collections and
      * views must all be able to access the correct profile settings for the database in which they
-     * reside. Simple database name to struct ProfileSettings map. Access protected by
-     * _profileSettingsLock.
+     * reside. Simple database name to struct ProfileSettings map.
      */
     DatabaseProfileSettingsMap _databaseProfileSettings;
+};
+
+/**
+ * RAII style object to stash a versioned CollectionCatalog on the OperationContext.
+ * Calls to CollectionCatalog::get(OperationContext*) will return this instance.
+ *
+ * Unstashes the CollectionCatalog at destruction.
+ *
+ * It is not safe to nest usages of this type.
+ */
+class CollectionCatalogStasher {
+public:
+    CollectionCatalogStasher(OperationContext* opCtx);
+    CollectionCatalogStasher(OperationContext* opCtx,
+                             std::shared_ptr<const CollectionCatalog> catalog);
+    ~CollectionCatalogStasher();
+
+    CollectionCatalogStasher(const CollectionCatalogStasher&) = delete;
+    CollectionCatalogStasher(CollectionCatalogStasher&& other);
+
+    CollectionCatalogStasher& operator=(const CollectionCatalogStasher&) = delete;
+    CollectionCatalogStasher& operator=(CollectionCatalogStasher&&) = delete;
+
+    /**
+     * Stashes a new catalog on OperationContext
+     */
+    void stash(std::shared_ptr<const CollectionCatalog> catalog);
+
+    /**
+     * Resets the OperationContext so CollectionCatalog::get() returns latest catalog again
+     */
+    void reset();
+
+private:
+    OperationContext* _opCtx;
+    bool _stashed;
 };
 
 /**

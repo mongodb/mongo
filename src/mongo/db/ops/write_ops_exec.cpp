@@ -218,7 +218,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
         Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
 
         assertCanWrite_inlock(opCtx, ns);
-        if (!CollectionCatalog::get(opCtx).lookupCollectionByNamespace(
+        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                 opCtx,
                 ns)) {  // someone else may have beat us to it.
             uassertStatusOK(userAllowedCreateNS(ns));
@@ -401,7 +401,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         }
 
         curOp.raiseDbProfileLevel(
-            CollectionCatalog::get(opCtx).getDatabaseProfileLevel(wholeOp.getNamespace().db()));
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(wholeOp.getNamespace().db()));
         assertCanWrite_inlock(opCtx, wholeOp.getNamespace());
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -667,7 +667,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     auto& curOp = *CurOp::get(opCtx);
 
     if (collection->getDb()) {
-        curOp.raiseDbProfileLevel(CollectionCatalog::get(opCtx).getDatabaseProfileLevel(ns.db()));
+        curOp.raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.db()));
     }
 
     assertCanWrite_inlock(opCtx, ns);
@@ -906,7 +906,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     AutoGetCollection collection(opCtx, ns, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     if (collection.getDb()) {
-        curOp.raiseDbProfileLevel(CollectionCatalog::get(opCtx).getDatabaseProfileLevel(ns.db()));
+        curOp.raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.db()));
     }
 
     assertCanWrite_inlock(opCtx, ns);

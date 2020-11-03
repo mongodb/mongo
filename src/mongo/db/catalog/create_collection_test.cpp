@@ -214,8 +214,8 @@ TEST_F(CreateCollectionTest,
     ASSERT_EQUALS(uuid, getCollectionUuid(opCtx.get(), newNss));
 
     // Check that old collection that was renamed out of the way still exists.
-    auto& catalog = CollectionCatalog::get(opCtx.get());
-    auto renamedCollectionNss = catalog.lookupNSSByUUID(opCtx.get(), existingCollectionUuid);
+    auto catalog = CollectionCatalog::get(opCtx.get());
+    auto renamedCollectionNss = catalog->lookupNSSByUUID(opCtx.get(), existingCollectionUuid);
     ASSERT(renamedCollectionNss);
     ASSERT_TRUE(collectionExists(opCtx.get(), *renamedCollectionNss))
         << "old renamed collection with UUID " << existingCollectionUuid
