@@ -76,6 +76,7 @@
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
             <ComponentRef Id="c_mongodecrypt"/>
+            <ComponentRef Id="c_mongokerberos"/>
             <ComponentRef Id="c_mongoldap"/>
           <?endif ?>
         </Feature>
