@@ -73,6 +73,7 @@ protected:
                                                false,
                                                epoch,
                                                boost::none,
+                                               true,
                                                {std::move(chunk)});
 
         return CollectionMetadata(ChunkManager(ShardId("this"),

@@ -114,3 +114,9 @@ structs:
                               original collection undergoing a resharding operation or this
                               collection is the temporary resharding collection."
                 optional: true
+            allowMigrations:
+                type: bool
+                description: "Whether this collection allows chunks to move. It is required by
+                              almost all DDL operations in order to guarantee that the set of
+                              shards, which comprise a collection will not change."
+                default: true

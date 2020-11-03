@@ -80,7 +80,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     }
 
     auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, boost::none, chunks);
+        kNss, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, boost::none, true, chunks);
     return CollectionMetadata(ChunkManager(ShardId("Shard0"),
                                            DatabaseVersion(UUID::gen(), 1),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
@@ -110,8 +110,8 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
-    auto rt =
-        cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(boost::none, newChunks);
+    auto rt = cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(
+        boost::none, true, newChunks);
     return CollectionMetadata(ChunkManager(ShardId("shard0"),
                                            DatabaseVersion(UUID::gen(), 1),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
@@ -160,8 +160,15 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
     }
 
     for (auto keepRunning : state) {
-        auto rt = RoutingTableHistory::makeNew(
-            kNss, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, boost::none, chunks);
+        auto rt = RoutingTableHistory::makeNew(kNss,
+                                               UUID::gen(),
+                                               shardKeyPattern,
+                                               nullptr,
+                                               true,
+                                               collEpoch,
+                                               boost::none,
+                                               true,
+                                               chunks);
         benchmark::DoNotOptimize(
             CollectionMetadata(ChunkManager(ShardId("shard0"),
                                             DatabaseVersion(UUID::gen(), 1),

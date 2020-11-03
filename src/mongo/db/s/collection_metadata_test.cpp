@@ -90,6 +90,7 @@ CollectionMetadata makeCollectionMetadataImpl(
                                                       false,
                                                       epoch,
                                                       boost::none,
+                                                      true,
                                                       allChunks)),
                      kChunkManager),
         kThisShard);

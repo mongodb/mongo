@@ -71,7 +71,7 @@ RoutingTableHistory splitChunk(const RoutingTableHistory& rt,
         newChunks.emplace_back(kNss, range, curVersion, kThisShard);
     }
 
-    return rt.makeUpdated(boost::none, newChunks);
+    return rt.makeUpdated(boost::none, true, newChunks);
 }
 
 /**
@@ -160,8 +160,15 @@ public:
                       version,
                       kThisShard};
 
-        _rt.emplace(RoutingTableHistory::makeNew(
-            kNss, UUID::gen(), _shardKeyPattern, nullptr, false, epoch, boost::none, {initChunk}));
+        _rt.emplace(RoutingTableHistory::makeNew(kNss,
+                                                 UUID::gen(),
+                                                 _shardKeyPattern,
+                                                 nullptr,
+                                                 false,
+                                                 epoch,
+                                                 boost::none,
+                                                 true,
+                                                 {initChunk}));
         ASSERT_EQ(_rt->numChunks(), 1ull);
 
         // Should only be one
@@ -326,8 +333,15 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                   version,
                   kThisShard};
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), getShardKeyPattern(), nullptr, false, epoch, boost::none, {chunkAll});
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           getShardKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           boost::none,
+                                           true,
+                                           {chunkAll});
 
     std::vector<ChunkType> chunks1 = {
         ChunkType{kNss,
@@ -339,7 +353,7 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                   ChunkVersion{2, 2, epoch},
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none, chunks1);
+    auto rt1 = rt.makeUpdated(boost::none, true, chunks1);
     auto v1 = ChunkVersion{2, 2, epoch};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
 
@@ -357,7 +371,7 @@ TEST_F(RoutingTableHistoryTest, TestSplits) {
                   ChunkVersion{3, 2, epoch},
                   kThisShard}};
 
-    auto rt2 = rt1.makeUpdated(boost::none, chunks2);
+    auto rt2 = rt1.makeUpdated(boost::none, true, chunks2);
     auto v2 = ChunkVersion{3, 2, epoch};
     ASSERT_EQ(v2, rt2.getVersion(kThisShard));
 }
@@ -371,8 +385,15 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
                   ChunkVersion{1, 0, epoch},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), getShardKeyPattern(), nullptr, false, epoch, boost::none, initialChunks);
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           getShardKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           boost::none,
+                                           true,
+                                           initialChunks);
     ASSERT_EQ(rt.numChunks(), 1);
 
     std::vector<ChunkType> changedChunks = {
@@ -385,7 +406,7 @@ TEST_F(RoutingTableHistoryTest, TestReplaceEmptyChunk) {
                   ChunkVersion{2, 2, epoch},
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none, changedChunks);
+    auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
     auto v1 = ChunkVersion{2, 2, epoch};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -413,8 +434,15 @@ TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
                   ChunkVersion{1, 0, epoch},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), getShardKeyPattern(), nullptr, false, epoch, boost::none, initialChunks);
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           getShardKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           boost::none,
+                                           true,
+                                           initialChunks);
     ASSERT_EQ(rt.numChunks(), 1);
 
     std::vector<ChunkType> changedChunks = {
@@ -431,7 +459,7 @@ TEST_F(RoutingTableHistoryTest, TestUseLatestVersions) {
                   ChunkVersion{2, 2, epoch},
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none, changedChunks);
+    auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
     auto v1 = ChunkVersion{2, 2, epoch};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -450,8 +478,15 @@ TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
                   ChunkVersion{2, 2, epoch},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), getShardKeyPattern(), nullptr, false, epoch, boost::none, initialChunks);
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           getShardKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           boost::none,
+                                           true,
+                                           initialChunks);
     ASSERT_EQ(rt.numChunks(), 2);
 
     std::vector<ChunkType> changedChunks = {
@@ -464,7 +499,7 @@ TEST_F(RoutingTableHistoryTest, TestOutOfOrderVersion) {
                   ChunkVersion{3, 1, epoch},
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none, changedChunks);
+    auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
     auto v1 = ChunkVersion{3, 1, epoch};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -492,8 +527,15 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
                   ChunkVersion{2, 2, epoch},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), getShardKeyPattern(), nullptr, false, epoch, boost::none, initialChunks);
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           getShardKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           boost::none,
+                                           true,
+                                           initialChunks);
     ASSERT_EQ(rt.numChunks(), 3);
     ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, epoch));
 
@@ -507,7 +549,7 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunks) {
                   ChunkVersion{3, 1, epoch},
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none, changedChunks);
+    auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
     auto v1 = ChunkVersion{3, 1, epoch};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -530,8 +572,15 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
                   ChunkVersion{2, 2, epoch},
                   kThisShard}};
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), getShardKeyPattern(), nullptr, false, epoch, boost::none, initialChunks);
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           getShardKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           boost::none,
+                                           true,
+                                           initialChunks);
     ASSERT_EQ(rt.numChunks(), 3);
     ASSERT_EQ(rt.getVersion(), ChunkVersion(2, 2, epoch));
 
@@ -545,7 +594,7 @@ TEST_F(RoutingTableHistoryTest, TestMergeChunksOrdering) {
                   ChunkVersion{3, 1, epoch},
                   kThisShard}};
 
-    auto rt1 = rt.makeUpdated(boost::none, changedChunks);
+    auto rt1 = rt.makeUpdated(boost::none, true, changedChunks);
     auto v1 = ChunkVersion{3, 1, epoch};
     ASSERT_EQ(v1, rt1.getVersion(kThisShard));
     ASSERT_EQ(rt1.numChunks(), 2);
@@ -586,8 +635,15 @@ TEST_F(RoutingTableHistoryTest, TestFlatten) {
                   kThisShard},
     };
 
-    auto rt = RoutingTableHistory::makeNew(
-        kNss, UUID::gen(), getShardKeyPattern(), nullptr, false, epoch, boost::none, initialChunks);
+    auto rt = RoutingTableHistory::makeNew(kNss,
+                                           UUID::gen(),
+                                           getShardKeyPattern(),
+                                           nullptr,
+                                           false,
+                                           epoch,
+                                           boost::none,
+                                           true,
+                                           initialChunks);
     ASSERT_EQ(rt.numChunks(), 2);
     ASSERT_EQ(rt.getVersion(), ChunkVersion(4, 1, epoch));
 
@@ -596,5 +652,6 @@ TEST_F(RoutingTableHistoryTest, TestFlatten) {
     ASSERT_EQ(chunk1->getMin().woCompare(getShardKeyPattern().globalMin()), 0);
     ASSERT_EQ(chunk1->getMax().woCompare(BSON("a" << 10)), 0);
 }
+
 }  // namespace
 }  // namespace mongo

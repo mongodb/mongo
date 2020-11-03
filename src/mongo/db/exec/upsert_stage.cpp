@@ -119,10 +119,9 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
     // throw so that MongoS can target the insert to the correct shard.
     if (_isUserInitiatedWrite) {
         auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
-        const auto collFilter = css->getOwnershipFilter(
-            opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
-
-        if (collFilter.isSharded()) {
+        if (css->getCollectionDescription(opCtx()).isSharded()) {
+            const auto collFilter = css->getOwnershipFilter(
+                opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
             const ShardKeyPattern shardKeyPattern(collFilter.getKeyPattern());
             auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newDocument);
 
@@ -274,4 +273,5 @@ void UpsertStage::_assertDocumentToBeInsertedIsValid(const mb::Document& documen
         _assertPathsNotArray(document, shardKeyPaths);
     }
 }
+
 }  // namespace mongo

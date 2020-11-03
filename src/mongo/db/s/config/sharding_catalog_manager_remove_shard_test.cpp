@@ -63,6 +63,8 @@ using std::string;
 using std::vector;
 using unittest::assertGet;
 
+const KeyPattern kKeyPattern(BSON("_id" << 1));
+
 BSONObj getReplSecondaryOkMetadata() {
     BSONObjBuilder o;
     ReadPreferenceSetting(ReadPreference::Nearest).toContainingBSON(&o);
@@ -214,7 +216,9 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
 
     setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard1.getName(), true);
-    setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3});
+    setupCollection(NamespaceString("testDB.testColl"),
+                    kKeyPattern,
+                    std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
     auto startedResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());
@@ -297,7 +301,9 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
 
     setupShards(std::vector<ShardType>{shard1, shard2});
     setupDatabase("testDB", shard2.getName(), false);
-    setupChunks(std::vector<ChunkType>{chunk1, chunk2, chunk3});
+    setupCollection(NamespaceString("testDB.testColl"),
+                    kKeyPattern,
+                    std::vector<ChunkType>{chunk1, chunk2, chunk3});
 
     auto startedResult = ShardingCatalogManager::get(operationContext())
                              ->removeShard(operationContext(), shard1.getName());

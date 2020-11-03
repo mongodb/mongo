@@ -42,6 +42,7 @@ public:
     using ShardCollectionTypeBase::kKeyPatternFieldName;
     using ShardCollectionTypeBase::kLastRefreshedCollectionVersionFieldName;
     using ShardCollectionTypeBase::kNssFieldName;
+    using ShardCollectionTypeBase::kPre50CompatibleAllowMigrationsFieldName;
     using ShardCollectionTypeBase::kRefreshingFieldName;
     using ShardCollectionTypeBase::kReshardingFieldsFieldName;
     using ShardCollectionTypeBase::kUniqueFieldName;
@@ -79,6 +80,11 @@ public:
     // A wrapper around the IDL generated 'ShardCollectionTypeBase::toBSON' to ensure backwards
     // compatibility.
     BSONObj toBSON() const;
+
+    bool getAllowMigrations() const {
+        return getPre50CompatibleAllowMigrations().get_value_or(true);
+    }
+    void setAllowMigrations(bool allowMigrations);
 };
 
 }  // namespace mongo

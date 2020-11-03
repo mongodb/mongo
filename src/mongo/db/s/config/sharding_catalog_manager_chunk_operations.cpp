@@ -774,12 +774,12 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
                                             boost::none));
 
     uassert(ErrorCodes::ShardNotFound,
-            str::stream() << "shard " << toShard << " does not exist",
+            str::stream() << "Shard " << toShard << " does not exist",
             !shardResult.docs.empty());
 
     auto shard = uassertStatusOK(ShardType::fromBSON(shardResult.docs.front()));
     uassert(ErrorCodes::ShardNotFound,
-            str::stream() << toShard << " is draining",
+            str::stream() << "Shard " << toShard << " is currently draining",
             !shard.getDraining());
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
@@ -798,38 +798,42 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
 
-    // Must use local read concern because we will perform subsequent writes.
-    auto findResponse =
+    auto findCollResponse = uassertStatusOK(
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            CollectionType::ConfigNS,
+                                            BSON(CollectionType::kNssFieldName << nss.ns()),
+                                            {},
+                                            1));
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Collection does not exist",
+            !findCollResponse.docs.empty());
+    const CollectionType coll(findCollResponse.docs[0]);
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            "Collection is undergoing changes and chunks cannot be moved",
+            coll.getAllowMigrations());
+
+    auto findResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                             repl::ReadConcernLevel::kLocalReadConcern,
                                             ChunkType::ConfigNS,
                                             BSON("ns" << nss.ns()),
                                             BSON(ChunkType::lastmod << -1),
-                                            1);
-    if (!findResponse.isOK()) {
-        return findResponse.getStatus();
-    }
+                                            1));
+    uassert(ErrorCodes::IncompatibleShardingMetadata,
+            str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
+                          << ", but found no chunks",
+            !findResponse.docs.empty());
+
+    const auto chunk = uassertStatusOK(ChunkType::fromConfigBSON(findResponse.docs[0]));
+    const auto currentCollectionVersion = chunk.getVersion();
 
     if (MONGO_unlikely(migrationCommitVersionError.shouldFail())) {
-        uassert(ErrorCodes::StaleEpoch,
-                "failpoint 'migrationCommitVersionError' generated error",
-                false);
+        uasserted(ErrorCodes::StaleEpoch,
+                  "Failpoint 'migrationCommitVersionError' generated error");
     }
-
-    const auto chunksVector = std::move(findResponse.getValue().docs);
-    if (chunksVector.empty()) {
-        return {ErrorCodes::IncompatibleShardingMetadata,
-                str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
-                              << ", but found no chunks"};
-    }
-
-    const auto swChunk = ChunkType::fromConfigBSON(chunksVector.front());
-    if (!swChunk.isOK()) {
-        return swChunk.getStatus();
-    }
-
-    const auto currentCollectionVersion = swChunk.getValue().getVersion();
 
     // It is possible for a migration to end up running partly without the protection of the
     // distributed lock if the config primary stepped down since the start of the migration and

@@ -68,4 +68,11 @@ BSONObj ShardCollectionType::toBSON() const {
     return obj;
 }
 
+void ShardCollectionType::setAllowMigrations(bool allowMigrations) {
+    if (allowMigrations)
+        setPre50CompatibleAllowMigrations(boost::none);
+    else
+        setPre50CompatibleAllowMigrations(false);
+}
+
 }  // namespace mongo

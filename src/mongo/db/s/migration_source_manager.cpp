@@ -164,6 +164,9 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         uassert(ErrorCodes::IncompatibleShardingMetadata,
                 "Cannot move chunks for an unsharded collection",
                 metadata.isSharded());
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                "Collection is undergoing changes so moveChunk is not allowed.",
+                metadata.allowMigrations());
 
         return std::make_tuple(std::move(metadata), std::move(collectionUUID));
     }();

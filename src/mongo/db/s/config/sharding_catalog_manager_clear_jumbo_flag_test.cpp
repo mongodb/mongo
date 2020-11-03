@@ -44,6 +44,7 @@ namespace {
 
 using unittest::assertGet;
 
+const KeyPattern kKeyPattern(BSON("x" << 1));
 
 class ClearJumboFlagTest : public ConfigServerTestFixture {
 public:
@@ -73,12 +74,6 @@ protected:
 
         setupShards({shard});
 
-        CollectionType collection(_namespace, _epoch, Date_t::now(), UUID::gen());
-        collection.setKeyPattern(BSON("x" << 1));
-
-        ASSERT_OK(insertToConfigCollection(
-            operationContext(), CollectionType::ConfigNS, collection.toBSON()));
-
         ChunkType chunk;
         chunk.setName(OID::gen());
         chunk.setNS(_namespace);
@@ -96,7 +91,7 @@ protected:
         otherChunk.setMin(nonJumboChunk().getMin());
         otherChunk.setMax(nonJumboChunk().getMax());
 
-        setupChunks({chunk, otherChunk});
+        setupCollection(_namespace, kKeyPattern, {chunk, otherChunk});
     }
 
 private:

@@ -95,6 +95,7 @@ CollectionAndChangedChunks getCollectionRefresh(
                                       swCollectionReturnValue.getValue().getDefaultCollation(),
                                       swCollectionReturnValue.getValue().getUnique(),
                                       reshardingFields,
+                                      swCollectionReturnValue.getValue().getAllowMigrations(),
                                       std::move(chunks)};
 }
 

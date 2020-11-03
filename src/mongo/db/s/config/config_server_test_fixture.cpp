@@ -325,10 +325,17 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opC
     return ShardType::fromBSON(doc.getValue());
 }
 
-void ConfigServerTestFixture::setupChunks(const std::vector<ChunkType>& chunks) {
-    const NamespaceString chunkNS(ChunkType::ConfigNS);
+void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
+                                              const KeyPattern& shardKey,
+                                              const std::vector<ChunkType>& chunks) {
+    CollectionType coll(nss, chunks[0].getVersion().epoch(), Date_t::now(), UUID::gen());
+    coll.setKeyPattern(shardKey);
+    ASSERT_OK(
+        insertToConfigCollection(operationContext(), CollectionType::ConfigNS, coll.toBSON()));
+
     for (const auto& chunk : chunks) {
-        ASSERT_OK(insertToConfigCollection(operationContext(), chunkNS, chunk.toConfigBSON()));
+        ASSERT_OK(insertToConfigCollection(
+            operationContext(), ChunkType::ConfigNS, chunk.toConfigBSON()));
     }
 }
 

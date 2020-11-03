@@ -86,16 +86,19 @@ public:
     static constexpr auto kKeyPatternFieldName =
         CollectionTypeBase::kPre50CompatibleKeyPatternFieldName;
     static constexpr auto kUuidFieldName = CollectionTypeBase::kPre50CompatibleUuidFieldName;
+    using CollectionTypeBase::kAllowMigrationsFieldName;
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
     using CollectionTypeBase::kUniqueFieldName;
     using CollectionTypeBase::kUpdatedAtFieldName;
 
     // Make getters and setters accessible.
+    using CollectionTypeBase::getAllowMigrations;
     using CollectionTypeBase::getNss;
     using CollectionTypeBase::getReshardingFields;
     using CollectionTypeBase::getUnique;
     using CollectionTypeBase::getUpdatedAt;
+    using CollectionTypeBase::setAllowMigrations;
     using CollectionTypeBase::setNss;
     using CollectionTypeBase::setReshardingFields;
     using CollectionTypeBase::setUnique;
@@ -147,7 +150,7 @@ public:
     void setUuid(UUID uuid);
 
     bool getDropped() const {
-        return getPre50CompatibleDropped() ? *getPre50CompatibleDropped() : false;
+        return getPre50CompatibleDropped().get_value_or(false);
     }
 
     const KeyPattern& getKeyPattern() const {
@@ -156,8 +159,7 @@ public:
     void setKeyPattern(KeyPattern keyPattern);
 
     BSONObj getDefaultCollation() const {
-        return getPre50CompatibleDefaultCollation() ? *getPre50CompatibleDefaultCollation()
-                                                    : BSONObj();
+        return getPre50CompatibleDefaultCollation().get_value_or(BSONObj());
     }
     void setDefaultCollation(const BSONObj& defaultCollation);
 

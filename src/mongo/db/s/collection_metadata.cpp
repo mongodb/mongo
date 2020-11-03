@@ -44,6 +44,10 @@ namespace mongo {
 CollectionMetadata::CollectionMetadata(ChunkManager cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
 
+bool CollectionMetadata::allowMigrations() const {
+    return _cm ? _cm->allowMigrations() : true;
+}
+
 BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
     BSONObj key;
 

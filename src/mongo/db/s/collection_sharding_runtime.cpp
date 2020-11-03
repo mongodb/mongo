@@ -112,11 +112,22 @@ CollectionShardingRuntime* CollectionShardingRuntime::get_UNSAFE(ServiceContext*
 ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OperationContext* opCtx, OrphanCleanupPolicy orphanCleanupPolicy) {
     const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
-    invariant(!optReceivedShardVersion || !ChunkVersion::isIgnoredVersion(*optReceivedShardVersion),
-              "getOwnershipFilter called by operation that doesn't have a valid shard version");
+    // TODO (SERVER-52764): No operations should be calling getOwnershipFilter without a shard
+    // version
+    //
+    // invariant(optReceivedShardVersion,
+    //          "getOwnershipFilter called by operation that doesn't specify shard version");
+    if (!optReceivedShardVersion)
+        return {kUnshardedCollection};
 
-    return _getMetadataWithVersionCheckAt(opCtx,
-                                          repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
+    auto metadata = _getMetadataWithVersionCheckAt(
+        opCtx, repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime());
+    invariant(!ChunkVersion::isIgnoredVersion(*optReceivedShardVersion) ||
+                  !metadata->get().allowMigrations() || !metadata->get().isSharded(),
+              "For sharded collections getOwnershipFilter cannot be relied on without a valid "
+              "shard version");
+
+    return {std::move(metadata)};
 }
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
@@ -335,10 +346,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
                 !criticalSectionSignal);
     }
 
-    if (ChunkVersion::isIgnoredVersion(receivedShardVersion))
-        return kUnshardedCollection;
-
-    if (receivedShardVersion.isWriteCompatibleWith(wantedShardVersion))
+    if (wantedShardVersion.isWriteCompatibleWith(receivedShardVersion) ||
+        ChunkVersion::isIgnoredVersion(receivedShardVersion))
         return optCurrentMetadata;
 
     StaleConfigInfo sci(

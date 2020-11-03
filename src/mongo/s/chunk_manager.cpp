@@ -308,6 +308,7 @@ RoutingTableHistory::RoutingTableHistory(
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    bool allowMigrations,
     ChunkMap chunkMap)
     : _nss(std::move(nss)),
       _uuid(uuid),
@@ -315,6 +316,7 @@ RoutingTableHistory::RoutingTableHistory(
       _defaultCollator(std::move(defaultCollator)),
       _unique(unique),
       _reshardingFields(std::move(reshardingFields)),
+      _allowMigrations(allowMigrations),
       _chunkMap(std::move(chunkMap)),
       _shardVersions(_chunkMap.constructShardVersionMap()) {}
 
@@ -656,6 +658,12 @@ ChunkManager ChunkManager::makeAtTime(const ChunkManager& cm, Timestamp clusterT
     return ChunkManager(cm.dbPrimary(), cm.dbVersion(), cm._rt, clusterTime);
 }
 
+bool ChunkManager::allowMigrations() const {
+    if (!_rt->optRt)
+        return true;
+    return _rt->optRt->allowMigrations();
+}
+
 std::string ChunkManager::toString() const {
     return _rt->optRt ? _rt->optRt->toString() : "UNSHARDED";
 }
@@ -719,6 +727,7 @@ RoutingTableHistory RoutingTableHistory::makeNew(
     bool unique,
     OID epoch,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    bool allowMigrations,
     const std::vector<ChunkType>& chunks) {
     return RoutingTableHistory(std::move(nss),
                                std::move(uuid),
@@ -726,12 +735,14 @@ RoutingTableHistory RoutingTableHistory::makeNew(
                                std::move(defaultCollator),
                                std::move(unique),
                                boost::none,
+                               allowMigrations,
                                ChunkMap{epoch})
-        .makeUpdated(std::move(reshardingFields), chunks);
+        .makeUpdated(std::move(reshardingFields), allowMigrations, chunks);
 }
 
 RoutingTableHistory RoutingTableHistory::makeUpdated(
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
+    bool allowMigrations,
     const std::vector<ChunkType>& changedChunks) const {
     auto changedChunkInfos = flatten(changedChunks);
     auto chunkMap = _chunkMap.createMerged(changedChunkInfos);
@@ -745,6 +756,7 @@ RoutingTableHistory RoutingTableHistory::makeUpdated(
                                CollatorInterface::cloneCollator(getDefaultCollator()),
                                isUnique(),
                                std::move(reshardingFields),
+                               allowMigrations,
                                std::move(chunkMap));
 }
 

@@ -159,10 +159,11 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             TypeCollectionDonorFields donorField(coordinatorDoc.getReshardingKey());
             originalEntryReshardingFields.setDonorFields(donorField);
 
-            return BSON(
-                "$set" << BSON("reshardingFields"
-                               << originalEntryReshardingFields.toBSON() << "lastmod"
-                               << opCtx->getServiceContext()->getPreciseClockSource()->now()));
+            return BSON("$set" << BSON(CollectionType::kReshardingFieldsFieldName
+                                       << originalEntryReshardingFields.toBSON()
+                                       << CollectionType::kUpdatedAtFieldName
+                                       << opCtx->getServiceContext()->getPreciseClockSource()->now()
+                                       << CollectionType::kAllowMigrationsFieldName << false));
         }
         case CoordinatorStateEnum::kCommitted:
             // Update the config.collections entry for the original nss to reflect
@@ -179,10 +180,10 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
         case mongo::CoordinatorStateEnum::kDone:
             // Remove 'reshardingFields' from the config.collections entry
             return BSON(
-                "$unset" << BSON("reshardingFields"
-                                 << "")
+                "$unset" << BSON(CollectionType::kReshardingFieldsFieldName
+                                 << "" << CollectionType::kAllowMigrationsFieldName << "")
                          << "$set"
-                         << BSON("lastmod"
+                         << BSON(CollectionType::kUpdatedAtFieldName
                                  << opCtx->getServiceContext()->getPreciseClockSource()->now()));
         default:
             // Update the 'state' field in the 'reshardingFields' section

@@ -166,6 +166,7 @@ public:
         bool unique,
         OID epoch,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
+        bool allowMigrations,
         const std::vector<ChunkType>& chunks);
 
     /**
@@ -182,6 +183,7 @@ public:
      */
     RoutingTableHistory makeUpdated(
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
+        bool allowMigrations,
         const std::vector<ChunkType>& changedChunks) const;
 
     const NamespaceString& nss() const {
@@ -280,6 +282,10 @@ public:
         return _reshardingFields;
     }
 
+    bool allowMigrations() const {
+        return _allowMigrations;
+    }
+
 private:
     friend class ChunkManager;
 
@@ -289,6 +295,7 @@ private:
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
                         boost::optional<TypeCollectionReshardingFields> reshardingFields,
+                        bool allowMigrations,
                         ChunkMap chunkMap);
 
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
@@ -313,6 +320,8 @@ private:
     // resharding operation, and that these fields were present in the config.collections entry
     // for this collection.
     boost::optional<TypeCollectionReshardingFields> _reshardingFields;
+
+    bool _allowMigrations;
 
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
     // ranges must cover the complete space from [MinKey, MaxKey).
@@ -459,6 +468,12 @@ public:
     bool isSharded() const {
         return bool(_rt->optRt);
     }
+
+    /**
+     * Indicates that this collection must not honour any moveChunk requests, because it is required
+     * to provide a stable view of its constituent shards.
+     */
+    bool allowMigrations() const;
 
     const ShardId& dbPrimary() const {
         return _dbPrimary;

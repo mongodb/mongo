@@ -71,6 +71,7 @@ protected:
             false,
             epoch,
             boost::none,
+            true,
             [&] {
                 ChunkVersion version(1, 0, epoch);
 

@@ -69,6 +69,8 @@ public:
         return bool(_cm);
     }
 
+    bool allowMigrations() const;
+
     /**
      * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
      *

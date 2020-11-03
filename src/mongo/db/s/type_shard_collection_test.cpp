@@ -109,5 +109,18 @@ TEST(ShardCollectionType, ReshardingFieldsIncluded) {
     ASSERT_EQ(reshardingUuid, shardCollType.getReshardingFields()->getUuid());
 }
 
+TEST(ShardCollectionType, AllowMigrationsFieldBackwardsCompatibility) {
+    ShardCollectionType shardCollType(kNss, OID::gen(), UUID::gen(), kKeyPattern, true);
+    shardCollType.setAllowMigrations(false);
+    ASSERT_EQ(
+        false,
+        shardCollType.toBSON()[ShardCollectionTypeBase::kPre50CompatibleAllowMigrationsFieldName]
+            .Bool());
+
+    shardCollType.setAllowMigrations(true);
+    ASSERT(shardCollType.toBSON()[ShardCollectionTypeBase::kPre50CompatibleAllowMigrationsFieldName]
+               .eoo());
+}
+
 }  // namespace
 }  // namespace mongo

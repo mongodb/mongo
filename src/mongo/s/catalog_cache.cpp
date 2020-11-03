@@ -563,6 +563,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
             if (isIncremental &&
                 existingHistory->optRt->getVersion().epoch() == collectionAndChunks.epoch) {
                 return existingHistory->optRt->makeUpdated(collectionAndChunks.reshardingFields,
+                                                           collectionAndChunks.allowMigrations,
                                                            collectionAndChunks.changedChunks);
             }
 
@@ -583,6 +584,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                                 collectionAndChunks.shardKeyIsUnique,
                                                 collectionAndChunks.epoch,
                                                 std::move(collectionAndChunks.reshardingFields),
+                                                collectionAndChunks.allowMigrations,
                                                 collectionAndChunks.changedChunks);
         }();
 

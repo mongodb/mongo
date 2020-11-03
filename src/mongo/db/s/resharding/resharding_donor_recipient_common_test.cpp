@@ -105,6 +105,7 @@ protected:
                                                                            false,
                                                                            epoch,
                                                                            boost::none,
+                                                                           true,
                                                                            {std::move(chunk)})),
             boost::none);
 

@@ -156,13 +156,6 @@ public:
     }
 
 protected:
-    CollectionType createCollection(const OID& epoch) {
-        CollectionType coll(kNss, epoch, Date_t::now(), UUID::gen());
-        coll.setKeyPattern(BSON(kShardKey << 1));
-        coll.setUnique(false);
-        return coll;
-    }
-
     std::vector<ChunkType> createChunks(const OID& epoch, const std::string& shardKey) {
         auto range1 = ChunkRange(BSON(shardKey << MINKEY), BSON(shardKey << 5));
         ChunkType chunk1(kNss, range1, ChunkVersion(1, 0, epoch), kShardList[0].getName());
@@ -201,20 +194,22 @@ protected:
 
         client.createCollection(env.tempNss.ns());
 
-
         DatabaseType db(kNss.db().toString(), kShardList[0].getName(), true, env.dbVersion);
 
         TypeCollectionReshardingFields reshardingFields;
         reshardingFields.setUuid(UUID::gen());
         reshardingFields.setDonorFields(TypeCollectionDonorFields{BSON("y" << 1)});
 
-        auto collType = createCollection(env.version.epoch());
+        CollectionType coll(kNss, env.version.epoch(), Date_t::now(), UUID::gen());
+        coll.setKeyPattern(BSON(kShardKey << 1));
+        coll.setUnique(false);
+        coll.setAllowMigrations(false);
 
         _mockCatalogCacheLoader->setDatabaseRefreshReturnValue(db);
         _mockCatalogCacheLoader->setCollectionRefreshValues(
-            kNss, collType, createChunks(env.version.epoch(), kShardKey), reshardingFields);
+            kNss, coll, createChunks(env.version.epoch(), kShardKey), reshardingFields);
         _mockCatalogCacheLoader->setCollectionRefreshValues(
-            env.tempNss, collType, createChunks(env.version.epoch(), "y"), boost::none);
+            env.tempNss, coll, createChunks(env.version.epoch(), "y"), boost::none);
 
         forceDatabaseRefresh(opCtx, kNss.db());
         forceShardFilteringMetadataRefresh(opCtx, kNss);
@@ -229,21 +224,9 @@ protected:
                   const NamespaceString& nss,
                   const BSONObj& doc,
                   const ReshardingEnv& env) {
+        AutoGetCollection coll(opCtx, nss, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        AutoGetCollection autoColl1(opCtx, nss, MODE_IX);
-
-        // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter
-        // has been updated to detect frozen migrations.
-        if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                nss, env.version, env.dbVersion);
-        }
-
-        auto collection = CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, nss);
-        ASSERT(collection);
-        auto status = collection->insertDocument(opCtx, InsertStatement(doc), nullptr);
-        ASSERT_OK(status);
-
+        ASSERT_OK(coll->insertDocument(opCtx, InsertStatement(doc), nullptr));
         wuow.commit();
     }
 
@@ -253,14 +236,6 @@ protected:
                    const BSONObj& update,
                    const ReshardingEnv& env) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-
-        // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter
-        // has been updated to detect frozen migrations.
-        if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                kNss, env.version, env.dbVersion);
-        }
-
         Helpers::update(opCtx, nss.toString(), filter, update);
     }
 
@@ -269,13 +244,6 @@ protected:
                    const BSONObj& query,
                    const ReshardingEnv& env) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-
-        // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter
-        // has been updated to detect frozen migrations.
-        if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                kNss, env.version, env.dbVersion);
-        }
 
         RecordId rid = Helpers::findOne(opCtx, coll.getCollection(), query, false);
         ASSERT(!rid.isNull());
@@ -303,14 +271,8 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipient) {
     auto env = setupReshardingEnv(opCtx, true);
 
     AutoGetCollection coll(opCtx, kNss, MODE_IX);
-
-    // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter has
-    // been updated to detect frozen migrations.
-    if (!OperationShardingState::isOperationVersioned(opCtx)) {
-        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-            kNss, env.version, env.dbVersion);
-    }
-
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     auto destShardId = getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10));
     ASSERT(destShardId);
     ASSERT_EQ(*destShardId, env.destShard);
@@ -322,14 +284,8 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
 
     {
         AutoGetCollection coll(opCtx, kNss, MODE_IX);
-
-        // TODO(SERVER-50027): This is to temporarily make this test pass until getOwnershipFilter
-        // has been updated to detect frozen migrations.
-        if (!OperationShardingState::isOperationVersioned(opCtx)) {
-            OperationShardingState::get(opCtx).initializeClientRoutingVersions(
-                kNss, env.version, env.dbVersion);
-        }
-
+        OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+            kNss, env.version, env.dbVersion);
         ASSERT_THROWS(getDestinedRecipient(opCtx, kNss, BSON("x" << 2 << "y" << 10)),
                       ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>);
     }
@@ -341,6 +297,8 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     writeDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10), env);
 
     auto entry = getLastOplogEntry(opCtx);
@@ -354,6 +312,8 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTran
     auto opCtx = operationContext();
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     runInTransaction(
         opCtx, [&]() { writeDoc(opCtx, kNss, BSON("_id" << 0 << "x" << 2 << "y" << 10), env); });
 
@@ -380,7 +340,33 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdates) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
+
+    auto entry = getLastOplogEntry(opCtx);
+    auto recipShard = entry.getDestinedRecipient();
+
+    ASSERT(recipShard);
+    ASSERT_EQ(*recipShard, env.destShard);
+}
+
+TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("x" << 0 << "y" << 10 << "z" << 4));
+    client.insert(kNss.toString(), BSON("x" << 0 << "y" << 10 << "z" << 4));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, ChunkVersion::IGNORED(), env.dbVersion);
+    client.update(kNss.ns(),
+                  Query{BSON("x" << 0)},
+                  BSON("$set" << BSON("z" << 5)),
+                  false /*upsert*/,
+                  true /*multi*/);
 
     auto entry = getLastOplogEntry(opCtx);
     auto recipShard = entry.getDestinedRecipient();
@@ -397,6 +383,8 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesOutOfP
 
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
 
     auto entry = getLastOplogEntry(opCtx);
@@ -414,6 +402,8 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTran
 
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() {
         updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("z" << 50)), env);
     });
@@ -441,6 +431,8 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletes) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     deleteDoc(opCtx, kNss, BSON("_id" << 0), env);
 
     auto entry = getLastOplogEntry(opCtx);
@@ -458,6 +450,8 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
 
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() { deleteDoc(opCtx, kNss, BSON("_id" << 0), env); });
 
     // Look for destined recipient in latest oplog entry. Since this write was done in a
@@ -483,6 +477,8 @@ TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     ASSERT_THROWS(runInTransaction(
                       opCtx,
                       [&]() {
@@ -500,6 +496,8 @@ TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {
 
     auto env = setupReshardingEnv(opCtx, true);
 
+    OperationShardingState::get(opCtx).initializeClientRoutingVersions(
+        kNss, env.version, env.dbVersion);
     runInTransaction(opCtx, [&]() {
         updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("y" << 3)), env);
     });

@@ -97,6 +97,7 @@ public:
             false,
             epoch,
             boost::none,
+            true,
             {ChunkType{kNss,
                        ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},
                        ChunkVersion(1, 0, epoch),

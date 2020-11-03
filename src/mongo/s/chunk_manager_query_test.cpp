@@ -512,8 +512,15 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     ChunkType chunk1(kNss, {BSON("x" << 0), BSON("x" << MAXKEY)}, version, ShardId("1"));
     chunk1.setName(OID::gen());
 
-    auto oldRoutingTable = RoutingTableHistory::makeNew(
-        kNss, boost::none, BSON("x" << 1), nullptr, false, epoch, boost::none, {chunk0, chunk1});
+    auto oldRoutingTable = RoutingTableHistory::makeNew(kNss,
+                                                        boost::none,
+                                                        BSON("x" << 1),
+                                                        nullptr,
+                                                        false,
+                                                        epoch,
+                                                        boost::none,
+                                                        true,
+                                                        {chunk0, chunk1});
 
     // Simulate move chunk {x: 0} to shard 0. Effectively moving all remaining chunks to shard 0.
     version.incMajor();
@@ -525,7 +532,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     ChunkManager chunkManager(
         ShardId("0"),
         DatabaseVersion(UUID::gen(), 1),
-        makeStandaloneRoutingTableHistory(oldRoutingTable.makeUpdated(boost::none, {chunk1})),
+        makeStandaloneRoutingTableHistory(oldRoutingTable.makeUpdated(boost::none, true, {chunk1})),
         Timestamp(5, 0));
 
     std::set<ShardId> shardIds;

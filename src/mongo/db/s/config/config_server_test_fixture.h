@@ -103,7 +103,9 @@ protected:
     /**
      * Setup the config.chunks collection to contain the given chunks.
      */
-    void setupChunks(const std::vector<ChunkType>& chunks);
+    void setupCollection(const NamespaceString& nss,
+                         const KeyPattern& shardKey,
+                         const std::vector<ChunkType>& chunks);
 
     /**
      * Retrieves the chunk document from the config server.

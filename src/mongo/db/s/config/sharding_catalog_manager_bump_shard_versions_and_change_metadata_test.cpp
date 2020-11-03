@@ -44,6 +44,7 @@ namespace mongo {
 namespace {
 
 const NamespaceString kNss("TestDB", "TestColl");
+const KeyPattern kKeyPattern(BSON("a" << 1));
 const ShardType kShard0("shard0000", "shard0000:1234");
 const ShardType kShard1("shard0001", "shard0001:1234");
 
@@ -144,7 +145,7 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     ChunkVersion targetChunkVersion(
         collectionVersion.majorVersion() + 1, 0, collectionVersion.epoch());
 
-    setupChunks({shard0Chunk0, shard1Chunk0});
+    setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard1Chunk0});
 
     auto opCtx = operationContext();
 
@@ -173,7 +174,7 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     ChunkVersion targetChunkVersion(
         collectionVersion.majorVersion() + 1, 0, collectionVersion.epoch());
 
-    setupChunks({shard0Chunk0, shard0Chunk1, shard1Chunk0});
+    setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard0Chunk1, shard1Chunk0});
 
     auto opCtx = operationContext();
     std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};
@@ -203,7 +204,7 @@ TEST_F(ShardingCatalogManagerBumpShardVersionsAndChangeMetadataTest,
     ChunkVersion targetChunkVersion(
         collectionVersion.majorVersion() + 1, 0, collectionVersion.epoch());
 
-    setupChunks({shard0Chunk0, shard0Chunk1, shard1Chunk0, shard1Chunk1});
+    setupCollection(kNss, kKeyPattern, {shard0Chunk0, shard0Chunk1, shard1Chunk0, shard1Chunk1});
 
     auto opCtx = operationContext();
     std::vector<ShardId> shardIds{kShard0.getName(), kShard1.getName()};

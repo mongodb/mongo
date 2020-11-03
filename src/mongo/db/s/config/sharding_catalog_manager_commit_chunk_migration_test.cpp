@@ -47,6 +47,7 @@ using unittest::assertGet;
 using CommitChunkMigrate = ConfigServerTestFixture;
 
 const NamespaceString kNamespace("TestDB.TestColl");
+const KeyPattern kKeyPattern(BSON("x" << 1));
 
 TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
     ShardType shard0;
@@ -83,7 +84,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
         controlChunk.setJumbo(true);
     }
 
-    setupChunks({migratedChunk, controlChunk});
+    setupCollection(kNamespace, kKeyPattern, {migratedChunk, controlChunk});
 
     Timestamp validAfter{101, 0};
     BSONObj versions = assertGet(ShardingCatalogManager::get(operationContext())
@@ -154,7 +155,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     auto chunkMax = BSON("a" << 10);
     chunk0.setMax(chunkMax);
 
-    setupChunks({chunk0});
+    setupCollection(kNamespace, kKeyPattern, {chunk0});
 
     Timestamp validAfter{101, 0};
 
@@ -211,7 +212,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     auto chunkMax = BSON("a" << 10);
     chunk0.setMax(chunkMax);
 
-    setupChunks({chunk0});
+    setupCollection(kNamespace, kKeyPattern, {chunk0});
 
     // Make the time distance between the last history element large enough.
     Timestamp validAfter{200, 0};
@@ -270,7 +271,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     auto chunkMax = BSON("a" << 10);
     chunk0.setMax(chunkMax);
 
-    setupChunks({chunk0});
+    setupCollection(kNamespace, kKeyPattern, {chunk0});
 
     // Make the time before the last change to trigger the failure.
     Timestamp validAfter{99, 0};
@@ -288,7 +289,6 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
 }
 
 TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -324,7 +324,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk0, chunk1});
+    setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
     Timestamp validAfter{1};
 
@@ -341,7 +341,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 }
 
 TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -379,7 +378,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     chunk1.setMax(chunkMaxax);
 
     // get version from the control chunk this time
-    setupChunks({chunk1, chunk0});
+    setupCollection(kNamespace, kKeyPattern, {chunk1, chunk0});
 
     Timestamp validAfter{1};
 
@@ -396,7 +395,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
 }
 
 TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -432,7 +430,7 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
     auto chunkMaxax = BSON("a" << 20);
     chunk1.setMax(chunkMaxax);
 
-    setupChunks({chunk1});
+    setupCollection(kNamespace, kKeyPattern, {chunk1});
 
     Timestamp validAfter{1};
 
@@ -449,7 +447,6 @@ TEST_F(CommitChunkMigrate, RejectChunkMissing0) {
 }
 
 TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks) {
-
     ShardType shard0;
     shard0.setName("shard0");
     shard0.setHost("shard0:12");
@@ -489,7 +486,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     Timestamp ctrlChunkValidAfter = Timestamp(50, 0);
     chunk1.setHistory({ChunkHistory(ctrlChunkValidAfter, shard1.getName())});
 
-    setupChunks({chunk0, chunk1});
+    setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
     Timestamp validAfter{101, 0};
     StatusWith<BSONObj> resultBSON = ShardingCatalogManager::get(operationContext())
@@ -557,7 +554,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
-    setupChunks({currentChunk});
+    setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
     Timestamp validAfter{101, 0};
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
@@ -606,7 +603,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
-    setupChunks({currentChunk});
+    setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
     Timestamp validAfter{101, 0};
     auto result = ShardingCatalogManager::get(operationContext())
@@ -655,7 +652,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
-    setupChunks({currentChunk});
+    setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
     Timestamp validAfter{101, 0};
     auto result = ShardingCatalogManager::get(operationContext())
