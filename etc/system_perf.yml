@@ -1297,7 +1297,8 @@ buildvariants:
     - name: mixed_workloads
     - name: misc_workloads
     - name: map_reduce_workloads
-    - name: refine_shard_key_transaction_stress
+#    Disable the workload until TIG-2695 is done
+#    - name: refine_shard_key_transaction_stress
     - name: smoke_test
     - name: retryable_writes_workloads
     - name: industry_benchmarks_wmajority
