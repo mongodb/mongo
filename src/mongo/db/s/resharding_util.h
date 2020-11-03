@@ -191,7 +191,7 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
 std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ShardKeyPattern& newShardKeyPattern,
-    const NamespaceString& sourceNss,
+    const NamespaceString& tempNss,
     const ShardId& recipientShard);
 
 /**

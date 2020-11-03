@@ -58,6 +58,7 @@
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/visit_helper.h"
 
 namespace mongo::sharded_agg_helpers {
 
@@ -576,22 +577,27 @@ void abandonCacheIfSentToShards(Pipeline* shardsPipeline) {
 
 }  // namespace
 
-/**
- * For a sharded collection, establishes remote cursors on each shard that may have results, and
- * creates a DocumentSourceMergeCursors stage to merge the remote cursors. Returns a pipeline
- * beginning with that DocumentSourceMergeCursors stage. Note that one of the 'remote' cursors might
- * be this node itself.
- */
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, Pipeline* ownedPipeline) {
-    std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
-                                                        PipelineDeleter(expCtx->opCtx));
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregationRequest> targetRequest) {
+    auto&& [aggRequest, pipeline] = [&] {
+        return stdx::visit(
+            visit_helper::Overloaded{
+                [&](std::unique_ptr<Pipeline, PipelineDeleter>&& pipeline) {
+                    return std::make_pair(
+                        AggregationRequest(expCtx->ns, pipeline->serializeToBson()),
+                        std::move(pipeline));
+                },
+                [&](AggregationRequest&& aggRequest) {
+                    auto rawPipeline = aggRequest.getPipeline();
+                    return std::make_pair(std::move(aggRequest),
+                                          Pipeline::parse(std::move(rawPipeline), expCtx));
+                }},
+            std::move(targetRequest));
+    }();
 
     invariant(pipeline->getSources().empty() ||
               !dynamic_cast<DocumentSourceMergeCursors*>(pipeline->getSources().front().get()));
-
-    // Generate the command object for the targeted shards.
-    AggregationRequest aggRequest(expCtx->ns, pipeline->serializeToBson());
 
     // The default value for 'allowDiskUse' and 'maxTimeMS' in the AggregationRequest may not match
     // what was set on the originating command, so copy it from the ExpressionContext.
@@ -1143,7 +1149,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* owne
             auto pipelineToTarget = pipeline->clone();
             if (allowTargetingShards && !expCtx->ns.isConfigDotCacheDotChunks() &&
                 expCtx->ns.db() != "local") {
-                return targetShardsAndAddMergeCursors(expCtx, pipelineToTarget.release());
+                return targetShardsAndAddMergeCursors(expCtx, std::move(pipelineToTarget));
             }
             return expCtx->mongoProcessInterface->attachCursorSourceToPipelineForLocalRead(
                 pipelineToTarget.release());

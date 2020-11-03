@@ -547,6 +547,7 @@ let viewsCommandTests = {
     testDeprecation: {skip: isAnInternalCommand},
     testDeprecationInVersion2: {skip: isAnInternalCommand},
     testRemoval: {skip: isAnInternalCommand},
+    testReshardCloneCollection: {skip: isAnInternalCommand},
     testVersion2: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},

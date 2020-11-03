@@ -613,6 +613,7 @@ let testCases = {
     testDeprecation: {skip: "does not accept read or write concern"},
     testDeprecationInVersion2: {skip: "does not accept read or write concern"},
     testRemoval: {skip: "does not accept read or write concern"},
+    testReshardCloneCollection: {skip: "internal command"},
     testVersions1And2: {skip: "does not accept read or write concern"},
     testVersion2: {skip: "does not accept read or write concern"},
     top: {skip: "does not accept read or write concern"},

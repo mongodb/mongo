@@ -291,6 +291,7 @@ const allCommands = {
     testDeprecation: {skip: isNotAUserDataRead},
     testDeprecationInVersion2: {skip: isNotAUserDataRead},
     testRemoval: {skip: isNotAUserDataRead},
+    testReshardCloneCollection: {skip: isNotAUserDataRead},
     testVersions1And2: {skip: isNotAUserDataRead},
     testVersion2: {skip: isNotAUserDataRead},
     top: {skip: isNotAUserDataRead},

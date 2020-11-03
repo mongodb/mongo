@@ -101,10 +101,10 @@ std::unique_ptr<Fetcher> cloneConfigTxnsForResharding(
                                pipeline->serializeToBson());
 
     request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
-                                << repl::ReadConcernLevel::kMajorityReadConcern
+                                << repl::readConcernLevels::kMajorityName
                                 << repl::ReadConcernArgs::kAfterClusterTimeFieldName
                                 << fetchTimestamp));
-    request.setHint(BSON("_id_" << 1));
+    request.setHint(BSON("_id" << 1));
 
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
     const auto targetHost = uassertStatusOK(

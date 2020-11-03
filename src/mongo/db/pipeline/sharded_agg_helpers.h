@@ -33,6 +33,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/query/owned_remote_cursor.h"
+#include "mongo/stdx/variant.h"
 
 namespace mongo {
 namespace sharded_agg_helpers {
@@ -190,6 +191,20 @@ Shard::RetryPolicy getDesiredRetryPolicy(OperationContext* opCtx);
  */
 std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* ownedPipeline,
                                                                   bool allowTargetingShards);
+
+/**
+ * For a sharded collection, establishes remote cursors on each shard that may have results, and
+ * creates a DocumentSourceMergeCursors stage to merge the remote cursors. Returns a pipeline
+ * beginning with that DocumentSourceMergeCursors stage. Note that one of the 'remote' cursors might
+ * be this node itself.
+ *
+ * Use the AggregationRequest alternative for 'targetRequest' to explicitly specify command options
+ * (e.g. read concern) to the shards when establishing remote cursors. Note that doing so incurs the
+ * cost of parsing the pipeline.
+ */
+std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregationRequest> targetRequest);
 
 /**
  * Adds a log message with the given message. Simple helper to avoid defining the log component in a

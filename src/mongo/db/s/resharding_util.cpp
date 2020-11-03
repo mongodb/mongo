@@ -574,7 +574,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
     stages.emplace_back(
         DocumentSourceReplaceRoot::createFromBson(replaceWithBSON.firstElement(), expCtx));
 
-    invariant(tempNss.isTemporaryReshardingCollection());
+    invariant(tempNss.isTemporaryReshardingCollection(), tempNss.ns());
     std::string cacheChunksColl = "cache.chunks." + tempNss.toString();
     BSONObjBuilder lookupBuilder;
     lookupBuilder.append("from",
