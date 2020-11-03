@@ -456,15 +456,14 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
 
     // If we are here then this is an op-style update and we were not able to target a single shard.
     // Non-multi updates must target a single shard or an exact _id.
-    uassert(
-        ErrorCodes::InvalidOptions,
-        str::stream() << "A {multi:false} update on a sharded collection must either contain an "
-                         "exact match on _id or must target a single shard, but this update "
-                         "targeted _id (and have the collection default collation) or must target "
-                         "a single shard (and have the simple collation), but this update targeted "
-                      << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
-                      << ", shard key pattern: " << shardKeyPattern.toString(),
-        updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, *_cm));
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream()
+                << "A {multi:false} update on a sharded collection must contain an "
+                   "exact match on _id (and have the collection default collation) or target a "
+                   "single shard (and have the simple collation), but this update targeted "
+                << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
+                << ", shard key pattern: " << shardKeyPattern.toString(),
+            updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, *_cm));
 
     // If the request is {multi:false}, then this is a single op-style update which we are
     // broadcasting to multiple shards by exact _id. Record this event in our serverStatus metrics.
