@@ -176,6 +176,7 @@ env.Depends(pre_msi_cmd, '#buildscripts/packaging/msi/mongod.yaml')
 
 if 'enterprise' in env['MONGO_MODULES']:
     env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongodecrypt.exe")
+    env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongokerberos.exe")
     env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongoldap.exe")
     env.Depends(pre_msi_cmd, "$DESTDIR/$PREFIX_BINDIR/mongocryptd.exe")
 

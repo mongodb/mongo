@@ -60,6 +60,10 @@
           <File Id="f_mongodecrypt" Name="mongodecrypt.exe" Source="$(var.BinarySource)\mongodecrypt.exe"
                 DiskId="1" KeyPath="yes"/>
         </Component>
+        <Component Id="c_mongokerberos" Guid="AEE18146-7C51-4BAF-ACB1-8140E4F07506">
+          <File Id="f_mongokerberos" Name="mongokerberos.exe"
+                Source="$(var.BinarySource)\mongokerberos.exe" DiskId="1" KeyPath="yes"/>
+        </Component>
         <Component Id="c_mongoldap" Guid="553E4E3D-ED32-4ABA-8F27-3A7525C3145C">
           <File Id="f_mongoldap" Name="mongoldap.exe" Source="$(var.BinarySource)\mongoldap.exe"
                 DiskId="1" KeyPath="yes"/>
