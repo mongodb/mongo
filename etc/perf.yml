@@ -43,19 +43,6 @@ variables:
 
 
 modules:
-- name: enterprise
-  repo: git@github.com:10gen/mongo-enterprise-modules.git
-  prefix: src/mongo/db/modules
-  branch: master
-- name: mongo-tools
-  repo: git@github.com:mongodb/mongo-tools.git
-  prefix: mongo-tools/src/github.com/mongodb
-  branch: master
-- name: mongo-perf
-  repo: git@github.com:mongodb/mongo-perf.git
-  prefix: ../../src
-  branch: master
-
 ###
 # Same in every DSI project
 - name: dsi
@@ -92,6 +79,19 @@ modules:
   prefix: ../../src
   branch: master
 ###
+
+- name: enterprise
+  repo: git@github.com:10gen/mongo-enterprise-modules.git
+  prefix: src/mongo/db/modules
+  branch: master
+- name: mongo-tools
+  repo: git@github.com:mongodb/mongo-tools.git
+  prefix: mongo-tools/src/github.com/mongodb
+  branch: master
+- name: mongo-perf
+  repo: git@github.com:mongodb/mongo-perf.git
+  prefix: ../../src
+  branch: master
 
 
 ###
@@ -242,6 +242,18 @@ functions:
           display_name: Pip Requirements
   ###
 
+  "f_other_post_ops":
+      - command: shell.exec
+        params:
+          working_dir: src
+          script: |
+            # removes files from the (local) scons cache when it's over a
+            # threshold, to the $prune_ratio percentage. Ideally override
+            # these default values in the distro config in evergreen.
+
+            if [ -d "${scons_cache_path}" ]; then
+                /opt/mongodbtoolchain/v3/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
+            fi
   "f_other_pre_ops":
     - &f_other_pre_ops
       command: shell.exec
@@ -251,30 +263,6 @@ functions:
           for PS in mongo{,d,s,import,export,dump,restore,stat,files,top,bridge} resmoke.py python{,2} lldb _test; do
               pkill -9 "$PS"
           done
-
-  "f_other_post_ops":
-    - command: s3.put
-      params:
-            aws_key: ${aws_key}
-            aws_secret: ${aws_secret}
-            local_file: mongod.log
-            remote_file: ${project}/${build_variant}/${revision}/${task_id}/${version_id}/logs/mongod-${build_id}.log
-            bucket: mciuploads
-            permissions: public-read
-            content_type: ${content_type|text/plain}
-            display_name: mongod.log
-    - *f_other_pre_ops
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          # removes files from the (local) scons cache when it's over a
-          # threshold, to the $prune_ratio percentage. Ideally override
-          # these default values in the distro config in evergreen.
-
-          if [ -d "${scons_cache_path}" ]; then
-              /opt/mongodbtoolchain/v3/bin/python3 buildscripts/scons_cache_prune.py --cache-dir ${scons_cache_path} --cache-size ${scons_cache_size|200} --prune-ratio ${scons_prune_ratio|0.8}
-          fi
 
   ###
   # Compile
@@ -385,7 +373,6 @@ functions:
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile-variant|}.tar.gz
   ###
-
 
 tasks:
 ###
