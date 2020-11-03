@@ -522,16 +522,45 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
     btree->checkpoint_gen = __wt_gen(session, WT_GEN_CHECKPOINT); /* Checkpoint generation */
 
     /*
-     * In the regular case, we'll be initializing to the connection-wide base write generation since
-     * this is the largest of all btree write generations from the previous run. This has the nice
-     * property of ensuring that the range of write generations used by consecutive runs do not
-     * overlap which aids with debugging.
+     * The first time we open a btree, we'll be initializing the write gen to the connection-wide
+     * base write generation since this is the largest of all btree write generations from the
+     * previous run. This has the nice property of ensuring that the range of write generations used
+     * by consecutive runs do not overlap which aids with debugging.
      *
-     * In the import case, the btree write generation from the last run may actually be ahead of the
-     * connection-wide base write generation. In that case, we should initialize our write gen just
-     * ahead of our btree specific write generation.
+     * If we're reopening a btree or importing a new one to a running system, the btree write
+     * generation from the last run may actually be ahead of the connection-wide base write
+     * generation. In that case, we should initialize our write gen just ahead of our btree specific
+     * write generation.
+     *
+     * The runtime write generation is important since it's going to determine what we're going to
+     * use as the base write generation (and thus what pages to wipe transaction ids from). The idea
+     * is that we want to initialize it once the first time we open the btree during a run and then
+     * for every subsequent open, we want to reuse it. This so that we're still able to read
+     * transaction ids from the previous time a btree was open in the same run.
+     *
+     * FIXME-WT-6819: When we begin discarding dhandles more aggressively, we need to check that
+     * updates aren't having their transaction ids wiped after reopening the dhandle. The runtime
+     * write generation is relevant here since it should remain static across the entire run.
      */
-    btree->write_gen = btree->base_write_gen = WT_MAX(ckpt->write_gen + 1, conn->base_write_gen);
+    btree->write_gen = WT_MAX(ckpt->write_gen, conn->base_write_gen) + 1;
+    WT_ASSERT(session, ckpt->write_gen >= ckpt->run_write_gen);
+
+    /* If this is the first time opening the tree this run. */
+    if (F_ISSET(session, WT_SESSION_IMPORT) || ckpt->run_write_gen <= conn->base_write_gen)
+        btree->base_write_gen = btree->run_write_gen = btree->write_gen;
+    else
+        btree->base_write_gen = btree->run_write_gen = ckpt->run_write_gen;
+
+    /*
+     * We've just overwritten the runtime write generation based off the fact that know that we're
+     * importing and therefore, the checkpoint data's runtime write generation is meaningless. We
+     * need to ensure that the underlying dhandle doesn't get discarded without being included in a
+     * subsequent checkpoint including the new overwritten runtime write generation. Otherwise,
+     * we'll reopen, won't know that we're in the import case and will incorrectly use the old
+     * system's runtime write generation.
+     */
+    if (F_ISSET(session, WT_SESSION_IMPORT))
+        btree->modified = true;
 
     return (0);
 }

@@ -44,7 +44,6 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
     uri="table:test"
 
     def add_data(self):
-
         c = self.session.open_cursor(self.uri)
         for i in range(0, self.nops):
             num = i + (self.mult * self.nops)

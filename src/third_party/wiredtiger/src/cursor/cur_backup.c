@@ -274,6 +274,15 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
     if (othercb != NULL)
         WT_CURSOR_BACKUP_CHECK_STOP(othercb);
 
+    /* Special backup cursor to query incremental IDs. */
+    if (strcmp(uri, "backup:query_id") == 0) {
+        /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
+        WT_ASSERT(session, othercb == NULL);
+        if (!F_ISSET(S2C(session), WT_CONN_INCR_BACKUP))
+            WT_RET_MSG(session, EINVAL, "Incremental backup is not configured");
+        F_SET(cb, WT_CURBACKUP_QUERYID);
+    }
+
     /*
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
      * view when creating a copy.
@@ -582,6 +591,26 @@ err:
 }
 
 /*
+ * __backup_query_setup --
+ *     Setup the names to return with a backup query cursor.
+ */
+static int
+__backup_query_setup(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
+{
+    WT_BLKINCR *blkincr;
+    u_int i;
+
+    for (i = 0; i < WT_BLKINCR_MAX; ++i) {
+        blkincr = &S2C(session)->incr_backups[i];
+        /* If it isn't valid, skip it. */
+        if (!F_ISSET(blkincr, WT_BLKINCR_VALID))
+            continue;
+        WT_RET(__backup_list_append(session, cb, blkincr->id_str));
+    }
+    return (0);
+}
+
+/*
  * __backup_start --
  *     Start a backup.
  */
@@ -622,7 +651,7 @@ __backup_start(
      * set a flag and we're done. Actions will be performed on cursor close.
      */
     WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "incremental.force_stop", &cval));
-    if (cval.val) {
+    if (!F_ISSET(cb, WT_CURBACKUP_QUERYID) && cval.val) {
         /*
          * If we're force stopping incremental backup, set the flag. The resources involved in
          * incremental backup will be released on cursor close and that is the only expected usage
@@ -652,7 +681,16 @@ __backup_start(
 
         /* We're the lock holder, we own cleanup. */
         F_SET(cb, WT_CURBACKUP_LOCKER);
-
+        /*
+         * If we are a query backup cursor there are no configuration settings and it will set up
+         * its own list of strings to return. We don't have to do any of the other processing. A
+         * query creates a list to return but does not create the backup file. After appending the
+         * list of IDs we are done.
+         */
+        if (F_ISSET(cb, WT_CURBACKUP_QUERYID)) {
+            ret = __backup_query_setup(session, cb);
+            goto query_done;
+        }
         /*
          * Create a temporary backup file. This must be opened before generating the list of targets
          * in backup_config. This file will later be renamed to the correct name depending on
@@ -719,6 +757,7 @@ __backup_start(
         WT_ERR(__backup_list_append(session, cb, WT_WIREDTIGER));
     }
 
+query_done:
 err:
     /* Close the hot backup file. */
     if (srcfs != NULL)
@@ -726,7 +765,8 @@ err:
     /*
      * Sync and rename the temp file into place.
      */
-    if (ret == 0)
+    WT_TRET(__wt_fs_exist(session, WT_BACKUP_TMP, &exist));
+    if (ret == 0 && exist)
         ret = __wt_sync_and_rename(session, &cb->bfs, WT_BACKUP_TMP, dest);
     if (ret == 0) {
         WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup_list = cb->list);

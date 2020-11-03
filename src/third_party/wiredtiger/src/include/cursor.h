@@ -69,7 +69,8 @@ struct __wt_cursor_backup {
 #define WT_CURBACKUP_INCR 0x020u        /* Incremental backup cursor */
 #define WT_CURBACKUP_INCR_INIT 0x040u   /* Cursor traversal initialized */
 #define WT_CURBACKUP_LOCKER 0x080u      /* Hot-backup started */
-#define WT_CURBACKUP_RENAME 0x100u      /* Object had a rename */
+#define WT_CURBACKUP_QUERYID 0x100u     /* Backup cursor for incremental ids */
+#define WT_CURBACKUP_RENAME 0x200u      /* Object had a rename */
                                         /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };
