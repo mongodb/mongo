@@ -1060,7 +1060,6 @@ functions:
   "bypass compile and fetch binaries":
     command: shell.exec
     params:
-      continue_on_err: true
       working_dir: src
       shell: bash
       script: |
