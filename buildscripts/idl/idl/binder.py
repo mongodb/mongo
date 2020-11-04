@@ -143,6 +143,10 @@ def _validate_cpp_type(ctxt, idl_type, syntax_type):
     if idl_type.cpp_type == "std::vector<std::uint8_t>":
         return
 
+    # Support variant for writeConcernW.
+    if idl_type.cpp_type == "stdx::variant<std::string, std::int64_t>":
+        return
+
     # Check for std fixed integer types which are not allowed. These are not allowed even if they
     # have the "std::" prefix.
     for std_numeric_type in [

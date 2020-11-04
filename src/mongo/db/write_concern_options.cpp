@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <type_traits>
+
 #include "mongo/db/write_concern_options.h"
 
 #include "mongo/base/status.h"
@@ -36,6 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/idl/basic_types_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -197,13 +200,11 @@ WriteConcernOptions WriteConcernOptions::deserializerForIDL(const BSONObj& obj) 
 }
 
 StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const BSONObj& cmdObj) {
-    WriteConcernOptions writeConcern;
-
     // Return the default write concern if no write concern is provided. We check for the existence
     // of the write concern field up front in order to avoid the expense of constructing an error
     // status in bsonExtractTypedField() below.
     if (!cmdObj.hasField(kWriteConcernField)) {
-        return writeConcern;
+        return WriteConcernOptions();
     }
 
     BSONElement writeConcernElement;
@@ -216,15 +217,70 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
     BSONObj writeConcernObj = writeConcernElement.Obj();
     // Empty write concern is interpreted to default.
     if (writeConcernObj.isEmpty()) {
-        return writeConcern;
+        return WriteConcernOptions();
     }
 
-    auto sw = parse(writeConcernObj);
-    if (!sw.isOK()) {
-        return sw.getStatus();
+    // Ensure that the write concern document complies with the strict IDL definition, found in
+    // idl/basic_types.idl.
+    try {
+        auto writeConcernIdl = WriteConcernIdl::parse(
+            IDLParserErrorContext("WriteConcernOptions::extractWCFromCommand"), writeConcernObj);
+        // Convert the IDL parsed WriteConcern into a WriteConcernOptions object.
+        auto sw = convertFromIdl(writeConcernIdl);
+        if (!sw.isOK()) {
+            return sw.getStatus();
+        }
+        auto writeConcernOptions = sw.getValue();
+        writeConcernOptions.usedDefault = false;
+        return writeConcernOptions;
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-    writeConcern = sw.getValue();
-    writeConcern.usedDefault = false;
+}
+
+StatusWith<WriteConcernOptions> WriteConcernOptions::convertFromIdl(
+    const WriteConcernIdl& writeConcernIdl) {
+    WriteConcernOptions writeConcern;
+    auto parsedW = writeConcernIdl.getWriteConcernW();
+    if (!parsedW.usedDefault()) {
+        writeConcern.usedDefaultW = false;
+        auto wVal = parsedW.getValue();
+        if (auto wNum = stdx::get_if<std::int64_t>(&wVal)) {
+            if (*wNum < 0 ||
+                *wNum >
+                    static_cast<std::decay_t<decltype(*wNum)>>(repl::ReplSetConfig::kMaxMembers)) {
+                uasserted(ErrorCodes::FailedToParse,
+                          str::stream() << "w has to be a non-negative number and not greater than "
+                                        << repl::ReplSetConfig::kMaxMembers);
+            }
+            writeConcern.wNumNodes = static_cast<decltype(writeConcern.wNumNodes)>(*wNum);
+        } else {
+            auto wMode = stdx::get_if<std::string>(&wVal);
+            invariant(wMode);
+            writeConcern.wNumNodes = 0;  // Have to reset from default 1.
+            writeConcern.wMode = std::move(*wMode);
+        }
+    }
+
+    auto j = writeConcernIdl.getJ();
+    auto fsync = writeConcernIdl.getFsync();
+    if (j && fsync && *j && *fsync) {
+        // If j and fsync are both set to true
+        return Status{ErrorCodes::FailedToParse, "fsync and j options cannot be used together"};
+    }
+    if (j && *j) {
+        writeConcern.syncMode = SyncMode::JOURNAL;
+    } else if (fsync && *fsync) {
+        writeConcern.syncMode = SyncMode::FSYNC;
+    } else if (j) {
+        // j has been set to false
+        writeConcern.syncMode = SyncMode::NONE;
+    }
+
+    writeConcern.wTimeout = writeConcernIdl.getWtimeout();
+    if (auto source = writeConcernIdl.getSource()) {
+        writeConcern._provenance = ReadWriteConcernProvenance(*source);
+    }
     return writeConcern;
 }
 

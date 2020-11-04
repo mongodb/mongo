@@ -552,13 +552,40 @@ TEST(IDLStructTests, TestNonStrictStruct) {
     }
 }
 
-// Test some basic properties of the OkReply struct. TODO SERVER-51380 replace with a more
-// thorough/integration-oriented test once some basic OkReplying-commands like ping get implemented.
-TEST(IDLStructTests, TestOkReplyStruct) {
-    OkReply okReply;
-
-    // Ensure that the serialized OkReply struct is the empty BSON object.
-    ASSERT_BSONOBJ_EQ(okReply.toBSON(), BSONObj());
+TEST(IDLStructTests, WriteConcernTest) {
+    IDLParserErrorContext ctxt("root");
+    // Numeric w value
+    {
+        auto writeConcernDoc = BSON("w" << 1 << "j" << true << "wtimeout" << 5000);
+        auto writeConcernStruct = WriteConcernIdl::parse(ctxt, writeConcernDoc);
+        BSONObjBuilder builder;
+        writeConcernStruct.serialize(&builder);
+        ASSERT_BSONOBJ_EQ(builder.obj(), writeConcernDoc);
+    }
+    // String w value
+    {
+        auto writeConcernDoc = BSON("w"
+                                    << "majority"
+                                    << "j" << true << "wtimeout" << 5000);
+        auto writeConcernStruct = WriteConcernIdl::parse(ctxt, writeConcernDoc);
+        BSONObjBuilder builder;
+        writeConcernStruct.serialize(&builder);
+        ASSERT_BSONOBJ_EQ(builder.obj(), writeConcernDoc);
+    }
+    // Ignore options wElectionId, wOpTime, getLastError
+    {
+        auto writeConcernDoc = BSON("w"
+                                    << "majority"
+                                    << "j" << true << "wtimeout" << 5000 << "wElectionId" << 12345
+                                    << "wOpTime" << 98765 << "getLastError" << true);
+        auto writeConcernDocWithoutIgnoredFields = BSON("w"
+                                                        << "majority"
+                                                        << "j" << true << "wtimeout" << 5000);
+        auto writeConcernStruct = WriteConcernIdl::parse(ctxt, writeConcernDoc);
+        BSONObjBuilder builder;
+        writeConcernStruct.serialize(&builder);
+        ASSERT_BSONOBJ_EQ(builder.obj(), writeConcernDocWithoutIgnoredFields);
+    }
 }
 
 /// Struct default comparison tests

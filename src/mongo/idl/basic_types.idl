@@ -202,8 +202,33 @@ types:
         serializer: mongo::IDLAnyType::serializeToBSON
         deserializer: mongo::IDLAnyType::parseFromBSON
 
-structs:
+    writeConcernW:
+        bson_serialization_type:
+                                 - string
+                                 - int 
+                                 - decimal
+                                 - double
+                                 - long
+        description: >-
+            A string or integer representing the 'w' option in a document specifying write concern.
+            See https://docs.mongodb.com/manual/reference/write-concern/"
+        cpp_type: "mongo::WriteConcernW"
+        default: "mongo::WriteConcernW()"
+        serializer: "mongo::WriteConcernW::serializeWriteConcernW"
+        deserializer: "mongo::WriteConcernW::deserializeWriteConcernW"
 
+enums:
+    ReadWriteConcernProvenanceSource:
+        description: "Provenance sources"
+        type: string
+        values:
+            clientSupplied: "clientSupplied"
+            implicitDefault: "implicitDefault"
+            customDefault: "customDefault"
+            getLastErrorDefaults: "getLastErrorDefaults"
+
+
+structs:
     OkReply:
         description: "Shared by commands that reply with just {ok: 1} and no additional information"
         strict: true
@@ -230,3 +255,35 @@ structs:
                 type: safeInt64
                 optional: true
                 validator: { gte: 0 }
+    WriteConcernIdl:
+        description: "WriteConcern object parser"
+        strict: true
+        fields:
+            w:
+                type: writeConcernW
+                cpp_name: writeConcernW
+            j:
+                type: safeBool
+                optional: true
+            wtimeout:
+                type: safeInt64
+                default: 0
+            fsync:
+                type: safeBool
+                optional: true
+            # Fields with names wElectionId, wOpTime, and getLastError are accepted in the WriteConcern document for 
+            # backwards-compatibility reasons, but their values are entirely ignored.
+            wElectionId:
+                type: any
+                ignore: true
+            wOpTime:
+                type: any
+                ignore: true
+            getLastError:
+                type: any
+                ignore: true
+            provenance:
+                description: "The source for this provenance"
+                cpp_name: source
+                type: ReadWriteConcernProvenanceSource
+                optional: true

@@ -33,6 +33,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/read_write_concern_provenance.h"
+#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 
@@ -143,6 +144,7 @@ public:
 
 private:
     ReadWriteConcernProvenance _provenance;
+    static StatusWith<WriteConcernOptions> convertFromIdl(const WriteConcernIdl& writeConcernIdl);
 };
 
 }  // namespace mongo

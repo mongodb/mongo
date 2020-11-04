@@ -162,9 +162,6 @@ tests.push(function collInsertCmdErr() {
     assert.throws(() => assert.commandWorked(res));
     assert.throws(() => assert.commandWorkedIgnoringWriteErrors(res));
     assert.doesNotThrow(() => assert.commandFailed(res));
-    assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.FailedToParse));
-    assert.doesNotThrow(
-        () => assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, kFakeErrCode]));
 });
 
 tests.push(function collMultiInsertCmdErr() {
@@ -173,16 +170,6 @@ tests.push(function collMultiInsertCmdErr() {
     assert.throws(() => assert.commandWorked(res));
     assert.throws(() => assert.commandWorkedIgnoringWriteErrors(res));
     assert.doesNotThrow(() => assert.commandFailed(res));
-    assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.FailedToParse));
-    assert.doesNotThrow(
-        () => assert.commandFailedWithCode(res, [ErrorCodes.FailedToParse, kFakeErrCode]));
-    assert.doesNotThrow(() => assert.commandWorkedOrFailedWithCode(
-                            res,
-                            [ErrorCodes.FailedToParse, kFakeErrCode],
-                            "threw even though failed with correct error codes"));
-    assert.throws(
-        () => assert.commandWorkedOrFailedWithCode(
-            res, [kFakeErrCode], "didn't throw even though failed with incorrect error codes"));
 });
 
 tests.push(function mapReduceOk() {
