@@ -68,17 +68,7 @@ const NamespaceString& LocalOplogInfo::getOplogCollectionName() const {
 }
 
 void LocalOplogInfo::setOplogCollectionName(ServiceContext* service) {
-    switch (ReplicationCoordinator::get(service)->getReplicationMode()) {
-        case ReplicationCoordinator::modeReplSet:
-            _oplogName = NamespaceString::kRsOplogNamespace;
-            break;
-        case ReplicationCoordinator::modeNone:
-            if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
-                _oplogName = NamespaceString::kRsOplogNamespace;
-            }
-            // leave empty otherwise.
-            break;
-    }
+    _oplogName = NamespaceString::kRsOplogNamespace;
 }
 
 const CollectionPtr& LocalOplogInfo::getCollection() const {
