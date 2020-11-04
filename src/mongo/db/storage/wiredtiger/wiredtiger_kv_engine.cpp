@@ -1577,7 +1577,9 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     return std::move(rs);
 }
 
-Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru, StringData ident) {
+Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
+                                     StringData ident,
+                                     StorageEngine::DropIdentCallback&& onDrop) {
     string uri = _uri(ident);
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(ru);
@@ -1588,21 +1590,20 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru, StringData ident) {
 
     int ret = session.getSession()->drop(
         session.getSession(), uri.c_str(), "force,checkpoint_wait=false");
-    LOGV2_DEBUG(22338, 1, "WT drop of {uri} res {ret}", "uri"_attr = uri, "ret"_attr = ret);
-
-    if (ret == 0) {
-        // yay, it worked
-        return Status::OK();
-    }
+    LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "ret"_attr = ret);
 
     if (ret == EBUSY) {
         // this is expected, queue it up
         {
             stdx::lock_guard<Latch> lk(_identToDropMutex);
-            _identToDrop.push_front(uri);
+            _identToDrop.push_front({std::move(uri), std::move(onDrop)});
         }
         _sessionCache->closeCursorsForQueuedDrops();
         return Status::OK();
+    }
+
+    if (onDrop) {
+        onDrop();
     }
 
     if (ret == ENOENT) {
@@ -1659,8 +1660,9 @@ std::list<WiredTigerCachedCursor> WiredTigerKVEngine::filterCursorsWithQueuedDro
 
     for (auto i = cache->begin(); i != cache->end();) {
         if (!i->_cursor ||
-            std::find(_identToDrop.begin(), _identToDrop.end(), std::string(i->_cursor->uri)) ==
-                _identToDrop.end()) {
+            std::find_if(_identToDrop.begin(), _identToDrop.end(), [i](const auto& identToDrop) {
+                return identToDrop.uri == std::string(i->_cursor->uri);
+            }) == _identToDrop.end()) {
             ++i;
             continue;
         }
@@ -1708,28 +1710,30 @@ void WiredTigerKVEngine::dropSomeQueuedIdents() {
 
     LOGV2_DEBUG(22339,
                 1,
-                "WT Queue is: {numInQueue} attempting to drop: {numToDelete} tables",
+                "WT Queue: attempting to drop tables",
                 "numInQueue"_attr = numInQueue,
                 "numToDelete"_attr = numToDelete);
     for (int i = 0; i < numToDelete; i++) {
-        string uri;
+        IdentToDrop identToDrop;
         {
             stdx::lock_guard<Latch> lk(_identToDropMutex);
             if (_identToDrop.empty())
                 break;
-            uri = _identToDrop.front();
+            identToDrop = std::move(_identToDrop.front());
             _identToDrop.pop_front();
         }
         int ret = session.getSession()->drop(
-            session.getSession(), uri.c_str(), "force,checkpoint_wait=false");
-        LOGV2_DEBUG(
-            22340, 1, "WT queued drop of  {uri} res {ret}", "uri"_attr = uri, "ret"_attr = ret);
+            session.getSession(), identToDrop.uri.c_str(), "force,checkpoint_wait=false");
+        LOGV2_DEBUG(22340, 1, "WT queued drop", "uri"_attr = identToDrop.uri, "ret"_attr = ret);
 
         if (ret == EBUSY) {
             stdx::lock_guard<Latch> lk(_identToDropMutex);
-            _identToDrop.push_back(uri);
+            _identToDrop.push_back(std::move(identToDrop));
         } else {
             invariantWTOK(ret);
+            if (identToDrop.callback) {
+                identToDrop.callback();
+            }
         }
     }
 }

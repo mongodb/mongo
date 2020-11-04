@@ -93,7 +93,9 @@ public:
 
     virtual void endBackup(OperationContext* opCtx) {}
 
-    virtual Status dropIdent(mongo::RecoveryUnit* ru, StringData ident);
+    virtual Status dropIdent(mongo::RecoveryUnit* ru,
+                             StringData ident,
+                             StorageEngine::DropIdentCallback&& onDrop);
 
     virtual void dropIdentForImport(OperationContext* opCtx, StringData ident) {}
 

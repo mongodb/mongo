@@ -198,7 +198,9 @@ public:
                                                                        const IndexDescriptor* desc,
                                                                        KVPrefix prefix) override;
 
-    Status dropIdent(RecoveryUnit* ru, StringData ident) override;
+    Status dropIdent(RecoveryUnit* ru,
+                     StringData ident,
+                     StorageEngine::DropIdentCallback&& onDrop = nullptr) override;
 
     void dropIdentForImport(OperationContext* opCtx, StringData ident) override;
 
@@ -380,6 +382,11 @@ public:
 private:
     class WiredTigerSessionSweeper;
 
+    struct IdentToDrop {
+        std::string uri;
+        StorageEngine::DropIdentCallback callback;
+    };
+
     /**
      * Opens a connection on the WiredTiger database 'path' with the configuration 'wtOpenConfig'.
      * Only returns when successful. Intializes both '_conn' and '_fileVersion'.
@@ -472,7 +479,7 @@ private:
     std::string _indexOptions;
 
     mutable Mutex _identToDropMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_identToDropMutex");
-    std::list<std::string> _identToDrop;
+    std::list<IdentToDrop> _identToDrop;
 
     mutable Date_t _previousCheckedDropsQueued;
 

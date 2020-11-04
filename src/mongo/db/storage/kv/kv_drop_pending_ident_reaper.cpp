@@ -47,7 +47,7 @@ KVDropPendingIdentReaper::KVDropPendingIdentReaper(KVEngine* engine) : _engine(e
 void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestamp,
                                                    const NamespaceString& nss,
                                                    std::shared_ptr<Ident> ident,
-                                                   const StorageEngine::DropIdentCallback& onDrop) {
+                                                   StorageEngine::DropIdentCallback&& onDrop) {
     stdx::lock_guard<Latch> lock(_mutex);
     const auto equalRange = _dropPendingIdents.equal_range(dropTimestamp);
     const auto& lowerBound = equalRange.first;
@@ -109,13 +109,13 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
         return;
     }
 
-    for (const auto& timestampAndIdentInfo : toDrop) {
+    for (auto& timestampAndIdentInfo : toDrop) {
         // Guards against catalog changes while dropping idents using KVEngine::dropIdent(). Yields
         // after dropping each ident.
         Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
         const auto& dropTimestamp = timestampAndIdentInfo.first;
-        const auto& identInfo = timestampAndIdentInfo.second;
+        auto& identInfo = timestampAndIdentInfo.second;
         const auto& nss = identInfo.nss;
         const auto& identName = identInfo.identName;
         LOGV2(22237,
@@ -124,7 +124,8 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
               logAttrs(nss),
               "dropTimestamp"_attr = dropTimestamp);
         WriteUnitOfWork wuow(opCtx);
-        auto status = _engine->dropIdent(opCtx->recoveryUnit(), identName);
+        auto status =
+            _engine->dropIdent(opCtx->recoveryUnit(), identName, std::move(identInfo.onDrop));
         if (!status.isOK()) {
             LOGV2_FATAL_NOTRACE(51022,
                                 "Failed to remove drop-pending ident",
@@ -134,10 +135,6 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
                                 "error"_attr = status);
         }
         wuow.commit();
-
-        if (identInfo.onDrop) {
-            identInfo.onDrop(nss);
-        }
     }
 
     {

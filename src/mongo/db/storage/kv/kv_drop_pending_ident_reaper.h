@@ -82,7 +82,7 @@ public:
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
                              std::shared_ptr<Ident> ident,
-                             const StorageEngine::DropIdentCallback& onDrop = nullptr);
+                             StorageEngine::DropIdentCallback&& onDrop = nullptr);
 
     /**
      * Returns earliest drop timestamp in '_dropPendingIdents'.

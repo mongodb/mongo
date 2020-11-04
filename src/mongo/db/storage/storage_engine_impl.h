@@ -317,7 +317,7 @@ public:
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              const NamespaceString& nss,
                              std::shared_ptr<Ident> ident,
-                             const DropIdentCallback& onDrop) override;
+                             DropIdentCallback&& onDrop) override;
 
     void checkpoint() override;
 

@@ -128,8 +128,7 @@ Status dropCollection(OperationContext* opCtx,
     // first phase is successuflly committed.
     opCtx->recoveryUnit()->onCommit([recoveryUnit, storageEngine, &collectionCatalog, nss, ident](
                                         boost::optional<Timestamp> commitTimestamp) {
-        StorageEngine::DropIdentCallback onDrop = [storageEngine,
-                                                   &collectionCatalog](const NamespaceString& ns) {
+        StorageEngine::DropIdentCallback onDrop = [storageEngine, &collectionCatalog, ns = nss] {
             // Nothing to do if not using directoryperdb or there are still collections in the
             // database.
             if (!storageEngine->isUsingDirectoryPerDb() ||
@@ -162,12 +161,13 @@ Status dropCollection(OperationContext* opCtx,
                   logAttrs(nss),
                   "ident"_attr = ident->getIdent(),
                   "commitTimestamp"_attr = commitTimestamp);
-            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, onDrop);
+            storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident, std::move(onDrop));
         } else {
             // Intentionally ignoring failure here. Since we've removed the metadata pointing to
             // the collection, we should never see it again anyway.
-            storageEngine->getEngine()->dropIdent(recoveryUnit, ident->getIdent()).ignore();
-            onDrop(nss);
+            storageEngine->getEngine()
+                ->dropIdent(recoveryUnit, ident->getIdent(), std::move(onDrop))
+                .ignore();
         }
     });
 

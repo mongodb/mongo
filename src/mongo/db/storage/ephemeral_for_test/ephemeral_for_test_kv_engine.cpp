@@ -159,7 +159,9 @@ std::unique_ptr<mongo::SortedDataInterface> KVEngine::getSortedDataInterface(
         return std::make_unique<SortedDataInterfaceStandard>(opCtx, ident, desc);
 }
 
-Status KVEngine::dropIdent(mongo::RecoveryUnit* ru, StringData ident) {
+Status KVEngine::dropIdent(mongo::RecoveryUnit* ru,
+                           StringData ident,
+                           StorageEngine::DropIdentCallback&& onDrop) {
     Status dropStatus = Status::OK();
     stdx::unique_lock lock(_identsLock);
     if (_idents.count(ident.toString()) > 0) {
@@ -179,6 +181,9 @@ Status KVEngine::dropIdent(mongo::RecoveryUnit* ru, StringData ident) {
         }
         lock.lock();
         _idents.erase(ident.toString());
+    }
+    if (dropStatus.isOK() && onDrop) {
+        onDrop();
     }
     return dropStatus;
 }

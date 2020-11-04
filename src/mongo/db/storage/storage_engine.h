@@ -78,7 +78,7 @@ public:
     using OldestActiveTransactionTimestampCallback =
         std::function<OldestActiveTransactionTimestampResult(Timestamp stableTimestamp)>;
 
-    using DropIdentCallback = std::function<void(const NamespaceString& ns)>;
+    using DropIdentCallback = std::function<void()>;
 
     /**
      * The interface for creating new instances of storage engines.
@@ -475,7 +475,7 @@ public:
     virtual void addDropPendingIdent(const Timestamp& dropTimestamp,
                                      const NamespaceString& nss,
                                      std::shared_ptr<Ident> ident,
-                                     const DropIdentCallback& onDrop = nullptr) = 0;
+                                     DropIdentCallback&& onDrop = nullptr) = 0;
 
     /**
      * Called when the checkpoint thread instructs the storage engine to take a checkpoint. The

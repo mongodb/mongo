@@ -1039,8 +1039,8 @@ void StorageEngineImpl::_dumpCatalog(OperationContext* opCtx) {
 void StorageEngineImpl::addDropPendingIdent(const Timestamp& dropTimestamp,
                                             const NamespaceString& nss,
                                             std::shared_ptr<Ident> ident,
-                                            const DropIdentCallback& onDrop) {
-    _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident, onDrop);
+                                            DropIdentCallback&& onDrop) {
+    _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, nss, ident, std::move(onDrop));
 }
 
 void StorageEngineImpl::checkpoint() {
