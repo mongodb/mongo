@@ -51,7 +51,7 @@ static const char kDocUnitsRead[] = "docUnitsRead";
 static const char kIdxEntryBytesRead[] = "idxEntryBytesRead";
 static const char kIdxEntryUnitsRead[] = "idxEntryUnitsRead";
 static const char kKeysSorted[] = "keysSorted";
-static const char kCpuMillis[] = "cpuMillis";
+static const char kCpuNanos[] = "cpuNanos";
 static const char kDocBytesWritten[] = "docBytesWritten";
 static const char kDocUnitsWritten[] = "docUnitsWritten";
 static const char kIdxEntryBytesWritten[] = "idxEntryBytesWritten";
@@ -118,13 +118,15 @@ void ResourceConsumption::AggregatedMetrics::toBson(BSONObjBuilder* builder) con
     }
 
     writeMetrics.toBson(builder);
-    builder->appendNumber(kCpuMillis, cpuMillis);
+    builder->appendNumber(kCpuNanos, durationCount<Nanoseconds>(cpuNanos));
 }
 
 void ResourceConsumption::OperationMetrics::toBson(BSONObjBuilder* builder) const {
     readMetrics.toBson(builder);
     writeMetrics.toBson(builder);
-    builder->appendNumber(kCpuMillis, cpuMillis);
+    if (cpuTimer) {
+        builder->appendNumber(kCpuNanos, durationCount<Nanoseconds>(cpuTimer->getElapsed()));
+    }
 }
 
 void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* builder) const {
@@ -135,7 +137,9 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
     appendNonZeroMetric(builder, kKeysSorted, readMetrics.keysSorted);
     appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docUnitsReturned);
 
-    appendNonZeroMetric(builder, kCpuMillis, cpuMillis);
+    if (cpuTimer) {
+        appendNonZeroMetric(builder, kCpuNanos, durationCount<Nanoseconds>(cpuTimer->getElapsed()));
+    }
     appendNonZeroMetric(builder, kDocBytesWritten, writeMetrics.docBytesWritten);
     appendNonZeroMetric(builder, kDocUnitsWritten, writeMetrics.docUnitsWritten);
     appendNonZeroMetric(builder, kIdxEntryBytesWritten, writeMetrics.idxEntryBytesWritten);
@@ -194,8 +198,27 @@ void ResourceConsumption::MetricsCollector::incrementOneIdxEntryWritten(size_t b
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementCpuMillis(size_t cpuMillis) {
-    _doIfCollecting([&] { _metrics.cpuMillis += cpuMillis; });
+void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationContext* opCtx,
+                                                                  const std::string& dbName) {
+    invariant(!isInScope());
+    _dbName = dbName;
+    _collecting = ScopedCollectionState::kInScopeCollecting;
+    _hasCollectedMetrics = true;
+
+    // The OperationCPUTimer may be nullptr on unsupported systems.
+    _metrics.cpuTimer = OperationCPUTimer::get(opCtx);
+    if (_metrics.cpuTimer) {
+        _metrics.cpuTimer->start();
+    }
+}
+
+bool ResourceConsumption::MetricsCollector::endScopedCollecting() {
+    bool wasCollecting = isCollecting();
+    if (wasCollecting && _metrics.cpuTimer) {
+        _metrics.cpuTimer->stop();
+    }
+    _collecting = ScopedCollectionState::kInactive;
+    return wasCollecting;
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,
@@ -217,7 +240,7 @@ ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationCon
         return;
     }
 
-    metrics.beginScopedCollecting(dbName);
+    metrics.beginScopedCollecting(opCtx, dbName);
 }
 
 ResourceConsumption::ScopedMetricsCollector::~ScopedMetricsCollector() {
@@ -271,7 +294,9 @@ void ResourceConsumption::merge(OperationContext* opCtx,
         elem.secondaryReadMetrics += metrics.readMetrics;
     }
     elem.writeMetrics += metrics.writeMetrics;
-    elem.cpuMillis += metrics.cpuMillis;
+    if (metrics.cpuTimer) {
+        elem.cpuNanos += metrics.cpuTimer->getElapsed();
+    }
 }
 
 ResourceConsumption::MetricsMap ResourceConsumption::getMetrics() const {

@@ -66,11 +66,6 @@ public:
 
     typedef std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>
         ClientAndCtx;
-    ClientAndCtx makeClientAndCtx(const std::string& clientName) {
-        auto client = getServiceContext()->makeClient(clientName);
-        auto opCtx = client->makeOperationContext();
-        return std::make_pair(std::move(client), std::move(opCtx));
-    }
 
 protected:
     ServiceContext::UniqueOperationContext _opCtx;
@@ -79,23 +74,28 @@ protected:
 TEST_F(ResourceConsumptionMetricsTest, Merge) {
     auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
 
-    auto [client2, opCtx2] = makeClientAndCtx("opCtx2");
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
 
-    auto& operationMetrics1 = ResourceConsumption::MetricsCollector::get(_opCtx.get());
-    auto& operationMetrics2 = ResourceConsumption::MetricsCollector::get(opCtx2.get());
+    operationMetrics.beginScopedCollecting(_opCtx.get(), "db1");
+    globalResourceConsumption.merge(
+        _opCtx.get(), operationMetrics.getDbName(), operationMetrics.getMetrics());
+    globalResourceConsumption.merge(
+        _opCtx.get(), operationMetrics.getDbName(), operationMetrics.getMetrics());
 
-    operationMetrics1.beginScopedCollecting("db1");
-    operationMetrics2.beginScopedCollecting("db2");
-    globalResourceConsumption.merge(
-        _opCtx.get(), operationMetrics1.getDbName(), operationMetrics1.getMetrics());
-    globalResourceConsumption.merge(
-        _opCtx.get(), operationMetrics1.getDbName(), operationMetrics1.getMetrics());
-    globalResourceConsumption.merge(
-        opCtx2.get(), operationMetrics2.getDbName(), operationMetrics2.getMetrics());
-    globalResourceConsumption.merge(
-        opCtx2.get(), operationMetrics2.getDbName(), operationMetrics2.getMetrics());
 
     auto globalMetrics = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(globalMetrics.count("db1"), 1);
+    ASSERT_EQ(globalMetrics.count("db2"), 0);
+    ASSERT_EQ(globalMetrics.count("db3"), 0);
+    operationMetrics.endScopedCollecting();
+
+    operationMetrics.beginScopedCollecting(_opCtx.get(), "db2");
+    globalResourceConsumption.merge(
+        _opCtx.get(), operationMetrics.getDbName(), operationMetrics.getMetrics());
+    globalResourceConsumption.merge(
+        _opCtx.get(), operationMetrics.getDbName(), operationMetrics.getMetrics());
+
+    globalMetrics = globalResourceConsumption.getMetrics();
     ASSERT_EQ(globalMetrics.count("db1"), 1);
     ASSERT_EQ(globalMetrics.count("db2"), 1);
     ASSERT_EQ(globalMetrics.count("db3"), 0);
@@ -542,5 +542,49 @@ TEST_F(ResourceConsumptionMetricsTest, IdxEntryUnitsWritten) {
     auto metricsCopy = globalResourceConsumption.getMetrics();
     ASSERT_EQ(metricsCopy["db1"].writeMetrics.idxEntryBytesWritten, expectedBytes);
     ASSERT_EQ(metricsCopy["db1"].writeMetrics.idxEntryUnitsWritten, expectedUnits);
+}
+
+TEST_F(ResourceConsumptionMetricsTest, CpuNanos) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    // Do not run the test if a CPU timer is not available for this system.
+    if (!OperationCPUTimer::get(_opCtx.get())) {
+        return;
+    }
+
+    // Helper to busy wait.
+    auto spinFor = [&](Milliseconds millis) {
+        auto deadline = Date_t::now().toDurationSinceEpoch() + millis;
+        while (Date_t::now().toDurationSinceEpoch() < deadline) {
+        }
+    };
+
+    {
+        // Ensure that the CPU timer increases relative to a single operation.
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+        auto lastNanos = operationMetrics.getMetrics().cpuTimer->getElapsed();
+        spinFor(Milliseconds(1));
+        ASSERT_GT(operationMetrics.getMetrics().cpuTimer->getElapsed(), lastNanos);
+    }
+
+    // Ensure that the CPU timer stops counting past the end of the scope.
+    auto nanos = operationMetrics.getMetrics().cpuTimer->getElapsed();
+    spinFor(Milliseconds(1));
+    ASSERT_EQ(nanos, operationMetrics.getMetrics().cpuTimer->getElapsed());
+
+    // Ensure the CPU time gets aggregated globally.
+    auto globalMetrics = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(globalMetrics["db1"].cpuNanos, nanos);
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+        spinFor(Milliseconds(1));
+    }
+
+    // Ensure the aggregated CPU time increases over time.
+    nanos += operationMetrics.getMetrics().cpuTimer->getElapsed();
+    globalMetrics = globalResourceConsumption.getMetrics();
+    ASSERT_EQ(globalMetrics["db1"].cpuNanos, nanos);
 }
 }  // namespace mongo

@@ -44,7 +44,12 @@ const assertMetricsExist = (profilerEntry) => {
     assert.gte(metrics.keysSorted, 0);
     assert.gte(metrics.docUnitsReturned, 0);
 
-    assert.gte(metrics.cpuMillis, 0);
+    // Every test should perform enough work to be measured as non-zero CPU activity in
+    // nanoseconds.
+    // The CPU time metrics is not collected on Windows.
+    if (!_isWindows()) {
+        assert.gt(metrics.cpuNanos, 0);
+    }
     assert.gte(metrics.docBytesWritten, 0);
     assert.gte(metrics.docUnitsWritten, 0);
     assert.gte(metrics.idxEntryBytesWritten, 0);

@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_cpu_timer.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
@@ -120,6 +121,8 @@ public:
      */
     class OperationMetrics {
     public:
+        OperationMetrics() = default;
+
         /**
          * Reports all metrics on a BSONObjBuilder.
          */
@@ -134,8 +137,8 @@ public:
         ReadMetrics readMetrics;
         WriteMetrics writeMetrics;
 
-        // Amount of CPU time consumed by an operation in milliseconds
-        long long cpuMillis = 0;
+        // Records CPU time consumed by this operation.
+        OperationCPUTimer* cpuTimer = nullptr;
     };
 
     /**
@@ -148,7 +151,7 @@ public:
             primaryReadMetrics += other.primaryReadMetrics;
             secondaryReadMetrics += other.secondaryReadMetrics;
             writeMetrics += other.writeMetrics;
-            cpuMillis += other.cpuMillis;
+            cpuNanos += other.cpuNanos;
         };
 
         AggregatedMetrics& operator+=(const AggregatedMetrics& other) {
@@ -170,8 +173,8 @@ public:
         // Write metrics recorded for all operations
         WriteMetrics writeMetrics;
 
-        // Amount of CPU time consumed by an operation in milliseconds
-        long long cpuMillis = 0;
+        // Amount of CPU time consumed by an operation in nanoseconds
+        Nanoseconds cpuNanos;
     };
 
     /**
@@ -185,12 +188,7 @@ public:
         /**
          * When called, resource consumption metrics should be recorded for this operation.
          */
-        void beginScopedCollecting(const std::string& dbName) {
-            invariant(!isInScope());
-            _dbName = dbName;
-            _collecting = ScopedCollectionState::kInScopeCollecting;
-            _hasCollectedMetrics = true;
-        }
+        void beginScopedCollecting(OperationContext* opCtx, const std::string& dbName);
 
         /**
          * When called, sets state that a ScopedMetricsCollector is in scope, but is not recording
@@ -206,11 +204,7 @@ public:
          * When called, resource consumption metrics should not be recorded. Returns whether this
          * Collector was in a collecting state.
          */
-        bool endScopedCollecting() {
-            bool wasCollecting = isCollecting();
-            _collecting = ScopedCollectionState::kInactive;
-            return wasCollecting;
-        }
+        bool endScopedCollecting();
 
         bool isCollecting() const {
             return _collecting == ScopedCollectionState::kInScopeCollecting;
@@ -280,8 +274,6 @@ public:
          * that entry. This is a no-op when metrics collection is disabled on this operation.
          */
         void incrementOneIdxEntryWritten(size_t idxEntryBytesWritten);
-
-        void incrementCpuMillis(size_t cpuMillis);
 
     private:
         /**

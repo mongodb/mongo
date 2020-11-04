@@ -324,7 +324,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx.get());
         if (ResourceConsumption::shouldCollectMetricsForDatabase(dbName) &&
             ResourceConsumption::isMetricsCollectionEnabled()) {
-            metricsCollector.beginScopedCollecting(dbName);
+            metricsCollector.beginScopedCollecting(opCtx.get(), dbName);
         }
 
         // Index builds should never take the PBWM lock, even on a primary. This allows the

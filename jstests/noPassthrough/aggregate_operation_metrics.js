@@ -34,7 +34,7 @@ let assertMetricsExist = function(metrics) {
             assert.gte(readMetrics.docUnitsReturned, 0);
         });
 
-        assert.gte(metrics.cpuMillis, 0);
+        assert.gte(metrics.cpuNanos, 0);
         assert.gte(metrics.docBytesWritten, 0);
         assert.gte(metrics.docUnitsWritten, 0);
         assert.gte(metrics.idxEntryBytesWritten, 0);
