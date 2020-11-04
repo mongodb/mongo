@@ -643,7 +643,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
     auto opCtx = cc().makeOperationContext();
     {
         stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
-        _stateDoc.setDataConsistentStopDonorOpTime(_sharedData->getLastVisibleOpTime(sharedDatalk));
+        auto lastVisibleMajorityCommittedDonorOpTime =
+            _sharedData->getLastVisibleOpTime(sharedDatalk);
+        invariant(!lastVisibleMajorityCommittedDonorOpTime.isNull());
+        _stateDoc.setDataConsistentStopDonorOpTime(lastVisibleMajorityCommittedDonorOpTime);
     }
     _stateDoc.setCloneFinishedRecipientOpTime(
         repl::ReplicationCoordinator::get(opCtx.get())->getMyLastAppliedOpTime());

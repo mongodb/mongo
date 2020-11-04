@@ -90,6 +90,18 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
         getStatusFromCommandResult(readResult),
         "TenantAllDatabaseCloner failed to get listDatabases result majority-committed");
 
+    {
+        // _operationTime is now majority committed on donor.
+        //
+        // Tenant Migration recipient oplog fetcher doesn't care about the donor term field in
+        // TenantMigrationRecipientDocument::DataConsistentStopDonorOpTime, which is determined by
+        // TenantMigrationSharedData::_lastVisibleOpTime. So, it's ok to build a fake OpTime with
+        // term set as OpTime::kUninitializedTerm.
+        stdx::lock_guard<TenantMigrationSharedData> lk(*getSharedData());
+        getSharedData()->setLastVisibleOpTime(lk,
+                                              OpTime(_operationTime, OpTime::kUninitializedTerm));
+    }
+
     // Process and verify the listDatabases results.
     for (const auto& dbBSON : databasesArray) {
         LOGV2_DEBUG(4881508,

@@ -108,6 +108,9 @@ BSONObj makeListDatabasesResponse(std::vector<std::string> databaseNames) {
         }
     }
     bob.append("ok", 1);
+    // Set the operation time as if the remote mock server received the
+    // 'listDatabases' cmd with '$replData' set to true.
+    bob.append(LogicalTime::kOperationTimeFieldName, Timestamp(1, 1));
     return bob.obj();
 }
 
@@ -869,7 +872,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
 
     taskFp->waitForTimesEntered(initialTimesEntered + 1);
 
-    ASSERT_EQ(OpTime(Timestamp(0, 0), OpTime::kUninitializedTerm),
+    ASSERT_EQ(OpTime(Timestamp(1, 1), OpTime::kUninitializedTerm),
               getStateDoc(instance.get()).getDataConsistentStopDonorOpTime());
     ASSERT_EQ(cloneCompletionRecipientOpTime,
               getStateDoc(instance.get()).getCloneFinishedRecipientOpTime());

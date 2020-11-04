@@ -44,6 +44,7 @@ public:
 
 private:
     // Must hold mutex (in base class) to access this.
+    // Represents last visible majority committed donor opTime.
     OpTime _lastVisibleOpTime;
 };
 }  // namespace repl
