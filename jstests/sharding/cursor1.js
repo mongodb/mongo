@@ -25,6 +25,10 @@ assert.eq(1,
           s.config.chunks.count({"ns": "test.foo"}),
           "test requires collection to have one chunk initially");
 
+// Cursor timeout only occurs outside of sessions. Otherwise we rely on the session timeout
+// mechanism to kill cursors.
+TestData.disableImplicitSessions = true;
+
 // we'll split the collection in two and move the second chunk while three cursors are open
 // cursor1 still has more data in the first chunk, the one that didn't move
 // cursor2 buffered the last obj of the first chunk
@@ -64,6 +68,8 @@ assert.soon(function() {
         return true;
     }
 }, "cursor failed to time out", /*timeout*/ 30000, /*interval*/ 5000);
+
+TestData.disableImplicitSessions = false;
 
 s.stop();
 })();
