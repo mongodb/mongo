@@ -313,8 +313,8 @@ public:
 
         /*
          * Gets called when the cloner completes cloning data successfully.
-         * And, it is responsible to populate the 'dataConsistentStopOpTime'
-         * and 'cloneFinishedOpTime' fields in the state doc.
+         * And, it is responsible to populate the 'dataConsistentStopDonorOpTime'
+         * and 'cloneFinishedRecipientOpTime' fields in the state doc.
          */
         SemiFuture<void> _onCloneSuccess();
 

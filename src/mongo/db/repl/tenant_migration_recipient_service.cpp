@@ -439,17 +439,17 @@ void TenantMigrationRecipientService::Instance::_getStartOpTimesFromDonor(WithLo
                 "tenantId"_attr = _stateDoc.getTenantId(),
                 "lastOplogEntry"_attr = lastOplogEntry2Bson);
     auto lastOplogEntry2OpTime = uassertStatusOK(OpTime::parseFromOplogEntry(lastOplogEntry2Bson));
-    _stateDoc.setStartApplyingOpTime(lastOplogEntry2OpTime);
+    _stateDoc.setStartApplyingDonorOpTime(lastOplogEntry2OpTime);
 
-    OpTime startFetchingOpTime = lastOplogEntry1OpTime;
+    OpTime startFetchingDonorOpTime = lastOplogEntry1OpTime;
     if (!earliestOpenTransactionBson.isEmpty()) {
         auto startOpTimeField =
             earliestOpenTransactionBson[SessionTxnRecord::kStartOpTimeFieldName];
         if (startOpTimeField.isABSONObj()) {
-            startFetchingOpTime = OpTime::parse(startOpTimeField.Obj());
+            startFetchingDonorOpTime = OpTime::parse(startOpTimeField.Obj());
         }
     }
-    _stateDoc.setStartFetchingOpTime(startFetchingOpTime);
+    _stateDoc.setStartFetchingDonorOpTime(startFetchingDonorOpTime);
 }
 
 void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
@@ -462,14 +462,14 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
     NamespaceString oplogBufferNs(NamespaceString::kConfigDb,
                                   kOplogBufferPrefix + getMigrationUUID().toString());
     stdx::lock_guard lk(_mutex);
-    invariant(_stateDoc.getStartFetchingOpTime());
+    invariant(_stateDoc.getStartFetchingDonorOpTime());
     _donorOplogBuffer = std::make_unique<OplogBufferCollection>(
         StorageInterface::get(opCtx.get()), oplogBufferNs, options);
     _donorOplogBuffer->startup(opCtx.get());
     _dataReplicatorExternalState = std::make_unique<DataReplicatorExternalStateTenantMigration>();
     _donorOplogFetcher = (*_createOplogFetcherFn)(
         (**_scopedExecutor).get(),
-        *_stateDoc.getStartFetchingOpTime(),
+        *_stateDoc.getStartFetchingDonorOpTime(),
         _oplogFetcherClient->getServerHostAndPort(),
         // The config is only used for setting the awaitData timeout; the defaults are fine.
         ReplSetConfig::parse(BSON("_id"
@@ -594,7 +594,7 @@ void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint
 }
 
 bool TenantMigrationRecipientService::Instance::_isCloneCompletedMarkerSet(WithLock) const {
-    return _stateDoc.getCloneFinishedOpTime().has_value();
+    return _stateDoc.getCloneFinishedRecipientOpTime().has_value();
 }
 
 Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseCloner(WithLock lk) {
@@ -643,9 +643,9 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_onCloneSuccess() {
     auto opCtx = cc().makeOperationContext();
     {
         stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
-        _stateDoc.setDataConsistentStopOpTime(_sharedData->getLastVisibleOpTime(sharedDatalk));
+        _stateDoc.setDataConsistentStopDonorOpTime(_sharedData->getLastVisibleOpTime(sharedDatalk));
     }
-    _stateDoc.setCloneFinishedOpTime(
+    _stateDoc.setCloneFinishedRecipientOpTime(
         repl::ReplicationCoordinator::get(opCtx.get())->getMyLastAppliedOpTime());
 
     uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(opCtx.get(), _stateDoc));
@@ -663,7 +663,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFu
     }
 
     return _tenantOplogApplier
-        ->getNotificationForOpTime(_stateDoc.getDataConsistentStopOpTime().get())
+        ->getNotificationForOpTime(_stateDoc.getDataConsistentStopDonorOpTime().get())
         .thenRunOn(**_scopedExecutor)
         .then([this](TenantOplogApplier::OpTimePair donorRecipientOpTime) {
             auto opCtx = cc().makeOperationContext();
@@ -855,18 +855,18 @@ void TenantMigrationRecipientService::Instance::run(
 
             stdx::lock_guard lk(_mutex);
             // Create the oplog applier but do not start it yet.
-            invariant(_stateDoc.getStartApplyingOpTime());
+            invariant(_stateDoc.getStartApplyingDonorOpTime());
             LOGV2_DEBUG(4881202,
                         1,
                         "Recipient migration service creating oplog applier",
                         "tenantId"_attr = getTenantId(),
                         "migrationId"_attr = getMigrationUUID(),
-                        "startApplyingOpTime"_attr = *_stateDoc.getStartApplyingOpTime());
+                        "startApplyingDonorOpTime"_attr = *_stateDoc.getStartApplyingDonorOpTime());
 
             _tenantOplogApplier =
                 std::make_unique<TenantOplogApplier>(_migrationUuid,
                                                      _tenantId,
-                                                     *_stateDoc.getStartApplyingOpTime(),
+                                                     *_stateDoc.getStartApplyingDonorOpTime(),
                                                      _donorOplogBuffer.get(),
                                                      **_scopedExecutor,
                                                      _writerPool.get());
@@ -898,9 +898,10 @@ void TenantMigrationRecipientService::Instance::run(
                         "Tenant migration recipient instance is in consistent state",
                         "migrationId"_attr = getMigrationUUID(),
                         "tenantId"_attr = getTenantId(),
-                        "donorConsistentOpTime"_attr = _stateDoc.getDataConsistentStopOpTime());
+                        "donorConsistentOpTime"_attr =
+                            _stateDoc.getDataConsistentStopDonorOpTime());
 
-            _dataConsistentPromise.emplaceValue(_stateDoc.getDataConsistentStopOpTime().get());
+            _dataConsistentPromise.emplaceValue(_stateDoc.getDataConsistentStopDonorOpTime().get());
         })
         .then([this] {
             _stopOrHangOnFailPoint(&fpAfterDataConsistentMigrationRecipientInstance);

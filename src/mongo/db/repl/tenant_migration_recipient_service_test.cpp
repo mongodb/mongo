@@ -612,8 +612,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
     // Wait for task completion success.
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 
-    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
-    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
@@ -652,8 +652,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion success.
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 
-    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
-    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
+    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
@@ -690,8 +690,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
     // Wait for task completion success.
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 
-    ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
-    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
+    ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
@@ -737,8 +737,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion success.
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 
-    ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingOpTime());
-    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingOpTime());
+    ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
+    ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
@@ -870,8 +870,9 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
     taskFp->waitForTimesEntered(initialTimesEntered + 1);
 
     ASSERT_EQ(OpTime(Timestamp(0, 0), OpTime::kUninitializedTerm),
-              getStateDoc(instance.get()).getDataConsistentStopOpTime());
-    ASSERT_EQ(cloneCompletionRecipientOpTime, getStateDoc(instance.get()).getCloneFinishedOpTime());
+              getStateDoc(instance.get()).getDataConsistentStopDonorOpTime());
+    ASSERT_EQ(cloneCompletionRecipientOpTime,
+              getStateDoc(instance.get()).getCloneFinishedRecipientOpTime());
     checkStateDocPersisted(opCtx.get(), instance.get());
 
     taskFpGuard.dismiss();
@@ -895,8 +896,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplicat
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Setting these causes us to skip cloning.
-    initialStateDocument.setCloneFinishedOpTime(topOfOplogOpTime);
-    initialStateDocument.setDataConsistentStopOpTime(topOfOplogOpTime);
+    initialStateDocument.setCloneFinishedRecipientOpTime(topOfOplogOpTime);
+    initialStateDocument.setDataConsistentStopDonorOpTime(topOfOplogOpTime);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
@@ -944,8 +945,8 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Setting these causes us to skip cloning.
-    initialStateDocument.setCloneFinishedOpTime(topOfOplogOpTime);
-    initialStateDocument.setDataConsistentStopOpTime(topOfOplogOpTime);
+    initialStateDocument.setCloneFinishedRecipientOpTime(topOfOplogOpTime);
+    initialStateDocument.setDataConsistentStopDonorOpTime(topOfOplogOpTime);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
@@ -998,8 +999,8 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
 
     // Setting these causes us to skip cloning.
-    initialStateDocument.setCloneFinishedOpTime(topOfOplogOpTime);
-    initialStateDocument.setDataConsistentStopOpTime(topOfOplogOpTime);
+    initialStateDocument.setCloneFinishedRecipientOpTime(topOfOplogOpTime);
+    initialStateDocument.setDataConsistentStopDonorOpTime(topOfOplogOpTime);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;

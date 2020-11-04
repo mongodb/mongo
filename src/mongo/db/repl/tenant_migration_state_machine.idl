@@ -138,25 +138,25 @@ structs:
                     The wall-clock time at which the state machine document should be
                     removed by the TTL monitor.
                 optional: true
-            startApplyingOpTime:
+            startApplyingDonorOpTime:
                 description: >-
                     Populated during data sync; the donor's operation time when the data
                     cloning starts.
                 type: optime
                 optional: true
-            startFetchingOpTime:
+            startFetchingDonorOpTime:
                 description: >-
                     Populated during data sync; the donor's operation time of the last open
                     transaction when the data cloning started.
                 type: optime
                 optional: true
-            dataConsistentStopOpTime:
+            dataConsistentStopDonorOpTime:
                 description: >-
                     Populated during data sync; the donor's operation time when the data
                     cloning finishes.
                 type: optime
                 optional: true
-            cloneFinishedOpTime:
+            cloneFinishedRecipientOpTime:
                 description: >-
                     Populated during data sync; the recipient operation time when the data
                     cloning finishes.

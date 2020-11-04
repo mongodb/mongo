@@ -79,13 +79,13 @@ public:
                 opCtx, recipientService, stateDoc.toBSON());
             uassertStatusOK(recipientInstance->checkIfOptionsConflict(stateDoc));
 
-            auto returnAfterReachingTimestamp = cmd.getReturnAfterReachingTimestamp();
-            if (!returnAfterReachingTimestamp) {
+            auto returnAfterReachingDonorTs = cmd.getReturnAfterReachingDonorTimestamp();
+            if (!returnAfterReachingDonorTs) {
                 return Response(recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
             }
 
             return Response(recipientInstance->waitUntilTimestampIsMajorityCommitted(
-                opCtx, *returnAfterReachingTimestamp));
+                opCtx, *returnAfterReachingDonorTs));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}
