@@ -139,10 +139,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         ? boost::none
         : boost::make_optional(1);
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx,
-        NamespaceString::kConfigReshardingOperationsNamespace,
-        std::move(request),
-        txnNumber);
+        opCtx, NamespaceString::kConfigReshardingOperationsNamespace, request, txnNumber);
 
     if (expectedNumModified) {
         assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
@@ -276,7 +273,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
         : boost::make_optional(1);
 
     auto res = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
-        opCtx, CollectionType::ConfigNS, std::move(request), txnNumber);
+        opCtx, CollectionType::ConfigNS, request, txnNumber);
 
     if (expectedNumModified) {
         assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
