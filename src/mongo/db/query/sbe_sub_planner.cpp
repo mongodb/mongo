@@ -54,16 +54,19 @@ CandidatePlans SubPlanner::plan(
     auto multiplanCallback = [&](CanonicalQuery* cq,
                                  std::vector<std::unique_ptr<QuerySolution>> solutions)
         -> StatusWith<std::unique_ptr<QuerySolution>> {
-        // Before planning a new branch of the $or, we need to clear any plans previously registered
-        // to yield. Each branch of the $or gets multi-planned independently, so we don't want to
-        // try to yield plans leftover from a different branch.
-        _yieldPolicy->clearRegisteredPlans();
-
         std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots;
         for (auto&& solution : solutions) {
             roots.push_back(stage_builder::buildSlotBasedExecutableTree(
                 _opCtx, _collection, *cq, *solution, _yieldPolicy, true));
         }
+
+        // Ensure that no previous plans are registered to yield while we multi plan each branch.
+        _yieldPolicy->clearRegisteredPlans();
+
+        // Clear any plans registered to yield once multiplanning is done for this branch. We don't
+        // want to leave dangling pointers to the execution plans used in multi planning hanging
+        // around in the YieldPolicy.
+        ON_BLOCK_EXIT([this]() { _yieldPolicy->clearRegisteredPlans(); });
 
         // We pass the SometimesCache option to the MPS because the SubplanStage currently does
         // not use the 'CachedSolutionPlanner' eviction mechanism. We therefore are more
