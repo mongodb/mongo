@@ -184,7 +184,7 @@ void ScanStage::open(bool reOpen) {
             const auto msgTag = tag;
             uassert(ErrorCodes::BadValue,
                     str::stream() << "seek key is wrong type: " << msgTag,
-                    tag == value::TypeTags::NumberInt64);
+                    tag == value::TypeTags::RecordId);
 
             _key = RecordId{value::bitcastTo<int64_t>(val)};
         }
@@ -221,7 +221,7 @@ PlanState ScanStage::getNext() {
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(value::TypeTags::NumberInt64,
+        _recordIdAccessor->reset(value::TypeTags::RecordId,
                                  value::bitcastFrom<int64_t>(nextRecord->id.repr()));
     }
 
@@ -527,7 +527,7 @@ PlanState ParallelScanStage::getNext() {
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(value::TypeTags::NumberInt64,
+        _recordIdAccessor->reset(value::TypeTags::RecordId,
                                  value::bitcastFrom<int64_t>(nextRecord->id.repr()));
     }
 

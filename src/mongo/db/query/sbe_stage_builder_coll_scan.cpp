@@ -191,7 +191,7 @@ generateOptimizedOplogScan(OperationContext* opCtx,
                     sbe::makeS<sbe::CoScanStage>(csn->nodeId()), 1, boost::none, csn->nodeId()),
                 csn->nodeId(),
                 *seekRecordIdSlot,
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::RecordId,
                                            sbe::value::bitcastFrom<int64_t>(seekRecordId->repr()))),
             std::move(stage),
             sbe::makeSV(),
@@ -359,7 +359,7 @@ generateGenericCollScan(OperationContext* opCtx,
             csn->nodeId(),
             seekSlot,
             sbe::makeE<sbe::EConstant>(
-                sbe::value::TypeTags::NumberInt64,
+                sbe::value::TypeTags::RecordId,
                 sbe::value::bitcastFrom<int64_t>(csn->resumeAfterRecordId->repr())));
 
         // Construct a 'seek' branch of the 'union'. If we're succeeded to reposition the cursor,

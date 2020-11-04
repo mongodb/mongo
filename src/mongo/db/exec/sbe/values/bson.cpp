@@ -231,6 +231,7 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
             case value::TypeTags::NumberInt32:
                 builder.append(value::bitcastTo<int32_t>(val));
                 break;
+            case value::TypeTags::RecordId:
             case value::TypeTags::NumberInt64:
                 builder.append(value::bitcastTo<int64_t>(val));
                 break;
@@ -317,6 +318,7 @@ void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
             case value::TypeTags::NumberInt32:
                 builder.append(name, value::bitcastTo<int32_t>(val));
                 break;
+            case value::TypeTags::RecordId:
             case value::TypeTags::NumberInt64:
                 builder.append(name, value::bitcastTo<int64_t>(val));
                 break;

@@ -100,6 +100,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isBinData
     0,  // isDate
     0,  // isNaN
+    0,  // isRecordId
     0,  // typeMatch
 
     0,  // function is special, the stack offset is encoded in the instruction itself
@@ -324,6 +325,10 @@ void CodeFragment::appendIsDate() {
 
 void CodeFragment::appendIsNaN() {
     appendSimpleInstruction(Instruction::isNaN);
+}
+
+void CodeFragment::appendIsRecordId() {
+    appendSimpleInstruction(Instruction::isRecordId);
 }
 
 void CodeFragment::appendTypeMatch(uint32_t typeMask) {
@@ -2595,6 +2600,20 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                         topStack(false,
                                  value::TypeTags::Boolean,
                                  value::bitcastFrom<bool>(value::isNaN(tag, val)));
+                    }
+
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::isRecordId: {
+                    auto [owned, tag, val] = getFromStack(0);
+
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(value::isRecordId(tag)));
                     }
 
                     if (owned) {

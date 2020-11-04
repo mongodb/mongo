@@ -274,7 +274,7 @@ PlanState IndexScanStage::getNext() {
     }
 
     if (_recordIdAccessor) {
-        _recordIdAccessor->reset(value::TypeTags::NumberInt64,
+        _recordIdAccessor->reset(value::TypeTags::RecordId,
                                  value::bitcastFrom<int64_t>(_nextRecord->loc.repr()));
     }
 

@@ -161,6 +161,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
         case TypeTags::timeZoneDB:
             stream << "timeZoneDB";
             break;
+        case TypeTags::RecordId:
+            stream << "RecordId";
+            break;
         default:
             stream << "unknown tag";
             break;
@@ -370,6 +373,9 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             stream << "TimeZoneDatabase(" + timeZones.front() + "..." + timeZones.back() + ")";
             break;
         }
+        case value::TypeTags::RecordId:
+            stream << "RecordId(" << bitcastTo<int64_t>(val) << ")";
+            break;
         default:
             MONGO_UNREACHABLE;
     }
@@ -401,6 +407,7 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::EOO;
         case TypeTags::NumberInt32:
             return BSONType::NumberInt;
+        case TypeTags::RecordId:
         case TypeTags::NumberInt64:
             return BSONType::NumberLong;
         case TypeTags::NumberDouble:
@@ -449,6 +456,7 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
     switch (tag) {
         case TypeTags::NumberInt32:
             return absl::Hash<int32_t>{}(bitcastTo<int32_t>(val));
+        case TypeTags::RecordId:
         case TypeTags::NumberInt64:
             return absl::Hash<int64_t>{}(bitcastTo<int64_t>(val));
         case TypeTags::NumberDouble: {
@@ -695,6 +703,9 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
     } else if (lhsTag == TypeTags::Nothing && rhsTag == TypeTags::Nothing) {
         // Special case for Nothing in a hash table (group) and sort comparison.
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+    } else if (lhsTag == TypeTags::RecordId && rhsTag == TypeTags::RecordId) {
+        auto result = compareHelper(bitcastTo<int64_t>(lhsValue), bitcastTo<int64_t>(rhsValue));
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else {
         // Different types.
         auto result =

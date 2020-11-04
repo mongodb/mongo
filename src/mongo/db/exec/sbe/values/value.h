@@ -99,6 +99,7 @@ enum class TypeTags : uint8_t {
     Object,
 
     ObjectId,
+    RecordId,
 
     // TODO add the rest of mongo types (regex, etc.)
 
@@ -143,6 +144,10 @@ inline constexpr bool isObjectId(TypeTags tag) noexcept {
 
 inline constexpr bool isBinData(TypeTags tag) noexcept {
     return tag == TypeTags::bsonBinData;
+}
+
+inline constexpr bool isRecordId(TypeTags tag) noexcept {
+    return tag == TypeTags::RecordId;
 }
 
 BSONType tagToType(TypeTags tag) noexcept;

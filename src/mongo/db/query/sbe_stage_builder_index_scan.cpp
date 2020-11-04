@@ -603,7 +603,7 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
         makeSlotVector(resultSlot, std::move(indexKeySlots)),
         sbe::makeE<sbe::EPrimUnary>(
             sbe::EPrimUnary::logicNot,
-            sbe::makeE<sbe::EFunction>("isNumber"sv,
+            sbe::makeE<sbe::EFunction>("isRecordId"sv,
                                        sbe::makeEs(sbe::makeE<sbe::EVariable>(resultSlot)))),
         ixn->nodeId());
 
@@ -611,7 +611,7 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
     return {resultSlot,
             sbe::makeS<sbe::FilterStage<false>>(
                 std::move(spool),
-                sbe::makeE<sbe::EFunction>("isNumber"sv,
+                sbe::makeE<sbe::EFunction>("isRecordId"sv,
                                            sbe::makeEs(sbe::makeE<sbe::EVariable>(resultSlot))),
                 ixn->nodeId())};
 }

@@ -449,6 +449,8 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
      InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsBinData, false}},
     {"isDate", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsDate, false}},
     {"isNaN", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsNaN, false}},
+    {"isRecordId",
+     InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendIsRecordId, false}},
     {"sum", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendSum, true}},
     {"min", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMin, true}},
     {"max", InstrFn{[](size_t n) { return n == 1; }, &vm::CodeFragment::appendMax, true}},

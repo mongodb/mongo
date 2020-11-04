@@ -46,6 +46,7 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
         case TypeTags::NumberInt32:
             val = bitcastFrom<int32_t>(buf.read<int32_t>());
             break;
+        case TypeTags::RecordId:
         case TypeTags::NumberInt64:
             val = bitcastFrom<int64_t>(buf.read<int64_t>());
             break;
@@ -184,6 +185,7 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
         case TypeTags::NumberInt32:
             buf.appendNum(bitcastTo<int32_t>(val));
             break;
+        case TypeTags::RecordId:
         case TypeTags::NumberInt64:
             buf.appendNum(bitcastTo<int64_t>(val));
             break;
@@ -300,6 +302,7 @@ static int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::Timestamp:
         case TypeTags::Boolean:
         case TypeTags::StringSmall:
+        case TypeTags::RecordId:
             break;
         // There are deep types.
         case TypeTags::NumberDecimal:

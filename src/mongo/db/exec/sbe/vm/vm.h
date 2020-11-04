@@ -151,6 +151,7 @@ struct Instruction {
         isBinData,
         isDate,
         isNaN,
+        isRecordId,
         typeMatch,
 
         function,
@@ -297,6 +298,7 @@ public:
     void appendIsBinData();
     void appendIsDate();
     void appendIsNaN();
+    void appendIsRecordId();
     void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, uint8_t arity);
     void appendJump(int jumpOffset);
