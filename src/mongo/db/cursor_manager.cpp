@@ -119,7 +119,7 @@ CursorManager::~CursorManager() {
 }
 
 bool CursorManager::cursorShouldTimeout_inlock(const ClientCursor* cursor, Date_t now) {
-    if (cursor->isNoTimeout() || cursor->_operationUsingCursor) {
+    if (cursor->isNoTimeout() || cursor->_operationUsingCursor || cursor->getSessionId()) {
         return false;
     }
     return (now - cursor->_lastUseDate) >= Milliseconds(getCursorTimeoutMillis());
