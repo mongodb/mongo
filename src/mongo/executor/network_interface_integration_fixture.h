@@ -31,6 +31,7 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/client/connection_string.h"
+#include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
@@ -63,7 +64,8 @@ using StartCommandCB = std::function<void(const RemoteCommandResponse&)>;
 
 class NetworkInterfaceIntegrationFixture : public mongo::unittest::Test {
 public:
-    void createNet(std::unique_ptr<NetworkConnectionHook> connectHook = nullptr);
+    void createNet(std::unique_ptr<NetworkConnectionHook> connectHook = nullptr,
+                   ConnectionPool::Options options = {});
     void startNet(std::unique_ptr<NetworkConnectionHook> connectHook = nullptr);
     void tearDown() override;
 

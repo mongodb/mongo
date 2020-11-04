@@ -134,15 +134,16 @@ private:
 
 class TLConnection final : public ConnectionPool::ConnectionInterface, public TLTypeFactory::Type {
 public:
-    TLConnection(const std::shared_ptr<TLTypeFactory>& factory,
-                 transport::ReactorHandle reactor,
-                 ServiceContext* serviceContext,
-                 HostAndPort peer,
-                 transport::ConnectSSLMode sslMode,
-                 size_t generation,
-                 NetworkConnectionHook* onConnectHook,
-                 bool skipAuth,
-                 std::shared_ptr<transport::SSLConnectionContext> sslContextOverride = nullptr)
+    TLConnection(
+        const std::shared_ptr<TLTypeFactory>& factory,
+        transport::ReactorHandle reactor,
+        ServiceContext* serviceContext,
+        HostAndPort peer,
+        transport::ConnectSSLMode sslMode,
+        size_t generation,
+        NetworkConnectionHook* onConnectHook,
+        bool skipAuth,
+        std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr)
         : ConnectionInterface(generation),
           TLTypeFactory::Type(factory),
           _reactor(reactor),
@@ -152,7 +153,7 @@ public:
           _peer(std::move(peer)),
           _sslMode(sslMode),
           _onConnectHook(onConnectHook),
-          _sslContextOverride(sslContextOverride) {}
+          _transientSSLContext(transientSSLContext) {}
     ~TLConnection() {
         // Release must be the first expression of this dtor
         release();
@@ -190,7 +191,8 @@ private:
     HostAndPort _peer;
     transport::ConnectSSLMode _sslMode;
     NetworkConnectionHook* const _onConnectHook;
-    std::shared_ptr<transport::SSLConnectionContext> _sslContextOverride;
+    // SSL context to use intead of the default one for this pool.
+    std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
     AsyncDBClient::Handle _client;
 };
 

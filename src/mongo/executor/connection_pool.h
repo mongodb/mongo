@@ -33,6 +33,7 @@
 #include <memory>
 #include <queue>
 
+#include "mongo/config.h"
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/platform/mutex.h"
@@ -43,6 +44,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 
@@ -150,6 +152,14 @@ public:
          */
         bool skipAuthentication = false;
 
+#ifdef MONGO_CONFIG_SSL
+        /**
+         * Provides SSL params if the egress cluster connection requires custom SSL certificates
+         * different from the global (default) certificates.
+         */
+        boost::optional<TransientSSLParams> transientSSLParams;
+#endif
+
         std::function<std::shared_ptr<ControllerInterface>(void)> controllerFactory =
             &ConnectionPool::makeLimitController;
     };
@@ -226,9 +236,11 @@ public:
         bool canShutdown = false;
     };
 
-    explicit ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> impl,
-                            std::string name,
-                            Options options = Options{});
+    explicit ConnectionPool(
+        std::shared_ptr<DependentTypeFactoryInterface> impl,
+        std::string name,
+        Options options = Options{},
+        std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = {});
 
     ~ConnectionPool();
 
@@ -257,7 +269,10 @@ private:
     std::string _name;
 
     const std::shared_ptr<DependentTypeFactoryInterface> _factory;
-    Options _options;
+    const Options _options;
+
+    // SSL context for the connections that require non-default SSL paramaeters.
+    std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
 
     std::shared_ptr<ControllerInterface> _controller;
 

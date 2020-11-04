@@ -569,7 +569,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
     ConnectSSLMode sslMode,
     const ReactorHandle& reactor,
     Milliseconds timeout,
-    std::shared_ptr<SSLConnectionContext> sslContextOverride) {
+    std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
 
     struct AsyncConnectState {
         AsyncConnectState(HostAndPort peer,
@@ -662,13 +662,13 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
 #endif
             return connector->socket.async_connect(*connector->resolvedEndpoint, UseFuture{});
         })
-        .then([this, connector, sslMode, sslContextOverride]() -> Future<void> {
+        .then([this, connector, sslMode, transientSSLContext]() -> Future<void> {
             stdx::unique_lock<Latch> lk(connector->mutex);
             connector->session = std::make_shared<ASIOSession>(this,
                                                                std::move(connector->socket),
                                                                false,
                                                                *connector->resolvedEndpoint,
-                                                               sslContextOverride);
+                                                               transientSSLContext);
             connector->session->ensureAsync();
 
 #ifndef MONGO_CONFIG_SSL

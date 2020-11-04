@@ -65,7 +65,7 @@ public:
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,
         Milliseconds timeout,
-        std::shared_ptr<SSLConnectionContext> sslContextOverride = nullptr) override;
+        std::shared_ptr<const SSLConnectionContext> transientSSLContext = nullptr) override;
 
     Status setup() override;
     Status start() override;

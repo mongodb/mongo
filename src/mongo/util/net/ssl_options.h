@@ -37,6 +37,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/config.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/role_name.h"
@@ -132,6 +133,15 @@ struct SSLParams {
 };
 
 extern SSLParams sslGlobalParams;
+
+
+// Additional SSL Params that could be used to augment a particular connection
+// or have limited lifetime. In all cases, the fields stored here are not appropriate
+// to be part of sslGlobalParams.
+struct TransientSSLParams {
+    ConnectionString targetedClusterConnectionString;
+    std::string sslClusterPEMPayload;
+};
 
 /**
  * Older versions of mongod/mongos accepted --sslDisabledProtocols values

@@ -61,7 +61,7 @@ public:
         ServiceContext* const context,
         transport::ReactorHandle reactor,
         Milliseconds timeout,
-        std::shared_ptr<transport::SSLConnectionContext> sslContextOverride = nullptr);
+        std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(
         executor::RemoteCommandRequest request, const BatonHandle& baton = nullptr);

@@ -72,8 +72,8 @@ Future<SessionHandle> TransportLayerManager::asyncConnect(
     ConnectSSLMode sslMode,
     const ReactorHandle& reactor,
     Milliseconds timeout,
-    std::shared_ptr<SSLConnectionContext> sslContextOverride) {
-    return _tls.front()->asyncConnect(peer, sslMode, reactor, timeout, sslContextOverride);
+    std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
+    return _tls.front()->asyncConnect(peer, sslMode, reactor, timeout, transientSSLContext);
 }
 
 ReactorHandle TransportLayerManager::getReactor(WhichReactor which) {

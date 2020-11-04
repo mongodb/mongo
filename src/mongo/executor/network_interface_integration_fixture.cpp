@@ -48,8 +48,7 @@ namespace mongo {
 namespace executor {
 
 void NetworkInterfaceIntegrationFixture::createNet(
-    std::unique_ptr<NetworkConnectionHook> connectHook) {
-    ConnectionPool::Options options;
+    std::unique_ptr<NetworkConnectionHook> connectHook, ConnectionPool::Options options) {
 
     options.minConnections = 0u;
 

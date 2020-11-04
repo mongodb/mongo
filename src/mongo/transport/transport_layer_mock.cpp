@@ -72,7 +72,7 @@ Future<SessionHandle> TransportLayerMock::asyncConnect(
     ConnectSSLMode sslMode,
     const ReactorHandle& reactor,
     Milliseconds timeout,
-    std::shared_ptr<SSLConnectionContext> sslContextOverride) {
+    std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
     MONGO_UNREACHABLE;
 }
 

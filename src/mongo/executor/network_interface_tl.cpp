@@ -124,11 +124,23 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
         _tl = _ownedTransportLayer.get();
     }
 
+    std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
+    if (_connPoolOpts.transientSSLParams) {
+        // TODO: uncomment when changes for SERVER-51599 are submitted.
+        // auto statusOrContext = _tl->createTransientSSLContext(
+        //     _connPoolOpts.transientSSLParams.get(), nullptr, true /* asyncOCSPStaple */);
+        // uassertStatusOK(statusOrContext.getStatus());
+        // transientSSLContext = std::make_shared<const transport::SSLConnectionContext>(
+        //     std::move(statusOrContext.getValue()));
+    }
+
     _reactor = _tl->getReactor(transport::TransportLayer::kNewReactor);
     auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
         _reactor, _tl, std::move(_onConnectHook), _connPoolOpts);
-    _pool = std::make_shared<ConnectionPool>(
-        std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
+    _pool = std::make_shared<ConnectionPool>(std::move(typeFactory),
+                                             std::string("NetworkInterfaceTL-") + _instanceName,
+                                             _connPoolOpts,
+                                             transientSSLContext);
 
     if (TestingProctor::instance().isEnabled()) {
         _counters = std::make_unique<SynchronizedCounters>();
