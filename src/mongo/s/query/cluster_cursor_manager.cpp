@@ -411,7 +411,7 @@ std::size_t ClusterCursorManager::killMortalCursorsInactiveSince(OperationContex
     stdx::unique_lock<Latch> lk(_mutex);
 
     auto pred = [cutoff](CursorId cursorId, const CursorEntry& entry) -> bool {
-        bool res = entry.getLifetimeType() == CursorLifetime::Mortal &&
+        bool res = entry.getLifetimeType() == CursorLifetime::Mortal && !entry.getLsid() &&
             !entry.getOperationUsingCursor() && entry.getLastActive() <= cutoff;
 
         if (res) {
