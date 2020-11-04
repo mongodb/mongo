@@ -65,14 +65,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResh
 
     std::list<boost::intrusive_ptr<DocumentSource>> stages;
     if (startAfter) {
-        stages.emplace_back(DocumentSourceMatch::create(BSON(SessionTxnRecord::kSessionIdFieldName
-                                                             << BSON("$gt" << startAfter->toBSON())
-                                                             << SessionTxnRecord::kStateFieldName
-                                                             << BSON("$exists" << false)),
-                                                        expCtx));
-    } else {
         stages.emplace_back(DocumentSourceMatch::create(
-            BSON(SessionTxnRecord::kStateFieldName << BSON("$exists" << false)), expCtx));
+            BSON(SessionTxnRecord::kSessionIdFieldName << BSON("$gt" << startAfter->toBSON())),
+            expCtx));
     }
     stages.emplace_back(
         DocumentSourceSort::create(expCtx, BSON(SessionTxnRecord::kSessionIdFieldName << 1)));
@@ -189,7 +184,7 @@ void configTxnsMergerForResharding(OperationContext* opCtx, BSONObj donorBsonTra
 
         repl::MutableOplogEntry oplogEntry;
         oplogEntry.setObject(BSON("$sessionMigrateInfo" << 1));
-        oplogEntry.setObject2(BSON("$incompleteOplogHistory" << 1));
+        oplogEntry.setObject2(TransactionParticipant::kDeadEndSentinel);
         oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
         oplogEntry.setSessionId(donorTransaction.getSessionId());
         oplogEntry.setTxnNumber(donorTransaction.getTxnNum());

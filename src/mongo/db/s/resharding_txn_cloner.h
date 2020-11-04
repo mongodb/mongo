@@ -41,7 +41,7 @@ namespace mongo {
 /**
  * Create pipeline stages for iterating donor config.transactions.  The pipeline has these stages:
  * pipeline: [
- *      {$match: {_id: {$gt: <startAfter>}, state: {$exists: false}}},
+ *      {$match: {_id: {$gt: <startAfter>}}},
  *      {$sort: {_id: 1}},
  *      {$match: {"lastWriteOpTime.ts": {$lt: <fetchTimestamp>}}},
  * ],
