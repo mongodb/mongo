@@ -34,16 +34,15 @@ from wtdataset import simple_key
 from wtscenario import make_scenarios
 import glob
 
-# test_backup15.py
-# Test cursor backup with a block-based incremental cursor.
-class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
+# test_backup19.py
+# Test cursor backup with a block-based incremental cursor source id only.
+class test_backup19(wttest.WiredTigerTestCase, suite_subprocess):
     bkp_home = "WT_BLOCK"
     counter=0
     conn_config='cache_size=1G,log=(enabled,file_max=100K)'
     logmax="100K"
-    max_iteration=5
     mult=0
-    nops=100000
+    nops=10000
     savefirst=0
     savekey='NOTSET'
     uri="table:main"
@@ -69,7 +68,8 @@ class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
     # incremental each time through.
     #
     def setup_directories(self):
-        for i in range(0, self.max_iteration):
+        # We're only coming through once so just set up the 0 and 1 directories.
+        for i in range(0, 2):
             # The log directory is a subdirectory of the home directory,
             # creating that will make the home directory also.
             log_dir = self.home_incr + '.' + str(i) + '/' + self.logpath
@@ -125,7 +125,7 @@ class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
 
             if self.counter == 0:
                 # Take a full backup into each incremental directory
-                for i in range(0, self.max_iteration):
+                for i in range(0, 2):
                     copy_from = newfile
                     # If it is a log file, prepend the path.
                     if ("WiredTigerLog" in newfile):
@@ -148,7 +148,7 @@ class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
     def take_incr_backup(self):
         self.assertTrue(self.counter > 0)
         # Open the backup data source for incremental backup.
-        buf = 'incremental=(src_id="ID' +  str(self.counter - 1) + '",this_id="ID' + str(self.counter) + '")'
+        buf = 'incremental=(src_id="ID' +  str(self.counter - 1) + '")'
         self.pr(buf)
         bkup_c = self.session.open_cursor('backup:', None, buf)
 
@@ -208,7 +208,7 @@ class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
             incr_c.close()
 
             # For each file, we want to copy it into each of the later incremental directories.
-            for i in range(self.counter, self.max_iteration):
+            for i in range(self.counter, 2):
                 h = self.home_incr + '.' + str(i)
                 copy_from = newfile
                 if ("WiredTigerLog" in newfile):
@@ -265,7 +265,7 @@ class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
         if self.initial_backup == False:
             self.counter += 1
 
-    def test_backup15(self):
+    def test_backup19(self):
         os.mkdir(self.bkp_home)
         self.home = self.bkp_home
         self.session.create(self.uri, "key_format=S,value_format=S")
@@ -280,20 +280,11 @@ class test_backup15(wttest.WiredTigerTestCase, suite_subprocess):
         self.initial_backup = False
         self.session.checkpoint()
 
-        # Each call now to take a full backup will make a copy into a full directory. Then
-        # each incremental will take an incremental backup and we can compare them.
-        for i in range(1, self.max_iteration):
-            self.add_data(self.uri)
-            self.session.checkpoint()
-            # Swap the order of the full and incremental backups. It should not matter. They
-            # should not interfere with each other.
-            if i % 2 == 0:
-                self.take_full_backup()
-                self.take_incr_backup()
-            else:
-                self.take_incr_backup()
-                self.take_full_backup()
-            self.compare_backups(self.uri)
+        self.add_data(self.uri)
+        self.session.checkpoint()
+        self.take_full_backup()
+        self.take_incr_backup()
+        self.compare_backups(self.uri)
 
 if __name__ == '__main__':
     wttest.run()

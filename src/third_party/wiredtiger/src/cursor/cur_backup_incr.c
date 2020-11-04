@@ -111,8 +111,10 @@ __curbackup_incr_next(WT_CURSOR *cursor)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     wt_off_t size;
+    uint64_t start_bitoff, total_len;
     uint32_t raw;
     const char *file;
+    bool found;
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     btree = cb->incr_cursor == NULL ? NULL : CUR2BT(cb->incr_cursor);
@@ -144,18 +146,7 @@ __curbackup_incr_next(WT_CURSOR *cursor)
         F_SET(cb, WT_CURBACKUP_INCR_INIT);
         __wt_cursor_set_key(cursor, 0, size, WT_BACKUP_FILE);
     } else {
-        if (F_ISSET(cb, WT_CURBACKUP_INCR_INIT)) {
-            /* Look for the next chunk that had modifications.  */
-            while (cb->bit_offset < cb->nbits)
-                if (__bit_test(cb->bitstring.mem, cb->bit_offset))
-                    break;
-                else
-                    ++cb->bit_offset;
-
-            /* We either have this object's incremental information or we're done. */
-            if (cb->bit_offset >= cb->nbits)
-                WT_ERR(WT_NOTFOUND);
-        } else {
+        if (!F_ISSET(cb, WT_CURBACKUP_INCR_INIT)) {
             /*
              * We don't have this object's incremental information, and it's not a full file copy.
              * Get a list of the block modifications for the file. The block modifications are from
@@ -186,8 +177,37 @@ __curbackup_incr_next(WT_CURSOR *cursor)
                 WT_ERR(WT_NOTFOUND);
             }
         }
-        __wt_cursor_set_key(cursor, cb->offset + cb->granularity * cb->bit_offset++,
-          cb->granularity, WT_BACKUP_RANGE);
+        /* We have initialized incremental information. */
+        start_bitoff = cb->bit_offset;
+        total_len = cb->granularity;
+        found = false;
+        /* The bit offset can be less than or equal to but never greater than the number of bits. */
+        WT_ASSERT(session, cb->bit_offset <= cb->nbits);
+        /* Look for the next chunk that had modifications.  */
+        while (cb->bit_offset < cb->nbits)
+            if (__bit_test(cb->bitstring.mem, cb->bit_offset)) {
+                found = true;
+                /*
+                 * Care must be taken to leave the bit_offset field set to the next offset bit so
+                 * that the next call is set to the correct offset.
+                 */
+                start_bitoff = cb->bit_offset++;
+                if (F_ISSET(cb, WT_CURBACKUP_CONSOLIDATE)) {
+                    while (
+                      cb->bit_offset < cb->nbits && __bit_test(cb->bitstring.mem, cb->bit_offset++))
+                        total_len += cb->granularity;
+                }
+                break;
+            } else
+                ++cb->bit_offset;
+
+        /* We either have this object's incremental information or we're done. */
+        if (!found)
+            WT_ERR(WT_NOTFOUND);
+        WT_ASSERT(session, cb->granularity != 0);
+        WT_ASSERT(session, total_len != 0);
+        __wt_cursor_set_key(
+          cursor, cb->offset + cb->granularity * start_bitoff, total_len, WT_BACKUP_RANGE);
     }
 
 done:
@@ -249,6 +269,11 @@ __wt_curbackup_open_incr(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *o
           cb->incr_file, other_cb->incr_src->id_str);
         F_SET(cb, WT_CURBACKUP_FORCE_FULL);
     }
+    if (F_ISSET(other_cb, WT_CURBACKUP_CONSOLIDATE))
+        F_SET(cb, WT_CURBACKUP_CONSOLIDATE);
+    else
+        F_CLR(cb, WT_CURBACKUP_CONSOLIDATE);
+
     /*
      * Set up the incremental backup information, if we are not forcing a full file copy. We need an
      * open cursor on the file. Open the backup checkpoint, confirming it exists.

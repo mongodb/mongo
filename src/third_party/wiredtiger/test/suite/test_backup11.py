@@ -135,6 +135,16 @@ class test_backup11(wttest.WiredTigerTestCase, suite_subprocess):
         self.pr("Opened backup for error testing")
 
         # Now test all the error cases with an incremental primary open.
+        # - We cannot specify consolidate on the duplicate cursor.
+        config = 'incremental=(consolidate=true,file=test.wt)'
+        msg = "/consolidation can only be specified on a primary/"
+        self.pr("Test consolidation on a dup")
+        self.pr("=========")
+        # Test multiple duplicate backup cursors.
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.assertEquals(self.session.open_cursor(None,
+            bkup_c, config), 0), msg)
+
         # - We cannot make multiple incremental duplcate backup cursors.
         # - We cannot duplicate the duplicate backup cursor.
         config = 'incremental=(file=test.wt)'

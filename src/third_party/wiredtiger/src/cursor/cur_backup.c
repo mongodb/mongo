@@ -195,6 +195,7 @@ __curbackup_close(WT_CURSOR *cursor)
     WT_CURSOR_BACKUP *cb;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    const char *cfg[3] = {NULL, NULL, NULL};
 
     cb = (WT_CURSOR_BACKUP *)cursor;
     CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, close, NULL);
@@ -204,6 +205,14 @@ err:
         __wt_verbose(
           session, WT_VERB_BACKUP, "%s", "Releasing resources from forced stop incremental");
         __wt_backup_destroy(session);
+        /*
+         * We need to force a checkpoint to the metadata to make the force stop durable. Without it,
+         * the backup information could reappear if we crash and restart.
+         */
+        cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_checkpoint);
+        cfg[1] = "force=true";
+        WT_WITH_DHANDLE(session, WT_SESSION_META_DHANDLE(session),
+          WT_WITH_METADATA_LOCK(session, ret = __wt_checkpoint(session, cfg)));
     }
 
     /*
@@ -440,7 +449,7 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     const char *uri;
-    bool incremental_config, is_dup, log_config, target_list;
+    bool consolidate, incremental_config, is_dup, log_config, target_list;
 
     *foundp = *incr_only = *log_only = false;
 
@@ -462,6 +471,19 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
         }
         /* Granularity can only be set once at the beginning */
         F_SET(conn, WT_CONN_INCR_BACKUP);
+        incremental_config = true;
+    }
+
+    /*
+     * Consolidation can be on a per incremental basis or a per-file duplicate cursor basis.
+     */
+    WT_RET(__wt_config_gets(session, cfg, "incremental.consolidate", &cval));
+    consolidate = F_MASK(cb, WT_CURBACKUP_CONSOLIDATE);
+    if (cval.val) {
+        if (is_dup)
+            WT_RET_MSG(session, EINVAL,
+              "Incremental consolidation can only be specified on a primary backup cursor");
+        F_SET(cb, WT_CURBACKUP_CONSOLIDATE);
         incremental_config = true;
     }
 
@@ -584,8 +606,11 @@ __backup_config(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb, const char *cfg[
         F_SET(cb, WT_CURBACKUP_INCR);
     }
 err:
-    if (ret != 0 && cb->incr_src != NULL)
+    if (ret != 0 && cb->incr_src != NULL) {
         F_CLR(cb->incr_src, WT_BLKINCR_INUSE);
+        F_CLR(cb, WT_CURBACKUP_CONSOLIDATE);
+        F_SET(cb, consolidate);
+    }
     __wt_scr_free(session, &tmp);
     return (ret);
 }

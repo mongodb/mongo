@@ -1281,6 +1281,12 @@ methods = {
         configure the cursor for block incremental backup usage. These formats
         are only compatible with the backup data source; see @ref backup''',
         type='category', subconfig=[
+        Config('consolidate', 'false', r'''
+            causes block incremental backup information to be consolidated if adjacent
+            granularity blocks are modified. If false, information will be returned in
+            granularity sized blocks only. This must be set on the primary backup cursor and it
+            applies to all files for this backup''',
+            type='boolean'),
         Config('enabled', 'false', r'''
             whether to configure this backup as the starting point for a subsequent
             incremental backup''',

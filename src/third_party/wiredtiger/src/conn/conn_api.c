@@ -2762,7 +2762,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
      */
     if (verify_meta) {
         WT_ERR(__wt_open_internal_session(conn, "verify hs", false, 0, &verify_session));
-        ret = __wt_history_store_verify(verify_session);
+        ret = __wt_hs_verify(verify_session);
         WT_TRET(__wt_session_close_internal(verify_session));
         WT_ERR(ret);
     }

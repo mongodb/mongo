@@ -342,7 +342,8 @@ take_incr_backup(WT_SESSION *session, int i)
     /*! [Query existing IDs] */
 
     /* Open the backup data source for incremental backup. */
-    (void)snprintf(buf, sizeof(buf), "incremental=(src_id=\"ID%d\",this_id=\"ID%d\")", i - 1, i);
+    (void)snprintf(buf, sizeof(buf), "incremental=(src_id=\"ID%d\",this_id=\"ID%d\"%s)", i - 1, i,
+      i % 2 == 0 ? "" : ",consolidate=true");
     error_check(session->open_cursor(session, "backup:", NULL, buf, &backup_cur));
     rfd = wfd = -1;
     count = 0;

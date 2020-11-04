@@ -25,12 +25,12 @@ static int __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR 
   const WT_ITEM *srch_key);
 
 /*
- * __hs_insert_updates_verbose --
+ * __hs_verbose_cache_stats --
  *     Display a verbose message once per checkpoint with details about the cache state when
  *     performing a history store table write.
  */
 static void
-__hs_insert_updates_verbose(WT_SESSION_IMPL *session, WT_BTREE *btree)
+__hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -699,7 +699,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
 
 err:
     if (ret == 0 && insert_cnt > 0)
-        __hs_insert_updates_verbose(session, btree);
+        __hs_verbose_cache_stats(session, btree);
 
     __wt_scr_free(session, &key);
     /* modify_value is allocated in __wt_modify_pack. Free it if it is allocated. */
