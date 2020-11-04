@@ -51,6 +51,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/ttl_gen.h"
@@ -300,6 +301,9 @@ private:
             LOGV2(22534, "Hanging due to hangTTLMonitorWithLock fail point");
             hangTTLMonitorWithLock.pauseWhileSet(opCtx);
         }
+
+        ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx,
+                                                                  collectionNSS.db().toString());
 
         if (!collection) {
             // Collection was dropped.
