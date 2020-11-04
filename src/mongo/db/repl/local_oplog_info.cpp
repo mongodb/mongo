@@ -35,6 +35,7 @@
 
 #include "mongo/db/logical_clock.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/record_store.h"
@@ -74,7 +75,8 @@ void LocalOplogInfo::setOplogCollectionName(ServiceContext* service) {
             _oplogName = NamespaceString::kRsOplogNamespace;
             break;
         case ReplicationCoordinator::modeNone:
-            if (ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+            if (ReplSettings::shouldRecoverFromOplogAsStandalone() ||
+                (storageGlobalParams.readOnly && !recoverToOplogTimestamp.empty())) {
                 _oplogName = NamespaceString::kRsOplogNamespace;
             }
             // leave empty otherwise.

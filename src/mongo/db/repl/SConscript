@@ -25,6 +25,7 @@ env.Library(
         'repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/logical_time',
+        '$BUILD_DIR/mongo/db/mongod_options',
         '$BUILD_DIR/mongo/db/storage/flow_control',
     ],
 )
