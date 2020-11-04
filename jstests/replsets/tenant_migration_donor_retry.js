@@ -167,7 +167,7 @@ const donorPrimary = donorRst.getPrimary();
 
 (() => {
     jsTest.log(
-        "Test that the donor does not retry recipientSyncData (with returnAfterReachingTimestamp) " +
+        "Test that the donor does not retry recipientSyncData (with returnAfterReachingDonorTimestamp) " +
         "on stepdown errors");
 
     const migrationId = testMigrationAbortsOnRecipientSyncDataCmdError(
@@ -180,7 +180,7 @@ const donorPrimary = donorRst.getPrimary();
 
 (() => {
     jsTest.log(
-        "Test that the donor does not retry recipientSyncData (with returnAfterReachingTimestamp) " +
+        "Test that the donor does not retry recipientSyncData (with returnAfterReachingDonorTimestamp) " +
         "on recipient shutdown errors");
 
     const migrationId = testMigrationAbortsOnRecipientSyncDataCmdError(

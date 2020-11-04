@@ -91,7 +91,7 @@ assert.commandFailedWithCode(primary.adminCommand({
 }),
                              ErrorCodes.BadValue);
 
-// Test 'returnAfterReachingTimestamp' can' be null.
+// Test 'returnAfterReachingDonorTimestamp' can' be null.
 const nullTimestamps = [Timestamp(0, 0), Timestamp(0, 1)];
 nullTimestamps.forEach((nullTs) => {
     assert.commandFailedWithCode(primary.adminCommand({
@@ -100,7 +100,7 @@ nullTimestamps.forEach((nullTs) => {
         donorConnectionString: connectionString,
         tenantId: tenantId,
         readPreference: readPreference,
-        returnAfterReachingTimestamp: nullTs
+        returnAfterReachingDonorTimestamp: nullTs
     }),
                                  ErrorCodes.BadValue);
 });
