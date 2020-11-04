@@ -497,6 +497,9 @@ bool WiredTigerIndex::isDup(OperationContext* opCtx, WT_CURSOR* c, const KeyStri
     }
     invariantWTOK(ret);
 
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementOneCursorSeek();
+
     // If the key exists, check if we already have this id at this key. If so, we don't
     // consider that to be a dup.
     WT_ITEM value;
@@ -1138,6 +1141,10 @@ protected:
             return false;
         }
         invariantWTOK(ret);
+
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
+        metricsCollector.incrementOneCursorSeek();
+
         _cursorAtEof = false;
 
         LOGV2_TRACE_CURSOR(20089, "cmp: {cmp}", "cmp"_attr = cmp);
@@ -1440,6 +1447,9 @@ bool WiredTigerIndexUnique::_keyExists(OperationContext* opCtx,
         return false;
     invariantWTOK(ret);
 
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementOneCursorSeek();
+
     if (cmp == 0)
         return true;
 
@@ -1553,6 +1563,8 @@ Status WiredTigerIndexUnique::_insertTimestampUnsafe(OperationContext* opCtx,
     // down to a single value, it will be cleaned up.
     ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return c->search(c); });
     invariantWTOK(ret);
+
+    metricsCollector.incrementOneCursorSeek();
 
     WT_ITEM old;
     invariantWTOK(c->get_value(c, &old));
@@ -1721,6 +1733,10 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
                 return;
             }
             invariantWTOK(ret);
+
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            metricsCollector.incrementOneCursorSeek();
+
             WT_ITEM value;
             invariantWTOK(c->get_value(c, &value));
             BufReader br(value.data, value.size);
@@ -1755,6 +1771,9 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
         return;
     }
     invariantWTOK(ret);
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+    metricsCollector.incrementOneCursorSeek();
 
     WT_ITEM old;
     invariantWTOK(c->get_value(c, &old));

@@ -58,6 +58,7 @@ static const char kDocUnitsWritten[] = "docUnitsWritten";
 static const char kIdxEntryBytesWritten[] = "idxEntryBytesWritten";
 static const char kIdxEntryUnitsWritten[] = "idxEntryUnitsWritten";
 static const char kDocUnitsReturned[] = "docUnitsReturned";
+static const char kCursorSeeks[] = "cursorSeeks";
 
 inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long long value) {
     if (value != 0) {
@@ -121,6 +122,7 @@ void ResourceConsumption::ReadMetrics::toBson(BSONObjBuilder* builder) const {
     builder->appendNumber(kIdxEntryUnitsRead, idxEntryUnitsRead);
     builder->appendNumber(kKeysSorted, keysSorted);
     builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
+    builder->appendNumber(kCursorSeeks, cursorSeeks);
 }
 
 void ResourceConsumption::WriteMetrics::toBson(BSONObjBuilder* builder) const {
@@ -162,6 +164,7 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
     appendNonZeroMetric(builder, kIdxEntryUnitsRead, readMetrics.idxEntryUnitsRead);
     appendNonZeroMetric(builder, kKeysSorted, readMetrics.keysSorted);
     appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docUnitsReturned);
+    appendNonZeroMetric(builder, kCursorSeeks, readMetrics.cursorSeeks);
 
     if (cpuTimer) {
         appendNonZeroMetric(builder, kCpuNanos, durationCount<Nanoseconds>(cpuTimer->getElapsed()));
@@ -245,6 +248,10 @@ bool ResourceConsumption::MetricsCollector::endScopedCollecting() {
     }
     _collecting = ScopedCollectionState::kInactive;
     return wasCollecting;
+}
+
+void ResourceConsumption::MetricsCollector::incrementOneCursorSeek() {
+    _doIfCollecting([&] { _metrics.readMetrics.cursorSeeks++; });
 }
 
 ResourceConsumption::ScopedMetricsCollector::ScopedMetricsCollector(OperationContext* opCtx,

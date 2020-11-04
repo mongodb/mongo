@@ -60,6 +60,7 @@ public:
             idxEntryUnitsRead += other.idxEntryUnitsRead;
             keysSorted += other.keysSorted;
             docUnitsReturned += other.docUnitsReturned;
+            cursorSeeks += other.cursorSeeks;
         }
 
         ReadMetrics& operator+=(const ReadMetrics& other) {
@@ -84,6 +85,8 @@ public:
         long long keysSorted = 0;
         // Number of document units returned by a query
         long long docUnitsReturned = 0;
+        // Number of cursor seeks
+        long long cursorSeeks = 0;
     };
 
     /* WriteMetrics maintains metrics for write operations. */
@@ -276,6 +279,14 @@ public:
          * that entry. This is a no-op when metrics collection is disabled on this operation.
          */
         void incrementOneIdxEntryWritten(size_t idxEntryBytesWritten);
+
+        /**
+         * This should be called once every time the storage engine successfully does a cursor seek.
+         * Note that if it takes multiple attempts to do a successful seek, this function should
+         * only be called once. If the seek does not find anything, this function should not be
+         * called.
+         */
+        void incrementOneCursorSeek();
 
     private:
         /**

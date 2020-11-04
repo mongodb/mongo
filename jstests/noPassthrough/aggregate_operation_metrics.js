@@ -32,6 +32,7 @@ let assertMetricsExist = function(metrics) {
             assert.gte(readMetrics.idxEntryUnitsRead, 0);
             assert.gte(readMetrics.keysSorted, 0);
             assert.gte(readMetrics.docUnitsReturned, 0);
+            assert.gte(readMetrics.cursorSeeks, 0);
         });
 
         assert.gte(metrics.cpuNanos, 0);
@@ -124,8 +125,10 @@ const secondary = rst.getSecondary();
         [db1Name, db2Name].forEach((db) => {
             assert.gt(allMetrics[db].primaryMetrics.docBytesRead, 0);
             assert.gt(allMetrics[db].primaryMetrics.docUnitsRead, 0);
+            assert.eq(allMetrics[db].primaryMetrics.cursorSeeks, 0);
             assert.eq(allMetrics[db].secondaryMetrics.docBytesRead, 0);
             assert.eq(allMetrics[db].secondaryMetrics.docUnitsRead, 0);
+            assert.eq(allMetrics[db].secondaryMetrics.cursorSeeks, 0);
         });
         assert.eq(allMetrics[db1Name].primaryMetrics.docBytesRead,
                   allMetrics[db2Name].primaryMetrics.docBytesRead);
@@ -134,8 +137,10 @@ const secondary = rst.getSecondary();
         [db1Name, db2Name].forEach((db) => {
             assert.gt(allMetrics[db].secondaryMetrics.docBytesRead, 0);
             assert.gt(allMetrics[db].secondaryMetrics.docUnitsRead, 0);
+            assert.eq(allMetrics[db].secondaryMetrics.cursorSeeks, 0);
             assert.eq(allMetrics[db].primaryMetrics.docBytesRead, 0);
             assert.eq(allMetrics[db].primaryMetrics.docUnitsRead, 0);
+            assert.eq(allMetrics[db].primaryMetrics.cursorSeeks, 0);
         });
         assert.eq(allMetrics[db1Name].secondaryMetrics.docBytesRead,
                   allMetrics[db2Name].secondaryMetrics.docBytesRead);
