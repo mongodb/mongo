@@ -90,11 +90,12 @@ server_parameters:
   # Plan cache
   #
 
-  internalQueryCacheSize:
+  internalQueryCacheMaxEntriesPerCollection:
     description: "The maximum number of entries allowed in a given collection's plan cache."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryCacheSize"
+    cpp_varname: "internalQueryCacheMaxEntriesPerCollection"
     cpp_vartype: AtomicWord<int>
+    deprecated_name: "internalQueryCacheSize"
     default: 5000
     validator:
       gte: 0

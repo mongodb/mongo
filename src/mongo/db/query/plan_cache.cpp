@@ -431,7 +431,7 @@ std::string SolutionCacheData::toString() const {
 // PlanCache
 //
 
-PlanCache::PlanCache() : PlanCache(internalQueryCacheSize.load()) {}
+PlanCache::PlanCache() : PlanCache(internalQueryCacheMaxEntriesPerCollection.load()) {}
 
 PlanCache::PlanCache(size_t size) : _cache(size) {}
 
