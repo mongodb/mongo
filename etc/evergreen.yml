@@ -9898,6 +9898,7 @@ buildvariants:
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
+            featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
@@ -9998,6 +9999,7 @@ buildvariants:
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
+            featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
@@ -10664,6 +10666,7 @@ buildvariants:
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
+            featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
@@ -11971,6 +11974,7 @@ buildvariants:
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
+            featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
@@ -12977,6 +12981,7 @@ buildvariants:
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
+            featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
@@ -13143,6 +13148,7 @@ buildvariants:
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
+            featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,
@@ -13247,6 +13253,7 @@ buildvariants:
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
             featureFlagWindowFunctions: true,
+            featureFlagUseSecondaryDelaySecs: true,
         }"
         --mongosSetParameters="{
             featureFlagWindowFunctions: true,

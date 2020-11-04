@@ -434,7 +434,7 @@ TEST_F(TopoCoordTest, NodeReturnsClosestValidSyncSourceAsSyncSource) {
                                          << "arbiterOnly" << true)
                            << BSON("_id" << 50 << "host"
                                          << "h5"
-                                         << "slaveDelay" << 1 << "priority" << 0)
+                                         << "secondaryDelaySecs" << 1 << "priority" << 0)
                            << BSON("_id" << 60 << "host"
                                          << "h6")
                            << BSON("_id" << 70 << "host"
@@ -4360,13 +4360,13 @@ TEST_F(TopoCoordTest, DontChangeDueToPingTimeWhenCandidatePingTimeIsMissing) {
                                                                     ReadPreference::Nearest));
 }
 
-TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSlaveDelay) {
+TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSecondaryDelaySecs) {
     updateConfig(BSON("_id"
                       << "rs0"
                       << "version" << 5 << "term" << 1 << "members"
                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                << "host1:27017"
-                                               << "slaveDelay" << 1 << "priority" << 0)
+                                               << "secondaryDelaySecs" << 1 << "priority" << 0)
                                     << BSON("_id" << 1 << "host"
                                                   << "host2:27017")
                                     << BSON("_id" << 2 << "host"
@@ -4374,7 +4374,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeConfiguredWithSlaveDelay) {
                       << "protocolVersion" << 1),
                  0);
 
-    // Set up so that without slaveDelay, the node otherwise would have changed sync sources.
+    // Set up so that without secondaryDelaySecs, the node otherwise would have changed sync
+    // sources.
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 
@@ -4391,7 +4392,7 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
                       << "version" << 5 << "term" << 1 << "members"
                       << BSON_ARRAY(BSON("_id" << 0 << "host"
                                                << "host1:27017"
-                                               << "slaveDelay" << 1 << "priority" << 0)
+                                               << "secondaryDelaySecs" << 1 << "priority" << 0)
                                     << BSON("_id" << 1 << "host"
                                                   << "host2:27017")
                                     << BSON("_id" << 2 << "host"
@@ -4399,8 +4400,8 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenNodeNotFoundInConfig) {
                       << "protocolVersion" << 1),
                  -1);
 
-    // Set up so that without slaveDelay and not being in the config, the node otherwise would have
-    // changed sync sources.
+    // Set up so that without secondaryDelaySecs and not being in the config, the node otherwise
+    // would have changed sync sources.
     getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
     getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
 

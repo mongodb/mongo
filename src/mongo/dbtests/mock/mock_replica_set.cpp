@@ -248,9 +248,9 @@ void MockReplicaSet::mockIsMasterCmd() {
                 builder.append("passive", true);
             }
 
-            if (member->getSlaveDelay().count()) {
-                builder.appendIntOrLL("slaveDelay",
-                                      durationCount<Seconds>(member->getSlaveDelay()));
+            if (member->getSecondaryDelay().count()) {
+                builder.appendIntOrLL("secondaryDelaySecs",
+                                      durationCount<Seconds>(member->getSecondaryDelay()));
             }
 
             if (member->isHidden()) {

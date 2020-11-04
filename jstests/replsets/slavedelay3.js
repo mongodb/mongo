@@ -1,22 +1,26 @@
+// @tags: [requires_fcv_49]
 load("jstests/replsets/rslib.js");
 
-var name = 'slavedelay3';
-var replTest = new ReplSetTest({name: name, nodes: 3, useBridge: true});
+var replTest = new ReplSetTest({nodes: 3, useBridge: true});
 var nodes = replTest.startSet();
+// If featureFlagUseSecondaryDelaySecs is enabled, we must use the 'secondaryDelaySecs' field
+// name in our config. Otherwise, we use 'slaveDelay'.
+const delayFieldName = selectDelayFieldName(replTest);
+
 var config = replTest.getReplSetConfig();
 // ensure member 0 is primary
 config.members[0].priority = 2;
 config.members[1].priority = 0;
-config.members[1].slaveDelay = 5;
+config.members[1][delayFieldName] = 5;
 config.members[2].priority = 0;
 
 replTest.initiate(config);
-var primary = replTest.getPrimary().getDB(name);
+var primary = replTest.getPrimary().getDB(jsTestName());
 
 var secondaryConns = replTest.getSecondaries();
 var secondaries = [];
 for (var i in secondaryConns) {
-    var d = secondaryConns[i].getDB(name);
+    var d = secondaryConns[i].getDB(jsTestName());
     d.getMongo().setSecondaryOk();
     secondaries.push(d);
 }

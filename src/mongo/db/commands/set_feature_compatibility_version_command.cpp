@@ -50,6 +50,8 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -239,11 +241,47 @@ public:
         FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
             actualVersion, requestedVersion, isFromConfigServer);
 
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        const bool isReplSet =
+            replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
         if (actualVersion < requestedVersion) {
             checkInitialSyncFinished(opCtx);
 
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx, actualVersion, requestedVersion, isFromConfigServer);
+
+            // If the 'useSecondaryDelaySecs' feature flag is enabled in the upgraded FCV, issue a
+            // reconfig to change the 'slaveDelay' field to 'secondaryDelaySecs'.
+            if (isReplSet && repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() &&
+                requestedVersion == ServerGlobalParams::FeatureCompatibility::kLatest) {
+                auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
+                    auto newConfig = oldConfig.getMutable();
+                    newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
+                    for (auto mem = oldConfig.membersBegin(); mem != oldConfig.membersEnd();
+                         mem++) {
+                        newConfig.useSecondaryDelaySecsFieldName(mem->getId());
+                    }
+                    return repl::ReplSetConfig(std::move(newConfig));
+                };
+                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, true /* force */);
+                uassertStatusOKWithContext(status, "Failed to upgrade the replica set config");
+
+                LOGV2(5042301,
+                      "Waiting for the upgraded replica set config to propagate to a majority");
+                // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
+                WriteConcernOptions writeConcern(
+                    repl::ReplSetConfig::kConfigMajorityWriteConcernModeName,
+                    WriteConcernOptions::SyncMode::NONE,
+                    opCtx->getWriteConcern().wTimeout);
+                writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+                repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
+                uassertStatusOKWithContext(
+                    replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
+                    "Failed to wait for the upgraded replica set config to propagate to a "
+                    "majority");
+                LOGV2(5042302, "The upgraded replica set config has been propagated to a majority");
+            }
+
             {
                 // Take the global lock in S mode to create a barrier for operations taking the
                 // global IX or X locks. This ensures that either
@@ -321,6 +359,41 @@ public:
 
             FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                 opCtx, actualVersion, requestedVersion, isFromConfigServer);
+
+            // If the 'useSecondaryDelaySecs' feature flag is disabled in the downgraded FCV, issue
+            // a reconfig to change the 'secondaryDelaySecs' field to 'slaveDelay'.
+            if (isReplSet && repl::feature_flags::gUseSecondaryDelaySecs.isEnabledAndIgnoreFCV() &&
+                requestedVersion < repl::feature_flags::gUseSecondaryDelaySecs.getVersion()) {
+                auto getNewConfig = [&](const repl::ReplSetConfig& oldConfig, long long term) {
+                    auto newConfig = oldConfig.getMutable();
+                    newConfig.setConfigVersion(newConfig.getConfigVersion() + 1);
+                    for (auto mem = oldConfig.membersBegin(); mem != oldConfig.membersEnd();
+                         mem++) {
+                        newConfig.useSlaveDelayFieldName(mem->getId());
+                    }
+
+                    return repl::ReplSetConfig(std::move(newConfig));
+                };
+
+                auto status = replCoord->doReplSetReconfig(opCtx, getNewConfig, true /* force */);
+                uassertStatusOKWithContext(status, "Failed to downgrade the replica set config");
+
+                LOGV2(5042303,
+                      "Waiting for the downgraded replica set config to propagate to a majority");
+                // If a write concern is given, we'll use its wTimeout. It's kNoTimeout by default.
+                WriteConcernOptions writeConcern(
+                    repl::ReplSetConfig::kConfigMajorityWriteConcernModeName,
+                    WriteConcernOptions::SyncMode::NONE,
+                    opCtx->getWriteConcern().wTimeout);
+                writeConcern.checkCondition = WriteConcernOptions::CheckCondition::Config;
+                repl::OpTime fakeOpTime(Timestamp(1, 1), replCoord->getTerm());
+                uassertStatusOKWithContext(
+                    replCoord->awaitReplication(opCtx, fakeOpTime, writeConcern).status,
+                    "Failed to wait for the downgraded replica set config to propagate to a "
+                    "majority");
+                LOGV2(5042304,
+                      "The downgraded replica set config has been propagated to a majority");
+            }
 
             {
                 // Take the global lock in S mode to create a barrier for operations taking the

@@ -1041,7 +1041,7 @@ Seconds ReplicationCoordinatorImpl::getSecondaryDelaySecs() const {
         // queue of work.
         return Seconds(0);
     }
-    return _rsConfig.getMemberAt(_selfIndex).getSlaveDelay();
+    return _rsConfig.getMemberAt(_selfIndex).getSecondaryDelay();
 }
 
 void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {

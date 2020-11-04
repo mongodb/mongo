@@ -63,6 +63,7 @@ public:
     using MemberConfigBase::kIdFieldName;
     using MemberConfigBase::kNewlyAddedFieldName;
     using MemberConfigBase::kPriorityFieldName;
+    using MemberConfigBase::kSecondaryDelaySecsFieldName;
     using MemberConfigBase::kSlaveDelaySecsFieldName;
     using MemberConfigBase::kTagsFieldName;
     using MemberConfigBase::kVotesFieldName;
@@ -134,8 +135,14 @@ public:
      * Gets the amount of time behind the primary that this member will atempt to
      * remain.  Zero seconds means stay as caught up as possible.
      */
-    Seconds getSlaveDelay() const {
-        return Seconds(getSlaveDelaySecs());
+    Seconds getSecondaryDelay() const {
+        if (getSecondaryDelaySecs()) {
+            return Seconds(getSecondaryDelaySecs().get());
+        }
+        if (getSlaveDelaySecs()) {
+            return Seconds(getSlaveDelaySecs().get());
+        }
+        return Seconds(0);
     }
 
     /**
@@ -158,6 +165,20 @@ public:
      */
     bool isArbiter() const {
         return getArbiterOnly();
+    }
+
+    /**
+     * Returns true if this member has the field 'slaveDelay'.
+     */
+    bool hasSlaveDelay() const {
+        return getSlaveDelaySecs().has_value();
+    }
+
+    /**
+     * Returns true if this member has the field 'secondaryDelaySecs'.
+     */
+    bool hasSecondaryDelaySecs() const {
+        return getSecondaryDelaySecs().has_value();
     }
 
     /**

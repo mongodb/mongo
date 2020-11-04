@@ -13,6 +13,8 @@
 (function() {
 "use strict";
 
+load("jstests/replsets/rslib.js");
+
 // Skip this test if running with --nojournal and WiredTiger.
 if (jsTest.options().noJournal &&
     (!jsTest.options().storageEngine || jsTest.options().storageEngine === "wiredTiger")) {
@@ -45,11 +47,17 @@ if (storageEngine !== "wiredTiger") {
     var conf = rst.getReplSetConfig();
     conf.members[1].votes = 1;
     conf.members[1].priority = 0;
-    conf.members[1].slaveDelay = 24 * 60 * 60;
 
     rst.startSet();
+
+    // If featureFlagUseSecondaryDelaySecs is enabled, we must use the 'secondaryDelaySecs' field
+    // name in our config. Otherwise, we use 'slaveDelay'.
+    const delayFieldName = selectDelayFieldName(rst);
+
+    conf.members[1][delayFieldName] = 24 * 60 * 60;
+
     // We cannot wait for a stable recovery timestamp, oplog replication, or config replication due
-    // to the slaveDelay.
+    // to the secondary delay.
     rst.initiateWithAnyNodeAsPrimary(conf, "replSetInitiate", {
         doNotWaitForStableRecoveryTimestamp: true,
         doNotWaitForReplication: true,

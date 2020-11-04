@@ -1,6 +1,6 @@
-// SERVER-21118 don't hang at shutdown or apply ops too soon with slaveDelay.
+// SERVER-21118 don't hang at shutdown or apply ops too soon with secondaryDelaySecs.
 //
-// @tags: [requires_persistence]
+// @tags: [requires_persistence, requires_fcv_49]
 load('jstests/replsets/rslib.js');
 (function() {
 "use strict";
@@ -18,9 +18,13 @@ var conf = rst.getReplSetConfig();
 conf.members[1].votes = 0;
 conf.members[1].priority = 0;
 conf.members[1].hidden = true;
-conf.members[1].slaveDelay = 0;  // Set later.
 
 rst.startSet();
+// If featureFlagUseSecondaryDelaySecs is enabled, we must use the 'secondaryDelaySecs' field
+// name in our config. Otherwise, we use 'slaveDelay'.
+const delayFieldName = selectDelayFieldName(rst);
+conf.members[1][delayFieldName] = 0;  // Set later.
+
 rst.initiate(conf);
 
 var primary = rst.getPrimary();  // Waits for PRIMARY state.
@@ -28,15 +32,16 @@ var primary = rst.getPrimary();  // Waits for PRIMARY state.
 // Push some ops through before setting slave delay.
 assert.commandWorked(primary.getCollection(ns).insert([{}, {}, {}], {writeConcern: {w: 2}}));
 
-// Set slaveDelay and wait for secondary to receive the change.
+// Set the delay field and wait for secondary to receive the change.
 conf = rst.getReplSetConfigFromNode();
 conf.version++;
-conf.members[1].slaveDelay = 24 * 60 * 60;
+conf.members[1][delayFieldName] = 24 * 60 * 60;
 reconfig(rst, conf);
-assert.soon(() => rst.getReplSetConfigFromNode(1).members[1].slaveDelay > 0,
+assert.soon(() => rst.getReplSetConfigFromNode(1).members[1][delayFieldName] > 0,
             () => rst.getReplSetConfigFromNode(1));
 
-sleep(2000);  // The secondary apply loop only checks for slaveDelay changes once per second.
+// The secondary apply loop only checks for the delay field changes once per second.
+sleep(2000);
 var secondary = rst.getSecondary();
 const lastOp = getLatestOp(secondary);
 

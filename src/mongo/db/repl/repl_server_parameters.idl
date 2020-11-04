@@ -450,3 +450,9 @@ feature_flags:
             When enabled, tenant migration commands are supported.
         cpp_varname: feature_flags::gTenantMigrations
         default: false
+
+    featureFlagUseSecondaryDelaySecs:
+        description: >-
+            If enabled, use field secondaryDelaySecs instead of slaveDelay in MemberConfig.
+        cpp_varname: feature_flags::gUseSecondaryDelaySecs
+        default: false

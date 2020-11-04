@@ -95,10 +95,19 @@ structs:
             slaveDelay:
                 cpp_name: slaveDelaySecs
                 type: safeInt64
-                default: 0
+                optional: true
                 validator: { gte: 0, lte: 31622400 }
                 description: "The number of seconds 'behind' the primary that this replica set
-                              member should 'lag'"
+                              member should 'lag'. This is a legacy field kept for backwards
+                              compatibility, and 5.0+ nodes should use secondaryDelaySecs"
+            secondaryDelaySecs:
+                cpp_name: secondaryDelaySecs
+                type: safeInt64
+                optional: true
+                validator: { gte: 0, lte: 31622400 }
+                description: "The number of seconds 'behind' the primary that this replica set
+                              member should 'lag'. Only 5.0+ nodes will use this field,
+                              and older nodes will use slaveDelay"
             arbiterOnly:
                 type: safeBool
                 default: false

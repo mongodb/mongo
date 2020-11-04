@@ -14,10 +14,13 @@ var st = new ShardingTest({
     other: {rsOptions: {verbose: 1}}
 });
 var replTest = st.rs0;
+// If featureFlagUseSecondaryDelaySecs is enabled, we must use the 'secondaryDelaySecs' field
+// name in our config. Otherwise, we use 'slaveDelay'.
+const delayFieldName = selectDelayFieldName(replTest);
 
 var config = replTest.getReplSetConfig();
 // Add a delay long enough so getLastError would actually 'wait' for write concern.
-config.members[1].slaveDelay = 3;
+config.members[1][delayFieldName] = 3;
 config.version = replTest.getReplSetConfigFromNode().version + 1;
 
 reconfig(replTest, config, true);
@@ -25,7 +28,7 @@ reconfig(replTest, config, true);
 assert.soon(function() {
     var secConn = replTest.getSecondary();
     var config = secConn.getDB('local').system.replset.findOne();
-    return config.members[1].slaveDelay == 3;
+    return config.members[1][delayFieldName] == 3;
 });
 
 replTest.awaitSecondaryNodes();

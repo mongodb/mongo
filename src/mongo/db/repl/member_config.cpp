@@ -91,7 +91,7 @@ MemberConfig::MemberConfig(const BSONObj& mcfg) {
         if (!isVoter()) {
             uasserted(ErrorCodes::BadValue, "priority must be 0 when non-voting (votes:0)");
         }
-        if (getSlaveDelay() > Seconds(0)) {
+        if (getSecondaryDelay() > Seconds(0)) {
             uasserted(ErrorCodes::BadValue, "priority must be 0 when slaveDelay is used");
         }
         if (isHidden()) {
@@ -211,7 +211,13 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
 
     _splitHorizon.toBSON(configBuilder);
 
-    configBuilder.append(kSlaveDelaySecsFieldName, getSlaveDelaySecs());
+    if (getSecondaryDelaySecs()) {
+        configBuilder.append(kSecondaryDelaySecsFieldName, getSecondaryDelaySecs().get());
+    }
+    if (getSlaveDelaySecs()) {
+        configBuilder.append(kSlaveDelaySecsFieldName, getSlaveDelaySecs().get());
+    }
+
     configBuilder.append(kVotesFieldName, MemberConfigBase::getVotes() ? 1 : 0);
     return configBuilder.obj();
 }

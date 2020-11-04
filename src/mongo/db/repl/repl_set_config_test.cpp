@@ -820,6 +820,23 @@ TEST(ReplSetConfig, ValidateFailsWithDuplicateMemberId) {
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
 }
 
+TEST(ReplSetConfig, ValidateFailsWithBothDelaySecsFieldNames) {
+    ReplSetConfig config(ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345")
+                           << BSON("_id" << 1 << "host"
+                                         << "localhost:54321"
+                                         << "priority" << 0 << "secondaryDelaySecs" << 10
+                                         << "slaveDelay" << 10)))));
+    Status status = config.validate();
+    ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    ASSERT_STRING_CONTAINS(status.reason(),
+                           "Cannot specify both secondaryDelaySecs and slaveDelay");
+}
+
 TEST(ReplSetConfig, InitializeFailsWithInvalidMember) {
     ReplSetConfig config;
     ASSERT_THROWS(ReplSetConfig::parse(BSON("_id"
@@ -1255,7 +1272,7 @@ bool operator==(const MemberConfig& a, const MemberConfig& b) {
         }
     }
     return a.getId() == b.getId() && a.getHostAndPort() == b.getHostAndPort() &&
-        a.getPriority() == b.getPriority() && a.getSlaveDelay() == b.getSlaveDelay() &&
+        a.getPriority() == b.getPriority() && a.getSecondaryDelay() == b.getSecondaryDelay() &&
         a.isVoter() == b.isVoter() && a.isArbiter() == b.isArbiter() &&
         a.isNewlyAdded() == b.isNewlyAdded() && a.isHidden() == b.isHidden() &&
         a.shouldBuildIndexes() == b.shouldBuildIndexes() && a.getNumTags() == b.getNumTags() &&
@@ -1365,8 +1382,8 @@ TEST(ReplSetConfig, toBSONRoundTripAbilityLarge) {
                       << BSON("_id" << 3 << "host"
                                     << "localhost:3828"
                                     << "arbiterOnly" << false << "hidden" << true << "buildIndexes"
-                                    << false << "priority" << 0 << "slaveDelay" << 17 << "votes"
-                                    << 0 << "newlyAdded" << true << "tags"
+                                    << false << "priority" << 0 << "secondaryDelaySecs" << 17
+                                    << "votes" << 0 << "newlyAdded" << true << "tags"
                                     << BSON("coast"
                                             << "east"
                                             << "ssd"
@@ -1558,21 +1575,20 @@ TEST(ReplSetConfig, CheckConfigServerMustBuildIndexes) {
     ASSERT_STRING_CONTAINS(status.reason(), "must build indexes");
 }
 
-TEST(ReplSetConfig, CheckConfigServerCantHaveSlaveDelay) {
+TEST(ReplSetConfig, CheckConfigServerCantHaveSecondaryDelaySecs) {
     ReplSetConfig configA;
-    configA = ReplSetConfig::parse(BSON("_id"
-                                        << "rs0"
-                                        << "protocolVersion" << 1 << "version" << 1 << "configsvr"
-                                        << true << "members"
-                                        << BSON_ARRAY(BSON("_id" << 0 << "host"
-                                                                 << "localhost:12345")
-                                                      << BSON("_id" << 1 << "host"
-                                                                    << "localhost:54321"
-                                                                    << "priority" << 0
-                                                                    << "slaveDelay" << 3))));
+    configA = ReplSetConfig::parse(
+        BSON("_id"
+             << "rs0"
+             << "protocolVersion" << 1 << "version" << 1 << "configsvr" << true << "members"
+             << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                      << "localhost:12345")
+                           << BSON("_id" << 1 << "host"
+                                         << "localhost:54321"
+                                         << "priority" << 0 << "secondaryDelaySecs" << 3))));
     Status status = configA.validate();
     ASSERT_EQUALS(ErrorCodes::BadValue, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "cannot have a non-zero slaveDelay");
+    ASSERT_STRING_CONTAINS(status.reason(), "cannot have a non-zero secondaryDelaySecs");
 }
 
 TEST(ReplSetConfig, CheckConfigServerMustHaveTrueForWriteConcernMajorityJournalDefault) {

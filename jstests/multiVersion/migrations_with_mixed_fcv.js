@@ -218,7 +218,7 @@ function testSetFCVDoesNotBlockWhileMigratingChunk() {
 
     // Send FCV command with a maxTimeMS and assert that it does not timeout.
     assert.commandWorked(st.shard0.getDB("admin").runCommand(
-        {setFeatureCompatibilityVersion: latestFCV, maxTimeMS: 1000}));
+        {setFeatureCompatibilityVersion: latestFCV, maxTimeMS: 10000}));
 
     failpoint.off();
     awaitShell();

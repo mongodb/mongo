@@ -30,6 +30,18 @@ const primary = rst.getPrimary();
 const testDB = primary.getDB('test');
 const coll = testDB.getCollection('test');
 
+// TODO SERVER-53953: Remove to re-enable test for feature flag enabled variants.
+const res = assert.commandWorked(
+    primary.adminCommand({getParameter: 1, featureFlagUseSecondaryDelaySecs: 1}),
+    "Failed to call getParameter on feature flag: featureFlagUseSecondaryDelaySecs");
+const featureFlagUseSecondaryDelaySecsEnabled = res.featureFlagUseSecondaryDelaySecs.value;
+
+if (featureFlagUseSecondaryDelaySecsEnabled) {
+    jsTestLog("Skipping test because the useSecondaryDelaySecs feature flag is enabled");
+    rst.stopSet();
+    return;
+}
+
 assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(primary);

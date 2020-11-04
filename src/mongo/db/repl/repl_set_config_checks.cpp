@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
 #include "mongo/db/service_context.h"
@@ -94,6 +95,54 @@ Status ensureNoNewlyAddedMembers(const ReplSetConfig& config) {
                                  "initial configuration of a replica set.");
         }
     }
+    return Status::OK();
+}
+
+/**
+ * Checks that the current feature compatibility version is compatible with
+ * each member config's delay field name. If the feature flag 'featureFlagUseSecondaryDelaySecs' is
+ * enabled, the nodes must use the 'secondaryDelaySecs' field instead of the 'slaveDelay' field.
+ */
+Status isFCVCompatible(const ReplSetConfig& config) {
+    auto version = serverGlobalParams.featureCompatibility.getVersion();
+    // TODO (SERVER-53354) If we are currently upgrading, we check if the feature flag is enabled
+    // for the target version. We use the generic FCV references here to avoid having to update the
+    // FCV constants used after each continuous release. After release, we should make sure to
+    // remove these references while removing the feature flag.
+    //
+    //(Generic FCV reference): feature flag support
+    if (version == ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastLTSToLatest ||
+        version == ServerGlobalParams::FeatureCompatibility::kUpgradingFromLastContinuousToLatest) {
+        version = ServerGlobalParams::FeatureCompatibility::kLatest;
+    }
+
+    ServerGlobalParams::FeatureCompatibility targetFCV;
+    targetFCV.setVersion(version);
+    bool isEnabled = feature_flags::gUseSecondaryDelaySecs.isEnabled(targetFCV);
+    // We must check that every member config has a valid delay field name.
+    for (auto iter = config.membersBegin(); iter != config.membersEnd(); ++iter) {
+        if ((isEnabled && iter->hasSlaveDelay()) || (!isEnabled && iter->hasSecondaryDelaySecs())) {
+            // TODO (SERVER-53354) If the feature flag is disabled, getVersion() will throw. In this
+            // case, the version should default to kLatest. We use the generic FCV references here
+            // to avoid having to update the FCV constants used after each continuous release. After
+            // release, we should make sure to remove these references while removing the feature
+            // flag.
+            //
+            //(Generic FCV reference): feature flag support
+            auto featureFlagVersion = isEnabled
+                ? FeatureCompatibilityVersionParser::toString(
+                      feature_flags::gUseSecondaryDelaySecs.getVersion())
+                : FeatureCompatibilityVersionParser::toString(
+                      ServerGlobalParams::FeatureCompatibility::kLatest);
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "If the node is in FCV " << featureFlagVersion
+                                        << ", we must use the secondaryDelaySecs field name "
+                                           "instead of slaveDelay. Only nodes below FCV "
+                                        << featureFlagVersion << " should use slaveDelay.");
+        }
+    }
+
+
     return Status::OK();
 }
 
@@ -331,6 +380,11 @@ StatusWith<int> validateConfigForInitiate(ReplicationCoordinatorExternalState* e
         return StatusWith<int>(status);
     }
 
+    status = isFCVCompatible(newConfig);
+    if (!status.isOK()) {
+        return StatusWith<int>(status);
+    }
+
     status = newConfig.checkIfWriteConcernCanBeSatisfied(newConfig.getDefaultWriteConcern());
     if (!status.isOK()) {
         return status.withContext(
@@ -366,6 +420,11 @@ Status validateConfigForReconfig(const ReplSetConfig& oldConfig,
                                  const ReplSetConfig& newConfig,
                                  bool force) {
     Status status = newConfig.validate();
+    if (!status.isOK()) {
+        return status;
+    }
+
+    status = isFCVCompatible(newConfig);
     if (!status.isOK()) {
         return status;
     }

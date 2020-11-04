@@ -560,6 +560,24 @@ function runShardingTest(downgradeVersion) {
     downgradedShard.stopSet();
 }
 
+// TODO SERVER-53894: Remove to re-enable test for feature flag enabled variants.
+jsTestLog(
+    "Running standalone to gather parameter info about featureFlag: featureFlagUseSecondaryDelaySecs");
+// Spin up a standalone to check the release version of 'featureFlagUseSecondaryDelaySecs'.
+const standalone = MongoRunner.runMongod();
+const adminDB = standalone.getDB("admin");
+try {
+    res = assert.commandWorked(
+        adminDB.runCommand({getParameter: 1, featureFlagUseSecondaryDelaySecs: 1}),
+        "Failed to call getParameter on feature flag: featureFlagUseSecondaryDelaySecs");
+} finally {
+    MongoRunner.stopMongod(standalone);
+}
+if (res && res.featureFlagUseSecondaryDelaySecs.value) {
+    jsTestLog("Skipping test because the useSecondaryDelaySecs feature flag is enabled");
+    return;
+}
+
 runStandaloneTest('last-lts');
 runReplicaSetTest('last-lts');
 runShardingTest('last-lts');
