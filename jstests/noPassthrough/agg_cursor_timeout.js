@@ -37,6 +37,10 @@ const batchSize = 2;
 const numMatches = 5;
 
 function assertCursorTimesOut(collName, pipeline) {
+    // Cursor timeout only occurs outside of sessions. Otherwise we rely on the session timeout
+    // mechanism to kill cursors.
+    TestData.disableImplicitSessions = true;
+
     const res = assert.commandWorked(testDB.runCommand({
         aggregate: collName,
         pipeline: pipeline,
@@ -68,6 +72,8 @@ function assertCursorTimesOut(collName, pipeline) {
         cursor.itcount();
     });
     assert.eq(ErrorCodes.CursorNotFound, err.code, tojson(err));
+
+    TestData.disableImplicitSessions = false;
 }
 
 assert.commandWorked(testDB.source.insert({local: 1}));

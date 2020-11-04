@@ -14,7 +14,7 @@
 // the session cursors #5 and #6 are attached to to simulate that session timing out, and ensures
 // that cursors #5 and #6 are killed as a result.
 //
-// @tags: [requires_sharding]
+// @tags: [requires_sharding, requires_find_command, requires_fcv_47]
 (function() {
 'use strict';
 
