@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Bypass compile and fetch binaries."""
-
 from collections import namedtuple
 import json
 import logging
@@ -10,6 +9,7 @@ import tarfile
 from tempfile import TemporaryDirectory
 import urllib.error
 import urllib.parse
+from urllib.parse import urlparse
 import urllib.request
 from typing import Any, Dict, List
 
@@ -34,6 +34,7 @@ structlog.configure(logger_factory=LoggerFactory())
 LOGGER = structlog.get_logger(__name__)
 
 EVG_CONFIG_FILE = ".evergreen.yml"
+DESTDIR = os.getenv("DESTDIR")
 
 _IS_WINDOWS = (sys.platform == "win32" or sys.platform == "cygwin")
 
@@ -91,14 +92,14 @@ ARTIFACTS_NEEDING_PERMISSIONS = {
     os.path.join("jstests", "libs", "keyForRollover"): 0o600,
 }
 
-ARTIFACT_ENTRIES_MAP_WINDOWS = {
-    "mongo_binaries": "Binaries",
-    "mongo_debugsymbols": "mongo-debugsymbols.zip",
-}
-
 ARTIFACT_ENTRIES_MAP = {
     "mongo_binaries": "Binaries",
-    "mongo_debugsymbols": "mongo-debugsymbols.tgz",
+}
+
+ARTIFACTS_TO_EXTRACT = {
+    "mongobridge",
+    "mongotmock",
+    "wt",
 }
 
 TargetBuild = namedtuple("TargetBuild", [
@@ -108,36 +109,24 @@ TargetBuild = namedtuple("TargetBuild", [
 ])
 
 
-def executable_name(pathname, destdir=""):
+def executable_name(pathname: str) -> str:
     """Return the executable name."""
     # Ensure that executable files on Windows have a ".exe" extension.
     if _IS_WINDOWS and os.path.splitext(pathname)[1] != ".exe":
-        pathname = "{}.exe".format(pathname)
+        pathname = f"{pathname}.exe"
 
-    if destdir:
-        return os.path.join(destdir, "bin", pathname)
+    if DESTDIR:
+        return os.path.join(DESTDIR, "bin", pathname)
 
     return pathname
 
 
-def archive_name(archive):
+def archive_name(archive: str) -> str:
     """Return the archive name."""
     # Ensure the right archive extension is used for Windows.
     if _IS_WINDOWS:
-        return "{}.zip".format(archive)
-    return "{}.tgz".format(archive)
-
-
-def requests_get_json(url):
-    """Return the JSON response."""
-    response = requests.get(url)
-    response.raise_for_status()
-
-    try:
-        return response.json()
-    except ValueError:
-        LOGGER.warning("Invalid JSON object returned with response", response=response.text)
-        raise
+        return f"{archive}.zip"
+    return f"{archive}.tgz"
 
 
 def write_out_bypass_compile_expansions(patch_file, **expansions):
@@ -190,11 +179,9 @@ def generate_bypass_expansions(target: TargetBuild, artifacts_list: List) -> Dic
     """
     # Convert the artifacts list to a dictionary for easy lookup.
     artifacts_dict = {artifact["name"].strip(): artifact["link"] for artifact in artifacts_list}
-
-    artifact_entries_map = ARTIFACT_ENTRIES_MAP_WINDOWS if _IS_WINDOWS else ARTIFACT_ENTRIES_MAP
     bypass_expansions = {
         key: _artifact_to_bypass_path(target.project, artifacts_dict[value])
-        for key, value in artifact_entries_map.items()
+        for key, value in ARTIFACT_ENTRIES_MAP.items()
     }
     bypass_expansions["bypass_compile"] = True
     return bypass_expansions
@@ -312,7 +299,7 @@ def find_build_for_previous_compile_task(evg_api: EvergreenApi, target: TargetBu
     :return: build_id of the base revision.
     """
     project_prefix = target.project.replace("-", "_")
-    version_of_base_revision = "{}_{}".format(project_prefix, target.revision)
+    version_of_base_revision = f"{project_prefix}_{target.revision}"
     version = evg_api.version_by_id(version_of_base_revision)
     build = version.build_by_variant(target.build_variant)
     return build
@@ -330,7 +317,78 @@ def find_previous_compile_task(build: Build) -> Task:
     return tasks[0]
 
 
-def fetch_artifacts(build: Build, revision: str):
+def extract_filename_from_url(url: str) -> str:
+    """
+    Extract the name of a file from the download url.
+
+    :param url: Download URL to extract from.
+    :return: filename part of the given url.
+    """
+    parsed_url = urlparse(url)
+    filename = os.path.basename(parsed_url.path)
+    return filename
+
+
+def download_file(download_url: str, download_location: str) -> None:
+    """
+    Download the file at the specified path locally.
+
+    :param download_url: URL to download.
+    :param download_location: Path to store the downloaded file.
+    """
+    try:
+        urllib.request.urlretrieve(download_url, download_location)
+    except urllib.error.ContentTooShortError:
+        LOGGER.warning(
+            "The artifact could not be completely downloaded. Default"
+            " compile bypass to false.", filename=download_location)
+        raise ValueError("No artifacts were found for the current task")
+
+
+def extract_artifacts(filename: str) -> None:
+    """
+    Extract interests contents from the artifacts tar file.
+
+    :param filename: Path to artifacts file.
+    """
+    extract_files = {executable_name(artifact) for artifact in ARTIFACTS_TO_EXTRACT}
+    with tarfile.open(filename, "r:gz") as tar:
+        # The repo/ directory contains files needed by the package task. May
+        # need to add other files that would otherwise be generated by SCons
+        # if we did not bypass compile.
+        subdir = [
+            tarinfo for tarinfo in tar.getmembers()
+            if tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
+        ]
+        LOGGER.info("Extracting the files...", filename=filename,
+                    files="\n".join(tarinfo.name for tarinfo in subdir))
+        tar.extractall(members=subdir)
+
+
+def rename_artifact(filename: str, target_name: str) -> None:
+    """
+    Rename the provided artifact file.
+
+    :param filename: Path to artifact file to rename.
+    :param target_name: New name to use.
+    """
+    extension = os.path.splitext(filename)[1]
+    target_filename = f"{target_name}{extension}"
+
+    LOGGER.info("Renaming", source=filename, target=target_filename)
+    os.rename(filename, target_filename)
+
+
+def validate_url(url: str) -> None:
+    """
+    Check the link exists, else raise an exception.
+
+    :param url: Link to check.
+    """
+    requests.head(url).raise_for_status()
+
+
+def fetch_artifacts(build: Build, revision: str) -> List[Dict[str, str]]:
     """
     Fetch artifacts from a given revision.
 
@@ -341,70 +399,45 @@ def fetch_artifacts(build: Build, revision: str):
     LOGGER.info("Fetching artifacts", build_id=build.id, revision=revision)
     task = find_previous_compile_task(build)
     if task is None or not task.is_success():
+        task_id = task.task_id if task else None
         LOGGER.warning(
             "Could not retrieve artifacts because the compile task for base commit"
-            " was not available. Default compile bypass to false.", task_id=task.task_id)
+            " was not available. Default compile bypass to false.", task_id=task_id)
         raise ValueError("No artifacts were found for the current task")
+
     LOGGER.info("Fetching pre-existing artifacts from compile task", task_id=task.task_id)
     artifacts = []
     for artifact in task.artifacts:
-        filename = os.path.basename(artifact.url)
+        filename = extract_filename_from_url(artifact.url)
         if filename.startswith(build.id):
-            LOGGER.info("Retrieving archive", filename=filename)
-            # This is the artifacts.tgz as referenced in evergreen.yml.
-            try:
-                urllib.request.urlretrieve(artifact.url, filename)
-            except urllib.error.ContentTooShortError:
-                LOGGER.warning(
-                    "The artifact could not be completely downloaded. Default"
-                    " compile bypass to false.", filename=filename)
-                raise ValueError("No artifacts were found for the current task")
-            # Need to extract certain files from the pre-existing artifacts.tgz.
-            extract_files = [
-                executable_name("mongobridge", destdir=os.getenv("DESTDIR")),
-                executable_name("mongotmock", destdir=os.getenv("DESTDIR")),
-                executable_name("wt", destdir=os.getenv("DESTDIR")),
-            ]
-            with tarfile.open(filename, "r:gz") as tar:
-                # The repo/ directory contains files needed by the package task. May
-                # need to add other files that would otherwise be generated by SCons
-                # if we did not bypass compile.
-                subdir = [
-                    tarinfo for tarinfo in tar.getmembers()
-                    if tarinfo.name.startswith("repo/") or tarinfo.name in extract_files
-                ]
-                LOGGER.info("Extracting the files...", filename=filename,
-                            files="\n".join(tarinfo.name for tarinfo in subdir))
-                tar.extractall(members=subdir)
+            LOGGER.info("Retrieving artifacts.tgz", filename=filename)
+            download_file(artifact.url, filename)
+            extract_artifacts(filename)
+
+        elif filename.startswith("debugsymbols"):
+            LOGGER.info("Retrieving debug symbols", filename=filename)
+            download_file(artifact.url, filename)
+            rename_artifact(filename, "mongo-debugsymbols")
+
         elif filename.startswith("mongo-src"):
             LOGGER.info("Retrieving mongo source", filename=filename)
-            # This is the distsrc.[tgz|zip] as referenced in evergreen.yml.
-            try:
-                urllib.request.urlretrieve(artifact.url, filename)
-            except urllib.error.ContentTooShortError:
-                LOGGER.warn(
-                    "The artifact could not be completely downloaded. Default"
-                    " compile bypass to false.", filename=filename)
-                raise ValueError("No artifacts were found for the current task")
-            extension = os.path.splitext(filename)[1]
-            distsrc_filename = "distsrc{}".format(extension)
-            LOGGER.info("Renaming", filename=filename, rename=distsrc_filename)
-            os.rename(filename, distsrc_filename)
+            download_file(artifact.url, filename)
+            rename_artifact(filename, "distsrc")
+
         else:
-            LOGGER.info("Linking base artifact to this patch build", filename=filename)
             # For other artifacts we just add their URLs to the JSON file to upload.
-            files = {
+            LOGGER.info("Linking base artifact to this patch build", filename=filename)
+            validate_url(artifact.url)
+            artifacts.append({
                 "name": artifact.name,
                 "link": artifact.url,
                 "visibility": "private",
-            }
-            # Check the link exists, else raise an exception. Compile bypass is disabled.
-            requests.head(artifact.url).raise_for_status()
-            artifacts.append(files)
+            })
+
     return artifacts
 
 
-def update_artifact_permissions(permission_dict):
+def update_artifact_permissions(permission_dict: Dict[str, int]) -> None:
     """
     Update the given files with the specified permissions.
 
@@ -414,15 +447,15 @@ def update_artifact_permissions(permission_dict):
         os.chmod(path, perm)
 
 
-def gather_artifacts_and_update_expansions(build: Build, target: TargetBuild, json_artifact_file,
-                                           expansions_file):
+def gather_artifacts_and_update_expansions(build: Build, target: TargetBuild,
+                                           json_artifact_file: str, expansions_file: str):
     """
     Fetch the artifacts for this build and save them to be used by other tasks.
 
     :param build: build containing artifacts.
     :param target: Target build being bypassed.
     :param json_artifact_file: File to write json artifacts to.
-    :param expansions_file: Files to write expansions to.
+    :param expansions_file: File to write expansions to.
     """
     artifacts = fetch_artifacts(build, target.revision)
     update_artifact_permissions(ARTIFACTS_NEEDING_PERMISSIONS)
@@ -444,7 +477,8 @@ def gather_artifacts_and_update_expansions(build: Build, target: TargetBuild, js
 @click.option("--json-artifact", required=True,
               help="The JSON file to write out the metadata of files to attach to task.")
 def main(  # pylint: disable=too-many-arguments,too-many-locals,too-many-statements
-        project, build_variant, revision, patch_file, out_file, json_artifact):
+        project: str, build_variant: str, revision: str, patch_file: str, out_file: str,
+        json_artifact: str):
     """
     Create a file with expansions that can be used to bypass compile.
 
