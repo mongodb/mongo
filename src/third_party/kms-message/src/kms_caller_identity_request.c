@@ -40,7 +40,10 @@ kms_caller_identity_request_new (const kms_request_opt_t *opt)
    payload = kms_request_str_new ();
    kms_request_str_appendf (payload,
                             "Action=GetCallerIdentity&Version=2011-06-15");
-   kms_request_append_payload (request, payload->str, payload->len);
+   if (!kms_request_append_payload (request, payload->str, payload->len)) {
+      KMS_ERROR (request, "Could not append payload");
+      goto done;
+   }
 
 done:
    kms_request_str_destroy (payload);

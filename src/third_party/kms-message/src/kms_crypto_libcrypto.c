@@ -16,6 +16,8 @@
 
 #include "kms_crypto.h"
 
+#ifdef KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO
+
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -88,3 +90,49 @@ kms_sha256_hmac (void *unused_ctx,
                 hash_out,
                 NULL) != NULL;
 }
+
+bool
+kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
+                           const char *private_key,
+                           size_t private_key_len,
+                           const char *input,
+                           size_t input_len,
+                           unsigned char *signature_out)
+{
+   EVP_MD_CTX *ctx;
+   EVP_PKEY *pkey = NULL;
+   bool ret = false;
+   size_t signature_out_len = 256;
+
+   ctx = EVP_MD_CTX_new ();
+   pkey = d2i_PrivateKey (EVP_PKEY_RSA,
+                          NULL,
+                          (const unsigned char **) &private_key,
+                          private_key_len);
+   if (!pkey) {
+      goto cleanup;
+   }
+
+   ret = EVP_DigestSignInit (ctx, NULL, EVP_sha256 (), NULL /* engine */, pkey);
+   if (ret != 1) {
+      goto cleanup;
+   }
+
+   ret = EVP_DigestSignUpdate (ctx, input, input_len);
+   if (ret != 1) {
+      goto cleanup;
+   }
+
+   ret = EVP_DigestSignFinal (ctx, signature_out, &signature_out_len);
+   if (ret != 1) {
+      goto cleanup;
+   }
+
+   ret = true;
+cleanup:
+   EVP_MD_CTX_free (ctx);
+   EVP_PKEY_free (pkey);
+   return ret;
+}
+
+#endif /* KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO */

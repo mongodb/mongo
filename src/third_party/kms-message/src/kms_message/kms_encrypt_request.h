@@ -17,7 +17,9 @@
 #ifndef KMS_ENCRYPT_REQUEST_H
 #define KMS_ENCRYPT_REQUEST_H
 
-#include "kms_message.h"
+#include "kms_message_defines.h"
+#include "kms_request.h"
+#include "kms_request_opt.h"
 
 #ifdef __cplusplus
 extern "C" {

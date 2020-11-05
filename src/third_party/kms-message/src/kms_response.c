@@ -38,3 +38,9 @@ kms_response_get_body (kms_response_t *response, size_t *len)
    }
    return response->body->str;
 }
+
+int
+kms_response_get_status (kms_response_t *response)
+{
+   return response->status;
+}

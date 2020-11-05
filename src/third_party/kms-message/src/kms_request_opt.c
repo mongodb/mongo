@@ -57,3 +57,31 @@ kms_request_opt_set_crypto_hooks (kms_request_opt_t *opt,
    opt->crypto.sha256_hmac = sha256_hmac;
    opt->crypto.ctx = ctx;
 }
+
+bool
+kms_request_opt_set_provider (kms_request_opt_t *opt,
+                              kms_request_provider_t provider)
+{
+   if (provider != KMS_REQUEST_PROVIDER_AWS &&
+       provider != KMS_REQUEST_PROVIDER_AZURE &&
+       provider != KMS_REQUEST_PROVIDER_GCP) {
+      return false;
+   }
+   opt->provider = provider;
+   return true;
+}
+
+void
+kms_request_opt_set_crypto_hook_sign_rsaes_pkcs1_v1_5 (
+   kms_request_opt_t *opt,
+   bool (*sign_rsaes_pkcs1_v1_5) (void *sign_ctx,
+                                  const char *private_key,
+                                  size_t private_key_len,
+                                  const char *input,
+                                  size_t input_len,
+                                  unsigned char *signature_out),
+   void *sign_ctx)
+{
+   opt->crypto.sign_rsaes_pkcs1_v1_5 = sign_rsaes_pkcs1_v1_5;
+   opt->crypto.sign_ctx = sign_ctx;
+}

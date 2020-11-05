@@ -28,21 +28,24 @@ struct _kms_request_t {
    char error[512];
    bool failed;
    bool finalized;
+   /* Begin: AWS specific */
    kms_request_str_t *region;
    kms_request_str_t *service;
    kms_request_str_t *access_key_id;
    kms_request_str_t *secret_key;
+   kms_request_str_t *datetime;
+   kms_request_str_t *date;
+   /* End: AWS specific */
    kms_request_str_t *method;
    kms_request_str_t *path;
    kms_request_str_t *query;
    kms_request_str_t *payload;
-   kms_request_str_t *datetime;
-   kms_request_str_t *date;
    kms_kv_list_t *query_params;
    kms_kv_list_t *header_fields;
    /* turn off for tests only, not in public kms_request_opt_t API */
    bool auto_content_length;
    _kms_crypto_t crypto;
+   kms_request_provider_t provider;
 };
 
 struct _kms_response_t {
@@ -55,6 +58,8 @@ typedef enum {
    PARSING_STATUS_LINE,
    PARSING_HEADER,
    PARSING_BODY,
+   PARSING_CHUNK_LENGTH,
+   PARSING_CHUNK,
    PARSING_DONE
 } kms_response_parser_state_t;
 
@@ -65,6 +70,14 @@ struct _kms_response_parser_t {
    kms_request_str_t *raw_response;
    int content_length;
    int start; /* start of the current thing getting parsed. */
+
+   /* Support two types of HTTP 1.1 responses.
+    * - "Content-Length: x" header is present, indicating the body length.
+    * - "Transfer-Encoding: chunked" header is present, indicating a stream of
+    * chunks.
+    */
+   bool transfer_encoding_chunked;
+   int chunk_size;
    kms_response_parser_state_t state;
 };
 
@@ -84,10 +97,10 @@ set_error (char *error, size_t size, const char *fmt, ...);
       set_error (obj->error, sizeof (obj->error), __VA_ARGS__); \
    } while (0)
 
-#define KMS_ASSERT(stmt) \
-if (!(stmt)) { \
-    fprintf (stderr, "%s failed\n", #stmt); \
-    abort (); \
-}
+#define KMS_ASSERT(stmt)                      \
+   if (!(stmt)) {                             \
+      fprintf (stderr, "%s failed\n", #stmt); \
+      abort ();                               \
+   }
 
 #endif /* KMS_MESSAGE_PRIVATE_H */

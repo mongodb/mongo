@@ -17,6 +17,8 @@
 #ifndef KMS_MESSAGE_H
 #define KMS_MESSAGE_H
 
+#include <sys/types.h>
+
 #include "kms_message_defines.h"
 #include "kms_request_opt.h"
 #include "kms_request.h"
