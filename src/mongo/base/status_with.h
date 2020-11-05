@@ -52,20 +52,16 @@ class StringBuilderImpl;
 template <typename T>
 class StatusWith;
 
-// Using extern constexpr to prevent the compiler from allocating storage as a poor man's c++17
-// inline constexpr variable.
-// TODO delete extern in c++17 because inline is the default for constexpr variables.
 template <typename T>
-extern constexpr bool isStatusWith = false;
+inline constexpr bool isStatusWith = false;
 template <typename T>
-extern constexpr bool isStatusWith<StatusWith<T>> = true;
+inline constexpr bool isStatusWith<StatusWith<T>> = true;
 
 template <typename T>
-extern constexpr bool isStatusOrStatusWith =
-    std::is_same<T, mongo::Status>::value || isStatusWith<T>;
+inline constexpr bool isStatusOrStatusWith = std::is_same_v<T, Status> || isStatusWith<T>;
 
 template <typename T>
-using StatusOrStatusWith = std::conditional_t<std::is_void<T>::value, Status, StatusWith<T>>;
+using StatusOrStatusWith = std::conditional_t<std::is_void_v<T>, Status, StatusWith<T>>;
 
 /**
  * StatusWith is used to return an error or a value.
