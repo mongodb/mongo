@@ -303,11 +303,17 @@ TEST(ErrorExtraInfo, OptionalExtraInfoDoesNotThrowAndReturnsOriginalError) {
 }
 
 TEST(ErrorExtraInfo, OptionalExtraInfoStatusParserThrows) {
-    const auto status =
-        Status(ErrorCodes::ForTestingOptionalErrorExtraInfo, "", fromjson("{data: 123}"));
-    ASSERT_EQ(status, ErrorCodes::duplicateCodeForTest(4696200));
-    ASSERT(!status.extraInfo());
-    ASSERT(!status.extraInfo<OptionalErrorExtraInfoExample>());
+    OptionalErrorExtraInfoExample::EnableParserForTest whenInScope;
+    bool failed = false;
+
+    auto pars = ErrorExtraInfo::parserFor(ErrorCodes::ForTestingOptionalErrorExtraInfo);
+    try {
+        pars(fromjson("{a: 1}"));
+    } catch (const DBException&) {
+        failed = true;
+    }
+
+    ASSERT(failed);
 }
 
 TEST(ErrorExtraInfo, OptionalExtraInfoStatusParserWorks) {

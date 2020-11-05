@@ -91,7 +91,11 @@ Status::Status(ErrorCodes::Error code, StringData reason, const BSONObj& extraIn
         try {
             *this = Status(code, reason, parser(extraInfoHolder));
         } catch (const DBException& ex) {
-            *this = ex.toStatus(str::stream() << "Error parsing extra info for " << code);
+            if (ErrorCodes::mustHaveExtraInfo(code)) {
+                *this = ex.toStatus(str::stream() << "Error parsing extra info for " << code);
+            } else {
+                *this = Status(code, reason);
+            }
         }
     } else {
         *this = Status(code, reason);
