@@ -6,12 +6,14 @@ import shlex
 from buildscripts.resmokelib import configure_resmoke
 from buildscripts.resmokelib.hang_analyzer import HangAnalyzerPlugin
 from buildscripts.resmokelib.run import RunPlugin
+from buildscripts.resmokelib.setup_multiversion import SetupMultiversionPlugin
 from buildscripts.resmokelib.undodb import UndoDbPlugin
 
 _PLUGINS = [
     RunPlugin(),
     HangAnalyzerPlugin(),
     UndoDbPlugin(),
+    SetupMultiversionPlugin(),
 ]
 
 
@@ -34,7 +36,7 @@ def parse(sys_args):
     parser = _add_subcommands()
     parsed_args = parser.parse_args(sys_args)
 
-    return (parser, parsed_args)
+    return parser, parsed_args
 
 
 def parse_command_line(sys_args, **kwargs):

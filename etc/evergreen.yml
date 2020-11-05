@@ -7658,6 +7658,8 @@ tasks:
   depends_on: []
   commands:
   - func: "do non-compile setup"
+  - func: "set up remote credentials"
+  - func: "configure evergreen api credentials"
   - func: "do multiversion setup"
   - func: "run tests"
     vars:
