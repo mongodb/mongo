@@ -683,9 +683,12 @@ Status storeMongodOptions(const moe::Environment& params) {
 }
 
 // This warning must be deferred until after ServerLogRedirection has started up so that it goes to
-// the right place.
-MONGO_INITIALIZER_WITH_PREREQUISITES(IgnoreEnableMajorityReadConcernWarning,
-                                     ("ServerLogRedirection"))
+// the right place. This initializer depends on the "default" initializer, which in turn depends on
+// the "ServerLogRedirection". This ensures that when this initializer is run, the log redirection
+// to file, if any, is ready. The reason for depending on "default" instead of
+// "ServerLogRedirection" is that this way we avoid having to add a dummy "ServerLogRedirection"
+// initializer in each one of the unit tests that depend on mongod_options.
+MONGO_INITIALIZER(IgnoreEnableMajorityReadConcernWarning)
 (InitializerContext*) {
     if (gIgnoreEnableMajorityReadConcernWarning) {
         LOGV2_WARNING(20879,

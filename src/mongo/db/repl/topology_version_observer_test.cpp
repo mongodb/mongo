@@ -35,7 +35,6 @@
 #include <iostream>
 #include <memory>
 
-#include "mongo/base/init.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/repl/is_master_response.h"
@@ -52,12 +51,6 @@
 namespace mongo {
 namespace repl {
 namespace {
-
-MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
-    // mongod_options.cpp has an initializer which depends on logging.
-    // We can stub that dependency out for unit testing purposes.
-    return Status::OK();
-}
 
 /**
  * Sets up and tears down the test environment for `TopologyVersionObserver`
