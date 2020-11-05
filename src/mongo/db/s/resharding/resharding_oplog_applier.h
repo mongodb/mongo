@@ -51,7 +51,7 @@ class ThreadPool;
 class ReshardingOplogApplier {
 public:
     ReshardingOplogApplier(ServiceContext* service,
-                           ReshardingOplogSourceId sourceId,
+                           ReshardingSourceId sourceId,
                            NamespaceString oplogNs,
                            NamespaceString nsBeingResharded,
                            UUID collUUIDBeingResharded,
@@ -78,7 +78,7 @@ public:
     Future<void> applyUntilDone();
 
     static boost::optional<ReshardingOplogApplierProgress> checkStoredProgress(
-        OperationContext* opCtx, const ReshardingOplogSourceId& id);
+        OperationContext* opCtx, const ReshardingSourceId& id);
 
 private:
     using OplogBatch = std::vector<repl::OplogEntry>;
@@ -144,7 +144,7 @@ private:
     static constexpr auto kClientName = "ReshardingOplogApplier"_sd;
 
     // Identifier for the oplog source.
-    const ReshardingOplogSourceId _sourceId;
+    const ReshardingSourceId _sourceId;
 
     // Namespace that contains the oplog from a source shard that this is going to apply.
     const NamespaceString _oplogNs;

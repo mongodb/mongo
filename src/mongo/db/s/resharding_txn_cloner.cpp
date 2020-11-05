@@ -43,9 +43,11 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/transaction_participant.h"
@@ -82,7 +84,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResh
 
 std::unique_ptr<Fetcher> cloneConfigTxnsForResharding(
     OperationContext* opCtx,
-    const ShardId& shardId,
+    const ReshardingSourceId& sourceId,
     Timestamp fetchTimestamp,
     boost::optional<LogicalSessionId> startAfter,
     std::function<void(OperationContext*, BSONObj)> merge,
@@ -101,14 +103,15 @@ std::unique_ptr<Fetcher> cloneConfigTxnsForResharding(
                                 << fetchTimestamp));
     request.setHint(BSON("_id" << 1));
 
-    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+    auto shard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, sourceId.getShardId()));
     const auto targetHost = uassertStatusOK(
         shard->getTargeter()->findHost(opCtx, ReadPreferenceSetting{ReadPreference::Nearest}));
     auto serviceContext = opCtx->getServiceContext();
     auto fetcherCallback =
-        [merge, status, serviceContext](const Fetcher::QueryResponseStatus& dataStatus,
-                                        Fetcher::NextAction* nextAction,
-                                        BSONObjBuilder* getMoreBob) {
+        [merge, status, serviceContext, sourceId](const Fetcher::QueryResponseStatus& dataStatus,
+                                                  Fetcher::NextAction* nextAction,
+                                                  BSONObjBuilder* getMoreBob) {
             if (!dataStatus.isOK()) {
                 *status = dataStatus.getStatus();
                 return;
@@ -125,6 +128,23 @@ std::unique_ptr<Fetcher> cloneConfigTxnsForResharding(
                     *status = ex.toStatus();
                     return;
                 }
+            }
+
+            if (data.documents.size()) {
+                auto lastTxnRecord = SessionTxnRecord::parse(
+                    IDLParserErrorContext("ReshardingTxnClonerProgress"), data.documents.back());
+
+                // TODO SERVER-52921: Ensure fetcherOpCtx is interrupted on stepdown so the progress
+                // document write cannot happen in a different term than the config.transactions
+                // writes above.
+                PersistentTaskStore<ReshardingTxnClonerProgress> store(
+                    NamespaceString::kReshardingTxnClonerProgressNamespace);
+                store.upsert(
+                    fetcherOpCtx,
+                    QUERY(ReshardingTxnClonerProgress::kSourceIdFieldName << sourceId.toBSON()),
+                    BSON("$set" << BSON(ReshardingTxnClonerProgress::kProgressFieldName
+                                        << lastTxnRecord.getSessionId().toBSON())),
+                    WriteConcernOptions());
             }
 
             if (!getMoreBob) {

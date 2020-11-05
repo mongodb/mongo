@@ -39,6 +39,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/resharding_txn_cloner.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -111,7 +112,10 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
     }
 
 protected:
+    const UUID kDefaultReshardingId = UUID::gen();
     const std::vector<ShardId> kTwoShardIdList{{"s1"}, {"s2"}};
+    const std::vector<ReshardingSourceId> kTwoSourceIdList = {
+        {kDefaultReshardingId, ShardId("s1")}, {kDefaultReshardingId, ShardId("s2")}};
 
     const std::vector<DurableTxnStateEnum> kDurableTxnStateEnumValues = {
         DurableTxnStateEnum::kPrepared,
@@ -132,6 +136,33 @@ protected:
             makeLogicalSessionIdForTest(), 0, repl::OpTime(Timestamp::min(), 0), Date_t());
         txn.setState(multiDocTxnState);
         return txn.toBSON();
+    }
+
+    LogicalSessionId getTxnRecordLsid(BSONObj txnRecord) {
+        return SessionTxnRecord::parse(IDLParserErrorContext("ReshardingTxnClonerTest"), txnRecord)
+            .getSessionId();
+    }
+
+    std::vector<BSONObj> makeSortedTxns(int numTxns) {
+        std::vector<BSONObj> txns;
+        for (int i = 0; i < numTxns; i++) {
+            txns.emplace_back(makeTxn());
+        }
+        std::sort(txns.begin(), txns.end(), [this](BSONObj a, BSONObj b) {
+            return getTxnRecordLsid(a).toBSON().woCompare(getTxnRecordLsid(b).toBSON());
+        });
+        return txns;
+    }
+
+    void onCommandReturnTxnBatch(std::vector<BSONObj> firstBatch,
+                                 CursorId cursorId,
+                                 bool isFirstBatch) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            return CursorResponse(
+                       NamespaceString::kSessionTransactionsTableNamespace, cursorId, firstBatch)
+                .toBSON(isFirstBatch ? CursorResponse::ResponseType::InitialResponse
+                                     : CursorResponse::ResponseType::SubsequentResponse);
+        });
     }
 
     void onCommandReturnTxns(std::vector<BSONObj> firstBatch, std::vector<BSONObj> secondBatch) {
@@ -181,9 +212,11 @@ protected:
 
     void checkTxnHasBeenUpdated(LogicalSessionId sessionId, TxnNumber txnNum) {
         DBDirectClient client(operationContext());
-        auto bsonOplog =
-            client.findOne(NamespaceString::kRsOplogNamespace.ns(),
-                           BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()));
+        // The same logical session entry may be inserted more than once by a test case, so use a
+        // $natural sort to find the most recently inserted entry.
+        Query oplogQuery(BSON(repl::OplogEntryBase::kSessionIdFieldName << sessionId.toBSON()));
+        auto bsonOplog = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                                        oplogQuery.sort(BSON("$natural" << -1)));
         ASSERT(!bsonOplog.isEmpty());
         auto oplogEntry = repl::MutableOplogEntry::parse(bsonOplog).getValue();
         ASSERT_EQ(oplogEntry.getTxnNumber().get(), txnNum);
@@ -200,6 +233,7 @@ protected:
         ASSERT_EQ(txn.getTxnNum(), txnNum);
         ASSERT_EQ(txn.getLastWriteOpTime(), oplogEntry.getOpTime());
     }
+
     void checkTxnHasNotBeenUpdated(LogicalSessionId sessionId, TxnNumber txnNum) {
         auto opCtx = operationContext();
         opCtx->setLogicalSessionId(sessionId);
@@ -213,6 +247,27 @@ protected:
 
         ASSERT_BSONOBJ_EQ(bsonOplog, {});
         ASSERT_EQ(txnParticipant.getActiveTxnNumber(), txnNum);
+    }
+
+    boost::optional<ReshardingTxnClonerProgress> getTxnCloningProgress(
+        const ReshardingSourceId& sourceId) {
+        DBDirectClient client(operationContext());
+        auto progressDoc = client.findOne(
+            NamespaceString::kReshardingTxnClonerProgressNamespace.ns(),
+            BSON(ReshardingTxnClonerProgress::kSourceIdFieldName << sourceId.toBSON()));
+
+        if (progressDoc.isEmpty()) {
+            return boost::none;
+        }
+
+        return ReshardingTxnClonerProgress::parse(
+            IDLParserErrorContext("ReshardingTxnClonerProgress"), progressDoc);
+    }
+
+    boost::optional<LogicalSessionId> getProgressLsid(const ReshardingSourceId& sourceId) {
+        auto progressDoc = getTxnCloningProgress(sourceId);
+        return progressDoc ? boost::optional<LogicalSessionId>(progressDoc->getProgress())
+                           : boost::none;
     }
 
 private:
@@ -232,7 +287,7 @@ TEST_F(ReshardingTxnClonerTest, TxnAggregation) {
     std::vector<BSONObj> retrievedTransactions;
 
     auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                kTwoShardIdList[1],
+                                                kTwoSourceIdList[1],
                                                 Timestamp::max(),
                                                 boost::none,
                                                 [&](OperationContext* opCtx, BSONObj transaction) {
@@ -265,7 +320,7 @@ TEST_F(ReshardingTxnClonerTest, CursorNotFoundError) {
 
     auto fetcher = cloneConfigTxnsForResharding(
         operationContext(),
-        kTwoShardIdList[1],
+        kTwoSourceIdList[1],
         Timestamp::max(),
         boost::none,
         [&](auto opCtx, BSONObj transaction) { retrievedTransactions.push_back(transaction); },
@@ -296,7 +351,7 @@ TEST_F(ReshardingTxnClonerTest, MergeTxnNotOnRecipient) {
         Status status = Status::OK();
 
         auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                    kTwoShardIdList[1],
+                                                    kTwoSourceIdList[1],
                                                     Timestamp::max(),
                                                     boost::none,
                                                     &configTxnsMergerForResharding,
@@ -321,7 +376,7 @@ TEST_F(ReshardingTxnClonerTest, MergeUnParsableTxn) {
     Status status = Status::OK();
 
     auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                kTwoShardIdList[1],
+                                                kTwoSourceIdList[1],
                                                 Timestamp::max(),
                                                 boost::none,
                                                 &configTxnsMergerForResharding,
@@ -350,7 +405,7 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverMultiDocTxn) {
         seedTransactionOnRecipient(sessionId, recipientTxnNum, true);
 
         auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                    kTwoShardIdList[1],
+                                                    kTwoSourceIdList[1],
                                                     Timestamp::max(),
                                                     boost::none,
                                                     &configTxnsMergerForResharding,
@@ -379,7 +434,7 @@ TEST_F(ReshardingTxnClonerTest, MergeNewTxnOverRetryableWriteTxn) {
         seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
 
         auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                    kTwoShardIdList[1],
+                                                    kTwoSourceIdList[1],
                                                     Timestamp::max(),
                                                     boost::none,
                                                     &configTxnsMergerForResharding,
@@ -407,7 +462,7 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverRetryableWriteTxn) {
         seedTransactionOnRecipient(sessionId, txnNum, false);
 
         auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                    kTwoShardIdList[1],
+                                                    kTwoSourceIdList[1],
                                                     Timestamp::max(),
                                                     boost::none,
                                                     &configTxnsMergerForResharding,
@@ -435,7 +490,7 @@ TEST_F(ReshardingTxnClonerTest, MergeCurrentTxnOverMultiDocTxn) {
         seedTransactionOnRecipient(sessionId, txnNum, true);
 
         auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                    kTwoShardIdList[1],
+                                                    kTwoSourceIdList[1],
                                                     Timestamp::max(),
                                                     boost::none,
                                                     &configTxnsMergerForResharding,
@@ -465,7 +520,7 @@ TEST_F(ReshardingTxnClonerTest, MergeOldTxnOverTxn) {
         seedTransactionOnRecipient(sessionId, recipientTxnNum, false);
 
         auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                    kTwoShardIdList[1],
+                                                    kTwoSourceIdList[1],
                                                     Timestamp::max(),
                                                     boost::none,
                                                     &configTxnsMergerForResharding,
@@ -491,7 +546,7 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
     TxnNumber txnNum = 3;
 
     auto fetcher = cloneConfigTxnsForResharding(operationContext(),
-                                                kTwoShardIdList[1],
+                                                kTwoSourceIdList[1],
                                                 Timestamp::max(),
                                                 boost::none,
                                                 &configTxnsMergerForResharding,
@@ -511,6 +566,178 @@ TEST_F(ReshardingTxnClonerTest, MergeMultiDocTransactionAndRetryableWrite) {
     ASSERT(status.isOK());
     checkTxnHasBeenUpdated(sessionIdRetryableWrite, txnNum);
     checkTxnHasBeenUpdated(sessionIdMultiDocTxn, txnNum);
+}
+
+TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressSingleBatch) {
+    const auto txns = makeSortedTxns(2);
+    const auto lastLsid = getTxnRecordLsid(txns.back());
+
+    {
+        ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+        ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
+
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoSourceIdList[1],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    nullptr);
+
+        onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
+        fetcher->join();
+
+        ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+        ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
+    }
+
+    // Repeat with a different shard to verify multiple progress docs can exist at once for a
+    // resharding operation.
+    {
+        ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+        ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
+
+        auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                    kTwoSourceIdList[0],
+                                                    Timestamp::max(),
+                                                    boost::none,
+                                                    &configTxnsMergerForResharding,
+                                                    nullptr);
+
+        onCommandReturnTxnBatch(txns, CursorId{0}, true /* isFirstBatch */);
+        fetcher->join();
+
+        ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[0]), lastLsid);
+        ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
+    }
+
+    // Verify each progress document is scoped to a single resharding operation.
+    ASSERT_FALSE(getTxnCloningProgress(ReshardingSourceId(UUID::gen(), kTwoShardIdList[0])));
+    ASSERT_FALSE(getTxnCloningProgress(ReshardingSourceId(UUID::gen(), kTwoShardIdList[1])));
+}
+
+TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressMultipleBatches) {
+    const auto txns = makeSortedTxns(4);
+    const auto firstLsid = getTxnRecordLsid(txns[1]);
+    const auto lastLsid = getTxnRecordLsid(txns.back());
+
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
+
+    auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                kTwoSourceIdList[1],
+                                                Timestamp::max(),
+                                                boost::none,
+                                                &configTxnsMergerForResharding,
+                                                nullptr);
+
+    onCommandReturnTxnBatch(std::vector<BSONObj>(txns.begin(), txns.begin() + 2),
+                            CursorId{123},
+                            true /* isFirstBatch */);
+
+    // After the first batch, the progress document should contain the lsid of the last document in
+    // that batch.
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
+
+    onCommandReturnTxnBatch(
+        std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, false /* isFirstBatch */);
+    fetcher->join();
+
+    // After the second and final batch, the progress document should have been updated to the final
+    // overall lsid.
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
+}
+
+TEST_F(ReshardingTxnClonerTest, ClonerStoresProgressResume) {
+    const auto txns = makeSortedTxns(4);
+    const auto firstLsid = getTxnRecordLsid(txns.front());
+    const auto lastLsid = getTxnRecordLsid(txns.back());
+
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[1]));
+
+    Status error = Status::OK();
+    auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                kTwoSourceIdList[1],
+                                                Timestamp::max(),
+                                                boost::none,
+                                                &configTxnsMergerForResharding,
+                                                &error);
+
+    onCommandReturnTxnBatch({txns.front()}, CursorId{123}, true /* isFirstBatch */);
+
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
+
+    // Simulate the cloning shard stepping down and interrupting the cloner.
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        return Status(ErrorCodes::InterruptedDueToReplStateChange, "Mock state change error");
+    });
+    fetcher->join();
+
+    // The stored progress should be unchanged.
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), firstLsid);
+
+    // Simulate a resume on the new primary by creating a new fetcher that resumes after the lsid in
+    // the progress document.
+    fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                           kTwoSourceIdList[1],
+                                           Timestamp::max(),
+                                           firstLsid,
+                                           &configTxnsMergerForResharding,
+                                           nullptr);
+
+    onCommandReturnTxnBatch(
+        std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, true /* isFirstBatch */);
+    fetcher->join();
+
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
+
+    for (const auto& txn : txns) {
+        // Note 0 is the default txnNumber used for txn records made by makeSortedTxns()
+        checkTxnHasBeenUpdated(getTxnRecordLsid(txn), 0);
+    }
+
+    // Simulate a resume after a rollback of an update to the progress document by creating a new
+    // fetcher that resumes at the lsid from the first progress document. This verifies cloning is
+    // idempotent on the cloning shard.
+    fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                           kTwoSourceIdList[1],
+                                           Timestamp::max(),
+                                           firstLsid,
+                                           &configTxnsMergerForResharding,
+                                           nullptr);
+
+    onCommandReturnTxnBatch(
+        std::vector<BSONObj>(txns.begin() + 1, txns.end()), CursorId{0}, true /* isFirstBatch */);
+    fetcher->join();
+
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+    ASSERT_EQ(*getProgressLsid(kTwoSourceIdList[1]), lastLsid);
+
+    for (const auto& txn : txns) {
+        // Note 0 is the default txnNumber used for txn records made by makeSortedTxns()
+        checkTxnHasBeenUpdated(getTxnRecordLsid(txn), 0);
+    }
+}
+
+TEST_F(ReshardingTxnClonerTest, ClonerDoesNotUpdateProgressOnEmptyBatch) {
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
+
+    auto fetcher = cloneConfigTxnsForResharding(operationContext(),
+                                                kTwoSourceIdList[0],
+                                                Timestamp::max(),
+                                                boost::none,
+                                                &configTxnsMergerForResharding,
+                                                nullptr);
+
+    onCommandReturnTxnBatch({}, CursorId{0}, true /* isFirstBatch */);
+    fetcher->join();
+
+    ASSERT_FALSE(getTxnCloningProgress(kTwoSourceIdList[0]));
 }
 
 }  // namespace

@@ -52,7 +52,7 @@ using namespace fmt::literals;
 
 ReshardingOplogApplier::ReshardingOplogApplier(
     ServiceContext* service,
-    ReshardingOplogSourceId sourceId,
+    ReshardingSourceId sourceId,
     NamespaceString oplogNs,
     NamespaceString nsBeingResharded,
     UUID collUUIDBeingResharded,
@@ -394,7 +394,7 @@ void ReshardingOplogApplier::_onWriterVectorDone(Status status) {
 }
 
 boost::optional<ReshardingOplogApplierProgress> ReshardingOplogApplier::checkStoredProgress(
-    OperationContext* opCtx, const ReshardingOplogSourceId& id) {
+    OperationContext* opCtx, const ReshardingSourceId& id) {
     DBDirectClient client(opCtx);
     auto doc = client.findOne(
         NamespaceString::kReshardingApplierProgressNamespace.ns(),

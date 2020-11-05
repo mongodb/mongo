@@ -92,7 +92,7 @@ class UUID {
     friend class RecipientForgetMigration;
     friend class RecipientSyncData;
     friend class ReshardingDonorDocument;
-    friend class ReshardingOplogSourceId;
+    friend class ReshardingSourceId;
     friend class ResumeIndexInfo;
     friend class ResumeTokenInternal;
     friend class ShardCollectionTypeBase;

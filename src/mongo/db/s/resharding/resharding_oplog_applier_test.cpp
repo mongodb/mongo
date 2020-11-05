@@ -154,7 +154,7 @@ public:
         return _executor.get();
     }
 
-    const ReshardingOplogSourceId& sourceId() {
+    const ReshardingSourceId& sourceId() {
         return _sourceId;
     }
 
@@ -167,7 +167,7 @@ private:
     const ShardId kMyShardId{"shard1"};
     UUID _crudNsUuid = UUID::gen();
 
-    const ReshardingOplogSourceId _sourceId{UUID::gen(), kMyShardId};
+    const ReshardingSourceId _sourceId{UUID::gen(), kMyShardId};
 
     std::unique_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::unique_ptr<ThreadPool> _writerPool;

@@ -26,28 +26,29 @@
 # it in the license file.
 #
 
-# This file defines the document used for storing progress by the resharding oplog applier.
+# This file defines the document used for storing progress by the resharding config.transactions
+# cloner.
 
 global:
     cpp_namespace: "mongo"
 
 imports:
+    - "mongo/db/logical_session_id.idl"
     - "mongo/idl/basic_types.idl"
-    - "mongo/db/s/resharding/donor_oplog_id.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/s/sharding_types.idl"
 
 structs:
-    ReshardingOplogApplierProgress:
-        description: "Used for storing the progress made by the resharding oplog applier."
+    ReshardingTxnClonerProgress:
+        description: "Used for storing the progress made by the resharding transaction cloner."
         fields:
             _id:
                 type: ReshardingSourceId
-                description: "The identifier for the source of the oplog entries."
-                cpp_name: oplogSourceId
+                description: "The identifier for the source of the config.transactions entries."
+                cpp_name: sourceId
             progress:
-                type: ReshardingDonorOplogId
+                type: LogicalSessionId
                 description: >-
-                    The minimum point where the resharding oplog applier can start without missing
-                    any oplog it needs to process.
+                    The minimum point where the resharding transaction cloner can start without
+                    missing any config.transactions entries it needs to process.
 

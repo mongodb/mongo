@@ -130,3 +130,13 @@ structs:
                               the original resharding collection will be executed as distributed
                               transactions."
                 optional: true
+
+    ReshardingSourceId:
+        description: "Identifier for a shard involved in a particular resharding operation."
+        fields:
+            reshardingUUID:
+                type: uuid
+                description: "Identifier for a resharding operation."
+            shardId:
+                type: shard_id
+                description: "A shard identifier."

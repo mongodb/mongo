@@ -145,6 +145,9 @@ public:
     // Namespace for storing oplog applier progress for resharding.
     static const NamespaceString kReshardingApplierProgressNamespace;
 
+    // Namespace for storing config.transactions cloner progress for resharding.
+    static const NamespaceString kReshardingTxnClonerProgressNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

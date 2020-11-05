@@ -33,10 +33,10 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {
-
 
 /**
  * Create pipeline stages for iterating donor config.transactions.  The pipeline has these stages:
@@ -58,13 +58,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> createConfigTxnCloningPipelineForResh
 /**
  * Clone config.transactions from source and updates the config.transactions on itself.
  * The parameter merge is a function called on every transaction received and should be used
- * to merge the transaction into this machine's own congig.transactions collection.
+ * to merge the transaction into this machine's own config.transactions collection.
  *
  * returns a pointer to the fetcher object sending the command.
  */
 std::unique_ptr<Fetcher> cloneConfigTxnsForResharding(
     OperationContext* opCtx,
-    const ShardId& shardId,
+    const ReshardingSourceId& sourceId,
     Timestamp fetchTimestamp,
     boost::optional<LogicalSessionId> startAfter,
     std::function<void(OperationContext*, BSONObj)> merge,
