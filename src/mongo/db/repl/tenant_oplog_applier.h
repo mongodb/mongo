@@ -82,7 +82,9 @@ public:
     /**
      * Return a future which will be notified when that optime has been reached.  Future will
      * contain donor and recipient optime of last oplog entry in batch where donor optime is greater
-     * than passed-in time.
+     * than passed-in time. To be noted, recipient optime returned in the future can be null if the
+     * tenant oplog applier has never applied any tenant oplog entries (i.e., non resume token no-op
+     * entries) till that batch.
      */
     SemiFuture<OpTimePair> getNotificationForOpTime(OpTime donorOpTime);
 
@@ -139,8 +141,10 @@ private:
     const OpTime _beginApplyingAfterOpTime;             // (R)
     RandomAccessOplogBuffer* _oplogBuffer;              // (R)
     std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
-    OpTimePair _lastBatchCompletedOpTimes;              // (M)
-    std::vector<OpTimePair> _opTimeMapping;             // (M)
+    // Keeps track of last applied donor and recipient optimes by the tenant oplog applier.
+    // This gets updated only on batch boundaries.
+    OpTimePair _lastAppliedOpTimesUpToLastBatch;  // (M)
+    std::vector<OpTimePair> _opTimeMapping;       // (M)
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
     ThreadPool* const _writerPool;                                        // (S)

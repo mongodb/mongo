@@ -94,9 +94,9 @@ SemiFuture<TenantOplogApplier::OpTimePair> TenantOplogApplier::getNotificationFo
         return SemiFuture<OpTimePair>::makeReady(_finalStatus);
     }
     // If this optime has already passed, just return a ready future.
-    if (_lastBatchCompletedOpTimes.donorOpTime >= donorOpTime ||
+    if (_lastAppliedOpTimesUpToLastBatch.donorOpTime >= donorOpTime ||
         _beginApplyingAfterOpTime >= donorOpTime) {
-        return SemiFuture<OpTimePair>::makeReady(_lastBatchCompletedOpTimes);
+        return SemiFuture<OpTimePair>::makeReady(_lastAppliedOpTimesUpToLastBatch);
     }
 
     // This will pull a new future off the existing promise for this time if it exists, otherwise
@@ -219,7 +219,14 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
                 "migrationUuid"_attr = _migrationUuid);
     auto lastBatchCompletedOpTimes = _writeNoOpEntries(opCtx.get(), *batch);
     stdx::lock_guard lk(_mutex);
-    _lastBatchCompletedOpTimes = lastBatchCompletedOpTimes;
+    _lastAppliedOpTimesUpToLastBatch.donorOpTime = lastBatchCompletedOpTimes.donorOpTime;
+    // If the batch contains only resume token no-ops, then the last batch completed
+    // recipient optime returned will be null.
+    if (!lastBatchCompletedOpTimes.recipientOpTime.isNull()) {
+        _lastAppliedOpTimesUpToLastBatch.recipientOpTime =
+            lastBatchCompletedOpTimes.recipientOpTime;
+    }
+
     LOGV2_DEBUG(4886002,
                 1,
                 "Tenant Oplog Applier finished applying batch",
@@ -227,11 +234,11 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
                 "migrationUuid"_attr = _migrationUuid,
                 "lastBatchCompletedOpTimes"_attr = lastBatchCompletedOpTimes);
 
-    // Notify all the waiters on optimes before and including _lastBatchCompletedOpTimes.
+    // Notify all the waiters on optimes before and including _lastAppliedOpTimesUpToLastBatch.
     auto firstUnexpiredIter =
-        _opTimeNotificationList.upper_bound(_lastBatchCompletedOpTimes.donorOpTime);
+        _opTimeNotificationList.upper_bound(_lastAppliedOpTimesUpToLastBatch.donorOpTime);
     for (auto iter = _opTimeNotificationList.begin(); iter != firstUnexpiredIter; iter++) {
-        iter->second.emplaceValue(_lastBatchCompletedOpTimes);
+        iter->second.emplaceValue(_lastAppliedOpTimesUpToLastBatch);
     }
     _opTimeNotificationList.erase(_opTimeNotificationList.begin(), firstUnexpiredIter);
 }
