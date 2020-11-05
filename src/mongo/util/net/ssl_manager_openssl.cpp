@@ -594,6 +594,16 @@ struct OCSPFetchResponse {
             return Milliseconds(0);
         }
 
+        // If the setParameter for OCSPStaplingRefreshPeriodSecs is too high, we want to
+        // make sure that we are never left without a stapled OCSP response because we
+        // were not refreshing fast enough.
+        if (kOCSPStaplingRefreshPeriodSecs != -1 &&
+            kOCSPStaplingRefreshPeriodSecs <
+                durationCount<Seconds>(timeBeforeNextUpdate -
+                                       Seconds(60 + gTLSOCSPStaplingTimeoutSecs))) {
+
+            return Milliseconds(Seconds(kOCSPStaplingRefreshPeriodSecs));
+        }
         return timeBeforeNextUpdate / 2;
     }
 
@@ -1890,6 +1900,14 @@ Status OCSPFetcher::start(SSL_CTX* context, bool asyncOCSPStaple) {
     return Status::OK();
 }
 
+Milliseconds getPeriodForStapleJob(StatusWith<Milliseconds> swDuration) {
+    if (!swDuration.isOK()) {
+        return kOCSPUnknownStatusRefreshRate;
+    } else {
+        return swDuration.getValue();
+    }
+}
+
 void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
     stdx::lock_guard<Latch> lock(_staplingMutex);
 
@@ -1901,24 +1919,11 @@ void OCSPFetcher::startPeriodicJob(StatusWith<Milliseconds> swDurationInitial) {
         return;
     }
 
-    // determine the OCSP validation refresh period
-    Milliseconds duration;
-    if (swDurationInitial.isOK()) {
-        // if the validation refresh period was set manually, use it
-        if (kOCSPStaplingRefreshPeriodSecs != -1) {
-            duration = Seconds(kOCSPStaplingRefreshPeriodSecs);
-        } else {
-            duration = swDurationInitial.getValue();
-        }
-    } else {
-        duration = kOCSPUnknownStatusRefreshRate;
-    }
-
     _ocspStaplingAnchor =
         getGlobalServiceContext()->getPeriodicRunner()->makeJob(PeriodicRunner::PeriodicJob(
             "OCSP Fetch and Staple",
             [this, sm = _manager->shared_from_this()](Client* client) { doPeriodicJob(); },
-            duration));
+            getPeriodForStapleJob(swDurationInitial)));
 
     _ocspStaplingAnchor.start();
 }
@@ -1932,17 +1937,7 @@ void OCSPFetcher::doPeriodicJob() {
                 return;
             }
 
-            if (!swDuration.isOK()) {
-                this->_ocspStaplingAnchor.setPeriod(kOCSPUnknownStatusRefreshRate);
-                return;
-            } else {
-                // if the validation refresh period was set manually, use it
-                if (kOCSPStaplingRefreshPeriodSecs != -1) {
-                    this->_ocspStaplingAnchor.setPeriod(Seconds(kOCSPStaplingRefreshPeriodSecs));
-                } else {
-                    this->_ocspStaplingAnchor.setPeriod(swDuration.getValue());
-                }
-            }
+            this->_ocspStaplingAnchor.setPeriod(getPeriodForStapleJob(swDuration));
         });
 }
 
