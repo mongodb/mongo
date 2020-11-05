@@ -318,7 +318,7 @@ void RegexMatchExpression::shortDebugString(StringBuilder& debug) const {
 
 // ---------
 
-ModMatchExpression::ModMatchExpression(StringData path, int divisor, int remainder)
+ModMatchExpression::ModMatchExpression(StringData path, long long divisor, long long remainder)
     : LeafMatchExpression(MOD, path), _divisor(divisor), _remainder(remainder) {
     uassert(ErrorCodes::BadValue, "divisor cannot be 0", divisor != 0);
 }
@@ -326,7 +326,7 @@ ModMatchExpression::ModMatchExpression(StringData path, int divisor, int remaind
 bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (!e.isNumber())
         return false;
-    return mongoSafeMod(e.numberLong(), static_cast<long long>(_divisor)) == _remainder;
+    return mongoSafeMod(truncateToLong(e), _divisor) == _remainder;
 }
 
 void ModMatchExpression::debugString(StringBuilder& debug, int level) const {
