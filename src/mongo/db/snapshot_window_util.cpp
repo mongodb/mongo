@@ -42,6 +42,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/testing_proctor.h"
 
 namespace mongo {
 
@@ -110,7 +111,7 @@ void increaseTargetSnapshotWindowSize(OperationContext* opCtx) {
     // the window size.
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
     if (engine && engine->isCacheUnderPressure(opCtx)) {
-        invariant(!engine->isEphemeral() || getTestCommandsEnabled());
+        invariant(!engine->isEphemeral() || TestingProctor::instance().isEnabled());
         LOGV2_WARNING(
             23788,
             "Attempted to increase the time window of available snapshots for point-in-time "
@@ -156,7 +157,7 @@ void decreaseTargetSnapshotWindowSize(OperationContext* opCtx) {
 
     StorageEngine* engine = opCtx->getServiceContext()->getStorageEngine();
     if (engine && engine->isCacheUnderPressure(opCtx)) {
-        invariant(!engine->isEphemeral() || getTestCommandsEnabled());
+        invariant(!engine->isEphemeral() || TestingProctor::instance().isEnabled());
         _decreaseTargetSnapshotWindowSize(lock, opCtx);
     }
 }
