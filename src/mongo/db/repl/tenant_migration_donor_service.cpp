@@ -55,7 +55,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(abortTenantMigrationAfterBlockingStarts);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterBlockingStarts);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterDataSync);
-MONGO_FAIL_POINT_DEFINE(skipSendingRecipientSyncDataCommand);
 
 const std::string kTTLIndexName = "TenantMigrationDonorTTLIndex";
 const Seconds kRecipientSyncDataTimeout(30);
@@ -448,9 +447,6 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS) {
-    if (skipSendingRecipientSyncDataCommand.shouldFail()) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();

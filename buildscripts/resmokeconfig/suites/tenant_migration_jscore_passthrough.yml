@@ -17,12 +17,6 @@ selector:
   - jstests/core/top.js
   # The override cannot deep copy very large or small dates.
   - jstests/core/index_large_and_small_dates.js
-  # These tests expect the profiler to observe batched write operations but batched writes are
-  # disabled in this suite.
-  - jstests/core/profile_insert.js
-  - jstests/core/profile_delete.js
-  - jstests/core/profile_findandmodify.js
-  - jstests/core/profile_update.js
   # These tests are not expected to pass with replica-sets.
   - jstests/core/opcounters_write_cmd.js
   - jstests/core/read_after_optime.js
@@ -54,7 +48,38 @@ selector:
   - jstests/core/comment_field.js
   - jstests/core/invalidated_legacy_cursors.js
   # TODO (SERVER-51753): Handle applyOps running concurrently with a tenant migration.
+  - jstests/core/apply_ops1.js
+  - jstests/core/apply_ops1.js
+  - jstests/core/apply_ops2.js
+  - jstests/core/apply_ops_dups.js
+  - jstests/core/apply_ops_index_collation.js
+  - jstests/core/apply_ops_invalid_index_spec.js
+  - jstests/core/apply_ops_missing_field.js
+  - jstests/core/apply_ops_system_dot_views.js
+  - jstests/core/apply_ops_without_ns.js
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/collation.js
+  - jstests/core/collmod_without_uuid.js
+  - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
+  - jstests/core/txns/commands_not_allowed_in_txn.js
+  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+  - jstests/core/txns/statement_ids_accepted.js
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/list_collections_no_views.js
+  - jstests/core/views/duplicate_ns.js
+  - jstests/core/views/view_with_invalid_dbname.js
+  - jstests/core/views/views_creation.js
+  - jstests/core/views/invalid_system_views.js
+  - jstests/core/views/views_all_commands.js
   - jstests/core/rename_stayTemp.js
+  # TODO (SERVER-52727): Synchronize cloneCollectionAsCapped with tenant migrations.
+  - jstests/core/capped_convertToCapped1.js
+  # TODO (SERVER-52866): Synchronize getLastError with tenant migrations.
+  - jstests/core/bulk_legacy_enforce_gle.js
+  # These tests run getMore commands which are not supported in the tenant migration *passthrough*.
+  exclude_with_any_tags:
+  - requires_getmore
 
 executor:
   archive:
@@ -70,8 +95,6 @@ executor:
       global_vars:
         TestData: &TestData
           tenantId: "tenantMigrationTenantId"
-          # TODO (SERVER-50494): Implement proxy's retry logic for batch write commands.
-          disableBatchWrites: true
       readMode: commands
   hooks:
   - class: ContinuousTenantMigration
@@ -85,20 +108,24 @@ executor:
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN
-    # TODO (SERVER-49204): The ContinuousTenantMigration hook reuses TestData.tenantId hook for all
-    # migrations. Therefore, it needs to run the donorForgetMigration command after each migration
-    # (i.e. test) in order to make the subsequent migration not conflict with the one run by the
-    # previous test. Until we have the donorForgetMigration command, we need to specify n: 1 to
-    # clear the in-memory and persisted state for each migration.
-    n: 1
+    n: 20
   fixture:
     class: TenantMigrationFixture
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        failpoint.abortTenantMigrationAfterBlockingStarts:
+            mode: alwaysOn
+            data:
+              blockTimeMS: 250
         # TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
         failpoint.returnResponseOkForRecipientSyncDataCmd:
             mode: alwaysOn
+        # Set the delay before migration state machine is garbage collected to be short to avoid
+        # migration conflicts since the ContinuousTenantMigration hook migrates a single tenant
+        # between the replica sets in the fixture.
+        tenantMigrationGarbageCollectionDelayMS: 100
+        ttlMonitorSleepSecs: 1
     num_replica_sets: 2
     num_nodes_per_replica_set: 3
     use_replica_set_connection_string: true

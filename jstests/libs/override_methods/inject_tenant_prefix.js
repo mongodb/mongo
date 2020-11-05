@@ -197,6 +197,92 @@ function extractTenantMigrationAbortedError(resObj) {
     }
     return null;
 }
+/**
+ * If the command was a batch command where some of the operations failed, modifies the command
+ * object so that only failed operations are retried.
+ */
+function modifyCmdObjForRetry(cmdObj, resObj) {
+    if (cmdObj.insert) {
+        let retryOps = [];
+        if (cmdObj.ordered) {
+            retryOps = cmdObj.documents.slice(resObj.writeErrors[0].index);
+        } else {
+            for (let writeError of resObj.writeErrors) {
+                if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+                    retryOps.push(cmdObj.documents[writeError.index]);
+                }
+            }
+        }
+        cmdObj.documents = retryOps;
+    }
+
+    // findAndModify may also have an update field, but is not a batched command.
+    if (cmdObj.update && !cmdObj.findAndModify && !cmdObj.findandmodify) {
+        let retryOps = [];
+        if (cmdObj.ordered) {
+            retryOps = cmdObj.updates.slice(resObj.writeErrors[0].index);
+        } else {
+            for (let writeError of resObj.writeErrors) {
+                if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+                    retryOps.push(cmdObj.updates[writeError.index]);
+                }
+            }
+        }
+        cmdObj.updates = retryOps;
+    }
+
+    if (cmdObj.delete) {
+        let retryOps = [];
+        if (cmdObj.ordered) {
+            retryOps = cmdObj.deletes.slice(resObj.writeErrors[0].index);
+        } else {
+            for (let writeError of resObj.writeErrors) {
+                if (writeError.code == ErrorCodes.TenantMigrationAborted) {
+                    retryOps.push(cmdObj.deletes[writeError.index]);
+                }
+            }
+        }
+        cmdObj.deletes = retryOps;
+    }
+}
+
+/**
+ * Sets the keys of the given index map to consecutive non-negative integers starting from 0.
+ */
+function resetIndices(indexMap) {
+    let newIndexMap = {};
+    Object.keys(indexMap).map((key, index) => {
+        newIndexMap[index] = indexMap[key];
+    });
+    return newIndexMap;
+}
+
+function toIndexSet(indexedDocs) {
+    let set = new Set();
+    if (indexedDocs) {
+        for (let doc of indexedDocs) {
+            set.add(doc.index);
+        }
+    }
+    return set;
+}
+
+/**
+ * Remove the indices for non-upsert writes that succeeded.
+ */
+function removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap) {
+    // Optimization to only look through the indices in a set rather than in an array.
+    let indexSetForUpserted = toIndexSet(resObj.upserted);
+    let indexSetForWriteErrors = toIndexSet(resObj.writeErrors);
+
+    for (let index in Object.keys(indexMap)) {
+        if ((!indexSetForUpserted.has(parseInt(index)) &&
+             !indexSetForWriteErrors.has(parseInt(index)))) {
+            delete indexMap[index];
+        }
+    }
+    return indexMap;
+}
 
 Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     // Create another cmdObj from this command with TestData.tenantId prepended to all the
@@ -204,6 +290,31 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const cmdObjWithTenantId = createCmdObjWithTenantId(cmdObj);
 
     let numAttempts = 0;
+
+    // Keep track of the write operations that were applied.
+    let n = 0;
+    let nModified = 0;
+    let upserted = [];
+    let nonRetryableWriteErrors = [];
+
+    // 'indexMap' is a mapping from a write's index in the current cmdObj to its index in the
+    // original cmdObj.
+    let indexMap = {};
+    if (cmdObjWithTenantId.documents) {
+        for (let i = 0; i < cmdObjWithTenantId.documents.length; i++) {
+            indexMap[i] = i;
+        }
+    }
+    if (cmdObjWithTenantId.updates) {
+        for (let i = 0; i < cmdObjWithTenantId.updates.length; i++) {
+            indexMap[i] = i;
+        }
+    }
+    if (cmdObjWithTenantId.deletes) {
+        for (let i = 0; i < cmdObjWithTenantId.deletes.length; i++) {
+            indexMap[i] = i;
+        }
+    }
 
     while (true) {
         numAttempts++;
@@ -214,21 +325,118 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         // assume the command was run against the original database.
         removeTenantId(resObj);
 
+        // If the write didn't encounter a TenantMigrationAborted error at all, return the result
+        // directly.
         let tenantMigrationAbortedErr = extractTenantMigrationAbortedError(resObj);
-        if (!tenantMigrationAbortedErr) {
+        if (numAttempts == 1 && !tenantMigrationAbortedErr) {
             return resObj;
         }
-        jsTest.log("Got TenantMigrationAborted after trying " + numAttempts +
-                   " times, retrying command " + tojson(cmdObj));
+
+        // Add/modify the shells's n, nModified, upserted, and writeErrors.
+        if (resObj.n) {
+            n += resObj.n;
+        }
+        if (resObj.nModified) {
+            nModified += resObj.nModified;
+        }
+        if (resObj.upserted || resObj.writeErrors) {
+            // This is an optimization to make later lookups into 'indexMap' faster, since it
+            // removes any key that is not pertinent in the current cmdObj execution.
+            indexMap = removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap);
+
+            if (resObj.upserted) {
+                for (let upsert of resObj.upserted) {
+                    // Set the entry's index to the write's index in the original cmdObj.
+                    upsert.index = indexMap[upsert.index];
+
+                    // Track that this write resulted in an upsert.
+                    upserted.push(upsert);
+
+                    // This write will not need to be retried, so remove it from 'indexMap'.
+                    delete indexMap[upsert.index];
+                }
+            }
+            if (resObj.writeErrors) {
+                for (let writeError of resObj.writeErrors) {
+                    // If we encounter a TenantMigrationAborted error, the rest of the batch must
+                    // have failed with the same code.
+                    if (writeError.code === ErrorCodes.TenantMigrationAborted) {
+                        break;
+                    }
+
+                    // Set the entry's index to the write's index in the original cmdObj.
+                    writeError.index = indexMap[writeError.index];
+
+                    // Track that this write resulted in a non-retryable error.
+                    nonRetryableWriteErrors.push(writeError);
+
+                    // This write will not need to be retried, so remove it from 'indexMap'.
+                    delete indexMap[writeError.index];
+                }
+            }
+        }
+
+        if (tenantMigrationAbortedErr) {
+            modifyCmdObjForRetry(cmdObjWithTenantId, resObj);
+
+            // Build a new indexMap where the keys are the index that each write that needs to be
+            // retried will have in the next attempt's cmdObj.
+            indexMap = resetIndices(indexMap);
+
+            jsTest.log(
+                `Got TenantMigrationAborted for command against database ` +
+                `"${dbName}" with response ${tojson(resObj)} after trying ${numAttempts} times, ` +
+                `retrying the command`);
+        } else {
+            // Modify the resObj before returning the result.
+            if (resObj.n) {
+                resObj.n = n;
+            }
+            if (resObj.nModified) {
+                resObj.nModified = nModified;
+            }
+            if (upserted.length > 0) {
+                resObj.upserted = upserted;
+            }
+            if (nonRetryableWriteErrors.length > 0) {
+                resObj.writeErrors = nonRetryableWriteErrors;
+            }
+            return resObj;
+        }
     }
 };
 
 Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs) {
     // Create another cmdObj from this command with TestData.tenantId prepended to all the
     // applicable database names and namespaces.
-    const commandArgsWithTenantId = createCmdObjWithTenantId(commandArgs);
+    const cmdObjWithTenantId = createCmdObjWithTenantId(cmdObj);
 
     let numAttempts = 0;
+
+    // Keep track of the write operations that were applied.
+    let n = 0;
+    let nModified = 0;
+    let upserted = [];
+    let nonRetryableWriteErrors = [];
+
+    // 'indexMap' is a mapping from a write's index in the current cmdObj to its index in the
+    // original cmdObj.
+    let indexMap = {};
+    if (cmdObjWithTenantId.documents) {
+        for (let i = 0; i < cmdObjWithTenantId.documents.length; i++) {
+            indexMap[i] = i;
+        }
+    }
+    if (cmdObjWithTenantId.updates) {
+        for (let i = 0; i < cmdObjWithTenantId.updates.length; i++) {
+            indexMap[i] = i;
+        }
+    }
+    if (cmdObjWithTenantId.deletes) {
+        for (let i = 0; i < cmdObjWithTenantId.deletes.length; i++) {
+            indexMap[i] = i;
+        }
+    }
 
     while (true) {
         numAttempts++;
@@ -239,12 +447,84 @@ Mongo.prototype.runCommandWithMetadata = function(dbName, metadata, commandArgs)
         // assume the command was run against the original database.
         removeTenantId(resObj);
 
+        // If the write didn't encounter a TenantMigrationAborted error at all, return the result
+        // directly.
         let tenantMigrationAbortedErr = extractTenantMigrationAbortedError(resObj);
-        if (!tenantMigrationAbortedErr) {
+        if (numAttempts == 1 && !tenantMigrationAbortedErr) {
             return resObj;
         }
-        jsTest.log("Got TenantMigrationAborted after trying " + numAttempts +
-                   " times, retrying command " + tojson(commandArgs));
+
+        // Add/modify the shells's n, nModified, upserted, and writeErrors.
+        if (resObj.n) {
+            n += resObj.n;
+        }
+        if (resObj.nModified) {
+            nModified += resObj.nModified;
+        }
+        if (resObj.upserted || resObj.writeErrors) {
+            // This is an optimization to make later lookups into 'indexMap' faster, since it
+            // removes any key that is not pertinent in the current cmdObj execution.
+            indexMap = removeSuccessfulOpIndexesExceptForUpserted(resObj, indexMap);
+
+            if (resObj.upserted) {
+                for (let upsert of resObj.upserted) {
+                    // Set the entry's index to the write's index in the original cmdObj.
+                    upsert.index = indexMap[upsert.index];
+
+                    // Track that this write resulted in an upsert.
+                    upserted.push(upsert);
+
+                    // This write will not need to be retried, so remove it from 'indexMap'.
+                    delete indexMap[upsert.index];
+                }
+            }
+            if (resObj.writeErrors) {
+                for (let writeError of resObj.writeErrors) {
+                    // If we encounter a TenantMigrationAborted error, the rest of the batch must
+                    // have failed with the same code.
+                    if (writeError.code === ErrorCodes.TenantMigrationAborted) {
+                        break;
+                    }
+
+                    // Set the entry's index to the write's index in the original cmdObj.
+                    writeError.index = indexMap[writeError.index];
+
+                    // Track that this write resulted in a non-retryable error.
+                    nonRetryableWriteErrors.push(writeError);
+
+                    // This write will not need to be retried, so remove it from 'indexMap'.
+                    delete indexMap[writeError.index];
+                }
+            }
+        }
+
+        if (tenantMigrationAbortedErr) {
+            modifyCmdObjForRetry(cmdObjWithTenantId, resObj);
+
+            // Build a new indexMap where the keys are the index that each write that needs to be
+            // retried will have in the next attempt's cmdObj.
+            indexMap = resetIndices(indexMap);
+
+            jsTest.log(
+                `Got TenantMigrationAborted for command against database ` +
+                `"${dbName}" with response ${tojson(resObj)} after trying ${numAttempts} times, ` +
+                `retrying the command`);
+        } else {
+            // Modify the resObj before returning the result.
+            if (resObj.n) {
+                resObj.n = n;
+            }
+            if (resObj.nModified) {
+                resObj.nModified = nModified;
+            }
+            if (upserted.length > 0) {
+                resObj.upserted = upserted;
+            }
+            if (nonRetryableWriteErrors.length > 0) {
+                resObj.writeErrors = nonRetryableWriteErrors;
+            }
+            return resObj;
+        }
     }
 };
 
