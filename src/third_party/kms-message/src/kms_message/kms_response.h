@@ -17,7 +17,9 @@
 #ifndef KMS_RESPONSE_H
 #define KMS_RESPONSE_H
 
-#include "kms_message.h"
+#include "kms_message_defines.h"
+
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,9 +27,11 @@ extern "C" {
 
 typedef struct _kms_response_t kms_response_t;
 
+KMS_MSG_EXPORT (int)
+kms_response_get_status (kms_response_t *response);
 KMS_MSG_EXPORT (const char *)
-kms_response_get_body (kms_response_t *reply, size_t *len);
-KMS_MSG_EXPORT (void) kms_response_destroy (kms_response_t *reply);
+kms_response_get_body (kms_response_t *response, size_t *len);
+KMS_MSG_EXPORT (void) kms_response_destroy (kms_response_t *response);
 
 #ifdef __cplusplus
 } /* extern "C" */

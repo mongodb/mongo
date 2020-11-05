@@ -53,4 +53,14 @@ kms_message_cleanup (void);
 } /* extern "C" */
 #endif
 
+#ifdef _MSC_VER
+#include <basetsd.h>
+#pragma warning(disable : 4142)
+#ifndef _SSIZE_T_DEFINED
+#define _SSIZE_T_DEFINED
+typedef SSIZE_T ssize_t;
+#endif
+#pragma warning(default : 4142)
+#endif
+
 #endif /* KMS_MESSAGE_DEFINES_H */

@@ -17,8 +17,12 @@
 #ifndef KMS_RESPONSE_PARSER_H
 #define KMS_RESPONSE_PARSER_H
 
-#include "kms_message.h"
+#include "kms_message_defines.h"
 #include "kms_response.h"
+
+#include <sys/types.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

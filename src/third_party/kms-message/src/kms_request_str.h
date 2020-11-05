@@ -25,11 +25,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#if defined(_WIN32)
-#include <basetsd.h>
-typedef SSIZE_T ssize_t;
-#endif // _WIN32
-
 typedef struct {
    char *str;
    size_t len;
@@ -71,6 +66,8 @@ kms_request_str_append_lowercase (kms_request_str_t *str,
                                   kms_request_str_t *appended);
 KMS_MSG_EXPORT (void)
 kms_request_str_appendf (kms_request_str_t *str, const char *format, ...);
+KMS_MSG_EXPORT (void)
+kms_request_strdupf (kms_request_str_t *str, const char *format, ...);
 KMS_MSG_EXPORT (void)
 kms_request_str_append_escaped (kms_request_str_t *str,
                                 kms_request_str_t *appended,

@@ -9,7 +9,7 @@ def removeIfPresent(lst, item):
     except ValueError:
         pass
 
-for to_remove in ['-Werror', "-Wsign-compare","-Wall","-Werror=unused-result"]:
+for to_remove in ['-Werror', "-Wsign-compare", "-Wall", "-Werror=unused-result"]:
     removeIfPresent(env['CCFLAGS'], to_remove)
     removeIfPresent(env['CFLAGS'], to_remove)
 
@@ -18,29 +18,35 @@ env.Append(CPPDEFINES=['KMS_MSG_STATIC'])
 additional_sources = []
 
 if env.TargetOSIs('windows'):
+    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_CNG'])
     additional_sources.append(['src/kms_crypto_windows.c'])
     # Disable warnings about deprecated functions
     env.Append(CFLAGS=['/wd4996'])
 elif env.TargetOSIs('darwin'):
+    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO'])
     additional_sources.append(['src/kms_crypto_apple.c'])
 else:
-    additional_sources.append(['src/kms_crypto_openssl.c'])
+    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO'])
+    additional_sources.append(['src/kms_crypto_libcrypto.c'])
 
 env.Library(
     target="kms-message",
     source=[
         'src/hexlify.c',
+        'src/kms_azure_request.c',
         'src/kms_b64.c',
         'src/kms_caller_identity_request.c',
         'src/kms_decrypt_request.c',
         'src/kms_encrypt_request.c',
+        'src/kms_gcp_request.c',
         'src/kms_kv_list.c',
         'src/kms_message.c',
-        'src/kms_request.c',
+        'src/kms_port.c',
         'src/kms_request_opt.c',
         'src/kms_request_str.c',
-        'src/kms_response.c',
+        'src/kms_request.c',
         'src/kms_response_parser.c',
+        'src/kms_response.c',
         'src/sort.c',
     ] + additional_sources,
     LIBDEPS_TAGS=[

@@ -17,6 +17,7 @@
 
 #include "kms_kv_list.h"
 #include "kms_message/kms_message.h"
+#include "kms_message_private.h"
 #include "kms_request_str.h"
 #include "kms_port.h"
 #include "sort.h"
@@ -39,9 +40,12 @@ kms_kv_list_t *
 kms_kv_list_new (void)
 {
    kms_kv_list_t *lst = malloc (sizeof (kms_kv_list_t));
+   KMS_ASSERT (lst);
 
    lst->size = 16;
    lst->kvs = malloc (lst->size * sizeof (kms_kv_t));
+   KMS_ASSERT (lst->kvs);
+
    lst->len = 0;
 
    return lst;
@@ -72,6 +76,7 @@ kms_kv_list_add (kms_kv_list_t *lst,
    if (lst->len == lst->size) {
       lst->size *= 2;
       lst->kvs = realloc (lst->kvs, lst->size * sizeof (kms_kv_t));
+      KMS_ASSERT (lst->kvs);
    }
 
    kv_init (&lst->kvs[lst->len], key, value);
@@ -84,7 +89,7 @@ kms_kv_list_find (const kms_kv_list_t *lst, const char *key)
    size_t i;
 
    for (i = 0; i < lst->len; i++) {
-      if (0 == strcasecmp (lst->kvs[i].key->str, key)) {
+      if (0 == kms_strcasecmp (lst->kvs[i].key->str, key)) {
          return &lst->kvs[i];
       }
    }
@@ -119,8 +124,12 @@ kms_kv_list_dup (const kms_kv_list_t *lst)
    }
 
    dup = malloc (sizeof (kms_kv_list_t));
+   KMS_ASSERT (dup);
+
    dup->size = dup->len = lst->len;
    dup->kvs = malloc (lst->len * sizeof (kms_kv_t));
+   KMS_ASSERT (dup->kvs);
+
 
    for (i = 0; i < lst->len; i++) {
       kv_init (&dup->kvs[i], lst->kvs[i].key, lst->kvs[i].value);

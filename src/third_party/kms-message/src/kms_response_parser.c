@@ -1,10 +1,12 @@
 #include "kms_message/kms_response_parser.h"
 #include "kms_message_private.h"
 
-#include "kms_message_private.h"
+#include <errno.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "hexlify.h"
 
 /* destroys the members of parser, but not the parser itself. */
 static void
@@ -24,16 +26,21 @@ _parser_init (kms_response_parser_t *parser)
    parser->raw_response = kms_request_str_new ();
    parser->content_length = -1;
    parser->response = calloc (1, sizeof (kms_response_t));
+   KMS_ASSERT (parser->response);
    parser->response->headers = kms_kv_list_new ();
    parser->state = PARSING_STATUS_LINE;
    parser->start = 0;
    parser->failed = false;
+   parser->chunk_size = 0;
+   parser->transfer_encoding_chunked = false;
 }
 
 kms_response_parser_t *
 kms_response_parser_new (void)
 {
    kms_response_parser_t *parser = malloc (sizeof (kms_response_parser_t));
+   KMS_ASSERT (parser);
+
    _parser_init (parser);
    return parser;
 }
@@ -47,6 +54,12 @@ kms_response_parser_wants_bytes (kms_response_parser_t *parser, int32_t max)
    case PARSING_STATUS_LINE:
    case PARSING_HEADER:
       return max;
+   case PARSING_CHUNK_LENGTH:
+      return max;
+   case PARSING_CHUNK:
+      /* add 2 for trailing \r\n */
+      return (parser->chunk_size + 2) -
+             ((int) parser->raw_response->len - parser->start);
    case PARSING_BODY:
       KMS_ASSERT (parser->content_length != -1);
       return parser->content_length -
@@ -59,11 +72,26 @@ static bool
 _parse_int (const char *str, int *result)
 {
    char *endptr = NULL;
+   int64_t long_result;
 
-   *result = (int) strtol (str, &endptr, 10);
-   if (*endptr) {
+   errno = 0;
+   long_result = strtol (str, &endptr, 10);
+   if (endptr == str) {
+      /* No digits were parsed. Consider this an error */
       return false;
    }
+   if (endptr != NULL && *endptr != '\0') {
+      /* endptr points to the first invalid character. */
+      return false;
+   }
+   if (errno == EINVAL || errno == ERANGE) {
+      return false;
+   }
+   if (long_result > INT32_MAX || long_result < INT32_MIN) {
+      return false;
+   }
+   *result = (int) long_result;
+
    return true;
 }
 
@@ -72,6 +100,8 @@ static bool
 _parse_int_from_view (const char *str, int start, int end, int *result)
 {
    char *num_str = malloc (end - start + 1);
+   KMS_ASSERT (num_str);
+
    bool ret;
 
    strncpy (num_str, str + start, end - start);
@@ -79,6 +109,16 @@ _parse_int_from_view (const char *str, int start, int end, int *result)
    ret = _parse_int (num_str, result);
    free (num_str);
    return ret;
+}
+
+static bool
+_parse_hex_from_view (const char *str, int len, int *result)
+{
+   *result = unhexlify (str, len);
+   if (*result < 0) {
+      return false;
+   }
+   return true;
 }
 
 /* returns true if char is "linear white space". This *ignores* the folding case
@@ -134,6 +174,9 @@ _parse_line (kms_response_parser_t *parser, int end)
 
       if (i == end) {
          /* empty line, this signals the start of the body. */
+         if (parser->transfer_encoding_chunked) {
+            return PARSING_CHUNK_LENGTH;
+         }
          return PARSING_BODY;
       }
 
@@ -181,9 +224,29 @@ _parse_line (kms_response_parser_t *parser, int end)
             return PARSING_DONE;
          }
       }
+
+      if (0 == strcmp (key->str, "Transfer-Encoding")) {
+         if (0 == strcmp (val->str, "chunked")) {
+            parser->transfer_encoding_chunked = true;
+         } else {
+            KMS_ERROR (parser, "Unsupported Transfer-Encoding: %s", val->str);
+            kms_request_str_destroy (key);
+            kms_request_str_destroy (val);
+            return PARSING_DONE;
+         }
+      }
       kms_request_str_destroy (key);
       kms_request_str_destroy (val);
       return PARSING_HEADER;
+   } else if (parser->state == PARSING_CHUNK_LENGTH) {
+      int result = 0;
+
+      if (!_parse_hex_from_view (raw + i, end - i, &result)) {
+         KMS_ERROR (parser, "Failed to parse hex chunk length.");
+         return PARSING_DONE;
+      }
+      parser->chunk_size = result;
+      return PARSING_CHUNK;
    }
    return PARSING_DONE;
 }
@@ -194,7 +257,7 @@ kms_response_parser_feed (kms_response_parser_t *parser,
                           uint32_t len)
 {
    kms_request_str_t *raw = parser->raw_response;
-   int curr, body_read;
+   int curr, body_read, chunk_read;
 
    curr = (int) raw->len;
    kms_request_str_append_chars (raw, (char *) buf, len);
@@ -203,6 +266,7 @@ kms_response_parser_feed (kms_response_parser_t *parser,
       switch (parser->state) {
       case PARSING_STATUS_LINE:
       case PARSING_HEADER:
+      case PARSING_CHUNK_LENGTH:
          /* find the next \r\n. */
          if (curr && strncmp (raw->str + (curr - 1), "\r\n", 2) == 0) {
             parser->state = _parse_line (parser, curr - 1);
@@ -233,6 +297,28 @@ kms_response_parser_feed (kms_response_parser_t *parser,
          }
 
          curr = (int) raw->len;
+         break;
+      case PARSING_CHUNK:
+         chunk_read = (int) raw->len - parser->start;
+         /* check if we've read the full chunk and the trailing \r\n */
+         if (chunk_read >= parser->chunk_size + 2) {
+            if (!parser->response->body) {
+               parser->response->body = kms_request_str_new ();
+            }
+            kms_request_str_append_chars (parser->response->body,
+                                          raw->str + parser->start,
+                                          parser->chunk_size);
+            curr = parser->start + parser->chunk_size + 2;
+            parser->start = curr;
+            if (parser->chunk_size == 0) {
+               /* last chunk. */
+               parser->state = PARSING_DONE;
+            } else {
+               parser->state = PARSING_CHUNK_LENGTH;
+            }
+         } else {
+            curr = (int) raw->len;
+         }
          break;
       case PARSING_DONE:
          KMS_ERROR (parser, "Unexpected extra HTTP content");

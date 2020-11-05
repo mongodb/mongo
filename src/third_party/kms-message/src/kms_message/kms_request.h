@@ -17,7 +17,8 @@
 #ifndef KMS_REQUEST_H
 #define KMS_REQUEST_H
 
-#include "kms_message.h"
+#include "kms_message_defines.h"
+#include "kms_request_opt.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -28,6 +29,8 @@
 extern "C" {
 #endif
 
+/* A KMS request is general enough to create arbitrary HTTP requests, but also
+ * supports generating AWS signature v4. */
 typedef struct _kms_request_t kms_request_t;
 
 KMS_MSG_EXPORT (kms_request_t *)
@@ -38,6 +41,8 @@ KMS_MSG_EXPORT (void)
 kms_request_destroy (kms_request_t *request);
 KMS_MSG_EXPORT (const char *)
 kms_request_get_error (kms_request_t *request);
+
+/* Begin: AWS specific */
 KMS_MSG_EXPORT (bool)
 kms_request_set_date (kms_request_t *request, const struct tm *tm);
 KMS_MSG_EXPORT (bool)
@@ -48,6 +53,8 @@ KMS_MSG_EXPORT (bool)
 kms_request_set_access_key_id (kms_request_t *request, const char *akid);
 KMS_MSG_EXPORT (bool)
 kms_request_set_secret_key (kms_request_t *request, const char *key);
+/* End: AWS specific */
+
 KMS_MSG_EXPORT (bool)
 kms_request_add_header_field (kms_request_t *request,
                               const char *field_name,
@@ -60,6 +67,8 @@ KMS_MSG_EXPORT (bool)
 kms_request_append_payload (kms_request_t *request,
                             const char *payload,
                             size_t len);
+
+/* Begin: AWS specific */
 KMS_MSG_EXPORT (char *)
 kms_request_get_canonical (kms_request_t *request);
 
@@ -74,8 +83,13 @@ KMS_MSG_EXPORT (char *)
 kms_request_get_signature (kms_request_t *request);
 KMS_MSG_EXPORT (char *)
 kms_request_get_signed (kms_request_t *request);
+/* End: AWS specific */
+
 KMS_MSG_EXPORT (void)
 kms_request_free_string (char *ptr);
+
+/* Finalize and obtain a plain HTTP request (no signing). */
+KMS_MSG_EXPORT (char *) kms_request_to_string (kms_request_t *request);
 
 #ifdef __cplusplus
 } /* extern "C" */
