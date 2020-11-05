@@ -4171,6 +4171,25 @@ tasks:
       vars:
         targets: lint-errorcodes
 
+- name: test_api_version_compatibility
+  commands:
+    - command: manifest.load
+    - func: "git get project"
+    - func: "set task expansion macros"
+    - func: "set up virtualenv"
+    - func: "upload pip requirements"
+    - command: shell.exec
+      type: test
+      params:
+        working_dir: src
+        shell: bash
+        script: |
+          set -o errexit
+          set -o verbose
+          ${activate_virtualenv}
+
+          $python buildscripts/idl/checkout_idl_files_from_past_releases.py -v idls
+
 - name: burn_in_tests_gen
   commands:
   - command: manifest.load
@@ -10328,6 +10347,7 @@ buildvariants:
   - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: lint_errorcodes
+  - name: test_api_version_compatibility
   - name: burn_in_tests_gen
   - name: burn_in_tests_multiversion_gen
   - name: .aggfuzzer
