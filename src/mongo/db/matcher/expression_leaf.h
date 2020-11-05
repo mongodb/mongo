@@ -335,7 +335,7 @@ class ModMatchExpression : public LeafMatchExpression {
 public:
     ModMatchExpression() : LeafMatchExpression(MOD) {}
 
-    Status init(StringData path, int divisor, int remainder);
+    Status init(StringData path, long long divisor, long long remainder);
 
     virtual std::unique_ptr<MatchExpression> shallowClone() const {
         std::unique_ptr<ModMatchExpression> m = stdx::make_unique<ModMatchExpression>();
@@ -354,11 +354,18 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    int getDivisor() const {
+    long long getDivisor() const {
         return _divisor;
     }
-    int getRemainder() const {
+    long long getRemainder() const {
         return _remainder;
+    }
+
+    static long long truncateToLong(const BSONElement& element) {
+        if (element.type() == BSONType::NumberDecimal) {
+            return element.numberDecimal().toLong(Decimal128::kRoundTowardZero);
+        }
+        return element.numberLong();
     }
 
 private:
@@ -366,8 +373,8 @@ private:
         return [](std::unique_ptr<MatchExpression> expression) { return expression; };
     }
 
-    int _divisor;
-    int _remainder;
+    long long _divisor;
+    long long _remainder;
 };
 
 class ExistsMatchExpression : public LeafMatchExpression {

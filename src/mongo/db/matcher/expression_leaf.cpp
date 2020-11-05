@@ -289,7 +289,7 @@ void RegexMatchExpression::shortDebugString(StringBuilder& debug) const {
 
 // ---------
 
-Status ModMatchExpression::init(StringData path, int divisor, int remainder) {
+Status ModMatchExpression::init(StringData path, long long divisor, long long remainder) {
     if (divisor == 0)
         return Status(ErrorCodes::BadValue, "divisor cannot be 0");
     _divisor = divisor;
@@ -300,7 +300,7 @@ Status ModMatchExpression::init(StringData path, int divisor, int remainder) {
 bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails* details) const {
     if (!e.isNumber())
         return false;
-    return mongoSafeMod(e.numberLong(), static_cast<long long>(_divisor)) == _remainder;
+    return mongoSafeMod(truncateToLong(e), _divisor) == _remainder;
 }
 
 void ModMatchExpression::debugString(StringBuilder& debug, int level) const {

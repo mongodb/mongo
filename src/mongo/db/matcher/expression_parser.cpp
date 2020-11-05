@@ -565,7 +565,8 @@ StatusWithMatchExpression parseMOD(StringData name, BSONElement e) {
         return {Status(ErrorCodes::BadValue, "malformed mod, too many elements")};
 
     auto temp = stdx::make_unique<ModMatchExpression>();
-    auto s = temp->init(name, d.numberInt(), r.numberInt());
+    auto s = temp->init(
+        name, ModMatchExpression::truncateToLong(d), ModMatchExpression::truncateToLong(r));
     if (!s.isOK())
         return s;
     return {std::move(temp)};
