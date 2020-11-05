@@ -2160,44 +2160,7 @@ public:
         unsupportedExpression("$meta");
     }
     void visit(ExpressionMod* expr) final {
-        auto frameId = _context->frameIdGenerator->generate();
-        auto rhs = _context->popExpr();
-        auto lhs = _context->popExpr();
-        auto binds = sbe::makeEs(std::move(lhs), std::move(rhs));
-        sbe::EVariable lhsVar{frameId, 0};
-        sbe::EVariable rhsVar{frameId, 1};
-
-        // If the rhs is a small integral double, convert it to int32 to match $mod MQL semantics.
-        auto numericConvert32 =
-            sbe::makeE<sbe::ENumericConvert>(rhsVar.clone(), sbe::value::TypeTags::NumberInt32);
-        auto rhsExpr = buildMultiBranchConditional(
-            CaseValuePair{
-                sbe::makeE<sbe::EPrimBinary>(
-                    sbe::EPrimBinary::logicAnd,
-                    sbe::makeE<sbe::ETypeMatch>(
-                        rhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)),
-                    sbe::makeE<sbe::EPrimUnary>(
-                        sbe::EPrimUnary::logicNot,
-                        sbe::makeE<sbe::ETypeMatch>(
-                            lhsVar.clone(), getBSONTypeMask(sbe::value::TypeTags::NumberDouble)))),
-                sbe::makeE<sbe::EFunction>(
-                    "fillEmpty", sbe::makeEs(std::move(numericConvert32), rhsVar.clone()))},
-            rhsVar.clone());
-
-        auto modExpr = buildMultiBranchConditional(
-            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                       generateNullOrMissing(lhsVar),
-                                                       generateNullOrMissing(rhsVar)),
-                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-            CaseValuePair{sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                       generateNonNumericCheck(lhsVar),
-                                                       generateNonNumericCheck(rhsVar)),
-                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154000},
-                                                 "$mod only supports numeric types")},
-            sbe::makeE<sbe::EFunction>("mod", sbe::makeEs(lhsVar.clone(), std::move(rhsExpr))));
-
-        _context->pushExpr(
-            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(modExpr)));
+        unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionMultiply* expr) final {
         auto arity = expr->getChildren().size();

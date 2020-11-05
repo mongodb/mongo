@@ -54,7 +54,6 @@ selector:
   - jstests/core/or2.js
   - jstests/core/or3.js
   - jstests/core/orj.js
-  - jstests/core/projection_expr_mod.js
   - jstests/core/ref.js
   - jstests/core/ref4.js
   - jstests/core/regex_limit.js
