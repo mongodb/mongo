@@ -113,7 +113,6 @@ void OplogApplierImplTest::setUp() {
 
     DropPendingCollectionReaper::set(
         serviceContext, std::make_unique<DropPendingCollectionReaper>(getStorageInterface()));
-    repl::setOplogCollectionName(serviceContext);
     repl::createOplog(_opCtx.get());
 
     _consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();

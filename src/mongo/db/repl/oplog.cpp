@@ -172,10 +172,6 @@ void registerApplyImportCollectionFn(ApplyImportCollectionFn func) {
     applyImportCollection = func;
 }
 
-void setOplogCollectionName(ServiceContext* service) {
-    LocalOplogInfo::get(service)->setOplogCollectionName(service);
-}
-
 void createIndexForApplyOps(OperationContext* opCtx,
                             const BSONObj& indexSpec,
                             const NamespaceString& indexNss,
@@ -649,7 +645,7 @@ void createOplog(OperationContext* opCtx,
 void createOplog(OperationContext* opCtx) {
     const auto isReplSet = ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
         ReplicationCoordinator::modeReplSet;
-    createOplog(opCtx, LocalOplogInfo::get(opCtx)->getOplogCollectionName(), isReplSet);
+    createOplog(opCtx, NamespaceString::kRsOplogNamespace, isReplSet);
 }
 
 std::vector<OplogSlot> getNextOpTimes(OperationContext* opCtx, std::size_t count) {
@@ -1790,12 +1786,8 @@ void clearLocalOplogPtr() {
 }
 
 void acquireOplogCollectionForLogging(OperationContext* opCtx) {
-    auto oplogInfo = LocalOplogInfo::get(opCtx);
-    const auto& nss = oplogInfo->getOplogCollectionName();
-    if (!nss.isEmpty()) {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        LocalOplogInfo::get(opCtx)->setCollection(autoColl.getCollection());
-    }
+    AutoGetCollection autoColl(opCtx, NamespaceString::kRsOplogNamespace, MODE_IX);
+    LocalOplogInfo::get(opCtx)->setCollection(autoColl.getCollection());
 }
 
 void establishOplogCollectionForLogging(OperationContext* opCtx, const CollectionPtr& oplog) {

@@ -54,7 +54,6 @@ public:
                                     std::make_unique<ReplicationCoordinatorMock>(serviceContext));
         StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
 
-        repl::setOplogCollectionName(serviceContext);
         repl::createOplog(opCtx.get());
 
         // Step up the node.

@@ -103,7 +103,6 @@ void RollbackTest::setUp() {
     _coordinator = new ReplicationCoordinatorRollbackMock(serviceContext);
     ReplicationCoordinator::set(serviceContext,
                                 std::unique_ptr<ReplicationCoordinator>(_coordinator));
-    setOplogCollectionName(serviceContext);
 
     _opCtx = makeOperationContext();
     _replicationProcess->getConsistencyMarkers()->clearAppliedThrough(_opCtx.get(), {});

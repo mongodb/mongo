@@ -117,7 +117,6 @@ ServiceContext::ConstructorActionRegisterer replicationManagerInitializer(
 
         auto replCoord = std::make_unique<ReplicationCoordinatorEmbedded>(serviceContext);
         repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-        repl::setOplogCollectionName(serviceContext);
 
         IndexBuildsCoordinator::set(serviceContext,
                                     std::make_unique<IndexBuildsCoordinatorEmbedded>());

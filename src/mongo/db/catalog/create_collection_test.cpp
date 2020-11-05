@@ -71,7 +71,6 @@ void CreateCollectionTest::setUp() {
     auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
     ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
     repl::ReplicationCoordinator::set(service, std::move(replCoord));
-    repl::setOplogCollectionName(service);
 
     _storage = std::make_unique<repl::StorageInterfaceImpl>();
 }

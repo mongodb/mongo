@@ -139,7 +139,6 @@ public:
 
         // Clean out the oplog and write one no-op entry. The timestamp of this first oplog entry
         // will serve as resharding's `fetchTimestamp`.
-        repl::setOplogCollectionName(_svcCtx);
         repl::createOplog(_opCtx);
         reset(NamespaceString::kRsOplogNamespace);
         {

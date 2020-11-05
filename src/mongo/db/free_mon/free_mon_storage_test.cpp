@@ -87,7 +87,6 @@ void FreeMonStorageTest::setUp() {
     // Transition to PRIMARY so that the server can accept writes.
     ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
-    repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
 }
 

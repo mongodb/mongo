@@ -998,7 +998,6 @@ void setUpReplication(ServiceContext* serviceContext) {
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
-    repl::setOplogCollectionName(serviceContext);
 
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
 

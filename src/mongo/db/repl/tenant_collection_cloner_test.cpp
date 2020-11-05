@@ -126,7 +126,6 @@ protected:
             ReplicationCoordinator::set(
                 serviceContext, std::make_unique<ReplicationCoordinatorMock>(serviceContext));
 
-            repl::setOplogCollectionName(serviceContext);
             repl::createOplog(opCtx.get());
 
             // Need real (non-mock) storage for the test.

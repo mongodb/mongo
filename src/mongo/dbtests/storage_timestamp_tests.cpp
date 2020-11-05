@@ -212,7 +212,6 @@ public:
         registry->addObserver(std::make_unique<OpObserverImpl>());
         _opCtx->getServiceContext()->setOpObserver(std::move(registry));
 
-        repl::setOplogCollectionName(_opCtx->getServiceContext());
         repl::createOplog(_opCtx);
 
         _clock->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));

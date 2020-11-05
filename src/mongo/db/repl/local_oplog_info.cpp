@@ -63,14 +63,6 @@ LocalOplogInfo* LocalOplogInfo::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-const NamespaceString& LocalOplogInfo::getOplogCollectionName() const {
-    return _oplogName;
-}
-
-void LocalOplogInfo::setOplogCollectionName(ServiceContext* service) {
-    _oplogName = NamespaceString::kRsOplogNamespace;
-}
-
 const CollectionPtr& LocalOplogInfo::getCollection() const {
     return _oplog;
 }

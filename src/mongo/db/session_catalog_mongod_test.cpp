@@ -49,7 +49,6 @@ protected:
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
         repl::ReplicationCoordinator::set(service, std::move(replCoord));
-        repl::setOplogCollectionName(service);
         repl::createOplog(_opCtx);
 
         service->setFastClockSource(std::make_unique<ClockSourceMock>());

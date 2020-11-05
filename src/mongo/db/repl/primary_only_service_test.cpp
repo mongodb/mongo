@@ -298,7 +298,6 @@ public:
             auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
             ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
-            repl::setOplogCollectionName(serviceContext);
             repl::createOplog(opCtx.get());
             // Set up OpObserver so that repl::logOp() will store the oplog entry's optime in
             // ReplClientInfo.

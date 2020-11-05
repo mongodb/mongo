@@ -123,7 +123,6 @@ public:
 
         sc->setOpObserver(std::make_unique<OpObserverImpl>());
 
-        setOplogCollectionName(sc);
         createOplog(&_opCtx);
 
         dbtests::WriteContextForTests ctx(&_opCtx, ns());

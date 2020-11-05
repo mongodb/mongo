@@ -69,7 +69,6 @@ public:
         repl::ReplicationCoordinator::set(
             service,
             std::make_unique<repl::ReplicationCoordinatorMock>(service, createReplSettings()));
-        repl::setOplogCollectionName(service);
         repl::createOplog(opCtx.get());
 
         // Ensure that we are primary.

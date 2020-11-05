@@ -74,7 +74,6 @@ public:
         auto _storageInterfaceImpl = std::make_unique<repl::StorageInterfaceImpl>();
         repl::StorageInterface::set(getServiceContext(), std::move(_storageInterfaceImpl));
 
-        repl::setOplogCollectionName(getServiceContext());
         repl::createOplog(operationContext());
         MongoDSessionCatalog::onStepUp(operationContext());
     }

@@ -56,16 +56,6 @@ public:
     LocalOplogInfo& operator=(const LocalOplogInfo&) = delete;
     LocalOplogInfo() = default;
 
-    /**
-     * Returns namespace of the local oplog collection.
-     */
-    const NamespaceString& getOplogCollectionName() const;
-
-    /**
-     * Detects the current replication mode and sets the "_oplogName" accordingly.
-     */
-    void setOplogCollectionName(ServiceContext* service);
-
     const CollectionPtr& getCollection() const;
     void setCollection(const CollectionPtr& oplog);
     void resetCollection();

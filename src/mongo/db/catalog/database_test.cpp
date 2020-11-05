@@ -89,7 +89,6 @@ void DatabaseTest::setUp() {
     // Set up ReplicationCoordinator and create oplog.
     repl::ReplicationCoordinator::set(service,
                                       std::make_unique<repl::ReplicationCoordinatorMock>(service));
-    repl::setOplogCollectionName(service);
     repl::createOplog(_opCtx.get());
 
     // Ensure that we are primary.

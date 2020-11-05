@@ -132,7 +132,6 @@ ShardingMongodTestFixture::ShardingMongodTestFixture() {
     opObserver->addObserver(std::make_unique<ConfigServerOpObserver>());
     opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
 
-    repl::setOplogCollectionName(service);
     repl::createOplog(operationContext());
 
     // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to

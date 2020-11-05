@@ -144,7 +144,6 @@ public:
             auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
             ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
-            repl::setOplogCollectionName(serviceContext);
             repl::createOplog(opCtx.get());
 
             // Need real (non-mock) storage for the oplog buffer.

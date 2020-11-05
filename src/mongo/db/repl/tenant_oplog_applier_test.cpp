@@ -141,7 +141,6 @@ public:
         // expected to exist when fetching the next opTime (LocalOplogInfo::getNextOpTimes) to use
         // for a write.
         _opCtx = cc().makeOperationContext();
-        repl::setOplogCollectionName(service);
         repl::createOplog(_opCtx.get());
 
         // Ensure that we are primary.
