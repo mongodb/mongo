@@ -236,7 +236,7 @@ struct KillCursorsOpRunner final : public OpRunner {
 struct WriteOpRunner final : public OpRunner {
     using OpRunner::OpRunner;
     DbResponse runOperation() override {
-        Strategy::writeOp(hr->rec->getOpCtx(), &hr->rec->getDbMessage());  // No Response.
+        Strategy::writeOp(hr->rec);  // No Response.
         return {};
     }
 };

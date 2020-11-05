@@ -75,7 +75,7 @@ public:
      * with the result from the operation. Doesn't send any response back and does not throw on
      * errors.
      */
-    static void writeOp(OperationContext* opCtx, DbMessage* dbm);
+    static void writeOp(std::shared_ptr<RequestExecutionContext> rec);
 
     /**
      * Executes a command from either OP_QUERY or OP_MSG wire protocols.
