@@ -8,10 +8,18 @@
 (function() {
 "use strict";
 
+load("jstests/concurrency/fsm_workload_helpers/server_types.js");
+// This workload would timeout on ephemeralForTest. isEphemeralForTest throws an exception if called
+// from a mongos, so we need to check that first. Unique indexes are not supported on sharded
+// collections anyway so it's safe to quit early if the db is a mongos.
+if (isMongos(db) || isEphemeralForTest(db)) {
+    return;
+}
+
 let coll = db.stress_test_unique_index_unique;
 coll.drop();
 
-const kNumDocs = 2000000;  // ~65 MB
+const kNumDocs = 500000;  // ~15 MB
 
 function loadCollectionWithDocs(collection, numDocs) {
     const kMaxChunkSize = 100000;
