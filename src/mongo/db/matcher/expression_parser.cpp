@@ -498,7 +498,9 @@ StatusWithMatchExpression parseMOD(StringData name, BSONElement elem) {
     if (iter.more())
         return {Status(ErrorCodes::BadValue, "malformed mod, too many elements")};
 
-    return {std::make_unique<ModMatchExpression>(name, divisor.numberInt(), remainder.numberInt())};
+    return {std::make_unique<ModMatchExpression>(name,
+                                                 ModMatchExpression::truncateToLong(divisor),
+                                                 ModMatchExpression::truncateToLong(remainder))};
 }
 
 StatusWithMatchExpression parseRegexDocument(StringData name, const BSONObj& doc) {

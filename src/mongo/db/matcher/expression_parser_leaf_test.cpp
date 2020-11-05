@@ -350,6 +350,65 @@ TEST(MatchExpressionParserLeafTest, SimpleMod1) {
     ASSERT(result.getValue()->matchesBSON(BSON("x" << 8)));
 }
 
+TEST(MatchExpressionParserLeafTest, ModFloatTruncate) {
+    struct TestCase {
+        BSONObj _query;
+        long long _divider;
+        long long _remainder;
+    };
+
+    const auto positiveLargerThanInt = 3 * static_cast<long long>(std::numeric_limits<int>::max());
+    const auto negativeSmallerThanInt = 3 * static_cast<long long>(std::numeric_limits<int>::min());
+    std::vector<TestCase> testCases = {
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(3 << 2))), 3, 2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(3LL << 2LL))), 3, 2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(3.2 << 2.2))), 3, 2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(3.7 << 2.7))), 3, 2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("3") << Decimal128("2")))), 3, 2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("3.2") << Decimal128("2.2")))), 3, 2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("3.7") << Decimal128("2.7")))), 3, 2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(positiveLargerThanInt << positiveLargerThanInt))),
+         positiveLargerThanInt,
+         positiveLargerThanInt},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(static_cast<double>(positiveLargerThanInt)
+                                               << static_cast<double>(positiveLargerThanInt)))),
+         positiveLargerThanInt,
+         positiveLargerThanInt},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128(positiveLargerThanInt)
+                                               << Decimal128(positiveLargerThanInt)))),
+         positiveLargerThanInt,
+         positiveLargerThanInt},
+
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(-3 << -2))), -3, -2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(-3LL << -2LL))), -3, -2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(-3.2 << -2.2))), -3, -2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(-3.7 << -2.7))), -3, -2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("-3") << Decimal128("-2")))), -3, -2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("-3.2") << Decimal128("-2.2")))), -3, -2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128("-3.7") << Decimal128("-2.7")))), -3, -2},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(negativeSmallerThanInt << negativeSmallerThanInt))),
+         negativeSmallerThanInt,
+         negativeSmallerThanInt},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(static_cast<double>(negativeSmallerThanInt)
+                                               << static_cast<double>(negativeSmallerThanInt)))),
+         negativeSmallerThanInt,
+         negativeSmallerThanInt},
+        {BSON("x" << BSON("$mod" << BSON_ARRAY(Decimal128(negativeSmallerThanInt)
+                                               << Decimal128(negativeSmallerThanInt)))),
+         negativeSmallerThanInt,
+         negativeSmallerThanInt},
+    };
+
+    for (const auto& testCase : testCases) {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression result = MatchExpressionParser::parse(testCase._query, expCtx);
+        ASSERT_OK(result.getStatus());
+        auto modExpr = checked_cast<ModMatchExpression*>(result.getValue().get());
+        ASSERT_EQ(modExpr->getDivisor(), testCase._divider);
+        ASSERT_EQ(modExpr->getRemainder(), testCase._remainder);
+    }
+}
+
 TEST(MatchExpressionParserLeafTest, IdCollation) {
     BSONObj query = BSON("$id"
                          << "string");
