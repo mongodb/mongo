@@ -174,10 +174,8 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
     auto [latestConnStrings, rsmIncrementForConnStrings] = _getLatestConnStrings();
 
     for (const auto& latestConnString : latestConnStrings) {
-        // TODO SERVER-50909: Optimise by only doing this work if the latest conn string differs.
-
         auto shard = returnData.findByRSName(latestConnString.first.toString());
-        if (!shard) {
+        if (shard == nullptr || shard->getConnString() == latestConnString.second) {
             continue;
         }
 
