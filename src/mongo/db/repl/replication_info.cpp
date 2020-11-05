@@ -61,7 +61,7 @@
 #include "mongo/executor/network_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/transport/ismaster_metrics.h"
+#include "mongo/transport/hello_metrics.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point.h"
 

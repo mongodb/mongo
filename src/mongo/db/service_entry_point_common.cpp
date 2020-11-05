@@ -98,7 +98,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/transport/ismaster_metrics.h"
+#include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
