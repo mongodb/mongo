@@ -175,6 +175,8 @@ selector:
   - jstests/sharding/kill_pinned_cursor.js
   # Uses the ShardingTaskExecutorPoolReplicaSetMatching parameter which does not exist on 4.0.
   - jstests/sharding/sharding_task_executor_pool_matching_policy.js
+  # Enable the following once SERVER-50412 is backported to 4.0. "helloOk" does not exist on 4.0.
+  - jstests/sharding/mongos_helloOk_protocol.js
 executor:
   config:
     shell_options:

@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
@@ -118,6 +119,20 @@ public:
             result.appendBool("isWritablePrimary", true);
         }
         result.append("msg", "isdbgrid");
+
+        // Try to parse the optional 'helloOk' field. On mongos, if we see this field, we will
+        // respond with helloOk: true so the client knows that it can continue to send the hello
+        // command to mongos.
+        bool helloOk;
+        Status status = bsonExtractBooleanField(cmdObj, "helloOk", &helloOk);
+        if (status.isOK()) {
+            // Attach helloOk: true to the response so that the client knows the server supports
+            // the hello command.
+            result.append("helloOk", true);
+        } else if (status.code() != ErrorCodes::NoSuchKey) {
+            uassertStatusOK(status);
+        }
+
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
         result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
         result.appendNumber("maxWriteBatchSize", write_ops::kMaxWriteBatchSize);
