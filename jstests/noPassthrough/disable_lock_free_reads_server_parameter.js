@@ -2,7 +2,6 @@
  * Tests the 'disableLockFreeReads' startup setParameter.
  *
  * User set disableLockFreeReads will be overridden to true (disabled) if:
- *   - in standalone mode
  *   - with enableMajorityReadConcern=false
  * Otherwise, the default for disableLockFreeReads is true.
  *
@@ -19,13 +18,21 @@
 
 const replSetName = 'disable_lock_free_reads_server_parameter';
 
-jsTest.log("Starting server with disableLockFreeReads=false in standalone mode: this should " +
-           "override the setting to true.");
+jsTest.log("Starting server with disableLockFreeReads=false in standalone mode: this should turn " +
+           "on lock-free reads.");
 
 let conn = MongoRunner.runMongod({setParameter: "disableLockFreeReads=false"});
-assert.neq(conn, null);
-checkLog.contains(conn, "disabling lock-free reads");
-checkLog.contains(conn, "Lock-free reads is disabled");
+assert(conn);
+checkLog.containsJson(conn, 4788403);  // Logging that lock-free reads is enabled.
+MongoRunner.stopMongod(conn);
+
+jsTest.log("Starting server with disableLockFreeReads=true in standalone mode: this is the " +
+           "default and nothing should happen.");
+
+conn = MongoRunner.runMongod({setParameter: "disableLockFreeReads=true"});
+assert(conn);
+assert(!checkLog.checkContainsOnce(conn, "disabling lock-free reads"));
+checkLog.containsJson(conn, 4788402);  // Logging that lock-free reads is disabled.
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Starting server with disableLockFreeReads=false and enableMajorityReadConcern=false: " +
@@ -36,34 +43,25 @@ conn = MongoRunner.runMongod({
     enableMajorityReadConcern: false,
     setParameter: "disableLockFreeReads=false"
 });
-assert.neq(conn, null);
-checkLog.contains(conn, "disabling lock-free reads");
-checkLog.contains(conn, "Lock-free reads is disabled");
-MongoRunner.stopMongod(conn);
-
-jsTest.log("Starting server in standalone mode with disableLockFreeReads=true: this is the " +
-           "default and nothing should happen.");
-
-conn = MongoRunner.runMongod({setParameter: "disableLockFreeReads=true"});
-assert.neq(conn, null);
-assert(!checkLog.checkContainsOnce(conn, "disabling lock-free reads"));
-checkLog.contains(conn, "Lock-free reads is disabled");
+assert(conn);
+checkLog.containsJson(conn, 4788401);  // Logging eMRCf disables lock-free reads.
+checkLog.containsJson(conn, 4788402);  // Logging that lock-free reads is disabled.
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Starting server as a replica set member with disableLockFreeReads=false: this should " +
            "turn on lock-free reads.");
 
 conn = MongoRunner.runMongod({replSet: replSetName, setParameter: "disableLockFreeReads=false"});
-assert.neq(conn, null);
-checkLog.contains(conn, "Lock-free reads is enabled");
+assert(conn);
+checkLog.containsJson(conn, 4788403);  // Logging that lock-free reads is enabled.
 MongoRunner.stopMongod(conn);
 
 jsTest.log("Starting server as a replica set member with disableLockFreeReads=true: this is the " +
            "default and nothing should happen.");
 
 conn = MongoRunner.runMongod({replSet: replSetName, setParameter: "disableLockFreeReads=true"});
-assert.neq(conn, null);
+assert(conn);
 assert(!checkLog.checkContainsOnce(conn, "disabling lock-free reads"));
-checkLog.contains(conn, "Lock-free reads is disabled");
+checkLog.containsJson(conn, 4788402);  // Logging that lock-free reads is disabled.
 MongoRunner.stopMongod(conn);
 }());

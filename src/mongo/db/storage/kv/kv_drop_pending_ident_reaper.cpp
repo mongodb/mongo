@@ -94,7 +94,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
     {
         stdx::lock_guard<Latch> lock(_mutex);
         for (auto it = _dropPendingIdents.cbegin();
-             it != _dropPendingIdents.cend() && it->first < ts;
+             it != _dropPendingIdents.cend() && (it->first < ts || it->first == Timestamp::min());
              ++it) {
             // This collection/index satisfies the 'ts' requirement to be safe to drop, but we must
             // also check that there are no active operations remaining that still retain a

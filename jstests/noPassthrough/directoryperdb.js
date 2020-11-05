@@ -12,6 +12,7 @@
 
 const baseDir = "jstests_directoryperdb";
 const dbpath = MongoRunner.dataPath + baseDir + "/";
+const dbname = "foo";
 
 const isDirectoryPerDBSupported =
     jsTest.options().storageEngine == "wiredTiger" || !jsTest.options().storageEngine;
@@ -25,44 +26,51 @@ if (!isDirectoryPerDBSupported) {
     assert(m, 'storage engine with directoryperdb support failed to start up');
 }
 
-const getFooDir = function() {
-    return listFiles(dbpath).filter(function(path) {
-        return path.name.endsWith("/foo");
+const getDir = function(dbName, dbDirPath) {
+    return listFiles(dbDirPath).filter(function(path) {
+        return path.name.endsWith(dbName);
     });
 };
 
-const checkFooDirExists = function() {
-    const files = getFooDir();
-    assert.eq(
-        1,
-        files.length,
-        "dbpath did not contain 'foo' directory when it should have: " + tojson(listFiles(dbpath)));
+const checkDirExists = function(dbName, dbDirPath) {
+    const files = getDir(dbName, dbDirPath);
+    assert.eq(1,
+              files.length,
+              "dbpath did not contain '" + dbName +
+                  "' directory when it should have: " + tojson(listFiles(dbDirPath)));
     assert.gt(listFiles(files[0].name).length, 0);
 };
 
-const checkFooDirRemoved = function() {
-    checkLog.containsJson(db.getMongo(), 4888200, {db: "foo"});
-    const files = getFooDir();
-    assert.eq(0,
-              files.length,
-              "dbpath contained 'foo' directory when it should have been removed: " +
-                  tojson(listFiles(dbpath)));
+const checkDirRemoved = function(dbName, dbDirPath) {
+    checkLog.containsJson(db.getMongo(), 4888200, {db: dbName});
+    assert.soon(
+        function() {
+            const files = getDir(dbName, dbDirPath);
+            if (files.length == 0) {
+                return true;
+            } else {
+                return false;
+            }
+        },
+        "dbpath contained '" + dbName +
+            "' directory when it should have been removed:" + tojson(listFiles(dbDirPath)),
+        10 * 1000);  // The periodic task to run data table cleanup runs once a second.
 };
 
-const db = m.getDB("foo");
+const db = m.getDB(dbname);
 assert.commandWorked(db.bar.insert({x: 1}));
-checkFooDirExists();
+checkDirExists(dbname, dbpath);
 
 // Test that dropping the last collection in the database causes the database directory to be
 // removed.
 assert(db.bar.drop());
-checkFooDirRemoved();
+checkDirRemoved(dbname, dbpath);
 
 // Test that dropping the entire database causes the database directory to be removed.
 assert.commandWorked(db.bar.insert({x: 1}));
-checkFooDirExists();
+checkDirExists(dbname, dbpath);
 assert.commandWorked(db.dropDatabase());
-checkFooDirRemoved();
+checkDirRemoved(dbname, dbpath);
 
 MongoRunner.stopMongod(m);
 

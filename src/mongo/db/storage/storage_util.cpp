@@ -84,7 +84,11 @@ void removeIndex(OperationContext* opCtx,
                                      nss,
                                      indexNameStr = indexName.toString(),
                                      ident](boost::optional<Timestamp> commitTimestamp) {
-        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
+        if (storageEngine->supportsPendingDrops()) {
+            if (!commitTimestamp) {
+                // Standalone mode will not provide a timestamp.
+                commitTimestamp = Timestamp::min();
+            }
             LOGV2(22206,
                   "Deferring table drop for index '{index}' on collection "
                   "'{namespace}{uuid}. Ident: '{ident}', commit timestamp: '{commitTimestamp}'",
@@ -96,6 +100,8 @@ void removeIndex(OperationContext* opCtx,
                   "commitTimestamp"_attr = commitTimestamp);
             storageEngine->addDropPendingIdent(*commitTimestamp, nss, ident);
         } else {
+            // Intentionally ignoring failure here. Since we've removed the metadata pointing to
+            // the collection, we should never see it again anyway.
             auto kvEngine = storageEngine->getEngine();
             kvEngine->dropIdent(recoveryUnit, ident->getIdent()).ignore();
         }
@@ -155,7 +161,11 @@ Status dropCollection(OperationContext* opCtx,
             }
         };
 
-        if (storageEngine->supportsPendingDrops() && commitTimestamp) {
+        if (storageEngine->supportsPendingDrops()) {
+            if (!commitTimestamp) {
+                // Standalone mode will not provide a timestamp.
+                commitTimestamp = Timestamp::min();
+            }
             LOGV2(22214,
                   "Deferring table drop for collection",
                   logAttrs(nss),

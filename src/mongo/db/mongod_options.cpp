@@ -505,16 +505,6 @@ Status storeMongodOptions(const moe::Environment& params) {
         // storage engines will continue to perform regular capped collection handling for the oplog
         // collection, regardless of this parameter setting.
         storageGlobalParams.allowOplogTruncation = false;
-
-        // Standalone mode does not currently support lock-free reads, so we disable it. If the user
-        // tries to explicitly enable it by specifying --disableLockFreeReads=false, log a warning
-        // so that the user knows the feature will not run in standalone mode.
-        if (!storageGlobalParams.disableLockFreeReads) {
-            LOGV2_WARNING(
-                4788400,
-                "Lock-free reads is not supported in standalone mode: disabling lock-free reads.");
-            storageGlobalParams.disableLockFreeReads = true;
-        }
     }
 
     if (params.count("replication.enableMajorityReadConcern")) {

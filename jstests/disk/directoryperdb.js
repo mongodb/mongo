@@ -15,6 +15,27 @@ assertDocumentCount = function(db, count) {
 };
 
 /**
+ * Wait for the sub-directory for database 'dbName' in the MongoDB file directory 'dbDirPath' to be
+ * deleted. MongoDB does not always delete data immediately with a catalog change.
+ */
+const waitForDatabaseDirectoryRemoval = function(dbName, dbDirPath) {
+    assert.soon(
+        function() {
+            const files = listFiles(dbDirPath).filter(function(path) {
+                return path.name.endsWith(dbName);
+            });
+            if (files.length == 0) {
+                return true;
+            } else {
+                return false;
+            }
+        },
+        "dbpath contained '" + dbName +
+            "' directory when it should have been removed: " + tojson(listFiles(dbDirPath)),
+        10 * 1000);  // The periodic task to run data table cleanup runs once a second.
+};
+
+/**
  * Returns the current connection which gets restarted with wiredtiger.
  */
 checkDBFilesInDBDirectory = function(conn, dbToCheck) {
@@ -94,6 +115,7 @@ dbBase = m.getDB(baseName);
 
 // Drop a database created with directoryperdb.
 assert.commandWorked(dbBase.runCommand({dropDatabase: 1}));
+waitForDatabaseDirectoryRemoval(baseName, dbpath);
 assertDocumentCount(dbBase, 0);
 m = checkDBDirectoryNonexistent(m, baseName);
 dbBase = m.getDB(baseName);

@@ -1048,13 +1048,9 @@ void StorageEngineImpl::checkpoint() {
 }
 
 void StorageEngineImpl::_onMinOfCheckpointAndOldestTimestampChanged(const Timestamp& timestamp) {
-    if (timestamp.isNull()) {
-        return;
-    }
-
     // No drop-pending idents present if getEarliestDropTimestamp() returns boost::none.
     if (auto earliestDropTimestamp = _dropPendingIdentReaper.getEarliestDropTimestamp()) {
-        if (timestamp > *earliestDropTimestamp) {
+        if (timestamp >= *earliestDropTimestamp) {
             LOGV2(22260,
                   "Removing drop-pending idents with drop timestamps before timestamp",
                   "timestamp"_attr = timestamp);
@@ -1145,6 +1141,10 @@ void StorageEngineImpl::TimestampMonitor::startup() {
                                    _currentTimestamps.minOfCheckpointAndOldest !=
                                        minOfCheckpointAndOldest) {
                             listener->notify(minOfCheckpointAndOldest);
+                        } else if (stable == Timestamp::min()) {
+                            // Special case notification of all listeners when writes do not have
+                            // timestamps. This handles standalone mode.
+                            listener->notify(Timestamp::min());
                         }
                     }
                 }
