@@ -244,15 +244,8 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
     }
     BSONObj errObj = err.done();
 
-    const bool isStaleConfig = exception.code() == ErrorCodes::StaleConfig;
-    if (isStaleConfig) {
-        LOGV2_OPTIONS(21953,
-                      {logv2::LogComponent::kQuery},
-                      "Stale version detected during query over {namespace}: {error}",
-                      "Detected stale version while querying namespace",
-                      "namespace"_attr = queryMessage.ns,
-                      "error"_attr = errObj);
-    }
+    invariant(!exception.isA<ErrorCategory::StaleShardVersionError>() &&
+              exception.code() != ErrorCodes::StaleDbVersion);
 
     BufBuilder bb;
     bb.skip(sizeof(QueryResult::Value));
@@ -262,9 +255,6 @@ void generateLegacyQueryErrorResponse(const AssertionException& exception,
     QueryResult::View msgdata = bb.buf();
     QueryResult::View qr = msgdata;
     qr.setResultFlags(ResultFlag_ErrSet);
-    if (isStaleConfig) {
-        qr.setResultFlags(qr.getResultFlags() | ResultFlag_ShardConfigStale);
-    }
     qr.msgdata().setLen(bb.len());
     qr.msgdata().setOperation(opReply);
     qr.setCursorId(0);
@@ -1836,8 +1826,6 @@ DbResponse receivedQuery(OperationContext* opCtx,
 
         dbResponse.shouldRunAgainForExhaust = runQuery(opCtx, q, nss, dbResponse.response);
     } catch (const AssertionException& e) {
-        behaviors.handleException(e.toStatus(), opCtx);
-
         dbResponse.response.reset();
         generateLegacyQueryErrorResponse(e, q, &op, &dbResponse.response);
     }

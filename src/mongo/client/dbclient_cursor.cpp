@@ -363,11 +363,11 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
     QueryResult::View qr = reply.singleData().view2ptr();
     resultFlags = qr.getResultFlags();
 
-    if (qr.getResultFlags() & ResultFlag_ErrSet) {
+    if (resultFlags & ResultFlag_ErrSet) {
         wasError = true;
     }
 
-    if (qr.getResultFlags() & ResultFlag_CursorNotFound) {
+    if (resultFlags & ResultFlag_CursorNotFound) {
         // cursor id no longer valid at the server.
         invariant(qr.getCursorId() == 0);
 
@@ -408,11 +408,9 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
 
     _client->checkResponse(batch.objs, false, &retry, &host);  // watches for "not primary"
 
-    if (qr.getResultFlags() & ResultFlag_ShardConfigStale) {
-        BSONObj error;
-        verify(peekError(&error));
-        uasserted(StaleConfigInfo::parseFromCommandError(error), "stale config on lazy receive");
-    }
+    tassert(5262101,
+            "Deprecated ShardConfigStale flag encountered in query result",
+            !(resultFlags & ResultFlag_ShardConfigStaleDeprecated));
 
     /* this assert would fire the way we currently work:
         verify( nReturned || cursorId == 0 );

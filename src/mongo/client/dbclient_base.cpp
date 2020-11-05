@@ -739,11 +739,9 @@ void DBClientBase::findN(vector<BSONObj>& out,
                           << " ns: " << ns << " query: " << query.toString(),
             c.get());
 
-    if (c->hasResultFlag(ResultFlag_ShardConfigStale)) {
-        BSONObj error;
-        c->peekError(&error);
-        uasserted(StaleConfigInfo::parseFromCommandError(error), "findN stale config");
-    }
+    tassert(5262100,
+            "Deprecated ShardConfigStale flag encountered in query result",
+            !c->hasResultFlag(ResultFlag_ShardConfigStaleDeprecated));
 
     for (int i = 0; i < nToReturn; i++) {
         if (!c->more())

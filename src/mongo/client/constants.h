@@ -40,8 +40,8 @@ enum ResultFlagType {
     /* { $err : ... } is being returned */
     ResultFlag_ErrSet = 2,
 
-    /* Have to update config from the server, usually $err is also set */
-    ResultFlag_ShardConfigStale = 4,
+    /* Formerly used to comminicate stale version errors */
+    ResultFlag_ShardConfigStaleDeprecated = 4,
 
     /* for backward compatibility: this let's us know the server supports
        the QueryOption_AwaitData option. if it doesn't, a repl slave client should sleep
