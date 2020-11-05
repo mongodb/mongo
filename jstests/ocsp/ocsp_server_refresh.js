@@ -98,4 +98,47 @@ assert.doesNotThrow(() => {
 });
 
 MongoRunner.stopMongod(conn);
+
+// Make sure that the refresh period is set to a very large value so that we can
+// make sure that the period defined by the mock OCSP responder overrides it.
+let ocsp_options_high_refresh = {
+    sslMode: "requireSSL",
+    sslPEMKeyFile: OCSP_SERVER_CERT,
+    sslCAFile: OCSP_CA_PEM,
+    sslAllowInvalidHostnames: "",
+    setParameter: {
+        "ocspEnabled": "true",
+        "ocspStaplingRefreshPeriodSecs": 300000,
+    },
+};
+
+mock_ocsp = new MockOCSPServer("", 10);
+mock_ocsp.start();
+
+assert.doesNotThrow(() => {
+    conn = MongoRunner.runMongod(ocsp_options);
+});
+
+// Kill the ocsp responder, start it with cert revoked, and wait 20 seconds
+// so the server refreshes its stapled OCSP response.
+mock_ocsp.stop();
+mock_ocsp = new MockOCSPServer(FAULT_REVOKED, 100);
+mock_ocsp.start();
+
+sleep(20000);
+
+// By asserting here that a new connection cannot be established to the
+// mongod, we prove that the server has refreshed its stapled response sooner
+// than the refresh period indicated.
+assert.throws(() => {
+    new Mongo(conn.host);
+});
+
+MongoRunner.stopMongod(conn);
+
+// The mongoRunner spawns a new Mongo Object to validate the collections which races
+// with the shutdown logic of the mock_ocsp responder on some platforms. We need this
+// sleep to make sure that the threads don't interfere with each other.
+sleep(1000);
+mock_ocsp.stop();
 }());

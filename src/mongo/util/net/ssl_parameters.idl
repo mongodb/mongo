@@ -75,7 +75,7 @@ server_parameters:
   ocspStaplingRefreshPeriodSecs:
     description: "Interval at which the OCSP response will be refreshed"
     set_at: startup
-    cpp_vartype: int
+    cpp_vartype: long long
     deprecated_name: ocspValidationRefreshPeriodSecs
     default: -1
     cpp_varname: "kOCSPStaplingRefreshPeriodSecs"
