@@ -359,8 +359,10 @@ restart:
              * done.
              */
             if (__wt_ref_is_root(ref)) {
-                if (!LF_ISSET(WT_READ_SKIP_INTL))
+                if (!LF_ISSET(WT_READ_SKIP_INTL)) {
                     *refp = ref;
+                    WT_ASSERT(session, ref != ref_orig);
+                }
                 goto done;
             }
 
@@ -392,6 +394,7 @@ restart:
                 /* Success, "couple" released. */
                 couple = NULL;
                 *refp = ref;
+                WT_ASSERT(session, ref != ref_orig);
                 goto done;
             }
 
@@ -464,6 +467,7 @@ descend:
                 /* Return leaf pages to our caller. */
                 if (F_ISSET(ref, WT_REF_FLAG_LEAF)) {
                     *refp = ref;
+                    WT_ASSERT(session, ref != ref_orig);
                     goto done;
                 }
 

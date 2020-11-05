@@ -798,8 +798,6 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
      * back it all out.
      */
     WT_RET(__wt_meta_track_on(session));
-    if (import)
-        F_SET(session, WT_SESSION_IMPORT);
 
     if (WT_PREFIX_MATCH(uri, "colgroup:"))
         ret = __create_colgroup(session, uri, exclusive, config);
@@ -818,7 +816,6 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
         ret = __wt_bad_object_type(session, uri);
 
     session->dhandle = NULL;
-    F_CLR(session, WT_SESSION_IMPORT);
     WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
     return (ret);
