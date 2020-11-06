@@ -4185,6 +4185,80 @@ if get_option('ninja') != 'disabled':
 
     env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
 
+    if get_option('build-tools') == 'next' and env.TargetOSIs("windows"):
+        # This is a workaround on windows for SERVER-48691 where the line length
+        # in response files is too long:
+        # https://developercommunity.visualstudio.com/content/problem/441978/fatal-error-lnk1170-line-in-command-file-contains.html
+        #
+        # Ninja currently does not support
+        # storing a newline in the ninja file, and therefore you can not
+        # easily generate it to the response files. The only documented
+        # way to get newlines into the response file is to use the $in_newline
+        # variable in the rule.
+        #
+        # This workaround will move most of the object or lib links into the
+        # inputs and then make the respone file consist of the inputs plus
+        # whatever options are left in the original response content
+        # more info can be found here:
+        # https://github.com/ninja-build/ninja/pull/1223/files/e71bcceefb942f8355aab83ab447d702354ba272#r179526824
+        # https://github.com/ninja-build/ninja/issues/1000
+
+        # we are making a new special rule which will leverage
+        # the $in_newline to get newlines into our response file
+        env.NinjaRule(
+            "WINLINK",
+            "$env$WINLINK @$out.rsp",
+            description="Linking $out",
+            deps=None,
+            pool="local_pool",
+            use_depfile=False,
+            use_response_file=True,
+            response_file_content="$in_newline $rspc")
+
+        # Setup the response file content generation to use our workaround rule
+        # for LINK commands.
+        provider = env.NinjaGenResponseFileProvider(
+            "WINLINK",
+            "$LINK",
+        )
+        env.NinjaRuleMapping("${LINKCOM}", provider)
+        env.NinjaRuleMapping(env["LINKCOM"], provider)
+
+        # The workaround function will move some of the content from the rspc
+        # variable into the nodes inputs. We only want to move build nodes because
+        # inputs must be files, so we make sure the the option in the rspc
+        # file starts with the build directory.
+        def winlink_workaround(env, node, ninja_build):
+            if ninja_build and 'rspc' in ninja_build["variables"]:
+
+                rsp_content = []
+                ninja_build["inputs"] = []
+                for opt in ninja_build["variables"]["rspc"].split():
+
+                    # if its a candidate to go in the inputs add it, else keep it in the non-newline
+                    # rsp_content list
+                    if opt.startswith(str(env.Dir("$BUILD_DIR"))) and opt != str(node):
+                        ninja_build["inputs"].append(opt)
+                    else:
+                        rsp_content.append(opt)
+
+                ninja_build["variables"]["rspc"] = ' '.join(rsp_content)
+                ninja_build["inputs"] += [infile for infile in ninja_build["inputs"] if infile not in ninja_build["inputs"]]
+
+        # We apply the workaround to all Program nodes as they have potential
+        # response files that have lines that are too long.
+        # This will setup a callback function for a node
+        # so that when its been processed, we can make some final adjustments before
+        # its generated to the ninja file.
+        def winlink_workaround_emitter(target, source, env):
+            env.NinjaSetBuildNodeCallback(target[0], winlink_workaround)
+            return target, source
+
+        builder = env['BUILDERS']["Program"]
+        base_emitter = builder.emitter
+        new_emitter = SCons.Builder.ListEmitter([base_emitter, winlink_workaround_emitter])
+        builder.emitter = new_emitter
+
     if libdeps_typeinfo and get_option('build-tools') == 'next':
         # ninja will not handle the list action libdeps creates so in order for
         # to build ubsan with ninja, we need to undo the list action and then
