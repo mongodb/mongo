@@ -599,8 +599,13 @@ private:
         return _parseCommand().then([this, anchor = shared_from_this()] {
             return _initiateCommand()
                 .then([this] { return _commandExec(); })
-                .onError([this, anchor = shared_from_this()](Status status) {
-                    return _handleFailure(std::move(status));
+                .onCompletion([this, anchor = shared_from_this()](Status status) {
+                    // Ensure the lifetime of `_scopedMetrics` ends here.
+                    _scopedMetrics = boost::none;
+
+                    if (status.isOK())
+                        return;
+                    _handleFailure(std::move(status));
                 });
         });
     }
@@ -658,6 +663,7 @@ private:
     std::shared_ptr<CommandInvocation> _invocation;
     LogicalTime _startOperationTime;
     OperationSessionInfoFromClient _sessionOptions;
+    boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
     std::unique_ptr<PolymorphicScoped> _scoped;
 };
 
@@ -740,7 +746,7 @@ class InvokeCommand : public std::enable_shared_from_this<InvokeCommand> {
 public:
     explicit InvokeCommand(std::shared_ptr<ExecCommandDatabase> ecd) : _ecd(std::move(ecd)) {}
 
-    Future<void> run(const bool checkoutSession);
+    Future<void> run(bool checkoutSession);
 
 private:
     class SessionCheckoutPath;
@@ -1317,8 +1323,7 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
             fmt::format("Invalid database name: '{}'", dbname),
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-    ResourceConsumption::ScopedMetricsCollector scopedMetrics(
-        opCtx, dbname, command->collectsResourceConsumptionMetrics());
+    _scopedMetrics.emplace(opCtx, dbname, command->collectsResourceConsumptionMetrics());
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
