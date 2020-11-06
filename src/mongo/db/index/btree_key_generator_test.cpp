@@ -94,22 +94,13 @@ bool keysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& actualKe
     return true;
 }
 
-bool containsArrayElement(const BSONObj& obj) {
-    for (auto&& elem : obj) {
-        if (elem.type() == BSONType::Array ||
-            (elem.type() == BSONType::Object && containsArrayElement(elem.Obj()))) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool testKeygen(const BSONObj& kp,
                 const BSONObj& obj,
                 const KeyStringSet& expectedKeys,
                 const MultikeyPaths& expectedMultikeyPaths,
                 bool sparse = false,
-                const CollatorInterface* collator = nullptr) {
+                const CollatorInterface* collator = nullptr,
+                bool runWithoutSkipMultiKey = false) {
     invariant(expectedMultikeyPaths.size() == static_cast<size_t>(kp.nFields()));
 
     //
@@ -171,7 +162,10 @@ bool testKeygen(const BSONObj& kp,
 
     // If it is correct to do so, then test that the fast key generation path for the non-multikey
     // case works as expected.
-    if (!containsArrayElement(obj)) {
+    if (!runWithoutSkipMultiKey &&
+        std::all_of(expectedMultikeyPaths.begin(),
+                    expectedMultikeyPaths.end(),
+                    [](const auto& path) { return path.empty(); })) {
         if (!runTest(true)) {
             return false;
         }
@@ -297,7 +291,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysBasic) {
     BSONObj genKeysFrom = fromjson("{a: [1, 2, 3], b: [1, 2, 3]}}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+    ASSERT_THROWS(testKeygen(keyPattern,
+                             genKeysFrom,
+                             expectedKeys,
+                             expectedMultikeyPaths,
+                             false,    // sparse
+                             nullptr,  // collator
+                             true),    // runWithoutSkipMultiKey
                   AssertionException);
 }
 
@@ -426,7 +426,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysFromParallelArraysComplex) {
     BSONObj genKeysFrom = fromjson("{a:[{b:[1],c:[2]}]}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+    ASSERT_THROWS(testKeygen(keyPattern,
+                             genKeysFrom,
+                             expectedKeys,
+                             expectedMultikeyPaths,
+                             false,    // sparse
+                             nullptr,  // collator
+                             true),    // runWithoutSkipMultiKey
                   AssertionException);
 }
 
@@ -871,7 +877,13 @@ TEST(BtreeKeyGeneratorTest, ParallelArraysInNestedObjects) {
     BSONObj genKeysFrom = fromjson("{a:{a:[1]}, b:{a:[1]}}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+    ASSERT_THROWS(testKeygen(keyPattern,
+                             genKeysFrom,
+                             expectedKeys,
+                             expectedMultikeyPaths,
+                             false,    // sparse
+                             nullptr,  // collator
+                             true),    // runWithoutSkipMultiKey
                   AssertionException);
 }
 
@@ -880,7 +892,13 @@ TEST(BtreeKeyGeneratorTest, ParallelArraysUneven) {
     BSONObj genKeysFrom = fromjson("{b:{a:[1]}, a:[1,2]}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+    ASSERT_THROWS(testKeygen(keyPattern,
+                             genKeysFrom,
+                             expectedKeys,
+                             expectedMultikeyPaths,
+                             false,    // sparse
+                             nullptr,  // collator
+                             true),    // runWithoutSkipMultiKey
                   AssertionException);
 }
 
@@ -958,7 +976,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelEmptyArrays) {
     BSONObj genKeysFrom = fromjson("{a: [], b: []}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+    ASSERT_THROWS(testKeygen(keyPattern,
+                             genKeysFrom,
+                             expectedKeys,
+                             expectedMultikeyPaths,
+                             false,    // sparse
+                             nullptr,  // collator
+                             true),    // runWithoutSkipMultiKey
                   AssertionException);
 }
 
@@ -967,7 +991,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmpty) {
     BSONObj genKeysFrom = fromjson("{a: [], b: [1, 2, 3]}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+    ASSERT_THROWS(testKeygen(keyPattern,
+                             genKeysFrom,
+                             expectedKeys,
+                             expectedMultikeyPaths,
+                             false,    // sparse
+                             nullptr,  // collator
+                             true),    // runWithoutSkipMultiKey
                   AssertionException);
 }
 
@@ -976,7 +1006,13 @@ TEST(BtreeKeyGeneratorTest, GetKeysParallelArraysOneArrayEmptyNested) {
     BSONObj genKeysFrom = fromjson("{a: [{b: [{c: [1, 2, 3], d: []}]}]}");
     KeyStringSet expectedKeys;
     MultikeyPaths expectedMultikeyPaths(keyPattern.nFields());
-    ASSERT_THROWS(testKeygen(keyPattern, genKeysFrom, expectedKeys, expectedMultikeyPaths),
+    ASSERT_THROWS(testKeygen(keyPattern,
+                             genKeysFrom,
+                             expectedKeys,
+                             expectedMultikeyPaths,
+                             false,    // sparse
+                             nullptr,  // collator
+                             true),    // runWithoutSkipMultiKey
                   AssertionException);
 }
 

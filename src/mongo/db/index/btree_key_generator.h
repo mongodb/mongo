@@ -89,6 +89,9 @@ private:
     const bool _isIdIndex;
     const bool _isSparse;
     const KeyString::Value _nullKeyString;  // A full key with all fields null.
+    // True if any of the indexed paths contains a positional path component. This prohibits the key
+    // generator from using the non-multikey fast path.
+    bool _pathsContainPositionalComponent{false};
 
     std::vector<BSONElement> _fixed;
     /**
