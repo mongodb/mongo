@@ -210,6 +210,14 @@ OpTime TenantMigrationRecipientService::Instance::waitUntilTimestampIsMajorityCo
     auto getWaitOpTimeFuture = [&]() {
         stdx::lock_guard lk(_mutex);
 
+        if (_taskState.isDone()) {
+            // When task state is done, we reset _tenantOplogApplier, so just throw the
+            // task completion future result.
+            invariant(getCompletionFuture().isReady());
+            getCompletionFuture().get(opCtx);
+            MONGO_UNREACHABLE;
+        }
+
         // Sanity checks.
         invariant(_tenantOplogApplier);
         auto state = _stateDoc.getState();
@@ -567,10 +575,6 @@ void TenantMigrationRecipientService::Instance::_oplogFetcherCallback(Status opl
     }
 }
 
-namespace {
-constexpr std::int32_t stopFailPointErrorCode = 4880402;
-}  // namespace
-
 void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint* fp) {
     fp->executeIf(
         [&](const BSONObj& data) {
@@ -583,7 +587,7 @@ void TenantMigrationRecipientService::Instance::_stopOrHangOnFailPoint(FailPoint
             if (data["action"].str() == "hang") {
                 fp->pauseWhileSet();
             } else {
-                uasserted(stopFailPointErrorCode,
+                uasserted(data["stopErrorCode"].numberInt(),
                           "Skipping remaining processing due to fail point");
             }
         },
@@ -683,11 +687,39 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_getDataConsistentFu
         .semi();
 }
 
-void TenantMigrationRecipientService::Instance::_shutdownComponents(WithLock lk) {
-    if (_writerPool) {
-        _writerPool->shutdown();
+namespace {
+/*
+ * Acceptable classes for the 'Target' are AbstractAsyncComponent and RandomAccessOplogBuffer.
+ */
+template <class Target>
+void shutdownTarget(WithLock lk, Target& target) {
+    if (target)
+        target->shutdown();
+}
+
+template <class Target>
+void shutdownTargetWithOpCtx(WithLock lk, Target& target, OperationContext* opCtx) {
+    if (target)
+        target->shutdown(opCtx);
+}
+
+template <class Target>
+void joinTarget(Target& target) {
+    if (target)
+        target->join();
+}
+
+template <class Promise>
+void setPromiseErrorifNotReady(WithLock lk, Promise& promise, Status status) {
+    if (promise.getFuture().isReady()) {
+        return;
     }
 
+    promise.setError(status);
+}
+}  // namespace
+
+void TenantMigrationRecipientService::Instance::_cancelRemainingWork(WithLock lk) {
     if (_client) {
         // interrupts running tenant cloner.
         _client->shutdownAndDisallowReconnect();
@@ -698,14 +730,9 @@ void TenantMigrationRecipientService::Instance::_shutdownComponents(WithLock lk)
         _oplogFetcherClient->shutdownAndDisallowReconnect();
     }
 
-    if (_tenantOplogApplier) {
-        _tenantOplogApplier->shutdown();
-    }
-
-    if (_donorOplogBuffer) {
-        auto opCtx = cc().makeOperationContext();
-        _donorOplogBuffer->shutdown(opCtx.get());
-    }
+    // Interrupts running oplog applier.
+    shutdownTarget(lk, _tenantOplogApplier);
+    shutdownTarget(lk, _writerPool);
 }
 
 void TenantMigrationRecipientService::Instance::interrupt(Status status) {
@@ -718,7 +745,7 @@ void TenantMigrationRecipientService::Instance::interrupt(Status status) {
         return;
     }
 
-    _shutdownComponents(lk);
+    _cancelRemainingWork(lk);
 
     // If the task is running, then setting promise result will be taken care by the main task
     // continuation chain.
@@ -732,42 +759,44 @@ void TenantMigrationRecipientService::Instance::interrupt(Status status) {
 }
 
 void TenantMigrationRecipientService::Instance::_cleanupOnTaskCompletion(Status status) {
-    stdx::lock_guard lk(_mutex);
+    auto opCtx = cc().makeOperationContext();
 
-    _shutdownComponents(lk);
+    std::unique_ptr<OplogFetcher> savedDonorOplogFetcher;
+    std::unique_ptr<TenantOplogApplier> savedTenantOplogApplier;
+    std::unique_ptr<ThreadPool> savedWriterPool;
+    {
+        stdx::lock_guard lk(_mutex);
 
-    if (_donorOplogFetcher) {
-        _donorOplogFetcher->shutdown();
-        _donorOplogFetcher->join();
-    }
+        _cancelRemainingWork(lk);
 
-    if (_writerPool) {
-        _writerPool->join();
-    }
+        shutdownTarget(lk, _donorOplogFetcher);
+        shutdownTargetWithOpCtx(lk, _donorOplogBuffer, opCtx.get());
 
-    if (status.isOK()) {
-        // All intermediary promise should have been fulfilled already.
-        invariant(_dataSyncStartedPromise.getFuture().isReady() &&
-                  _dataConsistentPromise.getFuture().isReady());
-        _completionPromise.emplaceValue();
-    }
-
-    auto setPromiseErrorifNotReady = [&](auto& promise) {
-        if (promise.getFuture().isReady()) {
-            return;
+        if (status.isOK()) {
+            // All intermediary promise should have been fulfilled already.
+            invariant(_dataSyncStartedPromise.getFuture().isReady() &&
+                      _dataConsistentPromise.getFuture().isReady());
+            _completionPromise.emplaceValue();
         }
-        if (status.code() == stopFailPointErrorCode) {
-            promise.emplaceValue();
-        } else {
-            promise.setError(status);
-        }
-    };
 
-    setPromiseErrorifNotReady(_dataSyncStartedPromise);
-    setPromiseErrorifNotReady(_dataConsistentPromise);
-    setPromiseErrorifNotReady(_completionPromise);
+        invariant(!status.isOK());
+        setPromiseErrorifNotReady(lk, _dataSyncStartedPromise, status);
+        setPromiseErrorifNotReady(lk, _dataConsistentPromise, status);
+        setPromiseErrorifNotReady(lk, _completionPromise, status);
 
-    _taskState.setState(TaskState::kDone);
+        _taskState.setState(TaskState::kDone);
+
+        // Save them to join() with it outside of _mutex.
+        using std::swap;
+        swap(savedDonorOplogFetcher, _donorOplogFetcher);
+        swap(savedTenantOplogApplier, _tenantOplogApplier);
+        swap(savedWriterPool, _writerPool);
+    }
+
+    // Perform join outside the lock to avoid deadlocks.
+    joinTarget(savedDonorOplogFetcher);
+    joinTarget(savedDonorOplogFetcher);
+    joinTarget(savedWriterPool);
 }
 
 BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() const {
@@ -920,19 +949,18 @@ void TenantMigrationRecipientService::Instance::run(
                 // If we were interrupted during oplog application, replace oplog application
                 // status with error state.
                 stdx::lock_guard lk(_mutex);
-                if ((status.isOK() || ErrorCodes::isCancelationError(status)) &&
+                // Network and cancellation errors can be caused due to interrupt() (which shuts
+                // down the cloner/fetcher dbClientConnection & oplog applier), so replace those
+                // error status with interrupt status, if set.
+                if ((ErrorCodes::isCancelationError(status) ||
+                     ErrorCodes::isNetworkError(status)) &&
                     _taskState.isInterrupted()) {
-                    // We get an "OK" result when the stopReplProducer failpoint is set.  This also
-                    // cancels the migration.  We will have already logged this in
-                    // _oplogFetcherCallback()
-                    if (!status.isOK()) {
-                        LOGV2(4881207,
-                              "Migration completed with both error and interrupt",
-                              "tenantId"_attr = getTenantId(),
-                              "migrationId"_attr = getMigrationUUID(),
-                              "completionStatus"_attr = status,
-                              "interruptStatus"_attr = _taskState.getInterruptStatus());
-                    }
+                    LOGV2(4881207,
+                          "Migration completed with both error and interrupt",
+                          "tenantId"_attr = getTenantId(),
+                          "migrationId"_attr = getMigrationUUID(),
+                          "completionStatus"_attr = status,
+                          "interruptStatus"_attr = _taskState.getInterruptStatus());
                     status = _taskState.getInterruptStatus();
                 }
             }

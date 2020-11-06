@@ -69,6 +69,8 @@ namespace mongo {
 namespace repl {
 
 namespace {
+constexpr std::int32_t stopFailPointErrorCode = 4880402;
+
 OplogEntry makeOplogEntry(OpTime opTime,
                           OpTypeEnum opType,
                           NamespaceString nss,
@@ -129,6 +131,15 @@ BSONObj makeFindResponse(ErrorCodes::Error code = ErrorCodes::OK) {
 
 class TenantMigrationRecipientServiceTest : public ServiceContextMongoDTest {
 public:
+    class stopFailPointEnableBlock : public FailPointEnableBlock {
+    public:
+        explicit stopFailPointEnableBlock(StringData failPointName)
+            : FailPointEnableBlock(failPointName,
+                                   BSON("action"
+                                        << "stop"
+                                        << "stopErrorCode" << stopFailPointErrorCode)) {}
+    };
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         auto serviceContext = getServiceContext();
@@ -284,9 +295,7 @@ private:
 
 
 TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientServiceInstanceCreation) {
-    FailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
 
     const UUID migrationUUID = UUID::gen();
 
@@ -303,15 +312,13 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
     ASSERT(instance.get());
     ASSERT_EQ(migrationUUID, instance->getMigrationUUID());
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 }
 
 
 TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePersisitingStateDoc) {
-    FailPointEnableBlock failPoint("failWhilePersistingTenantMigrationRecipientInstanceStateDoc",
-                                   BSON("action"
-                                        << "stop"));
+    stopFailPointEnableBlock fp("failWhilePersistingTenantMigrationRecipientInstanceStateDoc");
 
     const UUID migrationUUID = UUID::gen();
 
@@ -334,9 +341,7 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Primary) {
-    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
@@ -377,14 +382,12 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 
     taskFp->setMode(FailPoint::off);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Secondary) {
-    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
@@ -425,14 +428,12 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
 
     taskFp->setMode(FailPoint::off);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_PrimaryFails) {
-    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     FailPointEnableBlock timeoutFp("setTenantMigrationRecipientInstanceHostTimeout",
                                    BSON("findHostTimeoutMillis" << 100));
@@ -491,9 +492,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_PrimaryFailsOver) {
-    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
@@ -537,14 +536,12 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 
     taskFp->setMode(FailPoint::off);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_BadConnectString) {
-    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     const UUID migrationUUID = UUID::gen();
 
@@ -566,9 +563,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientConnection_NonSetConnectString) {
-    FailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterConnectingTenantMigrationRecipientInstance");
 
     const UUID migrationUUID = UUID::gen();
 
@@ -589,9 +584,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_NoTransaction) {
-    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
 
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
@@ -611,8 +604,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
@@ -621,9 +614,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientGetStartOpTime_Advances_NoTransaction) {
-    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
+
     auto pauseFailPoint =
         globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
     auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
@@ -651,8 +643,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     insertTopOfOplog(&replSet, newTopOfOplogOpTime);
     pauseFailPoint->setMode(FailPoint::off, 0);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
     ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
@@ -660,9 +652,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTime_Transaction) {
-    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
 
     const UUID migrationUUID = UUID::gen();
     const OpTime txnStartOpTime(Timestamp(3, 1), 1);
@@ -689,8 +679,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 
     ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
@@ -699,9 +689,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientGetStartOpTime_Advances_Transaction) {
-    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
+
     auto pauseFailPoint =
         globalFailPointRegistry().find("pauseAfterRetrievingLastTxnMigrationRecipientInstance");
     auto timesEntered = pauseFailPoint->setMode(FailPoint::alwaysOn, 0);
@@ -736,8 +725,8 @@ TEST_F(TenantMigrationRecipientServiceTest,
     insertTopOfOplog(&replSet, newTopOfOplogOpTime);
     pauseFailPoint->setMode(FailPoint::off, 0);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 
     ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
     ASSERT_EQ(newTopOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
@@ -746,9 +735,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
 TEST_F(TenantMigrationRecipientServiceTest,
        TenantMigrationRecipientGetStartOpTimes_RemoteOplogQueryFails) {
-    FailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterRetrievingStartOpTimesMigrationRecipientInstance");
 
     const UUID migrationUUID = UUID::gen();
 
@@ -766,7 +753,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
-    // Wait for task completion success.
+    // Wait for task completion.
     ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
 
     // Even though we failed, the memory state should still match the on-disk state.
@@ -774,9 +761,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFetcher) {
-    FailPointEnableBlock fp("fpAfterStartingOplogFetcherMigrationRecipientInstance",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterStartingOplogFetcherMigrationRecipientInstance");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
@@ -814,14 +799,12 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
 
     taskFp->setMode(FailPoint::off);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner) {
-    FailPointEnableBlock fp("fpAfterCollectionClonerDone",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterCollectionClonerDone");
 
     auto taskFp = globalFailPointRegistry().find("hangBeforeTaskCompletion");
     auto taskFpGuard = makeGuard([&taskFp] { taskFp->setMode(FailPoint::off); });
@@ -880,8 +863,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
     taskFpGuard.dismiss();
     taskFp->setMode(FailPoint::off);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplication) {
@@ -917,6 +900,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplicat
           "suite"_attr = _agent.getSuiteName(),
           "test"_attr = _agent.getTestName());
     instance->waitUntilMigrationReachesConsistentState(opCtx.get());
+
 
     checkStateDocPersisted(opCtx.get(), instance.get());
     // The oplog fetcher should exist and be running.
@@ -1030,15 +1014,13 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
     // Stop the oplog applier.
     instance->stopOplogApplier_forTest();
 
-    // Wait for task completion success.  Since we're using a test function to cancel the applier,
+    // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTokenNoopsToBuffer) {
-    FailPointEnableBlock fp("fpAfterCollectionClonerDone",
-                            BSON("action"
-                                 << "stop"));
+    stopFailPointEnableBlock fp("fpAfterCollectionClonerDone");
     const UUID migrationUUID = UUID::gen();
     const OpTime topOfOplogOpTime(Timestamp(5, 1), 1);
 
@@ -1136,8 +1118,8 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
     // Let the recipient service complete.
     oplogFetcherFP->setMode(FailPoint::off);
 
-    // Wait for task completion success.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    // Wait for task completion.
+    ASSERT_EQ(stopFailPointErrorCode, instance->getCompletionFuture().getNoThrow().code());
 }
 }  // namespace repl
 }  // namespace mongo

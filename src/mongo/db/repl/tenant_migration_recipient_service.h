@@ -325,9 +325,9 @@ public:
         SemiFuture<void> _getDataConsistentFuture();
 
         /*
-         * Shuts down all components that are started by the instance.
+         * Cancels the tenant migration recipient instance task work.
          */
-        void _shutdownComponents(WithLock lk);
+        void _cancelRemainingWork(WithLock lk);
 
         /*
          * Performs some cleanup work on task completion, like, shutting down the components or

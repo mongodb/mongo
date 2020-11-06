@@ -24,6 +24,7 @@ const readPreference = {
     mode: 'primary'
 };
 
+TestData.stopFailPointErrorCode = 4880402;
 function checkTenantMigrationRecipientStateCollCount(expectedCount) {
     let res = tenantMigrationRecipientStateColl.find().toArray();
     assert.eq(expectedCount,
@@ -34,21 +35,22 @@ function checkTenantMigrationRecipientStateCollCount(expectedCount) {
 function startRecipientSyncDataCmd(migrationUuid, tenantId, connectionString, readPreference) {
     jsTestLog("Starting a recipientSyncDataCmd for migrationUuid: " + migrationUuid +
               " tenantId: '" + tenantId + "'");
-    assert.commandWorkedOrFailedWithCode(db.adminCommand({
-        recipientSyncData: 1,
-        migrationId: migrationUuid,
-        donorConnectionString: connectionString,
-        tenantId: tenantId,
-        readPreference: readPreference
-    }),
-                                         ErrorCodes.ConflictingOperationInProgress);
+    assert.commandFailedWithCode(
+        db.adminCommand({
+            recipientSyncData: 1,
+            migrationId: migrationUuid,
+            donorConnectionString: connectionString,
+            tenantId: tenantId,
+            readPreference: readPreference
+        }),
+        [TestData.stopFailPointErrorCode, ErrorCodes.ConflictingOperationInProgress]);
 }
 
 // Enable the failpoint to stop the tenant migration after persisting the state doc.
 assert.commandWorked(primary.adminCommand({
     configureFailPoint: "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
     mode: "alwaysOn",
-    data: {action: "stop"}
+    data: {action: "stop", stopErrorCode: NumberInt(TestData.stopFailPointErrorCode)}
 }));
 
 {
