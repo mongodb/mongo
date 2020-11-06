@@ -66,14 +66,14 @@ class test_timestamp20(wttest.WiredTigerTestCase):
 
         old_reader_session = self.conn.open_session()
         old_reader_cursor = old_reader_session.open_cursor(uri)
-        old_reader_session.begin_transaction('read_timestamp=' + timestamp_str(30))
+        old_reader_session.begin_transaction('read_timestamp=' + timestamp_str(20))
 
         # Now put two updates out of order. 5 will go to the history store and will trigger a
         # correction to the existing contents.
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value4
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+            self.session.commit_transaction('commit_timestamp=' + timestamp_str(25))
             self.session.begin_transaction()
             cursor[str(i)] = value5
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(40))
@@ -84,7 +84,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         for i in range(1, 10000):
-            self.assertEqual(old_reader_cursor[str(i)], value3)
+            self.assertEqual(old_reader_cursor[str(i)], value2)
         old_reader_session.rollback_transaction()
 
     # In this test we're using modifies since they are more sensitive to corruptions.
@@ -126,7 +126,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         # has been squashed into a full update.
         old_reader_session = self.conn.open_session()
         old_reader_cursor = old_reader_session.open_cursor(uri)
-        old_reader_session.begin_transaction('read_timestamp=' + timestamp_str(30))
+        old_reader_session.begin_transaction('read_timestamp=' + timestamp_str(20))
 
         # Now apply the last modify.
         # This will be the end of the chain of modifies.
@@ -141,7 +141,7 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         for i in range(1, 10000):
             self.session.begin_transaction()
             cursor[str(i)] = value2
-            self.session.commit_transaction('commit_timestamp=' + timestamp_str(5))
+            self.session.commit_transaction('commit_timestamp=' + timestamp_str(25))
             self.session.begin_transaction()
             cursor[str(i)] = value3
             self.session.commit_transaction('commit_timestamp=' + timestamp_str(50))
@@ -156,7 +156,6 @@ class test_timestamp20(wttest.WiredTigerTestCase):
         # Put together expected value.
         expected = list(value1)
         expected[100] = 'B'
-        expected[200] = 'C'
         expected = str().join(expected)
 
         # On the other hand, this older transaction SHOULD be able to read past the 5.

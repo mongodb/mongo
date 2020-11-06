@@ -836,7 +836,20 @@ struct __wt_dsrc_stats {
     int64_t cache_eviction_walk_from_root;
     int64_t cache_eviction_walk_saved_pos;
     int64_t cache_eviction_hazard;
+    int64_t cache_hs_insert;
+    int64_t cache_hs_insert_restart;
+    int64_t cache_hs_order_lose_durable_timestamp;
+    int64_t cache_hs_order_fixup_move;
+    int64_t cache_hs_order_fixup_insert;
     int64_t cache_hs_read;
+    int64_t cache_hs_read_miss;
+    int64_t cache_hs_read_squash;
+    int64_t cache_hs_key_truncate_rts_unstable;
+    int64_t cache_hs_key_truncate_rts;
+    int64_t cache_hs_key_truncate;
+    int64_t cache_hs_key_truncate_onpage_removal;
+    int64_t cache_hs_key_truncate_mix_ts;
+    int64_t cache_hs_write_squash;
     int64_t cache_inmem_splittable;
     int64_t cache_inmem_split;
     int64_t cache_eviction_internal;
@@ -893,8 +906,10 @@ struct __wt_dsrc_stats {
     int64_t cursor_reopen;
     int64_t cursor_cache;
     int64_t cursor_create;
+    int64_t cursor_next_hs_tombstone;
     int64_t cursor_next_skip_ge_100;
     int64_t cursor_next_skip_lt_100;
+    int64_t cursor_prev_hs_tombstone;
     int64_t cursor_prev_skip_ge_100;
     int64_t cursor_prev_skip_lt_100;
     int64_t cursor_insert;
@@ -956,6 +971,12 @@ struct __wt_dsrc_stats {
     int64_t rec_time_window_stop_txn;
     int64_t session_compact;
     int64_t txn_read_race_prepare_update;
+    int64_t txn_rts_hs_stop_older_than_newer_start;
+    int64_t txn_rts_keys_removed;
+    int64_t txn_rts_keys_restored;
+    int64_t txn_rts_hs_restore_tombstones;
+    int64_t txn_rts_sweep_hs_keys;
+    int64_t txn_rts_hs_removed;
     int64_t txn_update_conflict;
 };
 
