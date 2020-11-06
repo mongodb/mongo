@@ -156,6 +156,7 @@ private:
      * returns true. If the update does not change shard key fields, returns false.
      */
     bool checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& oldObj);
+    bool wasReshardingKeyUpdated(const BSONObj& newObj, const Snapshotted<BSONObj>& oldObj);
 
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;

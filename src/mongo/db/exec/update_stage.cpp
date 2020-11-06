@@ -48,6 +48,8 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/update/path_support.h"
@@ -270,7 +272,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
 
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
-                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(oldObj) &&
+                if (_isUserInitiatedWrite &&
+                    (checkUpdateChangesShardKeyFields(oldObj) ||
+                     wasReshardingKeyUpdated(_doc.getObject(), oldObj)) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
@@ -295,7 +299,9 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (!request->explain()) {
-                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(oldObj) &&
+                if (_isUserInitiatedWrite &&
+                    (checkUpdateChangesShardKeyFields(oldObj) ||
+                     wasReshardingKeyUpdated(_doc.getObject(), oldObj)) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
@@ -565,6 +571,37 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     _idRetrying = idToRetry;
     *out = WorkingSet::INVALID_ID;
     return NEED_YIELD;
+}
+
+bool UpdateStage::wasReshardingKeyUpdated(const BSONObj& newObj,
+                                          const Snapshotted<BSONObj>& oldObj) {
+    auto donorFields = resharding::getDonorFields(opCtx(), collection()->ns(), newObj);
+    if (!donorFields)
+        return false;
+
+    auto reshardingKeyPattern = ShardKeyPattern(donorFields->getReshardingKey());
+    auto oldShardKey = reshardingKeyPattern.extractShardKeyFromDoc(oldObj.value());
+    auto newShardKey = reshardingKeyPattern.extractShardKeyFromDoc(newObj);
+
+    if (newShardKey.binaryEqual(oldShardKey))
+        return false;
+
+    // If this node is a replica set primary node, an attempted update to the shard key value must
+    // either be a retryable write or inside a transaction.
+    // If this node is a replica set secondary node, we can skip validation.
+    uassert(ErrorCodes::IllegalOperation,
+            "Must run update to resharding key field in a multi-statement transaction or with "
+            "retryWrites: true.",
+            opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
+
+    auto oldRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), oldObj.value());
+    auto newRecipShard = getDestinedRecipient(opCtx(), collection()->ns(), newObj);
+
+    uassert(WouldChangeOwningShardInfo(oldObj.value(), newObj, false /* upsert */),
+            "This update would cause the doc to change owning shards under the new shard key",
+            oldRecipShard == newRecipShard);
+
+    return true;
 }
 
 bool UpdateStage::checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& oldObj) {

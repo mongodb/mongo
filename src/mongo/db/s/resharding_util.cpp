@@ -85,29 +85,6 @@ bool documentBelongsToMe(OperationContext* opCtx,
     return ownershipFilter.keyBelongsToMe(currentKeyPattern.extractShardKeyFromDoc(doc));
 }
 
-boost::optional<TypeCollectionDonorFields> getDonorFields(OperationContext* opCtx,
-                                                          const NamespaceString& sourceNss,
-                                                          const BSONObj& fullDocument) {
-    auto css = CollectionShardingState::get(opCtx, sourceNss);
-    auto collDesc = css->getCollectionDescription(opCtx);
-
-    if (!collDesc.isSharded())
-        return boost::none;
-
-    const auto& reshardingFields = collDesc.getReshardingFields();
-    if (!reshardingFields)
-        return boost::none;
-
-    const auto& donorFields = reshardingFields->getDonorFields();
-    if (!donorFields)
-        return boost::none;
-
-    if (!documentBelongsToMe(opCtx, css, fullDocument))
-        return boost::none;
-
-    return donorFields;
-}
-
 }  // namespace
 
 DonorShardEntry makeDonorShard(ShardId shardId,
@@ -648,11 +625,38 @@ std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
     return Pipeline::create(std::move(stages), expCtx);
 }
 
+namespace resharding {
+
+boost::optional<TypeCollectionDonorFields> getDonorFields(OperationContext* opCtx,
+                                                          const NamespaceString& sourceNss,
+                                                          const BSONObj& fullDocument) {
+    auto css = CollectionShardingState::get(opCtx, sourceNss);
+    auto collDesc = css->getCollectionDescription(opCtx);
+
+    if (!collDesc.isSharded())
+        return boost::none;
+
+    const auto& reshardingFields = collDesc.getReshardingFields();
+    if (!reshardingFields)
+        return boost::none;
+
+    const auto& donorFields = reshardingFields->getDonorFields();
+    if (!donorFields)
+        return boost::none;
+
+    return donorFields;
+}
+
+}  // namespace resharding
+
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
                                               const BSONObj& fullDocument) {
-    auto donorFields = getDonorFields(opCtx, sourceNss, fullDocument);
+    auto donorFields = resharding::getDonorFields(opCtx, sourceNss, fullDocument);
     if (!donorFields)
+        return boost::none;
+
+    if (!documentBelongsToMe(opCtx, CollectionShardingState::get(opCtx, sourceNss), fullDocument))
         return boost::none;
 
     bool allowLocks = true;

@@ -234,6 +234,9 @@ selector:
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js
 
+  # SERVER-52620 test writes directly to CSRS primary
+  - jstests/sharding/resharding_replicate_updates_as_insert_delete.js
+
 executor:
   config:
     shell_options:

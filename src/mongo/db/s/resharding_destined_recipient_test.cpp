@@ -216,6 +216,7 @@ protected:
         _mockCatalogCacheLoader->setCollectionRefreshValues(
             env.tempNss, collType, createChunks(env.version.epoch(), "y"), boost::none);
 
+        forceDatabaseRefresh(opCtx, kNss.db());
         forceShardFilteringMetadataRefresh(opCtx, kNss);
 
         if (refreshTempNss)
@@ -472,6 +473,36 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
     auto recipShard = replOp.getDestinedRecipient();
     ASSERT(recipShard);
     ASSERT_EQ(*recipShard, env.destShard);
+}
+
+TEST_F(DestinedRecipientTest, TestUpdateChangesOwningShardThrows) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    ASSERT_THROWS(runInTransaction(
+                      opCtx,
+                      [&]() {
+                          updateDoc(
+                              opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("y" << 50)), env);
+                      }),
+                  ExceptionFor<ErrorCodes::WouldChangeOwningShard>);
+}
+
+TEST_F(DestinedRecipientTest, TestUpdateSameOwningShard) {
+    auto opCtx = operationContext();
+
+    DBDirectClient client(opCtx);
+    client.insert(kNss.toString(), BSON("_id" << 0 << "x" << 2 << "y" << 2 << "z" << 4));
+
+    auto env = setupReshardingEnv(opCtx, true);
+
+    runInTransaction(opCtx, [&]() {
+        updateDoc(opCtx, kNss, BSON("_id" << 0), BSON("$set" << BSON("y" << 3)), env);
+    });
 }
 
 }  // namespace
