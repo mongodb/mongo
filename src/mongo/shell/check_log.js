@@ -12,6 +12,7 @@ if (checkLog) {
 
 checkLog = (function() {
     let getGlobalLog = function(conn) {
+        assert(typeof conn !== 'undefined', "Connection is undefined");
         let cmdRes;
         try {
             cmdRes = conn.adminCommand({getLog: 'global'});

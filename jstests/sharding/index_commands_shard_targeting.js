@@ -87,16 +87,10 @@ function assertCommandBlocksIfCriticalSectionInProgress(
 
     // Run the command with maxTimeMS.
     const cmdWithMaxTimeMS = Object.assign({}, testCase.command, {maxTimeMS: 500});
-    let cmdThread = new Thread((host, dbName, cmdWithMaxTimeMS) => {
-        const conn = new Mongo(host);
-        conn.getDB(dbName).runCommand(cmdWithMaxTimeMS);
-    }, st.s.host, dbName, cmdWithMaxTimeMS);
-    cmdThread.start();
+    assert.commandFailed(st.s.getDB(dbName).runCommand(cmdWithMaxTimeMS));
 
     // Assert that the command eventually times out.
-    checkLog.contains(st.shard0,
-                      new RegExp("Failed to refresh metadata for collection.*MaxTimeMSExpired"));
-    cmdThread.join();
+    checkLog.checkContainsOnceJsonStringMatch(st.shard0, 22062, "error", "MaxTimeMSExpired");
 
     // Turn off the fail point and wait for moveChunk to complete.
     unpauseMoveChunkAtStep(fromShard, moveChunkStepNames.chunkDataCommitted);
