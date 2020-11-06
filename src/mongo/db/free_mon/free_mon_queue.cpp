@@ -95,6 +95,21 @@ void FreeMonMessageQueue::enqueue(std::shared_ptr<FreeMonMessage> msg) {
     }
 }
 
+void FreeMonMessageQueue::deprioritizeFirstMessageForTest(FreeMonMessageType type) {
+    {
+        stdx::lock_guard<Latch> lock(_mutex);
+
+        auto item = _queue.top();
+        uassert(5167902, "Wrong message type", item->getType() == type);
+
+        _queue.pop();
+
+        ++_counter;
+        item->setId(_counter);
+        _queue.push(item);
+    }
+}
+
 boost::optional<std::shared_ptr<FreeMonMessage>> FreeMonMessageQueue::dequeue(
     ClockSource* clockSource) {
     {

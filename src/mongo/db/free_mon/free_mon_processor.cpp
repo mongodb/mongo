@@ -153,6 +153,10 @@ void FreeMonProcessor::turnCrankForTest(size_t countMessagesToIgnore) {
     _countdown.wait();
 }
 
+void FreeMonProcessor::deprioritizeFirstMessageForTest(FreeMonMessageType type) {
+    _queue.deprioritizeFirstMessageForTest(type);
+}
+
 void FreeMonProcessor::run() {
     try {
 
@@ -659,7 +663,7 @@ void FreeMonProcessor::doAsyncRegisterComplete(
 
     LOGV2(20615,
           "Free Monitoring is Enabled. Frequency: {interval} seconds",
-          "Free Moniforing is Enabled",
+          "Free Monitoring is Enabled",
           "interval"_attr = resp.getReportingInterval());
 
     // Enqueue next metrics upload immediately to deliver a good experience
@@ -791,6 +795,13 @@ void FreeMonProcessor::doMetricsSend(Client* client) {
 void FreeMonProcessor::doAsyncMetricsComplete(
     Client* client,
     const FreeMonMessageWithPayload<FreeMonMessageType::AsyncMetricsComplete>* msg) {
+
+    // If we have disabled the store between the metrics send message and the metrcs complete
+    // message then it means that we need to stop processing metrics on this instance. We ignore the
+    // message entirely including an errors as the disabling of the store takes priority.
+    if (_lastReadState == boost::none) {
+        return;
+    }
 
     auto& resp = msg->getPayload();
 

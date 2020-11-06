@@ -128,6 +128,11 @@ public:
      */
     void turnCrankForTest(size_t countMessagesToIgnore);
 
+    /**
+     * Deproritize the first message to force interleavings of messages.
+     */
+    void deprioritizeFirstMessageForTest(FreeMonMessageType type);
+
 private:
     // Condition variable to signal consumer
     stdx::condition_variable _condvar;

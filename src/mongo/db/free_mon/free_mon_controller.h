@@ -75,6 +75,11 @@ public:
     void turnCrankForTest(size_t countMessagesToIgnore);
 
     /**
+     * Deproritize the first message to force interleavings of messages.
+     */
+    void deprioritizeFirstMessageForTest(FreeMonMessageType type);
+
+    /**
      * Add a metric collector to collect on registration
      */
     void addRegistrationCollector(std::unique_ptr<FreeMonCollectorInterface> collector);

@@ -1360,7 +1360,7 @@ void FreeMonControllerRSTest::tearDown() {
 TEST_F(FreeMonControllerRSTest, TransitionToPrimary) {
     ControllerHolder controller(_mockThreadPool.get(), FreeMonNetworkInterfaceMock::Options());
 
-    // Now become a secondary, then primary, and try what happens when we become primary
+    // Now become a secondary, then primary, and see what happens when we become primary
     ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_SECONDARY));
     ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_PRIMARY));
 
@@ -1384,7 +1384,7 @@ TEST_F(FreeMonControllerRSTest, StartupOnSecondary) {
 
     FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::enabled));
 
-    // Now become a secondary, then primary, and try what happens when we become primary
+    // Now become a secondary, then primary, and see what happens when we become primary
     ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
     controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
@@ -1554,6 +1554,54 @@ TEST_F(FreeMonControllerRSTest, SecondaryStopOnDocumentDrop) {
     ASSERT_EQ(controller.registerCollector->count(), 1UL);
     ASSERT_GTE(controller.metricsCollector->count(), 2UL);
 }
+
+
+// Positive: Test Metrics works on secondary after opObserver delete of document between metrics
+// send and metrics async complete
+TEST_F(FreeMonControllerRSTest, SecondaryStopOnDocumentDropDuringCollect) {
+    ControllerHolder controller(_mockThreadPool.get(), FreeMonNetworkInterfaceMock::Options());
+
+    FreeMonStorage::replace(_opCtx.get(), initStorage(StorageStateEnum::enabled));
+
+    // Now become a secondary
+    ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_SECONDARY));
+
+    controller.start(RegistrationType::RegisterAfterOnTransitionToPrimary);
+
+    controller->turnCrankForTest(Turner().registerServer().registerCommand().collect(1));
+
+    ASSERT_EQ(controller.metricsCollector->count(), 1UL);
+
+    // Crank the metrics send but not the complete
+    controller->turnCrankForTest(Turner().collect(1));
+
+    controller->notifyOnDelete();
+
+    // Move the notify delete above the async metrics complete
+    controller->deprioritizeFirstMessageForTest(FreeMonMessageType::AsyncMetricsComplete);
+
+    // There is a race condition where sometimes metrics send sneaks in
+    // Crank the notifyDelete and the async metrics complete.
+    controller->turnCrankForTest(Turner().notifyDelete().collect(1));
+
+    controller->turnCrankForTest(Turner().metricsSend().collect(2));
+
+    ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).is_initialized());
+
+    // Since there is no local write, it remains enabled
+    ASSERT_TRUE(FreeMonStorage::read(_opCtx.get()).get().getState() == StorageStateEnum::enabled);
+
+    BSONObjBuilder builder;
+    controller->getServerStatus(_opCtx.get(), &builder);
+    auto obj = builder.obj();
+    ASSERT_BSONOBJ_EQ(BSON("state"
+                           << "undecided"),
+                      obj);
+
+    ASSERT_EQ(controller.registerCollector->count(), 1UL);
+    ASSERT_EQ(controller.metricsCollector->count(), 5UL);
+}
+
 
 // Negative: Test nice shutdown on bad update
 TEST_F(FreeMonControllerRSTest, SecondaryStartOnBadUpdate) {
