@@ -78,6 +78,11 @@ modules:
   repo: git@github.com:mongodb/mongo-perf.git
   prefix: ../../src
   branch: master
+- name: ycsb
+  repo: git@github.com:mongodb-labs/YCSB.git
+  prefix: ../../src
+  branch: master
+  ref: 9e7888c5009e44a185b135104dd8456eea1deb1e
 ###
 
 - name: enterprise
