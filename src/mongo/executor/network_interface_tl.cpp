@@ -33,6 +33,7 @@
 
 #include "mongo/executor/network_interface_tl.h"
 
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
@@ -125,6 +126,8 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
     }
 
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
+
+#ifdef MONGO_CONFIG_SSL
     if (_connPoolOpts.transientSSLParams) {
         // TODO: uncomment when changes for SERVER-51599 are submitted.
         // auto statusOrContext = _tl->createTransientSSLContext(
@@ -133,6 +136,7 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
         // transientSSLContext = std::make_shared<const transport::SSLConnectionContext>(
         //     std::move(statusOrContext.getValue()));
     }
+#endif
 
     _reactor = _tl->getReactor(transport::TransportLayer::kNewReactor);
     auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
