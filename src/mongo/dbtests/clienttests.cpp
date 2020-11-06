@@ -335,22 +335,6 @@ public:
     }
 };
 
-class CreateHaystackIndex : public Base {
-public:
-    CreateHaystackIndex() : Base("CreateHaystackIndex") {}
-    void run() {
-        const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
-        OperationContext& opCtx = *opCtxPtr;
-        DBDirectClient db(&opCtx);
-
-        db.createIndex(ns(),
-                       IndexSpec()
-                           .addKey("aField", IndexSpec::kIndexTypeGeoHaystack)
-                           .addKey("otherField", IndexSpec::kIndexTypeDescending)
-                           .geoHaystackBucketSize(1.0));
-    }
-};
-
 class Create2DSphereIndex : public Base {
 public:
     Create2DSphereIndex() : Base("Create2DSphereIndex") {}
@@ -409,7 +393,6 @@ public:
         add<CreateUniqueSparseDropDupsIndexInBackground>();
         add<CreateComplexTextIndex>();
         add<Create2DIndex>();
-        add<CreateHaystackIndex>();
         add<Create2DSphereIndex>();
         add<CreateHashedIndex>();
         add<CreateIndexFailure>();

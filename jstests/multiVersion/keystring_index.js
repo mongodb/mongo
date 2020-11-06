@@ -13,7 +13,6 @@
  * The following index types are tested:
  * - btree
  * - 2d
- * - geoHaystack
  * - 2dsphere
  * - text
  * - hashed*
@@ -49,15 +48,6 @@ const indexTypes = [
         indexName: "2d",
         createDoc: i => ({loc: [i, i]}),
         spec: {loc: "2d"},
-    },
-    {
-        indexName: "hayStack",
-        createDoc: i => ({
-            loc: {lng: (i / 2.0) * (i / 2.0), lat: (i / 2.0)},
-            a: {x: i, y: i + 1, z: [i, i + 1]},
-        }),
-        spec: {loc: "geoHaystack", a: 1},
-        createIndexOptions: {bucketSize: 1},
     },
     {
         indexName: "2dSphere",

@@ -293,10 +293,20 @@ StatusWith<BSONObj> validateIndexSpec(
                 keys.push_back(keyElemFieldName);
             }
 
+            // TODO SERVER-51871: When 5.0 becomes last-lts, this check should be moved into
+            // 'validateKeyPattern()'. It must currently be done here so that haystack indexes
+            // continue to replicate correctly before the upgrade to FCV "4.9" is complete.
+            const auto keyPattern = indexSpecElem.Obj();
+            if (IndexNames::findPluginName(keyPattern) == IndexNames::GEO_HAYSTACK) {
+                return {ErrorCodes::CannotCreateIndex,
+                        str::stream()
+                            << "GeoHaystack indexes cannot be created in version 4.9 and above"};
+            }
+
             // Here we always validate the key pattern according to the most recent rules, in order
             // to enforce that all new indexes have well-formed key patterns.
             Status keyPatternValidateStatus =
-                validateKeyPattern(indexSpecElem.Obj(), IndexDescriptor::kLatestIndexVersion);
+                validateKeyPattern(keyPattern, IndexDescriptor::kLatestIndexVersion);
             if (!keyPatternValidateStatus.isOK()) {
                 return keyPatternValidateStatus;
             }
@@ -434,6 +444,11 @@ StatusWith<BSONObj> validateIndexSpec(
                 return ex.toStatus(str::stream() << "Failed to parse: "
                                                  << IndexDescriptor::kPathProjectionFieldName);
             }
+        } else if (IndexDescriptor::kGeoHaystackBucketSize == indexSpecElemFieldName) {
+            return {ErrorCodes::CannotCreateIndex,
+                    str::stream()
+                        << "The 'bucketSize' parameter is disallowed because "
+                           "geoHaystack indexes are no longer supported in version 4.9 and above"};
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().

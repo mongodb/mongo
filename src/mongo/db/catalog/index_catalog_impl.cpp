@@ -120,11 +120,12 @@ Status IndexCatalogImpl::init(OperationContext* opCtx) {
             durableCatalog->getIndexSpec(opCtx, _collection->getCatalogId(), indexName).getOwned();
         BSONObj keyPattern = spec.getObjectField("key");
 
+        // TODO SERVER-51871: Delete this block once 5.0 becomes last-lts.
         if (spec.hasField(IndexDescriptor::kGeoHaystackBucketSize)) {
             LOGV2_OPTIONS(4670602,
                           {logv2::LogTag::kStartupWarnings},
                           "Found an existing geoHaystack index in the catalog. Support for "
-                          "geoHaystack indexes has been deprecated. Instead create a 2d index. See "
+                          "geoHaystack indexes has been removed. Instead create a 2d index. See "
                           "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
         }
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
@@ -314,9 +315,6 @@ void IndexCatalogImpl::_logInternalState(OperationContext* opCtx,
     }
 }
 
-namespace {
-std::string lastHaystackIndexLogged = "";
-}
 StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     OperationContext* opCtx,
     const BSONObj& original,
@@ -331,14 +329,13 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     auto indexName = validatedSpec.getField("name").String();
     // This gets hit twice per index, so we keep track of what we last logged to avoid logging the
     // same line for the same index twice.
-    if (validatedSpec.hasField(IndexDescriptor::kGeoHaystackBucketSize) &&
-        lastHaystackIndexLogged.compare(indexName) != 0) {
+    // TODO SERVER-51871: Delete this block once 5.0 becomes last-lts.
+    if (validatedSpec.hasField(IndexDescriptor::kGeoHaystackBucketSize)) {
         LOGV2_OPTIONS(4670601,
                       {logv2::LogTag::kStartupWarnings},
                       "Support for "
-                      "geoHaystack indexes has been deprecated. Instead create a 2d index. See "
+                      "geoHaystack indexes has been removed. Instead create a 2d index. See "
                       "https://dochub.mongodb.org/core/4.4-deprecate-geoHaystack");
-        lastHaystackIndexLogged = indexName;
     }
 
     // Check whether this is a non-_id index and there are any settings disallowing this server

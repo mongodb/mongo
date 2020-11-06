@@ -43,7 +43,7 @@ function createIndexes(coll) {
 // Verify that haystack indexes are deleted when upgrading a standalone.
 function runStandaloneTest() {
     // Set up a v4.4 mongod.
-    const dbPath = MongoRunner.dataPath + "delete_haystack";
+    const dbPath = MongoRunner.dataPath + "/delete_haystack";
     let mongo = MongoRunner.runMongod({dbpath: dbPath, binVersion: "last-lts"});
     assert.neq(null, mongo, "mongod was unable to start up");
     let testDB = mongo.getDB(dbName);
@@ -60,8 +60,11 @@ function runStandaloneTest() {
     testDB = mongo.getDB(dbName);
     coll = testDB[collName];
 
-    // The haystack index should still be present before the FCV is set.
+    // The haystack index should still be present before the FCV is set and the validate command
+    // should succeed.
     IndexBuildTest.assertIndexes(coll, indexList.length, indexList);
+    const validate = assert.commandWorked(coll.validate({full: true}));
+    assert.eq(true, validate.valid);
 
     // Set the FCV.
     const adminDB = mongo.getDB("admin");

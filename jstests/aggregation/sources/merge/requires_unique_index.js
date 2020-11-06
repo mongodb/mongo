@@ -241,12 +241,6 @@ function dropWithoutImplicitRecreate(coll) {
     assertMergeFailsWithoutUniqueIndex({source: source, onFields: "geo", target: target});
 
     dropWithoutImplicitRecreate(target);
-    assert.commandWorked(
-        target.createIndex({geo: "geoHaystack", a: 1}, {unique: true, bucketSize: 5}));
-    assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["a", "geo"], target: target});
-    assertMergeFailsWithoutUniqueIndex({source: source, onFields: ["geo", "a"], target: target});
-
-    dropWithoutImplicitRecreate(target);
     // MongoDB does not support unique hashed indexes.
     assert.commandFailedWithCode(target.createIndex({a: "hashed"}, {unique: true}), 16764);
     assert.commandWorked(target.createIndex({a: "hashed"}));
