@@ -131,6 +131,9 @@ class ReadThroughCache : public ReadThroughCacheBase {
     using Cache = InvalidatingLRUCache<Key, StoredValue, Time>;
 
 public:
+    template <typename T>
+    static constexpr bool IsComparable = Cache::template IsComparable<T>;
+
     /**
      * Common type for values returned from the cache.
      */
@@ -247,9 +250,12 @@ public:
      *  The returned value may be invalid by the time the caller gets to access it, if 'invalidate'
      *  is called for 'key'.
      */
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>&& std::is_constructible_v<Key, KeyType>)
     SharedSemiFuture<ValueHandle> acquireAsync(
-        const Key& key,
+        const KeyType& key,
         CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
+
         // Fast path
         if (auto cachedValue = _cache.get(key, causalConsistency))
             return {std::move(cachedValue)};
@@ -269,14 +275,15 @@ public:
         auto [it, emplaced] = _inProgressLookups.emplace(
             key,
             std::make_unique<InProgressLookup>(
-                *this, key, ValueHandle(std::move(cachedValue)), std::move(timeInStore)));
+                *this, Key(key), ValueHandle(std::move(cachedValue)), std::move(timeInStore)));
         invariant(emplaced);
         auto& inProgressLookup = *it->second;
         auto sharedFutureToReturn = inProgressLookup.addWaiter(ul);
 
         ul.unlock();
 
-        _doLookupWhileNotValid(key, Status(ErrorCodes::Error(461540), "")).getAsync([](auto) {});
+        _doLookupWhileNotValid(Key(key), Status(ErrorCodes::Error(461540), "")).getAsync([](auto) {
+        });
 
         return sharedFutureToReturn;
     }
@@ -287,9 +294,11 @@ public:
      * NOTES:
      *  This is a potentially blocking method.
      */
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
     ValueHandle acquire(
         OperationContext* opCtx,
-        const Key& key,
+        const KeyType& key,
         CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
         return acquireAsync(key, causalConsistency).get(opCtx);
     }
@@ -300,7 +309,9 @@ public:
      *
      * Doesn't attempt to lookup, and so doesn't block.
      */
-    ValueHandle peekLatestCached(const Key& key) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    ValueHandle peekLatestCached(const KeyType& key) {
         return {_cache.get(key, CacheCausalConsistency::kLatestCached)};
     }
 
@@ -363,7 +374,9 @@ public:
      * Returns true if the passed 'newTimeInStore' is grater than the time of the currently cached
      * value or if no value is cached for 'key'.
      */
-    bool advanceTimeInStore(const Key& key, const Time& newTime) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    bool advanceTimeInStore(const KeyType& key, const Time& newTime) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->advanceTimeInStore(lg, newTime);
@@ -380,7 +393,9 @@ public:
      *
      * In essence, the invalidate calls serve as a "barrier" for the affected keys.
      */
-    void invalidate(const Key& key) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    void invalidate(const KeyType& key) {
         stdx::lock_guard lg(_mutex);
         if (auto it = _inProgressLookups.find(key); it != _inProgressLookups.end())
             it->second->invalidateAndCancelCurrentLookupRound(lg);
@@ -453,7 +468,10 @@ public:
     }
 
 private:
-    using InProgressLookupsMap = stdx::unordered_map<Key, std::unique_ptr<InProgressLookup>>;
+    using InProgressLookupsMap = stdx::unordered_map<Key,
+                                                     std::unique_ptr<InProgressLookup>,
+                                                     LruKeyHasher<Key>,
+                                                     LruKeyComparator<Key>>;
 
     /**
      * This method implements an asynchronous "while (!valid)" loop over 'key', which must be on the
@@ -530,7 +548,9 @@ private:
 
         return mustDoAnotherLoop
             ? inProgressLookup.asyncLookupRound().onCompletion(
-                  [this, key](auto sw) { return _doLookupWhileNotValid(key, std::move(sw)); })
+                  [this, key = std::move(key)](auto sw) mutable {
+                      return _doLookupWhileNotValid(std::move(key), std::move(sw));
+                  })
             : Future<LookupResult>::makeReady(Status(ErrorCodes::Error(461542), ""));
     }
 

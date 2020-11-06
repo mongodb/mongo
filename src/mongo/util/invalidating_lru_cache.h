@@ -37,6 +37,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/lru_cache.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -93,6 +94,28 @@ enum class CacheCausalConsistency {
     // the value will be immediately returned. Otherwise, the 'acquire' call will block.
     kLatestKnown,
 };
+
+template <typename Key>
+struct DefaultKeyHasher : DefaultHasher<Key> {};
+
+template <typename Key>
+struct LruKeyTraits {
+    using hasher = DefaultKeyHasher<Key>;
+    using comparator = std::equal_to<Key>;
+};
+template <>
+struct LruKeyTraits<std::string> {
+    using hasher = StringMapHasher;
+    using comparator = std::equal_to<>;
+};
+
+template <typename Key>
+using LruKeyHasher = typename LruKeyTraits<Key>::hasher;
+template <typename Key>
+using LruKeyComparator = typename LruKeyTraits<Key>::comparator;
+
+template <typename Key>
+struct IsTrustedHasher<LruKeyHasher<Key>, Key> : std::true_type {};
 
 /**
  * Extension built on top of 'LRUCache', which provides thread-safety, introspection and most
@@ -189,9 +212,14 @@ class InvalidatingLRUCache {
         // 'advanceTimeInStore'.
         AtomicWord<bool> isValid;
     };
-    using Cache = LRUCache<Key, std::shared_ptr<StoredValue>>;
+
+    using Cache =
+        LRUCache<Key, std::shared_ptr<StoredValue>, LruKeyHasher<Key>, LruKeyComparator<Key>>;
 
 public:
+    template <typename T>
+    static constexpr bool IsComparable = Cache::template IsComparable<T>;
+
     /**
      * The 'cacheSize' parameter specifies the maximum size of the cache before the least recently
      * used entries start getting evicted. It is allowed to be zero, in which case no entries will
@@ -382,8 +410,10 @@ public:
      * it could still get evicted if the cache is under pressure. The returned handle must be
      * destroyed before the owning cache object itself is destroyed.
      */
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
     ValueHandle get(
-        const Key& key,
+        const KeyType& key,
         CacheCausalConsistency causalConsistency = CacheCausalConsistency::kLatestCached) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
@@ -413,7 +443,9 @@ public:
      * Returns true if the passed 'newTimeInStore' is grater than the time of the currently cached
      * value or if no value is cached for 'key'.
      */
-    bool advanceTimeInStore(const Key& key, const Time& newTimeInStore) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    bool advanceTimeInStore(const KeyType& key, const Time& newTimeInStore) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
@@ -441,7 +473,9 @@ public:
      * which can either be from the time of insertion or from the latest call to
      * 'advanceTimeInStore'. Otherwise, returns a nullptr ValueHandle and Time().
      */
-    std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(const Key& key) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    std::pair<ValueHandle, Time> getCachedValueAndTimeInStore(const KeyType& key) {
         stdx::lock_guard<Latch> lg(_mutex);
         std::shared_ptr<StoredValue> storedValue;
         if (auto it = _cache.find(key); it != _cache.end()) {
@@ -465,7 +499,9 @@ public:
      * Any already returned ValueHandles will start returning isValid = false. Subsequent calls to
      * 'get' will *not* return value for 'key' until the next call to 'insertOrAssign'.
      */
-    void invalidate(const Key& key) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    void invalidate(const KeyType& key) {
         LockGuardWithPostUnlockDestructor guard(_mutex);
         _invalidate(&guard, key, _cache.find(key));
     }
@@ -556,8 +592,10 @@ private:
      * the key may not exist, and after this call will no longer be valid and will not be in either
      * of the maps.
      */
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
     void _invalidate(LockGuardWithPostUnlockDestructor* guard,
-                     const Key& key,
+                     const KeyType& key,
                      typename Cache::iterator it,
                      Time* outTime = nullptr,
                      Time* outTimeInStore = nullptr) {
@@ -601,7 +639,8 @@ private:
     //
     // It must be destroyed after the entries in '_cache' are destroyed, because their destructors
     // look-up into that map.
-    using EvictedCheckedOutValuesMap = stdx::unordered_map<Key, std::weak_ptr<StoredValue>>;
+    using EvictedCheckedOutValuesMap = stdx::
+        unordered_map<Key, std::weak_ptr<StoredValue>, LruKeyHasher<Key>, LruKeyComparator<Key>>;
     EvictedCheckedOutValuesMap _evictedCheckedOutValues;
 
     // An always-incrementing counter from which to obtain "identities" for each value stored in the

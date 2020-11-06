@@ -105,9 +105,7 @@ StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx
     }
 
     try {
-        // TODO SERVER-49724: Make ReadThroughCache support StringData keys
-        auto dbEntry =
-            _databaseCache.acquire(opCtx, dbName.toString(), CacheCausalConsistency::kLatestKnown);
+        auto dbEntry = _databaseCache.acquire(opCtx, dbName, CacheCausalConsistency::kLatestKnown);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName << " not found",
                 dbEntry);
@@ -220,8 +218,7 @@ StatusWith<ChunkManager> CatalogCache::getCollectionRoutingInfoAt(OperationConte
 
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabaseWithRefresh(OperationContext* opCtx,
                                                                     StringData dbName) {
-    // TODO SERVER-49724: Make ReadThroughCache support StringData keys
-    _databaseCache.invalidate(dbName.toString());
+    _databaseCache.invalidate(dbName);
     return getDatabase(opCtx, dbName);
 }
 
@@ -252,9 +249,9 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                   "Registering new database version",
                                   "db"_attr = dbName,
                                   "version"_attr = version.toBSONForLogging());
-        _databaseCache.advanceTimeInStore(dbName.toString(), version);
+        _databaseCache.advanceTimeInStore(dbName, version);
     } else {
-        _databaseCache.invalidate(dbName.toString());
+        _databaseCache.invalidate(dbName);
     }
 }
 
@@ -295,7 +292,7 @@ void CatalogCache::checkEpochOrThrow(const NamespaceString& nss,
     uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
             str::stream() << "could not act as router for " << nss.ns()
                           << ", no entry for database " << nss.db(),
-            _databaseCache.peekLatestCached(nss.db().toString()));
+            _databaseCache.peekLatestCached(nss.db()));
 
     auto collectionValueHandle = _collectionCache.peekLatestCached(nss);
     uassert(StaleConfigInfo(nss, targetCollectionVersion, boost::none, shardId),
@@ -352,7 +349,7 @@ void CatalogCache::invalidateEntriesThatReferenceShard(const ShardId& shardId) {
 }
 
 void CatalogCache::purgeDatabase(StringData dbName) {
-    _databaseCache.invalidate(dbName.toString());
+    _databaseCache.invalidate(dbName);
     _collectionCache.invalidateKeyIf(
         [&](const NamespaceString& nss) { return nss.db() == dbName; });
 }

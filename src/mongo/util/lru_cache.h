@@ -50,6 +50,28 @@ namespace mongo {
  * Iteration over the cache will visit elements in order of last use, from most
  * recently used to least recently used.
  */
+
+template <typename Hasher, typename Comparator>
+struct KeyConstraints {
+    template <typename T, typename = decltype(std::declval<Hasher>().operator()(std::declval<T>()))>
+    static constexpr std::true_type IsHashable(T&&);
+    static constexpr std::false_type IsHashable(...);
+
+    template <typename T,
+              typename TT,
+              typename = decltype(std::declval<Comparator>().operator()(std::declval<T>(),
+                                                                        std::declval<TT>()))>
+    static constexpr std::true_type IsComparable(T&&, TT&&);
+    static constexpr std::false_type IsComparable(...);
+};
+
+template <typename Hasher, typename Comparator, typename T, typename TT>
+inline constexpr bool IsComparableWith =
+    decltype(KeyConstraints<Hasher, Comparator>::IsHashable(std::declval<TT>()))::value&& decltype(
+        KeyConstraints<Hasher, Comparator>::IsComparable(std::declval<T>(),
+                                                         std::declval<TT>()))::value;
+
+
 template <typename K,
           typename V,
           typename Hash = typename stdx::unordered_map<K, V>::hasher,
@@ -62,6 +84,9 @@ class LRUCache {
     LRUCache& operator=(LRUCache&&) = delete;
 
 public:
+    template <typename T>
+    static constexpr bool IsComparable = IsComparableWith<Hash, KeyEqual, K, T>;
+
     explicit LRUCache(std::size_t maxSize) : _maxSize(maxSize) {}
 
     using ListEntry = std::pair<K, V>;
@@ -115,7 +140,9 @@ public:
     /**
      * Finds an element in the cache by key.
      */
-    iterator find(const K& key) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    iterator find(const KeyType& key) {
         return promote(key);
     }
 
@@ -128,7 +155,9 @@ public:
      * the find(...) method above will prevent the LRUCache from functioning
      * properly.
      */
-    const_iterator cfind(const K& key) const {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    const_iterator cfind(const KeyType& key) const {
         auto it = _map.find(key);
         // TODO(SERVER-28890): Remove the function-style cast when MSVC's
         // `std::list< ... >::iterator` implementation doesn't conflict with their `/Zc:ternary`
@@ -140,7 +169,9 @@ public:
      * Promotes the element matching the given key, if one exists in the cache,
      * to the least recently used element.
      */
-    iterator promote(const K& key) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    iterator promote(const KeyType& key) {
         auto it = _map.find(key);
         return (it == _map.end()) ? end() : promote(it->second);
     }
@@ -175,7 +206,9 @@ public:
      * Removes the element in the cache stored for this key, if one
      * exists. Returns the count of elements erased.
      */
-    typename Map::size_type erase(const K& key) {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    typename Map::size_type erase(const KeyType& key) {
         auto it = _map.find(key);
         if (it == _map.end()) {
             return 0;
@@ -209,7 +242,9 @@ public:
      * If the given key has a matching element stored in the cache, returns true.
      * Otherwise, returns false.
      */
-    bool hasKey(const K& key) const {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    bool hasKey(const KeyType& key) const {
         return _map.find(key) != _map.end();
     }
 
@@ -266,7 +301,9 @@ public:
         return _list.cend();
     }
 
-    typename Map::size_type count(const K& key) const {
+    TEMPLATE(typename KeyType)
+    REQUIRES(IsComparable<KeyType>)
+    typename Map::size_type count(const KeyType& key) const {
         return _map.count(key);
     }
 
