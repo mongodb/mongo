@@ -1843,6 +1843,54 @@ def init_no_global_libdeps_tag_expand(source, target, env, for_signature):
 
 env['LIBDEPS_TAG_EXPANSIONS'].append(init_no_global_libdeps_tag_expand)
 
+link_guard_rules = {
+    "test" : ["dist"]
+}
+
+class LibdepsLinkGuard(SCons.Errors.UserError):
+        pass
+
+def checkComponentType(target_comps, comp, target, lib):
+    """
+    For a libdep and each AIB_COMPONENT its labeled as, check if its violates
+    any of the link gaurd rules.
+    """
+    for target_comp in target_comps:
+        for link_guard_rule in link_guard_rules:
+            if (target_comp in link_guard_rules[link_guard_rule]
+                and link_guard_rule in comp):
+                raise LibdepsLinkGuard(textwrap.dedent(f"""\n
+                    LibdepsLinkGuard:
+                    \tTarget '{target[0]}' links LIBDEP '{lib}'
+                    \tbut is listed as AIB_COMPONENT '{target_comp}' which is not allowed link libraries
+                    \twith AIB_COMPONENTS that include the word '{link_guard_rule}'\n"""))
+
+def get_comps(env):
+    """util function for extracting all AIB_COMPONENTS as a list"""
+    comps = env.get("AIB_COMPONENTS_EXTRA", [])
+    comp = env.get("AIB_COMPONENT", None)
+    if comp:
+        comps += [comp]
+    return comps
+
+def link_guard_libdeps_tag_expand(source, target, env, for_signature):
+    """
+    Callback function called on all binaries to check if a certain binary
+    from a given component is linked to another binary of a given component,
+    the goal being to define rules that prevents test components from being
+    linked into production or releaseable components.
+    """
+    for lib in libdeps.get_libdeps(source, target, env, for_signature):
+        if not lib.env:
+            continue
+
+        for comp in get_comps(lib.env):
+            checkComponentType(get_comps(env), comp, target, lib)
+
+    return []
+
+env['LIBDEPS_TAG_EXPANSIONS'].append(link_guard_libdeps_tag_expand)
+
 # ---- other build setup -----
 if debugBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_DEBUG_BUILD")

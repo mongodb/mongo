@@ -57,7 +57,7 @@ def build_cpp_unit_test(env, target, source, **kwargs):
             unit_test_components
         )
     else:
-        kwargs["AIB_COMPONENTS_EXTRA"] = unit_test_components
+        kwargs["AIB_COMPONENTS_EXTRA"] = list(unit_test_components)
 
     result = env.Program(target, source, **kwargs)
     env.RegisterTest("$UNITTEST_LIST", result[0])

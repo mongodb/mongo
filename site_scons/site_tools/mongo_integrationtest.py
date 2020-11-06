@@ -52,7 +52,7 @@ def build_cpp_integration_test(env, target, source, **kwargs):
             integration_test_components
         )
     else:
-        kwargs["AIB_COMPONENTS_EXTRA"] = integration_test_components
+        kwargs["AIB_COMPONENTS_EXTRA"] = list(integration_test_components)
 
     result = env.Program(target, source, **kwargs)
     env.RegisterTest("$INTEGRATION_TEST_LIST", result[0])

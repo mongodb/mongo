@@ -23,6 +23,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/third_party/shim_pcrecpp',
     ],
+    AIB_COMPONENT='unittests'
 )
 
 env.Library(
@@ -39,6 +40,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/wire_version',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
+    AIB_COMPONENT='unittests'
 )
 
 env.Library(
@@ -62,6 +64,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
     ],
+    AIB_COMPONENT='integration-tests'
 )
 
 bmEnv = env.Clone()
@@ -76,6 +79,7 @@ bmEnv.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/third_party/shim_benchmark',
     ],
+    AIB_COMPONENT='benchmarks'
 )
 
 env.Library(
@@ -86,6 +90,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
+    AIB_COMPONENT='benchmarks'
 )
 
 env.CppUnitTest(

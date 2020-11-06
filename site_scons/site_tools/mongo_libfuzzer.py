@@ -58,7 +58,7 @@ def build_cpp_libfuzzer_test(env, target, source, **kwargs):
             libfuzzer_test_components
         )
 
-    kwargs["AIB_COMPONENTS_EXTRA"] = libfuzzer_test_components
+    kwargs["AIB_COMPONENTS_EXTRA"] =  list(libfuzzer_test_components)
 
     result = myenv.Program(target, source, **kwargs)
     myenv.RegisterTest("$LIBFUZZER_TEST_LIST", result[0])

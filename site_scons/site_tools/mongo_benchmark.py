@@ -58,7 +58,7 @@ def build_benchmark(env, target, source, **kwargs):
             benchmark_test_components
         )
 
-    kwargs["AIB_COMPONENTS_EXTRA"] = benchmark_test_components
+    kwargs["AIB_COMPONENTS_EXTRA"] = list(benchmark_test_components)
 
     result = bmEnv.Program(target, source, **kwargs)
     bmEnv.RegisterTest("$BENCHMARK_LIST", result[0])
