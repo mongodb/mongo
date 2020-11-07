@@ -2004,6 +2004,11 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
     });
 
     future.default_timed_get();
+
+    // It is expected that the transaction will leave the request of Shard2 without processing, so,
+    // the baton is manually run because there is no other blocking call on the operation context,
+    // making the cleanup as scheduled by the destructor of MultiStatementTransactionRequestsSender.
+    operationContext()->getBaton()->run(getServiceContext()->getPreciseClockSource());
 }
 
 /**
