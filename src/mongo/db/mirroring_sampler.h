@@ -34,7 +34,7 @@
 #include <random>
 #include <vector>
 
-#include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/hello_response.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {

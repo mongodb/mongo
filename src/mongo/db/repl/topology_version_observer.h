@@ -34,7 +34,7 @@
 #include <memory>
 #include <string>
 
-#include "mongo/db/repl/is_master_response.h"
+#include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"

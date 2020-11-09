@@ -832,7 +832,7 @@ env.Library('speculative_majority_read_info',
 env.Library(
     target='replica_set_messages',
     source=[
-        'is_master_response.cpp',
+        'hello_response.cpp',
         'member_config.cpp',
         'repl_set_config.cpp',
         'repl_set_config_validators.cpp',
