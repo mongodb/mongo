@@ -133,7 +133,21 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
 
     def dump_kv_to_line(self, b):
         # The output from dump is a 'u' format.
-        return b.strip(b'\x00').decode() + '\n'
+        # Printable chars appear 'as is', unprintable chars
+        # appear as \hh where hh are hex digits.
+        # We can't decode the entire byte array, some Unicode decoders
+        # will complain as the set of bytes don't represent UTF-8 encoded
+        # characters.
+
+        # Create byte representation of printable ascii chars
+        printable_chars = bytes(string.printable, 'ascii')
+        result = ''
+        for byte in b.strip(b'\x00'):
+            if byte in printable_chars:
+                result += bytearray([byte]).decode()
+            else:
+                result += "\\{:02x}".format(byte)
+        return result + '\n'
 
     def write_entries(self, cursor, expectout, hexoutput, commit_timestamp, write_expected):
         if commit_timestamp is not None:
@@ -217,9 +231,6 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
         self.dump(False, True, None, None)
 
     def test_dump_api(self):
-        import platform
-        if platform.system() == 'Darwin':
-            self.skipTest('dump API test for OSX not yet working on Python3')
         self.dump(True, False, None, None)
 
     def test_dump_api_hex(self):

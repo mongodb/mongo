@@ -4932,9 +4932,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	1105
 /*!
  * cache: history store table truncation to remove range of updates due
- * to mixed timestamps
+ * to non timestamped update on data page
  */
-#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_MIX_TS	1106
+#define	WT_STAT_CONN_CACHE_HS_KEY_TRUNCATE_NON_TS	1106
 /*! cache: history store table writes requiring squashed modifies */
 #define	WT_STAT_CONN_CACHE_HS_WRITE_SQUASH		1107
 /*! cache: in-memory page passed criteria to be split */
@@ -6008,9 +6008,9 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_ONPAGE_REMOVAL	2074
 /*!
  * cache: history store table truncation to remove range of updates due
- * to mixed timestamps
+ * to non timestamped update on data page
  */
-#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_MIX_TS	2075
+#define	WT_STAT_DSRC_CACHE_HS_KEY_TRUNCATE_NON_TS	2075
 /*! cache: history store table writes requiring squashed modifies */
 #define	WT_STAT_DSRC_CACHE_HS_WRITE_SQUASH		2076
 /*! cache: in-memory page passed criteria to be split */

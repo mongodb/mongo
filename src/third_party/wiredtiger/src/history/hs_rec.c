@@ -535,14 +535,14 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
           !F_ISSET(first_non_ts_upd, WT_UPDATE_CLEARED_HS)) {
             /* We can only delete history store entries that have timestamps. */
             WT_ERR(__wt_hs_delete_key_from_ts(session, btree->id, key, 1, true));
-            WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
-            WT_STAT_DATA_INCR(session, cache_hs_key_truncate_mix_ts);
+            WT_STAT_CONN_INCR(session, cache_hs_key_truncate_non_ts);
+            WT_STAT_DATA_INCR(session, cache_hs_key_truncate_non_ts);
             F_SET(first_non_ts_upd, WT_UPDATE_CLEARED_HS);
         } else if (first_non_ts_upd != NULL && !F_ISSET(first_non_ts_upd, WT_UPDATE_CLEARED_HS) &&
           (list->ins == NULL || ts_updates_in_hs)) {
             WT_ERR(__wt_hs_delete_key_from_ts(session, btree->id, key, 1, true));
-            WT_STAT_CONN_INCR(session, cache_hs_key_truncate_mix_ts);
-            WT_STAT_DATA_INCR(session, cache_hs_key_truncate_mix_ts);
+            WT_STAT_CONN_INCR(session, cache_hs_key_truncate_non_ts);
+            WT_STAT_DATA_INCR(session, cache_hs_key_truncate_non_ts);
             F_SET(first_non_ts_upd, WT_UPDATE_CLEARED_HS);
         }
 

@@ -315,7 +315,8 @@ __wt_json_unpack_char(u_char ch, u_char *buf, size_t bufsz, bool force_unicode)
     u_char abbrev;
 
     if (!force_unicode) {
-        if (__wt_isprint(ch) && ch != '\\' && ch != '"') {
+        /* We treat all non-ASCII characters as non-printable. */
+        if (__wt_isascii(ch) && __wt_isprint(ch) && ch != '\\' && ch != '"') {
             if (bufsz >= 1)
                 *buf = ch;
             return (1);

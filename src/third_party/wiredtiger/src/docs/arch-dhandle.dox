@@ -1,0 +1,17 @@
+/*! @arch_page arch-dhandle Data Handles and Btrees
+
+An internal structure called a Data Handle (dhandle) is used to represent and
+access Btrees and other data sources in WiredTiger. A dhandle gets created
+when a table is accessed for the first time. It is kept in a global list
+and is shared across the sessions.  When a dhandle is not needed anymore
+and has been idle for a while, it is closed and destroyed, releasing all the
+resources associated with it.
+
+A Btree is one kind of dhandle. It embodies both the on-disk and in-memory
+representations of the Btree.
+
+@subpage arch-dhandle-lifecycle
+
+This section describes how dhandles are created, and how and when they are destroyed.
+
+*/

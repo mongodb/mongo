@@ -5,6 +5,7 @@ use the API interface to direct WiredTiger's operations (see @ref basic_api).
 Here is an overview of the software components in WiredTiger and how they are organized.
 An arrow indicates the "from" component uses "to" component.
 
+<div class="arch_diagram">
 @plantuml_start{wt_diagram.png}
 @startuml{wt_diagram.png}
 
@@ -41,11 +42,11 @@ rectangle "**WiredTiger Engine**                                                
     rectangle "                                        C API                                        " as c_api
     file "____" as SPACE_api2
   }
-  rectangle "[[#component-schema Schema]]" as schema
+  rectangle "[[arch-schema.html Schema]]" as schema
   rectangle "Cursor" as cursor
-  rectangle "Transactions" as txn
+  rectangle "[[arch-transaction.html Transactions]]" as txn
   rectangle "Metadata" as meta
-  rectangle "[[#component-dhandle dhandle/\n Btree]]" as btree
+  rectangle "[[arch-dhandle.html  dhandle/\n Btree]]" as btree
   rectangle " Row\n storage" as row
   rectangle " Column\n storage" as column
   rectangle "History\n Store" as history
@@ -116,27 +117,25 @@ wt_file -[hidden]right-> log_file
 
 @enduml
 @plantuml_end
+</div>
 
 We go into some detail for some of the internal components.
+
+@subpage arch-dhandle
+
+An internal structure called a Data Handle (dhandle) is used to represent and
+access Btrees and other data sources in WiredTiger.
+
+@subpage arch-schema
+
+A schema defines the format of the application data in WiredTiger.
+
+@subpage arch-transaction
+
+Transactions provide a powerful abstraction for multiple threads to operate on data concurrently.
 
 @subpage arch-glossary
 
 WiredTiger assigns specific meanings to certain words. Here we decode them.
-
-\anchor component-schema
-@subpage arch-schema
-
-Most applications begin to make use of WiredTiger by creating a table (or other
-data object) to store their data in. Create is one of several schema operations
-available in WiredTiger.
-
-\anchor component-dhandle
-@subpage arch-dhandle-lifecycle
-
-An internal structure called Data Handle (dhandle) is used to represent and
-access a table in WiredTiger. A dhandle gets created when a table is accessed
-for the first time. It is kept in a global list and is shared across the
-sessions.  When a dhandle is not needed anymore and has been idle for a while,
-it is closed and destroyed, releasing all the resources associated with it.
 
 */

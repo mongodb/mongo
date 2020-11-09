@@ -1658,6 +1658,17 @@ tasks:
             set -o verbose
             test/evergreen/compatibility_test_for_releases.sh -w
 
+  - name: import-compatibility-test
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/import_compatibility_test.sh
+
   - name: generate-datafile-little-endian
     depends_on:
       - name: compile
@@ -2541,6 +2552,7 @@ buildvariants:
   - ubuntu1804-test
   tasks:
     - name: compatibility-test-for-newer-releases
+    - name: import-compatibility-test
 
 - name: windows-64
   display_name: "! Windows 64-bit"

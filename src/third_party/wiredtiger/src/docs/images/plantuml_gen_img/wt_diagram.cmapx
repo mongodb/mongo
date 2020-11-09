@@ -1,4 +1,5 @@
 <map id="wt_diagram_map" name="wt_diagram_map">
-<area shape="rect" id="id1" href="#component-schema" title="#component-schema" alt="" coords="98,224,151,241"/>
-<area shape="rect" id="id2" href="#component-dhandle" title="#component-dhandle" alt="" coords="181,320,244,353"/>
+<area shape="rect" id="id1" href="arch-schema.html" title="arch-schema.html" alt="" coords="98,224,151,241"/>
+<area shape="rect" id="id2" href="arch-transaction.html" title="arch-transaction.html" alt="" coords="341,329,429,345"/>
+<area shape="rect" id="id3" href="arch-dhandle.html" title="arch-dhandle.html" alt="" coords="181,320,244,353"/>
 </map>

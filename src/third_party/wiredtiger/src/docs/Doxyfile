@@ -206,6 +206,8 @@ TAB_SIZE               = 8
 # You can put \n's in the value part of an alias to insert newlines.
 
 ALIASES                = \
+                         arch_page_table{2}="<div class="arch_head"><table><tr><th rowspan=2 style=\"width:10%;\">@htmlonly <div><a href=\"arch-index.html\"><img class=\"arch_thumbnail\" src=\"wt_diagram.png\" style=\"background-image: url(wt_diagram.png)\"></a></div>@endhtmlonly</th><th style=\"width:44%\">Data Structures</th><th style=\"width:45%\">Source Location</th></tr><tr><td><code>\1</code></td><td><code>\2</code></td></tr></table></div>" \
+                         arch_page_top{2}="@page \1 \2 (Architecture Guide)"  \
                          config{3}="  @row{<tt>\1</tt>,\2,\3}" \
                          configempty{2}="@param config configuration string, see @ref config_strings.  No values currently permitted." \
                          configend="  </table>" \

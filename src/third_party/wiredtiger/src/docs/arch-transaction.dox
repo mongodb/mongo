@@ -1,0 +1,8 @@
+/*! @arch_page arch-transaction Transactions
+
+Transactions provide a powerful abstraction for multiple threads to operate on data concurrently.
+A caller of WiredTiger uses @ref transactions within the API to start and stop transactions within
+a session (thread of control).
+
+Internally, the current transaction state is represented by the WT_TXN structure.
+*/
