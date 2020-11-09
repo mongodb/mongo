@@ -141,27 +141,25 @@ function validateTestCase(testCase) {
     assert(testCase.explicitlyCreateCollection
                ? typeof (testCase.explicitlyCreateCollection) === "boolean"
                : true);
-    assert(testCase.isSupportedInTransaction
-               ? typeof (testCase.isSupportedInTransaction) === "boolean"
-               : true);
-    assert(testCase.isRetryableWriteCommand
-               ? typeof (testCase.isRetryableWriteCommand) === "boolean"
-               : true);
+    assert(testCase.testInTransaction ? typeof (testCase.testInTransaction) === "boolean" : true);
+    assert(testCase.testAsRetryableWrite ? typeof (testCase.testAsRetryableWrite) === "boolean"
+                                         : true);
 }
 
-function makeTestOptions(primary, testCase, dbName, collName, useTransaction, useRetryableWrite) {
-    assert(!useTransaction || !useRetryableWrite);
+function makeTestOptions(
+    primary, testCase, dbName, collName, testInTransaction, testAsRetryableWrite) {
+    assert(!testInTransaction || !testAsRetryableWrite);
 
-    const useSession = useTransaction || useRetryableWrite;
+    const useSession = testInTransaction || testAsRetryableWrite || testCase.isTransactionCommand;
     const primaryConn = useSession ? primary.startSession({causalConsistency: false}) : primary;
     const primaryDB = useSession ? primaryConn.getDatabase(dbName) : primaryConn.getDB(dbName);
 
     let command = testCase.command(dbName, collName);
 
-    if (useTransaction || useRetryableWrite) {
+    if (testInTransaction || testAsRetryableWrite) {
         command.txnNumber = kTxnNumber;
     }
-    if (useTransaction) {
+    if (testInTransaction) {
         command.startTransaction = true;
         command.autocommit = false;
     }
@@ -175,14 +173,14 @@ function makeTestOptions(primary, testCase, dbName, collName, useTransaction, us
         dbName,
         collName,
         useSession,
-        useTransaction
+        testInTransaction
     };
 }
 
 function runTest(
-    primary, testCase, testFunc, dbName, collName, {useTransaction, useRetryableWrite} = {}) {
-    const testOpts =
-        makeTestOptions(primary, testCase, dbName, collName, useTransaction, useRetryableWrite);
+    primary, testCase, testFunc, dbName, collName, {testInTransaction, testAsRetryableWrite} = {}) {
+    const testOpts = makeTestOptions(
+        primary, testCase, dbName, collName, testInTransaction, testAsRetryableWrite);
     jsTest.log("Testing testOpts: " + tojson(testOpts) + " with testFunc " + testFunc.name);
 
     if (testCase.explicitlyCreateCollection) {
@@ -190,7 +188,7 @@ function runTest(
     }
 
     if (testCase.setUp) {
-        testCase.setUp(testOpts.primaryDB, collName);
+        testCase.setUp(testOpts.primaryDB, collName, testInTransaction);
     }
 
     testFunc(testCase, testOpts);
@@ -199,13 +197,30 @@ function runTest(
 function runCommand(testOpts, expectedError) {
     let res;
 
-    if (testOpts.useTransaction) {
-        // Test that the command doesn't throw an error but the transaction cannot commit.
-        testOpts.primaryConn.startTransaction();
+    if (testOpts.testInTransaction) {
+        // Since oplog entries for write commands inside a transaction are not generated until the
+        // commitTransaction command is run, here we assert on the response of the commitTransaction
+        // command instead.
         assert.commandWorked(testOpts.runAgainstAdminDb
                                  ? testOpts.primaryDB.adminCommand(testOpts.command)
                                  : testOpts.primaryDB.runCommand(testOpts.command));
-        res = testOpts.primaryConn.commitTransaction_forTesting();
+
+        let commitTxnCommand = {
+            commitTransaction: 1,
+            txnNumber: testOpts.command.txnNumber,
+            autocommit: false,
+            writeConcern: {w: "majority"}
+        };
+
+        // 'testWriteBlocksIfMigrationIsInBlocking' runs each write command with maxTimeMS attached
+        // and asserts that the command blocks and fails with MaxTimeMSExpired. So in the case of
+        // transactions, we want to assert that commitTransaction blocks and fails MaxTimeMSExpired
+        // instead.
+        if (testOpts.command.maxTimeMS) {
+            commitTxnCommand.maxTimeMS = testOpts.command.maxTimeMS;
+        }
+
+        res = testOpts.primaryDB.adminCommand(commitTxnCommand);
     } else {
         res = testOpts.runAgainstAdminDb ? testOpts.primaryDB.adminCommand(testOpts.command)
                                          : testOpts.primaryDB.runCommand(testOpts.command);
@@ -453,7 +468,8 @@ const testCases = {
     _shardsvrShardCollection: {skip: isNotRunOnUserDatabase},
     _transferMods: {skip: isNotRunOnUserDatabase},
     abortTransaction: {
-        skip: true,  // TODO (SERVER-49844)
+        skip: isNotWriteCommand  // aborting unprepared transaction doesn't create an abort oplog
+                                 // entry.
     },
     aggregate: {
         explicitlyCreateCollection: true,
@@ -472,7 +488,6 @@ const testCases = {
         }
     },
     appendOplogNote: {skip: isNotRunOnUserDatabase},
-
     // TODO (SERVER-51753): Handle applyOps running concurrently with a tenant migration.
     // applyOps: {
     //     explicitlyCreateCollection: true,
@@ -542,7 +557,31 @@ const testCases = {
     },
     collStats: {skip: isNotWriteCommand},
     commitTransaction: {
-        skip: true,  // TODO (SERVER-49844)
+        isTransactionCommand: true,
+        runAgainstAdminDb: true,
+        setUp: function(primaryDB, collName) {
+            assert.commandWorked(primaryDB.runCommand({
+                insert: collName,
+                documents: [kTestDoc],
+                txnNumber: NumberLong(kTxnNumber),
+                startTransaction: true,
+                autocommit: false
+            }));
+        },
+        command: function(dbName, collName) {
+            return {
+                commitTransaction: 1,
+                txnNumber: NumberLong(kTxnNumber),
+                autocommit: false,
+                writeConcern: {w: "majority"}
+            };
+        },
+        assertCommandSucceeded: function(db, dbName, collName) {
+            assert.eq(countDocs(db, collName), 1);
+        },
+        assertCommandFailed: function(db, dbName, collName) {
+            assert.eq(countDocs(db, collName), 0);
+        }
     },
     compact: {
         skip: isNotWriteCommand,  // TODO (SERVER-49834)
@@ -573,6 +612,7 @@ const testCases = {
     count: {skip: isNotWriteCommand},
     cpuload: {skip: isNotRunOnUserDatabase},
     create: {
+        testInTransaction: true,
         command: function(dbName, collName) {
             return {create: collName};
         },
@@ -584,7 +624,16 @@ const testCases = {
         }
     },
     createIndexes: {
+        testInTransaction: true,
         explicitlyCreateCollection: true,
+        setUp: function(primaryDB, collName, testInTransaction) {
+            if (testInTransaction) {
+                // Drop the collection that was explicitly created above since inside transactions
+                // the index to create must either be on a non-existing collection, or on a new
+                // empty collection created earlier in the same transaction.
+                assert.commandWorked(primaryDB.runCommand({drop: collName}));
+            }
+        },
         command: function(dbName, collName) {
             return {createIndexes: collName, indexes: [kTestIndex]};
         },
@@ -592,7 +641,7 @@ const testCases = {
             assert(indexExists(db, collName, kTestIndex));
         },
         assertCommandFailed: function(db, dbName, collName) {
-            assert(!indexExists(db, collName, kTestIndex));
+            assert(!collectionExists(db, collName) || !indexExists(db, collName, kTestIndex));
         }
     },
     createRole: {skip: isAuthCommand},
@@ -603,8 +652,8 @@ const testCases = {
     dbHash: {skip: isNotWriteCommand},
     dbStats: {skip: isNotWriteCommand},
     delete: {
-        isSupportedInTransaction: true,
-        isRetryableWriteCommand: true,
+        testInTransaction: true,
+        testAsRetryableWrite: true,
         setUp: insertTestDoc,
         command: function(dbName, collName) {
             return {delete: collName, deletes: [{q: kTestDoc, limit: 1}]};
@@ -683,8 +732,8 @@ const testCases = {
     filemd5: {skip: isNotWriteCommand},
     find: {skip: isNotWriteCommand},
     findAndModify: {
-        isSupportedInTransaction: true,
-        isRetryableWriteCommand: true,
+        testInTransaction: true,
+        testAsRetryableWrite: true,
         setUp: insertTestDoc,
         command: function(dbName, collName) {
             return {findAndModify: collName, query: kTestDoc, remove: true};
@@ -719,8 +768,8 @@ const testCases = {
     hostInfo: {skip: isNotRunOnUserDatabase},
     httpClientRequest: {skip: isNotRunOnUserDatabase},
     insert: {
-        isSupportedInTransaction: true,
-        isRetryableWriteCommand: true,
+        testInTransaction: true,
+        testAsRetryableWrite: true,
         explicitlyCreateCollection: true,
         command: function(dbName, collName) {
             return {insert: collName, documents: [kTestDoc]};
@@ -846,8 +895,8 @@ const testCases = {
     top: {skip: isNotRunOnUserDatabase},
     unsetSharding: {skip: isNotRunOnUserDatabase},
     update: {
-        isSupportedInTransaction: true,
-        isRetryableWriteCommand: true,
+        testInTransaction: true,
+        testAsRetryableWrite: true,
         setUp: insertTestDoc,
         command: function(dbName, collName) {
             return {
@@ -897,27 +946,25 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
             continue;
         }
 
-        runTest(primary,
-                testCase,
-                testFunc,
-                baseDbName + "Basic" +
-                    "_" + kTenantDefinedDbName,
-                kCollName);
+        runTest(
+            primary, testCase, testFunc, baseDbName + "Basic_" + kTenantDefinedDbName, kCollName);
 
-        // TODO (SERVER-49844): Test transactional writes during migration.
-        if (testCase.isSupportedInTransaction && testName == "noMigration") {
-            runTest(
-                primary, testCase, testFunc, baseDbName + "Txn", kCollName, {useTransaction: true});
-        }
-
-        if (testCase.isRetryableWriteCommand) {
+        if (testCase.testInTransaction) {
             runTest(primary,
                     testCase,
                     testFunc,
-                    baseDbName + "Retryable" +
-                        "_" + kTenantDefinedDbName,
+                    baseDbName + "Txn_" + kTenantDefinedDbName,
                     kCollName,
-                    {useRetryableWrite: true});
+                    {testInTransaction: true});
+        }
+
+        if (testCase.testAsRetryableWrite) {
+            runTest(primary,
+                    testCase,
+                    testFunc,
+                    baseDbName + "Retryable_" + kTenantDefinedDbName,
+                    kCollName,
+                    {testAsRetryableWrite: true});
         }
     }
 }

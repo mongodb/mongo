@@ -781,11 +781,24 @@ private:
 };
 
 Future<void> InvokeCommand::run(const bool checkoutSession) {
+    auto anchor = shared_from_this();
     auto [past, present] = makePromiseFuture<void>();
-    auto future = std::move(present).then([this, checkoutSession, anchor = shared_from_this()] {
-        if (checkoutSession)
+    auto future = std::move(present).then([this, checkoutSession, anchor] {
+        if (checkoutSession) {
             return std::make_shared<SessionCheckoutPath>(std::move(anchor))->run();
-        return _runInvocation();
+        }
+
+        return makeReadyFutureWith([] {})
+            .then([this, anchor] {
+                auto execContext = _ecd->getExecutionContext();
+                tenant_migration_donor::checkIfCanReadOrBlock(
+                    execContext->getOpCtx(), execContext->getRequest().getDatabase());
+                return _runInvocation();
+            })
+            .onError<ErrorCodes::TenantMigrationConflict>([this, anchor](Status status) {
+                tenant_migration_donor::handleTenantMigrationConflict(
+                    _ecd->getExecutionContext()->getOpCtx(), std::move(status));
+            });
     });
     past.emplaceValue();
     return future;
@@ -796,8 +809,22 @@ Future<void> InvokeCommand::SessionCheckoutPath::run() {
     return makeReadyFutureWith([] {})
         .then([this, anchor] { return _checkOutSession(); })
         .then([this, anchor] {
-            return _parent->_runInvocation().tapError(
-                [this, anchor](Status status) { return _tapError(std::move(status)); });
+            return makeReadyFutureWith([] {})
+                .then([this, anchor] {
+                    auto execContext = _parent->_ecd->getExecutionContext();
+                    tenant_migration_donor::checkIfCanReadOrBlock(
+                        execContext->getOpCtx(), execContext->getRequest().getDatabase());
+                    return _parent->_runInvocation();
+                })
+                .onError<ErrorCodes::TenantMigrationConflict>([this, anchor](Status status) {
+                    // Abort transaction and clean up transaction resources before blocking the
+                    // command to allow the stable timestamp on the node to advance.
+                    _guard.reset();
+
+                    tenant_migration_donor::handleTenantMigrationConflict(
+                        _parent->_ecd->getExecutionContext()->getOpCtx(), std::move(status));
+                })
+                .tapError([this, anchor](Status status) { return _tapError(std::move(status)); });
         })
         .then([this, anchor] { return _commitInvocation(); });
 }
@@ -931,12 +958,8 @@ Future<void> InvokeCommand::SessionCheckoutPath::_checkOutSession() {
 }
 
 Future<void> InvokeCommand::_runInvocation() noexcept {
-    auto execContext = _ecd->getExecutionContext();
-    return tenant_migration_donor::migrationConflictHandler(
-        execContext, [execContext, invocation = _ecd->getInvocation()] {
-            return CommandHelpers::runCommandInvocationAsync(std::move(execContext),
-                                                             std::move(invocation));
-        });
+    return CommandHelpers::runCommandInvocationAsync(_ecd->getExecutionContext(),
+                                                     _ecd->getInvocation());
 }
 
 void InvokeCommand::SessionCheckoutPath::_tapError(Status status) {

@@ -54,6 +54,7 @@
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/repl/tenant_migration_donor_util.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
@@ -1223,6 +1224,11 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots = repl::getNextOpTimes(opCtx, statements->size() + numberOfPreImagesToWrite);
+
+    // Throw TenantMigrationConflict error if the database for the transaction statements is being
+    // migrated. We only need check the namespace of the first statement since a transaction's
+    // statements must all be for the same tenant.
+    tenant_migration_donor::onWriteToDatabase(opCtx, statements->begin()->getNss().db());
 
     if (MONGO_unlikely(hangAndFailUnpreparedCommitAfterReservingOplogSlot.shouldFail())) {
         hangAndFailUnpreparedCommitAfterReservingOplogSlot.pauseWhileSet(opCtx);

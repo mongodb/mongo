@@ -84,13 +84,10 @@ void onWriteToDatabase(OperationContext* opCtx, StringData dbName);
 void recoverTenantMigrationAccessBlockers(OperationContext* opCtx);
 
 /**
- * Returns a future that asynchronously schedules and runs the argument function 'callable'. If it
- * throws a TenantMigrationConflict error (as indicated in 'replyBuilder'), clears 'replyBuilder'
- * and blocks until the migration commits or aborts, then returns TenantMigrationCommitted or
+ * Blocks until the migration commits or aborts, then returns TenantMigrationCommitted or
  * TenantMigrationAborted.
  */
-Future<void> migrationConflictHandler(std::shared_ptr<RequestExecutionContext> rec,
-                                      unique_function<Future<void>()> callable);
+void handleTenantMigrationConflict(OperationContext* opCtx, Status status);
 
 }  // namespace tenant_migration_donor
 
