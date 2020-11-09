@@ -1288,8 +1288,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         }
 
         _clientEngine.CAstore = std::move(swChain.getValue());
-        _clientEngine.hasCRL = !params.sslCRLFile.empty();
     }
+    _clientEngine.hasCRL = !params.sslCRLFile.empty();
 
     const auto serverCAFile =
         params.sslClusterCAFile.empty() ? params.sslCAFile : params.sslClusterCAFile;
@@ -1300,8 +1300,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         }
 
         _serverEngine.CAstore = std::move(swChain.getValue());
-        _serverEngine.hasCRL = !params.sslCRLFile.empty();
     }
+    _serverEngine.hasCRL = !params.sslCRLFile.empty();
 
     if (hasCertificateSelector(params.sslCertificateSelector)) {
         auto swCert = loadAndValidateCertificateSelector(params.sslCertificateSelector);
@@ -1740,6 +1740,10 @@ Status validatePeerCertificate(const std::string& remoteHost,
     memset(&chain_policy_para, 0, sizeof(chain_policy_para));
     chain_policy_para.cbSize = sizeof(chain_policy_para);
     chain_policy_para.pvExtraPolicyPara = &sslCertChainPolicy;
+
+    if (!hasCRL) {
+        chain_policy_para.dwFlags |= CERT_CHAIN_POLICY_IGNORE_ALL_REV_UNKNOWN_FLAGS;
+    }
 
     CERT_CHAIN_POLICY_STATUS certChainPolicyStatus;
     memset(&certChainPolicyStatus, 0, sizeof(certChainPolicyStatus));
