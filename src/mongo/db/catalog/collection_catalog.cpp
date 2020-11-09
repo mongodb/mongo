@@ -546,10 +546,12 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
                         });
                 }
             });
-        opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
-            uncommittedWritableCollections.remove(cloned.get());
-        });
     }
+    // mode is kManagedInWriteUnitOfWork or kUnmanagedCommitManagedRollback where rollback is
+    // managed
+    opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
+        uncommittedWritableCollections.remove(cloned.get());
+    });
 
     return cloned.get();
 }
@@ -636,10 +638,12 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
                         });
                 }
             });
-        opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
-            uncommittedWritableCollections.remove(cloned.get());
-        });
     }
+    // mode is kManagedInWriteUnitOfWork or kUnmanagedCommitManagedRollback where rollback is
+    // managed
+    opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
+        uncommittedWritableCollections.remove(cloned.get());
+    });
 
     return cloned.get();
 }
@@ -1000,11 +1004,6 @@ void CollectionCatalog::commitUnmanagedClone(OperationContext* opCtx, Collection
                                          std::move(cloned), boost::none, *commitHandlers);
                                  });
     }
-}
-
-void CollectionCatalog::discardUnmanagedClone(OperationContext* opCtx, Collection* collection) {
-    auto& uncommittedWritableCollections = getUncommittedWritableCollections(opCtx);
-    uncommittedWritableCollections.remove(collection);
 }
 
 CollectionCatalogStasher::CollectionCatalogStasher(OperationContext* opCtx)

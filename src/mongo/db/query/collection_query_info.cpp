@@ -245,24 +245,6 @@ void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& col
     rebuildIndexData(opCtx, coll);
 }
 
-void CollectionQueryInfo::addedIndex(OperationContext* opCtx,
-                                     const CollectionPtr& coll,
-                                     const IndexDescriptor* desc) {
-    invariant(desc);
-
-    rebuildIndexData(opCtx, coll);
-    CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
-        .registerIndex(desc->indexName(), desc->keyPattern());
-}
-
-void CollectionQueryInfo::droppedIndex(OperationContext* opCtx,
-                                       const CollectionPtr& coll,
-                                       StringData indexName) {
-    rebuildIndexData(opCtx, coll);
-    CollectionIndexUsageTrackerDecoration::get(coll->getSharedDecorations())
-        .unregisterIndex(indexName);
-}
-
 void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll) {
     _planCache = std::make_shared<PlanCache>();
 

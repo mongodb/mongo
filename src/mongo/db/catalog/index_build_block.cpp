@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
@@ -69,9 +70,10 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
-    auto indexCatalogEntry = getEntry(opCtx, collection);
-    CollectionQueryInfo::get(collection)
-        .addedIndex(opCtx, collection, indexCatalogEntry->descriptor());
+    auto desc = getEntry(opCtx, collection)->descriptor();
+    CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
+    CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
+        .registerIndex(desc->indexName(), desc->keyPattern());
 }
 
 Status IndexBuildBlock::initForResume(OperationContext* opCtx,

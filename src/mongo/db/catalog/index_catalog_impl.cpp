@@ -61,6 +61,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -456,16 +457,13 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
 
     bool initFromDisk = CreateIndexEntryFlags::kInitFromDisk & flags;
     if (!initFromDisk && UncommittedCollections::getForTxn(opCtx, _collection->ns()) == nullptr) {
-        opCtx->recoveryUnit()->onRollback([this, opCtx, isReadyIndex, descriptor = descriptorPtr] {
-            // Need to preserve indexName as descriptor no longer exists after remove().
-            const std::string indexName = descriptor->indexName();
-            if (isReadyIndex) {
-                _readyIndexes.remove(descriptor);
-            } else {
-                _buildingIndexes.remove(descriptor);
-            }
-            CollectionQueryInfo::get(_collection).droppedIndex(opCtx, _collection, indexName);
-        });
+        const std::string indexName = descriptorPtr->indexName();
+        opCtx->recoveryUnit()->onRollback(
+            [collectionDecorations = _collection->getSharedDecorations(),
+             indexName = std::move(indexName)] {
+                CollectionIndexUsageTrackerDecoration::get(collectionDecorations)
+                    .unregisterIndex(indexName);
+            });
     }
 
     return save;
@@ -1016,11 +1014,12 @@ Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx, const Inde
 namespace {
 class IndexRemoveChange final : public RecoveryUnit::Change {
 public:
-    IndexRemoveChange(OperationContext* opCtx,
-                      Collection* collection,
-                      IndexCatalogEntryContainer* entries,
-                      std::shared_ptr<IndexCatalogEntry> entry)
-        : _opCtx(opCtx), _collection(collection), _entries(entries), _entry(std::move(entry)) {}
+    IndexRemoveChange(IndexCatalogEntryContainer* entries,
+                      std::shared_ptr<IndexCatalogEntry> entry,
+                      SharedCollectionDecorations* collectionDecorations)
+        : _entries(entries),
+          _entry(std::move(entry)),
+          _collectionDecorations(collectionDecorations) {}
 
     void commit(boost::optional<Timestamp> commitTime) final {
         _entry->setDropped();
@@ -1028,19 +1027,17 @@ public:
 
     void rollback() final {
         auto indexDescriptor = _entry->descriptor();
-        _entries->add(std::move(_entry));
 
-        // Refresh the CollectionQueryInfo's knowledge of what indices are present. This must be
-        // done after re-adding our IndexCatalogEntry to the '_entries' list, since 'addedIndex()'
-        // refreshes its knowledge by iterating the list of indices currently in the catalog.
-        CollectionQueryInfo::get(_collection).addedIndex(_opCtx, _collection, indexDescriptor);
+        // Refresh the CollectionIndexUsageTrackerDecoration's knowledge of what indices are
+        // present as it is shared state across Collection copies.
+        CollectionIndexUsageTrackerDecoration::get(_collectionDecorations)
+            .registerIndex(indexDescriptor->indexName(), indexDescriptor->keyPattern());
     }
 
 private:
-    OperationContext* _opCtx;
-    Collection* _collection;
     IndexCatalogEntryContainer* _entries;
     std::shared_ptr<IndexCatalogEntry> _entry;
+    SharedCollectionDecorations* _collectionDecorations;
 };
 }  // namespace
 
@@ -1057,15 +1054,17 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx, IndexCatalogEnt
     if (released) {
         invariant(released.get() == entry);
         opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            opCtx, _collection, &_readyIndexes, std::move(released)));
+            &_readyIndexes, std::move(released), _collection->getSharedDecorations()));
     } else {
         released = _buildingIndexes.release(entry->descriptor());
         invariant(released.get() == entry);
         opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-            opCtx, _collection, &_buildingIndexes, std::move(released)));
+            &_buildingIndexes, std::move(released), _collection->getSharedDecorations()));
     }
 
-    CollectionQueryInfo::get(_collection).droppedIndex(opCtx, _collection, indexName);
+    CollectionQueryInfo::get(_collection).rebuildIndexData(opCtx, _collection);
+    CollectionIndexUsageTrackerDecoration::get(_collection->getSharedDecorations())
+        .unregisterIndex(indexName);
     _deleteIndexFromDisk(opCtx, indexName, entry->getSharedIdent());
 
     return Status::OK();
@@ -1245,12 +1244,13 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     // Delete the IndexCatalogEntry that owns this descriptor.  After deletion, 'oldDesc' is
     // invalid and should not be dereferenced. Also, invalidate the index from the
-    // CollectionQueryInfo.
+    // CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
     auto oldEntry = _readyIndexes.release(oldDesc);
     invariant(oldEntry);
     opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
-        opCtx, _collection, &_readyIndexes, std::move(oldEntry)));
-    CollectionQueryInfo::get(_collection).droppedIndex(opCtx, _collection, indexName);
+        &_readyIndexes, std::move(oldEntry), _collection->getSharedDecorations()));
+    CollectionIndexUsageTrackerDecoration::get(_collection->getSharedDecorations())
+        .unregisterIndex(indexName);
 
     // Ask the CollectionCatalogEntry for the new index spec.
     BSONObj spec =
@@ -1258,11 +1258,16 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     BSONObj keyPattern = spec.getObjectField("key");
 
     // Re-register this index in the index catalog with the new spec. Also, add the new index
-    // to the CollectionQueryInfo.
+    // to the CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
     auto newDesc = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
     auto newEntry = createIndexEntry(opCtx, std::move(newDesc), CreateIndexEntryFlags::kIsReady);
     invariant(newEntry->isReady(opCtx));
-    CollectionQueryInfo::get(_collection).addedIndex(opCtx, _collection, newEntry->descriptor());
+    auto desc = newEntry->descriptor();
+    CollectionIndexUsageTrackerDecoration::get(_collection->getSharedDecorations())
+        .registerIndex(desc->indexName(), desc->keyPattern());
+
+    // Last rebuild index data for CollectionQueryInfo for this Collection.
+    CollectionQueryInfo::get(_collection).rebuildIndexData(opCtx, _collection);
 
     opCtx->recoveryUnit()->onCommit([newEntry](auto commitTime) {
         if (commitTime) {
@@ -1699,21 +1704,8 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
     invariant(releasedEntry.get() == index);
     _readyIndexes.add(std::move(releasedEntry));
 
-    auto interceptor = index->indexBuildInterceptor();
     index->setIndexBuildInterceptor(nullptr);
     index->setIsReady(true);
-
-    // Only roll back index changes that are part of pre-existing collections.
-    if (UncommittedCollections::getForTxn(opCtx, coll->ns()) == nullptr) {
-        opCtx->recoveryUnit()->onRollback([this, index, interceptor]() {
-            auto releasedEntry = _readyIndexes.release(index->descriptor());
-            invariant(releasedEntry.get() == index);
-            _buildingIndexes.add(std::move(releasedEntry));
-
-            index->setIndexBuildInterceptor(interceptor);
-            index->setIsReady(false);
-        });
-    }
 }
 
 StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,

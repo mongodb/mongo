@@ -73,22 +73,12 @@ public:
     void init(OperationContext* opCtx, const CollectionPtr& coll);
 
     /**
-     * Register a newly-created index with the cache.  Must be called whenever an index is
-     * built on the associated collection.
+     * Rebuilds cached index information. Must be called when an index is modified or an index is
+     * dropped/created.
      *
      * Must be called under exclusive collection lock.
      */
-    void addedIndex(OperationContext* opCtx,
-                    const CollectionPtr& coll,
-                    const IndexDescriptor* desc);
-
-    /**
-     * Deregister a newly-dropped index with the cache.  Must be called whenever an index is
-     * dropped on the associated collection.
-     *
-     * Must be called under exclusive collection lock.
-     */
-    void droppedIndex(OperationContext* opCtx, const CollectionPtr& coll, StringData indexName);
+    void rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll);
 
     /**
      * Removes all cached query plans after ensuring that the PlanCache is uniquely owned. The
@@ -111,12 +101,6 @@ public:
 private:
     void computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll);
     void updatePlanCacheIndexEntries(OperationContext* opCtx, const CollectionPtr& coll);
-
-    /**
-     * Rebuilds cached information that is dependent on index composition. Must be called
-     * when index composition changes.
-     */
-    void rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll);
 
     // ---  index keys cache
     bool _keysComputed;
