@@ -62,6 +62,8 @@ public:
               LockMode mode,
               Date_t deadline = Date_t::max());
 
+    AutoGetDb(AutoGetDb&&) = default;
+
     /**
      * Returns the database, or nullptr if it didn't exist.
      */
@@ -76,9 +78,9 @@ public:
 
 private:
     OperationContext* _opCtx;
-    const std::string _dbName;
+    std::string _dbName;
 
-    const Lock::DBLock _dbLock;
+    Lock::DBLock _dbLock;
     Database* _db;
 };
 

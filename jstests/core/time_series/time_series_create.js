@@ -25,26 +25,28 @@ const testOptions = function(allowed,
                              },
                              errorCode = ErrorCodes.InvalidOptions) {
     const testDB = db.getSiblingDB(jsTestName());
-    // Drop database instead of collection to remove 'collName' and buckets collection from previous
-    // test runs.
-    assert.commandWorked(testDB.dropDatabase());
-
     const collName = 'timeseries_' + collCount++;
+    const bucketsCollName = 'system.buckets.' + collName;
+
     const res = testDB.runCommand(
         Object.extend({create: collName, timeseries: timeseriesOptions}, createOptions));
     if (allowed) {
         assert.commandWorked(res);
-        const bucketsCollName = 'system.buckets.' + collName;
         const collections =
             assert.commandWorked(testDB.runCommand({listCollections: 1, nameOnly: true}))
                 .cursor.firstBatch;
         assert.contains({name: collName, type: "view"}, collections);
         assert.contains({name: bucketsCollName, type: "collection"}, collections);
+
         assert.commandFailedWithCode(testDB.runCommand({drop: bucketsCollName}),
                                      ErrorCodes.IllegalOperation);
+        assert.commandWorked(testDB.runCommand({drop: collName, writeConcern: {w: "majority"}}));
     } else {
         assert.commandFailedWithCode(res, errorCode);
     }
+
+    assert(!testDB.getCollectionNames().includes(collName));
+    assert(!testDB.getCollectionNames().includes(bucketsCollName));
 };
 
 const testValidTimeseriesOptions = function(timeseriesOptions) {
