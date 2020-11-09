@@ -243,8 +243,20 @@ public:
                 _deleteHaystackIndexesOnUpgrade(opCtx);
             }
 
-            // Upgrade shards before config finishes its upgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                if (actualVersion ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44 ||
+                    actualVersion ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To47 ||
+                    actualVersion ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To48 ||
+                    actualVersion ==
+                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To49) {
+                    // SERVER-52630: Remove once 5.0 becomes the LastLTS
+                    ShardingCatalogManager::get(opCtx)->removeDroppedCollectionsMetadata(opCtx);
+                }
+
+                // Upgrade shards before config finishes its upgrade.
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));

@@ -444,6 +444,17 @@ public:
      */
     Status setFeatureCompatibilityVersionOnShards(OperationContext* opCtx, const BSONObj& cmdObj);
 
+    /**
+     * Removes all entries from the config server's config.collections where 'dropped' is true.
+     *
+     * Before v5.0, when a collection was dropped, its entry in config.collections remained, tagged
+     * as 'dropped: true'. As those are no longer needed, this method cleans up the leftover
+     * metadata.
+     *
+     * It shall be called on FCV 4.4 to 5.0 upgrade.
+     */
+    void removeDroppedCollectionsMetadata(OperationContext* opCtx);
+
     //
     // For Diagnostics
     //

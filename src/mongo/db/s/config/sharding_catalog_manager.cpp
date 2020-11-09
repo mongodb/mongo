@@ -436,6 +436,15 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     return Status::OK();
 }
 
+void ShardingCatalogManager::removeDroppedCollectionsMetadata(OperationContext* opCtx) {
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    uassertStatusOK(
+        catalogClient->removeConfigDocuments(opCtx,
+                                             CollectionType::ConfigNS,
+                                             BSON("dropped" << true),
+                                             ShardingCatalogClient::kMajorityWriteConcern));
+}
+
 Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {
     Lock::ExclusiveLock lk(opCtx->lockState(), _kZoneOpLock);
     return lk;
