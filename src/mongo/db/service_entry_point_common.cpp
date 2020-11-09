@@ -664,6 +664,7 @@ private:
     LogicalTime _startOperationTime;
     OperationSessionInfoFromClient _sessionOptions;
     boost::optional<ResourceConsumption::ScopedMetricsCollector> _scopedMetrics;
+    boost::optional<ImpersonationSessionGuard> _impersonationSessionGuard;
     std::unique_ptr<PolymorphicScoped> _scoped;
 };
 
@@ -1377,7 +1378,7 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
                       "Skipping command execution for help request");
     }
 
-    ImpersonationSessionGuard guard(opCtx);
+    _impersonationSessionGuard.emplace(opCtx);
     _invocation->checkAuthorization(opCtx, request);
 
     const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbname);
