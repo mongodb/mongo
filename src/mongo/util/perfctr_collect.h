@@ -270,6 +270,12 @@ private:
      */
     void checkForTicksTimeBase();
 
+    /**
+     * Add and get a counter by an English name in a language independent way.
+     */
+    StatusWith<std::tuple<PDH_HCOUNTER, std::unique_ptr<PDH_COUNTER_INFO>>> addAndGetCounter(
+        StringData path);
+
 private:
     // PDH Query
     HQUERY _query{INVALID_HANDLE_VALUE};
