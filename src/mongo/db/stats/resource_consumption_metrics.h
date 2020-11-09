@@ -350,21 +350,31 @@ public:
     void merge(OperationContext* opCtx, const std::string& dbName, const OperationMetrics& metrics);
 
     /**
-     * Returns a copy of the Metrics map.
+     * Returns a copy of the per-database metrics map.
      */
     using MetricsMap = std::map<std::string, AggregatedMetrics>;
-    MetricsMap getMetrics() const;
+    MetricsMap getDbMetrics() const;
 
     /**
-     * Returns the Metrics map and then clears the contents. This attempts to swap and return the
-     * metrics map rather than making a full copy like getMetrics.
+     * Returns the per-database metrics map and then clears the contents. This attempts to swap and
+     * return the metrics map rather than making a full copy like getDbMetrics.
      */
-    MetricsMap getAndClearMetrics();
+    MetricsMap getAndClearDbMetrics();
+
+    /**
+     * Returns the globally-aggregated CPU time.
+     */
+    Nanoseconds getCpuTime() const;
+
+    /**
+     * Clears the existing CPU time.
+     */
+    Nanoseconds getAndClearCpuTime();
 
 private:
-    // Protects _metrics
+    // Protects _dbMetrics and _cpuTime
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ResourceConsumption::_mutex");
-    MetricsMap _metrics;
+    MetricsMap _dbMetrics;
+    Nanoseconds _cpuTime;
 };
-
 }  // namespace mongo

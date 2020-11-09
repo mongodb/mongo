@@ -56,13 +56,13 @@ static constexpr StringData kDatabaseName = "db"_sd;
 
 DocumentSource::GetNextResult DocumentSourceOperationMetrics::doGetNext() {
     if (_operationMetrics.empty()) {
-        auto globalMetrics = [&]() {
+        auto dbMetrics = [&]() {
             if (_clearMetrics) {
-                return ResourceConsumption::get(pExpCtx->opCtx).getAndClearMetrics();
+                return ResourceConsumption::get(pExpCtx->opCtx).getAndClearDbMetrics();
             }
-            return ResourceConsumption::get(pExpCtx->opCtx).getMetrics();
+            return ResourceConsumption::get(pExpCtx->opCtx).getDbMetrics();
         }();
-        for (auto& [dbName, metrics] : globalMetrics) {
+        for (auto& [dbName, metrics] : dbMetrics) {
             BSONObjBuilder builder;
             builder.append(kDatabaseName, dbName);
             metrics.toBson(&builder);

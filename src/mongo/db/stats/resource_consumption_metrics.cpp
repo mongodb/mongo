@@ -33,6 +33,7 @@
 
 #include "mongo/db/stats/resource_consumption_metrics.h"
 
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/logv2/log.h"
@@ -63,6 +64,31 @@ inline void appendNonZeroMetric(BSONObjBuilder* builder, const char* name, long 
         builder->append(name, value);
     }
 }
+
+/**
+ * Reports globally-aggregated CPU time spent by user operations and a specific set of commands.
+ */
+class ResourceConsumptionSSS : public ServerStatusSection {
+public:
+    ResourceConsumptionSSS() : ServerStatusSection("resourceConsumption") {}
+
+    // Do not include this metric by default. It is likely to be misleading for diagnostic purposes
+    // because it does not include the CPU time for every operation or every command.
+    bool includeByDefault() const override {
+        return false;
+    }
+
+    BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElem) const override {
+        auto& resourceConsumption = ResourceConsumption::get(opCtx);
+        if (!resourceConsumption.isMetricsAggregationEnabled()) {
+            return BSONObj();
+        }
+        BSONObjBuilder builder;
+        builder.append(kCpuNanos, durationCount<Nanoseconds>(resourceConsumption.getCpuTime()));
+        return builder.obj();
+    }
+} resourceConsumptionMetricSSM;
+
 }  // namespace
 
 bool ResourceConsumption::isMetricsCollectionEnabled() {
@@ -284,31 +310,42 @@ void ResourceConsumption::merge(OperationContext* opCtx,
     auto isPrimary = repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase_UNSAFE(
         opCtx, NamespaceString::kAdminDb);
 
-    // Add all metrics into the the globally-aggregated metrics.
-    stdx::unique_lock<Mutex> lk(_mutex);
-    auto& elem = _metrics[dbName];
-
+    AggregatedMetrics newMetrics;
     if (isPrimary) {
-        elem.primaryReadMetrics += metrics.readMetrics;
+        newMetrics.primaryReadMetrics = metrics.readMetrics;
     } else {
-        elem.secondaryReadMetrics += metrics.readMetrics;
+        newMetrics.secondaryReadMetrics = metrics.readMetrics;
     }
-    elem.writeMetrics += metrics.writeMetrics;
+    newMetrics.writeMetrics = metrics.writeMetrics;
     if (metrics.cpuTimer) {
-        elem.cpuNanos += metrics.cpuTimer->getElapsed();
+        newMetrics.cpuNanos = metrics.cpuTimer->getElapsed();
     }
+
+    // Add all metrics into the the globally-aggregated metrics.
+    stdx::lock_guard<Mutex> lk(_mutex);
+    _dbMetrics[dbName] += newMetrics;
+    _cpuTime += newMetrics.cpuNanos;
 }
 
-ResourceConsumption::MetricsMap ResourceConsumption::getMetrics() const {
-    stdx::unique_lock<Mutex> lk(_mutex);
-    return _metrics;
+ResourceConsumption::MetricsMap ResourceConsumption::getDbMetrics() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+    return _dbMetrics;
 }
 
-ResourceConsumption::MetricsMap ResourceConsumption::getAndClearMetrics() {
-    stdx::unique_lock<Mutex> lk(_mutex);
+ResourceConsumption::MetricsMap ResourceConsumption::getAndClearDbMetrics() {
+    stdx::lock_guard<Mutex> lk(_mutex);
     MetricsMap newMap;
-    _metrics.swap(newMap);
+    _dbMetrics.swap(newMap);
     return newMap;
 }
 
+Nanoseconds ResourceConsumption::getCpuTime() const {
+    stdx::lock_guard<Mutex> lk(_mutex);
+    return _cpuTime;
+}
+
+Nanoseconds ResourceConsumption::getAndClearCpuTime() {
+    stdx::lock_guard<Mutex> lk(_mutex);
+    return std::exchange(_cpuTime, {});
+}
 }  // namespace mongo
