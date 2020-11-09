@@ -268,17 +268,16 @@ std::unique_ptr<OperationContext> ServiceContextMongoD::_newOpCtx(Client* client
     invariant(&cc() == client);
     auto opCtx = stdx::make_unique<OperationContext>(client, opId);
 
-    auto globalStorageEngine = getGlobalStorageEngine();
-    invariant(globalStorageEngine);
+    if (auto globalStorageEngine = getGlobalStorageEngine()) {
+        if (globalStorageEngine->isMmapV1()) {
+            opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
+        } else {
+            opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
+        }
 
-    if (globalStorageEngine->isMmapV1()) {
-        opCtx->setLockState(stdx::make_unique<MMAPV1LockerImpl>());
-    } else {
-        opCtx->setLockState(stdx::make_unique<DefaultLockerImpl>());
+        opCtx->setRecoveryUnit(globalStorageEngine->newRecoveryUnit(),
+                               OperationContext::kNotInUnitOfWork);
     }
-
-    opCtx->setRecoveryUnit(globalStorageEngine->newRecoveryUnit(),
-                           OperationContext::kNotInUnitOfWork);
     return opCtx;
 }
 
