@@ -102,6 +102,10 @@ modules:
   repo: git@github.com:mongodb-labs/benchmarks.git
   prefix: ../../src
   branch: master
+- name: py-tpcc
+  repo: git@github.com:10gen/py-tpcc.git
+  target: ../../src
+  ref: 52185e96bf28be6608ea65b61ff1d134b7cb3f13
 ###
 
 - name: enterprise
