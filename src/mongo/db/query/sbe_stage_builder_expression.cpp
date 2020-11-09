@@ -1986,7 +1986,69 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(ExpressionSplit* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+        std::vector<std::unique_ptr<sbe::EExpression>> args;
+        std::vector<std::unique_ptr<sbe::EExpression>> binds;
+        sbe::EVariable stringExpressionRef(frameId, 0);
+        sbe::EVariable delimiterRef(frameId, 1);
+
+        invariant(expr->getChildren().size() == 2);
+        _context->ensureArity(2);
+
+        auto delimiter = _context->popExpr();
+        auto stringExpression = _context->popExpr();
+
+        // Add stringExpression to arguments.
+        binds.push_back(std::move(stringExpression));
+        args.push_back(stringExpressionRef.clone());
+
+        // Add delimiter to arguments.
+        binds.push_back(std::move(delimiter));
+        args.push_back(delimiterRef.clone());
+
+        auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
+        auto [arrayWithEmptyStringTag, arrayWithEmptyStringVal] = sbe::value::makeNewArray();
+        sbe::value::ValueGuard arrayWithEmptyStringGuard{arrayWithEmptyStringTag,
+                                                         arrayWithEmptyStringVal};
+        auto arrayWithEmptyStringView = sbe::value::getArrayView(arrayWithEmptyStringVal);
+        arrayWithEmptyStringView->push_back(emptyStrTag, emptyStrVal);
+        arrayWithEmptyStringGuard.reset();
+
+        auto generateIsEmptyString = [emptyStrTag = emptyStrTag,
+                                      emptyStrVal = emptyStrVal](const sbe::EVariable& var) {
+            return sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::eq,
+                var.clone(),
+                sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal));
+        };
+
+        // Check that each argument exists, is not null, and is a string. Fails if the delimiter is
+        // an empty string. Returns [""] if the string input is an empty string, otherwise calls
+        // builtinSplit.
+        auto totalSplitFunc = buildMultiBranchConditional(
+            CaseValuePair{generateNullOrMissing(delimiterRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{
+                generateNonStringCheck(delimiterRef),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5155400},
+                                       str::stream() << "$split delimiter must be a string")},
+            CaseValuePair{generateIsEmptyString(delimiterRef),
+                          sbe::makeE<sbe::EFail>(
+                              ErrorCodes::Error{5155401},
+                              str::stream() << "$split delimiter must not be an empty string")},
+            CaseValuePair{generateNullOrMissing(stringExpressionRef),
+                          sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
+            CaseValuePair{generateNonStringCheck(stringExpressionRef),
+                          sbe::makeE<sbe::EFail>(
+                              ErrorCodes::Error{5155402},
+                              str::stream() << "$split string expression must be a string")},
+            sbe::makeE<sbe::EIf>(
+                generateIsEmptyString(stringExpressionRef),
+                sbe::makeE<sbe::EConstant>(arrayWithEmptyStringTag, arrayWithEmptyStringVal),
+                sbe::makeE<sbe::EFunction>("split", std::move(args))));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(totalSplitFunc)));
     }
     void visit(ExpressionSqrt* expr) final {
         auto frameId = _context->frameIdGenerator->generate();
