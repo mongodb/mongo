@@ -98,6 +98,10 @@ modules:
   prefix: ../../src
   branch: master
   ref: 9e7888c5009e44a185b135104dd8456eea1deb1e
+- name: benchmarks
+  repo: git@github.com:mongodb-labs/benchmarks.git
+  prefix: ../../src
+  branch: master
 ###
 
 - name: enterprise
