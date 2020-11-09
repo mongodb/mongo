@@ -226,8 +226,12 @@ Status ViewCatalog::_createOrUpdateView(WithLock lk,
     catalog.addResource(viewRid, viewName.ns());
 
     opCtx->recoveryUnit()->onRollback([this, viewName, opCtx, viewRid]() {
-        this->_viewMap.erase(viewName.ns());
-        this->_viewGraphNeedsRefresh = true;
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            this->_viewMap.erase(viewName.ns());
+            this->_viewGraphNeedsRefresh = true;
+        }
+
         CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
         catalog.removeResource(viewRid, viewName.ns());
     });
@@ -452,7 +456,11 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
     ViewDefinition savedDefinition = *viewPtr;
 
     opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition, opCtx]() {
-        this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
+        auto definition = std::make_shared<ViewDefinition>(savedDefinition);
+        {
+            stdx::lock_guard<Latch> lk(_mutex);
+            this->_viewMap[viewName.ns()] = std::move(definition);
+        }
         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
         CollectionCatalog& catalog = CollectionCatalog::get(opCtx);
         catalog.addResource(viewRid, viewName.ns());
