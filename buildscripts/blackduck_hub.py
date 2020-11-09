@@ -8,6 +8,7 @@ import io
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,8 @@ THIRD_PARTY_DIRECTORIES = [
 THIRD_PARTY_COMPONENTS_FILE = "etc/third_party_components.yml"
 
 ############################################################################
+
+RE_LETTERS = re.compile("[A-Za-z]{2,}")
 
 
 def default_if_none(value, default):
@@ -293,19 +296,8 @@ class VersionInfo:
                 self.ver_array = [2, 0]
                 return
 
-            # "git" is an abseil version
-            # "unknown_version" comes from this script when components do not have versions
-            # icu has cldr, release, snv, milestone, latest
-            # zlib has alt and task
-            # boost has ubuntu, fc, old-boost, start, ....
             # BlackDuck thinks boost 1.70.0 was released on 2007 which means we have to check hundreds of versions
-            bad_keywords = [
-                "unknown_version", "rc", "alpha", "beta", "git", "release", "cldr", "svn", "cvs",
-                "milestone", "latest", "alt", "task", "ubuntu", "fc", "old-boost", "start", "split",
-                "unofficial", "(", "ctp", "before", "review", "develop", "master", "filesystem",
-                "geometry", "icl", "intrusive", "old", "optional", "super", "docs", "+b", "-b",
-                "b1", ".0a", "system", "html", "interprocess"
-            ]
+            bad_keywords = ["(", "+b", "-b", "b1", ".0a"]
             if [bad for bad in bad_keywords if bad in self.ver_str]:
                 self.production_version = False
                 return
@@ -336,6 +328,11 @@ class VersionInfo:
 
             if self.ver_str.endswith('-'):
                 self.ver_str = self.ver_str[0:-1]
+
+            # Boost keeps varying the version strings so filter for anything with 2 or more ascii charaters
+            if RE_LETTERS.search(self.ver_str):
+                self.production_version = False
+                return
 
             # Some versions end with "-\d", change the "-" since it just means a patch release from a debian/rpm package
             # yaml-cpp has this problem where Black Duck sourced the wrong version information
