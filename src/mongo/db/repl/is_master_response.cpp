@@ -76,9 +76,9 @@ const std::string kCodeFieldName = "code";
 
 }  // namespace
 
-IsMasterResponse::IsMasterResponse()
-    : _isMaster(false),
-      _isMasterSet(false),
+HelloResponse::HelloResponse()
+    : _isWritablePrimary(false),
+      _isWritablePrimarySet(false),
       _secondary(false),
       _isSecondarySet(false),
       _setNameSet(false),
@@ -96,15 +96,15 @@ IsMasterResponse::IsMasterResponse()
       _hiddenSet(false),
       _buildIndexes(true),
       _buildIndexesSet(false),
-      _slaveDelay(0),
-      _slaveDelaySet(false),
+      _secondaryDelaySecs(0),
+      _secondaryDelaySecsSet(false),
       _tagsSet(false),
       _meSet(false),
       _electionId(OID()),
       _configSet(true),
       _shutdownInProgress(false) {}
 
-void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFields) const {
+void HelloResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponseFields) const {
     if (_topologyVersion) {
         BSONObjBuilder topologyVersionBuilder(builder->subobjStart(kTopologyVersionFieldName));
         _topologyVersion->serialize(&topologyVersionBuilder);
@@ -156,11 +156,11 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponse
 
     invariant(_setVersionSet);
     builder->append(kSetVersionFieldName, static_cast<int>(_setVersion));
-    invariant(_isMasterSet);
+    invariant(_isWritablePrimarySet);
     if (useLegacyResponseFields) {
-        builder->append(kIsMasterFieldName, _isMaster);
+        builder->append(kIsMasterFieldName, _isWritablePrimary);
     } else {
-        builder->append(kIsWritablePrimaryFieldName, _isMaster);
+        builder->append(kIsWritablePrimaryFieldName, _isWritablePrimary);
     }
     invariant(_isSecondarySet);
     builder->append(kSecondaryFieldName, _secondary);
@@ -175,12 +175,13 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponse
         builder->append(kHiddenFieldName, _hidden);
     if (_buildIndexesSet)
         builder->append(kBuildIndexesFieldName, _buildIndexes);
-    if (_slaveDelaySet) {
+    if (_secondaryDelaySecsSet) {
         if (useLegacyResponseFields) {
-            builder->appendIntOrLL(kSlaveDelayFieldName, durationCount<Seconds>(_slaveDelay));
+            builder->appendIntOrLL(kSlaveDelayFieldName,
+                                   durationCount<Seconds>(_secondaryDelaySecs));
         } else {
             builder->appendIntOrLL(kSecondaryDelaySecsFieldName,
-                                   durationCount<Seconds>(_slaveDelay));
+                                   durationCount<Seconds>(_secondaryDelaySecs));
         }
     }
     if (_tagsSet) {
@@ -209,25 +210,25 @@ void IsMasterResponse::addToBSON(BSONObjBuilder* builder, bool useLegacyResponse
     }
 }
 
-BSONObj IsMasterResponse::toBSON(bool useLegacyResponseFields) const {
+BSONObj HelloResponse::toBSON(bool useLegacyResponseFields) const {
     BSONObjBuilder builder;
     addToBSON(&builder, useLegacyResponseFields);
     return builder.obj();
 }
 
-Status IsMasterResponse::initialize(const BSONObj& doc) {
-    Status status = bsonExtractBooleanField(doc, kIsMasterFieldName, &_isMaster);
+Status HelloResponse::initialize(const BSONObj& doc) {
+    Status status = bsonExtractBooleanField(doc, kIsMasterFieldName, &_isWritablePrimary);
     if (!status.isOK()) {
         return status;
     }
-    _isMasterSet = true;
+    _isWritablePrimarySet = true;
     status = bsonExtractBooleanField(doc, kSecondaryFieldName, &_secondary);
     if (!status.isOK()) {
         return status;
     }
     _isSecondarySet = true;
     if (doc.hasField(kInfoFieldName)) {
-        if (_isMaster || _secondary || !doc.hasField(kIsReplicaSetFieldName) ||
+        if (_isWritablePrimary || _secondary || !doc.hasField(kIsReplicaSetFieldName) ||
             !doc[kIsReplicaSetFieldName].booleanSafe()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "Expected presence of \"" << kInfoFieldName
@@ -268,7 +269,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
             if (hostElement.type() != String) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kHostsFieldName
-                                            << "\" array of isMaster response must be of type "
+                                            << "\" array of hello response must be of type "
                                             << typeName(String) << " but found type "
                                             << typeName(hostElement.type()));
             }
@@ -288,7 +289,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
             if (passiveElement.type() != String) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kPassivesFieldName
-                                            << "\" array of isMaster response must be of type "
+                                            << "\" array of hello response must be of type "
                                             << typeName(String) << " but found type "
                                             << typeName(passiveElement.type()));
             }
@@ -308,7 +309,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
             if (arbiterElement.type() != String) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kArbitersFieldName
-                                            << "\" array of isMaster response must be of type "
+                                            << "\" array of hello response must be of type "
                                             << typeName(String) << " but found type "
                                             << typeName(arbiterElement.type()));
             }
@@ -360,13 +361,13 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
     }
 
     if (doc.hasField(kSlaveDelayFieldName)) {
-        long long slaveDelaySecs;
-        status = bsonExtractIntegerField(doc, kSlaveDelayFieldName, &slaveDelaySecs);
+        long long secondaryDelaySecs;
+        status = bsonExtractIntegerField(doc, kSlaveDelayFieldName, &secondaryDelaySecs);
         if (!status.isOK()) {
             return status;
         }
-        _slaveDelaySet = true;
-        _slaveDelay = Seconds(slaveDelaySecs);
+        _secondaryDelaySecsSet = true;
+        _secondaryDelaySecs = Seconds(secondaryDelaySecs);
     }
 
     if (doc.hasField(kTagsFieldName)) {
@@ -381,7 +382,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kTagsFieldName
                                             << "\" obj "
-                                               "of isMaster response must be of type "
+                                               "of hello response must be of type "
                                             << typeName(String) << " but found type "
                                             << typeName(tagsElement.type()));
             }
@@ -413,7 +414,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastWriteOpTimeFieldName
                                             << "\" obj "
-                                               "of isMaster response must be of type "
+                                               "of hello response must be of type "
                                             << typeName(Object) << " but found type "
                                             << typeName(lastWriteOpTimeElement.type()));
             }
@@ -433,7 +434,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastWriteDateFieldName
                                             << "\" obj "
-                                               "of isMaster response must be of type "
+                                               "of hello response must be of type "
                                             << typeName(Date) << " but found type "
                                             << typeName(lastWriteDateElement.type()));
             }
@@ -453,7 +454,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastMajorityWriteOpTimeFieldName
                                             << "\" obj "
-                                               "of isMaster response must be of type "
+                                               "of hello response must be of type "
                                             << typeName(Object) << " but found type "
                                             << typeName(lastMajorityWriteOpTimeElement.type()));
             }
@@ -474,7 +475,7 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
                 return Status(ErrorCodes::TypeMismatch,
                               str::stream() << "Elements in \"" << kLastMajorityWriteDateFieldName
                                             << "\" obj "
-                                               "of isMaster response must be of type "
+                                               "of hello response must be of type "
                                             << typeName(Date) << " but found type "
                                             << typeName(lastMajorityWriteDateElement.type()));
             }
@@ -500,103 +501,103 @@ Status IsMasterResponse::initialize(const BSONObj& doc) {
     return Status::OK();
 }
 
-void IsMasterResponse::setIsMaster(bool isMaster) {
-    _isMasterSet = true;
-    _isMaster = isMaster;
+void HelloResponse::setIsWritablePrimary(bool isWritablePrimary) {
+    _isWritablePrimarySet = true;
+    _isWritablePrimary = isWritablePrimary;
 }
 
-void IsMasterResponse::setIsSecondary(bool secondary) {
+void HelloResponse::setIsSecondary(bool secondary) {
     _isSecondarySet = true;
     _secondary = secondary;
 }
 
-void IsMasterResponse::setReplSetName(StringData setName) {
+void HelloResponse::setReplSetName(StringData setName) {
     _setNameSet = true;
     _setName = setName.toString();
 }
 
-void IsMasterResponse::setReplSetVersion(long long version) {
+void HelloResponse::setReplSetVersion(long long version) {
     _setVersionSet = true;
     _setVersion = version;
 }
 
-void IsMasterResponse::addHost(const HostAndPort& host) {
+void HelloResponse::addHost(const HostAndPort& host) {
     _hostsSet = true;
     _hosts.push_back(host);
 }
 
-void IsMasterResponse::addPassive(const HostAndPort& passive) {
+void HelloResponse::addPassive(const HostAndPort& passive) {
     _passivesSet = true;
     _passives.push_back(passive);
 }
 
-void IsMasterResponse::addArbiter(const HostAndPort& arbiter) {
+void HelloResponse::addArbiter(const HostAndPort& arbiter) {
     _arbitersSet = true;
     _arbiters.push_back(arbiter);
 }
 
-void IsMasterResponse::setPrimary(const HostAndPort& primary) {
+void HelloResponse::setPrimary(const HostAndPort& primary) {
     _primarySet = true;
     _primary = primary;
 }
 
-void IsMasterResponse::setIsArbiterOnly(bool arbiterOnly) {
+void HelloResponse::setIsArbiterOnly(bool arbiterOnly) {
     _arbiterOnlySet = true;
     _arbiterOnly = arbiterOnly;
 }
 
-void IsMasterResponse::setIsPassive(bool passive) {
+void HelloResponse::setIsPassive(bool passive) {
     _passiveSet = true;
     _passive = passive;
 }
 
-void IsMasterResponse::setIsHidden(bool hidden) {
+void HelloResponse::setIsHidden(bool hidden) {
     _hiddenSet = true;
     _hidden = hidden;
 }
 
-void IsMasterResponse::setShouldBuildIndexes(bool buildIndexes) {
+void HelloResponse::setShouldBuildIndexes(bool buildIndexes) {
     _buildIndexesSet = true;
     _buildIndexes = buildIndexes;
 }
 
-void IsMasterResponse::setTopologyVersion(TopologyVersion topologyVersion) {
+void HelloResponse::setTopologyVersion(TopologyVersion topologyVersion) {
     _topologyVersion = topologyVersion;
 }
 
-void IsMasterResponse::setSlaveDelay(Seconds slaveDelay) {
-    _slaveDelaySet = true;
-    _slaveDelay = slaveDelay;
+void HelloResponse::setSecondaryDelaySecs(Seconds secondaryDelaySecs) {
+    _secondaryDelaySecsSet = true;
+    _secondaryDelaySecs = secondaryDelaySecs;
 }
 
-void IsMasterResponse::addTag(const std::string& tagKey, const std::string& tagValue) {
+void HelloResponse::addTag(const std::string& tagKey, const std::string& tagValue) {
     _tagsSet = true;
     _tags[tagKey] = tagValue;
 }
 
-void IsMasterResponse::setMe(const HostAndPort& me) {
+void HelloResponse::setMe(const HostAndPort& me) {
     _meSet = true;
     _me = me;
 }
 
-void IsMasterResponse::setElectionId(const OID& electionId) {
+void HelloResponse::setElectionId(const OID& electionId) {
     _electionId = electionId;
 }
 
-void IsMasterResponse::setLastWrite(const OpTime& lastWriteOpTime, const time_t lastWriteDate) {
+void HelloResponse::setLastWrite(const OpTime& lastWriteOpTime, const time_t lastWriteDate) {
     _lastWrite = OpTimeWith<time_t>(lastWriteDate, lastWriteOpTime);
 }
 
-void IsMasterResponse::setLastMajorityWrite(const OpTime& lastMajorityWriteOpTime,
-                                            const time_t lastMajorityWriteDate) {
+void HelloResponse::setLastMajorityWrite(const OpTime& lastMajorityWriteOpTime,
+                                         const time_t lastMajorityWriteDate) {
     _lastMajorityWrite = OpTimeWith<time_t>(lastMajorityWriteDate, lastMajorityWriteOpTime);
 }
 
-void IsMasterResponse::markAsNoConfig() {
+void HelloResponse::markAsNoConfig() {
     _configSet = false;
 }
 
-void IsMasterResponse::markAsShutdownInProgress() {
+void HelloResponse::markAsShutdownInProgress() {
     _shutdownInProgress = true;
 }
 

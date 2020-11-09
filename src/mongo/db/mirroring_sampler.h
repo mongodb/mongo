@@ -40,7 +40,7 @@
 namespace mongo {
 
 /**
- * Populates a random subset of eligible secondaries (using `IsMasterResponse`
+ * Populates a random subset of eligible secondaries (using `HelloResponse`
  * and a ratio) for mirroring. An empty subset for eligible secondaries indicates
  * no mirroring is necessary/possible.
  */
@@ -85,14 +85,14 @@ public:
     /**
      * Use the given imr and params to determine if we should attempt to sample.
      */
-    bool shouldSample(const std::shared_ptr<const repl::IsMasterResponse>& imr,
+    bool shouldSample(const std::shared_ptr<const repl::HelloResponse>& imr,
                       const SamplingParameters& params) const noexcept;
 
     /**
-     * Return all eligible hosts from an IsMasterResponse that we should mirror to.
+     * Return all eligible hosts from a HelloResponse that we should mirror to.
      */
     std::vector<HostAndPort> getRawMirroringTargets(
-        const std::shared_ptr<const repl::IsMasterResponse>& isMaster) noexcept;
+        const std::shared_ptr<const repl::HelloResponse>& isMaster) noexcept;
 
     /**
      * Approximate use of the MirroringSampler for testing.
@@ -100,7 +100,7 @@ public:
      * In practice, we call constituent functions in sequence to pessimistically spare work.
      */
     static std::vector<HostAndPort> getMirroringTargets(
-        const std::shared_ptr<const repl::IsMasterResponse>& isMaster,
+        const std::shared_ptr<const repl::HelloResponse>& isMaster,
         const double ratio,
         RandomFunc rnd = defaultRandomFunc(),
         const int rndMax = defaultRandomMax()) noexcept;

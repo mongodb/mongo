@@ -63,15 +63,15 @@ MirroringSampler::SamplingParameters::SamplingParameters(const double ratio,
           return std::move(rnd)();
       }()) {}
 
-bool MirroringSampler::shouldSample(const std::shared_ptr<const repl::IsMasterResponse>& imr,
+bool MirroringSampler::shouldSample(const std::shared_ptr<const repl::HelloResponse>& helloResp,
                                     const SamplingParameters& params) const noexcept {
-    if (!imr) {
-        // If we don't have an IsMasterResponse, we can't know where to send our mirrored request.
+    if (!helloResp) {
+        // If we don't have a HelloResponse, we can't know where to send our mirrored request.
         return false;
     }
 
-    const auto secondariesCount = imr->getHosts().size() - 1;
-    if (!imr->isMaster() || secondariesCount < 1) {
+    const auto secondariesCount = helloResp->getHosts().size() - 1;
+    if (!helloResp->isWritablePrimary() || secondariesCount < 1) {
         // If this is not the primary, or there are no eligible secondaries, nothing more to do.
         return false;
     }
@@ -88,20 +88,20 @@ bool MirroringSampler::shouldSample(const std::shared_ptr<const repl::IsMasterRe
 }
 
 std::vector<HostAndPort> MirroringSampler::getRawMirroringTargets(
-    const std::shared_ptr<const repl::IsMasterResponse>& isMaster) noexcept {
-    invariant(isMaster);
-    if (!isMaster->isMaster()) {
+    const std::shared_ptr<const repl::HelloResponse>& helloResp) noexcept {
+    invariant(helloResp);
+    if (!helloResp->isWritablePrimary()) {
         // Don't mirror if we're not primary
         return {};
     }
 
-    const auto& hosts = isMaster->getHosts();
+    const auto& hosts = helloResp->getHosts();
     if (hosts.size() < 2) {
         // Don't mirror if we're standalone
         return {};
     }
 
-    const auto& self = isMaster->getPrimary();
+    const auto& self = helloResp->getPrimary();
 
     std::vector<HostAndPort> potentialTargets;
     for (auto& host : hosts) {
@@ -114,7 +114,7 @@ std::vector<HostAndPort> MirroringSampler::getRawMirroringTargets(
 }
 
 std::vector<HostAndPort> MirroringSampler::getMirroringTargets(
-    const std::shared_ptr<const repl::IsMasterResponse>& isMaster,
+    const std::shared_ptr<const repl::HelloResponse>& helloResp,
     const double ratio,
     RandomFunc rnd,
     const int rndMax) noexcept {
@@ -122,11 +122,11 @@ std::vector<HostAndPort> MirroringSampler::getMirroringTargets(
     auto sampler = MirroringSampler();
 
     auto samplingParams = SamplingParameters(ratio, rndMax, std::move(rnd));
-    if (!sampler.shouldSample(isMaster, samplingParams)) {
+    if (!sampler.shouldSample(helloResp, samplingParams)) {
         return {};
     }
 
-    return sampler.getRawMirroringTargets(isMaster);
+    return sampler.getRawMirroringTargets(helloResp);
 }
 
 }  // namespace mongo

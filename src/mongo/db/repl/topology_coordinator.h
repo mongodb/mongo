@@ -386,7 +386,7 @@ public:
     // Produce a reply to an ismaster request.  It is only valid to call this if we are a
     // replset.  Drivers interpret the isMaster fields according to the Server Discovery and
     // Monitoring Spec, see the "Parsing an isMaster response" section.
-    void fillIsMasterForReplSet(std::shared_ptr<IsMasterResponse> response,
+    void fillIsMasterForReplSet(std::shared_ptr<HelloResponse> response,
                                 const StringData& horizonString) const;
 
     // Produce member data for the serverStatus command and diagnostic logging.

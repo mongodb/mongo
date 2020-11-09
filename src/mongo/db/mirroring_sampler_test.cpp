@@ -36,57 +36,57 @@
 namespace mongo {
 
 DEATH_TEST(MirroringSamplerTest, ValidateNegativeRatio, "invariant") {
-    auto dummyIsMaster = std::make_shared<mongo::repl::IsMasterResponse>();
-    MirroringSampler::getMirroringTargets(dummyIsMaster, -1);
+    auto dummyHello = std::make_shared<mongo::repl::HelloResponse>();
+    MirroringSampler::getMirroringTargets(dummyHello, -1);
 }
 
 DEATH_TEST(MirroringSamplerTest, ValidateLargeRatio, "invariant") {
-    auto dummyIsMaster = std::make_shared<mongo::repl::IsMasterResponse>();
-    MirroringSampler::getMirroringTargets(dummyIsMaster, 1.1);
+    auto dummyHello = std::make_shared<mongo::repl::HelloResponse>();
+    MirroringSampler::getMirroringTargets(dummyHello, 1.1);
 }
 
-TEST(MirroringSamplerTest, ValidateMissingIsMaster) {
+TEST(MirroringSamplerTest, ValidateMissingHello) {
     auto targets = MirroringSampler::getMirroringTargets(nullptr, 1);
     ASSERT_EQ(targets.size(), 0);
 }
 
 TEST(MirroringSamplerTest, ValidateHostIsPrimary) {
-    auto isMaster = std::make_shared<mongo::repl::IsMasterResponse>();
-    isMaster->setIsMaster(false);
+    auto hello = std::make_shared<mongo::repl::HelloResponse>();
+    hello->setIsWritablePrimary(false);
 
-    auto targets = MirroringSampler::getMirroringTargets(isMaster, 1);
+    auto targets = MirroringSampler::getMirroringTargets(hello, 1);
     ASSERT_EQ(targets.size(), 0);
 }
 
 TEST(MirroringSamplerTest, NoEligibleSecondary) {
-    auto isMaster = std::make_shared<mongo::repl::IsMasterResponse>();
-    isMaster->setIsMaster(true);
-    isMaster->setIsSecondary(false);
-    isMaster->addHost(mongo::HostAndPort("primary", 12345));
-    isMaster->setPrimary(isMaster->getHosts()[0]);
-    isMaster->setMe(isMaster->getPrimary());
+    auto hello = std::make_shared<mongo::repl::HelloResponse>();
+    hello->setIsWritablePrimary(true);
+    hello->setIsSecondary(false);
+    hello->addHost(mongo::HostAndPort("primary", 12345));
+    hello->setPrimary(hello->getHosts()[0]);
+    hello->setMe(hello->getPrimary());
 
-    auto targets = MirroringSampler::getMirroringTargets(isMaster, 1.0);
+    auto targets = MirroringSampler::getMirroringTargets(hello, 1.0);
     ASSERT_EQ(targets.size(), 0);
 }
 
 class MirroringSamplerFixture : public unittest::Test {
 public:
     void init(size_t secondariesCount) {
-        _isMaster = std::make_shared<mongo::repl::IsMasterResponse>();
-        _isMaster->setIsMaster(true);
-        _isMaster->setIsSecondary(false);
+        _hello = std::make_shared<mongo::repl::HelloResponse>();
+        _hello->setIsWritablePrimary(true);
+        _hello->setIsSecondary(false);
         for (size_t i = 0; i < secondariesCount + 1; i++) {
             std::string hostName = "node-" + std::to_string(i);
-            _isMaster->addHost(mongo::HostAndPort(hostName, 12345));
+            _hello->addHost(mongo::HostAndPort(hostName, 12345));
         }
 
-        _isMaster->setPrimary(_isMaster->getHosts()[0]);
-        _isMaster->setMe(_isMaster->getPrimary());
+        _hello->setPrimary(_hello->getHosts()[0]);
+        _hello->setMe(_hello->getPrimary());
 
         _hitCounts.clear();
         for (size_t i = 1; i < secondariesCount + 1; i++) {
-            _hitCounts[_isMaster->getHosts()[i].toString()] = 0;
+            _hitCounts[_hello->getHosts()[i].toString()] = 0;
         }
     }
 
@@ -136,14 +136,14 @@ public:
         return std::sqrt(standardDeviation / _hitCounts.size());
     }
 
-    auto getIsMaster() const {
-        return _isMaster;
+    auto getHello() const {
+        return _hello;
     }
 
     const size_t repeats = 100000;
 
 private:
-    std::shared_ptr<repl::IsMasterResponse> _isMaster;
+    std::shared_ptr<repl::HelloResponse> _hello;
 
     double _pseudoRandomSeed;
 
@@ -158,7 +158,7 @@ TEST_F(MirroringSamplerFixture, SamplerFunction) {
     for (auto secondaryQ : secondariesCount) {
         // Set number of secondaries
         init(secondaryQ);
-        auto isMaster = getIsMaster();
+        auto hello = getHello();
 
         for (auto ratio : ratios) {
             resetPseudoRandomSeed();
@@ -167,8 +167,7 @@ TEST_F(MirroringSamplerFixture, SamplerFunction) {
             auto pseudoRandomGen = [&]() -> int { return this->nextPseudoRandom(); };
 
             for (size_t i = 0; i < repeats; i++) {
-                auto targets =
-                    MirroringSampler::getMirroringTargets(isMaster, ratio, pseudoRandomGen);
+                auto targets = MirroringSampler::getMirroringTargets(hello, ratio, pseudoRandomGen);
                 populteHitCounts(targets);
             }
 
@@ -192,10 +191,10 @@ TEST_F(MirroringSamplerFixture, MirrorAll) {
     for (auto secondaryQ : secondariesCount) {
         // Set number of secondaries
         init(secondaryQ);
-        auto isMaster = getIsMaster();
+        auto hello = getHello();
 
         for (size_t i = 0; i < repeats; i++) {
-            auto targets = MirroringSampler::getMirroringTargets(isMaster, 1.0);
+            auto targets = MirroringSampler::getMirroringTargets(hello, 1.0);
             populteHitCounts(targets);
         }
 

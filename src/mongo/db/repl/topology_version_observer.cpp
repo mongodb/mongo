@@ -103,7 +103,7 @@ void TopologyVersionObserver::shutdown() noexcept {
     thread->join();
 }
 
-std::shared_ptr<const IsMasterResponse> TopologyVersionObserver::getCached() noexcept {
+std::shared_ptr<const HelloResponse> TopologyVersionObserver::getCached() noexcept {
     if (_state.load() != State::kRunning || _shouldShutdown.load()) {
         // Early return if we know there isn't a worker
         return {};
@@ -119,7 +119,7 @@ std::string TopologyVersionObserver::toString() const {
     return str::stream() << kTopologyVersionObserverName;
 }
 
-void TopologyVersionObserver::_cacheIsMasterResponse(
+void TopologyVersionObserver::_cacheHelloResponse(
     OperationContext* opCtx, boost::optional<TopologyVersion> topologyVersion) try {
     invariant(opCtx);
 
@@ -133,7 +133,7 @@ void TopologyVersionObserver::_cacheIsMasterResponse(
         });
 
         invariant(_replCoordinator);
-        auto future = _replCoordinator->getIsMasterResponseFuture({}, topologyVersion);
+        auto future = _replCoordinator->getHelloResponseFuture({}, topologyVersion);
 
         if (auto response = std::move(future).get(opCtx); response->isConfigSet()) {
             stdx::lock_guard lk(_mutex);
@@ -160,8 +160,7 @@ void TopologyVersionObserver::_cacheIsMasterResponse(
         throw;
     }
 
-    LOGV2_WARNING(
-        40444, "Observer could not retrieve isMasterResponse", "error"_attr = e.toString());
+    LOGV2_WARNING(40444, "Observer could not retrieve HelloResponse", "error"_attr = e.toString());
 }
 
 void TopologyVersionObserver::_workerThreadBody() noexcept try {
@@ -232,7 +231,7 @@ void TopologyVersionObserver::_workerThreadBody() noexcept try {
         // Pause here so that we can force there to be an opCtx to be interrupted.
         topologyVersionObserverExpectsInterruption.pauseWhileSet();
 
-        _cacheIsMasterResponse(opCtxHandle.get(), getTopologyVersion());
+        _cacheHelloResponse(opCtxHandle.get(), getTopologyVersion());
     }
 } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
     LOGV2_DEBUG(40443, 3, "Observer thread stopped due to shutdown", "error"_attr = e.toString());

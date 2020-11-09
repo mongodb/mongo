@@ -89,7 +89,7 @@ structs:
                 type: safeBool
                 default: false
                 description: "When this value is true, the replica set hides this instance and does
-                             not include the member in the output of db.isMaster() or isMaster. This
+                             not include the member in the output of db.hello() or hello. This
                              prevents read operations (i.e. queries) from ever reaching this host by
                              way of secondary read preference"
             slaveDelay:

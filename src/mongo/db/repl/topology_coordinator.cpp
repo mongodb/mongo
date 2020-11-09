@@ -2071,7 +2071,7 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
     }
 }
 
-void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<IsMasterResponse> response,
+void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<HelloResponse> response,
                                                  const StringData& horizonString) const {
     invariant(_rsConfig.isInitialized());
     response->setTopologyVersion(getTopologyVersion());
@@ -2101,10 +2101,12 @@ void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<IsMasterRespons
     }
 
     response->setReplSetVersion(_rsConfig.getConfigVersion());
-    // "ismaster" is false if we are not primary. If we're stepping down, we're waiting for the
-    // Replication State Transition Lock before we can change to secondary, but we should report
-    // "ismaster" false to indicate that we can't accept new writes.
-    response->setIsMaster(myState.primary() && !isSteppingDown());
+    // Depending on whether or not the client sent a hello/isMaster request, we set the
+    // "isWritablePrimary"/"ismaster" field to false if we are not primary. If we're stepping down,
+    // we're waiting for the Replication State Transition Lock before we can change to secondary,
+    // but we should report "isWritablePrimary"/"ismaster" false to indicate that we can't accept
+    // new writes.
+    response->setIsWritablePrimary(myState.primary() && !isSteppingDown());
     response->setIsSecondary(myState.secondary());
 
     const MemberConfig* curPrimary = getCurrentPrimaryMember();
@@ -2119,7 +2121,7 @@ void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<IsMasterRespons
         response->setIsPassive(true);
     }
     if (selfConfig.getSlaveDelay() > Seconds(0)) {
-        response->setSlaveDelay(selfConfig.getSlaveDelay());
+        response->setSecondaryDelaySecs(selfConfig.getSlaveDelay());
     }
     if (selfConfig.isHidden()) {
         response->setIsHidden(true);

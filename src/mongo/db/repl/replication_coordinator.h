@@ -73,7 +73,7 @@ class ReplSetMetadata;
 namespace repl {
 
 class BackgroundSync;
-class IsMasterResponse;
+class HelloResponse;
 class OpTime;
 class OpTimeAndWallTime;
 class ReadConcernArgs;
@@ -130,9 +130,9 @@ public:
 
     /**
      * We enter quiesce mode during the shutdown process if we are in secondary mode. While in
-     * quiesce mode, we allow reads to continue and accept new reads, but we fail isMaster requests
+     * quiesce mode, we allow reads to continue and accept new reads, but we fail hello requests
      * with ShutdownInProgress. This function causes us to increment the topologyVersion and start
-     * failing isMaster requests with ShutdownInProgress. Returns true if the server entered quiesce
+     * failing hello requests with ShutdownInProgress. Returns true if the server entered quiesce
      * mode.
      *
      * We take in quiesceTime only for reporting purposes. The waiting during quiesce mode happens
@@ -251,7 +251,7 @@ public:
 
     /**
      * Returns true if the node can be considered master for the purpose of introspective
-     * commands such as isMaster() and rs.status().
+     * commands such as hello() and rs.status().
      */
     virtual bool isMasterForReportingPurposes() = 0;
 
@@ -982,24 +982,24 @@ public:
     virtual void incrementTopologyVersion() = 0;
 
     /**
-     * Constructs and returns an IsMasterResponse. Will block until the given deadline waiting for a
+     * Constructs and returns a HelloResponse. Will block until the given deadline waiting for a
      * significant topology change if the 'counter' field of 'clientTopologyVersion' is equal to the
      * current TopologyVersion 'counter' from the TopologyCoordinator. Returns immediately if
      * 'clientTopologyVersion' < TopologyVersion of the TopologyCoordinator or if the processId
      * differs.
      */
-    virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
+    virtual std::shared_ptr<const HelloResponse> awaitHelloResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion,
         boost::optional<Date_t> deadline) = 0;
 
     /**
-     * The futurized version of `awaitIsMasterResponse()`:
-     * * The future is ready for all cases that `awaitIsMasterResponse()` returns immediately.
-     * * For cases that `awaitIsMasterResponse()` blocks, calling `get()` on the future is blocking.
+     * The futurized version of `awaitHelloResponse()`:
+     * * The future is ready for all cases that `awaitHelloResponse()` returns immediately.
+     * * For cases that `awaitHelloResponse()` blocks, calling `get()` on the future is blocking.
      */
-    virtual SharedSemiFuture<std::shared_ptr<const IsMasterResponse>> getIsMasterResponseFuture(
+    virtual SharedSemiFuture<std::shared_ptr<const HelloResponse>> getHelloResponseFuture(
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion) = 0;
 

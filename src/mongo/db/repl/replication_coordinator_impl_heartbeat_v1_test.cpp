@@ -770,16 +770,16 @@ TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
     // A reconfig should increment the TopologyVersion counter.
     auto expectedCounter = currentTopologyVersion.getCounter() + 1;
     auto opCtx = makeOperationContext();
-    // awaitIsMasterResponse blocks and waits on a future when the request TopologyVersion equals
+    // awaitHelloResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
     stdx::thread getIsMasterThread([&] {
-        auto response = getReplCoord()->awaitIsMasterResponse(
-            opCtx.get(), {}, currentTopologyVersion, deadline);
+        auto response =
+            getReplCoord()->awaitHelloResponse(opCtx.get(), {}, currentTopologyVersion, deadline);
         auto topologyVersion = response->getTopologyVersion();
         ASSERT_EQUALS(topologyVersion->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersion->getProcessId(), expectedProcessId);
 
-        // Ensure the isMasterResponse contains the newly added node.
+        // Ensure the helloResponse contains the newly added node.
         const auto hosts = response->getHosts();
         ASSERT_EQUALS(3, hosts.size());
         ASSERT_EQUALS("node3", hosts[2].host());

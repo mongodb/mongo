@@ -358,13 +358,13 @@ public:
 
     virtual void incrementTopologyVersion() override;
 
-    using SharedIsMasterResponse = std::shared_ptr<const IsMasterResponse>;
+    using SharedHelloResponse = std::shared_ptr<const HelloResponse>;
 
-    virtual SharedSemiFuture<SharedIsMasterResponse> getIsMasterResponseFuture(
+    virtual SharedSemiFuture<SharedHelloResponse> getHelloResponseFuture(
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion) override;
 
-    virtual std::shared_ptr<const IsMasterResponse> awaitIsMasterResponse(
+    virtual std::shared_ptr<const HelloResponse> awaitHelloResponse(
         OperationContext* opCtx,
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<TopologyVersion> clientTopologyVersion,
@@ -490,7 +490,7 @@ private:
     using ScheduleFn = std::function<StatusWith<executor::TaskExecutor::CallbackHandle>(
         const executor::TaskExecutor::CallbackFn& work)>;
 
-    using SharedPromiseOfIsMasterResponse = SharedPromise<std::shared_ptr<const IsMasterResponse>>;
+    using SharedPromiseOfHelloResponse = SharedPromise<std::shared_ptr<const HelloResponse>>;
 
     /**
      * Configuration states for a replica set node.
@@ -1234,17 +1234,18 @@ private:
     long long _calculateRemainingQuiesceTimeMillis() const;
 
     /**
-     * Fills an IsMasterResponse with the appropriate replication related fields. horizonString
+     * Fills a HelloResponse with the appropriate replication related fields. horizonString
      * should be passed in if hasValidConfig is true.
      */
-    std::shared_ptr<IsMasterResponse> _makeIsMasterResponse(
-        boost::optional<StringData> horizonString, WithLock, const bool hasValidConfig) const;
+    std::shared_ptr<HelloResponse> _makeHelloResponse(boost::optional<StringData> horizonString,
+                                                      WithLock,
+                                                      const bool hasValidConfig) const;
 
     /**
-     * Creates a semi-future for isMasterResponse. horizonString should be passed in if and only if
+     * Creates a semi-future for HelloResponse. horizonString should be passed in if and only if
      * the server is a valid member of the config.
      */
-    virtual SharedSemiFuture<SharedIsMasterResponse> _getIsMasterResponseFuture(
+    virtual SharedSemiFuture<SharedHelloResponse> _getHelloResponseFuture(
         WithLock,
         const SplitHorizon::Parameters& horizonParams,
         boost::optional<StringData> horizonString,
@@ -1532,13 +1533,13 @@ private:
 
     // Maps a horizon name to the promise waited on by awaitable isMaster requests when the node
     // has an initialized replica set config and is an active member of the replica set.
-    StringMap<std::shared_ptr<SharedPromiseOfIsMasterResponse>>
+    StringMap<std::shared_ptr<SharedPromiseOfHelloResponse>>
         _horizonToTopologyChangePromiseMap;  // (M)
 
     // Maps a requested SNI to the promise waited on by awaitable isMaster requests when the node
     // has an unitialized replica set config or is removed. An empty SNI will map to a promise on
     // the default horizon.
-    StringMap<std::shared_ptr<SharedPromiseOfIsMasterResponse>> _sniToValidConfigPromiseMap;  // (M)
+    StringMap<std::shared_ptr<SharedPromiseOfHelloResponse>> _sniToValidConfigPromiseMap;  // (M)
 
     // Set to true when we are in the process of shutting down replication.
     bool _inShutdown;  // (M)

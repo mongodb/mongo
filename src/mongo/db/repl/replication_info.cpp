@@ -110,14 +110,14 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
             deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
                 Milliseconds(*maxAwaitTimeMS);
         }
-        auto isMasterResponse =
-            replCoord->awaitIsMasterResponse(opCtx, horizonParams, clientTopologyVersion, deadline);
-        result->appendElements(isMasterResponse->toBSON(useLegacyResponseFields));
+        auto helloResponse =
+            replCoord->awaitHelloResponse(opCtx, horizonParams, clientTopologyVersion, deadline);
+        result->appendElements(helloResponse->toBSON(useLegacyResponseFields));
         if (appendReplicationProcess) {
             replCoord->appendSlaveInfoData(result);
         }
-        invariant(isMasterResponse->getTopologyVersion());
-        return isMasterResponse->getTopologyVersion().get();
+        invariant(helloResponse->getTopologyVersion());
+        return helloResponse->getTopologyVersion().get();
     }
 
     auto currentTopologyVersion = replCoord->getTopologyVersion();

@@ -632,25 +632,25 @@ void ReplicationCoordinatorMock::incrementTopologyVersion() {
     return;
 }
 
-SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>
-ReplicationCoordinatorMock::getIsMasterResponseFuture(
+SharedSemiFuture<std::shared_ptr<const HelloResponse>>
+ReplicationCoordinatorMock::getHelloResponseFuture(
     const SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> clientTopologyVersion) {
     auto response =
-        awaitIsMasterResponse(nullptr, horizonParams, clientTopologyVersion, Date_t::now());
-    return SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>(
-        std::shared_ptr<const IsMasterResponse>(response));
+        awaitHelloResponse(nullptr, horizonParams, clientTopologyVersion, Date_t::now());
+    return SharedSemiFuture<std::shared_ptr<const HelloResponse>>(
+        std::shared_ptr<const HelloResponse>(response));
 }
 
-std::shared_ptr<const IsMasterResponse> ReplicationCoordinatorMock::awaitIsMasterResponse(
+std::shared_ptr<const HelloResponse> ReplicationCoordinatorMock::awaitHelloResponse(
     OperationContext* opCtx,
     const SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> clientTopologyVersion,
     boost::optional<Date_t> deadline) {
     auto config = getConfig();
-    auto response = std::make_shared<IsMasterResponse>();
+    auto response = std::make_shared<HelloResponse>();
     response->setReplSetVersion(config.getConfigVersion());
-    response->setIsMaster(true);
+    response->setIsWritablePrimary(true);
     response->setIsSecondary(false);
     if (config.getNumMembers() > 0) {
         response->setMe(config.getMemberAt(0).getHostAndPort());

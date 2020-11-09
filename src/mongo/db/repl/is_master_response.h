@@ -49,15 +49,15 @@ class Status;
 namespace repl {
 
 /**
- * Response structure for the ismaster command.  Only handles responses from nodes
+ * Response structure for the hello command. Only handles responses from nodes
  * that are in replset mode.
  */
-class IsMasterResponse {
+class HelloResponse {
 public:
-    IsMasterResponse();
+    HelloResponse();
 
     /**
-     * Initializes this IsMasterResponse from the contents of "doc".
+     * Initializes this HelloResponse from the contents of "doc".
      */
     Status initialize(const BSONObj& doc);
 
@@ -81,8 +81,8 @@ public:
 
     // ===================== Accessors for member variables ================================= //
 
-    bool isMaster() const {
-        return _isMaster;
+    bool isWritablePrimary() const {
+        return _isWritablePrimary;
     }
 
     bool isSecondary() const {
@@ -133,8 +133,8 @@ public:
         return _buildIndexes;
     }
 
-    Seconds getSlaveDelay() const {
-        return _slaveDelay;
+    Seconds getSecondaryDelaySecs() const {
+        return _secondaryDelaySecs;
     }
 
     const stdx::unordered_map<std::string, std::string> getTags() const {
@@ -200,7 +200,7 @@ public:
 
     // ===================== Mutators for member variables ================================= //
 
-    void setIsMaster(bool isMaster);
+    void setIsWritablePrimary(bool isWritablePrimary);
 
     void setIsSecondary(bool secondary);
 
@@ -226,7 +226,7 @@ public:
 
     void setTopologyVersion(TopologyVersion topologyVersion);
 
-    void setSlaveDelay(Seconds slaveDelay);
+    void setSecondaryDelaySecs(Seconds secondaryDelaySecs);
 
     void addTag(const std::string& tagKey, const std::string& tagValue);
 
@@ -254,8 +254,8 @@ public:
     void markAsShutdownInProgress();
 
 private:
-    bool _isMaster;
-    bool _isMasterSet;
+    bool _isWritablePrimary;
+    bool _isWritablePrimarySet;
     bool _secondary;
     bool _isSecondarySet;
     std::string _setName;
@@ -278,8 +278,8 @@ private:
     bool _hiddenSet;
     bool _buildIndexes;
     bool _buildIndexesSet;
-    Seconds _slaveDelay;
-    bool _slaveDelaySet;
+    Seconds _secondaryDelaySecs;
+    bool _secondaryDelaySecsSet;
     stdx::unordered_map<std::string, std::string> _tags;
     bool _tagsSet;
     HostAndPort _me;

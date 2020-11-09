@@ -522,7 +522,7 @@ void ReplicationCoordinatorEmbedded::incrementTopologyVersion() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
-std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::awaitIsMasterResponse(
+std::shared_ptr<const repl::HelloResponse> ReplicationCoordinatorEmbedded::awaitHelloResponse(
     OperationContext* opCtx,
     const repl::SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> previous,
@@ -530,8 +530,8 @@ std::shared_ptr<const repl::IsMasterResponse> ReplicationCoordinatorEmbedded::aw
     UASSERT_NOT_IMPLEMENTED;
 };
 
-SharedSemiFuture<std::shared_ptr<const IsMasterResponse>>
-ReplicationCoordinatorEmbedded::getIsMasterResponseFuture(
+SharedSemiFuture<std::shared_ptr<const HelloResponse>>
+ReplicationCoordinatorEmbedded::getHelloResponseFuture(
     const SplitHorizon::Parameters& horizonParams,
     boost::optional<TopologyVersion> clientTopologyVersion) {
     UASSERT_NOT_IMPLEMENTED;
