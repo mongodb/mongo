@@ -186,7 +186,8 @@ private:
         // Pair of collection namespace and index spec.
         std::vector<std::pair<NamespaceString, BSONObj>> ttlIndexes;
 
-        ttlPasses.increment();
+        // Increment the metric after the TTL work has been finished.
+        ON_BLOCK_EXIT([&] { ttlPasses.increment(); });
 
         // Get all TTL indexes from every collection.
         for (const std::pair<UUID, std::string>& ttlInfo : ttlInfos) {
