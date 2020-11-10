@@ -2,7 +2,6 @@
 //   requires_fastcount,
 //   # Uses $where operator
 //   requires_scripting,
-//   sbe_incompatible,
 // ]
 
 t = db.find6;

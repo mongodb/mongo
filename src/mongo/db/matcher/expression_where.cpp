@@ -47,66 +47,18 @@
 
 namespace mongo {
 
-using std::string;
-using std::stringstream;
 using std::unique_ptr;
-
-namespace {
-std::string getAuthenticatedUserNamesToken(Client* client) {
-    StringBuilder sb;
-
-    auto as = AuthorizationSession::get(client);
-    for (auto nameIter = as->getAuthenticatedUserNames(); nameIter.more(); nameIter.next()) {
-        // Using a NUL byte which isn't valid in usernames to separate them.
-        sb << '\0' << nameIter->getUnambiguousName();
-    }
-
-    return sb.str();
-}
-}  // namespace
 
 WhereMatchExpression::WhereMatchExpression(OperationContext* opCtx,
                                            WhereParams params,
                                            StringData dbName)
-    : WhereMatchExpressionBase(std::move(params)), _dbName(dbName.toString()), _opCtx(opCtx) {
-    invariant(_opCtx != nullptr);
-
-    uassert(
-        ErrorCodes::BadValue, "no globalScriptEngine in $where parsing", getGlobalScriptEngine());
-
-    uassert(ErrorCodes::BadValue, "ns for $where cannot be empty", dbName.size() != 0);
-
-    const auto userToken = getAuthenticatedUserNamesToken(opCtx->getClient());
-    _scope = getGlobalScriptEngine()->getPooledScope(_opCtx, _dbName, "where" + userToken);
-    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
-
-    _func = _scope->createFunction(getCode().c_str());
-
-    uassert(ErrorCodes::BadValue, "$where compile error", _func);
-}
+    : WhereMatchExpressionBase(std::move(params)),
+      _dbName(dbName.toString()),
+      _opCtx(opCtx),
+      _jsFunction(_opCtx, getCode(), _dbName) {}
 
 bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* details) const {
-    uassert(28692, "$where compile error", _func);
-    BSONObj obj = doc->toBSON();
-
-    _scope->registerOperation(Client::getCurrent()->getOperationContext());
-    const auto guard = makeGuard([&] { _scope->unregisterOperation(); });
-
-    _scope->advanceGeneration();
-    _scope->setObject("obj", const_cast<BSONObj&>(obj));
-    _scope->setBoolean("fullObject", true);  // this is a hack b/c fullObject used to be relevant
-
-    int err =
-        _scope->invoke(_func, nullptr, &obj, internalQueryJavaScriptFnTimeoutMillis.load(), false);
-    if (err == -3) {  // INVOKE_ERROR
-        stringstream ss;
-        ss << "error on invocation of $where function:\n" << _scope->getError();
-        uassert(16812, ss.str(), false);
-    } else if (err != 0) {  // ! INVOKE_SUCCESS
-        uassert(16813, "unknown error in invocation of $where function", false);
-    }
-
-    return _scope->getBoolean("__returnValue") != 0;
+    return _jsFunction.runAsPredicate(doc->toBSON());
 }
 
 unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {

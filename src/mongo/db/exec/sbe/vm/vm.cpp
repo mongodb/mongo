@@ -36,6 +36,8 @@
 #include <pcrecpp.h>
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
@@ -976,6 +978,32 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(uint
     auto regexMatchResult = pcreRegex->PartialMatch(pcreStringView);
 
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(regexMatchResult)};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRunJsPredicate(uint8_t arity) {
+    invariant(arity == 2);
+
+    auto [predicateOwned, predicateType, predicateValue] = getFromStack(0);
+    auto [inputOwned, inputType, inputValue] = getFromStack(1);
+
+    if (predicateType != value::TypeTags::jsFunction || !value::isObject(inputType)) {
+        return {false, value::TypeTags::Nothing, value::bitcastFrom<int64_t>(0)};
+    }
+
+    BSONObj obj;
+    if (inputType == value::TypeTags::Object) {
+        BSONObjBuilder objBuilder;
+        bson::convertToBsonObj(objBuilder, value::getObjectView(inputValue));
+        obj = objBuilder.obj();
+    } else if (inputType == value::TypeTags::bsonObject) {
+        obj = BSONObj(value::getRawPointerView(inputValue));
+    } else {
+        MONGO_UNREACHABLE;
+    }
+
+    auto predicate = value::getJsFunctionView(predicateValue);
+    auto predicateResult = predicate->runAsPredicate(obj);
+    return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(predicateResult)};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(uint8_t arity) {
@@ -2000,6 +2028,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinSetIntersection(arity);
         case Builtin::setDifference:
             return builtinSetDifference(arity);
+        case Builtin::runJsPredicate:
+            return builtinRunJsPredicate(arity);
     }
 
     MONGO_UNREACHABLE;

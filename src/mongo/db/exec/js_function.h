@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,41 +27,23 @@
  *    it in the license file.
  */
 
-#pragma once
+#include <memory>
+#include <string>
 
-#include "mongo/db/exec/js_function.h"
-#include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
-class OperationContext;
-
-class WhereMatchExpression final : public WhereMatchExpressionBase {
+class JsFunction {
 public:
-    WhereMatchExpression(OperationContext* opCtx, WhereParams params, StringData dbName);
+    JsFunction(OperationContext* opCtx, const std::string& code, const std::string& dbName);
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final;
-
-    std::unique_ptr<MatchExpression> shallowClone() const final;
-
-    void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
-        visitor->visit(this);
-    }
-
-    void acceptVisitor(MatchExpressionConstVisitor* visitor) const final {
-        visitor->visit(this);
-    }
-
-    const JsFunction& getPredicate() const {
-        return _jsFunction;
-    }
+    bool runAsPredicate(const BSONObj& obj) const;
 
 private:
-    std::string _dbName;
-
-    OperationContext* const _opCtx;
-
-    JsFunction _jsFunction;
+    std::shared_ptr<Scope> _scope;
+    ScriptingFunction _func;
 };
 
 }  // namespace mongo

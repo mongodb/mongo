@@ -3,7 +3,6 @@
 //   requires_fastcount,
 //   requires_javascript,
 //   requires_non_retryable_commands,
-//   sbe_incompatible,
 // ]
 
 t = db.jstests_js3;

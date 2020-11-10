@@ -413,6 +413,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::setIntersection, false}},
     {"setDifference",
      BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::setDifference, false}},
+    {"runJsPredicate",
+     BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::runJsPredicate, false}},
 };
 
 /**

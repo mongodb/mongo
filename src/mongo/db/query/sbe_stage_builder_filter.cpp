@@ -718,9 +718,7 @@ public:
         unsupportedExpression(expr);
     }
     void visit(const TypeMatchExpression* expr) final {}
-    void visit(const WhereMatchExpression* expr) final {
-        unsupportedExpression(expr);
-    }
+    void visit(const WhereMatchExpression* expr) final {}
     void visit(const WhereNoOpMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -1232,7 +1230,22 @@ public:
         generatePredicate(_context, expr->path(), std::move(makePredicate));
     }
 
-    void visit(const WhereMatchExpression* expr) final {}
+    void visit(const WhereMatchExpression* expr) final {
+        auto makePredicate = [expr](sbe::value::SlotId inputSlot,
+                                    EvalStage inputStage) -> EvalExprStagePair {
+            auto [predicateTag, predicateValue] =
+                sbe::value::makeCopyJsFunction(expr->getPredicate());
+            auto predicate = sbe::makeE<sbe::EConstant>(predicateTag, predicateValue);
+
+            auto whereExpr = sbe::makeE<sbe::EFunction>(
+                "runJsPredicate",
+                sbe::makeEs(std::move(predicate), sbe::makeE<sbe::EVariable>(inputSlot)));
+            return {std::move(whereExpr), std::move(inputStage)};
+        };
+
+        generatePredicate(_context, expr->path(), std::move(makePredicate));
+    }
+
     void visit(const WhereNoOpMatchExpression* expr) final {}
 
 private:

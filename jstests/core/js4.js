@@ -1,7 +1,6 @@
 // @tags: [
 //   # Uses $where operator
 //   requires_scripting,
-//   sbe_incompatible,
 // ]
 
 t = db.jstests_js4;

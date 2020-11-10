@@ -61,6 +61,8 @@ class Value;
 
 class TimeZoneDatabase;
 
+class JsFunction;
+
 namespace sbe {
 using FrameId = int64_t;
 using SpoolId = int64_t;
@@ -118,6 +120,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a timezone database object.
     timeZoneDB,
+
+    // Pointer to a compiled JS function with scope.
+    jsFunction,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -693,6 +698,10 @@ inline pcrecpp::RE* getPcreRegexView(Value val) noexcept {
     return reinterpret_cast<pcrecpp::RE*>(val);
 }
 
+inline JsFunction* getJsFunctionView(Value val) noexcept {
+    return reinterpret_cast<JsFunction*>(val);
+}
+
 inline TimeZoneDatabase* getTimeZoneDBView(Value val) noexcept {
     return reinterpret_cast<TimeZoneDatabase*>(val);
 }
@@ -700,6 +709,8 @@ inline TimeZoneDatabase* getTimeZoneDBView(Value val) noexcept {
 std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
 
 std::pair<TypeTags, Value> makeCopyPcreRegex(const pcrecpp::RE&);
+
+std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction&);
 
 void releaseValue(TypeTags tag, Value val) noexcept;
 
@@ -762,6 +773,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyKeyString(*getKeyStringView(val));
         case TypeTags::pcreRegex:
             return makeCopyPcreRegex(*getPcreRegexView(val));
+        case TypeTags::jsFunction:
+            return makeCopyJsFunction(*getJsFunctionView(val));
         default:
             break;
     }

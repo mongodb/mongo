@@ -228,6 +228,7 @@ enum class Builtin : uint8_t {
     setUnion,
     setIntersection,
     setDifference,
+    runJsPredicate,
 };
 
 class CodeFragment {
@@ -572,6 +573,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSetUnion(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetIntersection(uint8_t arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetDifference(uint8_t arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinRunJsPredicate(uint8_t arity);
 
     std::tuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, uint8_t arity);
 

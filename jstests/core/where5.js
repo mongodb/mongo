@@ -3,7 +3,6 @@
 // @tags: [
 //   # Uses $where operator
 //   requires_scripting,
-//   sbe_incompatible,
 // ]
 
 var t = db.where5;

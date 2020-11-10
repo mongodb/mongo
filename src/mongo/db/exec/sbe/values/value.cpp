@@ -33,6 +33,7 @@
 
 #include <pcrecpp.h>
 
+#include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -50,6 +51,11 @@ std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey) {
 std::pair<TypeTags, Value> makeCopyPcreRegex(const pcrecpp::RE& regex) {
     auto ownedRegexVal = sbe::value::bitcastFrom<pcrecpp::RE*>(new pcrecpp::RE(regex));
     return {TypeTags::pcreRegex, ownedRegexVal};
+}
+
+std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {
+    auto ownedJsFunction = sbe::value::bitcastFrom<JsFunction*>(new JsFunction(jsFunction));
+    return {TypeTags::jsFunction, ownedJsFunction};
 }
 
 void releaseValue(TypeTags tag, Value val) noexcept {
@@ -84,6 +90,8 @@ void releaseValue(TypeTags tag, Value val) noexcept {
         case TypeTags::pcreRegex:
             delete getPcreRegexView(val);
             break;
+        case TypeTags::jsFunction:
+            delete getJsFunctionView(val);
         default:
             break;
     }
@@ -163,6 +171,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
             break;
         case TypeTags::RecordId:
             stream << "RecordId";
+            break;
+        case TypeTags::jsFunction:
+            stream << "jsFunction";
             break;
         default:
             stream << "unknown tag";
@@ -375,6 +386,10 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         }
         case value::TypeTags::RecordId:
             stream << "RecordId(" << bitcastTo<int64_t>(val) << ")";
+            break;
+        case value::TypeTags::jsFunction:
+            // TODO: Also include code.
+            stream << "jsFunction";
             break;
         default:
             MONGO_UNREACHABLE;

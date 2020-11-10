@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_non_retryable_commands,
  *   requires_scripting,
- *   sbe_incompatible,
  * ]
  */
 (function() {

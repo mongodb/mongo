@@ -6,7 +6,6 @@
 //   # be routed to the primary.
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
-//   sbe_incompatible,
 // ]
 load("jstests/libs/logv2_helpers.js");
 

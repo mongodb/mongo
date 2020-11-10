@@ -290,4 +290,5 @@ const char* jsSkipWhiteSpace(const char* raw);
 
 ScriptEngine* getGlobalScriptEngine();
 void setGlobalScriptEngine(ScriptEngine* impl);
+
 }  // namespace mongo

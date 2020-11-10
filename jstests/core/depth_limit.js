@@ -2,7 +2,6 @@
 // @tags: [
 //   # Uses $where operator
 //   requires_scripting,
-//   sbe_incompatible,
 // ]
 
 function test() {

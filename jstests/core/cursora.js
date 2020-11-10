@@ -4,7 +4,6 @@
 //   requires_non_retryable_writes,
 //   # Uses $where operator
 //   requires_scripting,
-//   sbe_incompatible,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
 // ]
