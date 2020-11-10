@@ -28,16 +28,18 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
     _INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
 
     def __init__(  # pylint: disable=too-many-arguments, too-many-locals
-            self, logger, job_num, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
-            num_nodes=2, start_initial_sync_node=False, write_concern_majority_journal_default=None,
-            auth_options=None, replset_config_options=None, voting_secondaries=True,
-            all_nodes_electable=False, use_replica_set_connection_string=None, linear_chain=False,
-            mixed_bin_versions=None, default_read_concern=None, default_write_concern=None,
-            shard_logging_prefix=None, replicaset_logging_prefix=None):
+            self, logger, job_num, mongod_executable=None, mongod_options=None, dbpath_prefix=None,
+            preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
+            write_concern_majority_journal_default=None, auth_options=None,
+            replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
+            use_replica_set_connection_string=None, linear_chain=False, mixed_bin_versions=None,
+            default_read_concern=None, default_write_concern=None, shard_logging_prefix=None,
+            replicaset_logging_prefix=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
 
+        self.mongod_executable = mongod_executable
         self.mongod_options = utils.default_if_none(mongod_options, {})
         self.preserve_dbpath = preserve_dbpath
         self.start_initial_sync_node = start_initial_sync_node
@@ -62,8 +64,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.num_nodes = num_replset_nodes if num_replset_nodes else num_nodes
 
         if self.mixed_bin_versions is not None:
-            mongod_executable = utils.default_if_none(config.MONGOD_EXECUTABLE,
-                                                      config.DEFAULT_MONGOD_EXECUTABLE)
+            mongod_executable = utils.default_if_none(
+                self.mongod_executable, config.MONGOD_EXECUTABLE, config.DEFAULT_MONGOD_EXECUTABLE)
             latest_mongod = mongod_executable
             # The last-lts binary is currently expected to live in '/data/multiversion', which is
             # part of the PATH.
@@ -591,8 +593,8 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
 
     def _new_mongod(self, index, replset_name):
         """Return a standalone.MongoDFixture configured to be used as replica-set member."""
-        mongod_executable = None if self.mixed_bin_versions is None else self.mixed_bin_versions[
-            index]
+        mongod_executable = (self.mongod_executable
+                             if self.mixed_bin_versions is None else self.mixed_bin_versions[index])
         mongod_logger = self._get_logger_for_mongod(index)
         mongod_options = self.mongod_options.copy()
         mongod_options["replSet"] = replset_name

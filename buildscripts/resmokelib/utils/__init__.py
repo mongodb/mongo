@@ -32,9 +32,13 @@ def open_or_use_stdout(filename):
         fp.close()
 
 
-def default_if_none(value, default):
-    """Set default if value is 'None'."""
-    return value if value is not None else default
+def default_if_none(*values):
+    """Return the first argument that is not 'None'."""
+    for value in values:
+        if value is not None:
+            return value
+
+    return None
 
 
 def rmtree(path, **kwargs):

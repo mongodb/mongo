@@ -64,7 +64,7 @@ DEFAULTS = {
     "include_with_any_tags": None,
     "install_dir": None,
     "jobs": 1,
-    "logger_file": None,
+    "logger_file": "console",
     "mongo_executable": None,
     "mongod_executable": None,
     "mongod_set_parameters": [],

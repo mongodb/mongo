@@ -4181,12 +4181,15 @@ tasks:
         targets: lint-errorcodes
 
 - name: test_api_version_compatibility
+  depends_on:
+    - name: compile
   commands:
     - command: manifest.load
     - func: "git get project"
     - func: "set task expansion macros"
     - func: "set up virtualenv"
     - func: "upload pip requirements"
+    - func: "do setup"
     - command: shell.exec
       type: test
       params:
@@ -4197,6 +4200,7 @@ tasks:
           set -o verbose
           ${activate_virtualenv}
 
+          $python buildscripts/idl/check_versioned_api_commands_have_idl_definitions.py -v --include src --installDir dist-test/bin 1
           $python buildscripts/idl/checkout_idl_files_from_past_releases.py -v idls
 
 - name: burn_in_tests_gen

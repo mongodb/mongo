@@ -25,10 +25,11 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
     _SHARD_REPLSET_NAME_PREFIX = "shard-rs"
 
     def __init__(  # pylint: disable=too-many-arguments,too-many-locals
-            self, logger, job_num, mongos_executable=None, mongos_options=None, mongod_options=None,
-            dbpath_prefix=None, preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=1,
-            num_mongos=1, enable_sharding=None, enable_balancer=True, enable_autosplit=True,
-            auth_options=None, configsvr_options=None, shard_options=None, mixed_bin_versions=None):
+            self, logger, job_num, mongos_executable=None, mongos_options=None,
+            mongod_executable=None, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
+            num_shards=1, num_rs_nodes_per_shard=1, num_mongos=1, enable_sharding=None,
+            enable_balancer=True, enable_autosplit=True, auth_options=None, configsvr_options=None,
+            shard_options=None, mixed_bin_versions=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, dbpath_prefix=dbpath_prefix)
@@ -39,6 +40,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         self.mongos_executable = mongos_executable
         self.mongos_options = utils.default_if_none(mongos_options, {})
         self.mongod_options = utils.default_if_none(mongod_options, {})
+        self.mongod_executable = mongod_executable
         self.mongod_options["set_parameters"] = mongod_options.get("set_parameters", {}).copy()
         self.mongod_options["set_parameters"]["migrationLockAcquisitionMaxWaitMS"] = \
                 mongod_options["set_parameters"].get("migrationLockAcquisitionMaxWaitMS", 30000)
@@ -276,8 +278,9 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
         return replicaset.ReplicaSetFixture(
             mongod_logger, self.job_num, mongod_options=mongod_options,
-            preserve_dbpath=preserve_dbpath, num_nodes=num_nodes, auth_options=auth_options,
-            mixed_bin_versions=None, replset_config_options=replset_config_options,
+            mongod_executable=self.mongod_executable, preserve_dbpath=preserve_dbpath,
+            num_nodes=num_nodes, auth_options=auth_options, mixed_bin_versions=None,
+            replset_config_options=replset_config_options,
             shard_logging_prefix=shard_logging_prefix, **configsvr_options)
 
     def _new_rs_shard(self, index, num_rs_nodes_per_shard):
@@ -308,11 +311,11 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         mongod_options["replSet"] = ShardedClusterFixture._SHARD_REPLSET_NAME_PREFIX + str(index)
 
         return replicaset.ReplicaSetFixture(
-            mongod_logger, self.job_num, mongod_options=mongod_options,
-            preserve_dbpath=preserve_dbpath, num_nodes=num_rs_nodes_per_shard,
-            auth_options=auth_options, replset_config_options=replset_config_options,
-            mixed_bin_versions=mixed_bin_versions, shard_logging_prefix=shard_logging_prefix,
-            **shard_options)
+            mongod_logger, self.job_num, mongod_executable=self.mongod_executable,
+            mongod_options=mongod_options, preserve_dbpath=preserve_dbpath,
+            num_nodes=num_rs_nodes_per_shard, auth_options=auth_options,
+            replset_config_options=replset_config_options, mixed_bin_versions=mixed_bin_versions,
+            shard_logging_prefix=shard_logging_prefix, **shard_options)
 
     def _new_standalone_shard(self, index):
         """Return a standalone.MongoDFixture configured as a shard in a sharded cluster."""
@@ -330,6 +333,7 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
         mongod_options["dbpath"] = os.path.join(self._dbpath_prefix, "shard{}".format(index))
 
         return standalone.MongoDFixture(mongod_logger, self.job_num, mongod_options=mongod_options,
+                                        mongod_executable=self.mongod_executable,
                                         preserve_dbpath=preserve_dbpath, **shard_options)
 
     def _new_mongos(self, index, total):
