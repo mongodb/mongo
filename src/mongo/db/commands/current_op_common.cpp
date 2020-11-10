@@ -33,9 +33,9 @@
 
 #include <string>
 
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/idl/command_generic_argument.h"
 
 namespace mongo {
 namespace {

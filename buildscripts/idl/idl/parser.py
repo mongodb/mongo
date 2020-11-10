@@ -461,6 +461,103 @@ def _parse_struct(ctxt, spec, name, node):
     spec.symbols.add_struct(ctxt, struct)
 
 
+def _parse_generic_argument_list(ctxt, spec, name, node):
+    # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
+    """Parse a generic_argument_lists section in the IDL file."""
+    if not ctxt.is_mapping_node(node, "generic_argument_list"):
+        return
+
+    field_list = syntax.GenericArgumentList(ctxt.file_name, node.start_mark.line,
+                                            node.start_mark.column)
+    field_list.name = name
+
+    _generic_parser(
+        ctxt, node, "generic_argument_list", field_list, {
+            "description":
+                _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "cpp_name":
+                _RuleDesc('scalar'),
+            "fields":
+                _RuleDesc('mapping', mapping_parser_func=_parse_generic_argument_list_entries),
+        })
+
+    spec.symbols.add_generic_argument_list(ctxt, field_list)
+
+
+def _parse_generic_reply_field_list(ctxt, spec, name, node):
+    # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
+    """Parse a generic_reply_field_lists section in the IDL file."""
+    if not ctxt.is_mapping_node(node, "generic_reply_field_list"):
+        return
+
+    field_list = syntax.GenericReplyFieldList(ctxt.file_name, node.start_mark.line,
+                                              node.start_mark.column)
+    field_list.name = name
+
+    _generic_parser(
+        ctxt, node, "generic_reply_field_list", field_list, {
+            "description":
+                _RuleDesc('scalar', _RuleDesc.REQUIRED),
+            "cpp_name":
+                _RuleDesc('scalar'),
+            "fields":
+                _RuleDesc('mapping', mapping_parser_func=_parse_generic_reply_field_list_entries),
+        })
+
+    spec.symbols.add_generic_reply_field_list(ctxt, field_list)
+
+
+def _parse_field_list_entry(ctxt, name, node, is_generic_argument_field_list):
+    # type: (errors.ParserContext, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], bool) -> syntax.FieldListEntry
+    """Parse an entry in a generic argument or generic reply field list in the IDL file."""
+    entry = syntax.FieldListEntry(ctxt.file_name, node.start_mark.line, node.start_mark.column)
+    entry.name = name
+
+    if is_generic_argument_field_list:
+        mapping_rules = {"forward_to_shards": _RuleDesc("bool_scalar")}
+    else:
+        mapping_rules = {"forward_from_shards": _RuleDesc("bool_scalar")}
+
+    _generic_parser(ctxt, node, "field", entry, mapping_rules)
+    return entry
+
+
+def _parse_field_list_entries(ctxt, node, is_generic_argument_field_list):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode, bool) -> List[syntax.FieldListEntry]
+    """Parse a fields section in a field list in the IDL file."""
+
+    entries = []
+
+    field_name_set = set()  # type: Set[str]
+
+    for [first_node, second_node] in node.value:
+
+        first_name = first_node.value
+
+        if first_name in field_name_set:
+            ctxt.add_duplicate_error(first_node, first_name)
+            continue
+        entry = _parse_field_list_entry(ctxt, first_name, second_node,
+                                        is_generic_argument_field_list)
+        entries.append(entry)
+
+        field_name_set.add(first_name)
+
+    return entries
+
+
+def _parse_generic_argument_list_entries(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode) -> List[syntax.FieldListEntry]
+    """Parse a fields section in a generic argument list in the IDL file."""
+    return _parse_field_list_entries(ctxt, node, True)
+
+
+def _parse_generic_reply_field_list_entries(ctxt, node):
+    # type: (errors.ParserContext, yaml.nodes.MappingNode) -> List[syntax.FieldListEntry]
+    """Parse a fields section in a generic reply field list in the IDL file."""
+    return _parse_field_list_entries(ctxt, node, False)
+
+
 def _parse_enum_values(ctxt, node):
     # type: (errors.ParserContext, yaml.nodes.MappingNode) -> List[syntax.EnumValue]
     """Parse a values section in an enum in the IDL file."""
@@ -535,8 +632,6 @@ def _parse_command(ctxt, spec, name, node):
             "api_version": _RuleDesc('scalar'),
             "is_deprecated": _RuleDesc('bool_scalar'),
             "unstable": _RuleDesc("bool_scalar"),
-            "forward_to_shards": _RuleDesc("bool_scalar"),
-            "forward_from_shards": _RuleDesc("bool_scalar"),
             "strict": _RuleDesc("bool_scalar"),
             "inline_chained_structs": _RuleDesc("bool_scalar"),
             "immutable": _RuleDesc('bool_scalar'),
@@ -770,6 +865,12 @@ def _parse(stream, error_file_name):
             _parse_mapping(ctxt, spec, second_node, 'structs', _parse_struct)
         elif first_name == "commands":
             _parse_mapping(ctxt, spec, second_node, 'commands', _parse_command)
+        elif first_name == "generic_argument_lists":
+            _parse_mapping(ctxt, spec, second_node, 'generic_argument_lists',
+                           _parse_generic_argument_list)
+        elif first_name == "generic_reply_field_lists":
+            _parse_mapping(ctxt, spec, second_node, 'generic_reply_field_lists',
+                           _parse_generic_reply_field_list)
         elif first_name == "server_parameters":
             _parse_mapping(ctxt, spec, second_node, "server_parameters", _parse_server_parameter)
         elif first_name == "configs":

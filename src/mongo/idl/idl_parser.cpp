@@ -34,7 +34,7 @@
 #include "mongo/idl/idl_parser.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/command_generic_argument.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

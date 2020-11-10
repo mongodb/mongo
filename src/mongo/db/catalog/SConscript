@@ -20,9 +20,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/command_generic_argument',
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

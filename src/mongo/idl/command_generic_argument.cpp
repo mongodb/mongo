@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,50 +29,28 @@
 
 #include "mongo/platform/basic.h"
 
-#include <benchmark/benchmark.h>
-
-#include "mongo/base/string_data.h"
-#include "mongo/idl/command_generic_argument.h"
+#include "mongo/idl/generic_argument_gen.h"
 
 namespace mongo {
-namespace {
 
-static std::vector<std::string> keys{
-    "a",  // short not found
-    "CrazyFieldDeliberatelyNotFound",
-    "$db",
-    "$audit",
-    "lsid",
-    "writeConcern",
-    "",
-};
-
-void BM_IsGeneric(benchmark::State& state) {
-    const auto& key = keys[state.range()];
-    state.SetLabel(key.c_str());
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(mongo::isGenericArgument(key));
-    }
-}
-void BM_IsRequestStripArgument(benchmark::State& state) {
-    const auto& key = keys[state.range()];
-    state.SetLabel(key.c_str());
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(mongo::isRequestStripArgument(key));
-    }
+bool isGenericArgument(StringData arg) {
+    return Generic_args_api_v1::hasField(arg) || Generic_args_unstable_v1::hasField(arg);
 }
 
-void BM_IsReplyStripArgument(benchmark::State& state) {
-    const auto& key = keys[state.range()];
-    state.SetLabel(key.c_str());
-    for (auto _ : state) {
-        benchmark::DoNotOptimize(mongo::isReplyStripArgument(key));
-    }
+// TODO(SERVER-51848): rename shouldForwardToShards
+bool isRequestStripArgument(StringData arg) {
+    return !(Generic_args_api_v1::shouldForwardToShards(arg) &&
+             Generic_args_unstable_v1::shouldForwardToShards(arg));
 }
 
-BENCHMARK(BM_IsGeneric)->DenseRange(0, keys.size() - 1);
-BENCHMARK(BM_IsRequestStripArgument)->DenseRange(0, keys.size() - 1);
-BENCHMARK(BM_IsReplyStripArgument)->DenseRange(0, keys.size() - 1);
+// TODO(SERVER-51848): rename shouldForwardFromShards
+bool isReplyStripArgument(StringData arg) {
+    return !(Generic_reply_fields_api_v1::shouldForwardFromShards(arg) &&
+             Generic_reply_fields_unstable_v1::shouldForwardFromShards(arg));
+}
 
-}  // namespace
+bool isMongocryptdArgument(StringData arg) {
+    return arg == "jsonSchema"_sd;
+}
+
 }  // namespace mongo

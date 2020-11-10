@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/health_log.h"
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
@@ -45,6 +44,7 @@
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/background.h"
 
 #include "mongo/logv2/log.h"

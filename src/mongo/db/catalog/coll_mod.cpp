@@ -40,7 +40,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
@@ -57,6 +56,7 @@
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 

@@ -38,7 +38,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/idl/command_generic_argument.h"
 
 namespace mongo {
 

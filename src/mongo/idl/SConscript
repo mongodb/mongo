@@ -6,11 +6,13 @@ env = env.Clone()
 env.Library(
     target="idl_parser",
     source=[
+        'command_generic_argument.cpp',
+        'generic_argument.idl',
         'idl_parser.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/command_generic_argument',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
     ]
 )
 
@@ -59,6 +61,7 @@ env.CppUnitTest(
     target='idl_test',
     source=[
         'config_option_test.cpp',
+        'command_generic_argument_test.cpp',
         'feature_flag_test.cpp',
         'idl_test.cpp',
         'server_parameter_specialized_test.cpp',

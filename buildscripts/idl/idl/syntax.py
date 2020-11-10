@@ -113,6 +113,8 @@ class SymbolTable(object):
         self.enums = []  # type: List[Enum]
         self.structs = []  # type: List[Struct]
         self.types = []  # type: List[Type]
+        self.generic_argument_lists = []  # type: List[GenericArgumentList]
+        self.generic_reply_field_lists = []  # type: List[GenericReplyFieldList]
 
     def _is_duplicate(self, ctxt, location, name, duplicate_class_name):
         # type: (errors.ParserContext, common.SourceLocation, str, str) -> bool
@@ -122,6 +124,8 @@ class SymbolTable(object):
                 "enum": self.enums,
                 "struct": self.structs,
                 "type": self.types,
+                "generic_argument_list": self.generic_argument_lists,
+                "generic_reply_field_list": self.generic_reply_field_lists,
         }):
             if item.name == name:
                 ctxt.add_duplicate_symbol_error(location, name, duplicate_class_name, entity_type)
@@ -157,6 +161,18 @@ class SymbolTable(object):
         """Add an IDL command to the symbol table and check for duplicates."""
         if not self._is_duplicate(ctxt, command, command.name, "command"):
             self.commands.append(command)
+
+    def add_generic_argument_list(self, ctxt, field_list):
+        # type: (errors.ParserContext, GenericArgumentList) -> None
+        """Add an IDL generic argument list to the symbol table and check for duplicates."""
+        if not self._is_duplicate(ctxt, field_list, field_list.name, "generic_argument_list"):
+            self.generic_argument_lists.append(field_list)
+
+    def add_generic_reply_field_list(self, ctxt, field_list):
+        # type: (errors.ParserContext, GenericReplyFieldList) -> None
+        """Add an IDL generic reply field list to the symbol table and check for duplicates."""
+        if not self._is_duplicate(ctxt, field_list, field_list.name, "generic_reply_field_list"):
+            self.generic_reply_field_lists.append(field_list)
 
     def add_imported_symbol_table(self, ctxt, imported_symbols):
         # type: (errors.ParserContext, SymbolTable) -> None
@@ -420,16 +436,47 @@ class Command(Struct):
         # type: (str, int, int) -> None
         """Construct a Command."""
         self.namespace = None  # type: str
+        self.command_name = None  # type: str
         self.type = None  # type: str
         self.reply_type = None  # type: str
         self.api_version = ""  # type: str
         self.is_deprecated = False  # type: bool
         self.unstable = False  # type: bool
+        super(Command, self).__init__(file_name, line, column)
+
+
+class FieldListBase(common.SourceLocation):
+    """IDL field list information."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a FieldList."""
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
+        self.description = None  # type: str
+        self.fields = None  # type: List[FieldListEntry]
+        super(FieldListBase, self).__init__(file_name, line, column)
+
+
+class GenericArgumentList(FieldListBase):
+    """IDL generic argument list."""
+
+
+class GenericReplyFieldList(FieldListBase):
+    """IDL generic reply field list."""
+
+
+class FieldListEntry(common.SourceLocation):
+    """Options for a field in a generic argument or generic reply field list."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a FieldListEntry."""
+        self.name = None  # type: str
         self.forward_to_shards = False  # type: bool
         self.forward_from_shards = False  # type: bool
         self.command_name = None  # type: str
-
-        super(Command, self).__init__(file_name, line, column)
+        super(FieldListEntry, self).__init__(file_name, line, column)
 
 
 class EnumValue(common.SourceLocation):

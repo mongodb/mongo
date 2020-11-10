@@ -87,7 +87,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/command_generic_argument',
         '$BUILD_DIR/mongo/db/namespace_string',
     ],
     LIBDEPS_PRIVATE=[

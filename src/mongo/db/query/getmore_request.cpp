@@ -35,10 +35,10 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/bson_extract_optime.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

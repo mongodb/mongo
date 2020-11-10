@@ -44,9 +44,9 @@
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/str.h"
 

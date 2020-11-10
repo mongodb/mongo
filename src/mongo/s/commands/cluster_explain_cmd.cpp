@@ -29,9 +29,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/s/query/cluster_find.h"
 
 namespace mongo {

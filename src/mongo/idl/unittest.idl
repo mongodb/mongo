@@ -805,3 +805,30 @@ commands:
         command_name: CommandWithOkReply
         namespace: ignored
         reply_type: OkReply
+
+
+##################################################################################################
+#
+# Test field lists
+#
+##################################################################################################
+
+generic_argument_lists:
+    my_generic_args_list:
+        description: UnitTest for generic arguments list
+        fields:
+            my_generic_field_0:
+                forward_to_shards: false
+            my_generic_field_1:
+                forward_to_shards: true
+            my_generic_field_3: {}
+
+generic_reply_field_lists:
+    my_generic_reply_field_list:
+        description: UnitTest for generic reply fields list
+        fields:
+            my_generic_field_0:
+                forward_from_shards: false
+            my_generic_field_1:
+                forward_from_shards: true
+            my_generic_field_3: {}

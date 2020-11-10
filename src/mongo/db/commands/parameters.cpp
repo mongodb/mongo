@@ -38,11 +38,11 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/parameters_gen.h"
 #include "mongo/db/commands/parse_log_component_settings.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 

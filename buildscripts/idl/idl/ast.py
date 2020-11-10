@@ -33,11 +33,10 @@ Represents the derived IDL specification after type resolution in the binding pa
 This is a lossy translation from the IDL Syntax tree as the IDL AST only contains information about
 the enums and structs that need code generated for them, and just enough information to do that.
 """
+from abc import ABCMeta, abstractmethod
+from typing import List, Optional
 
-from typing import List, Union, Any, Optional, Tuple
-
-from . import common
-from . import errors
+from . import common, errors
 
 
 class IDLBoundSpec(object):
@@ -55,6 +54,8 @@ class IDLBoundSpec(object):
 class IDLAST(object):
     """The in-memory representation of an IDL file."""
 
+    # pylint: disable=too-many-instance-attributes
+
     def __init__(self):
         # type: () -> None
         """Construct an IDLAST."""
@@ -63,7 +64,8 @@ class IDLAST(object):
         self.commands = []  # type: List[Command]
         self.enums = []  # type: List[Enum]
         self.structs = []  # type: List[Struct]
-
+        self.generic_argument_lists = []  # type: List[GenericArgumentList]
+        self.generic_reply_field_lists = []  # type: List[GenericReplyFieldList]
         self.server_parameters = []  # type: List[ServerParameter]
         self.configs = []  # type: List[ConfigOption]
 
@@ -217,10 +219,65 @@ class Command(Struct):
         self.api_version = ""  # type: str
         self.is_deprecated = False  # type: bool
         self.unstable = False  # type: bool
+        super(Command, self).__init__(file_name, line, column)
+
+
+class FieldListBase(common.SourceLocation, metaclass=ABCMeta):
+    """Base class for generic argument or reply field lists."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a field list."""
+        self.name = None  # type: str
+        self.cpp_name = None  # type: str
+        self.description = None  # type: str
+        self.fields = []  # type: List[FieldListEntry]
+        super(FieldListBase, self).__init__(file_name, line, column)
+
+    @abstractmethod
+    def get_should_forward_name(self):
+        # type: () -> str
+        """Get the name of the shard-forwarding rule for this generic argument or reply field."""
+        pass
+
+
+class GenericArgumentList(FieldListBase):
+    """IDL generic argument list."""
+
+    def get_should_forward_name(self):
+        # type: () -> str
+        """Get the name of the shard-forwarding rule for a generic argument."""
+        return "shouldForwardToShards"
+
+
+class GenericReplyFieldList(FieldListBase):
+    """IDL generic reply field list."""
+
+    def get_should_forward_name(self):
+        # type: () -> str
+        """Get the name of the shard-forwarding rule for a generic reply field."""
+        return "shouldForwardFromShards"
+
+
+class FieldListEntry(common.SourceLocation):
+    """Options for a field in a field list."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a FieldListEntry."""
+        self.name = None  # type: str
         self.forward_to_shards = False  # type: bool
         self.forward_from_shards = False  # type: bool
+
         self.command_name = None  # type: str
-        super(Command, self).__init__(file_name, line, column)
+        super(FieldListEntry, self).__init__(file_name, line, column)
+
+    def get_should_forward(self):
+        """Get the shard-forwarding rule for a generic argument or reply field."""
+        assert not (self.forward_to_shards and self.forward_from_shards), \
+            "Only FieldListEntry.forward_to_shards or forward_from_shards should be set"
+
+        return self.forward_to_shards or self.forward_from_shards
 
 
 class EnumValue(common.SourceLocation):

@@ -34,9 +34,9 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/query/hint_parser.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 
 namespace mongo {

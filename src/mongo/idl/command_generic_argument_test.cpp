@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2020-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,18 +29,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/command_generic_argument.h"
-#include "mongo/util/string_map.h"
-
-#include <algorithm>
-#include <array>
-#include <cstdlib>
-#include <iterator>
+#include "mongo/idl/command_generic_argument.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
+namespace test {
 
-namespace {
+using namespace fmt::literals;
 
+// A copy of the generic command arguments and reply fields from before they were moved to IDL in
+// SERVER-51848. We will test that the IDL definitions match these old C++ definitions.
 struct SpecialArgRecord {
     StringData name;
     bool isGeneric;
@@ -48,9 +46,6 @@ struct SpecialArgRecord {
     bool stripFromReply;
 };
 
-// Not including "help" since we don't pass help requests through to the command parser.
-// If that changes, it should be added. When you add to this list, consider whether you
-// should also change the filterCommandRequestForPassthrough() function.
 // clang-format off
 static constexpr std::array<SpecialArgRecord, 34> specials{{
     //                                       /-isGeneric
@@ -92,36 +87,23 @@ static constexpr std::array<SpecialArgRecord, 34> specials{{
     {"$topologyTime"_sd,                     1, 1, 1}}};
 // clang-format on
 
-template <bool SpecialArgRecord::*pmo>
-bool filteredSpecialsContains(StringData arg) {
-    static const auto& filteredNames = *new auto([] {
-        StringSet s;
-        for (const auto& e : specials) {
-            if (e.*pmo) {
-                s.insert(e.name.toString());
-            }
+TEST(CommandGenericArgument, AllGenericArgumentsAndReplyFields) {
+    for (const auto& record : specials) {
+        if (isGenericArgument(record.name) != record.isGeneric) {
+            FAIL("isGenericArgument('{}') should be {}, but it's {}"_format(
+                record.name, record.isGeneric, isGenericArgument(record.name)));
         }
-        return s;
-    }());
-    return filteredNames.count(arg) > 0;
+
+        if (isRequestStripArgument(record.name) != record.stripFromRequest) {
+            FAIL("isRequestStripArgument('{}') should be {}, but it's {}"_format(
+                record.name, record.stripFromRequest, isRequestStripArgument(record.name)));
+        }
+
+        if (isReplyStripArgument(record.name) != record.stripFromReply) {
+            FAIL("isReplyStripArgument('{}') should be {}, but it's {}"_format(
+                record.name, record.stripFromReply, isReplyStripArgument(record.name)));
+        }
+    }
 }
-
-}  // namespace
-
-bool isGenericArgument(StringData arg) {
-    return filteredSpecialsContains<&SpecialArgRecord::isGeneric>(arg);
-}
-
-bool isRequestStripArgument(StringData arg) {
-    return filteredSpecialsContains<&SpecialArgRecord::stripFromRequest>(arg);
-}
-
-bool isReplyStripArgument(StringData arg) {
-    return filteredSpecialsContains<&SpecialArgRecord::stripFromReply>(arg);
-}
-
-bool isMongocryptdArgument(StringData arg) {
-    return arg == "jsonSchema"_sd;
-}
-
+}  // namespace test
 }  // namespace mongo

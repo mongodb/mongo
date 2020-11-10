@@ -36,7 +36,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/command_generic_argument.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/idl/command_generic_argument.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
