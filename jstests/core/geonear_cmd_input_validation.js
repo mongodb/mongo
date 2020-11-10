@@ -6,7 +6,7 @@
 // ]
 var t = db.geonear_cmd_input_validation;
 t.drop();
-t.ensureIndex({loc: "2dsphere"});
+t.createIndex({loc: "2dsphere"});
 
 // The test matrix. Some combinations are not supported:
 //     2d index and GeoJSON.

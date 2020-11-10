@@ -14,7 +14,7 @@ for (x = 0; x <= 20; x++) {
     }
 }
 
-t.ensureIndex({loc: "2d"});
+t.createIndex({loc: "2d"});
 
 searches = [
     [[1, 2], [4, 5]],

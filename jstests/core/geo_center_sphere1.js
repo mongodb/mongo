@@ -45,7 +45,7 @@ function test(index) {
     assert.commandWorked(bulk.execute());
 
     if (index) {
-        t.ensureIndex({loc: index});
+        t.createIndex({loc: index});
     }
 
     for (i = 0; i < searches.length; i++) {

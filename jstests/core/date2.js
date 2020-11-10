@@ -3,7 +3,7 @@
 t = db.jstests_date2;
 t.drop();
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 var obj = {a: new Timestamp(0, 1)};  // in old versions this was == to new Date(1)
 t.save(obj);

@@ -24,8 +24,8 @@ assert.commandWorked(coll.insert({a: 1, b: 3}));
 assert.commandWorked(coll.insert({a: 2, b: 2}));
 assert.commandWorked(coll.insert({a: 3, b: 1}));
 
-assert.commandWorked(coll.ensureIndex({a: 1}));
-assert.commandWorked(coll.ensureIndex({b: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({b: 1}));
 
 // Basic returnKey.
 results = coll.find().hint({a: 1}).sort({a: 1}).returnKey().toArray();

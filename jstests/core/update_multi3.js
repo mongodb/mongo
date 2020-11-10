@@ -6,7 +6,7 @@ function test(useIndex) {
     t.drop();
 
     if (useIndex)
-        t.ensureIndex({k: 1});
+        t.createIndex({k: 1});
 
     for (i = 0; i < 10; i++) {
         t.save({_id: i, k: 'x', a: []});

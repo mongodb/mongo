@@ -19,8 +19,8 @@ for (var i = 0; i < 3; i++) {
     var t = db.find_and_modify_concurrent;
     t.drop();
 
-    assert.commandWorked(t.ensureIndex({a: 1}));
-    assert.commandWorked(t.ensureIndex({b: 1}));
+    assert.commandWorked(t.createIndex({a: 1}));
+    assert.commandWorked(t.createIndex({b: 1}));
     assert.commandWorked(t.insert({_id: 1, a: 1, b: 1}));
 
     var join =

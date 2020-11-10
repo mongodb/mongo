@@ -99,7 +99,7 @@ assert.eq(collectionInfos[0].options.collation, {
 });
 
 // Ensure that an index with no collation inherits the collection-default collation.
-assert.commandWorked(coll.ensureIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
 assertIndexHasCollation({a: 1}, {
     locale: "fr_CA",
     caseLevel: false,
@@ -115,7 +115,7 @@ assertIndexHasCollation({a: 1}, {
 
 // Ensure that an index which specifies an overriding collation does not use the collection
 // default.
-assert.commandWorked(coll.ensureIndex({b: 1}, {collation: {locale: "en_US"}}));
+assert.commandWorked(coll.createIndex({b: 1}, {collation: {locale: "en_US"}}));
 assertIndexHasCollation({b: 1}, {
     locale: "en_US",
     caseLevel: false,
@@ -131,11 +131,11 @@ assertIndexHasCollation({b: 1}, {
 
 // Ensure that an index which specifies the "simple" collation as an overriding collation still
 // does not use the collection default.
-assert.commandWorked(coll.ensureIndex({d: 1}, {collation: {locale: "simple"}}));
+assert.commandWorked(coll.createIndex({d: 1}, {collation: {locale: "simple"}}));
 assertIndexHasCollation({d: 1}, {locale: "simple"});
 
 // Ensure that a v=1 index doesn't inherit the collection-default collation.
-assert.commandWorked(coll.ensureIndex({c: 1}, {v: 1}));
+assert.commandWorked(coll.createIndex({c: 1}, {v: 1}));
 assertIndexHasCollation({c: 1}, {locale: "simple"});
 
 // Test that all indexes retain their current collation when the collection is re-indexed. (Only
@@ -177,20 +177,20 @@ coll.drop();
 //
 
 // Attempting to build an index with an invalid collation should fail.
-assert.commandFailed(coll.ensureIndex({a: 1}, {collation: "not an object"}));
-assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {}}));
-assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {blah: 1}}));
-assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "en", blah: 1}}));
-assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "xx"}}));
-assert.commandFailed(coll.ensureIndex({a: 1}, {collation: {locale: "en", strength: 99}}));
+assert.commandFailed(coll.createIndex({a: 1}, {collation: "not an object"}));
+assert.commandFailed(coll.createIndex({a: 1}, {collation: {}}));
+assert.commandFailed(coll.createIndex({a: 1}, {collation: {blah: 1}}));
+assert.commandFailed(coll.createIndex({a: 1}, {collation: {locale: "en", blah: 1}}));
+assert.commandFailed(coll.createIndex({a: 1}, {collation: {locale: "xx"}}));
+assert.commandFailed(coll.createIndex({a: 1}, {collation: {locale: "en", strength: 99}}));
 
 // Attempting to create an index whose collation version does not match the collator version
 // produced by ICU should result in failure with a special error code.
 assert.commandFailedWithCode(
-    coll.ensureIndex({a: 1}, {collation: {locale: "en", version: "unknownVersion"}}),
+    coll.createIndex({a: 1}, {collation: {locale: "en", version: "unknownVersion"}}),
     ErrorCodes.IncompatibleCollationVersion);
 
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 assertIndexHasCollation({a: 1}, {
     locale: "en_US",
     caseLevel: false,
@@ -335,7 +335,7 @@ assert.eq(0, coll.aggregate([{$match: {str: "FOO"}}], {collation: {locale: "simp
 // default collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]);
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
@@ -343,7 +343,7 @@ assert(isIxscan(db, explain.queryPlanner.winningPlan));
 // collation is incompatible with index collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.explain("queryPlanner").aggregate([{$match: {a: "foo"}}]);
 assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
@@ -505,7 +505,7 @@ assert.eq(1, coll.distinct("_id", {str: "foo"}, {collation: {locale: "simple"}})
 // default collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.explain("queryPlanner").distinct("a");
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "DISTINCT_SCAN"));
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
@@ -534,7 +534,7 @@ assert(!planHasStage(db, explain.queryPlanner.winningPlan, "FETCH"));
 // incompatible with index collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.explain("queryPlanner").distinct("a");
 assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
@@ -608,7 +608,7 @@ if (db.getMongo().useReadCommands()) {
               coll.find({str: {$ne: "FOO"}}).collation({locale: "en_US", strength: 2}).itcount());
 
     // Find should return correct results when collation specified and compatible index exists.
-    assert.commandWorked(coll.ensureIndex({str: 1}, {collation: {locale: "en_US", strength: 2}}));
+    assert.commandWorked(coll.createIndex({str: 1}, {collation: {locale: "en_US", strength: 2}}));
     assert.eq(0, coll.find({str: "FOO"}).hint({str: 1}).itcount());
     assert.eq(0, coll.find({str: "FOO"}).collation({locale: "en_US"}).hint({str: 1}).itcount());
     assert.eq(
@@ -623,7 +623,7 @@ if (db.getMongo().useReadCommands()) {
 
     // Find should return correct results when collation specified and compatible partial index
     // exists.
-    assert.commandWorked(coll.ensureIndex({str: 1}, {
+    assert.commandWorked(coll.createIndex({str: 1}, {
         partialFilterExpression: {str: {$lte: "FOO"}},
         collation: {locale: "en_US", strength: 2}
     }));
@@ -644,7 +644,7 @@ if (db.getMongo().useReadCommands()) {
 
     // Ensure results from an index that doesn't match the query collation are sorted to match
     // the requested collation.
-    assert.commandWorked(coll.ensureIndex({a: 1}));
+    assert.commandWorked(coll.createIndex({a: 1}));
     var res =
         coll.find({a: {'$exists': true}}, {_id: 0}).collation({locale: "en_US", strength: 3}).sort({
             a: 1
@@ -746,7 +746,7 @@ if (db.getMongo().useReadCommands()) {
 // collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "en_US"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "en_US"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
@@ -754,7 +754,7 @@ assert(isIxscan(db, explain.queryPlanner.winningPlan));
 // collation is "simple".
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "simple"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
@@ -762,7 +762,7 @@ assert(isIxscan(db, explain.queryPlanner.winningPlan));
 // collection has a non-"simple" default collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.find({a: "foo"}).explain("queryPlanner");
 assert(isCollscan(db, explain.queryPlanner.winningPlan));
 
@@ -770,7 +770,7 @@ assert(isCollscan(db, explain.queryPlanner.winningPlan));
 // non-"simple" default collation.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
-assert.commandWorked(coll.ensureIndex({a: 1}, {collation: {locale: "simple"}}));
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 var explain = coll.find({a: "foo"}).collation({locale: "simple"}).explain("queryPlanner");
 assert(isIxscan(db, explain.queryPlanner.winningPlan));
 
@@ -1314,14 +1314,14 @@ const geoNearStage = {
 
 // $geoNear should return correct results when collation specified and string predicate not
 // indexed.
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 assert.eq(0, coll.aggregate([geoNearStage]).itcount());
 assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
 
 // $geoNear should return correct results when no collation specified and string predicate
 // indexed.
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere", str: 1}));
 assert.eq(0, coll.aggregate([geoNearStage]).itcount());
 assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
 
@@ -1329,7 +1329,7 @@ assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", streng
 // incompatible with string predicate.
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(
-    coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
+    coll.createIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
 assert.eq(0, coll.aggregate([geoNearStage]).itcount());
 assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
 
@@ -1337,7 +1337,7 @@ assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", streng
 // compatible with string predicate.
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(
-    coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
+    coll.createIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
 assert.eq(0, coll.aggregate([geoNearStage]).itcount());
 assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", strength: 2}}).itcount());
 
@@ -1346,7 +1346,7 @@ assert.eq(1, coll.aggregate([geoNearStage], {collation: {locale: "en_US", streng
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.eq(1, coll.aggregate([geoNearStage]).itcount());
 
@@ -1355,7 +1355,7 @@ assert.eq(1, coll.aggregate([geoNearStage]).itcount());
 coll.drop();
 assert.commandWorked(
     db.createCollection(coll.getName(), {collation: {locale: "en_US", strength: 2}}));
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
 assert.eq(0, coll.aggregate([geoNearStage], {collation: {locale: "simple"}}).itcount());
 
@@ -1378,7 +1378,7 @@ if (db.getMongo().useReadCommands()) {
     // predicate not indexed.
     coll.drop();
     assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, str: "abc"}));
-    assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+    assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
     assert.eq(
         0,
         coll.find(
@@ -1394,7 +1394,7 @@ if (db.getMongo().useReadCommands()) {
     // Find with $nearSphere should return correct results when no collation specified and
     // string predicate indexed.
     assert.commandWorked(coll.dropIndexes());
-    assert.commandWorked(coll.ensureIndex({geo: "2dsphere", str: 1}));
+    assert.commandWorked(coll.createIndex({geo: "2dsphere", str: 1}));
     assert.eq(
         0,
         coll.find(
@@ -1411,7 +1411,7 @@ if (db.getMongo().useReadCommands()) {
     // collation on index is incompatible with string predicate.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
-        coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
+        coll.createIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 3}}));
     assert.eq(
         0,
         coll.find(
@@ -1428,7 +1428,7 @@ if (db.getMongo().useReadCommands()) {
     // collation on index is compatible with string predicate.
     assert.commandWorked(coll.dropIndexes());
     assert.commandWorked(
-        coll.ensureIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
+        coll.createIndex({geo: "2dsphere", str: 1}, {collation: {locale: "en_US", strength: 2}}));
     assert.eq(
         0,
         coll.find(
@@ -1886,7 +1886,7 @@ if (db.getMongo().useReadCommands()) {
 
     // Ensure results from index with min/max query are sorted to match requested collation.
     coll.drop();
-    assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+    assert.commandWorked(coll.createIndex({a: 1, b: 1}));
     assert.commandWorked(
         coll.insert([{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "A"}, {a: 1, b: "a"}, {a: 2, b: 2}]));
     var expected = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 1, b: "a"}, {a: 1, b: "A"}, {a: 2, b: 2}];

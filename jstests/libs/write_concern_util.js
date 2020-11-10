@@ -8,7 +8,7 @@ load("jstests/libs/fail_point_util.js");
 function shardCollectionWithChunks(st, coll, numDocs) {
     var _db = coll.getDB();
     var numberDoc = numDocs || 20;
-    coll.ensureIndex({x: 1}, {unique: true});
+    coll.createIndex({x: 1}, {unique: true});
     st.ensurePrimaryShard(_db.toString(), st.shard0.shardName);
     st.shardColl(
         coll.getName(), {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, _db.toString(), true);

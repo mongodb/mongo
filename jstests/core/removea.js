@@ -10,7 +10,7 @@ Random.setRandomSeed();
 
 for (let v = 0; v < 2; ++v) {  // Try each index version.
     t.drop();
-    t.ensureIndex({a: 1}, {v: v});
+    t.createIndex({a: 1}, {v: v});
     const S = 100;
     const B = 100;
     for (let x = 0; x < S; x++) {

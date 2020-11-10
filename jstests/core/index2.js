@@ -40,7 +40,7 @@ assert(t.findOne({z: {a: 17}}).z.a == 17);
 assert(t.find({z: {a: 17}}).length() == 2);
 assert(t.find({z: {a: 18}}).length() == 1);
 
-t.ensureIndex({z: 1});
+t.createIndex({z: 1});
 
 assert(t.findOne({z: {a: 17}}).z.a == 17);
 assert(t.find({z: {a: 17}}).length() == 2);

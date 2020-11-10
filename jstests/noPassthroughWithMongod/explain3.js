@@ -8,7 +8,7 @@ s1 = startParallelShell(function() {
     t = db.jstests_slowNightly_explain3;
     for (var i = 0; i < 80; ++i) {
         t.drop();
-        t.ensureIndex({x: 1});
+        t.createIndex({x: 1});
         for (var j = 0; j < 1000; ++j) {
             t.save({x: j, y: 1});
         }

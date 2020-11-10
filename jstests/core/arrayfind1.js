@@ -26,7 +26,7 @@ t.save({a: [{x: 4}]});
 assert.eq(1, t.find({a: {$elemMatch: {x: 2}}}).count(), "B1");
 assert.eq(2, t.find({a: {$elemMatch: {x: {$gt: 2}}}}).count(), "B2");
 
-t.ensureIndex({"a.x": 1});
+t.createIndex({"a.x": 1});
 assert.eq(1, t.find({a: {$elemMatch: {x: 2}}}).count(), "D1");
 assert.eq(3, t.find({"a.x": 1}).count(), "D2.1");
 assert.eq(3, t.find({"a.x": {$gt: 1}}).count(), "D2.2");

@@ -24,9 +24,9 @@ function test(withIndex) {
     Z = t.find(query).count();
 
     if (withIndex) {
-        // t.ensureIndex( { 'a.b.c' : 1, 'created' : -1 } )
-        // t.ensureIndex( { created : -1 } )
-        t.ensureIndex({'a.b.c': 1}, {name: "x"});
+        // t.createIndex( { 'a.b.c' : 1, 'created' : -1 } )
+        // t.createIndex( { created : -1 } )
+        t.createIndex({'a.b.c': 1}, {name: "x"});
     }
 
     var res = t.update(query, {'$set': {"a.0.b.c": 0}}, false, true);

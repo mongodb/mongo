@@ -3,7 +3,7 @@
 t = db.jstests_exists4;
 t.drop();
 
-t.ensureIndex({date: -1, country_code: 1, user_id: 1}, {unique: 1, background: 1});
+t.createIndex({date: -1, country_code: 1, user_id: 1}, {unique: 1, background: 1});
 t.insert({date: new Date("08/27/2010"), tot_visit: 100});
 t.insert({date: new Date("08/27/2010"), country_code: "IT", tot_visit: 77});
 t.insert({date: new Date("08/27/2010"), country_code: "ES", tot_visit: 23});

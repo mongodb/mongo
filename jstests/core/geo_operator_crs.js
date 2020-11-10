@@ -14,7 +14,7 @@ coll.drop();
 // Test 2dsphere index
 //
 
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 
 var legacyZeroPt = [0, 0];
 var jsonZeroPt = {type: "Point", coordinates: [0, 0]};
@@ -42,7 +42,7 @@ assert.commandWorked(coll.dropIndexes());
 // Test 2d Index
 //
 
-assert.commandWorked(coll.ensureIndex({geo: "2d"}));
+assert.commandWorked(coll.createIndex({geo: "2d"}));
 
 assert.commandWorked(coll.insert({geo: legacy90Pt}));
 
@@ -55,7 +55,7 @@ assert.close(result[0].dis, Math.PI / 2);
 // Test with a 2d and 2dsphere index using the aggregation $geoNear stage.
 //
 
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 result = coll.aggregate({$geoNear: {near: jsonZeroPt, distanceField: "dis"}}).toArray();
 assert.close(result[0].dis, (Math.PI / 2) * earthRadiusMeters);
 }());

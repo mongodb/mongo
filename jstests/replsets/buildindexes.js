@@ -26,7 +26,7 @@ for (var i in secondaryConns) {
 }
 replTest.awaitReplication();
 
-primary.x.ensureIndex({y: 1});
+primary.x.createIndex({y: 1});
 
 for (i = 0; i < 100; i++) {
     primary.x.insert({x: 1, y: "abc", c: 1});

@@ -10,7 +10,7 @@ var msg = "Hello from remove test";
 function testSetup(dbConn) {
     var t = dbConn[collection_name];
     t.drop();
-    t.ensureIndex({num: 1});
+    t.createIndex({num: 1});
 
     for (var i = 0; i < size; i++) {
         t.save({num: i, msg: msg});

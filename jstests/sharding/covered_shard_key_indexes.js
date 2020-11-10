@@ -25,19 +25,19 @@ assert.commandWorked(
 assert.commandWorked(coll.insert({_id: true, a: true, b: true}));
 
 // Index without shard key query - not covered
-assert.commandWorked(coll.ensureIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(1, coll.find({a: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(1, coll.find({a: true}, {_id: 1, a: 1}).explain(true).executionStats.totalDocsExamined);
 
 // Index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(coll.ensureIndex({a: 1, _id: 1}));
+assert.commandWorked(coll.createIndex({a: 1, _id: 1}));
 assert.eq(1, coll.find({a: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(0, coll.find({a: true}, {_id: 1, a: 1}).explain(true).executionStats.totalDocsExamined);
 
 // Compound index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(coll.ensureIndex({a: 1, b: 1, _id: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1, _id: 1}));
 assert.eq(1, coll.find({a: true, b: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(
     0,
@@ -52,7 +52,7 @@ st.printShardingStatus();
 assert.commandWorked(coll.insert({_id: true, a: true, b: true}));
 
 // Index without shard key query - not covered
-assert.commandWorked(coll.ensureIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
 assert.eq(1, coll.find({a: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(1, coll.find({a: true}, {_id: 0, a: 1}).explain(true).executionStats.totalDocsExamined);
 
@@ -70,7 +70,7 @@ st.printShardingStatus();
 assert.commandWorked(coll.insert({_id: true, a: true, b: true, c: true, d: true}));
 
 // Index without shard key query - not covered
-assert.commandWorked(coll.ensureIndex({c: 1}));
+assert.commandWorked(coll.createIndex({c: 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(1,
           coll.find({c: true}, {_id: 0, a: 1, b: 1, c: 1})
@@ -79,7 +79,7 @@ assert.eq(1,
 
 // Index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndex({c: 1}));
-assert.commandWorked(coll.ensureIndex({c: 1, b: 1, a: 1}));
+assert.commandWorked(coll.createIndex({c: 1, b: 1, a: 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(0,
           coll.find({c: true}, {_id: 0, a: 1, b: 1, c: 1})
@@ -88,7 +88,7 @@ assert.eq(0,
 
 // Compound index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndex({c: 1, b: 1, a: 1}));
-assert.commandWorked(coll.ensureIndex({c: 1, d: 1, a: 1, b: 1, _id: 1}));
+assert.commandWorked(coll.createIndex({c: 1, d: 1, a: 1, b: 1, _id: 1}));
 assert.eq(1, coll.find({c: true, d: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(0,
           coll.find({c: true, d: true}, {a: 1, b: 1, c: 1, d: 1})
@@ -104,7 +104,7 @@ st.printShardingStatus();
 assert.commandWorked(coll.insert({_id: true, a: {b: true}, c: true}));
 
 // Index without shard key query - not covered
-assert.commandWorked(coll.ensureIndex({c: 1}));
+assert.commandWorked(coll.createIndex({c: 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(
     1,
@@ -112,7 +112,7 @@ assert.eq(
 
 // Index with shard key query - can be covered given the appropriate projection.
 assert.commandWorked(coll.dropIndex({c: 1}));
-assert.commandWorked(coll.ensureIndex({c: 1, 'a.b': 1}));
+assert.commandWorked(coll.createIndex({c: 1, 'a.b': 1}));
 assert.eq(1, coll.find({c: true}).explain(true).executionStats.totalDocsExamined);
 assert.eq(
     0,
@@ -127,7 +127,7 @@ st.printShardingStatus();
 assert.commandWorked(st.shard0.getCollection(coll.toString()).insert({_id: "bad data", c: true}));
 
 // Index without shard key query - not covered but succeeds
-assert.commandWorked(coll.ensureIndex({c: 1}));
+assert.commandWorked(coll.createIndex({c: 1}));
 var explain = coll.find({c: true}).explain(true).executionStats;
 assert.eq(1, explain.nReturned);
 assert.eq(1, explain.totalDocsExamined);
@@ -137,7 +137,7 @@ assert.eq(0, getChunkSkips(explain.executionStages.shards[0].executionStages));
 //
 // NOTE: This is weird and only a result of the fact that we don't have a dedicated "does not
 // exist" value for indexes
-assert.commandWorked(coll.ensureIndex({c: 1, a: 1}));
+assert.commandWorked(coll.createIndex({c: 1, a: 1}));
 var explain = coll.find({c: true}, {_id: 0, a: 1, c: 1}).explain(true).executionStats;
 assert.eq(1, explain.nReturned);
 assert.eq(0, explain.totalDocsExamined);

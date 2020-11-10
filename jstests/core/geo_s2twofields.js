@@ -55,7 +55,7 @@ function timeWithoutAndWithAnIndex(index, query) {
     var withoutTime = semiRigorousTime(function() {
         return t.find(query).explain("executionStats").executionStats.executionTimeMillis;
     });
-    t.ensureIndex(index);
+    t.createIndex(index);
     var withTime = semiRigorousTime(function() {
         return t.find(query).explain("executionStats").executionStats.executionTimeMillis;
     });

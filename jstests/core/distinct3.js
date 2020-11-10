@@ -10,8 +10,8 @@
 t = db.jstests_distinct3;
 t.drop();
 
-t.ensureIndex({a: 1});
-t.ensureIndex({b: 1});
+t.createIndex({a: 1});
+t.createIndex({b: 1});
 
 var bulk = t.initializeUnorderedBulkOp();
 for (i = 0; i < 50; ++i) {

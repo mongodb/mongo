@@ -25,10 +25,10 @@ const failPoint = "hangTTLCollectionCacheAfterRegisteringInfo";
 assert.commandWorked(db.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
 
 // Create an index on a non-existent collection. This will implicitly create the collection.
-let awaitEnsureIndex = startParallelShell(() => {
+let awaitcreateIndex = startParallelShell(() => {
     const testDB = db.getSiblingDB(TestData.dbName);
     assert.commandWorked(
-        testDB.getCollection(TestData.collName).ensureIndex({x: 1}, {expireAfterSeconds: 0}));
+        testDB.getCollection(TestData.collName).createIndex({x: 1}, {expireAfterSeconds: 0}));
 }, db.getMongo().port);
 
 // Wait for the TTL monitor to run and register the index in the TTL collection cache.
@@ -43,7 +43,7 @@ assert.soon(function() {
 
 // Finish the index build.
 assert.commandWorked(db.adminCommand({configureFailPoint: failPoint, mode: "off"}));
-awaitEnsureIndex();
+awaitcreateIndex();
 
 // Insert documents, which should expire immediately and be removed on the next TTL pass.
 const now = new Date();

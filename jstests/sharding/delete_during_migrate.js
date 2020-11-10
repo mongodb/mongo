@@ -28,7 +28,7 @@ for (var i = 0; i < 200000; i++) {
 assert.commandWorked(bulk.execute());
 
 // enable sharding of the collection. Only 1 chunk.
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 assert.commandWorked(st.s0.adminCommand({shardcollection: ns, key: {a: 1}}));
 

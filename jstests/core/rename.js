@@ -12,8 +12,8 @@ c.drop();
 
 a.save({a: 1});
 a.save({a: 2});
-a.ensureIndex({a: 1});
-a.ensureIndex({b: 1});
+a.createIndex({a: 1});
+a.createIndex({b: 1});
 
 c.save({a: 100});
 assert.commandFailed(

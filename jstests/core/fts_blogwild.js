@@ -18,7 +18,7 @@ t.save({
 
 // default weight is 1
 // specify weights if you want a field to be more meaningull
-t.ensureIndex({dummy: "text"}, {weights: "$**"});
+t.createIndex({dummy: "text"}, {weights: "$**"});
 
 res = t.find({"$text": {"$search": "blog"}});
 assert.eq(3, res.length(), "A1");
@@ -29,7 +29,7 @@ assert.eq(3, res.length(), "B1");
 // mixing
 t.dropIndex("dummy_text");
 assert.eq(1, t.getIndexKeys().length, "C1");
-t.ensureIndex({dummy: "text"}, {weights: {"$**": 1, title: 2}});
+t.createIndex({dummy: "text"}, {weights: {"$**": 1, title: 2}});
 
 res = t.find({"$text": {"$search": "write"}}, {score: {"$meta": "textScore"}}).sort({
     score: {"$meta": "textScore"}

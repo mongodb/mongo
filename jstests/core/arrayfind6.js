@@ -17,5 +17,5 @@ function checkElemMatchMatches() {
 }
 
 checkElemMatchMatches();
-t.ensureIndex({'a.b': 1});
+t.createIndex({'a.b': 1});
 checkElemMatchMatches();

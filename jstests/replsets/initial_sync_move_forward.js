@@ -36,7 +36,7 @@ bulk.insert({_id: count - 1, x: count - 1, longString: longString});
 assert.commandWorked(bulk.execute());
 
 // Create a unique index on {x: 1}.
-assert.commandWorked(primaryColl.ensureIndex({x: 1}, {unique: true}));
+assert.commandWorked(primaryColl.createIndex({x: 1}, {unique: true}));
 
 // Add a secondary.
 var secondary =

@@ -15,7 +15,7 @@ function testConstrainedFindMultiFieldSorting(db) {
     entries = [{a: 0, b: 0}, {a: 0, b: 1}, {a: 1, b: 1}, {a: 1, b: 1}, {a: 2, b: 0}];
     for (i = 0; i < entries.length; ++i)
         r.save(entries[i]);
-    r.ensureIndex({a: 1, b: 1});
+    r.createIndex({a: 1, b: 1});
     reverseEntries = entries.slice();
     reverseEntries.reverse();
 

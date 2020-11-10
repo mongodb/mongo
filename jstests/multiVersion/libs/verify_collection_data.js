@@ -35,10 +35,10 @@ createCollectionWithData = function(db, collectionName, dataGenerator) {
     var numIndexes = 0;
     while (dataGenerator.indexes.hasNext()) {
         var nextIndex = dataGenerator.indexes.next();
-        print("collection.ensureIndex(" + JSON.stringify(nextIndex.spec) + ", " +
+        print("collection.createIndex(" + JSON.stringify(nextIndex.spec) + ", " +
               JSON.stringify(nextIndex.options) + ");");
-        var ensureIndexResult = collection.ensureIndex(nextIndex.spec, nextIndex.options);
-        assert.commandWorked(ensureIndexResult);
+        var createIndexResult = collection.createIndex(nextIndex.spec, nextIndex.options);
+        assert.commandWorked(createIndexResult);
         numIndexes++;
     }
 

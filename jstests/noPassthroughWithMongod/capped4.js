@@ -3,7 +3,7 @@ t = db.jstests_capped4;
 t.drop();
 
 db.createCollection("jstests_capped4", {size: 1000, capped: true});
-t.ensureIndex({i: 1});
+t.createIndex({i: 1});
 for (i = 0; i < 20; ++i) {
     t.save({i: i});
 }

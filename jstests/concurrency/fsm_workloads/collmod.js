@@ -48,7 +48,7 @@ var $config = (function() {
         assertAlways.eq(this.numDocs, res.nInserted);
 
         // create TTL index
-        res = db[this.threadCollName].ensureIndex({createdAt: 1}, {expireAfterSeconds: 3600});
+        res = db[this.threadCollName].createIndex({createdAt: 1}, {expireAfterSeconds: 3600});
         assertAlways.commandWorked(res);
     }
 

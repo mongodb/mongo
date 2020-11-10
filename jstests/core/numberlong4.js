@@ -6,7 +6,7 @@ t.drop();
 
 if (0) {  // SERVER-3719
 
-    t.ensureIndex({x: 1});
+    t.createIndex({x: 1});
 
     Random.setRandomSeed();
 

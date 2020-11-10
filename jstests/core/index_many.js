@@ -22,7 +22,7 @@ function f() {
             patt = {x: 1};
         if (x == 64)
             patt = {y: 1};
-        lastErr = t.ensureIndex(patt);
+        lastErr = t.createIndex(patt);
         x++;
     }
 

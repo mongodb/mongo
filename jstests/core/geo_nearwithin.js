@@ -13,7 +13,7 @@ for (var x = -points; x < points; x += 1) {
     }
 }
 
-assert.commandWorked(t.ensureIndex({geo: "2d"}));
+assert.commandWorked(t.createIndex({geo: "2d"}));
 
 const runQuery = (center) =>
     t.find({$and: [{geo: {$near: [0, 0]}}, {geo: {$within: {$center: center}}}]}).toArray();

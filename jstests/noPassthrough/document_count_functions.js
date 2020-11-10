@@ -39,7 +39,7 @@ assert.eq(3, coll.countDocuments({i: 1}, {limit: 3}));
 // that we will have 2 left.
 assert.eq(2, coll.countDocuments({i: 1}, {skip: 2}));
 
-assert.commandWorked(coll.ensureIndex({i: 1}));
+assert.commandWorked(coll.createIndex({i: 1}));
 
 // Aggregate stage case: Add an option that gets added as an aggregation argument.
 assert.eq(4, coll.countDocuments({i: 1}, {hint: {i: 1}}));

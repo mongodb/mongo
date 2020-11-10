@@ -6,7 +6,7 @@
 t = db.jstests_explain4;
 t.drop();
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 for (i = 0; i < 10; ++i) {
     t.save({a: i, b: 0});

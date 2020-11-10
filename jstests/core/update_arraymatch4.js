@@ -17,7 +17,7 @@ x.arr[0] = "A2";
 t.update({arr: "A1"}, {$set: {"arr.$": "A2"}});
 assert.eq(x, t.findOne(), "A2");
 
-t.ensureIndex({arr: 1});
+t.createIndex({arr: 1});
 x.arr[0] = "A3";
 t.update({arr: "A2"}, {$set: {"arr.$": "A3"}});
 assert.eq(x, t.findOne(), "A3");  // SERVER-1055

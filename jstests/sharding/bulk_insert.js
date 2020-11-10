@@ -22,8 +22,8 @@ st.ensurePrimaryShard(collSh.getDB() + "", st.shard0.shardName);
 
 assert.commandWorked(admin.runCommand({movePrimary: collUn.getDB() + "", to: st.shard1.shardName}));
 
-printjson(collSh.ensureIndex({ukey: 1}, {unique: true}));
-printjson(collUn.ensureIndex({ukey: 1}, {unique: true}));
+printjson(collSh.createIndex({ukey: 1}, {unique: true}));
+printjson(collUn.createIndex({ukey: 1}, {unique: true}));
 
 assert.commandWorked(admin.runCommand({shardCollection: collSh + "", key: {ukey: 1}}));
 assert.commandWorked(admin.runCommand({split: collSh + "", middle: {ukey: 0}}));

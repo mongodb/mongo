@@ -9,5 +9,5 @@ t.save({a: [5]});
 assert.eq(2, t.count({'a.0': 5}));
 
 // Test with index.
-t.ensureIndex({'a.0': 1});
+t.createIndex({'a.0': 1});
 assert.eq(2, t.count({'a.0': 5}));

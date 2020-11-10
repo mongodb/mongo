@@ -10,7 +10,7 @@
 var coll = db.geo_big_polygon;
 coll.drop();
 
-// coll.ensureIndex({ loc : "2dsphere" });
+// coll.createIndex({ loc : "2dsphere" });
 
 var bigCRS = {type: "name", properties: {name: "urn:x-mongodb:crs:strictwinding:EPSG:4326"}};
 
@@ -56,7 +56,7 @@ assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20}}}).count(), 4)
 assert.eq(coll.find({loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).count(), 1);
 assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20Comp}}}).count(), 2);
 
-assert.commandWorked(coll.ensureIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
 assert.eq(coll.find({loc: {$geoWithin: {$geometry: bigPoly20}}}).count(), 3);
 assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20}}}).count(), 4);
@@ -81,11 +81,11 @@ assert.eq(coll.find({loc: {$geoWithin: {$geometry: bigPoly20Comp}}}).count(), 1)
 assert.eq(coll.find({loc: {$geoIntersects: {$geometry: bigPoly20Comp}}}).count(), 2);
 
 // 2. Building index fails due to big polygon
-assert.commandFailed(coll.ensureIndex({loc: "2dsphere"}));
+assert.commandFailed(coll.createIndex({loc: "2dsphere"}));
 
 // 3. After removing big polygon, index builds successfully
 assert.commandWorked(coll.remove({_id: "bigPoly10"}));
-assert.commandWorked(coll.ensureIndex({loc: "2dsphere"}));
+assert.commandWorked(coll.createIndex({loc: "2dsphere"}));
 
 // 4. With index, insert fails.
 assert.writeError(coll.insert({_id: "bigPoly10", loc: bigPoly10}));

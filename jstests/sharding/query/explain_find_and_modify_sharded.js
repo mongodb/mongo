@@ -17,7 +17,7 @@ var shardKey = {a: 1};
 var shardedColl = testDB.getCollection(collName);
 shardedColl.drop();
 assert.commandWorked(testDB.createCollection(collName));
-assert.commandWorked(shardedColl.ensureIndex(shardKey));
+assert.commandWorked(shardedColl.createIndex(shardKey));
 
 // Enable sharding on the database and shard the collection.
 // Use "st.shard0.shardName" as the primary shard.

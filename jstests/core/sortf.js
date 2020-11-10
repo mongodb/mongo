@@ -9,8 +9,8 @@
 t = db.jstests_sortf;
 t.drop();
 
-t.ensureIndex({a: 1});
-t.ensureIndex({b: 1});
+t.createIndex({a: 1});
+t.createIndex({b: 1});
 
 for (i = 0; i < 100; ++i) {
     t.save({a: 0, b: 0});

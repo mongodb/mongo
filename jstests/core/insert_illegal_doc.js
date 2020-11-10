@@ -2,7 +2,7 @@
 // "parallel indexing of arrays" test
 var coll = db.insert_illegal_doc;
 coll.drop();
-coll.ensureIndex({a: 1, b: 1});
+coll.createIndex({a: 1, b: 1});
 
 var res;
 // test upsert

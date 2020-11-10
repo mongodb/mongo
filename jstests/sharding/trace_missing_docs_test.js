@@ -20,7 +20,7 @@ var testDocMissing = function(useReplicaSet) {
     assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
     st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
 
-    coll.ensureIndex({sk: 1});
+    coll.createIndex({sk: 1});
     assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {sk: 1}}));
 
     assert.commandWorked(coll.insert({_id: 12345, sk: 67890, hello: "world"}));

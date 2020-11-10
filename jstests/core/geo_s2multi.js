@@ -1,7 +1,7 @@
 t = db.geo_s2multi;
 t.drop();
 
-t.ensureIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"});
 
 // Let's try the examples in the GeoJSON spec.
 // @tags: [

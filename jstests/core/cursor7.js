@@ -17,7 +17,7 @@ function testMultipleInequalities(db) {
         r.save(z[i]);
     idx = {a: 1, b: 1};
     rIdx = {a: -1, b: -1};
-    r.ensureIndex(idx);
+    r.createIndex(idx);
 
     checkResults([z[2], z[3]], r.find({a: {$gt: 3}}).sort(idx).hint(idx));
     checkResults([z[2]], r.find({a: {$gt: 3, $lt: 7}}).sort(idx).hint(idx));

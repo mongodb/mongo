@@ -8,7 +8,7 @@
 var coll = db.geo_validate;
 coll.drop();
 
-coll.ensureIndex({geo: "2dsphere"});
+coll.createIndex({geo: "2dsphere"});
 
 //
 //

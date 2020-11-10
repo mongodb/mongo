@@ -28,7 +28,7 @@ var status = function(msg) {
 var coll = db.getCollection("jstests_geo_update_btree2");
 coll.drop();
 
-coll.ensureIndex({loc: '2d'});
+coll.createIndex({loc: '2d'});
 
 status("Inserting points...");
 

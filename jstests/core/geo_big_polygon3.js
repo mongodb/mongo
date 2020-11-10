@@ -63,7 +63,7 @@ var bigPoly = {
 };
 
 // 2dsphere index required
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}), "2dsphere index");
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}), "2dsphere index");
 
 // $nearSphere on big polygon should fail
 assert.throws(function() {
@@ -222,7 +222,7 @@ assert.eq(totalDocs,
           "crs84CRS or epsg4326CRS intersects");
 
 // Add index and look again for stored point & spherical CRS documents
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}), "2dsphere index");
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}), "2dsphere index");
 
 assert.eq(totalDocs,
           coll.count({geo: {$geoWithin: {$geometry: poly}}}),

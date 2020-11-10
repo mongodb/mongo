@@ -16,5 +16,5 @@ function test(name) {
 }
 
 test("no index");
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 test("with index");

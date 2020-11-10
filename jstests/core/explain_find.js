@@ -10,7 +10,7 @@ var collName = "jstests_explain_find";
 var t = db[collName];
 t.drop();
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 for (var i = 0; i < 10; i++) {
     t.insert({_id: i, a: i});

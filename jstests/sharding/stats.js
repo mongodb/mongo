@@ -144,7 +144,7 @@ collStatComp(coll_not_scaled, coll_scaled_1024, 1024, true);
 (function() {
 var t = db.foo;
 
-assert.commandWorked(t.ensureIndex({a: 1}));
+assert.commandWorked(t.createIndex({a: 1}));
 assert.eq(2, t.getIndexes().length);
 
 var isWiredTiger =

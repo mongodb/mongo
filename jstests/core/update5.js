@@ -26,7 +26,7 @@ function go(key) {
     var ik = {};
     for (k in key)
         ik[k] = 1;
-    t.ensureIndex(ik);
+    t.createIndex(ik);
 
     t.update(key, {$inc: {n: 1}}, true);
     check(4, "D");

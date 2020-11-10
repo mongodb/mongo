@@ -42,7 +42,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        assertWhenOwnColl.commandWorked(db[collName].ensureIndex({yield_text: 'text'}));
+        assertWhenOwnColl.commandWorked(db[collName].createIndex({yield_text: 'text'}));
     };
 
     return $config;

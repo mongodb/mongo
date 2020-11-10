@@ -5,7 +5,7 @@ t.drop();
 function test(geometry) {
     t.insert({geo: geometry});
     assert.eq(1, t.find({geo: geometry}).itcount(), tojson(geometry));
-    t.ensureIndex({geo: "2dsphere"});
+    t.createIndex({geo: "2dsphere"});
     assert.eq(1, t.find({geo: geometry}).itcount(), tojson(geometry));
     t.dropIndex({geo: "2dsphere"});
 }

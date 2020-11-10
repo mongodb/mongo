@@ -12,7 +12,7 @@ let db = s.getDB("test");
 db.foo.save({x: 1});
 db.foo.save({x: 2});
 db.foo.save({x: 3});
-db.foo.ensureIndex({x: 1});
+db.foo.createIndex({x: 1});
 
 let a = s.shard0.getDB("test");
 let b = s.shard1.getDB("test");
@@ -73,7 +73,7 @@ db.mr.save({x: 1, tags: ["a", "b"]});
 db.mr.save({x: 2, tags: ["b", "c"]});
 db.mr.save({x: 3, tags: ["c", "a"]});
 db.mr.save({x: 4, tags: ["b", "c"]});
-db.mr.ensureIndex({x: 1});
+db.mr.createIndex({x: 1});
 
 let m = function() {
     this.tags.forEach(function(z) {

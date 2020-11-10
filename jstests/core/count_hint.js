@@ -18,7 +18,7 @@ assert.commandWorked(coll.insert({i: 2}));
 
 assert.eq(2, coll.find().count());
 
-assert.commandWorked(coll.ensureIndex({i: 1}));
+assert.commandWorked(coll.createIndex({i: 1}));
 
 assert.eq(2, coll.find().hint("i_1").count());
 assert.eq(2, coll.find().hint({i: 1}).count());
@@ -30,7 +30,7 @@ assert.eq(2, coll.find().hint("_id_").count());
 assert.eq(2, coll.find().hint({_id: 1}).count());
 
 // Create a sparse index which should have no entries.
-assert.commandWorked(coll.ensureIndex({x: 1}, {sparse: true}));
+assert.commandWorked(coll.createIndex({x: 1}, {sparse: true}));
 
 // A hint should be respected, even if it results in the wrong answer.
 assert.eq(0, coll.find().hint("x_1").count());

@@ -23,7 +23,7 @@ t.save({a: 0});
 t.save({a: 1});
 t.save({a: 2});
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 checkResults([1], t.find({a: 1}).sort({a: 1}).hint({a: 1}), testNum++);
 checkResults([1], t.find({a: 1}).sort({a: -1}).hint({a: 1}), testNum++);

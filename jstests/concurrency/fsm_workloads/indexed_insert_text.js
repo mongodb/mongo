@@ -37,7 +37,7 @@ var $config = (function() {
         var ixSpec = {};
         ixSpec[this.indexedField] = 'text';
         // Only allowed to create one text index, other tests may create one.
-        assertWhenOwnColl.commandWorked(db[collName].ensureIndex(ixSpec));
+        assertWhenOwnColl.commandWorked(db[collName].createIndex(ixSpec));
     }
 
     var text = [

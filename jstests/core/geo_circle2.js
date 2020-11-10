@@ -7,7 +7,7 @@
 t = db.geo_circle2;
 t.drop();
 
-t.ensureIndex({loc: "2d", categories: 1}, {"name": "placesIdx", "min": -100, "max": 100});
+t.createIndex({loc: "2d", categories: 1}, {"name": "placesIdx", "min": -100, "max": 100});
 
 t.insert(
     {"uid": 368900, "loc": {"x": -36, "y": -8}, "categories": ["sports", "hotel", "restaurant"]});

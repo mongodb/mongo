@@ -53,7 +53,7 @@ function findCollectionInfo() {
 assert.commandFailed(t.runCommand('collmod', {NotARealOption: 1}));
 
 // add a TTL index
-t.ensureIndex({a: 1}, {"name": "index1", "expireAfterSeconds": 50});
+t.createIndex({a: 1}, {"name": "index1", "expireAfterSeconds": 50});
 assert(findTTL({a: 1}, 50), "TTL index not added");
 
 // try to modify it with a bad key pattern
@@ -98,7 +98,7 @@ assert.commandFailed(db.runCommand({
 
 // try to modify a faulty TTL index with a non-numeric expireAfterSeconds field
 t.dropIndex({a: 1});
-t.ensureIndex({a: 1}, {"expireAfterSeconds": "50"});
+t.createIndex({a: 1}, {"expireAfterSeconds": "50"});
 var res =
     db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
 debug(res);
@@ -106,7 +106,7 @@ assert.eq(0, res.ok, "shouldn't be able to modify faulty index spec");
 
 // try with new index, this time set expireAfterSeconds
 t.dropIndex({a: 1});
-t.ensureIndex({a: 1}, {"expireAfterSeconds": 50});
+t.createIndex({a: 1}, {"expireAfterSeconds": 50});
 var res =
     db.runCommand({"collMod": coll, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}});
 debug(res);

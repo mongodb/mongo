@@ -117,8 +117,8 @@ assertExecError(result);
 
 // Now we introduce two indices. One provides the requested sort order, and
 // the other does not.
-t.ensureIndex({b: 1});
-t.ensureIndex({c: 1});
+t.createIndex({b: 1});
+t.createIndex({c: 1});
 
 // The query should no longer fail with a memory limit error because the planner can obtain
 // the sort by scanning an index.

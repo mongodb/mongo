@@ -190,7 +190,7 @@ if (db.getMongo().writeMode() === "commands") {
 
 coll.drop();
 assert.commandWorked(coll.insert({geo: {type: "Point", coordinates: [0, 0]}, a: 0}));
-assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
 assert.eq(1,
           coll.aggregate({
                   $geoNear: {

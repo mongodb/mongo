@@ -16,7 +16,7 @@ for (var i = 0; i < NRECORDS; i++) {
 assert.commandWorked(bulk.execute());
 
 print("making an index (this will take a while)");
-db.conc.ensureIndex({x: 1});
+db.conc.createIndex({x: 1});
 
 var c1 = db.conc.count({x: {$lt: NRECORDS}});
 

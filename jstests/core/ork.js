@@ -6,7 +6,7 @@
 t = db.jstests_ork;
 t.drop();
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 t.save({a: [1, 2], b: 5});
 t.save({a: [2, 4], b: 5});
 

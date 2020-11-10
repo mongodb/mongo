@@ -13,9 +13,9 @@ for (var i = 0; i < N; ++i) {
     t.insert({foo: i, bar: N - i, baz: i});
 }
 
-t.ensureIndex({foo: 1});
-t.ensureIndex({bar: 1});
-t.ensureIndex({baz: 1});
+t.createIndex({foo: 1});
+t.createIndex({bar: 1});
+t.createIndex({baz: 1});
 
 // Scan foo <= 20
 ixscan1 = {

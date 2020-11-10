@@ -11,7 +11,7 @@ function checkElemMatchMatches() {
 
 // The document is matched using nested $elemMatch expressions, with and without an index.
 checkElemMatchMatches();
-t.ensureIndex({'a.b.c': 1});
+t.createIndex({'a.b.c': 1});
 checkElemMatchMatches();
 
 function checkElemMatch(index, document, query) {
@@ -19,7 +19,7 @@ function checkElemMatch(index, document, query) {
     t.drop();
     t.save(document);
     assert.eq(1, t.count(query));
-    t.ensureIndex(index);
+    t.createIndex(index);
     assert.eq(1, t.count(query));
     t.save({a: {b: {c: [10, 11]}}});  // Make the index multikey.
     assert.eq(1, t.count(query));

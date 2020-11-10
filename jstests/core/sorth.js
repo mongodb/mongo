@@ -84,7 +84,7 @@ function reset(sort, index) {
     t.save({a: 2, b: 0});
     t.save({a: 2, b: 3});
     t.save({a: 2, b: 5});
-    t.ensureIndex(index);
+    t.createIndex(index);
     _sort = sort;
     _hint = index;
 }

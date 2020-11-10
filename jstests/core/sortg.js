@@ -47,9 +47,9 @@ noMemoryException({$natural: 1});
 
 assert.eq(1, t.getIndexes().length);
 
-t.ensureIndex({a: 1});
-t.ensureIndex({b: 1});
-t.ensureIndex({c: 1});
+t.createIndex({a: 1});
+t.createIndex({b: 1});
+t.createIndex({c: 1});
 
 assert.eq(4, t.getIndexes().length);
 

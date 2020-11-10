@@ -8,7 +8,7 @@
 t = db.indexa;
 t.drop();
 
-t.ensureIndex({x: 1}, true);
+t.createIndex({x: 1}, true);
 
 t.insert({'x': 'A'});
 t.insert({'x': 'B'});

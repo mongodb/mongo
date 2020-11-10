@@ -6,7 +6,7 @@ t = db.indexboundsnumberedgecases;
 
 t.drop();
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 t.save({a: -Infinity});
 t.save({a: -Number.MAX_VALUE});

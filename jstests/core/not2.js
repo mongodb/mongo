@@ -86,6 +86,6 @@ function doTest() {
 doTest();
 
 // Run the test with an index present.
-assert.commandWorked(coll.ensureIndex({i: 1}));
+assert.commandWorked(coll.createIndex({i: 1}));
 doTest();
 }());
