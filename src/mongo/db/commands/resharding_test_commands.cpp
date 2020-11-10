@@ -36,6 +36,7 @@
 #include "mongo/db/commands/resharding_test_commands_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
+#include "mongo/s/grid.h"
 
 namespace mongo {
 namespace {
@@ -50,13 +51,17 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            ReshardingCollectionCloner cloner(
-                ShardKeyPattern(request().getShardKey()), ns(), request().getUuid());
+            ReshardingCollectionCloner cloner(ShardKeyPattern(request().getShardKey()),
+                                              ns(),
+                                              request().getUuid(),
+                                              request().getShardId(),
+                                              request().getAtClusterTime(),
+                                              request().getOutputNs());
 
-            cloner.runPipeline(opCtx,
-                               request().getShardId(),
-                               request().getAtClusterTime(),
-                               request().getOutputNs());
+            cloner
+                .run(opCtx->getServiceContext(),
+                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
+                .get();
         }
 
     private:

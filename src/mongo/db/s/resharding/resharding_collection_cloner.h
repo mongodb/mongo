@@ -27,41 +27,68 @@
  *    it in the license file.
  */
 
-
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
-class OperationContext;
+namespace executor {
+
+class TaskExecutor;
+
+}  // namespace executor
+
+class ServiceContext;
 
 class ReshardingCollectionCloner {
 public:
     ReshardingCollectionCloner(ShardKeyPattern newShardKeyPattern,
                                NamespaceString sourceNss,
-                               CollectionUUID sourceUUID);
+                               CollectionUUID sourceUUID,
+                               ShardId recipientShard,
+                               Timestamp atClusterTime,
+                               NamespaceString outputNss);
 
-    void runPipeline(OperationContext* opCtx,
-                     const ShardId& recipientShard,
-                     Timestamp atClusterTime,
-                     const NamespaceString& outputNss);
+    ExecutorFuture<void> run(ServiceContext* serviceContext,
+                             std::shared_ptr<executor::TaskExecutor>);
 
 private:
-    std::unique_ptr<Pipeline, PipelineDeleter> buildCursor(
+    static constexpr StringData kClientName = "ReshardingCollectionCloner"_sd;
+
+    std::unique_ptr<Pipeline, PipelineDeleter> _makePipeline(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const ShardId& recipientShard,
         Timestamp atClusterTime,
         const NamespaceString& outputNss);
 
+    std::vector<InsertStatement> _fillBatch(Pipeline& pipeline);
+    void _insertBatch(OperationContext* opCtx, std::vector<InsertStatement>& batch);
+
+    template <typename Callable>
+    auto _withTemporaryOperationContext(ServiceContext* serviceContext, Callable&& callable);
+
+    ExecutorFuture<void> _insertBatchesUntilPipelineExhausted(
+        ServiceContext* serviceContext,
+        std::shared_ptr<executor::TaskExecutor> executor,
+        std::unique_ptr<Pipeline, PipelineDeleter> pipeline);
+
     const ShardKeyPattern _newShardKeyPattern;
     const NamespaceString _sourceNss;
     const CollectionUUID _sourceUUID;
+    const ShardId _recipientShard;
+    const Timestamp _atClusterTime;
+    const NamespaceString _outputNss;
 };
 
 }  // namespace mongo
