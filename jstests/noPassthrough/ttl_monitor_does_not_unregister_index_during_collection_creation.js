@@ -38,7 +38,7 @@ checkLog.containsJson(db.getMongo(), 4664000);
 // until the collection is committed.
 let ttlPass = assert.commandWorked(db.serverStatus()).metrics.ttl.passes;
 assert.soon(function() {
-    return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 1;
+    return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
 }, "TTL monitor didn't run.");
 
 // Finish the index build.
@@ -54,7 +54,7 @@ for (let i = 0; i < 10; i++) {
 // Let the TTL monitor run once to remove the expired documents.
 ttlPass = assert.commandWorked(db.serverStatus()).metrics.ttl.passes;
 assert.soon(function() {
-    return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 1;
+    return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
 }, "TTL monitor didn't run.");
 
 assert.eq(0, coll.find({}).count());
