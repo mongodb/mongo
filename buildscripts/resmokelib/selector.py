@@ -679,11 +679,13 @@ _SELECTOR_REGISTRY = {
     "db_test": (_DbTestSelectorConfig, _DbTestSelector),
     "fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
     "parallel_fsm_workload_test": (_MultiJSTestSelectorConfig, _MultiJSTestSelector),
+    "abort_txns_fsm_workload_test": (_JSTestSelectorConfig, _JSTestSelector),
     "json_schema_test": (_JsonTestSelectorConfig, _Selector),
     "js_test": (_JSTestSelectorConfig, _JSTestSelector),
     "multi_stmt_txn_passthrough": (_JSTestSelectorConfig, _JSTestSelector),
     "py_test": (_PyTestCaseSelectorConfig, _Selector),
     "sleep_test": (_SleepTestCaseSelectorConfig, _SleepTestCaseSelector),
+    "abort_multi_stmt_txn_passthrough": (_JSTestSelectorConfig, _JSTestSelector),
 }
 
 

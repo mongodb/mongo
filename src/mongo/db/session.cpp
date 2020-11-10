@@ -58,6 +58,7 @@
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/transaction_history_iterator.h"
+#include "mongo/platform/random.h"
 #include "mongo/stdx/memory.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/fail_point_service.h"
@@ -87,6 +88,9 @@ MONGO_EXPORT_SERVER_PARAMETER(transactionLifetimeLimitSeconds, std::int32_t, 60)
 
         return Status::OK();
     });
+
+// Used in our core transaction passthrough suites to test the abort logic for expired transactions.
+MONGO_FAIL_POINT_DEFINE(setTransactionLifetimeToRandomMillis);
 
 
 namespace {
@@ -588,6 +592,17 @@ void Session::_beginOrContinueTxn(WithLock wl,
         const auto now = curTimeMicros64();
         _transactionExpireDate = Date_t::fromMillisSinceEpoch(now / 1000) +
             Seconds{transactionLifetimeLimitSeconds.load()};
+
+        if (MONGO_FAIL_POINT(setTransactionLifetimeToRandomMillis)) {
+            PseudoRandom prng(SecureRandom::create()->nextInt64());
+            // Override the transaction lifetime to expire in the next 0-20 ms.
+            const auto expireMillis = prng.nextInt32(20);
+            log() << "setTransactionLifetimeToRandomMillis failpoint enabled -- "
+                  << "setting transaction to expire in " << expireMillis << "ms.";
+            _transactionExpireDate =
+                Date_t::fromMillisSinceEpoch(now / 1000) + Milliseconds{expireMillis};
+        }
+
         // Tracks various transactions metrics.
         {
             stdx::lock_guard<stdx::mutex> ls(_statsMutex);

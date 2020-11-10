@@ -99,3 +99,26 @@ class ParallelFSMWorkloadTestCase(FSMWorkloadTestCase):
         for workload_name in sorted(selected_tests):
             uid.update(workload_name)
         return uid.hexdigest()
+
+
+class AbortTxnsFSMWorkloadTestCase(FSMWorkloadTestCase):
+    """An FSM workload intended to be used by test suites that test transaction expiration logic."""
+
+    REGISTERED_NAME = "abort_txns_fsm_workload_test"
+
+    def _execute(self, process):
+        """Run the specified process."""
+        self.logger.info("Starting %s...\n%s", self.short_description(), process.as_command())
+
+        process.start()
+        self.logger.info("%s started with pid %s.", self.short_description(), process.pid)
+
+        self.return_code = process.wait()
+        # This test case is intended to randomly abort transactions in the core passthrough. We only
+        # expect to return a failure when the system crashes. This is different from the base
+        # implementation where we will throw in a non-zero return code.
+        if self.return_code != 0:
+            self.logger.info("Returning quietly instead of throwing failure: %s" %
+                             (self.short_description()))
+
+        self.logger.info("%s finished.", self.short_description())
