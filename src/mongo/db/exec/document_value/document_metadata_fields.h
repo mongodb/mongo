@@ -64,6 +64,7 @@ public:
         kSearchScore,
         kSortKey,
         kTextScore,
+        kSearchScoreDetails,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -316,6 +317,23 @@ public:
         _holder->recordId = rid;
     }
 
+    bool hasSearchScoreDetails() const {
+        return _holder && _holder->metaFields.test(MetaType::kSearchScoreDetails);
+    }
+
+    BSONObj getSearchScoreDetails() const {
+        invariant(hasSearchScoreDetails());
+        return _holder->searchScoreDetails;
+    }
+
+    void setSearchScoreDetails(BSONObj details) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+        _holder->metaFields.set(MetaType::kSearchScoreDetails);
+        _holder->searchScoreDetails = details.getOwned();
+    }
+
     void serializeForSorter(BufBuilder& buf) const;
 
 private:
@@ -337,6 +355,7 @@ private:
         Value searchHighlights;
         BSONObj indexKey;
         RecordId recordId;
+        BSONObj searchScoreDetails;
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

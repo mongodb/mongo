@@ -48,6 +48,8 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     metadata.setSearchScore(5.4);
     metadata.setSearchHighlights(Value{"foo"_sd});
     metadata.setIndexKey(BSON("b" << 1));
+    metadata.setSearchScoreDetails(BSON("scoreDetails"
+                                        << "foo"));
 
     BufBuilder builder;
     metadata.serializeForSorter(builder);
@@ -64,6 +66,9 @@ TEST(DocumentMetadataFieldsTest, AllMetadataRoundtripsThroughSerialization) {
     ASSERT_EQ(deserialized.getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(deserialized.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(deserialized.getIndexKey(), BSON("b" << 1));
+    ASSERT_BSONOBJ_EQ(deserialized.getSearchScoreDetails(),
+                      BSON("scoreDetails"
+                           << "foo"));
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
@@ -77,6 +82,7 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnFalseForEmptyMetadata) {
     ASSERT_FALSE(metadata.hasSearchScore());
     ASSERT_FALSE(metadata.hasSearchHighlights());
     ASSERT_FALSE(metadata.hasIndexKey());
+    ASSERT_FALSE(metadata.hasSearchScoreDetails());
 }
 
 TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
@@ -114,6 +120,11 @@ TEST(DocumentMetadataFieldsTest, HasMethodsReturnTrueForInitializedMetadata) {
     ASSERT_FALSE(metadata.hasIndexKey());
     metadata.setIndexKey(BSON("b" << 1));
     ASSERT_TRUE(metadata.hasIndexKey());
+
+    ASSERT_FALSE(metadata.hasSearchScoreDetails());
+    metadata.setSearchScoreDetails(BSON("scoreDetails"
+                                        << "foo"));
+    ASSERT_TRUE(metadata.hasSearchScoreDetails());
 }
 
 TEST(DocumentMetadataFieldsTest, MoveConstructor) {
@@ -126,6 +137,8 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     metadata.setSearchScore(5.4);
     metadata.setSearchHighlights(Value{"foo"_sd});
     metadata.setIndexKey(BSON("b" << 1));
+    metadata.setSearchScoreDetails(BSON("scoreDetails"
+                                        << "foo"));
 
     DocumentMetadataFields moveConstructed(std::move(metadata));
     ASSERT_TRUE(moveConstructed);
@@ -138,6 +151,9 @@ TEST(DocumentMetadataFieldsTest, MoveConstructor) {
     ASSERT_EQ(moveConstructed.getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(moveConstructed.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(moveConstructed.getIndexKey(), BSON("b" << 1));
+    ASSERT_BSONOBJ_EQ(moveConstructed.getSearchScoreDetails(),
+                      BSON("scoreDetails"
+                           << "foo"));
 
     ASSERT_FALSE(metadata);
 }
@@ -152,6 +168,8 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     metadata.setSearchScore(5.4);
     metadata.setSearchHighlights(Value{"foo"_sd});
     metadata.setIndexKey(BSON("b" << 1));
+    metadata.setSearchScoreDetails(BSON("scoreDetails"
+                                        << "foo"));
 
     DocumentMetadataFields moveAssigned;
     moveAssigned.setTextScore(12.3);
@@ -167,6 +185,9 @@ TEST(DocumentMetadataFieldsTest, MoveAssignmentOperator) {
     ASSERT_EQ(moveAssigned.getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(moveAssigned.getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(moveAssigned.getIndexKey(), BSON("b" << 1));
+    ASSERT_BSONOBJ_EQ(moveAssigned.getSearchScoreDetails(),
+                      BSON("scoreDetails"
+                           << "foo"));
 
     ASSERT_FALSE(metadata);
 }
@@ -219,6 +240,7 @@ TEST(DocumentMetadataFieldsTest, MergeWithOnlyCopiesMetadataThatDestinationDoesN
     ASSERT_FALSE(destination.hasSearchScore());
     ASSERT_FALSE(destination.hasSearchHighlights());
     ASSERT_FALSE(destination.hasIndexKey());
+    ASSERT_FALSE(destination.hasSearchScoreDetails());
 }
 
 TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
@@ -243,6 +265,7 @@ TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
     ASSERT_FALSE(destination.hasSearchScore());
     ASSERT_FALSE(destination.hasSearchHighlights());
     ASSERT_FALSE(destination.hasIndexKey());
+    ASSERT_FALSE(destination.hasSearchScoreDetails());
 }
 
 }  // namespace mongo

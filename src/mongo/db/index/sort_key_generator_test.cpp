@@ -231,6 +231,15 @@ TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchHighlightsMetaKeywordUa
                                 "$meta sort by 'searchHighlights' metadata is not supported");
 }
 
+TEST(SortKeyGeneratorTest, SortPatternComponentWithSearchScoreDetailsMetaKeywordUasserts) {
+    ASSERT_THROWS_CODE_AND_WHAT(makeSortKeyGen(BSON("a" << BSON("$meta"
+                                                                << "searchScoreDetails")),
+                                               nullptr),
+                                AssertionException,
+                                31138,
+                                "Illegal $meta sort: $meta: \"searchScoreDetails\"");
+}
+
 TEST(SortKeyGeneratorTest, CanGenerateKeysForTextScoreMetaSort) {
     auto sortKeyGen = makeSortKeyGen(BSON("a" << BSON("$meta"
                                                       << "textScore")),

@@ -53,7 +53,8 @@ const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore
                                                     Document::metaFieldGeoNearPoint,
                                                     Document::metaFieldSearchScore,
                                                     Document::metaFieldSearchHighlights,
-                                                    Document::metaFieldIndexKey};
+                                                    Document::metaFieldIndexKey,
+                                                    Document::metaFieldSearchScoreDetails};
 
 DocumentStorageIterator::DocumentStorageIterator(DocumentStorage* storage, BSONObjIterator bsonIt)
     : _bsonIt(std::move(bsonIt)),
@@ -398,6 +399,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setGeoNearPoint(val);
             } else if (fieldName == Document::metaFieldIndexKey) {
                 _metadataFields.setIndexKey(elem.Obj());
+            } else if (fieldName == Document::metaFieldSearchScoreDetails) {
+                _metadataFields.setSearchScoreDetails(elem.Obj());
             }
         }
     }
@@ -469,6 +472,7 @@ constexpr StringData Document::metaFieldGeoNearDistance;
 constexpr StringData Document::metaFieldGeoNearPoint;
 constexpr StringData Document::metaFieldSearchScore;
 constexpr StringData Document::metaFieldSearchHighlights;
+constexpr StringData Document::metaFieldSearchScoreDetails;
 
 BSONObj Document::toBsonWithMetaData(SortKeyFormat sortKeyFormat) const {
     BSONObjBuilder bb;
@@ -509,6 +513,8 @@ BSONObj Document::toBsonWithMetaData(SortKeyFormat sortKeyFormat) const {
         metadata().getSearchHighlights().addToBsonObj(&bb, metaFieldSearchHighlights);
     if (metadata().hasIndexKey())
         bb.append(metaFieldIndexKey, metadata().getIndexKey());
+    if (metadata().hasSearchScoreDetails())
+        bb.append(metaFieldSearchScoreDetails, metadata().getSearchScoreDetails());
     return bb.obj();
 }
 

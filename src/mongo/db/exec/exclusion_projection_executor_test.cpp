@@ -326,7 +326,8 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
                                                             "h: {$meta: 'geoNearPoint'}, "
                                                             "i: {$meta: 'recordId'}, "
                                                             "j: {$meta: 'indexKey'}, "
-                                                            "k: {$meta: 'sortKey'}}"));
+                                                            "k: {$meta: 'sortKey'}, "
+                                                            "l: {$meta: 'searchScoreDetails'}}"));
 
     MutableDocument inputDocBuilder(Document{{"a", 1}, {"b", 2}});
     inputDocBuilder.metadata().setTextScore(0.0);
@@ -338,13 +339,16 @@ TEST(ExclusionProjectionExecutionTest, ShouldEvaluateMetaExpressions) {
     inputDocBuilder.metadata().setRecordId(RecordId{6});
     inputDocBuilder.metadata().setIndexKey(BSON("foo" << 7));
     inputDocBuilder.metadata().setSortKey(Value{Document{{"bar", 8}}}, true);
+    inputDocBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
+                                                          << "foo"));
     Document inputDoc = inputDocBuilder.freeze();
 
     auto result = exclusion->applyTransformation(inputDoc);
 
     ASSERT_DOCUMENT_EQ(result,
                        Document{fromjson("{b: 2, c: 0.0, d: 1.0, e: 2.0, f: 'foo', g: 3.0, "
-                                         "h: [4, 5], i: 6, j: {foo: 7}, k: [{bar: 8}]}")});
+                                         "h: [4, 5], i: 6, j: {foo: 7}, k: [{bar: 8}],"
+                                         "l: {scoreDetails: 'foo'}}")});
 }
 
 TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
@@ -357,17 +361,19 @@ TEST(ExclusionProjectionExecutionTest, ShouldAddMetaExpressionsToDependencies) {
                                                             "h: {$meta: 'geoNearPoint'}, "
                                                             "i: {$meta: 'recordId'}, "
                                                             "j: {$meta: 'indexKey'}, "
-                                                            "k: {$meta: 'sortKey'}}"));
+                                                            "k: {$meta: 'sortKey'}, "
+                                                            "l: {$meta: 'searchScoreDetails'}}"));
 
     DepsTracker deps;
     exclusion->addDependencies(&deps);
 
     ASSERT_EQ(deps.fields.size(), 0UL);
 
-    // We do not add the dependencies for SEARCH_SCORE or SEARCH_HIGHLIGHTS because those values
-    // are not stored in the collection (or in mongod at all).
+    // We do not add the dependencies for searchScore, searchHighlights, or searchScoreDetails
+    // because those values are not stored in the collection (or in mongod at all).
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScore]);
     ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchHighlights]);
+    ASSERT_FALSE(deps.metadataDeps()[DocumentMetadataFields::kSearchScoreDetails]);
 
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kTextScore]);
     ASSERT_TRUE(deps.metadataDeps()[DocumentMetadataFields::kRandVal]);

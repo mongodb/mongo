@@ -82,6 +82,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasIndexKey() && other.hasIndexKey()) {
         setIndexKey(other.getIndexKey());
     }
+    if (!hasSearchScoreDetails() && other.hasSearchScoreDetails()) {
+        setSearchScoreDetails(other.getSearchScoreDetails());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -109,6 +112,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasIndexKey()) {
         setIndexKey(other.getIndexKey());
     }
+    if (other.hasSearchScoreDetails()) {
+        setSearchScoreDetails(other.getSearchScoreDetails());
+    }
 }
 
 size_t DocumentMetadataFields::getApproximateSize() const {
@@ -129,6 +135,7 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size += _holder->searchHighlights.getApproximateSize();
     size -= sizeof(_holder->searchHighlights);
     size += _holder->indexKey.objsize();
+    size += _holder->searchScoreDetails.objsize();
 
     return size;
 }
@@ -173,6 +180,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kIndexKey + 1));
         getIndexKey().appendSelfToBufBuilder(buf);
     }
+    if (hasSearchScoreDetails()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchScoreDetails + 1));
+        getSearchScoreDetails().appendSelfToBufBuilder(buf);
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -200,6 +211,9 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
                 Value::deserializeForSorter(buf, Value::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kIndexKey) + 1) {
             out->setIndexKey(
+                BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kSearchScoreDetails) + 1) {
+            out->setSearchScoreDetails(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
@@ -270,6 +284,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "sort key";
         case DocumentMetadataFields::kTextScore:
             return "text score";
+        case DocumentMetadataFields::kSearchScoreDetails:
+            return "$search score details";
         default:
             MONGO_UNREACHABLE;
     }
