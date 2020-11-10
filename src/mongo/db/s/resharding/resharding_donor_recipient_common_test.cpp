@@ -253,6 +253,8 @@ public:
     void tearDown() override {
         WaitForMajorityService::get(getServiceContext()).shutDown();
 
+        Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();
+
         _registry->onShutdown();
 
         ShardServerTestFixture::tearDown();
