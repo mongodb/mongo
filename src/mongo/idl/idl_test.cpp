@@ -2837,6 +2837,14 @@ TEST(IDLTypeCommand, TestStruct) {
     assert_same_types<decltype(testStruct.getCommandParameter()),
                       mongo::idl::import::One_string&>();
 
+    // Negative: Command with struct parameter should disallow 'undefined' input.
+    {
+        auto invalidDoc = BSON(CommandTypeStructCommand::kCommandName << BSONUndefined << "$db"
+                                                                      << "db");
+        ASSERT_THROWS(CommandTypeStructCommand::parse(ctxt, makeOMR(invalidDoc)),
+                      AssertionException);
+    }
+
     // Positive: Test we can roundtrip from the just parsed document
     {
         BSONObjBuilder builder;

@@ -1163,9 +1163,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if _is_required_serializer_field(field):
                 self._writer.write_line('%s = true;' % (_get_has_field_member_name(field)))
 
-    def gen_field_deserializer(self, field, bson_object, bson_element, field_usage_check):
-        # type: (ast.Field, str, str, _FieldUsageCheckerBase) -> None
+    def gen_field_deserializer(self, field, bson_object, bson_element, field_usage_check,
+                               is_command_field=False):
+        # type: (ast.Field, str, str, _FieldUsageCheckerBase, bool) -> None
         """Generate the C++ deserializer piece for a field."""
+        # pylint: disable=too-many-arguments
         if field.array:
             self._gen_usage_check(field, bson_element, field_usage_check)
 
@@ -1223,6 +1225,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                         _get_field_member_setter_name(field), object_value))
                 else:
                     validate_and_assign_or_uassert(field, object_value)
+            if is_command_field and predicate:
+                with self._block('else {', '}'):
+                    self._writer.write_line(
+                        'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
 
     def gen_doc_sequence_deserializer(self, field):
         # type: (ast.Field) -> None
@@ -1345,7 +1351,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if isinstance(struct, ast.Command) and struct.command_field:
             with self._block('{', '}'):
                 self.gen_field_deserializer(struct.command_field, bson_object, "commandElement",
-                                            None)
+                                            None, is_command_field=True)
         else:
             struct_type_info = struct_types.get_struct_info(struct)
 
