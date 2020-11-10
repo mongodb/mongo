@@ -769,6 +769,30 @@ TEST(MetaFields, SearchHighlightsBasic) {
     ASSERT_VALUE_EQ(doc2.metadata().getSearchHighlights(), otherHighlights);
 }
 
+TEST(MetaFields, SearchScoreDetailsBasic) {
+    // Documents should not have a value for searchScoreDetails until it is set.
+    ASSERT_FALSE(Document().metadata().hasSearchScoreDetails());
+
+    // Setting the searchScoreDetails field should work as expected.
+    MutableDocument docBuilder;
+    BSONObj details = BSON("scoreDetails"
+                           << "foo");
+    docBuilder.metadata().setSearchScoreDetails(details);
+    Document doc = docBuilder.freeze();
+    ASSERT_TRUE(doc.metadata().hasSearchScoreDetails());
+    ASSERT_BSONOBJ_EQ(doc.metadata().getSearchScoreDetails(), details);
+
+    // Setting the searchScoreDetails twice should keep the second value.
+    MutableDocument docBuilder2;
+    BSONObj otherDetails = BSON("scoreDetails"
+                                << "bar");
+    docBuilder2.metadata().setSearchScoreDetails(details);
+    docBuilder2.metadata().setSearchScoreDetails(otherDetails);
+    Document doc2 = docBuilder2.freeze();
+    ASSERT_TRUE(doc2.metadata().hasSearchScoreDetails());
+    ASSERT_BSONOBJ_EQ(doc2.metadata().getSearchScoreDetails(), otherDetails);
+}
+
 TEST(MetaFields, IndexKeyMetadataSerializesCorrectly) {
     Document doc{BSON("a" << 1)};
     MutableDocument mutableDoc{doc};
@@ -797,7 +821,9 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
                  << BSON_ARRAY(1 << 2) << "f" << 1 << "$searchScore" << 5.4 << "g" << 1
                  << "$searchHighlights"
                  << "foo"
-                 << "h" << 1 << "$indexKey" << BSON("y" << 1)));
+                 << "h" << 1 << "$indexKey" << BSON("y" << 1) << "$searchScoreDetails"
+                 << BSON("scoreDetails"
+                         << "foo")));
 
     MutableDocument destination{};
     destination.copyMetaDataFrom(source);
@@ -811,6 +837,9 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
     ASSERT_EQ(result.metadata().getSearchScore(), 5.4);
     ASSERT_VALUE_EQ(result.metadata().getSearchHighlights(), Value{"foo"_sd});
     ASSERT_BSONOBJ_EQ(result.metadata().getIndexKey(), BSON("y" << 1));
+    ASSERT_BSONOBJ_EQ(result.metadata().getSearchScoreDetails(),
+                      BSON("scoreDetails"
+                           << "foo"));
 }
 
 class SerializationTest : public unittest::Test {
@@ -847,6 +876,10 @@ protected:
         if (input.metadata().hasIndexKey()) {
             ASSERT_BSONOBJ_EQ(output.metadata().getIndexKey(), input.metadata().getIndexKey());
         }
+        if (input.metadata().hasSearchScoreDetails()) {
+            ASSERT_BSONOBJ_EQ(output.metadata().getSearchScoreDetails(),
+                              input.metadata().getSearchScoreDetails());
+        }
 
         ASSERT(output.toBson().binaryEqual(input.toBson()));
     }
@@ -859,6 +892,8 @@ TEST_F(SerializationTest, MetaSerializationNoVals) {
     docBuilder.metadata().setSearchScore(30.0);
     docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
                                                         << "def"_sd));
+    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
+                                                     << "foo"));
     assertRoundTrips(docBuilder.freeze());
 }
 
@@ -871,6 +906,8 @@ TEST_F(SerializationTest, MetaSerializationWithVals) {
     docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
                                                         << "def"_sd));
     docBuilder.metadata().setIndexKey(BSON("key" << 42));
+    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
+                                                     << "foo"));
     assertRoundTrips(docBuilder.freeze());
 }
 
@@ -891,6 +928,8 @@ TEST(MetaFields, ToAndFromBson) {
     docBuilder.metadata().setSearchScore(30.0);
     docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd
                                                         << "def"_sd));
+    docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
+                                                     << "foo"));
     Document doc = docBuilder.freeze();
     BSONObj obj = doc.toBsonWithMetaData();
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
@@ -899,11 +938,17 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_BSONOBJ_EQ(obj[Document::metaFieldSearchHighlights].embeddedObject(),
                       BSON_ARRAY("abc"_sd
                                  << "def"_sd));
+    ASSERT_BSONOBJ_EQ(obj[Document::metaFieldSearchScoreDetails].Obj(),
+                      BSON("scoreDetails"
+                           << "foo"));
     Document fromBson = Document::fromBsonWithMetaData(obj);
     ASSERT_TRUE(fromBson.metadata().hasTextScore());
     ASSERT_TRUE(fromBson.metadata().hasRandVal());
     ASSERT_EQ(10.0, fromBson.metadata().getTextScore());
     ASSERT_EQ(20, fromBson.metadata().getRandVal());
+    ASSERT_BSONOBJ_EQ(BSON("scoreDetails"
+                           << "foo"),
+                      fromBson.metadata().getSearchScoreDetails());
 }
 
 TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
@@ -922,7 +967,7 @@ TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
     ASSERT_GT(bigMetadataDocSize, smallMetadataDocSize);
 
     // Do a sanity check on the amount of space taken by metadata in document 2.
-    ASSERT_LT(doc2.getMetadataApproximateSize(), 250U);
+    ASSERT_LT(doc2.getMetadataApproximateSize(), 300U);
 
     Document emptyDoc;
     ASSERT_LT(emptyDoc.getMetadataApproximateSize(), 100U);

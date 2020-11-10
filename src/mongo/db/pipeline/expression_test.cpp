@@ -2680,6 +2680,20 @@ TEST(ExpressionMetaTest, ExpressionMetaTextScore) {
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_EQ(val.getDouble(), 1.23);
 }
+
+TEST(ExpressionMetaTest, ExpressionMetaSearchScoreDetails) {
+    auto expCtx = ExpressionContextForTest{};
+    BSONObj expr = fromjson("{$meta: \"searchScoreDetails\"}");
+    auto expressionMeta =
+        ExpressionMeta::parse(&expCtx, expr.firstElement(), expCtx.variablesParseState);
+
+    auto details = BSON("scoreDetails"
+                        << "foo");
+    MutableDocument doc;
+    doc.metadata().setSearchScoreDetails(details);
+    Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
+    ASSERT_DOCUMENT_EQ(val.getDocument(), Document(details));
+}
 }  // namespace expression_meta_test
 
 namespace ExpressionRegexTest {
