@@ -61,8 +61,10 @@ void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
         // http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
         _count += 1;
         const double delta = val - _mean;
-        _mean += delta / _count;
-        _m2 += delta * (val - _mean);
+        if (delta != 0.0) {
+            _mean += delta / _count;
+            _m2 += delta * (val - _mean);
+        }
     } else {
         // This is what getValue(true) produced below.
         verify(input.getType() == Object);
@@ -78,8 +80,13 @@ void AccumulatorStdDev::processInternal(const Value& input, bool merging) {
         const double delta = mean - _mean;
         const long long newCount = count + _count;
 
-        _mean = ((_count * _mean) + (count * mean)) / newCount;
-        _m2 += m2 + (delta * delta * (double(_count) * count / newCount));
+        if (delta != 0.0) {
+            // Avoid potential numerical stability issues.
+            _mean = ((_count * _mean) + (count * mean)) / newCount;
+            _m2 += delta * delta * (double(_count) * count / newCount);
+        }
+        _m2 += m2;
+
         _count = newCount;
     }
 }

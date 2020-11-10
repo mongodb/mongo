@@ -775,6 +775,22 @@ TEST(ExpressionFromAccumulators, StdDevSamp) {
          {{}, Value(BSONNULL)}});
 }
 
+TEST(ExpressionFromAccumulators, StdDevSampRepeated) {
+    ExpressionContextForTest expCtx;
+    AccumulatorStdDevPop mergedAcc(&expCtx);
+
+    for (int i = 0; i < 100; i++) {
+        AccumulatorStdDevPop acc(&expCtx);
+        acc.process(Value(std::exp(14.0)), false /*merging*/);
+        Value mergedValue = acc.getValue(true /*toBeMerged*/);
+        mergedAcc.process(mergedValue, true /*merging*/);
+    }
+
+    Value result = mergedAcc.getValue(false /*toBeMerged*/);
+    const double doubleVal = result.coerceToDouble();
+    ASSERT_EQ(0.0, doubleVal);
+}
+
 TEST(ExpressionPowTest, LargeExponentValuesWithBaseOfZero) {
     assertExpectedResults(
         "$pow",
