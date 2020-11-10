@@ -139,19 +139,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            if (isReplSet) {
-                // Ensure writes to the oplog are counted. Some oplog fields like UUID are
-                // randomized between runs, but the types are fixed-length, so we can make strong
-                // assertions about the sizes. If the oplog format changes for any reason, then so
-                // will these assertions.
-                assert.eq(profileDoc.docBytesWritten, 188);
-                // Note that the oplog entry is greater than the default unit size of 128 bytes so
-                // it counts for 2 document units.
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 7);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
         }
@@ -257,16 +246,10 @@ const operations = [
             }
             assert.eq(profileDoc.idxEntryBytesRead, 3);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
-            if (isReplSet) {
-                // Ensure writes to the oplog are counted.
-                assert.eq(profileDoc.docBytesWritten, 224);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                // This update will not be performed in-place because it is too small and affects an
-                // index.
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            // This update will not be performed in-place because it is too small and affects an
+            // index.
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             // Deletes one index entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 9);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
@@ -290,16 +273,10 @@ const operations = [
             }
             assert.eq(profileDoc.idxEntryBytesRead, 3);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
-            if (isReplSet) {
-                // Ensure writes to the oplog are counted.
-                assert.eq(profileDoc.docBytesWritten, 224);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                // This update will not be performed in-place because it is too small and affects an
-                // index.
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            // This update will not be performed in-place because it is too small and affects an
+            // index.
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             // Deletes one index entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
@@ -441,15 +418,9 @@ const operations = [
             }
             assert.eq(profileDoc.idxEntryBytesRead, 3);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
-            if (isReplSet) {
-                // Ensure writes to the oplog are counted.
-                assert.eq(profileDoc.docBytesWritten, 177);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                // Deleted bytes are counted as 'written'.
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            // Deleted bytes are counted as 'written'.
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
@@ -470,15 +441,9 @@ const operations = [
             }
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            if (isReplSet) {
-                // Ensure writes to the oplog are counted.
-                assert.eq(profileDoc.docBytesWritten, 177);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                // Deleted bytes are counted as 'written'.
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            // Deleted bytes are counted as 'written'.
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
@@ -560,17 +525,8 @@ const operations = [
             // Reads the index entry for 'a' to determine uniqueness.
             assert.eq(profileDoc.idxEntryBytesRead, 6);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
-            if (isReplSet) {
-                // Ensure writes to the oplog are counted. Some oplog fields like UUID are
-                // randomized between runs, but the types are fixed-length, so we can make strong
-                // assertions about the sizes. If the oplog format changes for any reason, then so
-                // will these assertions.
-                assert.eq(profileDoc.docBytesWritten, 188);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             // Deletes one entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
@@ -620,16 +576,10 @@ const operations = [
             // Reads index entries on '_id' for the lookup and 'a' to ensure uniqueness.
             assert.eq(profileDoc.idxEntryBytesRead, 9);
             assert.eq(profileDoc.idxEntryUnitsRead, 2);
-            if (isReplSet) {
-                // Ensure writes to the oplog are counted.
-                assert.eq(profileDoc.docBytesWritten, 224);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                // This out-of-place update should perform a direct insert because it is not large
-                // enough to qualify for the in-place update path.
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            // This out-of-place update should perform a direct insert because it is not large
+            // enough to qualify for the in-place update path.
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             // Removes one entry and inserts another.
             assert.eq(profileDoc.idxEntryBytesWritten, 11);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
@@ -661,11 +611,10 @@ const operations = [
             assert.eq(profileDoc.idxEntryBytesRead, 10);
             assert.eq(profileDoc.idxEntryUnitsRead, 2);
             if (isReplSet) {
-                // When WT_MODIFY is used on a replicated collection, in addition to writing fewer
-                // bytes per the comment about WT_MODIFY above, ensure it also inserts into the
-                // oplog.
-                assert.eq(profileDoc.docBytesWritten, 208);
-                assert.eq(profileDoc.docUnitsWritten, 3);
+                // When WT_MODIFY is used on a replicated collection fewer bytes are written per the
+                // comment about WT_MODIFY above.
+                assert.eq(profileDoc.docBytesWritten, 13);
+                assert.eq(profileDoc.docUnitsWritten, 1);
             } else {
                 assert.eq(profileDoc.docBytesWritten, 1061);
                 assert.eq(profileDoc.docUnitsWritten, 9);
@@ -699,18 +648,10 @@ const operations = [
             }
             assert.eq(profileDoc.idxEntryBytesRead, 4);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
-            if (isReplSet) {
-                // When WT_MODIFY is used on a replicated collection, in addition to writing fewer
-                // bytes per the comment about WT_MODIFY above, ensure it also inserts into the
-                // oplog.
-                assert.eq(profileDoc.docBytesWritten, 211);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                // This is calculated as the number of bytes overwritten + the number of bytes
-                // written, and is still less than the full document size.
-                assert.eq(profileDoc.docBytesWritten, 16);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            // This is calculated as the number of bytes overwritten + the number of bytes
+            // written, and is still less than the full document size.
+            assert.eq(profileDoc.docBytesWritten, 16);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
@@ -731,13 +672,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            if (isReplSet) {
-                assert.eq(profileDoc.docBytesWritten, 188);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
@@ -808,13 +744,8 @@ const operations = [
             }
             assert.eq(profileDoc.idxEntryBytesRead, 3);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
-            if (isReplSet) {
-                assert.eq(profileDoc.docBytesWritten, 211);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 16);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            assert.eq(profileDoc.docBytesWritten, 16);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
         }
@@ -837,13 +768,8 @@ const operations = [
             }
             assert.eq(profileDoc.idxEntryBytesRead, 3);
             assert.eq(profileDoc.idxEntryUnitsRead, 1);
-            if (isReplSet) {
-                assert.eq(profileDoc.docBytesWritten, 177);
-                assert.eq(profileDoc.docUnitsWritten, 3);
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 29);
-                assert.eq(profileDoc.docUnitsWritten, 1);
-            }
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
         }
@@ -865,15 +791,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
-            if (isReplSet) {
-                assert.eq(profileDoc.docBytesWritten, 18800);
-                // Each inserted document counts for 1 document unit plus 2 document units for its
-                // oplog entry (which is larger than the default unit size of 128 bytes).
-                assert.eq(profileDoc.docUnitsWritten, 300);
-            } else {
-                assert.eq(profileDoc.docBytesWritten, 2900);
-                assert.eq(profileDoc.docUnitsWritten, 100);
-            }
+            assert.eq(profileDoc.docBytesWritten, 2900);
+            assert.eq(profileDoc.docUnitsWritten, 100);
             assert.eq(profileDoc.idxEntryBytesWritten, 299);
             assert.eq(profileDoc.idxEntryUnitsWritten, 100);
         }

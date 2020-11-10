@@ -74,10 +74,9 @@ assert.commandWorked(primaryDB.createCollection(collName));
     assert.commandWorked(bulk.execute());
 
     assertMetrics(primary, (metrics) => {
-        // Each document insert counts as 1 unit plus 2 units (default unit size = 128) per oplog
-        // entry.
-        assert.eq(metrics[dbName].docBytesWritten, 167 * nDocs);
-        assert.eq(metrics[dbName].docUnitsWritten, 3 * nDocs);
+        // Each document is 29 bytes and we do not count oplog writes.
+        assert.eq(metrics[dbName].docBytesWritten, 29 * nDocs);
+        assert.eq(metrics[dbName].docUnitsWritten, nDocs);
 
         // The inserted keys will vary in size from 2 to 4 bytes depending on their value. Assert
         // that the number of bytes fall within that range.

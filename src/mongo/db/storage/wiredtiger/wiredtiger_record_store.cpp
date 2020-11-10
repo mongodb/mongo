@@ -1512,8 +1512,10 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
 
         // Increment metrics for each insert separately, as opposed to outside of the loop. The API
         // requires that each record be accounted for separately.
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-        metricsCollector.incrementOneDocWritten(value.size);
+        if (!_isOplog) {
+            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+            metricsCollector.incrementOneDocWritten(value.size);
+        }
     }
 
     _changeNumRecords(opCtx, nRecords);

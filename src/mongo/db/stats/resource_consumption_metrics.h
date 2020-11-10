@@ -265,7 +265,9 @@ public:
 
         /**
          * This should be called once per document written with the number of bytes written for that
-         * document. This is a no-op when metrics collection is disabled on this operation.
+         * document. This is a no-op when metrics collection is disabled on this operation. This
+         * function should not be called when the operation is a write to the oplog. The metrics are
+         * only for operations that are not oplog writes.
          */
         void incrementOneDocWritten(size_t docBytesWritten);
 
