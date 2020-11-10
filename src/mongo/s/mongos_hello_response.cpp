@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/mongos_is_master_response.h"
+#include "mongo/s/mongos_hello_response.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/str.h"
 

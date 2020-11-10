@@ -58,7 +58,7 @@ env.Library(
         'cluster_getmore_cmd.cpp',
         'cluster_index_filter_cmd.cpp',
         'cluster_is_db_grid_cmd.cpp',
-        'cluster_is_master_cmd.cpp',
+        'cluster_hello_cmd.cpp',
         'cluster_kill_op.cpp',
         'cluster_killcursors_cmd.cpp',
         'cluster_killoperations_cmd.cpp',
