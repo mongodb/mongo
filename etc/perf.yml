@@ -36,10 +36,13 @@ variables:
     - dsi
     - signal-processing
     - genny
+    - workloads
     - linkbench
     - linkbench2
-    - workloads
     - mongo-perf
+    - ycsb
+    - benchmarks
+    - py-tpcc
 
 
 modules:
@@ -83,8 +86,16 @@ modules:
   prefix: ../../src
   branch: master
   ref: 9e7888c5009e44a185b135104dd8456eea1deb1e
-###
+- name: benchmarks
+  repo: git@github.com:mongodb-labs/benchmarks.git
+  prefix: ../../src
+  branch: master
+- name: py-tpcc
+  repo: git@github.com:10gen/py-tpcc.git
+  prefix: ../../src
+  ref: 52185e96bf28be6608ea65b61ff1d134b7cb3f13
 
+###
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
@@ -92,10 +103,6 @@ modules:
 - name: mongo-tools
   repo: git@github.com:mongodb/mongo-tools.git
   prefix: mongo-tools/src/github.com/mongodb
-  branch: master
-- name: mongo-perf
-  repo: git@github.com:mongodb/mongo-perf.git
-  prefix: ../../src
   branch: master
 
 

@@ -51,10 +51,13 @@ variables:
     - dsi
     - signal-processing
     - genny
+    - workloads
     - linkbench
     - linkbench2
-    - workloads
     - mongo-perf
+    - ycsb
+    - benchmarks
+    - py-tpcc
 
 
 modules:
@@ -74,7 +77,7 @@ modules:
   branch: master
 - name: workloads
   repo: git@github.com:10gen/workloads.git
-  prefix: workloads
+  prefix: ../../src
   branch: master
 - name: wtdevelop
   repo: git@github.com:wiredtiger/wiredtiger.git
@@ -104,10 +107,10 @@ modules:
   branch: master
 - name: py-tpcc
   repo: git@github.com:10gen/py-tpcc.git
-  target: ../../src
+  prefix: ../../src
   ref: 52185e96bf28be6608ea65b61ff1d134b7cb3f13
-###
 
+###
 - name: enterprise
   repo: git@github.com:10gen/mongo-enterprise-modules.git
   prefix: src/mongo/db/modules
@@ -115,10 +118,6 @@ modules:
 - name: mongo-tools
   repo: git@github.com:mongodb/mongo-tools.git
   prefix: mongo-tools/src/github.com/mongodb
-  branch: master
-- name: mongo-perf
-  repo: git@github.com:mongodb/mongo-perf.git
-  prefix: ../../src
   branch: master
 
 
