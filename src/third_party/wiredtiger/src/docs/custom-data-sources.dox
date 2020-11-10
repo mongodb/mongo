@@ -233,4 +233,10 @@ responsibility of the implementation to protect any shared data.  For
 example, object operations such as WT_DATA_SOURCE::drop might not be
 permitted while there are open cursors for the WT_DATA_SOURCE object.
 
+@section custom_data_source_transactions Transactions
+
+WiredTiger does not start implicit transactions to the WT_DATA_SOURCE
+methods. It is the responsibility of the custom data source implementation
+to support the transaction semantics.
+
 */

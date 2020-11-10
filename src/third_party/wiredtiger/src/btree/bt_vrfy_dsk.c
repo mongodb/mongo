@@ -452,7 +452,6 @@ __verify_dsk_row_leaf(
     WT_DECL_RET;
     WT_ITEM *last;
     enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
-    void *huffman;
     size_t prefix;
     uint32_t cell_num, cell_type, i, key_cnt, last_cell_num;
     uint8_t *end;
@@ -460,7 +459,6 @@ __verify_dsk_row_leaf(
     btree = S2BT(session);
     bm = btree->bm;
     unpack = &_unpack;
-    huffman = dsk->type == WT_PAGE_ROW_INT ? NULL : btree->huffman_key;
 
     WT_ERR(__wt_scr_alloc(session, 0, &current));
     WT_ERR(__wt_scr_alloc(session, 0, &last_pfx));
@@ -575,37 +573,15 @@ __verify_dsk_row_leaf(
               cell_num, tag, prefix, last->size);
 
         /*
-         * If Huffman decoding required, unpack the cell to build the key, then resolve the prefix.
-         * Else, we can do it faster internally because we don't have to shuffle memory around as
-         * much.
+         * Get the cell's data/length and make sure we have enough buffer space.
          */
-        if (huffman != NULL) {
-            WT_ERR(__wt_dsk_cell_data_ref(session, dsk->type, unpack, current));
+        WT_ERR(__wt_buf_init(session, current, prefix + unpack->size));
 
-            /*
-             * If there's a prefix, make sure there's enough buffer space, then shift the decoded
-             * data past the prefix and copy the prefix into place. Take care with the pointers:
-             * current->data may be pointing inside the buffer.
-             */
-            if (prefix != 0) {
-                WT_ERR(__wt_buf_grow(session, current, prefix + current->size));
-                memmove((uint8_t *)current->mem + prefix, current->data, current->size);
-                memcpy(current->mem, last->data, prefix);
-                current->data = current->mem;
-                current->size += prefix;
-            }
-        } else {
-            /*
-             * Get the cell's data/length and make sure we have enough buffer space.
-             */
-            WT_ERR(__wt_buf_init(session, current, prefix + unpack->size));
-
-            /* Copy the prefix then the data into place. */
-            if (prefix != 0)
-                memcpy(current->mem, last->data, prefix);
-            memcpy((uint8_t *)current->mem + prefix, unpack->data, unpack->size);
-            current->size = prefix + unpack->size;
-        }
+        /* Copy the prefix then the data into place. */
+        if (prefix != 0)
+            memcpy(current->mem, last->data, prefix);
+        memcpy((uint8_t *)current->mem + prefix, unpack->data, unpack->size);
+        current->size = prefix + unpack->size;
 
 key_compare:
         /*

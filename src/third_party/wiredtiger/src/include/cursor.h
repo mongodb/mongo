@@ -159,14 +159,14 @@ struct __wt_cursor_btree {
     WT_COL *cip_saved; /* Last iteration reference */
 
     /*
-     * We don't instantiate prefix-compressed keys on pages where there's no Huffman encoding
-     * because we don't want to waste memory if only moving a cursor through the page, and it's
-     * faster to build keys while moving through the page than to roll-forward from a previously
-     * instantiated key (we don't instantiate all of the keys, just the ones at binary search
-     * points). We can't use the application's WT_CURSOR key field as a copy of the last-returned
-     * key because it may have been altered by the API layer, for example, dump cursors. Instead we
-     * store the last-returned key in a temporary buffer. The rip_saved field is used to determine
-     * if the key in the temporary buffer has the prefix needed for building the current key.
+     * We don't instantiate prefix-compressed keys on pages because we don't want to waste memory if
+     * only moving a cursor through the page, and it's faster to build keys while moving through the
+     * page than to roll-forward from a previously instantiated key (we don't instantiate all of the
+     * keys, just the ones at binary search points). We can't use the application's WT_CURSOR key
+     * field as a copy of the last-returned key because it may have been altered by the API layer,
+     * for example, dump cursors. Instead we store the last-returned key in a temporary buffer. The
+     * rip_saved field is used to determine if the key in the temporary buffer has the prefix needed
+     * for building the current key.
      */
     WT_ROW *rip_saved; /* Last-returned key reference */
 

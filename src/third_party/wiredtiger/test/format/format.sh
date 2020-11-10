@@ -49,9 +49,9 @@ smoke_list=(
 	# "$smoke_base_1 file_type=var"
 
 	# Huffman key/value encoding.
-	"$smoke_base_1 file_type=row huffman_key=1 huffman_value=1"
+	"$smoke_base_1 file_type=row huffman_value=1"
     # Temporarily disabled
-	# "$smoke_base_1 file_type=var huffman_key=1 huffman_value=1"
+	# "$smoke_base_1 file_type=var huffman_value=1"
 
 	# LSM
     # Temporarily disabled

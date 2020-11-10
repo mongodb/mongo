@@ -345,20 +345,8 @@ switch_and_jump:
             }
         }
         if (direction == FORWARD) {
-            /*
-             * Get a reference to the current key's bytes. Usually we want bytes from the page,
-             * fast-path that case.
-             */
-            if (btree->huffman_key == NULL) {
-                p = unpack->data;
-                size = unpack->size;
-            } else {
-                if (tmp == NULL)
-                    WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-                WT_ERR(__wt_dsk_cell_data_ref(session, WT_PAGE_ROW_LEAF, unpack, tmp));
-                p = tmp->data;
-                size = tmp->size;
-            }
+            p = unpack->data;
+            size = unpack->size;
 
             /*
              * Grow the buffer as necessary as well as ensure data has been copied into local buffer

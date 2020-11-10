@@ -1015,11 +1015,10 @@ struct __wt_col {
 
 /*
  * WT_IKEY --
- *	Instantiated key: row-store keys are usually prefix compressed and
- *	sometimes Huffman encoded or overflow objects.  Normally, a row-store
- *	page in-memory key points to the on-page WT_CELL, but in some cases,
- *	we instantiate the key in memory, in which case the row-store page
- *	in-memory key points to a WT_IKEY structure.
+ *  Instantiated key: row-store keys are usually prefix compressed or overflow objects.
+ *  Normally, a row-store page in-memory key points to the on-page WT_CELL, but in some
+ *  cases, we instantiate the key in memory, in which case the row-store page in-memory
+ *  key points to a WT_IKEY structure.
  */
 struct __wt_ikey {
     uint32_t size; /* Key length */

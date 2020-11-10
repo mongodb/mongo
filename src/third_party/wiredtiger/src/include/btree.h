@@ -112,7 +112,6 @@ struct __wt_btree {
     /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t assert_flags; /* Debugging assertion information */
 
-    void *huffman_key;   /* Key huffman encoding */
     void *huffman_value; /* Value huffman encoding */
 
     enum {

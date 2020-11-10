@@ -1079,9 +1079,6 @@ struct __wt_session {
 	 * \c none.}
 	 * @config{format, the file format., a string\, chosen from the following options: \c
 	 * "btree"; default \c btree.}
-	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted values are \c
-	 * "none"\, \c "english"\, \c "utf8<file>" or \c "utf16<file>". See @ref huffman for more
-	 * information., a string; default \c none.}
 	 * @config{huffman_value, configure Huffman encoding for values.  Permitted values are \c
 	 * "none"\, \c "english"\, \c "utf8<file>" or \c "utf16<file>". See @ref huffman for more
 	 * information., a string; default \c none.}

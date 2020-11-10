@@ -267,10 +267,6 @@ file_config = format_meta + file_runtime_config + [
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
-    Config('huffman_key', 'none', r'''
-        configure Huffman encoding for keys.  Permitted values are
-        \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information'''),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".

@@ -356,20 +356,19 @@ such a configuration string is as follows:
 
 - Huffman
 \n
-Reduces the size requirement by compressing individual key/value items, and
-can be separately configured either or both keys and values. The additional
-CPU cost of Huffman encoding can be high, and should be considered. (See @ref
-huffman for details.)
+Reduces the size requirement by compressing individual value items, and
+can be configured for values. The additional CPU cost of Huffman encoding
+can be high, and should be considered. (See @ref huffman for details.)
 \n\n
 Huffman configuration:
 \n
-Specified using the \c huffman_key and \c huffman_value configuration
+Specified using the \c huffman_value configuration
 options to WT_SESSION::create. These options can take values of "english"
 (to use a built-in English language frequency table), "utf8<file>" or
 "utf16<file>" (to use a custom UTF-8 or UTF-16 symbol frequency table file).
 An example of such a configuration string is as follows:
 <pre>
-"key_format=S,value_format=S,huffman_key=english,huffman_value=english"
+"key_format=S,value_format=S,huffman_value=english"
 </pre>
 
 - Block Compression
