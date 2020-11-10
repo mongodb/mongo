@@ -101,7 +101,7 @@ public:
         auto client = opCtx->getClient();
         ClientMetadata::tryFinalize(client);
 
-        // If a client is following the awaitable isMaster protocol, maxAwaitTimeMS should be
+        // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
@@ -122,9 +122,9 @@ public:
             deadline = opCtx->getServiceContext()->getPreciseClockSource()->now() +
                 Milliseconds(maxAwaitTimeMS);
 
-            LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
+            LOGV2_DEBUG(23871, 3, "Using maxAwaitTimeMS for awaitable hello protocol.");
 
-            // Awaitable isMaster commands have high latency by design. Ignore them.
+            // Awaitable hello commands have high latency by design. Ignore them.
             opCtx->setShouldIncrementLatencyStats(false);
         } else {
             uassert(51760,
@@ -137,12 +137,12 @@ public:
         auto result = replyBuilder->getBodyBuilder();
         const auto* mongosTopCoord = MongosTopologyCoordinator::get(opCtx);
 
-        auto mongosIsMasterResponse =
-            mongosTopCoord->awaitIsMasterResponse(opCtx, clientTopologyVersion, deadline);
+        auto mongosHelloResponse =
+            mongosTopCoord->awaitHelloResponse(opCtx, clientTopologyVersion, deadline);
 
-        mongosIsMasterResponse->appendToBuilder(&result, useLegacyResponseFields());
-        // The isMaster response always includes a topologyVersion.
-        auto currentMongosTopologyVersion = mongosIsMasterResponse->getTopologyVersion();
+        mongosHelloResponse->appendToBuilder(&result, useLegacyResponseFields());
+        // The hello response always includes a topologyVersion.
+        auto currentMongosTopologyVersion = mongosHelloResponse->getTopologyVersion();
 
         // Try to parse the optional 'helloOk' field. On mongos, if we see this field, we will
         // respond with helloOk: true so the client knows that it can continue to send the hello
@@ -184,10 +184,10 @@ public:
         saslMechanismRegistry.advertiseMechanismNamesForUser(opCtx, cmdObj, &result);
 
         if (opCtx->isExhaust()) {
-            LOGV2_DEBUG(23872, 3, "Using exhaust for isMaster or hello protocol");
+            LOGV2_DEBUG(23872, 3, "Using exhaust for hello protocol");
 
             uassert(51763,
-                    "An isMaster or hello request with exhaust must specify 'maxAwaitTimeMS'",
+                    "A hello/isMaster request with exhaust must specify 'maxAwaitTimeMS'",
                     maxAwaitTimeMSField);
             invariant(clientTopologyVersion);
 

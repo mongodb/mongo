@@ -160,7 +160,7 @@ Status waitForSigningKeys(OperationContext* opCtx) {
 
         auto configCS = shardRegistry->getConfigServerConnectionString();
         auto rsm = ReplicaSetMonitor::get(configCS.getSetName());
-        // mongod will set minWireVersion == maxWireVersion for isMaster requests from
+        // mongod will set minWireVersion == maxWireVersion for hello requests from
         // internalClient.
         if (rsm && (rsm->getMaxWireVersion() < WireVersion::SUPPORTS_OP_MSG)) {
             LOGV2(22841, "Waiting for signing keys not supported by config shard");
@@ -285,7 +285,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         }
 
         // Enter quiesce mode so that existing and new short operations are allowed to finish.
-        // At this point, we will start responding to any isMaster request with ShutdownInProgress
+        // At this point, we will start responding to any hello request with ShutdownInProgress
         // so that clients can re-route their operations.
         //
         // TODO SERVER-49138: Remove this FCV check when 5.0 becomes last-lts.

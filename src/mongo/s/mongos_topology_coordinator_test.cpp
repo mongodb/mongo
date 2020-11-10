@@ -90,57 +90,58 @@ TEST_F(MongosTopoCoordTest, MongosTopologyVersionCounterInitializedAtStartup) {
     ASSERT_EQ(0, getTopoCoord().getTopologyVersion().getCounter());
 }
 
-TEST_F(MongosTopoCoordTest, AwaitIsMasterReturnsCorrectFieldTypes) {
+TEST_F(MongosTopoCoordTest, AwaitHelloReturnsCorrectFieldTypes) {
     std::string mongosString = "isdbgrid";
     auto opCtx = makeOperationContext();
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
-    // Simple isMaster request with no topologyVersion or deadline. We just want to test a code path
-    // that calls _makeIsMasterResponse.
-    auto response = getTopoCoord().awaitIsMasterResponse(opCtx.get(), boost::none, boost::none);
+    // Simple hello request with no topologyVersion or deadline. We just want to test a code path
+    // that calls _makeHelloResponse.
+    auto response = getTopoCoord().awaitHelloResponse(opCtx.get(), boost::none, boost::none);
 
-    // Validate isMaster response field types.
+    // Validate hello response field types.
     ASSERT_EQUALS(response->getTopologyVersion().getProcessId(),
                   currentTopologyVersion.getProcessId());
     ASSERT_EQUALS(response->getTopologyVersion().getCounter(), currentTopologyVersion.getCounter());
-    // Mongos isMaster responses will always contain ismaster: true and msg: "isdbgrid"
-    ASSERT_TRUE(response->getIsMaster());
+    // Mongos hello responses will always contain ismaster: true (when using the "isMaster" alias)
+    // and msg: "isdbgrid"
+    ASSERT_TRUE(response->getIsWritablePrimary());
     ASSERT_EQUALS(response->getMsg(), mongosString);
 }
 
-TEST_F(MongosTopoCoordTest, AwaitIsMasterResponseReturnsCurrentMongosTopologyVersionOnTimeOut) {
+TEST_F(MongosTopoCoordTest, AwaitHelloResponseReturnsCurrentMongosTopologyVersionOnTimeOut) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
     auto halfwayToMaxAwaitTime = maxAwaitTime / 2;
     auto deadline = now() + maxAwaitTime;
 
-    // isMaster request with the current TopologyVersion should attempt to wait for maxAwaitTimeMS.
+    // hello request with the current TopologyVersion should attempt to wait for maxAwaitTimeMS.
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
-    bool isMasterReturned = false;
-    stdx::thread getIsMasterThread([&] {
-        Client::setCurrent(getServiceContext()->makeClient("getIsMasterThread"));
+    bool helloReturned = false;
+    stdx::thread getHelloThread([&] {
+        Client::setCurrent(getServiceContext()->makeClient("getHelloThread"));
         auto threadOpCtx = cc().makeOperationContext();
-        const auto response = getTopoCoord().awaitIsMasterResponse(
-            threadOpCtx.get(), currentTopologyVersion, deadline);
-        isMasterReturned = true;
+        const auto response =
+            getTopoCoord().awaitHelloResponse(threadOpCtx.get(), currentTopologyVersion, deadline);
+        helloReturned = true;
         auto topologyVersion = response->getTopologyVersion();
-        // Assert that on timeout, the returned IsMasterResponse contains the same TopologyVersion.
+        // Assert that on timeout, the returned helloResponse contains the same TopologyVersion.
         ASSERT_EQUALS(topologyVersion.getCounter(), currentTopologyVersion.getCounter());
         ASSERT_EQUALS(topologyVersion.getProcessId(), currentTopologyVersion.getProcessId());
     });
 
-    // Advance the clocks halfway and make sure awaitIsMasterResponse did not return yet.
+    // Advance the clocks halfway and make sure awaitHelloResponse did not return yet.
     advanceTime(halfwayToMaxAwaitTime);
-    ASSERT_FALSE(isMasterReturned);
+    ASSERT_FALSE(helloReturned);
 
-    // Advance the clocks the rest of the way so that awaitIsMasterResponse times out.
+    // Advance the clocks the rest of the way so that awaitHelloResponse times out.
     advanceTime(halfwayToMaxAwaitTime);
-    getIsMasterThread.join();
-    ASSERT_TRUE(isMasterReturned);
+    getHelloThread.join();
+    ASSERT_TRUE(helloReturned);
 }
 
-TEST_F(MongosTopoCoordTest, AwaitIsMasterErrorsWithHigherCounterAndSameProcessID) {
+TEST_F(MongosTopoCoordTest, AwaitHelloErrorsWithHigherCounterAndSameProcessID) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = now() + maxAwaitTime;
@@ -153,13 +154,13 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterErrorsWithHigherCounterAndSameProcessID
           "version counter: 0";
     auto higherTopologyVersionWithSameProcessId = TopologyVersion(
         currentTopologyVersion.getProcessId(), currentTopologyVersion.getCounter() + 1);
-    ASSERT_THROWS_WHAT(getTopoCoord().awaitIsMasterResponse(
+    ASSERT_THROWS_WHAT(getTopoCoord().awaitHelloResponse(
                            opCtx.get(), higherTopologyVersionWithSameProcessId, deadline),
                        AssertionException,
                        sb.str());
 }
 
-TEST_F(MongosTopoCoordTest, AwaitIsMasterReturnsImmediatelyWithHigherCounterAndDifferentProcessID) {
+TEST_F(MongosTopoCoordTest, AwaitHelloReturnsImmediatelyWithHigherCounterAndDifferentProcessID) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = now() + maxAwaitTime;
@@ -172,15 +173,14 @@ TEST_F(MongosTopoCoordTest, AwaitIsMasterReturnsImmediatelyWithHigherCounterAndD
     auto higherTopologyVersionWithDifferentProcessId =
         TopologyVersion(differentPid, currentTopologyVersion.getCounter() + 1);
 
-    auto response = getTopoCoord().awaitIsMasterResponse(
+    auto response = getTopoCoord().awaitHelloResponse(
         opCtx.get(), higherTopologyVersionWithDifferentProcessId, deadline);
     ASSERT_EQUALS(response->getTopologyVersion().getProcessId(),
                   currentTopologyVersion.getProcessId());
     ASSERT_EQUALS(response->getTopologyVersion().getCounter(), currentTopologyVersion.getCounter());
 }
 
-TEST_F(MongosTopoCoordTest,
-       AwaitIsMasterReturnsImmediatelyWithCurrentCounterAndDifferentProcessID) {
+TEST_F(MongosTopoCoordTest, AwaitHelloReturnsImmediatelyWithCurrentCounterAndDifferentProcessID) {
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
     auto deadline = now() + maxAwaitTime;
@@ -194,26 +194,26 @@ TEST_F(MongosTopoCoordTest,
     // Different process ID should return immediately with the current TopologyVersion.
     auto topologyVersionWithDifferentProcessId =
         TopologyVersion(differentPid, currentTopologyVersion.getCounter());
-    auto response = getTopoCoord().awaitIsMasterResponse(
+    auto response = getTopoCoord().awaitHelloResponse(
         opCtx.get(), topologyVersionWithDifferentProcessId, deadline);
     ASSERT_EQUALS(response->getTopologyVersion().getProcessId(),
                   currentTopologyVersion.getProcessId());
     ASSERT_EQUALS(response->getTopologyVersion().getCounter(), currentTopologyVersion.getCounter());
 }
 
-TEST_F(MongosTopoCoordTest, AwaitIsMasterReturnsImmediatelyWithNoTopologyVersion) {
+TEST_F(MongosTopoCoordTest, AwaitHelloReturnsImmediatelyWithNoTopologyVersion) {
     auto opCtx = makeOperationContext();
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
 
     // No topology version should return immediately with the current TopologyVersion. Note that we
     // do not specify deadline when there is no topology version.
-    auto response = getTopoCoord().awaitIsMasterResponse(opCtx.get(), boost::none, boost::none);
+    auto response = getTopoCoord().awaitHelloResponse(opCtx.get(), boost::none, boost::none);
     ASSERT_EQUALS(response->getTopologyVersion().getProcessId(),
                   currentTopologyVersion.getProcessId());
     ASSERT_EQUALS(response->getTopologyVersion().getCounter(), currentTopologyVersion.getCounter());
 }
 
-TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorInQuiesceMode) {
+TEST_F(MongosTopoCoordTest, HelloReturnsErrorInQuiesceMode) {
     auto currentTopologyVersion = getTopoCoord().getTopologyVersion();
     auto opCtx = makeOperationContext();
     auto maxAwaitTime = Milliseconds(5000);
@@ -226,19 +226,19 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorInQuiesceMode) {
     ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
                   getTopoCoord().getTopologyVersion().getCounter());
 
-    // The following isMaster requests should fail immediately with ShutdownInProgress errors
+    // The following hello requests should fail immediately with ShutdownInProgress errors
     // instead of following the usual error precedence.
 
     // Stale topology version
     ASSERT_THROWS_CODE(
-        getTopoCoord().awaitIsMasterResponse(opCtx.get(), currentTopologyVersion, deadline),
+        getTopoCoord().awaitHelloResponse(opCtx.get(), currentTopologyVersion, deadline),
         AssertionException,
         ErrorCodes::ShutdownInProgress);
 
     // Current topology version
     currentTopologyVersion = getTopoCoord().getTopologyVersion();
     ASSERT_THROWS_CODE(
-        getTopoCoord().awaitIsMasterResponse(opCtx.get(), currentTopologyVersion, deadline),
+        getTopoCoord().awaitHelloResponse(opCtx.get(), currentTopologyVersion, deadline),
         AssertionException,
         ErrorCodes::ShutdownInProgress);
 
@@ -247,13 +247,13 @@ TEST_F(MongosTopoCoordTest, IsMasterReturnsErrorInQuiesceMode) {
     ASSERT_NOT_EQUALS(differentPid, currentTopologyVersion.getProcessId());
     auto topologyVersionWithDifferentProcessId =
         TopologyVersion(differentPid, currentTopologyVersion.getCounter());
-    ASSERT_THROWS_CODE(getTopoCoord().awaitIsMasterResponse(
+    ASSERT_THROWS_CODE(getTopoCoord().awaitHelloResponse(
                            opCtx.get(), topologyVersionWithDifferentProcessId, deadline),
                        AssertionException,
                        ErrorCodes::ShutdownInProgress);
 
     // No topology version
-    ASSERT_THROWS_CODE(getTopoCoord().awaitIsMasterResponse(opCtx.get(), boost::none, boost::none),
+    ASSERT_THROWS_CODE(getTopoCoord().awaitHelloResponse(opCtx.get(), boost::none, boost::none),
                        AssertionException,
                        ErrorCodes::ShutdownInProgress);
 }
@@ -268,24 +268,24 @@ TEST_F(MongosTopoCoordTest, HelloReturnsErrorOnEnteringQuiesceMode) {
     auto waitForHelloFailPoint = globalFailPointRegistry().find("waitForHelloResponse");
     auto timesEnteredFailPoint = waitForHelloFailPoint->setMode(FailPoint::alwaysOn);
     ON_BLOCK_EXIT([&] { waitForHelloFailPoint->setMode(FailPoint::off, 0); });
-    stdx::thread getIsMasterThread([&] {
-        Client::setCurrent(getServiceContext()->makeClient("getIsMasterThread"));
+    stdx::thread getHelloThread([&] {
+        Client::setCurrent(getServiceContext()->makeClient("getHelloThread"));
         auto threadOpCtx = cc().makeOperationContext();
         auto maxAwaitTime = Milliseconds(5000);
         auto deadline = now() + maxAwaitTime;
-        ASSERT_THROWS_CODE(getTopoCoord().awaitIsMasterResponse(
-                               threadOpCtx.get(), currentTopologyVersion, deadline),
-                           AssertionException,
-                           ErrorCodes::ShutdownInProgress);
+        ASSERT_THROWS_CODE(
+            getTopoCoord().awaitHelloResponse(threadOpCtx.get(), currentTopologyVersion, deadline),
+            AssertionException,
+            ErrorCodes::ShutdownInProgress);
     });
 
-    // Ensure that awaitIsMasterResponse() is called before entering quiesce mode.
+    // Ensure that awaitHelloResponse() is called before entering quiesce mode.
     waitForHelloFailPoint->waitForTimesEntered(timesEnteredFailPoint + 1);
     getTopoCoord().enterQuiesceModeAndWait(opCtx.get(), quiesceTime);
     ASSERT_EQUALS(currentTopologyVersion.getCounter() + 1,
                   getTopoCoord().getTopologyVersion().getCounter());
     waitForHelloFailPoint->setMode(FailPoint::off);
-    getIsMasterThread.join();
+    getHelloThread.join();
 }
 
 }  // namespace

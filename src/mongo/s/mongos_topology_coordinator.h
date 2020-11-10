@@ -49,7 +49,7 @@ public:
     MongosTopologyCoordinator();
 
     /**
-     * Constructs and returns a MongosIsMasterResponse. Will block until the given deadline waiting
+     * Constructs and returns a MongosHelloResponse. Will block until the given deadline waiting
      * for a significant topology change if the 'counter' field of 'clientTopologyVersion' is equal
      * to the current TopologyVersion 'counter' maintained by this class. Returns immediately if
      * 'clientTopologyVersion' < TopologyVersion of this class or if the processId
@@ -57,7 +57,7 @@ public:
      *
      * Note that Quiesce Mode is the only valid topology change on mongos.
      */
-    std::shared_ptr<const MongosIsMasterResponse> awaitIsMasterResponse(
+    std::shared_ptr<const MongosHelloResponse> awaitHelloResponse(
         OperationContext* opCtx,
         boost::optional<TopologyVersion> clientTopologyVersion,
         boost::optional<Date_t> deadline) const;
@@ -65,7 +65,7 @@ public:
     /**
      * We only enter quiesce mode during the shutdown process, which means that the
      * MongosTopologyCoordinator will never need to reset _inQuiesceMode. This function causes us
-     * to increment the topologyVersion and start failing isMaster requests with ShutdownInProgress.
+     * to increment the topologyVersion and start failing hello requests with ShutdownInProgress.
      * This will inform clients to route new operations to another mongos.
      *
      * We also sleep for quiesceTime, which allows short running operations to finish.
@@ -84,8 +84,8 @@ public:
 
 
 private:
-    using SharedPromiseOfMongosIsMasterResponse =
-        SharedPromise<std::shared_ptr<const MongosIsMasterResponse>>;
+    using SharedPromiseOfMongosHelloResponse =
+        SharedPromise<std::shared_ptr<const MongosHelloResponse>>;
 
     /**
      * Calculates the time (in millis) left in quiesce mode and converts the value to int64.
@@ -93,9 +93,9 @@ private:
     long long _calculateRemainingQuiesceTimeMillis() const;
 
     /**
-     * Helper for constructing a MongosIsMasterResponse.
+     * Helper for constructing a MongosHelloResponse.
      **/
-    std::shared_ptr<MongosIsMasterResponse> _makeIsMasterResponse(WithLock) const;
+    std::shared_ptr<MongosHelloResponse> _makeHelloResponse(WithLock) const;
 
     //
     // All member variables are labeled with one of the following codes indicating the
@@ -109,14 +109,14 @@ private:
     // Keeps track of the current mongos TopologyVersion.
     TopologyVersion _topologyVersion;  // (M)
 
-    // True if we're in quiesce mode.  If true, we'll respond to isMaster requests with ok:0.
+    // True if we're in quiesce mode.  If true, we'll respond to hello requests with ok:0.
     bool _inQuiesceMode;  // (M)
 
     // The deadline until which quiesce mode will last.
     Date_t _quiesceDeadline;  // (M)
 
-    // The promise waited on by awaitable isMaster requests on mongos.
-    std::shared_ptr<SharedPromiseOfMongosIsMasterResponse> _promise;  // (M)
+    // The promise waited on by awaitable hello requests on mongos.
+    std::shared_ptr<SharedPromiseOfMongosHelloResponse> _promise;  // (M)
 };
 
 }  // namespace mongo

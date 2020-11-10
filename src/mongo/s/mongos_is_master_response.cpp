@@ -33,18 +33,18 @@
 
 namespace mongo {
 
-MongosIsMasterResponse::MongosIsMasterResponse(TopologyVersion topologyVersion) {
+MongosHelloResponse::MongosHelloResponse(TopologyVersion topologyVersion) {
     _topologyVersion = topologyVersion;
-    _isMaster = true;
+    _isWritablePrimary = true;
     _msg = "isdbgrid";
 }
 
-void MongosIsMasterResponse::appendToBuilder(BSONObjBuilder* builder,
-                                             bool useLegacyResponseFields) const {
+void MongosHelloResponse::appendToBuilder(BSONObjBuilder* builder,
+                                          bool useLegacyResponseFields) const {
     if (useLegacyResponseFields) {
-        builder->append(kIsMasterFieldName, _isMaster);
+        builder->append(kIsMasterFieldName, _isWritablePrimary);
     } else {
-        builder->append(kIsWritablePrimaryFieldName, _isMaster);
+        builder->append(kIsWritablePrimaryFieldName, _isWritablePrimary);
     }
     builder->append(kMsgFieldName, _msg);
 

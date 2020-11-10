@@ -92,7 +92,7 @@ MongosTopologyCoordinator* MongosTopologyCoordinator::get(OperationContext* opCt
 MongosTopologyCoordinator::MongosTopologyCoordinator()
     : _topologyVersion(instanceId, 0),
       _inQuiesceMode(false),
-      _promise(std::make_shared<SharedPromise<std::shared_ptr<const MongosIsMasterResponse>>>()) {}
+      _promise(std::make_shared<SharedPromise<std::shared_ptr<const MongosHelloResponse>>>()) {}
 
 long long MongosTopologyCoordinator::_calculateRemainingQuiesceTimeMillis() const {
     auto preciseClock = getGlobalServiceContext()->getPreciseClockSource();
@@ -103,26 +103,26 @@ long long MongosTopologyCoordinator::_calculateRemainingQuiesceTimeMillis() cons
     return remainingQuiesceTimeLong;
 }
 
-std::shared_ptr<MongosIsMasterResponse> MongosTopologyCoordinator::_makeIsMasterResponse(
+std::shared_ptr<MongosHelloResponse> MongosTopologyCoordinator::_makeHelloResponse(
     WithLock lock) const {
-    // It's possible for us to transition to Quiesce Mode after an isMaster request timed out.
+    // It's possible for us to transition to Quiesce Mode after a hello request timed out.
     // Check that we are not in Quiesce Mode before returning a response to avoid responding with
     // a higher topology version, but no indication that we are shutting down.
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
             kQuiesceModeShutdownMessage,
             !_inQuiesceMode);
 
-    auto response = std::make_shared<MongosIsMasterResponse>(_topologyVersion);
+    auto response = std::make_shared<MongosHelloResponse>(_topologyVersion);
     return response;
 }
 
-std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIsMasterResponse(
+std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHelloResponse(
     OperationContext* opCtx,
     boost::optional<TopologyVersion> clientTopologyVersion,
     boost::optional<Date_t> deadline) const {
     stdx::unique_lock lk(_mutex);
 
-    // Fail all new isMaster requests with ShutdownInProgress if we've transitioned to Quiesce
+    // Fail all new hello requests with ShutdownInProgress if we've transitioned to Quiesce
     // Mode.
     uassert(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
             kQuiesceModeShutdownMessage,
@@ -130,13 +130,13 @@ std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIs
 
     // Respond immediately if:
     // (1) There is no clientTopologyVersion, which indicates that the client is not using
-    //     awaitable ismaster.
+    //     awaitable hello.
     // (2) The process IDs are different.
     // (3) The clientTopologyVersion counter is less than mongos' counter.
     if (!clientTopologyVersion ||
         clientTopologyVersion->getProcessId() != _topologyVersion.getProcessId() ||
         clientTopologyVersion->getCounter() < _topologyVersion.getCounter()) {
-        return _makeIsMasterResponse(lk);
+        return _makeHelloResponse(lk);
     }
     uassert(51761,
             str::stream() << "Received a topology version with counter: "
@@ -167,26 +167,26 @@ std::shared_ptr<const MongosIsMasterResponse> MongosTopologyCoordinator::awaitIs
     // Wait for a mongos topology change with timeout set to deadline.
     LOGV2_DEBUG(4695502,
                 1,
-                "Waiting for an isMaster response from a topology change or until deadline",
+                "Waiting for a hello response from a topology change or until deadline",
                 "deadline"_attr = deadline.get(),
                 "currentMongosTopologyVersionCounter"_attr = _topologyVersion.getCounter());
 
-    auto statusWithIsMaster =
+    auto statusWithHello =
         futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
-    auto status = statusWithIsMaster.getStatus();
+    auto status = statusWithHello.getStatus();
 
     if (status == ErrorCodes::ExceededTimeLimit) {
-        // Return a MongosIsMasterResponse with the current topology version on timeout when
+        // Return a MongosHelloResponse with the current topology version on timeout when
         // waiting for a topology change.
         stdx::lock_guard lk(_mutex);
         HelloMetrics::get(opCtx)->decrementNumAwaitingTopologyChanges();
-        return _makeIsMasterResponse(lk);
+        return _makeHelloResponse(lk);
     }
 
-    // A topology change has happened so we return an IsMasterResponse with the updated
+    // A topology change has happened so we return a MongosHelloResponse with the updated
     // topology version.
     uassertStatusOK(status);
-    return statusWithIsMaster.getValue();
+    return statusWithHello.getValue();
 }
 
 void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
@@ -196,15 +196,15 @@ void MongosTopologyCoordinator::enterQuiesceModeAndWait(OperationContext* opCtx,
         _inQuiesceMode = true;
         _quiesceDeadline = getGlobalServiceContext()->getPreciseClockSource()->now() + quiesceTime;
 
-        // Increment the topology version and respond to any waiting isMaster request with an error.
+        // Increment the topology version and respond to any waiting hello request with an error.
         auto counter = _topologyVersion.getCounter();
         _topologyVersion.setCounter(counter + 1);
         _promise->setError(
             Status(ShutdownInProgressQuiesceInfo(_calculateRemainingQuiesceTimeMillis()),
                    kQuiesceModeShutdownMessage));
 
-        // Reset counter to 0 since we will respond to all waiting isMaster requests with an error.
-        // All new isMaster requests will immediately fail with ShutdownInProgress.
+        // Reset counter to 0 since we will respond to all waiting hello requests with an error.
+        // All new hello requests will immediately fail with ShutdownInProgress.
         HelloMetrics::get(getGlobalServiceContext())->resetNumAwaitingTopologyChanges();
     }
 

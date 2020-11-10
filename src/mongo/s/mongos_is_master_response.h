@@ -39,11 +39,11 @@ class BSONObj;
 class BSONObjBuilder;
 
 /**
- * Response structure for the ismaster command.
+ * Response structure for the hello command.
  *
  * Only handles responses from mongos.
  */
-class MongosIsMasterResponse {
+class MongosHelloResponse {
 public:
     static constexpr StringData kTopologyVersionFieldName = "topologyVersion"_sd;
     static constexpr StringData kIsMasterFieldName = "ismaster"_sd;
@@ -53,10 +53,10 @@ public:
     /**
      * Explicit constructor that sets the _topologyVersion field.
      */
-    MongosIsMasterResponse(TopologyVersion topologyVersion);
+    MongosHelloResponse(TopologyVersion topologyVersion);
 
     /**
-     * Appends MongosIsMasterResponse fields to "builder". When true, "useLegacyResponseFields"
+     * Appends MongosHelloResponse fields to "builder". When true, "useLegacyResponseFields"
      * indicates that we are responding to an isMaster command and not a hello command. Attach
      * the legacy "ismaster" field if true, and the "isWritablePrimary" field otherwise.
      */
@@ -66,8 +66,8 @@ public:
         return _topologyVersion;
     }
 
-    bool getIsMaster() const {
-        return _isMaster;
+    bool getIsWritablePrimary() const {
+        return _isWritablePrimary;
     }
 
     std::string getMsg() const {
@@ -76,7 +76,7 @@ public:
 
 private:
     TopologyVersion _topologyVersion;
-    bool _isMaster;
+    bool _isWritablePrimary;
     std::string _msg;
 };
 
