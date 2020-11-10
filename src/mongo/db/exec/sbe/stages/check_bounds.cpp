@@ -126,9 +126,20 @@ void CheckBoundsStage::close() {
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> CheckBoundsStage::getStats() const {
+std::unique_ptr<PlanStageStats> CheckBoundsStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+    ret->specific = std::make_unique<CheckBoundsStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("seeks", _specificStats.seeks);
+        bob.appendIntOrLL("inKeySlot", _inKeySlot);
+        bob.appendIntOrLL("inRecordIdSlot", _inRecordIdSlot);
+        bob.appendIntOrLL("outSlot", _outSlot);
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

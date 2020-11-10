@@ -6,7 +6,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   assumes_against_mongod_not_mongos,
-//   sbe_incompatible,
 // ]
 
 (function() {

@@ -153,9 +153,23 @@ PlanState HashAggStage::getNext() {
     return trackPlanState(PlanState::ADVANCED);
 }
 
-std::unique_ptr<PlanStageStats> HashAggStage::getStats() const {
+std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+
+    if (includeDebugInfo) {
+        DebugPrinter printer;
+        BSONObjBuilder bob;
+        bob.append("groupBySlots", _gbs);
+        if (!_aggs.empty()) {
+            BSONObjBuilder childrenBob(bob.subobjStart("expressions"));
+            for (auto&& [slot, expr] : _aggs) {
+                childrenBob.append(str::stream() << slot, printer.print(expr->debugPrint()));
+            }
+        }
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

@@ -99,6 +99,7 @@ void LoopJoinStage::openInner() {
     // (re)open the inner side as it can see the correlated value now.
     _children[1]->open(_reOpenInner);
     _reOpenInner = true;
+    ++_specificStats.innerOpens;
 }
 
 PlanState LoopJoinStage::getNext() {
@@ -117,7 +118,6 @@ PlanState LoopJoinStage::getNext() {
         bool pass = false;
 
         do {
-
             state = _children[1]->getNext();
             if (state == PlanState::ADVANCED) {
                 if (!_predicateCode) {
@@ -149,20 +149,35 @@ void LoopJoinStage::close() {
         _children[1]->close();
 
         _reOpenInner = false;
+        ++_specificStats.innerCloses;
     }
 
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> LoopJoinStage::getStats() const {
+std::unique_ptr<PlanStageStats> LoopJoinStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
-    ret->children.emplace_back(_children[1]->getStats());
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("innerOpens", _specificStats.innerOpens);
+        bob.appendNumber("innerCloses", _specificStats.innerCloses);
+        bob.append("outerProjects", _outerProjects);
+        bob.append("outerCorrelated", _outerCorrelated);
+        if (_predicate) {
+            bob.append("predicate", DebugPrinter{}.print(_predicate->debugPrint()));
+        }
+
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
     return ret;
 }
 
 const SpecificStats* LoopJoinStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint() const {

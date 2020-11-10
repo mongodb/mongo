@@ -132,9 +132,20 @@ void BSONScanStage::close() {
     _commonStats.closes++;
 }
 
-std::unique_ptr<PlanStageStats> BSONScanStage::getStats() const {
+std::unique_ptr<PlanStageStats> BSONScanStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->specific = std::make_unique<ScanStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        if (_recordSlot) {
+            bob.appendIntOrLL("recordSlot", *_recordSlot);
+        }
+        bob.append("field", _fields);
+        bob.append("outputSlots", _vars);
+        ret->debugInfo = bob.obj();
+    }
+
     return ret;
 }
 

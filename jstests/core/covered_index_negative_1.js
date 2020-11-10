@@ -6,7 +6,6 @@
 // Include helpers for analyzing explain output.
 // @tags: [
 //   assumes_balancer_off,
-//   sbe_incompatible,
 // ]
 load("jstests/libs/analyze_plan.js");
 

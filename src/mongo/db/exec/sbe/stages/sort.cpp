@@ -212,10 +212,26 @@ void SortStage::close() {
     _sorter.reset();
 }
 
-std::unique_ptr<PlanStageStats> SortStage::getStats() const {
+std::unique_ptr<PlanStageStats> SortStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->specific = std::make_unique<SortStats>(_specificStats);
-    ret->children.emplace_back(_children[0]->getStats());
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendIntOrLL("totalDataSizeSorted", _specificStats.totalDataSizeBytes);
+        bob.appendBool("usedDisk", _specificStats.spills > 0);
+
+        BSONObjBuilder childrenBob(bob.subobjStart("orderBySlots"));
+        for (size_t idx = 0; idx < _obs.size(); ++idx) {
+            childrenBob.append(str::stream() << _obs[idx],
+                               _dirs[idx] == sbe::value::SortDirection::Ascending ? "asc" : "desc");
+        }
+        childrenBob.doneFast();
+        bob.append("outputSlots", _vals);
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

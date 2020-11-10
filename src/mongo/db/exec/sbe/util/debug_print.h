@@ -117,6 +117,7 @@ public:
                    std::make_move_iterator(blocks.end()));
     }
     std::string print(PlanStage* s);
+    std::string print(const std::vector<Block>& blocks);
 
 private:
     bool _colorConsole;
@@ -126,8 +127,6 @@ private:
             s.append("    ");
         }
     }
-
-    std::string print(std::vector<Block> blocks);
 };
 }  // namespace sbe
 }  // namespace mongo

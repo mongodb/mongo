@@ -1,7 +1,6 @@
 // Check explain results for a plan that uses an index to obtain the requested sort order.
 // @tags: [
 //   assumes_balancer_off,
-//   sbe_incompatible,
 // ]
 
 t = db.jstests_explain5;

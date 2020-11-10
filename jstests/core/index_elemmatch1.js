@@ -2,7 +2,6 @@
  * Tests find with $elemMatch when supporting indexes are in place.
  * @tags: [
  *   assumes_balancer_off,
- *   sbe_incompatible,
  * ]
  */
 (function() {

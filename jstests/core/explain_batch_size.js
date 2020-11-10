@@ -6,7 +6,6 @@
 //
 // @tags: [
 //   requires_fastcount,
-//   sbe_incompatible,
 // ]
 
 t = db.explain_batch_size;

@@ -56,7 +56,7 @@ PlanState CoScanStage::getNext() {
     return PlanState::ADVANCED;
 }
 
-std::unique_ptr<PlanStageStats> CoScanStage::getStats() const {
+std::unique_ptr<PlanStageStats> CoScanStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     return ret;
 }

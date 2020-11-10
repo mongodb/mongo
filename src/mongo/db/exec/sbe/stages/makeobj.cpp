@@ -201,9 +201,24 @@ void MakeObjStage::close() {
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> MakeObjStage::getStats() const {
+std::unique_ptr<PlanStageStats> MakeObjStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendIntOrLL("objSlot", _objSlot);
+        if (_rootSlot) {
+            bob.appendIntOrLL("rootSlot", *_rootSlot);
+        }
+        bob.append("restrictFields", _restrictFields);
+        bob.append("projectFields", _projectFields);
+        bob.append("projectSlots", _projectVars);
+        bob.append("forceNewObject", _forceNewObject);
+        bob.append("returnOldObject", _returnOldObject);
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

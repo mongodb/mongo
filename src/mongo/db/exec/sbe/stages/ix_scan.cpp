@@ -46,7 +46,7 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
                                IndexKeysInclusionSet indexKeysToInclude,
                                value::SlotVector vars,
                                boost::optional<value::SlotId> seekKeySlotLow,
-                               boost::optional<value::SlotId> seekKeySlotHi,
+                               boost::optional<value::SlotId> seekKeySlotHigh,
                                PlanYieldPolicy* yieldPolicy,
                                TrialRunProgressTracker* tracker,
                                PlanNodeId nodeId)
@@ -59,11 +59,11 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
       _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)),
       _seekKeySlotLow(seekKeySlotLow),
-      _seekKeySlotHi(seekKeySlotHi),
+      _seekKeySlotHigh(seekKeySlotHigh),
       _tracker(tracker) {
     // The valid state is when both boundaries, or none is set, or only low key is set.
-    invariant((_seekKeySlotLow && _seekKeySlotHi) || (!_seekKeySlotLow && !_seekKeySlotHi) ||
-              (_seekKeySlotLow && !_seekKeySlotHi));
+    invariant((_seekKeySlotLow && _seekKeySlotHigh) || (!_seekKeySlotLow && !_seekKeySlotHigh) ||
+              (_seekKeySlotLow && !_seekKeySlotHigh));
 
     invariant(_indexKeysToInclude.count() == _vars.size());
 }
@@ -77,7 +77,7 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _indexKeysToInclude,
                                             _vars,
                                             _seekKeySlotLow,
-                                            _seekKeySlotHi,
+                                            _seekKeySlotHigh,
                                             _yieldPolicy,
                                             _tracker,
                                             _commonStats.nodeId);
@@ -101,8 +101,8 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
     if (_seekKeySlotLow) {
         _seekKeyLowAccessor = ctx.getAccessor(*_seekKeySlotLow);
     }
-    if (_seekKeySlotHi) {
-        _seekKeyHiAccessor = ctx.getAccessor(*_seekKeySlotHi);
+    if (_seekKeySlotHigh) {
+        _seekKeyHiAccessor = ctx.getAccessor(*_seekKeySlotHigh);
     }
 }
 
@@ -303,9 +303,31 @@ void IndexScanStage::close() {
     _open = false;
 }
 
-std::unique_ptr<PlanStageStats> IndexScanStage::getStats() const {
+std::unique_ptr<PlanStageStats> IndexScanStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->specific = std::make_unique<IndexScanStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("numReads", _specificStats.numReads);
+        bob.appendNumber("seeks", _specificStats.seeks);
+        if (_recordSlot) {
+            bob.appendIntOrLL("recordSlot", *_recordSlot);
+        }
+        if (_recordIdSlot) {
+            bob.appendIntOrLL("recordIdSlot", *_recordIdSlot);
+        }
+        if (_seekKeySlotLow) {
+            bob.appendIntOrLL("seekKeySlotLow", *_seekKeySlotLow);
+        }
+        if (_seekKeySlotHigh) {
+            bob.appendIntOrLL("seekKeySlotHigh", *_seekKeySlotHigh);
+        }
+        bob.append("outputSlots", _vars);
+        bob.append("indexKeysToInclude", _indexKeysToInclude.to_string());
+        ret->debugInfo = bob.obj();
+    }
+
     return ret;
 }
 
@@ -319,8 +341,8 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
     if (_seekKeySlotLow) {
 
         DebugPrinter::addIdentifier(ret, _seekKeySlotLow.get());
-        if (_seekKeySlotHi) {
-            DebugPrinter::addIdentifier(ret, _seekKeySlotHi.get());
+        if (_seekKeySlotHigh) {
+            DebugPrinter::addIdentifier(ret, _seekKeySlotHigh.get());
         }
     }
     if (_recordSlot) {

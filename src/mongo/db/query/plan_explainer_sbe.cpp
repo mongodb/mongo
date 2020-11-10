@@ -41,13 +41,10 @@
 namespace mongo {
 namespace {
 void statsToBSON(const QuerySolutionNode* node,
-                 const sbe::PlanStageStats* stats,
-                 ExplainOptions::Verbosity verbosity,
                  BSONObjBuilder* bob,
                  const BSONObjBuilder* topLevelBob) {
     invariant(bob);
     invariant(topLevelBob);
-    invariant(verbosity < ExplainOptions::Verbosity::kExecStats || stats);
 
     // Stop as soon as the BSON object we're building exceeds the limit.
     if (topLevelBob->len() > kMaxExplainStatsBSONSizeMB) {
@@ -63,25 +60,8 @@ void statsToBSON(const QuerySolutionNode* node,
         bob->append("filter", node->filter->serialize());
     }
 
-    // Some top-level exec stats get pulled out of the root stage.
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        // TODO SERVER-51409.
-    }
-
     // Stage-specific stats.
     switch (node->getType()) {
-        case STAGE_AND_HASH: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
-            break;
-        }
-        case STAGE_AND_SORTED: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
-            break;
-        }
         case STAGE_COLLSCAN: {
             auto csn = static_cast<const CollectionScanNode*>(node);
             bob->append("direction", csn->direction > 0 ? "forward" : "backward");
@@ -91,47 +71,20 @@ void statsToBSON(const QuerySolutionNode* node,
             if (csn->maxTs) {
                 bob->append("maxTs", *csn->maxTs);
             }
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
             break;
         }
-
-        case STAGE_ENSURE_SORTED: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
-            break;
-        }
-        case STAGE_FETCH: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
-            break;
-        }
-
         case STAGE_GEO_NEAR_2D: {
             auto geo2d = static_cast<const GeoNear2DNode*>(node);
-
             bob->append("keyPattern", geo2d->index.keyPattern);
             bob->append("indexName", geo2d->index.identifier.catalogName);
             bob->append("indexVersion", geo2d->index.version);
-
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
             break;
         }
         case STAGE_GEO_NEAR_2DSPHERE: {
             auto geo2dsphere = static_cast<const GeoNear2DSphereNode*>(node);
-
             bob->append("keyPattern", geo2dsphere->index.keyPattern);
             bob->append("indexName", geo2dsphere->index.identifier.catalogName);
             bob->append("indexVersion", geo2dsphere->index.version);
-
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
             break;
         }
         case STAGE_IXSCAN: {
@@ -160,16 +113,6 @@ void statsToBSON(const QuerySolutionNode* node,
             } else {
                 bob->append("indexBounds", bounds);
             }
-
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
-            break;
-        }
-        case STAGE_OR: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
             break;
         }
         case STAGE_LIMIT: {
@@ -184,15 +127,10 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("transformBy", projection_ast::astToDebugBSON(pn->proj.root()));
             break;
         }
-        case STAGE_SHARDING_FILTER: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
-            break;
-        }
         case STAGE_SKIP: {
             auto sn = static_cast<const SkipNode*>(node);
             bob->appendNumber("skipAmount", sn->skip);
+            break;
         }
         case STAGE_SORT_SIMPLE:
         case STAGE_SORT_DEFAULT: {
@@ -205,19 +143,11 @@ void statsToBSON(const QuerySolutionNode* node,
             }
 
             bob->append("type", node->getType() == STAGE_SORT_SIMPLE ? "simple" : "default");
-
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
             break;
         }
         case STAGE_SORT_MERGE: {
             auto smn = static_cast<const MergeSortNode*>(node);
             bob->append("sortPattern", smn->sort);
-
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
             break;
         }
         case STAGE_TEXT: {
@@ -229,20 +159,8 @@ void statsToBSON(const QuerySolutionNode* node,
             invariant(ftsQuery);
             bob->append("parsedTextQuery", ftsQuery->toBSON());
             bob->append("textIndexVersion", tn->index.version);
-        }
-        case STAGE_TEXT_MATCH: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
             break;
         }
-        case STAGE_TEXT_OR: {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                // TODO SERVER-51409.
-            }
-            break;
-        }
-
         default:
             break;
     }
@@ -257,7 +175,7 @@ void statsToBSON(const QuerySolutionNode* node,
     // rather than 'inputStages'.
     if (node->children.size() == 1) {
         BSONObjBuilder childBob;
-        statsToBSON(node->children[0], stats, verbosity, &childBob, topLevelBob);
+        statsToBSON(node->children[0], &childBob, topLevelBob);
         bob->append("inputStage", childBob.obj());
         return;
     }
@@ -267,9 +185,133 @@ void statsToBSON(const QuerySolutionNode* node,
     BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"));
     for (auto&& child : node->children) {
         BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSON(child, stats, verbosity, &childBob, topLevelBob);
+        statsToBSON(child, &childBob, topLevelBob);
     }
     childrenBob.doneFast();
+}
+
+void statsToBSON(const sbe::PlanStageStats* stats,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob) {
+    invariant(stats);
+    invariant(bob);
+    invariant(topLevelBob);
+
+    // Stop as soon as the BSON object we're building exceeds the limit.
+    if (topLevelBob->len() > kMaxExplainStatsBSONSizeMB) {
+        bob->append("warning", "stats tree exceeded BSON size limit for explain");
+        return;
+    }
+
+    auto stageType = stats->common.stageType;
+    bob->append("stage", stageType);
+    bob->appendNumber("planNodeId", static_cast<size_t>(stats->common.nodeId));
+
+    // Some top-level exec stats get pulled out of the root stage.
+    bob->appendNumber("nReturned", stats->common.advances);
+    // Include executionTimeMillis if it was recorded.
+    if (stats->common.executionTimeMillis) {
+        bob->appendNumber("executionTimeMillisEstimate", *stats->common.executionTimeMillis);
+    }
+    bob->appendNumber("advances", stats->common.advances);
+    bob->appendNumber("opens", stats->common.opens);
+    bob->appendNumber("closes", stats->common.closes);
+    bob->appendNumber("saveState", stats->common.yields);
+    bob->appendNumber("restoreState", stats->common.unyields);
+    bob->appendNumber("isEOF", stats->common.isEOF);
+
+    // Include any extra debug info if present.
+    bob->appendElements(stats->debugInfo);
+
+    // We're done if there are no children.
+    if (stats->children.empty()) {
+        return;
+    }
+
+    // If there's just one child (a common scenario), avoid making an array. This makes
+    // the output more readable by saving a level of nesting. Name the field 'inputStage'
+    // rather than 'inputStages'.
+    if (stats->children.size() == 1) {
+        BSONObjBuilder childBob;
+        statsToBSON(stats->children[0].get(), &childBob, topLevelBob);
+        bob->append("inputStage"_sd, childBob.obj());
+        return;
+    }
+
+    // For some stages we may want to output its children under different field names.
+    auto overridenNames = [stageType]() -> std::vector<StringData> {
+        if (stageType == "branch"_sd) {
+            return {"thenStage"_sd, "elseStage"_sd};
+        } else if (stageType == "nlj"_sd || stageType == "traverse"_sd) {
+            return {"outerStage"_sd, "innerStage"_sd};
+        }
+        return {};
+    }();
+    if (!overridenNames.empty()) {
+        invariant(overridenNames.size() == stats->children.size());
+
+        for (size_t idx = 0; idx < stats->children.size(); ++idx) {
+            BSONObjBuilder childBob;
+            statsToBSON(stats->children[idx].get(), &childBob, topLevelBob);
+            bob->append(overridenNames[idx], childBob.obj());
+        }
+        return;
+    }
+
+    // There is more than one child. Recursively call statsToBSON(...) on each
+    // of them and add them to the 'inputStages' array.
+    BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"_sd));
+    for (auto&& child : stats->children) {
+        BSONObjBuilder childBob(childrenBob.subobjStart());
+        statsToBSON(child.get(), &childBob, topLevelBob);
+    }
+    childrenBob.doneFast();
+}
+
+PlanSummaryStats collectExecutionStatsSummary(const sbe::PlanStageStats* stats) {
+    invariant(stats);
+
+    PlanSummaryStats summary;
+    summary.nReturned = stats->common.advances;
+
+    if (stats->common.executionTimeMillis) {
+        summary.executionTimeMillisEstimate = *stats->common.executionTimeMillis;
+    }
+
+    // Collect cumulative execution stats for the plan.
+    std::queue<const sbe::PlanStageStats*> queue;
+    queue.push(stats);
+    while (!queue.empty()) {
+        stats = queue.front();
+        invariant(stats);
+        queue.pop();
+
+        if (stats->specific) {
+            stats->specific->accumulate(summary);
+        }
+
+        for (auto&& child : stats->children) {
+            queue.push(child.get());
+        }
+    }
+
+    return summary;
+}
+
+PlanExplainer::PlanStatsDetails buildPlanStatsDetails(const QuerySolutionNode* node,
+                                                      const sbe::PlanStage* root,
+                                                      ExplainOptions::Verbosity verbosity) {
+    BSONObjBuilder bob;
+
+    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        auto stats = root->getStats(true /* includeDebugInfo  */);
+        auto summary = collectExecutionStatsSummary(stats.get());
+        statsToBSON(stats.get(), &bob, &bob);
+        return {bob.obj(), std::move(summary)};
+    }
+
+    statsToBSON(node, &bob, &bob);
+    return {bob.obj(), boost::none};
 }
 }  // namespace
 
@@ -420,20 +462,7 @@ PlanExplainer::PlanStatsDetails PlanExplainerSBE::getWinningPlanStats(
     ExplainOptions::Verbosity verbosity) const {
     invariant(_root);
     invariant(_solution);
-
-    auto&& [stats, summary] = [&]()
-        -> std::pair<std::unique_ptr<sbe::PlanStageStats>, boost::optional<PlanSummaryStats>> {
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            auto stats = _root->getStats();
-            // TODO: SERVER-51409 add support for PlanSummaryStats.
-            return {std::move(stats), PlanSummaryStats{}};
-        }
-        return {};
-    }();
-
-    BSONObjBuilder bob;
-    statsToBSON(_solution->root(), stats.get(), verbosity, &bob, &bob);
-    return {bob.obj(), std::move(summary)};
+    return buildPlanStatsDetails(_solution->root(), _root, verbosity);
 }
 
 std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansStats(
@@ -448,19 +477,8 @@ std::vector<PlanExplainer::PlanStatsDetails> PlanExplainerSBE::getRejectedPlansS
         invariant(candidate.root);
         invariant(candidate.solution);
 
-        auto&& [stats, summary] = [&]()
-            -> std::pair<std::unique_ptr<sbe::PlanStageStats>, boost::optional<PlanSummaryStats>> {
-            if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-                auto stats = candidate.root->getStats();
-                // TODO: SERVER-51409 add support for PlanSummaryStats.
-                return {std::move(stats), PlanSummaryStats{}};
-            }
-            return {};
-        }();
-
-        BSONObjBuilder bob;
-        statsToBSON(candidate.solution->root(), stats.get(), verbosity, &bob, &bob);
-        res.push_back({bob.obj(), std::move(summary)});
+        res.push_back(
+            buildPlanStatsDetails(candidate.solution->root(), candidate.root.get(), verbosity));
     }
     return res;
 }

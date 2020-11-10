@@ -1,7 +1,4 @@
 // check that we don't scan $ne values
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 t = db.jstests_ne2;
 t.drop();

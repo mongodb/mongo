@@ -269,9 +269,26 @@ void ScanStage::close() {
     _open = false;
 }
 
-std::unique_ptr<PlanStageStats> ScanStage::getStats() const {
+std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->specific = std::make_unique<ScanStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("numReads", _specificStats.numReads);
+        if (_recordSlot) {
+            bob.appendIntOrLL("recordSlot", *_recordSlot);
+        }
+        if (_recordIdSlot) {
+            bob.appendIntOrLL("recordIdSlot", *_recordIdSlot);
+        }
+        if (_seekKeySlot) {
+            bob.appendIntOrLL("seekKeySlot", *_seekKeySlot);
+        }
+        bob.append("fields", _fields);
+        bob.append("outputSlots", _vars);
+        ret->debugInfo = bob.obj();
+    }
     return ret;
 }
 
@@ -567,7 +584,7 @@ void ParallelScanStage::close() {
     _open = false;
 }
 
-std::unique_ptr<PlanStageStats> ParallelScanStage::getStats() const {
+std::unique_ptr<PlanStageStats> ParallelScanStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     return ret;
 }

@@ -169,9 +169,11 @@ public:
 
     /**
      * Returns a tree of stats. If the stage has any children it must propagate the request for
-     * stats to them.
+     * stats to them. If 'includeDebugInfo' is set to 'true' the stage may include some additional
+     * debug info, opaque to the caller, which will be available via 'PlanStageStats::debugInfo'
+     * member.
      */
-    virtual std::unique_ptr<PlanStageStats> getStats() const = 0;
+    virtual std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const = 0;
 
     /**
      * Get stats specific to this stage. Some stages may not have specific stats, in which

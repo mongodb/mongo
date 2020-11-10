@@ -54,7 +54,7 @@ public:
     }
 
     std::unique_ptr<PlanStage> clone() const final {
-        return std::make_unique<FilterStage>(
+        return std::make_unique<FilterStage<IsConst, IsEof>>(
             _children[0]->clone(), _filter->clone(), _commonStats.nodeId);
     }
 
@@ -126,10 +126,18 @@ public:
         }
     }
 
-    std::unique_ptr<PlanStageStats> getStats() const {
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const {
         auto ret = std::make_unique<PlanStageStats>(_commonStats);
         ret->specific = std::make_unique<FilterStats>(_specificStats);
-        ret->children.emplace_back(_children[0]->getStats());
+
+        if (includeDebugInfo) {
+            BSONObjBuilder bob;
+            bob.appendNumber("numTested", _specificStats.numTested);
+            bob.append("filter", DebugPrinter{}.print(_filter->debugPrint()));
+            ret->debugInfo = bob.obj();
+        }
+
+        ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
         return ret;
     }
 

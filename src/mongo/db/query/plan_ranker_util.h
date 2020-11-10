@@ -64,7 +64,11 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
     // Get stat trees from each plan.
     std::vector<std::unique_ptr<PlanStageStatsType>> statTrees;
     for (size_t i = 0; i < candidates.size(); ++i) {
-        statTrees.push_back(candidates[i].root->getStats());
+        if constexpr (std::is_same_v<PlanStageStatsType, PlanStageStats>) {
+            statTrees.push_back(candidates[i].root->getStats());
+        } else {
+            statTrees.push_back(candidates[i].root->getStats(false /* includeDebugInfo */));
+        }
     }
 
     // Holds (score, candidateIndex).
@@ -85,7 +89,6 @@ StatusWith<std::unique_ptr<PlanRankingDecision>> pickBestPlan(
         }();
 
         if (!candidates[i].failed) {
-
             log_detail::logScoringPlan([&]() { return candidates[i].solution->toString(); },
                                        [&]() {
                                            auto&& [stats, _] = explainer->getWinningPlanStats(

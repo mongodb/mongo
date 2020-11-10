@@ -1,9 +1,3 @@
-
-/**
- * @tags: [
- *   sbe_incompatible,
- * ]
- */
 t = db.explain1;
 t.drop();
 

@@ -156,6 +156,10 @@ struct BasePlanStageStats {
     // Per-stage place to stash additional information
     std::unique_ptr<SpecificStats> specific;
 
+    // Per-stage additional debug info which is opaque to the caller. Callers should not attempt to
+    // process/read this BSONObj other than for dumping the results to logs or back to the user.
+    BSONObj debugInfo;
+
     // The stats of the node's children.
     std::vector<std::unique_ptr<BasePlanStageStats<C, T>>> children;
 
@@ -612,8 +616,10 @@ struct ProjectionStats : public SpecificStats {
 
 struct SortStats : public SpecificStats {
     SortStats() = default;
+    SortStats(uint64_t limit, uint64_t maxMemoryUsageBytes)
+        : limit(limit), maxMemoryUsageBytes(maxMemoryUsageBytes) {}
 
-    SpecificStats* clone() const final {
+    SpecificStats* clone() const {
         SortStats* specific = new SortStats(*this);
         return specific;
     }

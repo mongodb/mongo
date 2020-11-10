@@ -94,9 +94,19 @@ void ProjectStage::close() {
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> ProjectStage::getStats() const {
+std::unique_ptr<PlanStageStats> ProjectStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+
+    if (includeDebugInfo) {
+        DebugPrinter printer;
+        BSONObjBuilder bob;
+        for (auto&& [slot, expr] : _projects) {
+            bob.append(str::stream() << slot, printer.print(expr->debugPrint()));
+        }
+        ret->debugInfo = BSON("projections" << bob.obj());
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

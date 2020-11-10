@@ -66,7 +66,7 @@ public:
     PlanState getNext() final;
     void close() final;
 
-    std::unique_ptr<PlanStageStats> getStats() const final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
@@ -109,5 +109,6 @@ private:
 
     bool _compiled{false};
     bool _reOpenInner{false};
+    TraverseStats _specificStats;
 };
 }  // namespace mongo::sbe

@@ -65,7 +65,7 @@ CandidatePlans CachedSolutionPlanner::plan(
         return replan(false);
     }
 
-    auto stats{candidate.root->getStats()};
+    auto stats{candidate.root->getStats(false /* includeDebugInfo  */)};
     auto numReads{calculateNumberOfReads(stats.get())};
     // If the cached plan hit EOF quickly enough, or still as efficient as before, then no need to
     // replan. Finalize the cached plan and return it.

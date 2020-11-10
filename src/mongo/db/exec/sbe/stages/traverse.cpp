@@ -261,15 +261,38 @@ void TraverseStage::close() {
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> TraverseStage::getStats() const {
+std::unique_ptr<PlanStageStats> TraverseStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
-    ret->children.emplace_back(_children[1]->getStats());
+    ret->specific = std::make_unique<TraverseStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        DebugPrinter printer;
+        BSONObjBuilder bob;
+        bob.appendNumber("innerOpens", _specificStats.innerOpens);
+        bob.appendNumber("innerCloses", _specificStats.innerCloses);
+        bob.appendIntOrLL("inputSlot", _inField);
+        bob.appendIntOrLL("outputSlot", _outField);
+        bob.appendIntOrLL("outputSlotInner", _outFieldInner);
+        bob.append("correlatedSlots", _correlatedSlots);
+        if (_nestedArraysDepth) {
+            bob.appendNumber("nestedArraysDepth", *_nestedArraysDepth);
+        }
+        if (_fold) {
+            bob.append("fold", printer.print(_fold->debugPrint()));
+        }
+        if (_final) {
+            bob.append("final", printer.print(_final->debugPrint()));
+        }
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
     return ret;
 }
 
 const SpecificStats* TraverseStage::getSpecificStats() const {
-    return nullptr;
+    return &_specificStats;
 }
 
 std::vector<DebugPrinter::Block> TraverseStage::debugPrint() const {

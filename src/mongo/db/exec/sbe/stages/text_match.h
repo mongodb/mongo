@@ -71,7 +71,7 @@ public:
 
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
-    std::unique_ptr<PlanStageStats> getStats() const final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
 
     const SpecificStats* getSpecificStats() const final {
         return nullptr;

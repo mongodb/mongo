@@ -119,10 +119,12 @@ void BranchStage::open(bool reOpen) {
             _activeBranch = 0;
             _children[0]->open(reOpen && _thenOpened);
             _thenOpened = true;
+            ++_specificStats.thenBranchOpens;
         } else {
             _activeBranch = 1;
             _children[1]->open(reOpen && _elseOpened);
             _elseOpened = true;
+            ++_specificStats.elseBranchOpens;
         }
     } else {
         _activeBranch = boost::none;
@@ -161,18 +163,35 @@ void BranchStage::close() {
     if (_thenOpened) {
         _children[0]->close();
         _thenOpened = false;
+        ++_specificStats.thenBranchCloses;
     }
     if (_elseOpened) {
         _children[1]->close();
         _elseOpened = false;
+        ++_specificStats.elseBranchCloses;
     }
 }
 
-std::unique_ptr<PlanStageStats> BranchStage::getStats() const {
+std::unique_ptr<PlanStageStats> BranchStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->specific = std::make_unique<FilterStats>(_specificStats);
-    ret->children.emplace_back(_children[0]->getStats());
-    ret->children.emplace_back(_children[1]->getStats());
+    ret->specific = std::make_unique<BranchStats>(_specificStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendNumber("numTested", _specificStats.numTested);
+        bob.appendNumber("thenBranchOpens", _specificStats.thenBranchOpens);
+        bob.appendNumber("thenBranchCloses", _specificStats.thenBranchCloses);
+        bob.appendNumber("elseBranchOpens", _specificStats.elseBranchOpens);
+        bob.appendNumber("elseBranchCloses", _specificStats.elseBranchCloses);
+        bob.append("filter", DebugPrinter{}.print(_filter->debugPrint()));
+        bob.append("thenSlots", _inputThenVals);
+        bob.append("elseSlots", _inputElseVals);
+        bob.append("outputSlots", _outputVals);
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
     return ret;
 }
 

@@ -84,10 +84,22 @@ void LimitSkipStage::close() {
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> LimitSkipStage::getStats() const {
+std::unique_ptr<PlanStageStats> LimitSkipStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
     ret->specific = std::make_unique<LimitSkipStats>(_specificStats);
-    ret->children.emplace_back(_children[0]->getStats());
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        if (_limit) {
+            bob.appendNumber("limit", *_limit);
+        }
+        if (_skip) {
+            bob.appendNumber("skip", *_skip);
+        }
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

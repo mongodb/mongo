@@ -361,9 +361,9 @@ void ExchangeConsumer::close() {
     }
 }
 
-std::unique_ptr<PlanStageStats> ExchangeConsumer::getStats() const {
+std::unique_ptr<PlanStageStats> ExchangeConsumer::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 
@@ -560,9 +560,9 @@ void ExchangeProducer::close() {
     _children[0]->close();
 }
 
-std::unique_ptr<PlanStageStats> ExchangeProducer::getStats() const {
+std::unique_ptr<PlanStageStats> ExchangeProducer::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

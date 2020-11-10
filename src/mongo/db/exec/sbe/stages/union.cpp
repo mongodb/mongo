@@ -145,10 +145,22 @@ void UnionStage::close() {
     }
 }
 
-std::unique_ptr<PlanStageStats> UnionStage::getStats() const {
+std::unique_ptr<PlanStageStats> UnionStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        BSONArrayBuilder childrenBob(bob.subarrayStart("inputSlots"));
+        for (auto&& slots : _inputVals) {
+            childrenBob.append(slots);
+        }
+        childrenBob.doneFast();
+        bob.append("outputSlots", _outputVals);
+        ret->debugInfo = bob.obj();
+    }
+
     for (auto&& child : _children) {
-        ret->children.emplace_back(child->getStats());
+        ret->children.emplace_back(child->getStats(includeDebugInfo));
     }
     return ret;
 }

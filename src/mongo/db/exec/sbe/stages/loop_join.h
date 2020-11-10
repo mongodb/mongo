@@ -51,7 +51,7 @@ public:
     PlanState getNext() final;
     void close() final;
 
-    std::unique_ptr<PlanStageStats> getStats() const final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
@@ -71,6 +71,7 @@ private:
     vm::ByteCode _bytecode;
     bool _reOpenInner{false};
     bool _outerGetNext{false};
+    LoopJoinStats _specificStats;
 
     void openInner();
 };

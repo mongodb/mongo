@@ -4,7 +4,6 @@
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_fcv_47,
-//   sbe_incompatible,
 // ]
 
 // Read ops tests for partial indexes.

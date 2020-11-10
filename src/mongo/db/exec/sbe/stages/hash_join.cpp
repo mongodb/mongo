@@ -187,10 +187,10 @@ void HashJoinStage::close() {
     _children[1]->close();
 }
 
-std::unique_ptr<PlanStageStats> HashJoinStage::getStats() const {
+std::unique_ptr<PlanStageStats> HashJoinStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
-    ret->children.emplace_back(_children[1]->getStats());
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
+    ret->children.emplace_back(_children[1]->getStats(includeDebugInfo));
     return ret;
 }
 

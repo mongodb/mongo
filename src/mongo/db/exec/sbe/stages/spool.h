@@ -61,7 +61,7 @@ public:
     PlanState getNext() final;
     void close() final;
 
-    std::unique_ptr<PlanStageStats> getStats() const final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
@@ -109,7 +109,7 @@ public:
     PlanState getNext() final;
     void close() final;
 
-    std::unique_ptr<PlanStageStats> getStats() const final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
@@ -214,8 +214,16 @@ public:
         _commonStats.closes++;
     }
 
-    std::unique_ptr<PlanStageStats> getStats() const {
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const {
         auto ret = std::make_unique<PlanStageStats>(_commonStats);
+
+        if (includeDebugInfo) {
+            BSONObjBuilder bob;
+            bob.appendIntOrLL("spoolId", _spoolId);
+            bob.append("outputSlots", _vals);
+            ret->debugInfo = bob.obj();
+        }
+
         return ret;
     }
 

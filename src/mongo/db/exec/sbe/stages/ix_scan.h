@@ -40,11 +40,11 @@ namespace mongo::sbe {
 
 /**
  * A stage that iterates the entries of a collection index, starting from a bound specified by the
- * value in 'seekKeySlotLow' and ending (via IS_EOF) with the 'seekKeySlotHi' bound. (An unspecified
- * 'seekKeySlowHi' scans to the end of the index. Leaving both bounds unspecified scans the index
- * from beginning to end.)
+ * value in 'seekKeySlotLow' and ending (via IS_EOF) with the 'seekKeySlotHigh' bound. (An
+ * unspecified 'seekKeySlotHigh' scans to the end of the index. Leaving both bounds unspecified
+ * scans the index from beginning to end.)
  *
- * The input 'seekKeySlotLow' and 'seekKeySlotHi' slots get read as part of the open (or re-open)
+ * The input 'seekKeySlotLow' and 'seekKeySlotHigh' slots get read as part of the open (or re-open)
  * call. A common use case for an IndexScanStage is to place it as the inner child of LoopJoinStage.
  * The outer side of the LoopJoinStage determines the bounds, and the inner IndexScanStage iterates
  * through all the entries within those bounds.
@@ -68,7 +68,7 @@ public:
                    IndexKeysInclusionSet indexKeysToInclude,
                    value::SlotVector vars,
                    boost::optional<value::SlotId> seekKeySlotLow,
-                   boost::optional<value::SlotId> seekKeySlotHi,
+                   boost::optional<value::SlotId> seekKeySlotHigh,
                    PlanYieldPolicy* yieldPolicy,
                    TrialRunProgressTracker* tracker,
                    PlanNodeId nodeId);
@@ -81,7 +81,7 @@ public:
     PlanState getNext() final;
     void close() final;
 
-    std::unique_ptr<PlanStageStats> getStats() const final;
+    std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
 
@@ -100,7 +100,7 @@ private:
     const IndexKeysInclusionSet _indexKeysToInclude;
     const value::SlotVector _vars;
     const boost::optional<value::SlotId> _seekKeySlotLow;
-    const boost::optional<value::SlotId> _seekKeySlotHi;
+    const boost::optional<value::SlotId> _seekKeySlotHigh;
 
     std::unique_ptr<value::ViewOfValueAccessor> _recordAccessor;
     std::unique_ptr<value::ViewOfValueAccessor> _recordIdAccessor;

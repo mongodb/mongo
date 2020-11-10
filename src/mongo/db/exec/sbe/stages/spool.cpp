@@ -115,9 +115,17 @@ void SpoolEagerProducerStage::close() {
     _commonStats.closes++;
 }
 
-std::unique_ptr<PlanStageStats> SpoolEagerProducerStage::getStats() const {
+std::unique_ptr<PlanStageStats> SpoolEagerProducerStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendIntOrLL("spoolId", _spoolId);
+        bob.append("outputSlots", _vals);
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 
@@ -248,9 +256,20 @@ void SpoolLazyProducerStage::close() {
     _commonStats.closes++;
 }
 
-std::unique_ptr<PlanStageStats> SpoolLazyProducerStage::getStats() const {
+std::unique_ptr<PlanStageStats> SpoolLazyProducerStage::getStats(bool includeDebugInfo) const {
     auto ret = std::make_unique<PlanStageStats>(_commonStats);
-    ret->children.emplace_back(_children[0]->getStats());
+
+    if (includeDebugInfo) {
+        BSONObjBuilder bob;
+        bob.appendIntOrLL("spoolId", _spoolId);
+        bob.append("outputSlots", _vals);
+        if (_predicate) {
+            bob.append("filter", DebugPrinter{}.print(_predicate->debugPrint()));
+        }
+        ret->debugInfo = bob.obj();
+    }
+
+    ret->children.emplace_back(_children[0]->getStats(includeDebugInfo));
     return ret;
 }
 

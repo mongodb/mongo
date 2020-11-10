@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo::sbe {
@@ -51,6 +52,14 @@ struct CommonStats {
     // constructing the SBE plan to construct groups of nodes with the same id, e.g. if a group of
     // PlanStages corresponds to an MQL operation specified by the user.
     const PlanNodeId nodeId;
+
+    // Time elapsed while working inside this stage. When this field is set to boost::none,
+    // timing info will not be collected during query execution.
+    //
+    // The field must be populated when running explain or when running with the profiler on. It
+    // must also be populated when multi planning, in order to gather stats stored in the plan
+    // cache.
+    boost::optional<long long> executionTimeMillis;
 
     size_t advances{0};
     size_t opens{0};
@@ -92,6 +101,7 @@ struct IndexScanStats final : public SpecificStats {
     }
 
     size_t numReads{0};
+    size_t seeks{0};
 };
 
 struct FilterStats final : public SpecificStats {
@@ -128,8 +138,62 @@ struct UniqueStats : public SpecificStats {
         return sizeof(*this);
     }
 
-    unsigned int dupsTested = 0;
-    unsigned int dupsDropped = 0;
+    size_t dupsTested = 0;
+    size_t dupsDropped = 0;
+};
+
+struct BranchStats final : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new BranchStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    size_t numTested{0};
+    size_t thenBranchOpens{0};
+    size_t thenBranchCloses{0};
+    size_t elseBranchOpens{0};
+    size_t elseBranchCloses{0};
+};
+
+struct CheckBoundsStats final : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new CheckBoundsStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    size_t seeks{0};
+};
+
+struct LoopJoinStats final : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new LoopJoinStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    size_t innerOpens{0};
+    size_t innerCloses{0};
+};
+
+struct TraverseStats : public SpecificStats {
+    SpecificStats* clone() const final {
+        return new TraverseStats(*this);
+    }
+
+    uint64_t estimateObjectSizeInBytes() const final {
+        return sizeof(*this);
+    }
+
+    size_t innerOpens{0};
+    size_t innerCloses{0};
 };
 
 /**
