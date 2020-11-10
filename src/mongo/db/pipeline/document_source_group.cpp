@@ -153,12 +153,15 @@ int DocumentSourceGroup::freeMemory() {
     invariant(_groups);
     int totalMemorySaved = 0;
     for (auto&& group : *_groups) {
-        for (auto&& groupObj : group.second) {
-            auto prevMemUsage = groupObj->memUsageForSorter();
-            groupObj->reduceMemoryConsumptionIfAble();
+        for (size_t i = 0; i < group.second.size(); i++) {
+            auto prevMemUsage = group.second[i]->memUsageForSorter();
+            group.second[i]->reduceMemoryConsumptionIfAble();
 
+            auto memorySaved = prevMemUsage - group.second[i]->memUsageForSorter();
+            // Update the memory usage for this AccumulationStatement.
+            _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes -= memorySaved;
             // Update the memory usage for this group.
-            totalMemorySaved += (prevMemUsage - groupObj->memUsageForSorter());
+            totalMemorySaved += memorySaved;
         }
     }
     return totalMemorySaved;
@@ -299,7 +302,23 @@ Value DocumentSourceGroup::serialize(boost::optional<ExplainOptions::Verbosity> 
         insides["$doingMerge"] = Value(true);
     }
 
-    return Value(DOC(getSourceName() << insides.freeze()));
+    MutableDocument out;
+    out[getSourceName()] = Value(insides.freeze());
+
+    if (explain >= ExplainOptions::Verbosity::kExecStats) {
+        MutableDocument md;
+        invariant(_accumulatedFields.size() == _memoryTracker.accumStatementMemoryBytes.size());
+        for (size_t i = 0; i < _accumulatedFields.size(); i++) {
+            md[_accumulatedFields[i].fieldName] = _usedDisk
+                ? Value(static_cast<long long>(
+                      _memoryTracker.accumStatementMemoryBytes[i].maxMemoryBytes))
+                : Value(static_cast<long long>(
+                      _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes));
+        }
+        out["maxAccumulatorMemoryUsageBytes"] = Value(md.freezeToValue());
+    }
+
+    return Value(out.freezeToValue());
 }
 
 DepsTracker::State DocumentSourceGroup::getDependencies(DepsTracker* deps) const {
@@ -355,35 +374,37 @@ const std::vector<AccumulationStatement>& DocumentSourceGroup::getAccumulatedFie
 }
 
 intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
-    const intrusive_ptr<ExpressionContext>& pExpCtx,
+    const intrusive_ptr<ExpressionContext>& expCtx,
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<AccumulationStatement> accumulationStatements,
     boost::optional<size_t> maxMemoryUsageBytes) {
     size_t memoryBytes = maxMemoryUsageBytes ? *maxMemoryUsageBytes
                                              : internalDocumentSourceGroupMaxMemoryBytes.load();
-    intrusive_ptr<DocumentSourceGroup> groupStage(new DocumentSourceGroup(pExpCtx, memoryBytes));
+    intrusive_ptr<DocumentSourceGroup> groupStage(new DocumentSourceGroup(expCtx, memoryBytes));
     groupStage->setIdExpression(groupByExpression);
     for (auto&& statement : accumulationStatements) {
         groupStage->addAccumulator(statement);
     }
+    groupStage->_memoryTracker.accumStatementMemoryBytes.resize(accumulationStatements.size(),
+                                                                {0, 0});
 
     return groupStage;
 }
 
-DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& pExpCtx,
+DocumentSourceGroup::DocumentSourceGroup(const intrusive_ptr<ExpressionContext>& expCtx,
                                          boost::optional<size_t> maxMemoryUsageBytes)
-    : DocumentSource(kStageName, pExpCtx),
+    : DocumentSource(kStageName, expCtx),
       _usedDisk(false),
       _doingMerge(false),
-      _memoryTracker{pExpCtx->allowDiskUse && !pExpCtx->inMongos,
+      _memoryTracker{expCtx->allowDiskUse && !expCtx->inMongos,
                      maxMemoryUsageBytes ? *maxMemoryUsageBytes
                                          : internalDocumentSourceGroupMaxMemoryBytes.load()},
       _initialized(false),
-      _groups(pExpCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
+      _groups(expCtx->getValueComparator().makeUnorderedValueMap<Accumulators>()),
       _spilled(false) {
-    if (!pExpCtx->inMongos && (pExpCtx->allowDiskUse || kDebugBuild)) {
+    if (!expCtx->inMongos && (expCtx->allowDiskUse || kDebugBuild)) {
         // We spill to disk in debug mode, regardless of allowDiskUse, to stress the system.
-        _fileName = pExpCtx->tempDir + "/" + nextFileName();
+        _fileName = expCtx->tempDir + "/" + nextFileName();
     }
 }
 
@@ -447,35 +468,39 @@ void DocumentSourceGroup::setIdExpression(const boost::intrusive_ptr<Expression>
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
-    BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
+    BSONElement elem, const intrusive_ptr<ExpressionContext>& expCtx) {
     uassert(15947, "a group's fields must be specified in an object", elem.type() == Object);
 
-    intrusive_ptr<DocumentSourceGroup> pGroup(new DocumentSourceGroup(pExpCtx));
+    intrusive_ptr<DocumentSourceGroup> groupStage(new DocumentSourceGroup(expCtx));
 
     BSONObj groupObj(elem.Obj());
     BSONObjIterator groupIterator(groupObj);
-    VariablesParseState vps = pExpCtx->variablesParseState;
+    VariablesParseState vps = expCtx->variablesParseState;
     while (groupIterator.more()) {
         BSONElement groupField(groupIterator.next());
         StringData pFieldName = groupField.fieldNameStringData();
         if (pFieldName == "_id") {
-            uassert(
-                15948, "a group's _id may only be specified once", pGroup->_idExpressions.empty());
-            pGroup->setIdExpression(parseIdExpression(pExpCtx, groupField, vps));
-            invariant(!pGroup->_idExpressions.empty());
+            uassert(15948,
+                    "a group's _id may only be specified once",
+                    groupStage->_idExpressions.empty());
+            groupStage->setIdExpression(parseIdExpression(expCtx, groupField, vps));
+            invariant(!groupStage->_idExpressions.empty());
         } else if (pFieldName == "$doingMerge") {
             massert(17030, "$doingMerge should be true if present", groupField.Bool());
 
-            pGroup->setDoingMerge(true);
+            groupStage->setDoingMerge(true);
         } else {
             // Any other field will be treated as an accumulator specification.
-            pGroup->addAccumulator(
-                AccumulationStatement::parseAccumulationStatement(pExpCtx.get(), groupField, vps));
+            groupStage->addAccumulator(
+                AccumulationStatement::parseAccumulationStatement(expCtx.get(), groupField, vps));
         }
     }
+    groupStage->_memoryTracker.accumStatementMemoryBytes.resize(
+        groupStage->getAccumulatedFields().size(), {0, 0});
 
-    uassert(15955, "a group specification must include an _id", !pGroup->_idExpressions.empty());
-    return pGroup;
+    uassert(
+        15955, "a group specification must include an _id", !groupStage->_idExpressions.empty());
+    return groupStage;
 }
 
 namespace {
@@ -532,6 +557,7 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
         vector<intrusive_ptr<AccumulatorState>>& group = (*_groups)[id];
         const bool inserted = _groups->size() != oldSize;
 
+        vector<uint64_t> oldAccumMemUsage(numAccumulators, 0);
         if (inserted) {
             _memoryTracker.memoryUsageBytes += id.getApproximateSize();
 
@@ -548,9 +574,10 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 group.push_back(accum);
             }
         } else {
-            for (auto&& groupObj : group) {
+            for (size_t i = 0; i < group.size(); i++) {
                 // subtract old mem usage. New usage added back after processing.
-                _memoryTracker.memoryUsageBytes -= groupObj->memUsageForSorter();
+                _memoryTracker.memoryUsageBytes -= group[i]->memUsageForSorter();
+                oldAccumMemUsage[i] = group[i]->memUsageForSorter();
             }
         }
 
@@ -563,6 +590,8 @@ DocumentSource::GetNextResult DocumentSourceGroup::initialize() {
                 _doingMerge);
 
             _memoryTracker.memoryUsageBytes += group[i]->memUsageForSorter();
+            _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes +=
+                group[i]->memUsageForSorter() - oldAccumMemUsage[i];
         }
 
         if (kDebugBuild && !storageGlobalParams.readOnly) {
@@ -667,6 +696,15 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
     metricsCollector.incrementSorterSpills(1);
 
     _groups->clear();
+    // Update the max memory consumption per accumulation statement if the previous max was exceeded
+    // prior to spilling. Then zero out the current per-accumulation statement memory consumption,
+    // as the memory has been freed by spilling.
+    for (size_t i = 0; i < _memoryTracker.accumStatementMemoryBytes.size(); i++) {
+        _memoryTracker.accumStatementMemoryBytes[i].maxMemoryBytes =
+            std::max(_memoryTracker.accumStatementMemoryBytes[i].maxMemoryBytes,
+                     _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes);
+        _memoryTracker.accumStatementMemoryBytes[i].currentMemoryBytes = 0;
+    }
 
     Sorter<Value, Value>::Iterator* iteratorPtr = writer.done();
     _nextSortedFileWriterOffset = writer.getFileEndOffset();
@@ -749,6 +787,8 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceGroup::distr
             pExpCtx.get(), "$$ROOT." + copiedAccumulatedField.fieldName, vps);
         mergingGroup->addAccumulator(copiedAccumulatedField);
     }
+    mergingGroup->_memoryTracker.accumStatementMemoryBytes.resize(_accumulatedFields.size(),
+                                                                  {0, 0});
 
     // {shardsStage, mergingStage, sortPattern}
     return DistributedPlanLogic{this, mergingGroup, boost::none};

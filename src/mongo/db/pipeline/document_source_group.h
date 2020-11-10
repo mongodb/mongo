@@ -116,7 +116,7 @@ public:
      * specification.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(
-        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+        BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kBlocking,
@@ -183,6 +183,14 @@ protected:
 
 private:
     struct MemoryUsageTracker {
+        struct AccumStatementMemoryTracker {
+            // Maximum memory consumption thus far observed. Only updated when data is spilled to
+            // disk during execution of the $group.
+            uint64_t maxMemoryBytes;
+            // Tracks the current memory footprint.
+            uint64_t currentMemoryBytes;
+        };
+
         /**
          * Cleans up any pending memory usage. Throws error, if memory usage is above
          * 'maxMemoryUsageBytes' and cannot spill to disk. The 'saveMemory' function should return
@@ -195,9 +203,11 @@ private:
         const bool allowDiskUse;
         const size_t maxMemoryUsageBytes;
         size_t memoryUsageBytes = 0;
+        // Tracks memory consumption per accumulation statement.
+        std::vector<AccumStatementMemoryTracker> accumStatementMemoryBytes;
     };
 
-    explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+    explicit DocumentSourceGroup(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                  boost::optional<size_t> maxMemoryUsageBytes = boost::none);
 
     ~DocumentSourceGroup();
