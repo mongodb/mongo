@@ -87,7 +87,7 @@ const migrationOpts = {
 assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
 const donorDoc =
-    donorPrimary.getCollection("config.tenantMigrationDonors").findOne({tenantId: kTenantId});
+    donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});
 
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 tenantMigrationTest.waitForMigrationGarbageCollection(donorRst.nodes, migrationId, kTenantId);
@@ -107,15 +107,15 @@ tenantMigrationTest.waitForMigrationGarbageCollection(donorRst.nodes, migrationI
 }
 
 // Test the aggregation pipeline the recipient would use for getting the config.transactions entry
-// on the donor. The recipient will use the real startApplyingTimestamp, but this test uses the
+// on the donor. The recipient will use the real startFetchingTimestamp, but this test uses the
 // donor's commit timestamp as a substitute.
-const startApplyingTimestamp = donorDoc.commitOrAbortOpTime.ts;
+const startFetchingTimestamp = donorDoc.commitOrAbortOpTime.ts;
 const aggRes = donorPrimary.getDB("config").runCommand({
     aggregate: "transactions",
     pipeline: [
-        {$match: {"lastWriteOpTime.ts": {$lt: startApplyingTimestamp}, "state": "committed"}},
+        {$match: {"lastWriteOpTime.ts": {$lt: startFetchingTimestamp}, "state": "committed"}},
     ],
-    readConcern: {level: "majority", afterClusterTime: startApplyingTimestamp},
+    readConcern: {level: "majority", afterClusterTime: startFetchingTimestamp},
     hint: "_id_",
     cursor: {},
 });

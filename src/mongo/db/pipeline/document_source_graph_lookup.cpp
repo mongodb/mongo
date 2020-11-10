@@ -40,6 +40,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document_path_support.h"
+#include "mongo/db/pipeline/document_source_merge_gen.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -51,6 +52,37 @@ namespace {
 bool foreignShardedLookupAllowed() {
     return getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
 }
+
+// Parses $graphLookup 'from' field. The 'from' field must be a string or
+// {from: {db: "local", coll: "oplog.rs"}, ...}.
+NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
+                                                        StringData defaultDb) {
+    // The object syntax only works for local.oplog.rs which is not a user namespace so object type
+    // is omitted from the error message below.
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << "$graphLookup 'from' field must be a string, but found "
+                          << typeName(elem.type()),
+            elem.type() == String || elem.type() == Object);
+
+    if (elem.type() == BSONType::String) {
+        NamespaceString fromNss(defaultDb, elem.valueStringData());
+        uassert(ErrorCodes::InvalidNamespace,
+                str::stream() << "invalid $graphLookup namespace: " << fromNss.ns(),
+                fromNss.isValid());
+        return fromNss;
+    }
+
+    // Valdate the db and coll names.
+    auto spec = NamespaceSpec::parse({elem.fieldNameStringData()}, elem.embeddedObject());
+    auto nss = NamespaceString(spec.getDb().value_or(""), spec.getColl().value_or(""));
+    uassert(ErrorCodes::FailedToParse,
+            str::stream()
+                << "$graphLookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
+                << nss.db() << " and coll: " << nss.coll(),
+            nss == NamespaceString::kRsOplogNamespace);
+    return nss;
+}
+
 }  // namespace
 
 using boost::intrusive_ptr;
@@ -70,16 +102,9 @@ std::unique_ptr<DocumentSourceGraphLookUp::LiteParsed> DocumentSourceGraphLookUp
             str::stream() << "missing 'from' option to $graphLookup stage specification: "
                           << specObj,
             fromElement);
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << "'from' option to $graphLookup must be a string, but was type "
-                          << typeName(specObj["from"].type()),
-            fromElement.type() == BSONType::String);
 
-    NamespaceString fromNss(nss.db(), fromElement.valueStringData());
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid $graphLookup namespace: " << fromNss.ns(),
-            fromNss.isValid());
-    return std::make_unique<LiteParsed>(spec.fieldName(), std::move(fromNss));
+    return std::make_unique<LiteParsed>(
+        spec.fieldName(), parseGraphLookupFromAndResolveNamespace(fromElement, nss.db()));
 }
 
 REGISTER_DOCUMENT_SOURCE(graphLookup,
@@ -220,11 +245,13 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
             auto pipeline = Pipeline::makePipeline(_fromPipeline, _fromExpCtx, pipelineOpts);
             while (auto next = pipeline->getNext()) {
+                // Make an exception for the oplog, since its docs are de-duplicated by the 'ts'
+                // field instead.
                 uassert(40271,
                         str::stream()
                             << "Documents in the '" << _from.ns()
                             << "' namespace must contain an _id for de-duplication in $graphLookup",
-                        !(*next)["_id"].missing());
+                        (_from == NamespaceString::kRsOplogNamespace) || !(*next)["_id"].missing());
 
                 shouldPerformAnotherQuery =
                     addToVisitedAndFrontier(*next, depth) || shouldPerformAnotherQuery;
@@ -242,8 +269,9 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
 }
 
 bool DocumentSourceGraphLookUp::addToVisitedAndFrontier(Document result, long long depth) {
-    auto id = result.getField("_id");
-
+    // The oplog does not have _id so visited oplog docs are cached by 'ts' instead.
+    auto id = _from == NamespaceString::kRsOplogNamespace ? result.getField("ts")
+                                                          : result.getField("_id");
     if (_visited.find(id) != _visited.end()) {
         // We've already seen this object, don't repeat any work.
         return false;
@@ -412,8 +440,12 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
 
 void DocumentSourceGraphLookUp::serializeToArray(
     std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+    auto fromValue = (pExpCtx->ns.db() == _from.db())
+        ? Value(_from.coll())
+        : Value(Document{{"db", _from.db()}, {"coll", _from.coll()}});
+
     // Serialize default options.
-    MutableDocument spec(DOC("from" << _from.coll() << "as" << _as.fullPath() << "connectToField"
+    MutableDocument spec(DOC("from" << fromValue << "as" << _as.fullPath() << "connectToField"
                                     << _connectToField.fullPath() << "connectFromField"
                                     << _connectFromField.fullPath() << "startWith"
                                     << _startWith->serialize(false)));
@@ -570,15 +602,17 @@ intrusive_ptr<DocumentSource> DocumentSourceGraphLookUp::createFromBson(
 
         if (argName == "from" || argName == "as" || argName == "connectFromField" ||
             argName == "depthField" || argName == "connectToField") {
-            // All remaining arguments to $graphLookup are expected to be strings.
+            // All remaining arguments to $graphLookup are expected to be strings or
+            // {db: "local", coll: "oplog.rs"}. local.oplog.rs is not a user namespace so object
+            // type is omitted from the error message below.
             uassert(40103,
                     str::stream() << "expected string as argument for " << argName
-                                  << ", found: " << argument.toString(false, false),
-                    argument.type() == String);
+                                  << ", found: " << typeName(argument.type()),
+                    argument.type() == String || argument.type() == Object);
         }
 
         if (argName == "from") {
-            from = NamespaceString(expCtx->ns.db().toString() + '.' + argument.String());
+            from = parseGraphLookupFromAndResolveNamespace(argument, expCtx->ns.db().toString());
         } else if (argName == "as") {
             as = argument.String();
         } else if (argName == "connectFromField") {

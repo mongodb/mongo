@@ -87,11 +87,14 @@ bool foreignShardedLookupAllowed() {
     return getTestCommandsEnabled() && internalQueryAllowShardedLookup.load();
 }
 
-// Parses $lookup 'from' field. The 'from' field must be a string or an object in the form of
-// {from: {db: "config", coll: "cache.chunks.*}, ...}.
+// Parses $lookup 'from' field. The 'from' field must be a string or
+// {from: {db: "config", coll: "cache.chunks.*"}, ...} or
+// {from: {db: "local", coll: "oplog.rs"}, ...} .
 NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem, StringData defaultDb) {
+    // The object syntax only works for cache.chunks.* and local.oplog.rs which are not user
+    // namespaces so object type is omitted from the error message below.
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "$lookup 'from' field must be either a string or an object, but found "
+            str::stream() << "$lookup 'from' field must be a string, but found "
                           << typeName(elem.type()),
             elem.type() == BSONType::String || elem.type() == BSONType::Object);
 
@@ -106,7 +109,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem, Stri
         ErrorCodes::FailedToParse,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
                       << nss.db() << " and coll: " << nss.coll(),
-        nss.isConfigDotCacheDotChunks());
+        nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace);
     return nss;
 }
 
