@@ -254,28 +254,25 @@ void _logOpsInner(OperationContext* opCtx,
         uasserted(ErrorCodes::NotWritablePrimary, ss);
     }
 
+    // Throw TenantMigrationConflict error if the database for 'nss' is being migrated. The oplog
+    // entry for renameCollection has 'nss' set to the fromCollection's ns. renameCollection can be
+    // across databases, but a tenant will never be able to rename into a database with a different
+    // prefix, so it is safe to use the fromCollection's db's prefix for this check.
     if (repl::enableTenantMigrations) {
-        // TODO (SERVER-50598): Not allow tenant migration donor to write "commitIndexBuild" and
-        // "abortIndexBuild" oplog entries in the blocking state.
-        // Allow that for now since if the donor doesn't write either a commit or abort oplog entry,
-        // some resources will not be released on the donor nodes, and this can lead to deadlocks.
-        auto isCommitOrAbortIndexBuild =
-            std::any_of(records->begin(), records->end(), [](Record record) {
-                auto oplogEntry = uassertStatusOK(OplogEntry::parse(record.data.toBson()));
-                return oplogEntry.getCommandType() == OplogEntry::CommandType::kCommitIndexBuild ||
-                    oplogEntry.getCommandType() == OplogEntry::CommandType::kAbortIndexBuild;
-            });
+        // Skip the check if this is an "abortIndexBuild" oplog entry since it is safe to the abort
+        // an index build on the donor after the blockTimestamp, plus if an index build fails to
+        // commit due to TenantMigrationConflict, we need to be able to abort the index build and
+        // clean up.
+        auto isAbortIndexBuild = std::any_of(records->begin(), records->end(), [](Record record) {
+            auto oplogEntry = uassertStatusOK(OplogEntry::parse(record.data.toBson()));
+            return oplogEntry.getCommandType() == OplogEntry::CommandType::kAbortIndexBuild;
+        });
 
-        if (!isCommitOrAbortIndexBuild) {
-            // Throw TenantMigrationConflict error if the database for 'nss' is being migrated.
-            // The oplog entry for renameCollection has 'nss' set to the fromCollection's ns.
-            // renameCollection can be across databases, but a tenant will never be able to rename
-            // into a database with a different prefix, so it is safe to use the fromCollection's
-            // db's prefix for this check.
+        if (!isAbortIndexBuild) {
             tenant_migration_donor::onWriteToDatabase(opCtx, nss.db());
         } else if (records->size() > 1) {
             str::stream ss;
-            ss << "commitIndexBuild or abortIndexBuild cannot be logged with other oplog entries ";
+            ss << "abortIndexBuild cannot be logged with other oplog entries ";
             ss << ": nss " << nss;
             ss << ": entries: " << records->size() << ": [ ";
             for (const auto& record : *records) {

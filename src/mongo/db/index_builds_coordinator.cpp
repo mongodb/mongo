@@ -2517,6 +2517,26 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
             uassertStatusOK(_indexBuildsManager.checkIndexConstraintViolations(
                 opCtx, collection.get(), replState->buildUUID));
         }
+
+        // If two phase index builds is enabled, index build will be coordinated using
+        // startIndexBuild and commitIndexBuild oplog entries.
+        auto onCommitFn = [&] { onCommitIndexBuild(opCtx, collection->ns(), replState); };
+
+        auto onCreateEachFn = [&](const BSONObj& spec) {
+            if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
+                return;
+            }
+
+            auto opObserver = opCtx->getServiceContext()->getOpObserver();
+            auto fromMigrate = false;
+            opObserver->onCreateIndex(
+                opCtx, collection->ns(), replState->collectionUUID, spec, fromMigrate);
+        };
+
+        // Commit index build.
+        TimestampBlock tsBlock(opCtx, commitIndexBuildTimestamp);
+        uassertStatusOK(_indexBuildsManager.commitIndexBuild(
+            opCtx, collection, collection->ns(), replState->buildUUID, onCreateEachFn, onCommitFn));
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
         logFailure(e.toStatus(), collection->ns(), replState);
         _completeAbortForShutdown(opCtx, replState, collection.get());
@@ -2552,25 +2572,6 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         throw;
     }
 
-    // If two phase index builds is enabled, index build will be coordinated using
-    // startIndexBuild and commitIndexBuild oplog entries.
-    auto onCommitFn = [&] { onCommitIndexBuild(opCtx, collection->ns(), replState); };
-
-    auto onCreateEachFn = [&](const BSONObj& spec) {
-        if (IndexBuildProtocol::kTwoPhase == replState->protocol) {
-            return;
-        }
-
-        auto opObserver = opCtx->getServiceContext()->getOpObserver();
-        auto fromMigrate = false;
-        opObserver->onCreateIndex(
-            opCtx, collection->ns(), replState->collectionUUID, spec, fromMigrate);
-    };
-
-    // Commit index build.
-    TimestampBlock tsBlock(opCtx, commitIndexBuildTimestamp);
-    uassertStatusOK(_indexBuildsManager.commitIndexBuild(
-        opCtx, collection, collection->ns(), replState->buildUUID, onCreateEachFn, onCommitFn));
     removeIndexBuildEntryAfterCommitOrAbort(opCtx, dbAndUUID, *replState);
     replState->stats.numIndexesAfter = getNumIndexesTotal(opCtx, collection.get());
     LOGV2(20663,
