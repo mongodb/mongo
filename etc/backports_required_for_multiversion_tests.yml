@@ -105,6 +105,8 @@ suites:
     test_file: jstests/replsets/rollback_via_refetch_anomaly.js
   - ticket: SERVER-35649
     test_file: jstests/replsets/disallow_adding_initialized_node1.js
+  - ticket: SERVER-47863
+    test_file: jstests/replsets/initial_sync_replSetGetStatus.js
 
   concurrency_sharded_replication_multiversion:
 

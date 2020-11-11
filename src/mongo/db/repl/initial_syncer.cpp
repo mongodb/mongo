@@ -436,6 +436,28 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
     if (!_initialSyncState) {
         return;
     }
+    if (_initialSyncState->allDatabaseCloner) {
+        const auto allDbClonerStats = _initialSyncState->allDatabaseCloner->getStats();
+        const auto approxTotalDataSize = allDbClonerStats.dataSize;
+        bob->appendNumber("approxTotalDataSize", approxTotalDataSize);
+        long long approxTotalBytesCopied = 0;
+        for (auto dbClonerStats : allDbClonerStats.databaseStats) {
+            for (auto collClonerStats : dbClonerStats.collectionStats) {
+                approxTotalBytesCopied += collClonerStats.approxBytesCopied;
+            }
+        }
+        bob->appendNumber("approxTotalBytesCopied", approxTotalBytesCopied);
+        if (approxTotalBytesCopied > 0) {
+            const auto statsObj = bob->asTempObj();
+            auto totalInitialSyncElapsedMillis =
+                statsObj.getField("totalInitialSyncElapsedMillis").safeNumberLong();
+            const auto remainingInitialSyncEstimatedMillis =
+                (totalInitialSyncElapsedMillis / approxTotalBytesCopied) *
+                (approxTotalDataSize - approxTotalBytesCopied);
+            bob->appendNumber("remainingInitialSyncEstimatedMillis",
+                              remainingInitialSyncEstimatedMillis);
+        }
+    }
     bob->appendNumber("appliedOps", _initialSyncState->appliedOps);
     if (!_initialSyncState->beginApplyingTimestamp.isNull()) {
         bob->append("initialSyncOplogStart", _initialSyncState->beginApplyingTimestamp);
@@ -2143,15 +2165,19 @@ void InitialSyncer::Stats::append(BSONObjBuilder* builder) const {
                           static_cast<long long>(failedInitialSyncAttempts));
     builder->appendNumber("maxFailedInitialSyncAttempts",
                           static_cast<long long>(maxFailedInitialSyncAttempts));
+
     if (initialSyncStart != Date_t()) {
         builder->appendDate("initialSyncStart", initialSyncStart);
+        auto elapsedDurationEnd = Date_t::now();
         if (initialSyncEnd != Date_t()) {
             builder->appendDate("initialSyncEnd", initialSyncEnd);
-            auto elapsed = initialSyncEnd - initialSyncStart;
-            long long elapsedMillis = duration_cast<Milliseconds>(elapsed).count();
-            builder->appendNumber("initialSyncElapsedMillis", elapsedMillis);
+            elapsedDurationEnd = initialSyncEnd;
         }
+        long long elapsedMillis =
+            duration_cast<Milliseconds>(elapsedDurationEnd - initialSyncStart).count();
+        builder->appendNumber("totalInitialSyncElapsedMillis", elapsedMillis);
     }
+
     BSONArrayBuilder arrBuilder(builder->subarrayStart("initialSyncAttempts"));
     for (unsigned int i = 0; i < initialSyncAttemptInfos.size(); ++i) {
         arrBuilder.append(initialSyncAttemptInfos[i].toBSON());

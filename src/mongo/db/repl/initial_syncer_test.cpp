@@ -3453,6 +3453,10 @@ TEST_F(InitialSyncerTest, LastOpTimeShouldBeSetEvenIfNoOperationsAreAppliedAfter
                              << BSON("readOnly" << false << "uuid" << *_options1.uuid))})
                 .data);
 
+        // The collection cloner pre-stage makes a remote call to collStats to store in-progress
+        // metrics.
+        _mockServer->setCommandReply("collStats", BSON("size" << 10));
+
         // count:a
         _mockServer->setCommandReply("count", BSON("n" << 1 << "ok" << 1));
 
@@ -4121,6 +4125,10 @@ TEST_F(InitialSyncerTest,
                              << BSON("readOnly" << false << "uuid" << *_options1.uuid))})
                 .data);
 
+        // The collection cloner pre-stage makes a remote call to collStats to store in-progress
+        // metrics.
+        _mockServer->setCommandReply("collStats", BSON("size" << 10));
+
         // count:a
         _mockServer->setCommandReply("count", BSON("n" << 1 << "ok" << 1));
 
@@ -4293,14 +4301,20 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24168, "Progress after first failed response", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 8) << progress;
+        ASSERT_EQUALS(progress.nFields(), 11) << progress;
+        ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
+        ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 0) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberDouble) << progress;
+        ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 0) << progress;
+        ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 0) << progress;
         ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_BSONOBJ_EQ(progress.getObjectField("initialSyncAttempts"), BSONObj());
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
-        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
+        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
+                          BSON("databasesToClone" << 0 << "databasesCloned" << 0));
         ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
 
         // Inject the listDatabases failure.
@@ -4317,6 +4331,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     LOGV2(24169, "Done playing failed responses");
 
+    const auto bytesToCopy = 10;
+    const auto avgObjSize = 2;
     {
         FailPointEnableBlock clonerFailpoint("hangBeforeClonerStage", kListDatabasesFailPointData);
         // Play the first 2 responses of the successful round of responses to ensure that the
@@ -4353,13 +4369,19 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
         auto progress = initialSyncer->getInitialSyncProgress();
         LOGV2(24171, "Progress after failure", "progress"_attr = progress);
-        ASSERT_EQUALS(progress.nFields(), 8) << progress;
+        ASSERT_EQUALS(progress.nFields(), 11) << progress;
+        ASSERT_FALSE(progress.hasField("remainingInitialSyncEstimatedMillis"));
+        ASSERT_FALSE(progress.hasField("InitialSyncEnd"));
         ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
         ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+        ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberDouble) << progress;
+        ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 0) << progress;
+        ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 0) << progress;
         ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
         ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
         ASSERT_EQUALS(progress.getIntField("appliedOps"), 0) << progress;
-        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"), BSON("databasesCloned" << 0));
+        ASSERT_BSONOBJ_EQ(progress.getObjectField("databases"),
+                          BSON("databasesToClone" << 0 << "databasesCloned" << 0));
         ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0);
 
         BSONObj attempts = progress["initialSyncAttempts"].Obj();
@@ -4385,6 +4407,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         NamespaceString nss("a.a");
         _mockServer->setCommandReply("listDatabases",
                                      makeListDatabasesResponse({nss.db().toString()}));
+        // The AllDatabaseCloner post stage calls dbStats to record initial sync progress metrics.
+        _mockServer->setCommandReply("dbStats", BSON("dataSize" << 10));
 
         // Set up data for "a"
         _mockServer->assignCollectionUuid(nss.ns(), *_options1.uuid);
@@ -4403,6 +4427,11 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
                              << "options" << _options1.toBSON() << "info"
                              << BSON("readOnly" << false << "uuid" << *_options1.uuid))})
                 .data);
+
+        // The collection cloner pre-stage makes a remote call to collStats to store in-progress
+        // metrics.
+        _mockServer->setCommandReply("collStats",
+                                     BSON("size" << bytesToCopy << "avgObjSize" << avgObjSize));
 
         // count:a
         _mockServer->setCommandReply("count", BSON("n" << 5 << "ok" << 1));
@@ -4444,17 +4473,22 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     auto progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24173, "Progress after all but last successful response", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 9) << progress;
+    ASSERT_EQUALS(progress.nFields(), 13) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
+    ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].type(), NumberDouble) << progress;
+    ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 10) << progress;
+    ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 10) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
+    ASSERT_EQUALS(progress.getIntField("remainingInitialSyncEstimatedMillis"), 0) << progress;
     ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
     ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
     auto databasesProgress = progress.getObjectField("databases");
     ASSERT_EQUALS(1, databasesProgress.getIntField("databasesCloned")) << databasesProgress;
+    ASSERT_EQUALS(0, databasesProgress.getIntField("databasesToClone")) << databasesProgress;
     auto dbProgress = databasesProgress.getObjectField("a");
     ASSERT_EQUALS(1, dbProgress.getIntField("collections")) << dbProgress;
     ASSERT_EQUALS(1, dbProgress.getIntField("clonedCollections")) << dbProgress;
@@ -4467,6 +4501,8 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
         << collectionProgress;
     ASSERT_EQUALS(1, collectionProgress.getIntField("indexes")) << collectionProgress;
     ASSERT_EQUALS(5, collectionProgress.getIntField("receivedBatches")) << collectionProgress;
+    ASSERT_EQUALS(bytesToCopy, collectionProgress.getIntField("bytesToCopy")) << collectionProgress;
+    ASSERT_EQUALS(10, collectionProgress.getIntField("approxBytesCopied")) << collectionProgress;
 
     auto attempts = progress["initialSyncAttempts"].Obj();
     ASSERT_EQUALS(attempts.nFields(), 1) << progress;
@@ -4488,6 +4524,9 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     // Play last successful response.
     {
         executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Advance the clock by 10 seconds
+        net->advanceTime(net->now() + Seconds(10));
 
         // Last rollback ID.
         assertRemoteCommandNameEquals(
@@ -4511,15 +4550,23 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
 
     progress = initialSyncer->getInitialSyncProgress();
     LOGV2(24175, "Progress at end", "progress"_attr = progress);
-    ASSERT_EQUALS(progress.nFields(), 11) << progress;
+    ASSERT_EQUALS(progress.nFields(), 14) << progress;
     ASSERT_EQUALS(progress.getIntField("failedInitialSyncAttempts"), 1) << progress;
     ASSERT_EQUALS(progress.getIntField("maxFailedInitialSyncAttempts"), 2) << progress;
     ASSERT_EQUALS(progress["initialSyncStart"].type(), Date) << progress;
     ASSERT_EQUALS(progress["initialSyncEnd"].type(), Date) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogStart"].timestamp(), Timestamp(1, 1)) << progress;
     ASSERT_EQUALS(progress["initialSyncOplogEnd"].timestamp(), Timestamp(7, 1)) << progress;
-    ASSERT_EQUALS(progress["initialSyncElapsedMillis"].type(), NumberInt) << progress;
-    ASSERT_EQUALS(progress.getIntField("totalTimeUnreachableMillis"), 0) << progress;
+    const auto initialSyncEnd = progress["initialSyncEnd"].Date();
+    // We should have elapsed 10 secs (from advancing the clock) + 1ms (initialSyncRetry wait time).
+    ASSERT_EQUALS(progress.getIntField("totalInitialSyncElapsedMillis"), 10001) << progress;
+    const auto prevElapsedMillis = progress["totalInitialSyncElapsedMillis"].safeNumberLong();
+    ASSERT_EQUALS(progress["initialSyncEnd"].Date() - progress["initialSyncStart"].Date(),
+                  Milliseconds{10001})
+        << progress;
+    ASSERT_EQUALS(progress.getIntField("remainingInitialSyncEstimatedMillis"), 0) << progress;
+    ASSERT_EQUALS(progress.getIntField("approxTotalDataSize"), 10) << progress;
+    ASSERT_EQUALS(progress.getIntField("approxTotalBytesCopied"), 10) << progress;
     // Expected applied ops to be a superset of this range: Timestamp(2,1) ... Timestamp(7,1).
     ASSERT_GREATER_THAN_OR_EQUALS(progress.getIntField("appliedOps"), 6) << progress;
 
@@ -4548,6 +4595,18 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     ASSERT_EQUALS(attempt1.getIntField("rollBackId"), 1) << attempt1;
     ASSERT_EQUALS(attempt1.getIntField("operationsRetried"), 0) << attempt1;
     ASSERT_EQUALS(attempt1.getIntField("totalTimeUnreachableMillis"), 0) << attempt1;
+
+    {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+
+        // Advance the clock by 100 seconds
+        net->advanceTime(net->now() + Seconds(100));
+    }
+
+    // Check the initial sync progress again to make sure the duration timer has stopped on finish.
+    progress = initialSyncer->getInitialSyncProgress();
+    ASSERT_EQUALS(progress["initialSyncEnd"].Date(), initialSyncEnd);
+    ASSERT_EQUALS(progress["totalInitialSyncElapsedMillis"].safeNumberLong(), prevElapsedMillis);
 }
 
 TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgressForNetworkError) {
@@ -4744,6 +4803,10 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressOmitsClonerStatsIfClonerStatsExc
                      .data,
                  makeCursorResponse(0LL, nss.getCommandNS(), collectionInfos[3], notFirstBatch)
                      .data});
+
+            // The collection cloner pre-stage makes a remote call to collStats to store in-progress
+            // metrics.
+            _mockServer->setCommandReply("collStats", BSON("size" << 0));
 
             // All document counts are 0.
             _mockServer->setCommandReply("count", BSON("n" << 0 << "ok" << 1));
