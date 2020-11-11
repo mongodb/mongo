@@ -1295,9 +1295,9 @@ functions:
 
         for i in {1..3}
         do
-          if ! kitchen verify "${packager_distro}"; then
+          if ! kitchen verify "${packager_distro}"\$; then
             verified="false"
-            kitchen destroy "${packager_distro}" || true
+            kitchen destroy "${packager_distro}"\$ || true
             sleep 30
           else
             verified="true"
@@ -1305,7 +1305,7 @@ functions:
           fi
         done
 
-        kitchen destroy "${packager_distro}" || true
+        kitchen destroy "${packager_distro}"\$ || true
         test "$verified" = "true"
 
   "fetch test_lifecycle.yml":
@@ -6639,6 +6639,186 @@ buildvariants:
   - name: push
     distros:
     - linux-64-amzn-small
+
+- name: enterprise-amazon2
+  display_name: "Enterprise Amazon Linux 2"
+  modules:
+  - enterprise
+  run_on:
+  - amazon2-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=requires_mmapv1
+      --excludeWithAnyTags=SERVER-34286
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 --release -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    has_packages: true
+    packager_script: packager-enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    tooltags: "ssl sasl"
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - amazon2-large
+  - name: compile_all
+    distros:
+    - amazon2-large
+  - name: aggregation_auth
+  - name: aggregation_WT
+  - name: audit_WT
+  - name: auth_WT
+  - name: auth_audit_WT
+  - name: dbtest_WT
+  - name: ese_WT
+  - name: failpoints_auth
+  - name: jsCore # TODO SERVER-32036: Remove when jsCore_auth depends on jsCore_WT.
+  - name: jsCore_WT
+  - name: jsCore_WT_ese
+  - name: jsCore_auth
+  - name: jsCore_decimal_WT
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
+  - name: replica_sets_auth
+  - name: replica_sets_WT_ese
+  - name: master_slave_auth
+  - name: master_slave_WT
+  - name: powercycle_WT
+  - name: sasl
+  - name: sharding_auth
+  - name: sharding_auth_audit_WT
+  - name: sharding_WT_ese
+  - name: slow1_WT
+  - name: serial_run_WT
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_op_query_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: snmp_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+    distros:
+    - amazon2-small
+
+- name: amazon2
+  display_name: SSL Amazon Linux 2
+  run_on:
+  - amazon2-test
+  batchtime: 1440 # 1 day
+  expansions:
+    test_flags: >-
+      --excludeWithAnyTags=requires_mmapv1
+      --excludeWithAnyTags=SERVER-34286
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-amazon2
+    compile_flags: --ssl MONGO_DISTMOD=amazon2 -j$(grep -c ^processor /proc/cpuinfo) --release --variables-files=etc/scons/mongodbtoolchain_gcc.vars
+    # We invoke SCons using --jobs = (# of CPUs / 4) to avoid causing out of memory errors due to
+    # spawning a large number of linker processes.
+    num_scons_link_jobs_available: $(( $(grep -c ^processor /proc/cpuinfo) / 4 ))
+    multiversion_platform: amazon
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon2
+    repo_edition: org
+    scons_cache_scope: shared
+    tooltags: "ssl"
+    build_mongoreplay: true
+  tasks:
+  - name: compile
+    distros:
+    - amazon2-large
+    distros:
+    - amazon2-large
+  - name: aggregation_WT
+  - name: aggregation_auth
+  - name: auth_WT
+  - name: dbtest_WT
+  - name: disk_WT
+  - name: failpoints
+  - name: failpoints_auth
+  - name: gle_auth_WT
+  - name: gle_auth_write_cmd_WT
+  - name: gle_auth_basics_passthrough_WT
+  - name: gle_auth_basics_passthrough_write_cmd_WT
+  - name: sharding_gle_auth_basics_passthrough_WT
+  - name: sharding_gle_auth_basics_passthrough_write_cmd_WT
+  - name: jsCore # TODO SERVER-32036: Remove when jsCore_auth depends on jsCore_WT.
+  - name: jsCore_WT
+  - name: jsCore_auth
+  - name: jsCore_compatibility_WT
+  - name: jsCore_decimal_WT
+  - name: jstestfuzz_WT
+  - name: jstestfuzz_concurrent_WT
+  - name: jstestfuzz_concurrent_replication_WT
+  - name: jstestfuzz_concurrent_sharded_WT
+  - name: jstestfuzz_replication_WT
+  - name: jstestfuzz_sharded_WT
+  - name: mongosTest
+  - name: multiversion_WT
+  - name: noPassthrough_WT
+  - name: noPassthroughWithMongod_WT
+  - name: bulk_gle_passthrough_WT
+  - name: parallel_WT
+  - name: parallel_compatibility_WT
+  - name: concurrency_WT
+  - name: concurrency_replication_WT
+  - name: concurrency_sharded_WT
+  - name: concurrency_simultaneous_WT
+  - name: logical_session_cache_replication_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_sharding_1sec_refresh_jscore_passthrough_WT
+  - name: logical_session_cache_standalone_1sec_refresh_jscore_passthrough_WT
+  - name: replica_sets_WT
+  - name: replica_sets_auth
+  - name: replica_sets_jscore_passthrough_WT
+  - name: master_slave_WT
+  - name: master_slave_auth
+  - name: master_slave_jscore_passthrough_WT
+  - name: sharding_WT
+  - name: sharding_auth
+  - name: sharding_last_stable_mongos_and_mixed_shards
+  - name: slow1_WT
+  - name: serial_run_WT
+  - name: sharded_collections_jscore_passthrough_WT
+  - name: sharding_jscore_passthrough_WT
+  - name: sharding_jscore_op_query_passthrough_WT
+  - name: sharding_jscore_passthrough_wire_ops_WT
+  - name: ssl
+  - name: sslSpecial
+  - name: tool_WT
+  - name: package
+    distros:
+    - ubuntu1604-packer
+  - name: push
+    distros:
+    - amazon2-small
 
 ###########################################
 #         Windows buildvariants           #

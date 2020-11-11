@@ -45,7 +45,7 @@ import urlparse
 ARCH_CHOICES=["x86_64", "ppc64le", "s390x", "arm64"]
 
 # Made up names for the flavors of distribution we package for.
-DISTROS=["suse", "debian","redhat","ubuntu","amazon"]
+DISTROS=["suse", "debian","redhat","ubuntu","amazon", "amazon2"]
 
 
 class EnterpriseSpec(packager.Spec):
