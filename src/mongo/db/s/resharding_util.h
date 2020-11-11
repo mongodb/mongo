@@ -193,15 +193,6 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const BSONObj& fullDocument);
 
 /**
- * Creates pipeline for filtering collection data matching the recipient shard.
- */
-std::unique_ptr<Pipeline, PipelineDeleter> createAggForCollectionCloning(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const ShardKeyPattern& newShardKeyPattern,
-    const NamespaceString& tempNss,
-    const ShardId& recipientShard);
-
-/**
  * Sentinel oplog format:
  * {
  *   op: "n",

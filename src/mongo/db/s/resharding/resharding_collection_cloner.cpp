@@ -35,12 +35,18 @@
 
 #include <utility>
 
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/aggregation_request.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
@@ -66,27 +72,104 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ShardKeyPattern newShardK
       _atClusterTime(atClusterTime),
       _outputNss(std::move(outputNss)) {}
 
-std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_makePipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const ShardId& recipientShard,
-    Timestamp atClusterTime,
-    const NamespaceString& outputNss) {
+std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipeline(
+    OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface) {
+    using Doc = Document;
+    using Arr = std::vector<Value>;
+    using V = Value;
 
-    std::vector<BSONObj> serializedPipeline =
-        createAggForCollectionCloning(expCtx, _newShardKeyPattern, outputNss, recipientShard)
-            ->serializeToBson();
+    // Assume that the input collection isn't a view. The collectionUUID parameter to
+    // the aggregate would enforce this anyway.
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces[_sourceNss.coll()] = {_sourceNss, std::vector<BSONObj>{}};
 
-    AggregationRequest request(_sourceNss, std::move(serializedPipeline));
+    // Assume that the config.cache.chunks collection isn't a view either.
+    auto tempNss = constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
+    auto tempCacheChunksNss =
+        NamespaceString(NamespaceString::kConfigDb, "cache.chunks." + tempNss.ns());
+    resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
+
+    auto expCtx = make_intrusive<ExpressionContext>(opCtx,
+                                                    boost::none, /* explain */
+                                                    false,       /* fromMongos */
+                                                    false,       /* needsMerge */
+                                                    false,       /* allowDiskUse */
+                                                    false,       /* bypassDocumentValidation */
+                                                    false,       /* isMapReduceCommand */
+                                                    _sourceNss,
+                                                    boost::none, /* runtimeConstants */
+                                                    nullptr,     /* collator */
+                                                    std::move(mongoProcessInterface),
+                                                    std::move(resolvedNamespaces),
+                                                    _sourceUUID);
+
+    Pipeline::SourceContainer stages;
+
+    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
+        fromjson("{$replaceWith: {original: '$$ROOT'}}").firstElement(), expCtx));
+
+    Arr extractShardKeyExpr;
+    for (auto&& field : _newShardKeyPattern.toBSON()) {
+        if (ShardKeyPattern::isHashedPatternEl(field)) {
+            extractShardKeyExpr.emplace_back(
+                Doc{{"$toHashedIndexKey", "$original." + field.fieldNameStringData()}});
+        } else {
+            extractShardKeyExpr.emplace_back("$original." + field.fieldNameStringData());
+        }
+    }
+
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup",
+             Doc{{"from",
+                  Doc{{"db", tempCacheChunksNss.db()}, {"coll", tempCacheChunksNss.coll()}}},
+                 {"let", Doc{{"sk", extractShardKeyExpr}}},
+                 {"pipeline",
+                  Arr{V{Doc{{"$match",
+                             Doc{{"$expr",
+                                  Doc{{"$eq",
+                                       Arr{V{"$shard"_sd}, V{_recipientShard.toString()}}}}}}}}},
+                      V{Doc(fromjson("{$match: {$expr: {$let: {\
+                            vars: {\
+                                min: {$map: {input: {$objectToArray: '$_id'}, in: '$$this.v'}},\
+                                max: {$map: {input: {$objectToArray: '$max'}, in: '$$this.v'}}\
+                            },\
+                            in: {$and: [\
+                                {$gte: ['$$sk', '$$min']},\
+                                {$cond: {\
+                                    if: {$allElementsTrue: [{$map: {\
+                                        input: '$$max',\
+                                        in: {$eq: [{$type: '$$this'}, 'maxKey']}\
+                                    }}]},\
+                                    then: {$lte: ['$$sk', '$$max']},\
+                                    else: {$lt:  ['$$sk', '$$max']}\
+                                }}\
+                            ]}\
+                        }}}}"))}}},
+                 {"as", "intersectingChunk"_sd}}}}
+            .toBson()
+            .firstElement(),
+        expCtx));
+
+    stages.emplace_back(
+        DocumentSourceMatch::create(fromjson("{intersectingChunk: {$ne: []}}"), expCtx));
+    stages.emplace_back(DocumentSourceReplaceRoot::createFromBson(
+        fromjson("{$replaceWith: '$original'}").firstElement(), expCtx));
+    return Pipeline::create(std::move(stages), expCtx);
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
+    const Pipeline& pipeline) {
+    AggregationRequest request(_sourceNss, pipeline.serializeToBson());
     request.setCollectionUUID(_sourceUUID);
     request.setHint(BSON("_id" << 1));
     request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
                                 << repl::readConcernLevels::kSnapshotName
                                 << repl::ReadConcernArgs::kAtClusterTimeFieldName
-                                << atClusterTime));
+                                << _atClusterTime));
     // TODO SERVER-52692: Set read preference to nearest.
     // request.setUnwrappedReadPref();
 
-    return sharded_agg_helpers::targetShardsAndAddMergeCursors(std::move(expCtx),
+    return sharded_agg_helpers::targetShardsAndAddMergeCursors(pipeline.getContext(),
                                                                std::move(request));
 }
 
@@ -208,34 +291,9 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
     return ExecutorFuture(executor)
         .then([this, serviceContext] {
             return _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
-                // Assume that the input collection isn't a view. The collectionUUID parameter to
-                // the aggregate would enforce this anyway.
-                StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-                resolvedNamespaces[_sourceNss.coll()] = {_sourceNss, std::vector<BSONObj>{}};
+                auto pipeline = _targetAggregationRequest(
+                    *makePipeline(opCtx, MongoProcessInterface::create(opCtx)));
 
-                // Assume that the config.cache.chunks collection isn't a view either.
-                auto tempNss = constructTemporaryReshardingNss(_sourceNss.db(), _sourceUUID);
-                auto tempCacheChunksNss =
-                    NamespaceString(NamespaceString::kConfigDb, "cache.chunks." + tempNss.ns());
-                resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss,
-                                                                 std::vector<BSONObj>{}};
-
-                auto expCtx =
-                    make_intrusive<ExpressionContext>(opCtx,
-                                                      boost::none, /* explain */
-                                                      false,       /* fromMongos */
-                                                      false,       /* needsMerge */
-                                                      false,       /* allowDiskUse */
-                                                      false,       /* bypassDocumentValidation */
-                                                      false,       /* isMapReduceCommand */
-                                                      _sourceNss,
-                                                      boost::none, /* runtimeConstants */
-                                                      nullptr,     /* collator */
-                                                      MongoProcessInterface::create(opCtx),
-                                                      std::move(resolvedNamespaces),
-                                                      _sourceUUID);
-
-                auto pipeline = _makePipeline(expCtx, _recipientShard, _atClusterTime, _outputNss);
                 pipeline->detachFromOperationContext();
                 return pipeline;
             });

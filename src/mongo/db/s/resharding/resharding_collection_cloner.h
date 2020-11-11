@@ -60,17 +60,16 @@ public:
                                Timestamp atClusterTime,
                                NamespaceString outputNss);
 
+    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+        OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
+
     ExecutorFuture<void> run(ServiceContext* serviceContext,
                              std::shared_ptr<executor::TaskExecutor>);
 
 private:
     static constexpr StringData kClientName = "ReshardingCollectionCloner"_sd;
 
-    std::unique_ptr<Pipeline, PipelineDeleter> _makePipeline(
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        const ShardId& recipientShard,
-        Timestamp atClusterTime,
-        const NamespaceString& outputNss);
+    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(const Pipeline& pipeline);
 
     std::vector<InsertStatement> _fillBatch(Pipeline& pipeline);
     void _insertBatch(OperationContext* opCtx, std::vector<InsertStatement>& batch);
