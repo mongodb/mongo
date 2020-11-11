@@ -41,6 +41,8 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -116,6 +118,24 @@ BaseCloner::ClonerStages CollectionCloner::getStages() {
 void CollectionCloner::preStage() {
     stdx::lock_guard<Latch> lk(_mutex);
     _stats.start = getSharedData()->getClock()->now();
+    BSONObj res;
+    getClient()->runCommand(
+        _sourceNss.db().toString(), BSON("collStats" << _sourceNss.coll().toString()), res);
+    if (auto status = getStatusFromCommandResult(res); status.isOK()) {
+        _stats.bytesToCopy = res.getField("size").safeNumberLong();
+        if (_stats.bytesToCopy > 0) {
+            // The 'avgObjSize' parameter is only available if 'collStats' returns a 'size' field
+            // greater than zero.
+            _stats.avgObjSize = res.getField("avgObjSize").safeNumberLong();
+        }
+    } else {
+        LOGV2_DEBUG(4786302,
+                    1,
+                    "Skipping the recording of some initial sync metrics due to failure in the "
+                    "'collStats' command",
+                    "ns"_attr = _sourceNss.coll().toString(),
+                    "status"_attr = status);
+    }
 }
 
 void CollectionCloner::postStage() {
@@ -428,6 +448,9 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
     {
         stdx::lock_guard<Latch> lk(_mutex);
         std::vector<BSONObj> docs;
+        // Increment 'fetchedBatches' even if no documents were inserted to match the number of
+        // 'receivedBatches'.
+        ++_stats.fetchedBatches;
         if (_documentsToInsert.size() == 0) {
             LOGV2_WARNING(21145,
                           "insertDocumentsCallback, but no documents to insert for ns:{namespace}",
@@ -437,7 +460,7 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
         }
         _documentsToInsert.swap(docs);
         _stats.documentsCopied += docs.size();
-        ++_stats.fetchedBatches;
+        _stats.approxBytesCopied = ((long)_stats.documentsCopied) * _stats.avgObjSize;
         _progressMeter.hit(int(docs.size()));
         invariant(_collLoader);
 
@@ -505,6 +528,10 @@ void CollectionCloner::Stats::append(BSONObjBuilder* builder) const {
     builder->appendNumber(kDocumentsCopiedFieldName, documentsCopied);
     builder->appendNumber("indexes", indexes);
     builder->appendNumber("fetchedBatches", fetchedBatches);
+    builder->appendNumber("bytesToCopy", bytesToCopy);
+    if (bytesToCopy) {
+        builder->appendNumber("approxBytesCopied", approxBytesCopied);
+    }
     if (start != Date_t()) {
         builder->appendDate("start", start);
         if (end != Date_t()) {

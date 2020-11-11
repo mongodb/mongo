@@ -60,6 +60,9 @@ public:
         size_t indexes{0};
         size_t fetchedBatches{0};  // This is actually inserted batches.
         size_t receivedBatches{0};
+        long long bytesToCopy{0};
+        long long avgObjSize{0};
+        long long approxBytesCopied{0};
 
         std::string toString() const;
         BSONObj toBSON() const;

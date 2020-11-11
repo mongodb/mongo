@@ -333,6 +333,9 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
                                                   << "collection"
                                                   << "options" << BSONObj() << "info"
                                                   << BSON("readOnly" << false << "uuid" << uuid2))};
+    // The collection cloner pre-stage makes a remote call to collStats to store in-progress
+    // metrics.
+    _mockServer->setCommandReply("collStats", BSON("size" << 0));
     _mockServer->setCommandReply("listCollections",
                                  createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
     _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
@@ -369,6 +372,9 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
                                                   << BSON("readOnly" << false << "uuid" << uuid2))};
     _mockServer->setCommandReply("listCollections",
                                  createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    // The collection cloner pre-stage makes a remote call to collStats to store in-progress
+    // metrics.
+    _mockServer->setCommandReply("collStats", BSON("size" << 0));
     _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
     _mockServer->setCommandReply("listIndexes",
                                  {createCursorResponse(_dbName + ".a", BSON_ARRAY(idIndexSpec)),
@@ -412,6 +418,9 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
                                                   << BSON("readOnly" << false << "uuid" << uuid2))};
     _mockServer->setCommandReply("listCollections",
                                  createListCollectionsResponse({sourceInfos[0], sourceInfos[1]}));
+    // The collection cloner pre-stage makes a remote call to collStats to store in-progress
+    // metrics.
+    _mockServer->setCommandReply("collStats", BSON("size" << 0));
     _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
     _mockServer->setCommandReply(
         "listIndexes",

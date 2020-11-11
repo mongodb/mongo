@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 namespace mongo {
 namespace repl {
@@ -145,7 +146,6 @@ BaseCloner::AfterStageBehavior AllDatabaseCloner::getInitialSyncIdStage() {
 }
 
 BaseCloner::AfterStageBehavior AllDatabaseCloner::listDatabasesStage() {
-    BSONObj res;
     auto databasesArray = getClient()->getDatabaseInfos(BSONObj(), true /* nameOnly */);
     for (const auto& dbBSON : databasesArray) {
         if (!dbBSON.hasField("name")) {
@@ -181,10 +181,29 @@ void AllDatabaseCloner::postStage() {
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.databasesCloned = 0;
+        _stats.databasesToClone = _databases.size();
         _stats.databaseStats.reserve(_databases.size());
         for (const auto& dbName : _databases) {
             _stats.databaseStats.emplace_back();
             _stats.databaseStats.back().dbname = dbName;
+
+            BSONObj res;
+            getClient()->runCommand(dbName, BSON("dbStats" << 1), res);
+            // It is possible for the call to 'dbStats' to fail if the sync source contains invalid
+            // views. We should not fail initial sync in this case due to the situation where the
+            // replica set may have lost majority availability and therefore have no access to a
+            // primary to fix the view definitions. Instead, we simply skip recording the data size
+            // metrics.
+            if (auto status = getStatusFromCommandResult(res); status.isOK()) {
+                _stats.dataSize += res.getField("dataSize").safeNumberLong();
+            } else {
+                LOGV2_DEBUG(4786301,
+                            1,
+                            "Skipping the recording of initial sync data size metrics due "
+                            "to failure in the 'dbStats' command",
+                            "db"_attr = dbName,
+                            "status"_attr = status);
+            }
         }
     }
     for (const auto& dbName : _databases) {
@@ -245,6 +264,7 @@ void AllDatabaseCloner::postStage() {
             _stats.databaseStats[_stats.databasesCloned] = _currentDatabaseCloner->getStats();
             _currentDatabaseCloner = nullptr;
             _stats.databasesCloned++;
+            _stats.databasesToClone--;
         }
     }
 }
@@ -263,6 +283,7 @@ std::string AllDatabaseCloner::toString() const {
     return str::stream() << "initial sync --"
                          << " active:" << isActive(lk) << " status:" << getStatus(lk).toString()
                          << " source:" << getSource()
+                         << " db cloners remaining:" << _stats.databasesToClone
                          << " db cloners completed:" << _stats.databasesCloned;
 }
 
@@ -277,6 +298,7 @@ BSONObj AllDatabaseCloner::Stats::toBSON() const {
 }
 
 void AllDatabaseCloner::Stats::append(BSONObjBuilder* builder) const {
+    builder->appendNumber("databasesToClone", databasesToClone);
     builder->appendNumber("databasesCloned", databasesCloned);
     for (auto&& db : databaseStats) {
         BSONObjBuilder dbBuilder(builder->subobjStart(db.dbname));

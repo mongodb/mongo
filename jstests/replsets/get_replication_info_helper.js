@@ -3,13 +3,45 @@
 
 (function() {
 "use strict";
+load("jstests/libs/fail_point_util.js");
+
 var name = "getReplicationInfo";
-var replSet = new ReplSetTest({name: name, nodes: 3, oplogSize: 50});
-var nodes = replSet.nodeList();
+const replSet = new ReplSetTest({name: name, nodes: 2, oplogSize: 50});
 replSet.startSet();
 replSet.initiate();
 
 var primary = replSet.getPrimary();
+
+// Test that db.printSlaveReplicationInfo() and db.printSecondaryReplicationInfo() both print
+// out initial sync info when called during an initial sync.
+const syncTarget = replSet.add({
+    rsConfig: {votes: 0, priority: 0},
+    setParameter: {
+        'failpoint.forceSyncSourceCandidate':
+            tojson({mode: 'alwaysOn', data: {hostAndPort: primary.name}})
+    }
+});
+syncTarget.setSecondaryOk();
+const failPointBeforeFinish = configureFailPoint(syncTarget, 'initialSyncHangBeforeFinish');
+replSet.reInitiate();
+
+failPointBeforeFinish.wait();
+const callPrintSecondaryReplInfo = startParallelShell(
+    "db.getSiblingDB('admin').printSecondaryReplicationInfo();", syncTarget.port);
+callPrintSecondaryReplInfo();
+assert(rawMongoProgramOutput().match("InitialSyncSyncSource: " + primary.name));
+assert(rawMongoProgramOutput().match("InitialSyncRemainingEstimatedDuration: "));
+clearRawMongoProgramOutput();
+
+const callPrintSlaveReplInfo =
+    startParallelShell("db.getSiblingDB('admin').printSlaveReplicationInfo();", syncTarget.port);
+callPrintSlaveReplInfo();
+assert(rawMongoProgramOutput().match("InitialSyncSyncSource: " + primary.name));
+assert(rawMongoProgramOutput().match("InitialSyncRemainingEstimatedDuration: "));
+clearRawMongoProgramOutput();
+failPointBeforeFinish.off();
+replSet.awaitSecondaryNodes();
+
 for (var i = 0; i < 100; i++) {
     primary.getDB('test').foo.insert({a: i});
 }
