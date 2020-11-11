@@ -38,9 +38,6 @@ case "$1" in
             mkdir -p /var/log/mongodb
             chown mongodb:mongodb /var/log/mongodb
         fi
-
-        # Check for changes to the service file
-        systemctl daemon-reload
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
