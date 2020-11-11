@@ -49,8 +49,8 @@ variables:
     - wtdevelop
 
     - dsi
-    - signal-processing
     - genny
+    - signal-processing
     - workloads
     - linkbench
     - linkbench2
@@ -151,11 +151,11 @@ functions:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          signal-processing: ${signal-processing_rev}
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
           workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
           mongo-perf: ${mongo-perf_rev}
           YCSB: ${YCSB_rev}
           benchmarks: ${benchmarks_rev}
