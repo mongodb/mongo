@@ -55,10 +55,9 @@ variables:
     - linkbench
     - linkbench2
     - mongo-perf
-    - ycsb
+    - YCSB
     - benchmarks
     - py-tpcc
-
 
 modules:
 ###
@@ -96,7 +95,7 @@ modules:
   repo: git@github.com:mongodb/mongo-perf.git
   prefix: ../../src
   branch: master
-- name: ycsb
+- name: YCSB
   repo: git@github.com:mongodb-labs/YCSB.git
   prefix: ../../src
   branch: master
@@ -158,6 +157,9 @@ functions:
           workloads: ${workloads_rev}
           signal-processing: ${signal-processing_rev}
           mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          benchmarks: ${benchmarks_rev}
+          py-tpcc: ${py-tpcc_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
