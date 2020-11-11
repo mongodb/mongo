@@ -17,7 +17,7 @@ In the new protocol, the StreamableReplicaSetMonitor is used to gather and maint
 * [**ReplicaSetMonitorInterface class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/replica_set_monitor_interface.h)
 * [**ReplicaSetMonitorManager class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/replica_set_monitor_manager.h)
 * [**RemoteCommandTargeter class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/remote_command_targeter.h)
-* [**ServerIsMasterMonitor class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/server_is_master_monitor.cpp)
+* [**ServerDiscoveryMonitor class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/server_discovery_monitor.cpp)
 * [**ServerPingMonitor class**](https://github.com/mongodb/mongo/blob/v4.4/src/mongo/client/server_ping_monitor.h)
 * The specifications for
 [**Server Discovery and Monitoring (SDAM)**](https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst)

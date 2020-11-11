@@ -50,13 +50,13 @@ public:
     void verifyActions(ErrorActions result, ErrorActions expectedResult) {
         ASSERT_EQUALS(result.dropConnections, expectedResult.dropConnections);
         ASSERT_EQUALS(result.requestImmediateCheck, expectedResult.requestImmediateCheck);
-        if (expectedResult.isMasterOutcome) {
-            ASSERT_FALSE(result.isMasterOutcome->isSuccess());
-            std::string resultError = result.isMasterOutcome->getErrorMsg();
-            ASSERT_NOT_EQUALS(resultError.find(expectedResult.isMasterOutcome->getErrorMsg()),
+        if (expectedResult.helloOutcome) {
+            ASSERT_FALSE(result.helloOutcome->isSuccess());
+            std::string resultError = result.helloOutcome->getErrorMsg();
+            ASSERT_NOT_EQUALS(resultError.find(expectedResult.helloOutcome->getErrorMsg()),
                               std::string::npos);
         } else {
-            ASSERT_FALSE(result.isMasterOutcome);
+            ASSERT_FALSE(result.helloOutcome);
         }
     }
 
@@ -118,7 +118,7 @@ public:
     inline static const HostAndPort kHost = HostAndPort("foobar:123");
     inline static const std::string kErrorMessage = "an error message";
     inline static const BSONObj kErrorBson = BSONObjBuilder().append("ok", 0).obj();
-    inline static const sdam::HelloOutcome kErrorIsMasterOutcome =
+    inline static const sdam::HelloOutcome kErrorHelloOutcome =
         sdam::HelloOutcome(kHost, kErrorBson, kErrorMessage);
 
     static constexpr bool kApplicationOperation = true;
@@ -132,7 +132,7 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture, ApplicationNetworkErr
         HandshakeStage::kPreHandshake,
         kApplicationOperation,
         kNetworkErrors,
-        StreamableReplicaSetMonitorErrorHandler::ErrorActions{true, false, kErrorIsMasterOutcome});
+        StreamableReplicaSetMonitorErrorHandler::ErrorActions{true, false, kErrorHelloOutcome});
 };
 
 // https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#network-error-when-reading-or-writing
@@ -141,7 +141,7 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture, ApplicationNetworkErr
         HandshakeStage::kPostHandshake,
         kApplicationOperation,
         kNetworkErrorsNoTimeout,
-        StreamableReplicaSetMonitorErrorHandler::ErrorActions{true, false, kErrorIsMasterOutcome});
+        StreamableReplicaSetMonitorErrorHandler::ErrorActions{true, false, kErrorHelloOutcome});
 };
 
 // https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-monitoring.rst#network-error-during-server-check
@@ -153,7 +153,7 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture, MonitoringNetworkErro
         return (count == 1)
             ? StreamableReplicaSetMonitorErrorHandler::ErrorActions{true, true, boost::none}
             : StreamableReplicaSetMonitorErrorHandler::ErrorActions{
-                  true, false, kErrorIsMasterOutcome};
+                  true, false, kErrorHelloOutcome};
     };
 
     testScenario(HandshakeStage::kPostHandshake,
@@ -169,7 +169,7 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture, MonitoringNetworkErro
         HandshakeStage::kPreHandshake,
         kMonitoringOperation,
         kNetworkErrors,
-        StreamableReplicaSetMonitorErrorHandler::ErrorActions{true, false, kErrorIsMasterOutcome},
+        StreamableReplicaSetMonitorErrorHandler::ErrorActions{true, false, kErrorHelloOutcome},
         kThreeAttempts);
 }
 
@@ -178,10 +178,10 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture, ApplicationNotMasterO
     const auto shutdownErrorsDropConnections = [](const Status& status) {
         if (ErrorCodes::isA<ErrorCategory::ShutdownError>(status.code())) {
             return StreamableReplicaSetMonitorErrorHandler::ErrorActions{
-                true, true, kErrorIsMasterOutcome};
+                true, true, kErrorHelloOutcome};
         } else {
             return StreamableReplicaSetMonitorErrorHandler::ErrorActions{
-                false, true, kErrorIsMasterOutcome};
+                false, true, kErrorHelloOutcome};
         }
     };
 
@@ -196,7 +196,7 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture, MonitoringNonNetworkE
         HandshakeStage::kPostHandshake,
         kMonitoringOperation,
         kInternalError,
-        StreamableReplicaSetMonitorErrorHandler::ErrorActions{false, false, kErrorIsMasterOutcome});
+        StreamableReplicaSetMonitorErrorHandler::ErrorActions{false, false, kErrorHelloOutcome});
 }
 
 TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture,
@@ -205,6 +205,6 @@ TEST_F(StreamableReplicaSetMonitorErrorHandlerTestFixture,
         HandshakeStage::kPostHandshake,
         kMonitoringOperation,
         kInternalError,
-        StreamableReplicaSetMonitorErrorHandler::ErrorActions{false, false, kErrorIsMasterOutcome});
+        StreamableReplicaSetMonitorErrorHandler::ErrorActions{false, false, kErrorHelloOutcome});
 }
 }  // namespace mongo

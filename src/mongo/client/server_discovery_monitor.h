@@ -35,30 +35,30 @@
 namespace mongo {
 using namespace sdam;
 
-class SingleServerIsMasterMonitor
-    : public std::enable_shared_from_this<SingleServerIsMasterMonitor> {
+class SingleServerDiscoveryMonitor
+    : public std::enable_shared_from_this<SingleServerDiscoveryMonitor> {
 public:
-    explicit SingleServerIsMasterMonitor(const MongoURI& setUri,
-                                         const HostAndPort& host,
-                                         boost::optional<TopologyVersion> topologyVersion,
-                                         const SdamConfiguration& sdamConfig,
-                                         TopologyEventsPublisherPtr eventListener,
-                                         std::shared_ptr<executor::TaskExecutor> executor);
+    explicit SingleServerDiscoveryMonitor(const MongoURI& setUri,
+                                          const HostAndPort& host,
+                                          boost::optional<TopologyVersion> topologyVersion,
+                                          const SdamConfiguration& sdamConfig,
+                                          TopologyEventsPublisherPtr eventListener,
+                                          std::shared_ptr<executor::TaskExecutor> executor);
 
     void init();
     void shutdown();
 
     /**
      * Request an immediate check. The server will be checked immediately if we haven't completed
-     * an isMaster less than SdamConfiguration::kMinHeartbeatFrequency ago. Otherwise,
+     * a hello less than SdamConfiguration::kMinHeartbeatFrequency ago. Otherwise,
      * we schedule a check that runs after SdamConfiguration::kMinHeartbeatFrequency since
-     * the last isMaster.
+     * the last hello.
      */
     void requestImmediateCheck();
     void disableExpeditedChecking();
 
     /**
-     * Calculates the timing of the next IsMaster request when moving to expedited mode. Returns
+     * Calculates the timing of the next Hello request when moving to expedited mode. Returns
      * boost::none if the existing schedule should be maintained.
      */
     static boost::optional<Milliseconds> calculateExpeditedDelayUntilNextCheck(
@@ -66,25 +66,25 @@ public:
         const Milliseconds& expeditedRefreshPeriod,
         const Milliseconds& previousRefreshPeriod);
 
-    // Sent in the initial isMaster request when using the streamable exhaust protocol. The max
+    // Sent in the initial hello request when using the streamable exhaust protocol. The max
     // duration a server should wait for a significant topology change before sending a response.
     static constexpr Milliseconds kMaxAwaitTime = Milliseconds(10000);
 
 private:
-    void _scheduleNextIsMaster(WithLock, Milliseconds delay);
-    void _rescheduleNextIsMaster(WithLock, Milliseconds delay);
+    void _scheduleNextHello(WithLock, Milliseconds delay);
+    void _rescheduleNextHello(WithLock, Milliseconds delay);
     void _doRemoteCommand();
 
-    // Use the awaitable isMaster protocol with the exhaust bit set. Attach _topologyVersion and
+    // Use the awaitable hello protocol with the exhaust bit set. Attach _topologyVersion and
     // kMaxAwaitTimeMS to the request.
-    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleStreamableIsMaster();
+    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleStreamableHello();
 
-    // Use the old isMaster protocol. Do not attach _topologyVersion or kMaxAwaitTimeMS to the
+    // Use the old hello protocol. Do not attach _topologyVersion or kMaxAwaitTimeMS to the
     // request.
-    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleSingleIsMaster();
+    StatusWith<executor::TaskExecutor::CallbackHandle> _scheduleSingleHello();
 
-    void _onIsMasterSuccess(const BSONObj bson);
-    void _onIsMasterFailure(const Status& status, const BSONObj bson);
+    void _onHelloSuccess(const BSONObj bson);
+    void _onHelloFailure(const Status& status, const BSONObj bson);
 
     Milliseconds _overrideRefreshPeriod(Milliseconds original);
     Milliseconds _currentRefreshPeriod(WithLock, bool scheduleImmediately);
@@ -95,7 +95,7 @@ private:
     static constexpr auto kLogLevel = 0;
 
     Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerIsMasterMonitor::mutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(4), "SingleServerDiscoveryMonitor::mutex");
     HostAndPort _host;
     boost::optional<TopologyVersion> _topologyVersion;
     TopologyEventsPublisherPtr _eventListener;
@@ -103,27 +103,27 @@ private:
     Milliseconds _heartbeatFrequency;
     Milliseconds _connectTimeout;
 
-    boost::optional<Date_t> _lastIsMasterAt;
-    bool _isMasterOutstanding = false;
+    boost::optional<Date_t> _lastHelloAt;
+    bool _helloOutstanding = false;
     bool _isExpedited;
-    executor::TaskExecutor::CallbackHandle _nextIsMasterHandle;
+    executor::TaskExecutor::CallbackHandle _nextHelloHandle;
     executor::TaskExecutor::CallbackHandle _remoteCommandHandle;
 
     bool _isShutdown;
     MongoURI _setUri;
 };
-using SingleServerIsMasterMonitorPtr = std::shared_ptr<SingleServerIsMasterMonitor>;
+using SingleServerDiscoveryMonitorPtr = std::shared_ptr<SingleServerDiscoveryMonitor>;
 
 
-class ServerIsMasterMonitor : public TopologyListener {
+class ServerDiscoveryMonitor : public TopologyListener {
 public:
-    ServerIsMasterMonitor(const MongoURI& setUri,
-                          const SdamConfiguration& sdamConfiguration,
-                          TopologyEventsPublisherPtr eventsPublisher,
-                          TopologyDescriptionPtr initialTopologyDescription,
-                          std::shared_ptr<executor::TaskExecutor> executor = nullptr);
+    ServerDiscoveryMonitor(const MongoURI& setUri,
+                           const SdamConfiguration& sdamConfiguration,
+                           TopologyEventsPublisherPtr eventsPublisher,
+                           TopologyDescriptionPtr initialTopologyDescription,
+                           std::shared_ptr<executor::TaskExecutor> executor = nullptr);
 
-    virtual ~ServerIsMasterMonitor() {}
+    virtual ~ServerDiscoveryMonitor() {}
 
     void shutdown();
 
@@ -151,13 +151,13 @@ private:
     static constexpr auto kLogLevel = 0;
 
     Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "ServerIsMasterMonitor::mutex");
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(5), "ServerDiscoveryMonitor::mutex");
     SdamConfiguration _sdamConfiguration;
     TopologyEventsPublisherPtr _eventPublisher;
     std::shared_ptr<executor::TaskExecutor> _executor;
-    stdx::unordered_map<HostAndPort, SingleServerIsMasterMonitorPtr> _singleMonitors;
+    stdx::unordered_map<HostAndPort, SingleServerDiscoveryMonitorPtr> _singleMonitors;
     bool _isShutdown;
     MongoURI _setUri;
 };
-using ServerIsMasterMonitorPtr = std::shared_ptr<ServerIsMasterMonitor>;
+using ServerDiscoveryMonitorPtr = std::shared_ptr<ServerDiscoveryMonitor>;
 }  // namespace mongo

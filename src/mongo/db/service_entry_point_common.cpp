@@ -38,7 +38,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/server_is_master_monitor.h"
+#include "mongo/client/server_discovery_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
@@ -634,7 +634,7 @@ private:
             // Hello should take kMaxAwaitTimeMs at most, log if it takes twice that.
             if (isHello()) {
                 _execContext->slowMsOverride =
-                    2 * durationCount<Milliseconds>(SingleServerIsMasterMonitor::kMaxAwaitTime);
+                    2 * durationCount<Milliseconds>(SingleServerDiscoveryMonitor::kMaxAwaitTime);
             }
         });
         pf.promise.emplaceValue();

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-#include "mongo/client/server_is_master_monitor.h"
+#include "mongo/client/server_discovery_monitor.h"
 
 #include <boost/optional/optional_io.hpp>
 
@@ -36,7 +36,7 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-class SingleServerIsMasterMonitorExpeditedFixture : public unittest::Test {
+class SingleServerDiscoveryMonitorExpeditedFixture : public unittest::Test {
 public:
     struct TestCase {
         boost::optional<Milliseconds> timeElapsedSinceLastIsMaster;
@@ -50,7 +50,7 @@ public:
                    "timeElapsedSinceLastIsMaster"_attr = testCase.timeElapsedSinceLastIsMaster,
                    "previousRefreshPeriod"_attr = testCase.previousRefreshPeriod,
                    "expeditedRefreshPeriod"_attr = kExpeditedRefreshPeriod);
-        auto result = SingleServerIsMasterMonitor::calculateExpeditedDelayUntilNextCheck(
+        auto result = SingleServerDiscoveryMonitor::calculateExpeditedDelayUntilNextCheck(
             testCase.timeElapsedSinceLastIsMaster,
             kExpeditedRefreshPeriod,
             testCase.previousRefreshPeriod);
@@ -64,29 +64,29 @@ public:
     static inline const auto kZeroMs = Milliseconds(0);
 };
 
-TEST_F(SingleServerIsMasterMonitorExpeditedFixture, NoPreviousRequest) {
+TEST_F(SingleServerDiscoveryMonitorExpeditedFixture, NoPreviousRequest) {
     verifyTestCase(TestCase{boost::none, kLongRefreshPeriod, Milliseconds(0)});
     verifyTestCase(TestCase{boost::none, kExpeditedRefreshPeriod, Milliseconds(0)});
 }
 
-TEST_F(SingleServerIsMasterMonitorExpeditedFixture,
+TEST_F(SingleServerDiscoveryMonitorExpeditedFixture,
        PreviousRequestLongerThanExpeditedRefreshPeriod) {
     verifyTestCase(TestCase{kExpeditedRefreshPeriod + kDelta, kLongRefreshPeriod, Milliseconds(0)});
     verifyTestCase(
         TestCase{kExpeditedRefreshPeriod + kDelta, kExpeditedRefreshPeriod, Milliseconds(0)});
 }
 
-TEST_F(SingleServerIsMasterMonitorExpeditedFixture, PreviousRequestEqualLongRefreshPeriod) {
+TEST_F(SingleServerDiscoveryMonitorExpeditedFixture, PreviousRequestEqualLongRefreshPeriod) {
     verifyTestCase(TestCase{kLongRefreshPeriod, kLongRefreshPeriod, boost::none});
     verifyTestCase(TestCase{kLongRefreshPeriod, kExpeditedRefreshPeriod, Milliseconds(0)});
 }
 
-TEST_F(SingleServerIsMasterMonitorExpeditedFixture, PreviousRequestEqualExpeditedRefreshPeriod) {
+TEST_F(SingleServerDiscoveryMonitorExpeditedFixture, PreviousRequestEqualExpeditedRefreshPeriod) {
     verifyTestCase(TestCase{kExpeditedRefreshPeriod, kLongRefreshPeriod, Milliseconds(0)});
     verifyTestCase(TestCase{kExpeditedRefreshPeriod, kExpeditedRefreshPeriod, boost::none});
 }
 
-TEST_F(SingleServerIsMasterMonitorExpeditedFixture,
+TEST_F(SingleServerDiscoveryMonitorExpeditedFixture,
        PreviousRequestShorterThanExpeditedRefreshPeriod) {
     verifyTestCase(
         TestCase{kExpeditedRefreshPeriod - kDelta, kLongRefreshPeriod, Milliseconds(kDelta)});
@@ -94,12 +94,12 @@ TEST_F(SingleServerIsMasterMonitorExpeditedFixture,
         TestCase{kExpeditedRefreshPeriod - kDelta, kExpeditedRefreshPeriod, boost::none});
 }
 
-TEST_F(SingleServerIsMasterMonitorExpeditedFixture, PreviousRequestImmediatelyBefore) {
+TEST_F(SingleServerDiscoveryMonitorExpeditedFixture, PreviousRequestImmediatelyBefore) {
     verifyTestCase(TestCase{kOneMs, kLongRefreshPeriod, kExpeditedRefreshPeriod - kOneMs});
     verifyTestCase(TestCase{kOneMs, kExpeditedRefreshPeriod, boost::none});
 }
 
-TEST_F(SingleServerIsMasterMonitorExpeditedFixture, PreviousRequestConcurrent) {
+TEST_F(SingleServerDiscoveryMonitorExpeditedFixture, PreviousRequestConcurrent) {
     verifyTestCase(TestCase{kZeroMs, kLongRefreshPeriod, kExpeditedRefreshPeriod});
     verifyTestCase(TestCase{kZeroMs, kExpeditedRefreshPeriod, boost::none});
 }

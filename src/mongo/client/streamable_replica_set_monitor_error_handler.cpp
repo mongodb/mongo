@@ -41,8 +41,8 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
     // description.
     ErrorActions result;
     ON_BLOCK_EXIT([this, &result, &host, &status] {
-        if (result.isMasterOutcome)
-            _clearConsecutiveErrorsWithoutIsMasterOutcome(host);
+        if (result.helloOutcome)
+            _clearConsecutiveErrorsWithoutHelloOutcome(host);
 
         LOGV2(4712102,
               "Host failed in replica set",
@@ -54,7 +54,7 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
 
     // Helpers to mutate the actions
     const auto setCreateServerDescriptionAction = [this, &result, &host, &status, bson]() {
-        result.isMasterOutcome = _createErrorIsMasterOutcome(host, bson, status);
+        result.helloOutcome = _createErrorHelloOutcome(host, bson, status);
     };
     const auto setImmediateCheckAction = [&result]() { result.requestImmediateCheck = true; };
     const auto setDropConnectionsAction = [&result]() { result.dropConnections = true; };
@@ -90,12 +90,12 @@ SdamErrorHandler::ErrorActions SdamErrorHandler::computeErrorActions(const HostA
                 setCreateServerDescriptionAction();
                 break;
             case HandshakeStage::kPostHandshake:
-                int errorCount = _getConsecutiveErrorsWithoutIsMasterOutcome(host);
+                int errorCount = _getConsecutiveErrorsWithoutHelloOutcome(host);
                 if (errorCount == 1) {
                     setCreateServerDescriptionAction();
                 } else {
                     setImmediateCheckAction();
-                    _incrementConsecutiveErrorsWithoutIsMasterOutcome(host);
+                    _incrementConsecutiveErrorsWithoutHelloOutcome(host);
                 }
                 break;
         }
@@ -109,8 +109,8 @@ BSONObj StreamableReplicaSetMonitorErrorHandler::ErrorActions::toBSON() const {
     BSONObjBuilder builder;
     builder.append("dropConnections", dropConnections);
     builder.append("requestImmediateCheck", requestImmediateCheck);
-    if (isMasterOutcome) {
-        builder.append("outcome", isMasterOutcome->toBSON());
+    if (helloOutcome) {
+        builder.append("outcome", helloOutcome->toBSON());
     }
     return builder.obj();
 }
@@ -139,25 +139,25 @@ bool SdamErrorHandler::_isNotMaster(const Status& status) const {
     return ErrorCodes::isA<ErrorCategory::NotPrimaryError>(status.code());
 }
 
-int SdamErrorHandler::_getConsecutiveErrorsWithoutIsMasterOutcome(const HostAndPort& host) const {
+int SdamErrorHandler::_getConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host) const {
     stdx::lock_guard lock(_mutex);
-    if (auto it = _consecutiveErrorsWithoutIsMasterOutcome.find(host);
-        it != _consecutiveErrorsWithoutIsMasterOutcome.end()) {
+    if (auto it = _consecutiveErrorsWithoutHelloOutcome.find(host);
+        it != _consecutiveErrorsWithoutHelloOutcome.end()) {
         return it->second;
     }
     return 0;
 }
 
-void SdamErrorHandler::_incrementConsecutiveErrorsWithoutIsMasterOutcome(const HostAndPort& host) {
+void SdamErrorHandler::_incrementConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host) {
     stdx::lock_guard lock(_mutex);
-    auto [iter, wasEmplaced] = _consecutiveErrorsWithoutIsMasterOutcome.emplace(host, 1);
+    auto [iter, wasEmplaced] = _consecutiveErrorsWithoutHelloOutcome.emplace(host, 1);
     if (!wasEmplaced) {
         ++(iter->second);
     }
 }
 
-void SdamErrorHandler::_clearConsecutiveErrorsWithoutIsMasterOutcome(const HostAndPort& host) {
+void SdamErrorHandler::_clearConsecutiveErrorsWithoutHelloOutcome(const HostAndPort& host) {
     stdx::lock_guard lock(_mutex);
-    _consecutiveErrorsWithoutIsMasterOutcome.erase(host);
+    _consecutiveErrorsWithoutHelloOutcome.erase(host);
 }
 }  // namespace mongo

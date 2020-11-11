@@ -82,10 +82,10 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
     ASSERT(serverDescription->getTopologyVersion() == boost::none);
 
     // If previous topologyVersion is boost::none, should update to new topologyVersion
-    auto isMasterOutcome = HelloOutcome(serverDescription->getAddress(),
-                                        kBsonTopologyVersionLow,
-                                        duration_cast<HelloRTT>(mongo::Milliseconds(40)));
-    topologyManager.onServerDescription(isMasterOutcome);
+    auto helloOutcome = HelloOutcome(serverDescription->getAddress(),
+                                     kBsonTopologyVersionLow,
+                                     duration_cast<HelloRTT>(mongo::Milliseconds(40)));
+    topologyManager.onServerDescription(helloOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];
     ASSERT(newServerDescription->getTopologyVersion());
@@ -93,10 +93,10 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnSuccess) {
                       kBsonTopologyVersionLow.getObjectField("topologyVersion"));
 
     // If previous topologyVersion is <= new topologyVersion, should update to new topologyVersion
-    isMasterOutcome = HelloOutcome(serverDescription->getAddress(),
-                                   kBsonTopologyVersionHigh,
-                                   duration_cast<HelloRTT>(mongo::Milliseconds(40)));
-    topologyManager.onServerDescription(isMasterOutcome);
+    helloOutcome = HelloOutcome(serverDescription->getAddress(),
+                                kBsonTopologyVersionHigh,
+                                duration_cast<HelloRTT>(mongo::Milliseconds(40)));
+    topologyManager.onServerDescription(helloOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     newServerDescription = topologyDescription->getServers()[0];
     ASSERT(newServerDescription->getTopologyVersion());
@@ -122,9 +122,9 @@ TEST_F(TopologyManagerTestFixture,
     auto topologyDescription = topologyManager.getTopologyDescription();
     auto firstServer = *topologyDescription->getServers()[0];
     auto host = firstServer.getAddress();
-    auto isMasterOutcome =
+    auto helloOutcome =
         HelloOutcome(host, kBsonRsPrimary, duration_cast<HelloRTT>(mongo::Milliseconds{40}));
-    topologyManager.onServerDescription(isMasterOutcome);
+    topologyManager.onServerDescription(helloOutcome);
     checkServerTopologyDescriptionMatches(topologyManager.getTopologyDescription());
 
     topologyManager.onServerRTTUpdated(host, Milliseconds{40});
@@ -141,19 +141,19 @@ TEST_F(TopologyManagerTestFixture, ShouldUpdateTopologyVersionOnErrorIfSent) {
     ASSERT(serverDescription->getTopologyVersion() == boost::none);
 
     // If previous topologyVersion is boost::none, should update to new topologyVersion
-    auto isMasterOutcome = HelloOutcome(serverDescription->getAddress(),
-                                        kBsonTopologyVersionLow,
-                                        duration_cast<HelloRTT>(mongo::Milliseconds(40)));
-    topologyManager.onServerDescription(isMasterOutcome);
+    auto helloOutcome = HelloOutcome(serverDescription->getAddress(),
+                                     kBsonTopologyVersionLow,
+                                     duration_cast<HelloRTT>(mongo::Milliseconds(40)));
+    topologyManager.onServerDescription(helloOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),
                       kBsonTopologyVersionLow.getObjectField("topologyVersion"));
 
-    // If isMasterOutcome is not successful, should preserve old topologyVersion
-    isMasterOutcome =
+    // If helloOutcome is not successful, should preserve old topologyVersion
+    helloOutcome =
         HelloOutcome(serverDescription->getAddress(), kBsonTopologyVersionLow, "an error occurred");
-    topologyManager.onServerDescription(isMasterOutcome);
+    topologyManager.onServerDescription(helloOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     newServerDescription = topologyDescription->getServers()[0];
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),
@@ -170,18 +170,18 @@ TEST_F(TopologyManagerTestFixture, ShouldNotUpdateServerDescriptionIfNewTopology
     ASSERT(serverDescription->getTopologyVersion() == boost::none);
 
     // If previous topologyVersion is boost::none, should update to new topologyVersion
-    auto isMasterOutcome = HelloOutcome(serverDescription->getAddress(),
-                                        kBsonTopologyVersionHigh,
-                                        duration_cast<HelloRTT>(mongo::Milliseconds(40)));
-    topologyManager.onServerDescription(isMasterOutcome);
+    auto helloOutcome = HelloOutcome(serverDescription->getAddress(),
+                                     kBsonTopologyVersionHigh,
+                                     duration_cast<HelloRTT>(mongo::Milliseconds(40)));
+    topologyManager.onServerDescription(helloOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     auto newServerDescription = topologyDescription->getServers()[0];
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),
                       kBsonTopologyVersionHigh.getObjectField("topologyVersion"));
 
-    // If isMasterOutcome is not successful, should preserve old topologyVersion
-    isMasterOutcome = HelloOutcome(serverDescription->getAddress(), kBsonTopologyVersionLow);
-    topologyManager.onServerDescription(isMasterOutcome);
+    // If helloOutcome is not successful, should preserve old topologyVersion
+    helloOutcome = HelloOutcome(serverDescription->getAddress(), kBsonTopologyVersionLow);
+    topologyManager.onServerDescription(helloOutcome);
     topologyDescription = topologyManager.getTopologyDescription();
     newServerDescription = topologyDescription->getServers()[0];
     ASSERT_BSONOBJ_EQ(newServerDescription->getTopologyVersion()->toBSON(),

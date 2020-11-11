@@ -41,7 +41,7 @@
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_listener_mock.h"
-#include "mongo/client/server_is_master_monitor.h"
+#include "mongo/client/server_discovery_monitor.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/thread_pool_mock.h"
@@ -59,7 +59,7 @@ using executor::RemoteCommandResponse;
 using executor::ThreadPoolExecutorTest;
 using InNetworkGuard = NetworkInterfaceMock::InNetworkGuard;
 
-class ServerIsMasterMonitorTestFixture : public unittest::Test {
+class ServerDiscoveryMonitorTestFixture : public unittest::Test {
 protected:
     /**
      * Sets up the task executor as well as a TopologyListenerMock for each unit test.
@@ -120,18 +120,18 @@ protected:
     }
 
     /**
-     * Sets up a SingleServerIsMasterMonitor that starts sending isMasters to the server.
+     * Sets up a SingleServerDiscoveryMonitor that starts sending isMasters to the server.
      */
-    std::shared_ptr<SingleServerIsMasterMonitor> initSingleServerIsMasterMonitor(
+    std::shared_ptr<SingleServerDiscoveryMonitor> initSingleServerDiscoveryMonitor(
         const sdam::SdamConfiguration& sdamConfiguration,
         const HostAndPort& hostAndPort,
         MockReplicaSet* replSet) {
-        auto ssIsMasterMonitor = std::make_shared<SingleServerIsMasterMonitor>(replSet->getURI(),
-                                                                               hostAndPort,
-                                                                               boost::none,
-                                                                               sdamConfiguration,
-                                                                               _eventsPublisher,
-                                                                               _executor);
+        auto ssIsMasterMonitor = std::make_shared<SingleServerDiscoveryMonitor>(replSet->getURI(),
+                                                                                hostAndPort,
+                                                                                boost::none,
+                                                                                sdamConfiguration,
+                                                                                _eventsPublisher,
+                                                                                _executor);
         ssIsMasterMonitor->init();
 
         // Ensure that the clock has not advanced since setUp() and _startDate is representative
@@ -140,11 +140,11 @@ protected:
         return ssIsMasterMonitor;
     }
 
-    std::shared_ptr<ServerIsMasterMonitor> initServerIsMasterMonitor(
+    std::shared_ptr<ServerDiscoveryMonitor> initServerDiscoveryMonitor(
         const MongoURI& setUri,
         const sdam::SdamConfiguration& sdamConfiguration,
         const sdam::TopologyDescriptionPtr topologyDescription) {
-        auto serverIsMasterMonitor = std::make_shared<ServerIsMasterMonitor>(
+        auto serverIsMasterMonitor = std::make_shared<ServerDiscoveryMonitor>(
             setUri, sdamConfiguration, _eventsPublisher, topologyDescription, _executor);
 
         // Ensure that the clock has not advanced since setUp() and _startDate is representative
@@ -266,16 +266,16 @@ private:
 };
 
 /**
- * Checks that a SingleServerIsMasterMonitor sends isMaster requests at least heartbeatFrequency
+ * Checks that a SingleServerDiscoveryMonitor sends isMaster requests at least heartbeatFrequency
  * apart.
  */
-TEST_F(ServerIsMasterMonitorTestFixture, heartbeatFrequencyCheck) {
+TEST_F(ServerDiscoveryMonitorTestFixture, heartbeatFrequencyCheck) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
     auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]);
 
     const auto config = SdamConfiguration(std::vector<HostAndPort>{hostAndPort});
-    auto ssIsMasterMonitor = initSingleServerIsMasterMonitor(config, hostAndPort, replSet.get());
+    auto ssIsMasterMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
     ssIsMasterMonitor->disableExpeditedChecking();
 
     // An isMaster command fails if it takes as long or longer than timeoutMS.
@@ -296,14 +296,14 @@ TEST_F(ServerIsMasterMonitorTestFixture, heartbeatFrequencyCheck) {
 }
 
 /**
- * Confirms that a SingleServerIsMasterMonitor reports to the TopologyListener when an isMaster
+ * Confirms that a SingleServerDiscoveryMonitor reports to the TopologyListener when an isMaster
  * command generates an error.
  */
-TEST_F(ServerIsMasterMonitorTestFixture, singleServerIsMasterMonitorReportsFailure) {
+TEST_F(ServerDiscoveryMonitorTestFixture, singleServerDiscoveryMonitorReportsFailure) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
-    // Kill the server before starting up the SingleServerIsMasterMonitor.
+    // Kill the server before starting up the SingleServerDiscoveryMonitor.
     auto hostAndPort = HostAndPort(replSet->getSecondaries()[0]);
     {
         NetworkInterfaceMock::InNetworkGuard ing(getNet());
@@ -311,7 +311,7 @@ TEST_F(ServerIsMasterMonitorTestFixture, singleServerIsMasterMonitorReportsFailu
     }
 
     const auto config = SdamConfiguration(std::vector<HostAndPort>{hostAndPort});
-    auto ssIsMasterMonitor = initSingleServerIsMasterMonitor(config, hostAndPort, replSet.get());
+    auto ssIsMasterMonitor = initSingleServerDiscoveryMonitor(config, hostAndPort, replSet.get());
     ssIsMasterMonitor->disableExpeditedChecking();
 
     processIsMasterRequest(replSet.get(), hostAndPort);
@@ -327,7 +327,7 @@ TEST_F(ServerIsMasterMonitorTestFixture, singleServerIsMasterMonitorReportsFailu
     ASSERT_EQ(response[0], ErrorCodes::HostUnreachable);
 }
 
-TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorOnTopologyDescriptionChangeAddHost) {
+TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorOnTopologyDescriptionChangeAddHost) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
@@ -335,11 +335,11 @@ TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorOnTopologyDescript
     auto host0 = hostAndPortList[0];
     std::vector<HostAndPort> host0Vec{host0};
 
-    // Start up the ServerIsMasterMonitor to monitor host0 only.
+    // Start up the ServerDiscoveryMonitor to monitor host0 only.
     auto sdamConfig0 = sdam::SdamConfiguration(host0Vec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerIsMasterMonitor(uri, sdamConfig0, topologyDescription0);
+    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
     isMasterMonitor->disableExpeditedChecking();
 
     auto host1Delay = Milliseconds(100);
@@ -354,7 +354,7 @@ TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorOnTopologyDescript
         std::make_shared<sdam::TopologyDescription>(sdamConfigAllHosts);
     isMasterMonitor->onTopologyDescriptionChangedEvent(topologyDescription0,
                                                        topologyDescriptionAllHosts);
-    // Ensure expedited checking is disabled for the SingleServerIsMasterMonitor corresponding to
+    // Ensure expedited checking is disabled for the SingleServerDiscoveryMonitor corresponding to
     // host1 as well.
     isMasterMonitor->disableExpeditedChecking();
 
@@ -365,7 +365,7 @@ TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorOnTopologyDescript
     checkSingleIsMaster(host1Delay, host0, replSet.get());
 }
 
-TEST_F(ServerIsMasterMonitorTestFixture,
+TEST_F(ServerDiscoveryMonitorTestFixture,
        serverIsMasterMonitorOnTopologyDescriptionChangeRemoveHost) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 2, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
@@ -375,13 +375,13 @@ TEST_F(ServerIsMasterMonitorTestFixture,
     auto host1 = hostAndPortList[1];
     std::vector<HostAndPort> allHostsVec{host0, host1};
 
-    // Start up the ServerIsMasterMonitor to monitor both hosts.
+    // Start up the ServerDiscoveryMonitor to monitor both hosts.
     auto sdamConfigAllHosts = sdam::SdamConfiguration(allHostsVec);
     auto topologyDescriptionAllHosts =
         std::make_shared<sdam::TopologyDescription>(sdamConfigAllHosts);
     auto uri = replSet->getURI();
     auto isMasterMonitor =
-        initServerIsMasterMonitor(uri, sdamConfigAllHosts, topologyDescriptionAllHosts);
+        initServerDiscoveryMonitor(uri, sdamConfigAllHosts, topologyDescriptionAllHosts);
     isMasterMonitor->disableExpeditedChecking();
 
     // Confirm that both hosts are monitored.
@@ -418,7 +418,7 @@ TEST_F(ServerIsMasterMonitorTestFixture,
     checkSingleIsMaster(heartbeatFrequency, host0, replSet.get());
 }
 
-TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMasterRequests) {
+TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMasterRequests) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
@@ -426,7 +426,7 @@ TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMas
     auto sdamConfig = sdam::SdamConfiguration(hostVec);
     auto topologyDescription = std::make_shared<sdam::TopologyDescription>(sdamConfig);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerIsMasterMonitor(uri, sdamConfig, topologyDescription);
+    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig, topologyDescription);
     isMasterMonitor->disableExpeditedChecking();
 
     auto heartbeatFrequency = sdamConfig.getHeartBeatFrequency();
@@ -434,7 +434,7 @@ TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMas
 
     isMasterMonitor->shutdown();
 
-    // After the ServerIsMasterMonitor shuts down, the TopologyListener may have responses until
+    // After the ServerDiscoveryMonitor shuts down, the TopologyListener may have responses until
     // heartbeatFrequency has passed, but none of them should indicate Status::OK.
     auto deadline = elapsed() + heartbeatFrequency;
     auto topologyListener = getTopologyListener();
@@ -457,22 +457,22 @@ TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorShutdownStopsIsMas
 }
 
 /**
- * Tests that the ServerIsMasterMonitor waits until SdamConfiguration::kMinHeartbeatFrequency has
+ * Tests that the ServerDiscoveryMonitor waits until SdamConfiguration::kMinHeartbeatFrequency has
  * passed since the last isMaster was received if requestImmediateCheck() is called before enough
  * time has passed.
  */
-TEST_F(ServerIsMasterMonitorTestFixture,
+TEST_F(ServerDiscoveryMonitorTestFixture,
        serverIsMasterMonitorRequestImmediateCheckWaitMinHeartbeat) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
     std::vector<HostAndPort> hostVec{replSet->getHosts()[0]};
 
-    // Start up the ServerIsMasterMonitor to monitor host0 only.
+    // Start up the ServerDiscoveryMonitor to monitor host0 only.
     auto sdamConfig0 = sdam::SdamConfiguration(hostVec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerIsMasterMonitor(uri, sdamConfig0, topologyDescription0);
+    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
 
     // Ensure the server is not in expedited mode *before* requestImmediateCheck().
     isMasterMonitor->disableExpeditedChecking();
@@ -503,20 +503,20 @@ TEST_F(ServerIsMasterMonitorTestFixture,
 
 /**
  * Tests that if more than SdamConfiguration::kMinHeartbeatFrequency has passed since the last
- * isMaster response was received, the ServerIsMasterMonitor sends an isMaster immediately after
+ * isMaster response was received, the ServerDiscoveryMonitor sends an isMaster immediately after
  * requestImmediateCheck() is called.
  */
-TEST_F(ServerIsMasterMonitorTestFixture, serverIsMasterMonitorRequestImmediateCheckNoWait) {
+TEST_F(ServerDiscoveryMonitorTestFixture, serverIsMasterMonitorRequestImmediateCheckNoWait) {
     auto replSet = std::make_unique<MockReplicaSet>(
         "test", 1, /* hasPrimary = */ false, /* dollarPrefixHosts = */ false);
 
     std::vector<HostAndPort> hostVec{replSet->getHosts()[0]};
 
-    // Start up the ServerIsMasterMonitor to monitor host0 only.
+    // Start up the ServerDiscoveryMonitor to monitor host0 only.
     auto sdamConfig0 = sdam::SdamConfiguration(hostVec);
     auto topologyDescription0 = std::make_shared<sdam::TopologyDescription>(sdamConfig0);
     auto uri = replSet->getURI();
-    auto isMasterMonitor = initServerIsMasterMonitor(uri, sdamConfig0, topologyDescription0);
+    auto isMasterMonitor = initServerDiscoveryMonitor(uri, sdamConfig0, topologyDescription0);
 
     // Ensure the server is not in expedited mode *before* requestImmediateCheck().
     isMasterMonitor->disableExpeditedChecking();

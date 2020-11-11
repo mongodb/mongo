@@ -57,10 +57,10 @@ public:
      *   3. Installs the cloned (and possibly modified) TopologyDescription as the current one.
      *
      * Multiple threads may call this function concurrently. However, the manager will process the
-     * IsMasterOutcomes serially, as required by:
+     * HelloOutcomes serially, as required by:
      *   https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#process-one-ismaster-outcome-at-a-time
      */
-    bool onServerDescription(const HelloOutcome& isMasterOutcome);
+    bool onServerDescription(const HelloOutcome& helloOutcome);
 
 
     /**

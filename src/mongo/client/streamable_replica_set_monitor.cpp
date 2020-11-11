@@ -201,9 +201,9 @@ void StreamableReplicaSetMonitor::init() {
         _uri, _eventsPublisher.get(), _sdamConfig.getHeartBeatFrequency(), _executor);
     _eventsPublisher->registerListener(_pingMonitor);
 
-    _isMasterMonitor = std::make_unique<ServerIsMasterMonitor>(
+    _serverDiscoveryMonitor = std::make_unique<ServerDiscoveryMonitor>(
         _uri, _sdamConfig, _eventsPublisher, _topologyManager->getTopologyDescription(), _executor);
-    _eventsPublisher->registerListener(_isMasterMonitor);
+    _eventsPublisher->registerListener(_serverDiscoveryMonitor);
 
     _isDropped.store(false);
 
@@ -227,7 +227,7 @@ void StreamableReplicaSetMonitor::drop() {
           "replicaSet"_attr = getName());
     _queryProcessor->shutdown();
     _pingMonitor->shutdown();
-    _isMasterMonitor->shutdown();
+    _serverDiscoveryMonitor->shutdown();
 
     ReplicaSetMonitorManager::get()->getNotifier().onDroppedSet(getName());
     LOGV2(4333210,
@@ -272,7 +272,7 @@ SemiFuture<std::vector<HostAndPort>> StreamableReplicaSetMonitor::getHostsOrRefr
         return {*immediateResult};
     }
 
-    _isMasterMonitor->requestImmediateCheck();
+    _serverDiscoveryMonitor->requestImmediateCheck();
     LOGV2_DEBUG(4333212,
                 kLowerLogLevel,
                 "RSM {replicaSet} start async getHosts with {readPref}",
@@ -425,12 +425,12 @@ void StreamableReplicaSetMonitor::_doErrorActions(
             _connectionManager->dropConnections(host);
 
         if (errorActions.requestImmediateCheck)
-            _isMasterMonitor->requestImmediateCheck();
+            _serverDiscoveryMonitor->requestImmediateCheck();
     }
 
     // Call outside of the lock since this may generate a topology change event.
-    if (errorActions.isMasterOutcome)
-        _topologyManager->onServerDescription(*errorActions.isMasterOutcome);
+    if (errorActions.helloOutcome)
+        _topologyManager->onServerDescription(*errorActions.helloOutcome);
 }
 
 boost::optional<ServerDescriptionPtr> StreamableReplicaSetMonitor::_currentPrimary() const {
@@ -519,14 +519,14 @@ void StreamableReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, boo
     BSONArrayBuilder hosts(monitorInfo.subarrayStart("hosts"));
     for (const auto& serverDescription : topologyDescription->getServers()) {
         bool isUp = false;
-        bool isMaster = false;
+        bool isWritablePrimary = false;
         bool isSecondary = false;
         bool isHidden = false;
 
         switch (serverDescription->getType()) {
             case ServerType::kRSPrimary:
                 isUp = true;
-                isMaster = true;
+                isWritablePrimary = true;
                 break;
             case ServerType::kRSSecondary:
                 isUp = true;
@@ -551,7 +551,7 @@ void StreamableReplicaSetMonitor::appendInfo(BSONObjBuilder& bsonObjBuilder, boo
         BSONObjBuilder builder(hosts.subobjStart());
         builder.append("addr", serverDescription->getAddress().toString());
         builder.append("ok", isUp);
-        builder.append("ismaster", isMaster);  // intentionally not camelCase
+        builder.append("ismaster", isWritablePrimary);  // intentionally not camelCase
         builder.append("hidden", isHidden);
         builder.append("secondary", isSecondary);
         builder.append("pingTimeMillis", pingTimeMillis(serverDescription));
@@ -640,7 +640,7 @@ void StreamableReplicaSetMonitor::onTopologyDescriptionChangedEvent(
 
 void StreamableReplicaSetMonitor::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                                   const BSONObj reply) {
-    // After the inital handshake, isMasterResponses should not update the RTT with durationMs.
+    // After the inital handshake, hello responses should not update the RTT with durationMs.
     HelloOutcome outcome(hostAndPort, reply, boost::none);
     _topologyManager->onServerDescription(outcome);
 }
@@ -762,7 +762,7 @@ void StreamableReplicaSetMonitor::_processOutstanding(
 
     if (_outstandingQueries.size()) {
         // enable expedited mode
-        _isMasterMonitor->requestImmediateCheck();
+        _serverDiscoveryMonitor->requestImmediateCheck();
     } else {
         // if no more outstanding queries, no need to listen for topology changes in
         // this monitor.

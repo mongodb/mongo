@@ -28,7 +28,7 @@
  */
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-#include "mongo/client/server_is_master_monitor.h"
+#include "mongo/client/server_discovery_monitor.h"
 
 #include <algorithm>
 #include <iterator>
@@ -65,7 +65,7 @@ bool exhaustEnabled(boost::optional<TopologyVersion> topologyVersion) {
 
 }  // namespace
 
-SingleServerIsMasterMonitor::SingleServerIsMasterMonitor(
+SingleServerDiscoveryMonitor::SingleServerDiscoveryMonitor(
     const MongoURI& setUri,
     const HostAndPort& host,
     boost::optional<TopologyVersion> topologyVersion,
@@ -89,13 +89,13 @@ SingleServerIsMasterMonitor::SingleServerIsMasterMonitor(
                 "replicaSet"_attr = _setUri.getSetName());
 }
 
-void SingleServerIsMasterMonitor::init() {
+void SingleServerDiscoveryMonitor::init() {
     stdx::lock_guard lock(_mutex);
     _isShutdown = false;
-    _scheduleNextIsMaster(lock, Milliseconds(0));
+    _scheduleNextHello(lock, Milliseconds(0));
 }
 
-void SingleServerIsMasterMonitor::requestImmediateCheck() {
+void SingleServerDiscoveryMonitor::requestImmediateCheck() {
     stdx::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
@@ -121,24 +121,24 @@ void SingleServerIsMasterMonitor::requestImmediateCheck() {
     // Get the new expedited refresh period.
     const auto expeditedRefreshPeriod = _currentRefreshPeriod(lock, false);
 
-    if (_isMasterOutstanding) {
+    if (_helloOutstanding) {
         LOGV2_DEBUG(
             4333216,
             kLogLevel + 2,
-            "RSM {replicaSet} immediate isMaster check requested, but there "
+            "RSM {replicaSet} immediate hello check requested, but there "
             "is already an outstanding request",
-            "RSM immediate isMaster check requested, but there is already an outstanding request",
+            "RSM immediate hello check requested, but there is already an outstanding request",
             "replicaSet"_attr = _setUri.getSetName());
         return;
     }
 
     if (const auto maybeDelayUntilNextCheck = calculateExpeditedDelayUntilNextCheck(
             _timeSinceLastCheck(), expeditedRefreshPeriod, previousRefreshPeriod)) {
-        _rescheduleNextIsMaster(lock, *maybeDelayUntilNextCheck);
+        _rescheduleNextHello(lock, *maybeDelayUntilNextCheck);
     }
 }
 
-boost::optional<Milliseconds> SingleServerIsMasterMonitor::calculateExpeditedDelayUntilNextCheck(
+boost::optional<Milliseconds> SingleServerDiscoveryMonitor::calculateExpeditedDelayUntilNextCheck(
     const boost::optional<Milliseconds>& maybeTimeSinceLastCheck,
     const Milliseconds& expeditedRefreshPeriod,
     const Milliseconds& previousRefreshPeriod) {
@@ -156,7 +156,7 @@ boost::optional<Milliseconds> SingleServerIsMasterMonitor::calculateExpeditedDel
 
     const auto delayUntilExistingRequest = previousRefreshPeriod - timeSinceLastCheck;
 
-    // Calculate when the next isMaster should be scheduled.
+    // Calculate when the next hello should be scheduled.
     const Milliseconds delayUntilNextCheck = expeditedRefreshPeriod - timeSinceLastCheck;
 
     // Do nothing if the time would be greater-than or equal to the existing request.
@@ -165,15 +165,15 @@ boost::optional<Milliseconds> SingleServerIsMasterMonitor::calculateExpeditedDel
         : boost::optional<Milliseconds>(delayUntilNextCheck);
 }
 
-boost::optional<Milliseconds> SingleServerIsMasterMonitor::_timeSinceLastCheck() const {
+boost::optional<Milliseconds> SingleServerDiscoveryMonitor::_timeSinceLastCheck() const {
     // Since the system clock is not monotonic, the returned value can be negative. In this case we
     // choose a conservative estimate of 0ms as the time we last checked.
-    return (_lastIsMasterAt) ? boost::optional<Milliseconds>(
-                                   std::max(Milliseconds(0), _executor->now() - *_lastIsMasterAt))
-                             : boost::none;
+    return (_lastHelloAt)
+        ? boost::optional<Milliseconds>(std::max(Milliseconds(0), _executor->now() - *_lastHelloAt))
+        : boost::none;
 }
 
-void SingleServerIsMasterMonitor::_rescheduleNextIsMaster(WithLock lock, Milliseconds delay) {
+void SingleServerDiscoveryMonitor::_rescheduleNextHello(WithLock lock, Milliseconds delay) {
     LOGV2_DEBUG(4333218,
                 kLogLevel,
                 "Rescheduling the next replica set monitoring request",
@@ -181,14 +181,14 @@ void SingleServerIsMasterMonitor::_rescheduleNextIsMaster(WithLock lock, Millise
                 "host"_attr = _host,
                 "delay"_attr = delay);
     _cancelOutstandingRequest(lock);
-    _scheduleNextIsMaster(lock, delay);
+    _scheduleNextHello(lock, delay);
 }
 
-void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds delay) {
+void SingleServerDiscoveryMonitor::_scheduleNextHello(WithLock, Milliseconds delay) {
     if (_isShutdown)
         return;
 
-    invariant(!_isMasterOutstanding);
+    invariant(!_helloOutstanding);
 
     auto swCbHandle = _executor->scheduleWorkAt(
         _executor->now() + delay,
@@ -201,14 +201,14 @@ void SingleServerIsMasterMonitor::_scheduleNextIsMaster(WithLock, Milliseconds d
         });
 
     if (!swCbHandle.isOK()) {
-        _onIsMasterFailure(swCbHandle.getStatus(), BSONObj());
+        _onHelloFailure(swCbHandle.getStatus(), BSONObj());
         return;
     }
 
-    _nextIsMasterHandle = swCbHandle.getValue();
+    _nextHelloHandle = swCbHandle.getValue();
 }
 
-void SingleServerIsMasterMonitor::_doRemoteCommand() {
+void SingleServerDiscoveryMonitor::_doRemoteCommand() {
     stdx::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
@@ -216,25 +216,24 @@ void SingleServerIsMasterMonitor::_doRemoteCommand() {
     StatusWith<executor::TaskExecutor::CallbackHandle> swCbHandle = [&]() {
         try {
             if (exhaustEnabled(_topologyVersion)) {
-                return _scheduleStreamableIsMaster();
+                return _scheduleStreamableHello();
             }
-            return _scheduleSingleIsMaster();
+            return _scheduleSingleHello();
         } catch (ExceptionFor<ErrorCodes::NetworkInterfaceExceededTimeLimit>& ex) {
             return StatusWith<executor::TaskExecutor::CallbackHandle>(ex.toStatus());
         }
     }();
 
     if (!swCbHandle.isOK()) {
-        _onIsMasterFailure(swCbHandle.getStatus(), BSONObj());
+        _onHelloFailure(swCbHandle.getStatus(), BSONObj());
         uasserted(4615612, swCbHandle.getStatus().toString());
     }
 
-    _isMasterOutstanding = true;
+    _helloOutstanding = true;
     _remoteCommandHandle = swCbHandle.getValue();
 }
 
-StatusWith<TaskExecutor::CallbackHandle>
-SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
+StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_scheduleStreamableHello() {
     auto maxAwaitTimeMS = durationCount<Milliseconds>(kMaxAwaitTime);
     overrideMaxAwaitTimeMS.execute([&](const BSONObj& data) {
         maxAwaitTimeMS =
@@ -264,7 +263,7 @@ SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
                 stdx::lock_guard lk(self->_mutex);
 
                 if (self->_isShutdown) {
-                    self->_isMasterOutstanding = false;
+                    self->_helloOutstanding = false;
                     LOGV2_DEBUG(4495400,
                                 kLogLevel,
                                 "RSM {replicaSet} not processing response: {error}",
@@ -282,25 +281,25 @@ SingleServerIsMasterMonitor::_scheduleStreamableIsMaster() {
                     self->_topologyVersion = boost::none;
                 }
 
-                self->_lastIsMasterAt = self->_executor->now();
+                self->_lastHelloAt = self->_executor->now();
                 if (!result.response.isOK() || !result.response.moreToCome) {
-                    self->_isMasterOutstanding = false;
+                    self->_helloOutstanding = false;
                     nextRefreshPeriod = self->_currentRefreshPeriod(lk, result.response.isOK());
-                    self->_scheduleNextIsMaster(lk, nextRefreshPeriod);
+                    self->_scheduleNextHello(lk, nextRefreshPeriod);
                 }
             }
 
             if (result.response.isOK()) {
-                self->_onIsMasterSuccess(result.response.data);
+                self->_onHelloSuccess(result.response.data);
             } else {
-                self->_onIsMasterFailure(result.response.status, result.response.data);
+                self->_onHelloFailure(result.response.status, result.response.data);
             }
         });
 
     return swCbHandle;
 }
 
-StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleSingleIsMaster() {
+StatusWith<TaskExecutor::CallbackHandle> SingleServerDiscoveryMonitor::_scheduleSingleHello() {
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
     if (auto wireSpec = WireSpec::instance().get(); wireSpec->isInternalClient) {
@@ -318,7 +317,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleS
             Milliseconds nextRefreshPeriod;
             {
                 stdx::lock_guard lk(self->_mutex);
-                self->_isMasterOutstanding = false;
+                self->_helloOutstanding = false;
 
                 if (self->_isShutdown) {
                     LOGV2_DEBUG(4333219,
@@ -330,7 +329,7 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleS
                     return;
                 }
 
-                self->_lastIsMasterAt = self->_executor->now();
+                self->_lastHelloAt = self->_executor->now();
 
                 auto responseTopologyVersion = result.response.data.getField("topologyVersion");
                 if (responseTopologyVersion) {
@@ -341,27 +340,27 @@ StatusWith<TaskExecutor::CallbackHandle> SingleServerIsMasterMonitor::_scheduleS
                 }
 
                 if (!result.response.isOK() || !result.response.moreToCome) {
-                    self->_isMasterOutstanding = false;
+                    self->_helloOutstanding = false;
 
                     // Prevent immediate rescheduling when exhaust is not supported.
                     auto scheduleImmediately =
                         (exhaustEnabled(self->_topologyVersion)) ? result.response.isOK() : false;
                     nextRefreshPeriod = self->_currentRefreshPeriod(lk, scheduleImmediately);
-                    self->_scheduleNextIsMaster(lk, nextRefreshPeriod);
+                    self->_scheduleNextHello(lk, nextRefreshPeriod);
                 }
             }
 
             if (result.response.isOK()) {
-                self->_onIsMasterSuccess(result.response.data);
+                self->_onHelloSuccess(result.response.data);
             } else {
-                self->_onIsMasterFailure(result.response.status, result.response.data);
+                self->_onHelloFailure(result.response.status, result.response.data);
             }
         });
 
     return swCbHandle;
 }
 
-void SingleServerIsMasterMonitor::shutdown() {
+void SingleServerDiscoveryMonitor::shutdown() {
     stdx::lock_guard lock(_mutex);
     if (std::exchange(_isShutdown, true)) {
         return;
@@ -386,45 +385,44 @@ void SingleServerIsMasterMonitor::shutdown() {
                 "replicaSet"_attr = _setUri.getSetName());
 }
 
-void SingleServerIsMasterMonitor::_cancelOutstandingRequest(WithLock) {
+void SingleServerDiscoveryMonitor::_cancelOutstandingRequest(WithLock) {
     if (_remoteCommandHandle) {
         _executor->cancel(_remoteCommandHandle);
     }
 
-    if (_nextIsMasterHandle) {
-        _executor->cancel(_nextIsMasterHandle);
+    if (_nextHelloHandle) {
+        _executor->cancel(_nextHelloHandle);
     }
 
-    _isMasterOutstanding = false;
+    _helloOutstanding = false;
 }
 
-void SingleServerIsMasterMonitor::_onIsMasterSuccess(const BSONObj bson) {
+void SingleServerDiscoveryMonitor::_onHelloSuccess(const BSONObj bson) {
     LOGV2_DEBUG(4333221,
                 kLogLevel + 1,
-                "RSM {replicaSet} received successful isMaster for server {host}: {isMasterReply}",
-                "RSM received successful isMaster",
+                "RSM {replicaSet} received successful hello for server {host}: {helloReply}",
+                "RSM received successful hello",
                 "host"_attr = _host,
                 "replicaSet"_attr = _setUri.getSetName(),
-                "isMasterReply"_attr = bson.toString());
+                "helloReply"_attr = bson.toString());
 
     _eventListener->onServerHeartbeatSucceededEvent(_host, bson);
 }
 
-void SingleServerIsMasterMonitor::_onIsMasterFailure(const Status& status, const BSONObj bson) {
-    LOGV2_DEBUG(
-        4333222,
-        kLogLevel,
-        "RSM {replicaSet} received failed isMaster for server {host}: {error}: {isMasterReply}",
-        "RSM received failed isMaster",
-        "host"_attr = _host,
-        "error"_attr = status.toString(),
-        "replicaSet"_attr = _setUri.getSetName(),
-        "isMasterReply"_attr = bson.toString());
+void SingleServerDiscoveryMonitor::_onHelloFailure(const Status& status, const BSONObj bson) {
+    LOGV2_DEBUG(4333222,
+                kLogLevel,
+                "RSM {replicaSet} received error response from server {host}: {error}: {response}",
+                "RSM received error response",
+                "host"_attr = _host,
+                "error"_attr = status.toString(),
+                "replicaSet"_attr = _setUri.getSetName(),
+                "response"_attr = bson.toString());
 
     _eventListener->onServerHeartbeatFailureEvent(status, _host, bson);
 }
 
-Milliseconds SingleServerIsMasterMonitor::_overrideRefreshPeriod(Milliseconds original) {
+Milliseconds SingleServerDiscoveryMonitor::_overrideRefreshPeriod(Milliseconds original) {
     Milliseconds r = original;
     static constexpr auto kPeriodField = "period"_sd;
     if (auto modifyReplicaSetMonitorDefaultRefreshPeriod =
@@ -438,21 +436,21 @@ Milliseconds SingleServerIsMasterMonitor::_overrideRefreshPeriod(Milliseconds or
     return r;
 }
 
-Milliseconds SingleServerIsMasterMonitor::_currentRefreshPeriod(WithLock,
-                                                                bool scheduleImmediately) {
+Milliseconds SingleServerDiscoveryMonitor::_currentRefreshPeriod(WithLock,
+                                                                 bool scheduleImmediately) {
     if (scheduleImmediately)
         return Milliseconds(0);
 
     return (_isExpedited) ? sdam::SdamConfiguration::kMinHeartbeatFrequency : _heartbeatFrequency;
 }
 
-void SingleServerIsMasterMonitor::disableExpeditedChecking() {
+void SingleServerDiscoveryMonitor::disableExpeditedChecking() {
     stdx::lock_guard lock(_mutex);
     _isExpedited = false;
 }
 
 
-ServerIsMasterMonitor::ServerIsMasterMonitor(
+ServerDiscoveryMonitor::ServerDiscoveryMonitor(
     const MongoURI& setUri,
     const sdam::SdamConfiguration& sdamConfiguration,
     sdam::TopologyEventsPublisherPtr eventsPublisher,
@@ -472,7 +470,7 @@ ServerIsMasterMonitor::ServerIsMasterMonitor(
     onTopologyDescriptionChangedEvent(nullptr, initialTopologyDescription);
 }
 
-void ServerIsMasterMonitor::shutdown() {
+void ServerDiscoveryMonitor::shutdown() {
     stdx::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
@@ -483,7 +481,7 @@ void ServerIsMasterMonitor::shutdown() {
     }
 }
 
-void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
+void ServerDiscoveryMonitor::onTopologyDescriptionChangedEvent(
     sdam::TopologyDescriptionPtr previousDescription, sdam::TopologyDescriptionPtr newDescription) {
     stdx::lock_guard lock(_mutex);
     if (_isShutdown)
@@ -532,7 +530,7 @@ void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
                                       "replicaSet"_attr = _setUri.getSetName(),
                                       "host"_attr = serverAddress);
                           _singleMonitors[serverAddress] =
-                              std::make_shared<SingleServerIsMasterMonitor>(
+                              std::make_shared<SingleServerDiscoveryMonitor>(
                                   _setUri,
                                   serverAddress,
                                   serverDescription->getTopologyVersion(),
@@ -546,21 +544,21 @@ void ServerIsMasterMonitor::onTopologyDescriptionChangedEvent(
     invariant(_singleMonitors.size() == servers.size());
 }
 
-std::shared_ptr<executor::TaskExecutor> ServerIsMasterMonitor::_setupExecutor(
+std::shared_ptr<executor::TaskExecutor> ServerDiscoveryMonitor::_setupExecutor(
     const std::shared_ptr<executor::TaskExecutor>& executor) {
     if (executor)
         return executor;
 
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     auto net = executor::makeNetworkInterface(
-        "ServerIsMasterMonitor-TaskExecutor", nullptr, std::move(hookList));
+        "ServerDiscoveryMonitor-TaskExecutor", nullptr, std::move(hookList));
     auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
     auto result = std::make_shared<ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
     result->startup();
     return result;
 }
 
-void ServerIsMasterMonitor::requestImmediateCheck() {
+void ServerDiscoveryMonitor::requestImmediateCheck() {
     stdx::lock_guard lock(_mutex);
     if (_isShutdown)
         return;
@@ -570,12 +568,12 @@ void ServerIsMasterMonitor::requestImmediateCheck() {
     }
 }
 
-void ServerIsMasterMonitor::disableExpeditedChecking() {
+void ServerDiscoveryMonitor::disableExpeditedChecking() {
     stdx::lock_guard lock(_mutex);
     _disableExpeditedChecking(lock);
 }
 
-void ServerIsMasterMonitor::_disableExpeditedChecking(WithLock) {
+void ServerDiscoveryMonitor::_disableExpeditedChecking(WithLock) {
     for (auto& addressAndMonitor : _singleMonitors) {
         addressAndMonitor.second->disableExpeditedChecking();
     }

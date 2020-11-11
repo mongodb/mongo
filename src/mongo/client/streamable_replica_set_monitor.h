@@ -39,7 +39,7 @@
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/sdam.h"
-#include "mongo/client/server_is_master_monitor.h"
+#include "mongo/client/server_discovery_monitor.h"
 #include "mongo/client/server_ping_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 #include "mongo/executor/egress_tag_closer.h"
@@ -224,7 +224,7 @@ private:
     sdam::ServerSelectorPtr _serverSelector;
     sdam::TopologyEventsPublisherPtr _eventsPublisher;
     std::unique_ptr<StreamableReplicaSetMonitorErrorHandler> _errorHandler;
-    ServerIsMasterMonitorPtr _isMasterMonitor;
+    ServerDiscoveryMonitorPtr _serverDiscoveryMonitor;
     std::shared_ptr<ServerPingMonitor> _pingMonitor;
 
     // This object will be registered as a TopologyListener if there are

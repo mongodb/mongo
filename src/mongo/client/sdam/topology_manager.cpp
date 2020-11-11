@@ -39,7 +39,7 @@
 namespace mongo::sdam {
 namespace {
 
-/* Compare topologyVersions to determine if the isMaster response's topologyVersion is stale
+/* Compare topologyVersions to determine if the hello response's topologyVersion is stale
  * according to the following rules:
  * 1. If the response's topologyVersion is unset or the lastServerDescription's topologyVersion is
  * null, the client MUST assume the response is more recent.
@@ -71,34 +71,33 @@ TopologyManager::TopologyManager(SdamConfiguration config,
       _topologyStateMachine(std::make_unique<TopologyStateMachine>(_config)),
       _topologyEventsPublisher(eventsPublisher) {}
 
-bool TopologyManager::onServerDescription(const HelloOutcome& isMasterOutcome) {
+bool TopologyManager::onServerDescription(const HelloOutcome& helloOutcome) {
     stdx::lock_guard<mongo::Mutex> lock(_mutex);
 
     boost::optional<HelloRTT> lastRTT;
     boost::optional<TopologyVersion> lastTopologyVersion;
 
     const auto& lastServerDescription =
-        _topologyDescription->findServerByAddress(isMasterOutcome.getServer());
+        _topologyDescription->findServerByAddress(helloOutcome.getServer());
     if (lastServerDescription) {
         lastRTT = (*lastServerDescription)->getRtt();
         lastTopologyVersion = (*lastServerDescription)->getTopologyVersion();
     }
 
-    boost::optional<TopologyVersion> newTopologyVersion = isMasterOutcome.getTopologyVersion();
+    boost::optional<TopologyVersion> newTopologyVersion = helloOutcome.getTopologyVersion();
     if (isStaleTopologyVersion(lastTopologyVersion, newTopologyVersion)) {
-        LOGV2(
-            23930,
-            "Ignoring this isMaster response because our topologyVersion: {lastTopologyVersion} is "
-            "fresher than the provided topologyVersion: {newTopologyVersion}",
-            "Ignoring this isMaster response because our last topologyVersion is fresher than the "
-            "new topologyVersion provided",
-            "lastTopologyVersion"_attr = lastTopologyVersion->toBSON(),
-            "newTopologyVersion"_attr = newTopologyVersion->toBSON());
+        LOGV2(23930,
+              "Ignoring this hello response because our topologyVersion: {lastTopologyVersion} is "
+              "fresher than the provided topologyVersion: {newTopologyVersion}",
+              "Ignoring this hello response because our last topologyVersion is fresher than the "
+              "new topologyVersion provided",
+              "lastTopologyVersion"_attr = lastTopologyVersion->toBSON(),
+              "newTopologyVersion"_attr = newTopologyVersion->toBSON());
         return false;
     }
 
     auto newServerDescription = std::make_shared<ServerDescription>(
-        _clockSource, isMasterOutcome, lastRTT, newTopologyVersion);
+        _clockSource, helloOutcome, lastRTT, newTopologyVersion);
 
     auto oldTopologyDescription = _topologyDescription;
     _topologyDescription = TopologyDescription::clone(oldTopologyDescription);
