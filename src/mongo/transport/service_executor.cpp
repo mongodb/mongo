@@ -40,6 +40,7 @@
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
@@ -251,6 +252,18 @@ ServiceExecutor* ServiceExecutorContext::getServiceExecutor() noexcept {
     // Once we use the ServiceExecutorSynchronous, we shouldn't use the ServiceExecutorReserved.
     _hasUsedSynchronous = true;
     return transport::ServiceExecutorSynchronous::get(_client->getServiceContext());
+}
+
+void ServiceExecutor::yieldIfAppropriate() const {
+    /*
+     * In perf testing we found that yielding after running a each request produced
+     * at 5% performance boost in microbenchmarks if the number of worker threads
+     * was greater than the number of available cores.
+     */
+    static const auto cores = ProcessInfo::getNumAvailableCores();
+    if (getRunningThreads() > cores) {
+        stdx::this_thread::yield();
+    }
 }
 
 }  // namespace transport

@@ -150,7 +150,9 @@ void scheduleCallbackOnDataAvailable(const transport::SessionHandle& session,
                                      unique_function<void(Status)> callback,
                                      transport::ServiceExecutor* executor) noexcept {
     invariant(session);
-    executor->schedule([session, callback = std::move(callback)](Status status) {
+    executor->schedule([session, callback = std::move(callback), executor](Status status) {
+        executor->yieldIfAppropriate();
+
         if (!status.isOK()) {
             callback(std::move(status));
             return;

@@ -78,6 +78,8 @@ public:
     void runOnDataAvailable(const SessionHandle& session,
                             OutOfLineExecutor::Task onCompletionCallback) override;
 
+    size_t getRunningThreads() const override;
+
     Mode transportMode() const override {
         return Mode::kSynchronous;
     }

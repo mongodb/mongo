@@ -37,7 +37,6 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_utils.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/thread_safety_context.h"
 
 namespace mongo {
@@ -67,8 +66,6 @@ ServiceExecutorSynchronous::ServiceExecutorSynchronous(ServiceContext* ctx)
     : _shutdownCondition(std::make_shared<stdx::condition_variable>()) {}
 
 Status ServiceExecutorSynchronous::start() {
-    _numHardwareCores = static_cast<size_t>(ProcessInfo::getNumAvailableCores());
-
     _stillRunning.store(true);
 
     return Status::OK();
@@ -102,15 +99,8 @@ Status ServiceExecutorSynchronous::scheduleTask(Task task, ScheduleFlags flags) 
     }
 
     if (!_localWorkQueue.empty()) {
-        /*
-         * In perf testing we found that yielding after running a each request produced
-         * at 5% performance boost in microbenchmarks if the number of worker threads
-         * was greater than the number of available cores.
-         */
         if (flags & ScheduleFlags::kMayYieldBeforeSchedule) {
-            if (_numRunningWorkerThreads.loadRelaxed() > _numHardwareCores) {
-                stdx::this_thread::yield();
-            }
+            yieldIfAppropriate();
         }
 
         // Execute task directly (recurse) if allowed by the caller as it produced better
@@ -166,8 +156,11 @@ void ServiceExecutorSynchronous::appendStats(BSONObjBuilder* bob) const {
 }
 
 void ServiceExecutorSynchronous::runOnDataAvailable(const SessionHandle& session,
-                                                    OutOfLineExecutor::Task onCompletionCallback) {
-    scheduleCallbackOnDataAvailable(session, std::move(onCompletionCallback), this);
+                                                    OutOfLineExecutor::Task callback) {
+    invariant(session);
+    yieldIfAppropriate();
+
+    schedule([callback = std::move(callback)](Status status) { callback(std::move(status)); });
 }
 
 

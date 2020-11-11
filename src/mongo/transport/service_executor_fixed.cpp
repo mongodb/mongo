@@ -388,9 +388,15 @@ void ServiceExecutorFixed::_schedule(OutOfLineExecutor::Task task) noexcept {
     });
 }
 
+size_t ServiceExecutorFixed::getRunningThreads() const {
+    return _threadsRunning();
+}
+
 void ServiceExecutorFixed::runOnDataAvailable(const SessionHandle& session,
                                               OutOfLineExecutor::Task onCompletionCallback) {
     invariant(session);
+
+    yieldIfAppropriate();
 
     auto waiter = Waiter{session, std::move(onCompletionCallback)};
 

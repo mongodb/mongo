@@ -61,6 +61,10 @@ public:
     Status shutdown(Milliseconds timeout) override;
     Status scheduleTask(Task task, ScheduleFlags flags) override;
 
+    size_t getRunningThreads() const override {
+        return _numRunningWorkerThreads.loadRelaxed();
+    }
+
     Mode transportMode() const override {
         return Mode::kSynchronous;
     }

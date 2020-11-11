@@ -125,6 +125,8 @@ public:
      */
     virtual Status shutdown(Milliseconds timeout) = 0;
 
+    virtual size_t getRunningThreads() const = 0;
+
     /*
      * Returns if this service executor is using asynchronous or synchronous networking.
      */
@@ -134,6 +136,11 @@ public:
      * Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output.
      */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
+
+    /**
+     * Yield if we have more threads than cores.
+     */
+    void yieldIfAppropriate() const;
 };
 
 /**

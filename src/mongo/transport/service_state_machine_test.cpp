@@ -268,6 +268,10 @@ public:
         }
     }
 
+    size_t getRunningThreads() const override {
+        return 1;
+    }
+
     Mode transportMode() const override {
         return Mode::kSynchronous;
     }
