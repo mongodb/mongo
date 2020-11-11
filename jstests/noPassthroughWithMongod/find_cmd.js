@@ -1,11 +1,12 @@
 // Basic tests for invoking the find command directly.
 
-var coll = db.findcmd;
-var collname = coll.getName();
+(function() {
+const coll = db.findcmd;
+const collname = coll.getName();
 coll.drop();
 
-var res;
-var cursor;
+let res;
+let cursor;
 
 // Non-existent collection.
 res = coll.runCommand("find");
@@ -28,10 +29,15 @@ res = coll.runCommand("find", {tailable: true});
 assert.commandWorked(res);
 assert.neq(0, res.cursor.id);
 assert.eq([{_id: 1}], res.cursor.firstBatch);
+coll.drop();
+
+// Ensure that the tailable cursor is invalidated by running 'killCursors' after 'coll' has been
+// dropped. This is done in order to ensure that the cursor doesn't timeout and modify the
+// cursor serverStatus metrics that other tests may depend on (see BF-19234 for more details).
+assert.commandWorked(db.runCommand({killCursors: collname, cursors: [res.cursor.id]}));
 
 // Multiple batches.
-coll.drop();
-for (var i = 0; i < 150; i++) {
+for (let i = 0; i < 150; i++) {
     assert.commandWorked(coll.insert({_id: i}));
 }
 res = coll.runCommand("find", {filter: {_id: {$lt: 140}}});
@@ -51,3 +57,4 @@ assert.commandFailed(coll.runCommand("find", {projection: {_id: 0}, filter: {$fo
 // Special command namespace.
 assert.commandFailed(coll.getDB().runCommand({find: "$cmd"}));
 assert.commandFailed(coll.getDB().runCommand({find: "$cmd.sys.inprog"}));
+})();
