@@ -124,13 +124,6 @@ boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
     newColl.setDefaultCollation(*request.getCollation());
     newColl.setUnique(request.getUnique());
 
-    // Set the distributionMode to "sharded" because this CollectionType represents the requested
-    // target state for the collection after shardCollection. The requested CollectionType will be
-    // compared with the existing CollectionType below, and if the existing CollectionType either
-    // does not have a distributionMode (FCV 4.2) or has distributionMode "sharded" (FCV 4.4), the
-    // collection will be considered to already be in its target state.
-    newColl.setDistributionMode(CollectionType::DistributionMode::kSharded);
-
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,
@@ -485,7 +478,6 @@ void updateShardingCatalogEntryForCollection(
         coll.setDefaultCollation(defaultCollator->getSpec().toBSON());
     }
     coll.setUnique(unique);
-    coll.setDistributionMode(CollectionType::DistributionMode::kSharded);
 
     uassertStatusOK(ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
         opCtx, nss, coll, true /*upsert*/));

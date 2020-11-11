@@ -491,7 +491,6 @@ CollectionType createTempReshardingCollectionType(
     collType.setKeyPattern(coordinatorDoc.getReshardingKey());
     collType.setDefaultCollation(collation);
     collType.setUnique(false);
-    collType.setDistributionMode(CollectionType::DistributionMode::kSharded);
 
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.get_id());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());

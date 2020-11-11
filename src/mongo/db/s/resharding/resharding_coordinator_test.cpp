@@ -115,7 +115,6 @@ protected:
             coordinatorDoc.getNss(), std::move(epoch), lastUpdated, std::move(uuid));
         collType.setKeyPattern(shardKey);
         collType.setUnique(false);
-        collType.setDistributionMode(CollectionType::DistributionMode::kSharded);
         if (reshardingFields)
             collType.setReshardingFields(std::move(reshardingFields.get()));
 

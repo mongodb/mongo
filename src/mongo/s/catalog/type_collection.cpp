@@ -42,8 +42,6 @@ namespace mongo {
 
 const NamespaceString CollectionType::ConfigNS("config.collections");
 
-const BSONField<std::string> CollectionType::distributionMode("distributionMode");
-
 CollectionType::CollectionType(NamespaceString nss, OID epoch, Date_t updatedAt, UUID uuid)
     : CollectionTypeBase(std::move(nss), std::move(updatedAt)) {
     setEpoch(std::move(epoch));
@@ -63,58 +61,12 @@ CollectionType::CollectionType(const BSONObj& obj) {
             getPre50CompatibleKeyPattern() || getDropped());
 }
 
-StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& source) {
-    auto swColl = [&] {
-        try {
-            return StatusWith<CollectionType>(CollectionType(source));
-        } catch (const DBException& ex) {
-            return StatusWith<CollectionType>(ex.toStatus());
-        }
-    }();
-
-    if (!swColl.isOK())
-        return swColl;
-
-    CollectionType coll = std::move(swColl.getValue());
-
-    {
-        std::string collDistributionMode;
-        Status status =
-            bsonExtractStringField(source, distributionMode.name(), &collDistributionMode);
-        if (status.isOK()) {
-            if (collDistributionMode == "unsharded") {
-                coll._distributionMode = DistributionMode::kUnsharded;
-            } else if (collDistributionMode == "sharded") {
-                coll._distributionMode = DistributionMode::kSharded;
-            } else {
-                return {ErrorCodes::FailedToParse,
-                        str::stream() << "Unknown distribution mode " << collDistributionMode};
-            }
-        } else if (status == ErrorCodes::NoSuchKey) {
-            // In v4.4, distributionMode can be missing in which case it is presumed "sharded"
-        } else {
-            return status;
-        }
+StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& obj) {
+    try {
+        return CollectionType(obj);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
     }
-
-    return StatusWith<CollectionType>(coll);
-}
-
-BSONObj CollectionType::toBSON() const {
-    BSONObjBuilder builder;
-    serialize(&builder);
-
-    if (_distributionMode) {
-        if (*_distributionMode == DistributionMode::kUnsharded) {
-            builder.append(distributionMode.name(), "unsharded");
-        } else if (*_distributionMode == DistributionMode::kSharded) {
-            builder.append(distributionMode.name(), "sharded");
-        } else {
-            MONGO_UNREACHABLE;
-        }
-    }
-
-    return builder.obj();
 }
 
 std::string CollectionType::toString() const {
@@ -144,7 +96,7 @@ bool CollectionType::hasSameOptions(const CollectionType& other) const {
                                                     other.getKeyPattern().toBSON()) &&
         SimpleBSONObjComparator::kInstance.evaluate(getDefaultCollation() ==
                                                     other.getDefaultCollation()) &&
-        getUnique() == other.getUnique() && getDistributionMode() == other.getDistributionMode();
+        getUnique() == other.getUnique();
 }
 
 }  // namespace mongo

@@ -55,7 +55,6 @@ using ReshardingFields = TypeCollectionReshardingFields;
  *      "unique" : false,
  *      "uuid" : UUID,
  *      "noBalance" : false,
- *      "distributionMode" : "unsharded|sharded",
  *      // Only populated if the collection is currently undergoing a resharding operation.
  *      "reshardingFields" : {
  *          "uuid" : UUID,
@@ -103,40 +102,19 @@ public:
     using CollectionTypeBase::setReshardingFields;
     using CollectionTypeBase::setUnique;
     using CollectionTypeBase::setUpdatedAt;
+    using CollectionTypeBase::toBSON;
 
     // Name of the collections collection in the config server.
     static const NamespaceString ConfigNS;
-
-    static const BSONField<std::string> distributionMode;
-
-    CollectionType() = default;
 
     CollectionType(NamespaceString nss, OID epoch, Date_t updatedAt, UUID uuid);
 
     explicit CollectionType(const BSONObj& obj);
 
-    /**
-     * Constructs a new CollectionType object from BSON. Also does validation of the contents.
-     *
-     * Dropped collections accumulate in the collections list, through 3.6, so that
-     * mongos <= 3.4.x, when it retrieves the list from the config server, can delete its
-     * cache entries for dropped collections.  See SERVER-27475, SERVER-27474
-     */
-    static StatusWith<CollectionType> fromBSON(const BSONObj& source);
+    CollectionType() = default;
 
-    enum class DistributionMode {
-        kUnsharded,
-        kSharded,
-    };
+    static StatusWith<CollectionType> fromBSON(const BSONObj& obj);
 
-    /**
-     * Returns the BSON representation of the entry.
-     */
-    BSONObj toBSON() const;
-
-    /**
-     * Returns a std::string representation of the current internal state.
-     */
     std::string toString() const;
 
     const OID& getEpoch() const {
@@ -167,19 +145,7 @@ public:
         return !getNoBalance();
     }
 
-    DistributionMode getDistributionMode() const {
-        return _distributionMode.get_value_or(DistributionMode::kSharded);
-    }
-    void setDistributionMode(DistributionMode distributionMode) {
-        _distributionMode = distributionMode;
-    }
-
     bool hasSameOptions(const CollectionType& other) const;
-
-private:
-    // New field in v4.4; optional in v4.4 for backwards compatibility with v4.2. Whether the
-    // collection is unsharded or sharded. If missing, implies sharded.
-    boost::optional<DistributionMode> _distributionMode;
 };
 
 }  // namespace mongo
