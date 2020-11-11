@@ -100,6 +100,26 @@ ValidateState::ValidateState(OperationContext* opCtx,
     _catalogGeneration = opCtx->getServiceContext()->getCatalogGeneration();
 }
 
+bool ValidateState::shouldEnforceFastCount() const {
+    if (_mode == ValidateMode::kForegroundFullEnforceFastCount) {
+        if (_nss.isOplog()) {
+            // Oplog writers only take a global IX lock, so the oplog can still be written to even
+            // during full validation despite its collection X lock. This can cause validate to
+            // incorrectly report an incorrect fast count on the oplog when run in enforceFastCount
+            // mode.
+            return false;
+        } else if (_nss == NamespaceString::kIndexBuildEntryNamespace) {
+            // Do not enforce fast count on the 'config.system.indexBuilds' collection. This is an
+            // internal collection that should not be queried and is empty most of the time.
+            return false;
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
 void ValidateState::yield(OperationContext* opCtx) {
     if (isBackground()) {
         _yieldLocks(opCtx);
