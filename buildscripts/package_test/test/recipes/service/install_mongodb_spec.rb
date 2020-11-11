@@ -132,10 +132,10 @@ if deb
       its('shell') { should eq '/usr/sbin/nologin' }
     end
   else
-    describe user('mongod') do
+    describe user('mongodb') do
       it { should exist }
-      its('groups') { should include 'mongod' }
-      its('home') { should eq '/var/lib/mongo' }
+      its('groups') { should include 'mongodb' }
+      its('home') { should eq '/home/mongodb' }
       its('shell') { should eq '/bin/false' }
     end
   end
