@@ -41,17 +41,18 @@ namespace mongo {
 bool isGenericArgument(StringData arg);
 
 /**
- * Returns true if arg must be stripped from requests that are forwarded to shards.
- * Only generic arguments are stripped, and some of them are not.
+ * Returns true if arg should be forwarded to shards.
+ *
  * See 'CommandHelpers::filterCommandRequestForPassthrough'.
  */
-bool isRequestStripArgument(StringData arg);
+bool shouldForwardToShards(StringData arg);
 
 /**
- * Returns true if arg is not safe to blindly forward from shards to clients.
+ * Returns true if replyField should be forwarded from shards to clients.
+ *
  * See 'CommandHelpers::filterCommandReplyForPassthrough'.
  */
-bool isReplyStripArgument(StringData arg);
+bool shouldForwardFromShards(StringData replyField);
 
 /**
  * Returns true if the provided argument is one that should be handled by a mongocryptd process.

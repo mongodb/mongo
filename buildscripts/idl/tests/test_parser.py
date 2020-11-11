@@ -881,8 +881,6 @@ class TestParser(testcase.IDLTestcase):
                 strict: false
                 namespace: ignored
                 is_deprecated: false
-                forward_to_shards: false
-                forward_from_shards: false
                 immutable: false
                 inline_chained_structs: false
                 generate_comparison_operators: false

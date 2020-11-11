@@ -37,16 +37,14 @@ bool isGenericArgument(StringData arg) {
     return Generic_args_api_v1::hasField(arg) || Generic_args_unstable_v1::hasField(arg);
 }
 
-// TODO(SERVER-51848): rename shouldForwardToShards
-bool isRequestStripArgument(StringData arg) {
-    return !(Generic_args_api_v1::shouldForwardToShards(arg) &&
-             Generic_args_unstable_v1::shouldForwardToShards(arg));
+bool shouldForwardToShards(StringData arg) {
+    return Generic_args_api_v1::shouldForwardToShards(arg) &&
+        Generic_args_unstable_v1::shouldForwardToShards(arg);
 }
 
-// TODO(SERVER-51848): rename shouldForwardFromShards
-bool isReplyStripArgument(StringData arg) {
-    return !(Generic_reply_fields_api_v1::shouldForwardFromShards(arg) &&
-             Generic_reply_fields_unstable_v1::shouldForwardFromShards(arg));
+bool shouldForwardFromShards(StringData replyField) {
+    return Generic_reply_fields_api_v1::shouldForwardFromShards(replyField) &&
+        Generic_reply_fields_unstable_v1::shouldForwardFromShards(replyField);
 }
 
 bool isMongocryptdArgument(StringData arg) {

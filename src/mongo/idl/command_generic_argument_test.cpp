@@ -94,14 +94,14 @@ TEST(CommandGenericArgument, AllGenericArgumentsAndReplyFields) {
                 record.name, record.isGeneric, isGenericArgument(record.name)));
         }
 
-        if (isRequestStripArgument(record.name) != record.stripFromRequest) {
-            FAIL("isRequestStripArgument('{}') should be {}, but it's {}"_format(
-                record.name, record.stripFromRequest, isRequestStripArgument(record.name)));
+        if (shouldForwardToShards(record.name) == record.stripFromRequest) {
+            FAIL("shouldForwardToShards('{}') should be {}, but it's {}"_format(
+                record.name, !record.stripFromRequest, shouldForwardToShards(record.name)));
         }
 
-        if (isReplyStripArgument(record.name) != record.stripFromReply) {
-            FAIL("isReplyStripArgument('{}') should be {}, but it's {}"_format(
-                record.name, record.stripFromReply, isReplyStripArgument(record.name)));
+        if (shouldForwardFromShards(record.name) == record.stripFromReply) {
+            FAIL("shouldForwardFromShards('{}') should be {}, but it's {}"_format(
+                record.name, !record.stripFromReply, shouldForwardFromShards(record.name)));
         }
     }
 }

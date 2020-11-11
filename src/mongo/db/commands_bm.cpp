@@ -58,7 +58,7 @@ void BM_IsRequestStripArgument(benchmark::State& state) {
     const auto& key = keys[state.range()];
     state.SetLabel(key.c_str());
     for (auto _ : state) {
-        benchmark::DoNotOptimize(mongo::isRequestStripArgument(key));
+        benchmark::DoNotOptimize(mongo::shouldForwardToShards(key));
     }
 }
 
@@ -66,7 +66,7 @@ void BM_IsReplyStripArgument(benchmark::State& state) {
     const auto& key = keys[state.range()];
     state.SetLabel(key.c_str());
     for (auto _ : state) {
-        benchmark::DoNotOptimize(mongo::isReplyStripArgument(key));
+        benchmark::DoNotOptimize(mongo::shouldForwardFromShards(key));
     }
 }
 

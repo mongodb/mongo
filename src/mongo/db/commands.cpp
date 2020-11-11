@@ -467,7 +467,7 @@ void CommandHelpers::filterCommandRequestForPassthrough(BSONObjIterator* cmdIter
             BSONObjBuilder(requestBuilder->subobjStart("$queryOptions")).append(elem);
             continue;
         }
-        if (isRequestStripArgument(name))
+        if (!shouldForwardToShards(name))
             continue;
         requestBuilder->append(elem);
     }
@@ -477,7 +477,7 @@ void CommandHelpers::filterCommandReplyForPassthrough(const BSONObj& cmdObj,
                                                       BSONObjBuilder* output) {
     for (auto elem : cmdObj) {
         const auto name = elem.fieldNameStringData();
-        if (isReplyStripArgument(name))
+        if (!shouldForwardFromShards(name))
             continue;
         output->append(elem);
     }
