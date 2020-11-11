@@ -465,6 +465,13 @@ public:
     }
 
     /**
+     * Returns whether this operation is continuing (not starting) a multi-document transaction.
+     */
+    bool isContinuingMultiDocumentTransaction() const {
+        return inMultiDocumentTransaction() && !isStartingMultiDocumentTransaction();
+    }
+
+    /**
      * Sets whether this operation is starting a multi-document transaction.
      */
     void setIsStartingMultiDocumentTransaction(bool isStartingMultiDocumentTransaction) {

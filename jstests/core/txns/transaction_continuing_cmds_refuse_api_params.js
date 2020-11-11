@@ -44,6 +44,9 @@ assert.commandFailedWithCode(
         {insert: collName, documents: [doc], apiVersion: "1", apiDeprecationErrors: false}),
     errorCode);
 
+// Transaction-continuing commands without API parameters are allowed.
+assert.commandWorked(sessionColl.runCommand({insert: collName, documents: [doc]}));
+
 assert.commandWorked(session.abortTransaction_forTesting());
 session.endSession();
 })();
