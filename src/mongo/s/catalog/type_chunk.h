@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_chunk_base_gen.h"
 #include "mongo/s/chunk_version.h"
@@ -201,6 +202,7 @@ public:
     static const BSONField<OID> name;
     static const BSONField<BSONObj> minShardID;
     static const BSONField<std::string> ns;
+    static const BSONField<std::string> collectionUUID;
     static const BSONField<BSONObj> min;
     static const BSONField<BSONObj> max;
     static const BSONField<std::string> shard;
@@ -211,6 +213,11 @@ public:
 
     ChunkType();
     ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId);
+    ChunkType(NamespaceString nss,
+              CollectionUUID collectionUUID,
+              ChunkRange range,
+              ChunkVersion version,
+              ShardId shardId);
 
     /**
      * Constructs a new ChunkType object from BSON that has the config server's config.chunks
@@ -252,6 +259,11 @@ public:
         return _nss.get();
     }
     void setNS(const NamespaceString& nss);
+
+    const CollectionUUID& getCollectionUUID() const {
+        return *_collectionUUID;
+    }
+    void setCollectionUUID(const CollectionUUID& uuid);
 
     const BSONObj& getMin() const {
         return _min.get();
@@ -315,6 +327,8 @@ private:
     boost::optional<OID> _id;
     // (O)(C)     collection this chunk is in
     boost::optional<NamespaceString> _nss;
+    // (O)(C)     uuid of the collection in the CollectionCatalog
+    boost::optional<CollectionUUID> _collectionUUID;
     // (M)(C)(S)  first key of the range, inclusive
     boost::optional<BSONObj> _min;
     // (M)(C)(S)  last key of the range, non-inclusive

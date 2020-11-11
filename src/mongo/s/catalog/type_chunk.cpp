@@ -38,6 +38,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/server_options.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -49,6 +51,7 @@ const std::string ChunkType::ShardNSPrefix = "config.cache.chunks.";
 const BSONField<OID> ChunkType::name("_id");
 const BSONField<BSONObj> ChunkType::minShardID("_id");
 const BSONField<std::string> ChunkType::ns("ns");
+const BSONField<std::string> ChunkType::collectionUUID("uuid");
 const BSONField<BSONObj> ChunkType::min("min");
 const BSONField<BSONObj> ChunkType::max("max");
 const BSONField<std::string> ChunkType::shard("shard");
@@ -424,6 +427,12 @@ void ChunkType::setName(const OID& id) {
 void ChunkType::setNS(const NamespaceString& nss) {
     invariant(nss.isValid());
     _nss = nss;
+}
+
+void ChunkType::setCollectionUUID(const CollectionUUID& uuid) {
+    invariant(
+        feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility));
+    _collectionUUID = uuid;
 }
 
 void ChunkType::setMin(const BSONObj& min) {
