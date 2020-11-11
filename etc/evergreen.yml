@@ -6491,6 +6491,24 @@ tasks:
       resmoke_args: --suites=concurrency --storageEngine=wiredTiger
       resmoke_jobs_max: 1
 
+- <<: *task_template
+  name: concurrency_metrics
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_metrics --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: concurrency_replication_metrics
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_args: --suites=concurrency_replication_metrics --storageEngine=wiredTiger
+      resmoke_jobs_max: 1
+
 - name: concurrency_replication_gen
   tags: ["concurrency", "common", "repl"]
   commands:
@@ -11009,6 +11027,10 @@ buildvariants:
   - name: compile_all_run_unittests_TG
     distros:
     - rhel62-large
+  - name: concurrency_metrics
+  - name: concurrency_replication_metrics
+    distros:
+      - rhel62-large
   - name: jsCore
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
