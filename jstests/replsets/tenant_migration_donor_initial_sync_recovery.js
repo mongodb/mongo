@@ -12,6 +12,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
+load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const donorRst = new ReplSetTest(
@@ -41,19 +42,15 @@ const kConfigDonorsNS = "config.tenantMigrationDonors";
 let donorPrimary = donorRst.getPrimary();
 let kRecipientConnString = recipientRst.getURL();
 
-function startMigration(host, recipientConnString, tenantId) {
-    const primary = new Mongo(host);
-    assert.commandWorked(primary.adminCommand({
-        donorStartMigration: 1,
-        migrationId: UUID(),
-        recipientConnectionString: recipientConnString,
-        tenantId: tenantId,
-        readPreference: {mode: "primary"}
-    }));
-}
+const migrationOpts = {
+    migrationIdString: extractUUIDFromObject(UUID()),
+    recipientConnString: kRecipientConnString,
+    tenantId: kTenantId,
+    readPreference: {mode: "primary"},
+};
 
 let migrationThread =
-    new Thread(startMigration, donorPrimary.host, kRecipientConnString, kTenantId);
+    new Thread(TenantMigrationUtil.startMigration, donorPrimary.host, migrationOpts);
 
 // Force the migration to pause after entering a randomly selected state to simulate a failure.
 Random.setRandomSeed();
@@ -62,9 +59,10 @@ const kMigrationFpNames = [
     "pauseTenantMigrationAfterBlockingStarts",
     "abortTenantMigrationAfterBlockingStarts"
 ];
+let fp;
 const index = Random.randInt(kMigrationFpNames.length + 1);
 if (index < kMigrationFpNames.length) {
-    configureFailPoint(donorPrimary, kMigrationFpNames[index]);
+    fp = configureFailPoint(donorPrimary, kMigrationFpNames[index]);
 }
 
 migrationThread.start();
@@ -131,6 +129,10 @@ if (donorDoc) {
         default:
             throw new Error(`Invalid state "${state}" from donor doc.`);
     }
+}
+
+if (fp) {
+    fp.off();
 }
 
 migrationThread.join();
