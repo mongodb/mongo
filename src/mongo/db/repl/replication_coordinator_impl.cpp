@@ -3000,6 +3000,10 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         ReplicationMetrics::get(getServiceContext()).getElectionParticipantMetricsBSON();
 
     stdx::lock_guard<Latch> lk(_mutex);
+    if (_inShutdown) {
+        return Status(ErrorCodes::ShutdownInProgress, "shutdown in progress");
+    }
+
     Status result(ErrorCodes::InternalError, "didn't set status in prepareStatusResponse");
     _topCoord->prepareStatusResponse(
         TopologyCoordinator::ReplSetStatusArgs{

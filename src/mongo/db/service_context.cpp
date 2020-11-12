@@ -313,7 +313,7 @@ Client* ServiceContext::LockedClientsCursor::next() {
     return result;
 }
 
-void ServiceContext::setKillAllOperations() {
+void ServiceContext::setKillAllOperations(const std::set<std::string>& excludedClients) {
     stdx::lock_guard<Latch> clientLock(_mutex);
 
     // Ensure that all newly created operation contexts will immediately be in the interrupted state
@@ -323,6 +323,12 @@ void ServiceContext::setKillAllOperations() {
     // Interrupt all active operations
     for (auto&& client : _clients) {
         stdx::lock_guard<Client> lk(*client);
+
+        // Do not kill operations from the excluded clients.
+        if (excludedClients.find(client->desc()) != excludedClients.end()) {
+            continue;
+        }
+
         auto opCtxToKill = client->getOperationContext();
         if (opCtxToKill) {
             killOperation(lk, opCtxToKill, ErrorCodes::InterruptedAtShutdown);
