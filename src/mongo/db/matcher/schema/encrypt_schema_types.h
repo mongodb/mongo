@@ -115,32 +115,4 @@ private:
 
     Type _type;
 };
-
-/**
- * Class to represent an element with any type from IDL. The caller must ensure that the backing
- * BSON stays alive while this type is in use.
- */
-class EncryptSchemaAnyType {
-public:
-    /**
-     * This type is currenty only used for serialization, not parsing.
-     */
-    static EncryptSchemaAnyType parseFromBSON(const BSONElement& element) {
-        return EncryptSchemaAnyType(element);
-    }
-
-    EncryptSchemaAnyType() = default;
-    EncryptSchemaAnyType(const BSONElement& element) : _element(element) {}
-
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
-        builder->appendAs(_element, fieldName);
-    }
-
-    const BSONElement& getElement() const {
-        return _element;
-    }
-
-private:
-    BSONElement _element;
-};
 }  // namespace mongo

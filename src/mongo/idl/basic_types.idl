@@ -195,6 +195,13 @@ types:
         serializer: "::mongo::FeatureCompatibilityVersionParser::serializeVersion"
         deserializer: "mongo::FeatureCompatibilityVersionParser::parseVersion"
 
+    IDLAnyType:
+        bson_serialization_type: any
+        description: "Holds a BSONElement of any type."
+        cpp_type: "mongo::IDLAnyType"
+        serializer: mongo::IDLAnyType::serializeToBSON
+        deserializer: mongo::IDLAnyType::parseFromBSON
+
 structs:
 
     OkReply:

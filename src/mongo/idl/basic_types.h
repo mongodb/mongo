@@ -104,4 +104,32 @@ private:
     boost::optional<bool> _value;
 };
 
+/**
+ * Class to represent a BSON element with any type from IDL. The caller must ensure that the backing
+ * BSON stays alive while this type is in use.
+ */
+class IDLAnyType {
+public:
+    static IDLAnyType parseFromBSON(const BSONElement& element) {
+        return IDLAnyType(element);
+    }
+
+    IDLAnyType() = default;
+    IDLAnyType(const BSONElement& element) : _element(element) {}
+
+    void serializeToBSON(StringData fieldName, BSONObjBuilder* builder) const {
+        builder->appendAs(_element, fieldName);
+    }
+
+    void serializeToBSON(BSONArrayBuilder* builder) const {
+        builder->append(_element);
+    }
+
+    const BSONElement& getElement() const {
+        return _element;
+    }
+
+private:
+    BSONElement _element;
+};
 }  // namespace mongo

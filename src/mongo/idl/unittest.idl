@@ -811,6 +811,13 @@ commands:
         namespace: ignored
         reply_type: OkReply
 
+    CommandWithAnyTypeMember:
+        description: "A mock command to test IDLAnyType"
+        command_name: CommandWithValueTypeMember
+        namespace: ignored
+        reply_type: OkReply
+        fields:
+            anyTypeField: IDLAnyType
 
 ##################################################################################################
 #

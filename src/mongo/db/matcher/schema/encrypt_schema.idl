@@ -36,13 +36,6 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 types:
-    encryptSchemaAnyType:
-        bson_serialization_type: any
-        description: "Holds a to-be-encrypted BSONElement of any type."
-        cpp_type: "mongo::EncryptSchemaAnyType"
-        serializer: mongo::EncryptSchemaAnyType::serializeToBSON
-        deserializer: mongo::EncryptSchemaAnyType::parseFromBSON
-
     encryptSchemaKeyId:
         bson_serialization_type: any
         description: "A string pointing to the key id or an array UUIDs identifying a set of keys."
@@ -130,5 +123,5 @@ structs:
             optional: true
           v:
             description: "value to encrypt"
-            type: encryptSchemaAnyType
+            type: IDLAnyType
             cpp_name: value

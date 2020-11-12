@@ -3008,5 +3008,38 @@ TEST(IDLTypeCommand, TestErrorReplyStruct) {
     }
 }
 
+TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeField) {
+    IDLParserErrorContext ctxt("root");
+    std::vector<BSONObj> differentTypeObjs = {
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField"
+                                                    << "string literal"
+                                                    << "$db"
+                                                    << "db"),
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << 1234 << "$db"
+                                                    << "db"),
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << 1234.5 << "$db"
+                                                    << "db"),
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << OID::max() << "$db"
+                                                    << "db"),
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << Date_t::now() << "$db"
+                                                    << "db"),
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField"
+                                                    << BSON("a"
+                                                            << "b")
+                                                    << "$db"
+                                                    << "db"),
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField"
+                                                    << BSON_ARRAY("a"
+                                                                  << "b")
+                                                    << "$db"
+                                                    << "db"),
+        BSON(CommandWithAnyTypeMember::kCommandName << 1 << "anyTypeField" << jstNULL << "$db"
+                                                    << "db")};
+    for (auto&& obj : differentTypeObjs) {
+        auto parsed = CommandWithAnyTypeMember::parse(ctxt, obj);
+        ASSERT_BSONELT_EQ(parsed.getAnyTypeField().getElement(), obj["anyTypeField"]);
+    }
+}
+
 }  // namespace
 }  // namespace mongo
