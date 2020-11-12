@@ -253,7 +253,7 @@ public:
                     actualVersion ==
                         ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To49) {
                     // SERVER-52630: Remove once 5.0 becomes the LastLTS
-                    ShardingCatalogManager::get(opCtx)->removeDroppedCollectionsMetadata(opCtx);
+                    ShardingCatalogManager::get(opCtx)->removePre44LegacyMetadata(opCtx);
                 }
 
                 // Upgrade shards before config finishes its upgrade.

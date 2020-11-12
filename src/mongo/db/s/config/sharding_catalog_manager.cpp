@@ -34,7 +34,9 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 
 #include "mongo/db/auth/authorization_session_impl.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/logv2/log.h"
@@ -436,13 +438,50 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     return Status::OK();
 }
 
-void ShardingCatalogManager::removeDroppedCollectionsMetadata(OperationContext* opCtx) {
+void ShardingCatalogManager::removePre44LegacyMetadata(OperationContext* opCtx) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    DBDirectClient client(opCtx);
+
+    // Delete all documents which have {dropped: true} from config.collections
     uassertStatusOK(
         catalogClient->removeConfigDocuments(opCtx,
                                              CollectionType::ConfigNS,
                                              BSON("dropped" << true),
-                                             ShardingCatalogClient::kMajorityWriteConcern));
+                                             ShardingCatalogClient::kLocalWriteConcern));
+
+    // Clear the {dropped:true} and {distributionMode:sharded} fields from config.collections
+    write_ops::Update clearDroppedAndDistributionMode(CollectionType::ConfigNS, [] {
+        write_ops::UpdateOpEntry u;
+        u.setQ({});
+        u.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("$unset"
+                                                                          << BSON("dropped"
+                                                                                  << "")
+                                                                          << "$unset"
+                                                                          << BSON("distributionMode"
+                                                                                  << ""))));
+        u.setMulti(true);
+        return std::vector{u};
+    }());
+    clearDroppedAndDistributionMode.setWriteCommandBase([] {
+        write_ops::WriteCommandBase base;
+        base.setOrdered(false);
+        return base;
+    }());
+
+    auto commandResult = client.runCommand(
+        OpMsgRequest::fromDBAndBody(CollectionType::ConfigNS.db(),
+                                    clearDroppedAndDistributionMode.toBSON(
+                                        ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+    uassertStatusOK([&] {
+        BatchedCommandResponse response;
+        std::string unusedErrmsg;
+        response.parseBSON(
+            commandResult->getCommandReply(),
+            &unusedErrmsg);  // Return value intentionally ignored, because response.toStatus() will
+                             // contain any errors in more detail
+        return response.toStatus();
+    }());
+    uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
 }
 
 Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {

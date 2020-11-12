@@ -1,7 +1,9 @@
 /**
  * This test checks several upgrade/downgrade routines related to sharding, namely:
  *  - The entries in the config server's config.collections that were marked as 'dropped: true' are
- * deleted. (SERVER-52630: Remove once 5.0 becomes the LastLTS)
+ *    deleted. (SERVER-52630: Remove once 5.0 becomes the LastLTS)
+ *  - The entries in the config server's config.collections contain a 'distributionMode' field.
+ *    (SERVER-51900: Remove once 5.0 becomes the LastLTS)
  */
 (function() {
 "use strict";
@@ -16,8 +18,15 @@ function setupInitialStateOnOldVersion() {
     assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.foo', key: {x: 1}}));
     assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.bar', key: {x: 1}}));
 
-    assert.neq(null, csrs_config_db.collections.findOne({_id: 'sharded.foo'}));
-    assert.neq(null, csrs_config_db.collections.findOne({_id: 'sharded.bar'}));
+    {
+        var collFoo = csrs_config_db.collections.findOne({_id: 'sharded.foo'});
+        assert.eq('sharded', collFoo.distributionMode);
+        assert.eq(false, collFoo.dropped);
+
+        var collBar = csrs_config_db.collections.findOne({_id: 'sharded.bar'});
+        assert.eq('sharded', collBar.distributionMode);
+        assert.eq(false, collBar.dropped);
+    }
 
     // Drop a collection so that it's metadata is left over on the config server's
     // config.collections as 'dropped: true'
@@ -28,9 +37,13 @@ function setupInitialStateOnOldVersion() {
 
 function runChecksAfterUpgrade() {
     let csrs_config_db = st.configRS.getPrimary().getDB('config');
+
     // Check that the left over metadata at csrs config.collections has been cleaned up.
     assert.eq(null, csrs_config_db.collections.findOne({_id: 'sharded.foo'}));
-    assert.neq(null, csrs_config_db.collections.findOne({_id: 'sharded.bar'}));
+
+    var collBar = csrs_config_db.collections.findOne({_id: 'sharded.bar'});
+    assert.eq(undefined, collBar.distributionMode);
+    assert.eq(undefined, collBar.dropped);
 }
 
 function runChecksAfterDowngrade() {

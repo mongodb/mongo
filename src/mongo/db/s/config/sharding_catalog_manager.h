@@ -453,7 +453,7 @@ public:
      *
      * It shall be called on FCV 4.4 to 5.0 upgrade.
      */
-    void removeDroppedCollectionsMetadata(OperationContext* opCtx);
+    void removePre44LegacyMetadata(OperationContext* opCtx);
 
     //
     // For Diagnostics
