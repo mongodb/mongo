@@ -94,9 +94,18 @@ assert.eq(authCluster.successful, initCluster.successful + 1);
 jsTest.log('Shutting down');
 
 // Authenticate csrs so ReplSetTest.stopSet() can do db hash check.
+// It's possible the admin account hasn't replicated yet, so give it time.
 if (st.configRS) {
-    st.configRS.nodes.forEach((node) => {
-        node.getDB('admin').auth('admin', 'pwd');
+    const nodes = st.configRS.nodes.map((x) => x);
+    let node = nodes.pop();
+    assert.soon(function() {
+        if (node === undefined) {
+            return true;
+        }
+        if (node.getDB('admin').auth('admin', 'pwd')) {
+            node = nodes.pop();
+        }
+        return false;
     });
 }
 
