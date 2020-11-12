@@ -36,5 +36,10 @@ var $config = extendWorkload($config, function($config, $super) {
         });
     };
 
+    // That 250ms per auth delay makes this take too long on a loaded system.
+    // Pull the iteration count back to something manageable.
+    const kMinimumIterations = 10;
+    $config.iterations = Math.max(Math.floor($config.iterations / 3), kMinimumIterations);
+
     return $config;
 });
