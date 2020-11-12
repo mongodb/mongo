@@ -4,15 +4,15 @@
  *
  * NOTE: This test is similar to the mixed_mode_sharded_transition.js in the sslSpecial
  * test suite. This suite must use ssl so it cannot test modes without ssl.
- *
- * TODO (SERVER-48261): Fix test to allow it to work with the resumable range deleter enabled.
- * @tags: [__TEMPORARILY_DISABLED__]
  */
 
 load('jstests/ssl/libs/ssl_helpers.js');
 
 (function() {
 'use strict';
+
+// The check orphans hook needs to be able to connect to the individual shards.
+TestData.skipCheckOrphans = true;
 
 var transitionToX509AllowSSL =
     Object.merge(allowSSL, {transitionToAuth: '', clusterAuthMode: 'x509'});

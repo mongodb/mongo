@@ -1505,6 +1505,16 @@ var ShardingTest = function(params) {
     const shardsRS = shardsAsReplSets ? this._rs.map(obj => obj.test) : [];
     const replicaSetsToInitiate = [...shardsRS, this.configRS].map(rst => {
         const rstConfig = rst.getReplSetConfig();
+
+        // The mongo shell cannot authenticate as the internal __system user in tests that use x509
+        // for cluster authentication. Choosing the default value for wcMajorityJournalDefault in
+        // ReplSetTest cannot be done automatically without the shell performing such
+        // authentication, so allow tests to pass the value in.
+        if (otherParams.hasOwnProperty("writeConcernMajorityJournalDefault")) {
+            rstConfig.writeConcernMajorityJournalDefault =
+                otherParams.writeConcernMajorityJournalDefault;
+        }
+
         if (rst === this.configRS) {
             rstConfig.configsvr = true;
             rstConfig.writeConcernMajorityJournalDefault = true;
@@ -1517,7 +1527,9 @@ var ShardingTest = function(params) {
                 name: rst.name,
                 nodeHosts: rst.nodes.map(node => `127.0.0.1:${node.port}`),
                 nodeOptions: rst.nodeOptions,
-                keyFile: this.keyFile,
+                // Mixed-mode SSL tests may specify a keyFile per replica set rather than one for
+                // the whole cluster.
+                keyFile: rst.keyFile ? rst.keyFile : this.keyFile,
                 host: otherParams.useHostname ? hostName : "localhost",
                 waitForKeys: false,
             },

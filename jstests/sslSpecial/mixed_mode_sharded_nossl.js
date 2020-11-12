@@ -1,9 +1,6 @@
 /**
  * This test checks if different mixtures of ssl modes
  * in a sharded clutster can or cannot function
- *
- * TODO (SERVER-48261): Fix test to allow it to work with the resumable range deleter enabled.
- * @tags: [ __TEMPORARILY_DISABLED__]
  */
 
 load("jstests/ssl/libs/ssl_helpers.js");
