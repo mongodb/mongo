@@ -342,10 +342,10 @@ protected:
 private:
     /**
      * Inspects the contents of 'replyBody' and informs the replica set monitor that the host 'this'
-     * is connected with is no longer the primary if a "not master" error message or error code was
+     * is connected with is no longer the primary if a "not primary" error message or error code was
      * returned.
      */
-    void handleNotMasterResponse(const BSONObj& replyBody, StringData errorMsgFieldName);
+    void handleNotPrimaryResponse(const BSONObj& replyBody, StringData errorMsgFieldName);
     enum FailAction { kSetFlag, kEndSession, kReleaseSession };
     void _markFailed(FailAction action);
 

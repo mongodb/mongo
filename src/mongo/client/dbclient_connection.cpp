@@ -450,7 +450,7 @@ std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTar
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
-            handleNotMasterResponse(replyBody, "errmsg");
+            handleNotPrimaryResponse(replyBody, "errmsg");
         }
     }
 
@@ -463,7 +463,7 @@ std::pair<rpc::UniqueReply, std::shared_ptr<DBClientBase>> DBClientConnection::r
     if (!_parentReplSetName.empty()) {
         const auto replyBody = out.first->getCommandReply();
         if (!isOk(replyBody)) {
-            handleNotMasterResponse(replyBody, "errmsg");
+            handleNotPrimaryResponse(replyBody, "errmsg");
         }
     }
 
@@ -799,7 +799,7 @@ void DBClientConnection::checkResponse(const std::vector<BSONObj>& batch,
     *host = _serverAddress.toString();
 
     if (!_parentReplSetName.empty() && !batch.empty()) {
-        handleNotMasterResponse(batch[0], "$err");
+        handleNotPrimaryResponse(batch[0], "$err");
     }
 }
 
@@ -807,8 +807,8 @@ void DBClientConnection::setParentReplSetName(const string& replSetName) {
     _parentReplSetName = replSetName;
 }
 
-void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
-                                                 StringData errorMsgFieldName) {
+void DBClientConnection::handleNotPrimaryResponse(const BSONObj& replyBody,
+                                                  StringData errorMsgFieldName) {
     const BSONElement errorMsgElem = replyBody[errorMsgFieldName];
     const BSONElement codeElem = replyBody["code"];
 
@@ -821,7 +821,7 @@ void DBClientConnection::handleNotMasterResponse(const BSONObj& replyBody,
     if (monitor) {
         monitor->failedHost(_serverAddress,
                             {ErrorCodes::NotWritablePrimary,
-                             str::stream() << "got not master from: " << _serverAddress
+                             str::stream() << "got not primary from: " << _serverAddress
                                            << " of repl set: " << _parentReplSetName});
     }
 
