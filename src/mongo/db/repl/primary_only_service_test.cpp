@@ -102,12 +102,13 @@ public:
               _state((State)_stateDoc["state"].Int()),
               _initialState(_state) {}
 
-        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override {
+        SemiFuture<void> run(
+            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override {
             if (MONGO_unlikely(TestServiceHangDuringInitialization.shouldFail())) {
                 TestServiceHangDuringInitialization.pauseWhileSet();
             }
 
-            SemiFuture<void>::makeReady()
+            return SemiFuture<void>::makeReady()
                 .thenRunOn(**executor)
                 .then([self = shared_from_this()] {
                     self->_runOnce(State::kInitializing, State::kOne);
@@ -134,7 +135,7 @@ public:
                         TestServiceHangDuringCompletion.pauseWhileSet();
                     }
                 })
-                .getAsync([self = shared_from_this()](Status status) {
+                .onCompletion([self = shared_from_this()](Status status) {
                     stdx::lock_guard lk(self->_mutex);
                     if (self->_completionPromise.getFuture().isReady()) {
                         // We were already interrupted
@@ -146,7 +147,8 @@ public:
                     } else {
                         self->_completionPromise.setError(status);
                     }
-                });
+                })
+                .semi();
         }
 
         void interrupt(Status status) override {

@@ -127,9 +127,9 @@ ReshardingRecipientService::RecipientStateMachine::~RecipientStateMachine() {
     invariant(_completionPromise.getFuture().isReady());
 }
 
-void ReshardingRecipientService::RecipientStateMachine::run(
+SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
-    ExecutorFuture<void>(**executor)
+    return ExecutorFuture<void>(**executor)
         .then([this] { _transitionToCreatingTemporaryReshardingCollection(); })
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToCloning(); })
         .then([this] { return _cloneThenTransitionToApplying(); })
@@ -152,7 +152,7 @@ void ReshardingRecipientService::RecipientStateMachine::run(
             this->_transitionStateToError(status);
             return status;
         })
-        .getAsync([this](Status status) {
+        .onCompletion([this](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got her.e
@@ -165,7 +165,8 @@ void ReshardingRecipientService::RecipientStateMachine::run(
                 // Set error on all promises
                 _completionPromise.setError(status);
             }
-        });
+        })
+        .semi();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status) {

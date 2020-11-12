@@ -103,9 +103,9 @@ ReshardingDonorService::DonorStateMachine::~DonorStateMachine() {
     invariant(_completionPromise.getFuture().isReady());
 }
 
-void ReshardingDonorService::DonorStateMachine::run(
+SemiFuture<void> ReshardingDonorService::DonorStateMachine::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
-    ExecutorFuture<void>(**executor)
+    return ExecutorFuture<void>(**executor)
         .then(
             [this] { _onPreparingToDonateCalculateTimestampThenTransitionToDonatingInitialData(); })
         .then([this, executor] {
@@ -130,7 +130,7 @@ void ReshardingDonorService::DonorStateMachine::run(
             this->_transitionStateToError(status);
             return status;
         })
-        .getAsync([this](Status status) {
+        .onCompletion([this](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here.
@@ -142,7 +142,8 @@ void ReshardingDonorService::DonorStateMachine::run(
             } else {
                 _completionPromise.setError(status);
             }
-        });
+        })
+        .semi();
 }
 
 void ReshardingDonorService::DonorStateMachine::interrupt(Status status) {

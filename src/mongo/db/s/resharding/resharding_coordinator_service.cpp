@@ -620,9 +620,9 @@ ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
     invariant(_completionPromise.getFuture().isReady());
 }
 
-void ReshardingCoordinatorService::ReshardingCoordinator::run(
+SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
-    ExecutorFuture<void>(**executor)
+    return ExecutorFuture<void>(**executor)
         .then([this, executor] { return _init(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
@@ -672,7 +672,7 @@ void ReshardingCoordinatorService::ReshardingCoordinator::run(
 
             return status;
         })
-        .getAsync([this](Status status) {
+        .onCompletion([this](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
                 // interrupt() was called before we got here.
@@ -684,7 +684,8 @@ void ReshardingCoordinatorService::ReshardingCoordinator::run(
             } else {
                 _completionPromise.setError(status);
             }
-        });
+        })
+        .semi();
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::interrupt(Status status) {

@@ -814,7 +814,7 @@ BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() cons
                                             << "o.applyOps.0.ns" << namespaceRegex)));
 }
 
-void TenantMigrationRecipientService::Instance::run(
+SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     _scopedExecutor = executor;
     pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
@@ -826,7 +826,7 @@ void TenantMigrationRecipientService::Instance::run(
           "connectionString"_attr = _donorConnectionString,
           "readPreference"_attr = _readPreference);
 
-    ExecutorFuture(**executor)
+    return ExecutorFuture(**executor)
         .then([this] {
             stdx::lock_guard lk(_mutex);
             // Instance task can be started only once for the current term on a primary.
@@ -942,7 +942,8 @@ void TenantMigrationRecipientService::Instance::run(
             // e.g. by recipientForgetMigration.
             return _tenantOplogApplier->getNotificationForOpTime(OpTime::max());
         })
-        .getAsync([this](StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
+        .thenRunOn(_recipientService->getInstanceCleanupExecutor())
+        .onCompletion([this](StatusOrStatusWith<TenantOplogApplier::OpTimePair> applierStatus) {
             // We don't need the final optime from the oplog applier.
             Status status = applierStatus.getStatus();
             {
@@ -979,7 +980,8 @@ void TenantMigrationRecipientService::Instance::run(
             }
 
             _cleanupOnTaskCompletion(status);
-        });
+        })
+        .semi();
 }
 
 const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const {

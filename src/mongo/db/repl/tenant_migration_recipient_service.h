@@ -79,7 +79,7 @@ public:
         explicit Instance(const TenantMigrationRecipientService* recipientService,
                           BSONObj stateDoc);
 
-        void run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
+        SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept final;
 
         /*
          * Interrupts the running instance and cause the completion future to complete with

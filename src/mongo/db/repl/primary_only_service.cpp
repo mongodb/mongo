@@ -280,6 +280,10 @@ void PrimaryOnlyService::unregisterOpCtx(OperationContext* opCtx) {
     invariant(wasRegistered);
 }
 
+std::shared_ptr<executor::TaskExecutor> PrimaryOnlyService::getInstanceCleanupExecutor() const {
+    invariant(_getHasExecutor());
+    return _executor;
+}
 
 void PrimaryOnlyService::startup(OperationContext* opCtx) {
     // Initialize the thread pool options with the service-specific limits on pool size.
@@ -311,11 +315,14 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
     _executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),
         executor::makeNetworkInterface(getServiceName() + "Network", nullptr, std::move(hookList)));
+    _setHasExecutor(lk);
+
     _executor->startup();
 }
 
 void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
     InstanceMap savedInstances;
+    invariant(_getHasExecutor());
     auto newThenOldScopedExecutor =
         std::make_shared<executor::ScopedTaskExecutor>(_executor, kExecutorShutdownStatus);
     {
@@ -346,9 +353,15 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
         (*newThenOldScopedExecutor)->join();
     }
 
-    // Now wait for the first write of the new term to be majority committed, so that we know all
-    // previous writes to state documents are also committed, and then schedule work to rebuild
-    // Instances from their persisted state documents.
+    // This ensures that all instances from previous term have joined.
+    for (auto& instance : savedInstances) {
+        if (instance.second->_running)
+            instance.second->_finishedNotifyFuture->wait();
+    }
+
+    // Now wait for the first write of the new term to be majority committed, so that we know
+    // all previous writes to state documents are also committed, and then schedule work to
+    // rebuild Instances from their persisted state documents.
     stdx::lock_guard lk(_mutex);
     auto term = _term;
     WaitForMajorityService::get(_serviceContext)
@@ -403,6 +416,7 @@ void PrimaryOnlyService::shutdown() {
     std::shared_ptr<executor::TaskExecutor> savedExecutor;
     std::shared_ptr<executor::ScopedTaskExecutor> savedScopedExecutor;
 
+    bool hasExecutor;
     {
         stdx::lock_guard lk(_mutex);
 
@@ -418,13 +432,14 @@ void PrimaryOnlyService::shutdown() {
         // Save the executor to join() with it outside of _mutex.
         using std::swap;
         swap(savedScopedExecutor, _scopedExecutor);
-        swap(savedExecutor, _executor);
 
         // Maintain the lifetime of the instances until all outstanding tasks using them are
         // complete.
         swap(savedInstances, _instances);
 
         _state = State::kShutdown;
+        // shutdown can race with startup, so access _hasExecutor in this critical section.
+        hasExecutor = _getHasExecutor();
     }
 
     for (auto& instance : savedInstances) {
@@ -436,13 +451,21 @@ void PrimaryOnlyService::shutdown() {
         // Make sure to shut down the scoped executor before the parent executor to avoid
         // SERVER-50612.
         (*savedScopedExecutor)->shutdown();
-        // No need to join() here since joining the parent executor below will join with all tasks
-        // owned by the scoped executor.
+        // Ensures all work on scoped task executor is completed; in-turn ensures that
+        // Instance::_finishedNotifyFuture gets set if instance is running.
+        (*savedScopedExecutor)->join();
     }
 
-    if (savedExecutor) {
-        savedExecutor->shutdown();
-        savedExecutor->join();
+    // Ensures that the instance cleanup (if any) gets completed before shutting down the
+    // parent task executor.
+    for (auto& instance : savedInstances) {
+        if (instance.second->_running)
+            instance.second->_finishedNotifyFuture->wait();
+    }
+
+    if (hasExecutor) {
+        _executor->shutdown();
+        _executor->join();
     }
     savedInstances.clear();
 }
@@ -519,6 +542,15 @@ void PrimaryOnlyService::releaseInstance(const InstanceID& id) {
 void PrimaryOnlyService::releaseAllInstances() {
     stdx::lock_guard lk(_mutex);
     _instances.clear();
+}
+
+void PrimaryOnlyService::_setHasExecutor(WithLock) {
+    auto hadExecutor = _hasExecutor.swap(true);
+    invariant(!hadExecutor);
+}
+
+bool PrimaryOnlyService::_getHasExecutor() const {
+    return _hasExecutor.load();
 }
 
 void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
@@ -636,7 +668,6 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl,
         ->schedule([this,
                     instance = std::move(instance),
                     scopedExecutor = _scopedExecutor,
-                    executor = _executor,
                     instanceID](auto status) {
             if (ErrorCodes::isCancelationError(status) ||
                 ErrorCodes::InterruptedDueToReplStateChange ==  // from kExecutorShutdownStatus
@@ -655,7 +686,7 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl,
                 "Starting instance of PrimaryOnlyService",
                 "service"_attr = getServiceName(),
                 "instanceID"_attr = instanceID);
-            instance->run(std::move(scopedExecutor));
+            instance->_finishedNotifyFuture = instance->run(std::move(scopedExecutor));
         });
 }
 

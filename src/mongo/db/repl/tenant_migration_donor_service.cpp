@@ -475,7 +475,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
                                    RecipientForgetMigration(_stateDoc.getId()).toBSON(BSONObj()));
 }
 
-void TenantMigrationDonorService::Instance::run(
+SemiFuture<void> TenantMigrationDonorService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     auto recipientUri =
         uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()));
@@ -487,7 +487,7 @@ void TenantMigrationDonorService::Instance::run(
             delete p;
         });
 
-    ExecutorFuture<void>(**executor)
+    return ExecutorFuture<void>(**executor)
         .then([this, self = shared_from_this(), executor] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kUninitialized) {
                 return ExecutorFuture<void>(**executor, Status::OK());
@@ -606,7 +606,7 @@ void TenantMigrationDonorService::Instance::run(
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
         })
-        .getAsync([this, self = shared_from_this()](Status status) {
+        .onCompletion([this, self = shared_from_this()](Status status) {
             LOGV2(4920400,
                   "Marked migration state as garbage collectable",
                   "migrationId"_attr = _stateDoc.getId(),
@@ -623,7 +623,8 @@ void TenantMigrationDonorService::Instance::run(
             } else {
                 _completionPromise.setError(status);
             }
-        });
+        })
+        .semi();
 }
 
 }  // namespace mongo
