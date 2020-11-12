@@ -124,6 +124,12 @@ for (let i = 0; i < numDocs; i++) {
     });
     jsTestLog('Insertion took ' + ((new Date()).getTime() - start.getTime()) +
               ' ms. Retrieving doc from view: ' + i);
+    start = new Date();
+    const docFromView = coll.findOne({_id: doc._id});
+    assert(docFromView, 'inserted doc missing from time-series view: ' + i + ': ' + tojson(doc));
+    jsTestLog('Doc retrieval took ' + ((new Date()).getTime() - start.getTime()) +
+              ' ms. Doc fetched from view: ' + i + ': ' + tojson(docFromView));
+    assert.docEq(doc, docFromView, 'Invalid document retrieved from view: ' + i);
 
     // Update expected control min/max and data in bucket.
     Object.keys(doc).forEach((key) => {
@@ -136,6 +142,10 @@ for (let i = 0; i < numDocs; i++) {
         expectedBucketDoc.data[key][i] = doc[key];
     });
 }
+
+// Check view.
+const viewDocs = coll.find().toArray();
+assert.eq(numDocs, viewDocs.length, viewDocs);
 
 // Check bucket collection.
 const bucketDocs = bucketsColl.find().toArray();
