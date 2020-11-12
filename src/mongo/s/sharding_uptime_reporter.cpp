@@ -41,6 +41,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostname_canonicalization.h"
@@ -49,6 +50,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(disableShardingUptimeReporterPeriodicThread);
 
 const Seconds kUptimeReportInterval(10);
 
@@ -109,6 +112,10 @@ void ShardingUptimeReporter::startPeriodicThread() {
         const Timer upTimeTimer;
 
         while (!globalInShutdownDeprecated()) {
+            if (MONGO_unlikely(disableShardingUptimeReporterPeriodicThread.shouldFail())) {
+                log() << "The sharding uptime reporter periodic thread is disabled for testing";
+                return;
+            }
             {
                 auto opCtx = cc().makeOperationContext();
                 reportStatus(opCtx.get(), instanceId, hostName, upTimeTimer);
