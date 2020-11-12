@@ -109,6 +109,78 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
     return view->isTimeseries();
 }
 
+// Default for control.version in time-series bucket collection.
+const int kTimeseriesControlVersion = 1;
+
+/**
+ * Returns min/max $set expressions for the bucket's control field.
+ */
+BSONObj makeTimeseriesControlMinMaxStages(const BSONObj& doc) {
+    BSONObjBuilder builder;
+    for (const auto& elem : doc) {
+        auto key = elem.fieldNameStringData();
+        builder.append("control.min." + key,
+                       BSON("$min" << BSON_ARRAY(("$control.min." + key) << elem)));
+        builder.append("control.max." + key,
+                       BSON("$max" << BSON_ARRAY(("$control.max." + key) << elem)));
+    }
+    return builder.obj();
+}
+
+/**
+ * Returns $set expressions for the bucket's data field.
+ */
+BSONObj makeTimeseriesDataStages(const BSONObj& doc) {
+    BSONObjBuilder builder;
+    for (const auto& elem : doc) {
+        auto key = elem.fieldNameStringData();
+        builder.append(
+            "data." + key,
+            BSON("$arrayToObject" << BSON(
+                     "$setUnion" << BSON_ARRAY(
+                         BSON("$objectToArray"
+                              << BSON("$ifNull" << BSON_ARRAY(("$data." + key) << BSONObj())))
+                         << BSON_ARRAY(BSON(
+                                "k" << BSON("$toString"
+                                            << BSON("$ifNull" << BSON_ARRAY("$control.count" << 0)))
+                                    << elem.wrap("v").firstElement()))))));
+    }
+    return builder.obj();
+}
+
+/**
+ * Transforms a single time-series insert to an upsert request.
+ */
+BSONObj makeTimeseriesUpsertRequest(const BSONObj& doc) {
+    BSONObjBuilder builder;
+    // TODO(SERVER-52523): Obtain _id of bucket to update from in-memory catalog.
+    builder.append(write_ops::UpdateOpEntry::kQFieldName, BSONObj());  // one bucket for now
+    builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
+    builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
+    {
+        BSONArrayBuilder stagesBuilder(
+            builder.subarrayStart(write_ops::UpdateOpEntry::kUFieldName));
+        stagesBuilder.append(
+            BSON("$set" << BSON("control.version"
+                                << BSON("$ifNull" << BSON_ARRAY("$control.version"
+                                                                << kTimeseriesControlVersion)))));
+        stagesBuilder.append(BSON(
+            "$set" << BSON("control.size"
+                           << BSON("$sum"
+                                   << BSON_ARRAY(BSON("$ifNull" << BSON_ARRAY("$control.size" << 0))
+                                                 << doc.objsize())))));
+        stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(doc)));
+        stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(doc)));
+        // Update 'control.count' last because it is referenced in preceding $set stages in this
+        // aggregation pipeline.
+        stagesBuilder.append(BSON(
+            "$set" << BSON("control.count" << BSON(
+                               "$sum" << BSON_ARRAY(
+                                   BSON("$ifNull" << BSON_ARRAY("$control.count" << 0)) << 1)))));
+    }
+    return builder.obj();
+}
+
 enum class ReplyStyle { kUpdate, kNotUpdate };  // update has extra fields.
 void serializeReply(OperationContext* opCtx,
                     ReplyStyle replyStyle,
@@ -375,17 +447,31 @@ private:
             auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
 
             BSONObjBuilder builder;
-            builder.append("insert"_sd, bucketsNs.coll());
-            builder.appendElementsUnique(_batch.toBSON({}));
+            builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
+            builder.append(write_ops::Update::kBypassDocumentValidationFieldName,
+                           _batch.getBypassDocumentValidation());
+            builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
+            if (auto stmtId = _batch.getStmtId()) {
+                builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
+            } else if (auto stmtIds = _batch.getStmtIds()) {
+                builder.append(write_ops::Update::kStmtIdsFieldName, *stmtIds);
+            }
+            {
+                BSONArrayBuilder updatesBuilder(
+                    builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
+                for (const auto& doc : _batch.getDocuments()) {
+                    updatesBuilder.append(makeTimeseriesUpsertRequest(doc));
+                }
+            }
             auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
 
-            auto timeseriesInsertBatch = InsertOp::parse(request);
+            auto timeseriesUpsertBatch = UpdateOp::parse(request);
 
-            auto reply = write_ops_exec::performInserts(opCtx, timeseriesInsertBatch);
+            auto reply = write_ops_exec::performUpdates(opCtx, timeseriesUpsertBatch);
             serializeReply(opCtx,
-                           ReplyStyle::kNotUpdate,
-                           !timeseriesInsertBatch.getWriteCommandBase().getOrdered(),
-                           timeseriesInsertBatch.getDocuments().size(),
+                           ReplyStyle::kUpdate,
+                           !timeseriesUpsertBatch.getWriteCommandBase().getOrdered(),
+                           timeseriesUpsertBatch.getUpdates().size(),
                            std::move(reply),
                            &result);
         }

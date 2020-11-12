@@ -21,6 +21,8 @@ assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection('t');
 const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 
+coll.drop();
+
 const timeFieldName = 'time';
 assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
@@ -47,39 +49,6 @@ function updateControlDoc(controlDoc, key, newVal) {
     }
 }
 
-/**
- * Returns min/max $set expressions for the bucket's control field.
- */
-function makeControlMinMaxStages(doc) {
-    const fieldsToSet = {};
-    Object.keys(doc).forEach((key) => {
-        fieldsToSet['control.min.' + key] = {$min: ['$control.min.' + key, doc[key]]};
-        fieldsToSet['control.max.' + key] = {$max: ['$control.max.' + key, doc[key]]};
-    });
-    return fieldsToSet;
-}
-
-/**
- * Returns $set expressions for the bucket's data field.
- */
-function makeDataStages(doc) {
-    const fieldsToSet = {};
-    Object.keys(doc).forEach((key) => {
-        fieldsToSet['data.' + key] = {
-            $arrayToObject: {
-                $setUnion: [
-                    {$objectToArray: {$ifNull: ['$data.' + key, {}]}},
-                    [{
-                        k: {$toString: {$ifNull: ['$control.count', 0]}},
-                        v: doc[key],
-                    }],
-                ],
-            },
-        };
-    });
-    return fieldsToSet;
-}
-
 const controlVersion = 1;
 const numDocs = 100;
 const expectedBucketDoc = {
@@ -102,26 +71,7 @@ for (let i = 0; i < numDocs; i++) {
 
     jsTestLog('Inserting doc into time-series collection: ' + i + ': ' + tojson(doc));
     let start = new Date();
-    bucketsColl.findAndModify({
-        // _id.getTimestamp() should be the same as control.min.<timeField>.
-        // query: {_id: {$lte: ObjectId.fromDate(t)}},
-        query: {},        // one bucket for now
-        sort: {_id: -1},  // not available in update command
-        update: [
-            {$set: {'control.version': {$ifNull: ['$control.version', controlVersion]}}},
-            {
-                $set: {
-                    'control.size': {$sum: [{$ifNull: ['$control.size', 0]}, Object.bsonsize(doc)]}
-                }
-            },
-            {$set: makeControlMinMaxStages(doc)},
-            {$set: makeDataStages(doc)},
-            // Update 'control.count' last because it is referenced in preceding $set stages in
-            // this aggregation pipeline.
-            {$set: {'control.count': {$sum: [{$ifNull: ['$control.count', 0]}, 1]}}},
-        ],
-        upsert: true,
-    });
+    assert.commandWorked(coll.insert(doc));
     jsTestLog('Insertion took ' + ((new Date()).getTime() - start.getTime()) +
               ' ms. Retrieving doc from view: ' + i);
     start = new Date();
