@@ -806,6 +806,9 @@ env.Library(
         'replica_set_messages',
         'storage_interface',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+    ],
 )
 
 env.Library('read_concern_args',

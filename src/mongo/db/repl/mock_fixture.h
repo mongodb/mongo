@@ -59,6 +59,8 @@ public:
             };
         }
 
+        Matcher(const BSONObj& matcherQuery);
+
         Matcher(MatcherFunc matcherFunc) : _matcherFunc(std::move(matcherFunc)) {}
 
         bool operator()(const BSONObj& request) {

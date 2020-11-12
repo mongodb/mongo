@@ -33,12 +33,21 @@
 
 #include "mongo/db/repl/mock_fixture.h"
 
+#include "mongo/db/matcher/matcher.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
 namespace test {
 namespace mock {
+
+MockNetwork::Matcher::Matcher(const BSONObj& matcherQuery) {
+    auto expCtx = make_intrusive<ExpressionContext>(
+        nullptr /* opCtx */, nullptr /* collator */, NamespaceString{"db.coll"} /* dummy nss */);
+    // Expression matcher doesn't have copy constructor, so wrap it in a shared_ptr for capture.
+    auto m = std::make_shared<mongo::Matcher>(matcherQuery, std::move(expCtx));
+    _matcherFunc = [=](const BSONObj& request) { return m->matches(request); };
+}
 
 bool MockNetwork::_allExpectationsSatisfied() const {
     return std::all_of(_expectations.begin(), _expectations.end(), [](const auto& exp) {

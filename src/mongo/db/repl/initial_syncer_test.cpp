@@ -374,11 +374,13 @@ protected:
         _mock = std::make_unique<MockNetwork>(getNet());
         // Default behavior for all tests using this mock.
         _mock->defaultExpect("replSetGetRBID", makeRollbackCheckerResponse(1));
+        _mock->defaultExpect(BSON("find"
+                                  << "oplog.rs"),
+                             makeCursorResponse(
+                                 0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
         _mock->defaultExpect(
-            [](auto& request) { return request["find"].str() == "oplog.rs"; },
-            makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
-        _mock->defaultExpect(
-            [](auto& request) { return request["find"].str() == "transactions"; },
+            BSON("find"
+                 << "transactions"),
             makeCursorResponse(0LL, NamespaceString::kSessionTransactionsTableNamespace, {}, true));
 
         // Usually we're just skipping the cloners in this test, so we provide an empty list
@@ -1746,7 +1748,8 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError_Mock
 
     // This is what we want to test.
     _mock
-        ->expect([](auto& request) { return request["find"].str() == "system.version"; },
+        ->expect(BSON("find"
+                      << "system.version"),
                  RemoteCommandResponse(ErrorCodes::OperationFailed,
                                        "find command failed at sync source"))
         .times(1);
