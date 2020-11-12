@@ -261,38 +261,18 @@ env.Library(
 )
 
 env.Library(
-    target='balancer',
+    target='sharding_catalog_manager',
     source=[
+        'add_shard_util.cpp',
         'balancer/balancer_chunk_selection_policy_impl.cpp',
         'balancer/balancer_chunk_selection_policy.cpp',
-        'balancer/balancer_policy.cpp',
         'balancer/balancer.cpp',
+        'balancer/balancer_policy.cpp',
         'balancer/cluster_statistics_impl.cpp',
         'balancer/cluster_statistics.cpp',
         'balancer/migration_manager.cpp',
         'balancer/scoped_migration_request.cpp',
         'balancer/type_migration.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
-        '$BUILD_DIR/mongo/s/client/sharding_client',
-        '$BUILD_DIR/mongo/s/coreshard',
-        'sharding_logging',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
-        'sharding_runtime_d_params',
-    ],
-)
-
-env.Library(
-    target='sharding_catalog_manager',
-    source=[
-        'add_shard_util.cpp',
         'config/initial_split_policy.cpp',
         'config/namespace_serializer.cpp',
         'config/sharding_catalog_manager_chunk_operations.cpp',
@@ -314,17 +294,24 @@ env.Library(
         'type_shard_identity',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/snapshot_window_options',
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
+        '$BUILD_DIR/mongo/s/catalog/dist_lock_manager',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        'balancer',
+        'sharding_logging',
+        'sharding_runtime_d_params',
     ],
 )
 
@@ -392,9 +379,9 @@ env.Library(
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
-        'balancer',
         'resharding_txn_cloner',
         'resharding_util',
+        'sharding_catalog_manager',
         'sharding_runtime_d',
     ],
 )
@@ -592,9 +579,9 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/replication_info',
         '$BUILD_DIR/mongo/s/catalog/dist_lock_manager_mock',
         '$BUILD_DIR/mongo/util/version_impl',
-        'balancer',
         'config_server_test_fixture',
         'resharding_txn_cloner',
         'resharding_util',
+        'sharding_catalog_manager',
     ],
 )

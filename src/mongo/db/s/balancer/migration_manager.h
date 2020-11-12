@@ -37,6 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/dist_lock_manager.h"
@@ -174,7 +175,17 @@ private:
     // O(1) removal time.
     using MigrationsList = std::list<Migration>;
 
-    using CollectionMigrationsStateMap = stdx::unordered_map<NamespaceString, MigrationsList>;
+    // Tracks the execution of all of the active migrations within a collection. It holds a
+    // NamespaceSerializer lock for the corresponding nss, which will be released when all of the
+    // scheduled chunk migrations for this collection have completed.
+    struct MigrationsState {
+        MigrationsState(NamespaceSerializer::ScopedLock lock);
+
+        MigrationsList migrationsList;
+        NamespaceSerializer::ScopedLock nsSerializerLock;
+    };
+
+    using CollectionMigrationsStateMap = stdx::unordered_map<NamespaceString, MigrationsState>;
 
     using ScopedMigrationRequestsMap =
         std::map<MigrationIdentifier, StatusWith<ScopedMigrationRequest>>;

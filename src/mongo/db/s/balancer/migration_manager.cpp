@@ -410,7 +410,7 @@ void MigrationManager::interruptAndDisableMigrations() {
 
     // Interrupt any active migrations with dist lock
     for (auto& cmsEntry : _activeMigrations) {
-        auto& migrations = cmsEntry.second;
+        auto& migrations = cmsEntry.second.migrationsList;
 
         for (auto& migration : migrations) {
             if (migration.callbackHandle) {
@@ -526,6 +526,10 @@ void MigrationManager::_schedule(WithLock lock,
     if (it == _activeMigrations.end()) {
         const std::string whyMessage(stream() << "Migrating chunk(s) in collection " << nss.ns());
 
+        // Acquire the NamespaceSerializer lock for this nss (blocking call)
+        auto scopedCollLock =
+            ShardingCatalogManager::get(opCtx)->serializeCreateOrDropCollection(opCtx, nss);
+
         // Acquire the collection distributed lock (blocking call)
         auto statusWithDistLockHandle =
             Grid::get(opCtx)->catalogClient()->getDistLockManager()->lockWithSessionID(
@@ -542,7 +546,8 @@ void MigrationManager::_schedule(WithLock lock,
             return;
         }
 
-        it = _activeMigrations.insert(std::make_pair(nss, MigrationsList())).first;
+        MigrationsState migrationsState(std::move(scopedCollLock));
+        it = _activeMigrations.insert(std::make_pair(nss, std::move(migrationsState))).first;
     }
 
     auto migrationRequestStatus = Status::OK();
@@ -561,7 +566,7 @@ void MigrationManager::_schedule(WithLock lock,
         }
     }
 
-    auto migrations = &it->second;
+    auto migrations = &it->second.migrationsList;
 
     // Add ourselves to the list of migrations on this collection
     migrations->push_front(std::move(migration));
@@ -609,7 +614,7 @@ void MigrationManager::_complete(WithLock lock,
     auto it = _activeMigrations.find(nss);
     invariant(it != _activeMigrations.end());
 
-    auto migrations = &it->second;
+    auto migrations = &it->second.migrationsList;
     migrations->erase(itMigration);
 
     if (migrations->empty()) {
@@ -717,5 +722,8 @@ MigrationManager::Migration::Migration(NamespaceString inNss, BSONObj inMoveChun
 MigrationManager::Migration::~Migration() {
     invariant(completionNotification);
 }
+
+MigrationManager::MigrationsState::MigrationsState(NamespaceSerializer::ScopedLock lock)
+    : nsSerializerLock(std::move(lock)) {}
 
 }  // namespace mongo

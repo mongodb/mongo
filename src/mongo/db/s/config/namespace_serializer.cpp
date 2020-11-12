@@ -45,18 +45,25 @@ namespace mongo {
 NamespaceSerializer::NamespaceSerializer() {}
 
 NamespaceSerializer::ScopedLock::ScopedLock(StringData ns, NamespaceSerializer& nsSerializer)
-    : _ns(ns.toString()), _nsSerializer(nsSerializer) {}
+    : _ns(ns.toString()), _nsSerializer(nsSerializer), _owns(true) {}
+
+NamespaceSerializer::ScopedLock::ScopedLock(ScopedLock&& other)
+    : _ns(std::move(other._ns)), _nsSerializer(other._nsSerializer), _owns(true) {
+    other._owns = false;
+}
 
 NamespaceSerializer::ScopedLock::~ScopedLock() {
-    stdx::unique_lock<Latch> lock(_nsSerializer._mutex);
-    auto iter = _nsSerializer._inProgressMap.find(_ns);
+    if (_owns) {
+        stdx::unique_lock<Latch> lock(_nsSerializer._mutex);
+        auto iter = _nsSerializer._inProgressMap.find(_ns);
 
-    iter->second->numWaiting--;
-    iter->second->isInProgress = false;
-    iter->second->cvLocked.notify_all();
+        iter->second->numWaiting--;
+        iter->second->isInProgress = false;
+        iter->second->cvLocked.notify_all();
 
-    if (iter->second->numWaiting == 0) {
-        _nsSerializer._inProgressMap.erase(_ns);
+        if (iter->second->numWaiting == 0) {
+            _nsSerializer._inProgressMap.erase(_ns);
+        }
     }
 }
 

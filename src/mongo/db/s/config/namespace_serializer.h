@@ -53,12 +53,19 @@ public:
     public:
         ~ScopedLock();
 
+        ScopedLock(const ScopedLock&) = delete;
+        ScopedLock& operator=(const ScopedLock&) = delete;
+
+        ScopedLock(ScopedLock&& other);
+        ScopedLock& operator=(ScopedLock&& other) = delete;
+
     private:
         friend class NamespaceSerializer;
         ScopedLock(StringData ns, NamespaceSerializer& nsSerializer);
 
         std::string _ns;
         NamespaceSerializer& _nsSerializer;
+        bool _owns;
     };
 
     NamespaceSerializer();
