@@ -41,7 +41,7 @@ clearOCSPCache();
 
 test();
 
-let mock_ocsp = new MockOCSPServer("", 1000);
+let mock_ocsp = new MockOCSPServer("", 10000);
 mock_ocsp.start();
 
 clearOCSPCache();
@@ -75,7 +75,7 @@ sleep(2000);
 
 MongoRunner.runHangAnalyzer.enable();
 
-mock_ocsp = new MockOCSPServer("", 1000);
+mock_ocsp = new MockOCSPServer("", 10000);
 mock_ocsp.start();
 
 // Get the mongos back up again so that we can shutdown the ShardingTest.
