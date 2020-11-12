@@ -334,6 +334,14 @@ void generateArraySize(MatchExpressionVisitorContext* context,
 
     auto makePredicate = [&](sbe::value::SlotId inputSlot,
                              EvalStage inputStage) -> EvalExprStagePair {
+        // Before generating a final leaf traverse stage, check that the thing we are about
+        // traverse is indeed an array.
+        auto fromBranch =
+            makeFilter<false>(std::move(inputStage),
+                              sbe::makeE<sbe::EFunction>(
+                                  "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot))),
+                              context->planNodeId);
+
         // Generate a traverse that projects the integer value 1 for each element in the array and
         // then sums up the 1's, resulting in the count of elements in the array.
         auto innerSlot = context->slotIdGenerator->generate();
@@ -346,7 +354,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
 
         auto traverseSlot = context->slotIdGenerator->generate();
         auto traverseStage =
-            makeTraverse(EvalStage{},
+            makeTraverse(std::move(fromBranch),
                          std::move(innerBranch),
                          inputSlot,
                          traverseSlot,
@@ -372,23 +380,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
                                            sbe::value::bitcastFrom<int64_t>(0))));
 
-        std::vector<EvalExprStagePair> branches;
-
-        // Check that the thing we are about traverse is indeed an array.
-        branches.emplace_back(makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                                  "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot)))),
-                              EvalStage{});
-
-        branches.emplace_back(std::move(sizeOutput), std::move(traverseStage));
-
-        auto [opOutput, opStage] = generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicAnd,
-                                                                    std::move(branches),
-                                                                    context->planNodeId,
-                                                                    context->slotIdGenerator);
-
-        inputStage = makeLoopJoin(std::move(inputStage), std::move(opStage), context->planNodeId);
-
-        return {std::move(opOutput), std::move(inputStage)};
+        return {std::move(sizeOutput), std::move(traverseStage)};
     };
 
     generatePredicate(context,
