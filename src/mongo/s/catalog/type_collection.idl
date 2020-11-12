@@ -62,6 +62,19 @@ structs:
                 description: "Contains the time of when the collection was either created, or if
                               dropped = true, when it was dropped."
                 optional: false
+            timestamp:
+                type: timestamp
+                description: "Uniquely identifies this incarnation of the collection. Only changes
+                              in case of drop and create, or shard key refine.
+                              This field will store the ClusterTime of the Config Server when the
+                              collection was created or it's shard key last refined. Because
+                              timestamps are comparable, we are able to define a total order in time
+                              in the collection. This field will replace Epoch, which are not
+                              comparable.
+
+                              It is optional for parsing purposes, because in versions of MongoDB
+                              prior to 5.0, this value wasn't being written."
+                optional: true
             uuid:
                 cpp_name: pre50CompatibleUuid
                 type: uuid
