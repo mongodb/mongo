@@ -11,6 +11,9 @@ load('jstests/ssl/libs/ssl_helpers.js');
 (function() {
 'use strict';
 
+// The check orphans hook needs to be able to connect to the individual shards.
+TestData.skipCheckOrphans = true;
+
 var transitionToX509AllowSSL =
     Object.merge(allowSSL, {transitionToAuth: '', clusterAuthMode: 'x509'});
 var transitionToX509PreferSSL =

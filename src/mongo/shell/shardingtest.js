@@ -1466,10 +1466,20 @@ var ShardingTest = function(params) {
         for (var i = 0; i < numShards; i++) {
             print("ShardingTest initiating replica set for shard: " + this._rs[i].setName);
 
+            // The mongo shell cannot authenticate as the internal __system user in tests that use
+            // x509 for cluster authentication. Choosing the default value for
+            // wcMajorityJournalDefault in ReplSetTest cannot be done automatically without the
+            // shell performing such  authentication, so allow tests to pass the value in.
+            let rstConfig = this._rs[i].test.getReplSetConfig();
+            if (otherParams.hasOwnProperty("writeConcernMajorityJournalDefault")) {
+                rstConfig.writeConcernMajorityJournalDefault =
+                    otherParams.writeConcernMajorityJournalDefault;
+            }
+
             // ReplSetTest.initiate() requires all nodes to be to be authorized to run
             // replSetGetStatus.
             // TODO(SERVER-14017): Remove this in favor of using initiate() everywhere.
-            this._rs[i].test.initiateWithAnyNodeAsPrimary();
+            this._rs[i].test.initiateWithAnyNodeAsPrimary(rstConfig);
 
             this["rs" + i] = this._rs[i].test;
             this._rsObjects[i] = this._rs[i].test;

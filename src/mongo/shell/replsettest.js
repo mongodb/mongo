@@ -1625,14 +1625,16 @@ var ReplSetTest = function(opts) {
             // solution.
             const masterId = "n" + rst.getNodeId(master);
             const masterOptions = rst.nodeOptions[masterId] || {};
-            if (masterOptions.clusterAuthMode === "x509") {
+            const options =
+                (masterOptions === {} || !self.startOptions) ? masterOptions : self.startOptions;
+            if (options.clusterAuthMode === "x509") {
                 print("AwaitLastStableRecoveryTimestamp: authenticating on separate shell " +
                       "with x509 for " + id);
                 const subShellArgs = [
                     'mongo',
                     '--ssl',
-                    '--sslCAFile=' + masterOptions.sslCAFile,
-                    '--sslPEMKeyFile=' + masterOptions.sslPEMKeyFile,
+                    '--sslCAFile=' + options.sslCAFile,
+                    '--sslPEMKeyFile=' + options.sslPEMKeyFile,
                     '--sslAllowInvalidHostnames',
                     '--authenticationDatabase=$external',
                     '--authenticationMechanism=MONGODB-X509',
@@ -1644,11 +1646,11 @@ var ReplSetTest = function(opts) {
                 const retVal = _runMongoProgram(...subShellArgs);
                 assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
             } else {
-                if (masterOptions.clusterAuthMode) {
+                if (options.clusterAuthMode) {
                     print("AwaitLastStableRecoveryTimestamp: authenticating with " +
-                          masterOptions.clusterAuthMode + " for " + id);
+                          options.clusterAuthMode + " for " + id);
                 }
-                asCluster(master, appendOplogNoteFn, masterOptions.keyFile);
+                asCluster(master, appendOplogNoteFn, options.keyFile);
             }
         }
 

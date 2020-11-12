@@ -122,13 +122,26 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         // authorized to do if auth is enabled.
         //
         // Once SERVER-14017 is fixed the "enableBalancer" line can be removed.
-        // TODO: SERVER-43899 Make sharding_with_x509.js and mixed_mode_sharded_transition.js start
-        // shards as replica sets.
+
+        // The mongo shell cannot authenticate as the internal __system user in tests that use x509
+        // for cluster authentication. Choosing the default value for wcMajorityJournalDefault in
+        // ReplSetTest cannot be done automatically without the shell performing such
+        // authentication, so in this test we must make the choice explicitly, based on the global
+        // test options.
+        if (jsTestOptions().noJournal || jsTestOptions().storageEngine == "ephemeralForTest" ||
+            jsTestOptions().storageEngine == "inMemory") {
+            wcMajorityJournalDefault = false;
+        } else {
+            wcMajorityJournalDefault = true;
+        }
         var st = new ShardingTest({
             mongos: [options1],
             config: [options1],
             shards: [options1, options2],
-            other: {enableBalancer: true, shardAsReplicaSet: false},
+            other: {
+                enableBalancer: true,
+                writeConcernMajorityJournalDefault: wcMajorityJournalDefault
+            },
         });
 
         // Create admin user in case the options include auth
@@ -136,10 +149,6 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         st.admin.auth('admin', 'pwd');
 
         authSucceeded = true;
-
-        // TODO (SERVER-48261): Run this test in FCV 4.4. It currently cannot be because the
-        // resumable range deleter only works on replica set shards.
-        assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: "4.2"}));
 
         st.stopBalancer();
         st.disableAutoSplit();
@@ -201,13 +210,6 @@ function mixedShardTest(options1, options2, shouldSucceed) {
                     'CN=client,OU=KernelUser,O=MongoDB,L=New York City,ST=New York,C=US';
                 st.s.getDB('$external')
                     .createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
-
-                // Check orphan hook needs a privileged user to auth as.
-                // Works only for stand alone shards.
-                st._connections.forEach((shardConn) => {
-                    shardConn.getDB('$external')
-                        .createUser({user: x509User, roles: [{role: '__system', db: 'admin'}]});
-                });
             }
 
             st.stop();
