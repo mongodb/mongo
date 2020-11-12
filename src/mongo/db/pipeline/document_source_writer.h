@@ -61,7 +61,9 @@ public:
         _originalArgs = repl::ReadConcernArgs::get(_opCtx);
         _originalSource = _opCtx->recoveryUnit()->getTimestampReadSource();
         if (_originalSource == RecoveryUnit::ReadSource::kProvided) {
-            _originalTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+            // Storage engine operations require at least Global IS.
+            Lock::GlobalLock lk(_opCtx, MODE_IS);
+            _originalTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx);
         }
 
         repl::ReadConcernArgs::get(_opCtx) = repl::ReadConcernArgs();

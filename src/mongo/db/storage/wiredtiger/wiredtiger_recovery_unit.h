@@ -117,7 +117,7 @@ public:
 
     Status majorityCommittedSnapshotAvailable() const override;
 
-    boost::optional<Timestamp> getPointInTimeReadTimestamp() override;
+    boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) override;
 
     Status setTimestamp(Timestamp timestamp) override;
 

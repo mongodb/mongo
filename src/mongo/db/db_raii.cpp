@@ -145,7 +145,7 @@ AutoGetCollectionForReadBase<AutoGetCollectionType>::AutoGetCollectionForReadBas
             readSource = *newReadSource;
         }
 
-        const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+        const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
         const auto afterClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAfterClusterTime();
         if (readTimestamp && afterClusterTime) {
             // Readers that use afterClusterTime have already waited at a higher level for the

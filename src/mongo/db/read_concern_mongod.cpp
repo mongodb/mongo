@@ -511,7 +511,11 @@ Status waitForSpeculativeMajorityReadConcernImpl(
         // Speculative majority reads are required to use the 'kNoOverlap' read source.
         invariant(opCtx->recoveryUnit()->getTimestampReadSource() ==
                   RecoveryUnit::ReadSource::kNoOverlap);
-        boost::optional<Timestamp> readTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+
+        // Storage engine operations require at least Global IS.
+        Lock::GlobalLock lk(opCtx, MODE_IS);
+        boost::optional<Timestamp> readTs =
+            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
         invariant(readTs);
         waitTs = *readTs;
     }

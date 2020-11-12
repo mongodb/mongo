@@ -225,7 +225,7 @@ public:
     ReadSource getTimestampReadSource() const override {
         return _source;
     };
-    boost::optional<Timestamp> getPointInTimeReadTimestamp() override {
+    boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) override {
         return _timestamp;
     }
 
@@ -255,17 +255,17 @@ void ReadSourceScopeTest::setUp() {
 TEST_F(ReadSourceScopeTest, RestoreReadSource) {
     opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kProvided, Timestamp(1, 2));
     ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
-    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), Timestamp(1, 2));
+    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx()), Timestamp(1, 2));
     {
         ReadSourceScope scope(opCtx(), ReadSource::kNoTimestamp);
         ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kNoTimestamp);
 
         opCtx()->recoveryUnit()->setTimestampReadSource(ReadSource::kNoOverlap);
         ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kNoOverlap);
-        ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), boost::none);
+        ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx()), boost::none);
     }
     ASSERT_EQ(opCtx()->recoveryUnit()->getTimestampReadSource(), ReadSource::kProvided);
-    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(), Timestamp(1, 2));
+    ASSERT_EQ(opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx()), Timestamp(1, 2));
 }
 
 }  // namespace

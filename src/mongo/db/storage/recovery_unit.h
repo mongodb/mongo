@@ -269,7 +269,7 @@ public:
      *
      * This may passively start a storage engine transaction to establish a read timestamp.
      */
-    virtual boost::optional<Timestamp> getPointInTimeReadTimestamp() {
+    virtual boost::optional<Timestamp> getPointInTimeReadTimestamp(OperationContext* opCtx) {
         return boost::none;
     }
 

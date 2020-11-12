@@ -236,7 +236,7 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     if (rs != RecoveryUnit::ReadSource::kNoTimestamp) {
         invariant(rs == RecoveryUnit::ReadSource::kNoOverlap);
         invariant(isBackground());
-        _validateTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+        _validateTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
     }
 
     const IndexCatalog* indexCatalog = _collection->getIndexCatalog();

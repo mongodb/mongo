@@ -506,7 +506,8 @@ Status WiredTigerRecoveryUnit::majorityCommittedSnapshotAvailable() const {
     return Status::OK();
 }
 
-boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp() {
+boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp(
+    OperationContext* opCtx) {
     // After a ReadSource has been set on this RecoveryUnit, callers expect that this method returns
     // the read timestamp that will be used for current or future transactions. Because callers use
     // this timestamp to inform visibility of operations, it is therefore necessary to open a
@@ -529,7 +530,8 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp()
             break;
     }
 
-    // Ensure a transaction is opened.
+    // Ensure a transaction is opened. Storage engine operations require the global lock.
+    invariant(opCtx->lockState()->isNoop() || opCtx->lockState()->isLocked());
     getSession();
 
     switch (_timestampReadSource) {

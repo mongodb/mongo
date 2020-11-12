@@ -229,7 +229,7 @@ TEST_F(SnapshotManagerTests, ConsistentIfNotSupported) {
     auto ru = op->recoveryUnit();
     auto readSource = ru->getTimestampReadSource();
     ASSERT(readSource != RecoveryUnit::ReadSource::kMajorityCommitted);
-    ASSERT(!ru->getPointInTimeReadTimestamp());
+    ASSERT(!ru->getPointInTimeReadTimestamp(op));
 }
 
 TEST_F(SnapshotManagerTests, FailsWithNoCommittedSnapshot) {

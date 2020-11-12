@@ -590,13 +590,13 @@ TEST_F(QueryStageSubplanTest, ShouldThrowOnRestoreIfIndexDroppedBeforePlanSelect
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
 
+    boost::optional<AutoGetCollectionForReadCommand> collLock;
+    collLock.emplace(opCtx(), nss);
+
     // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
     // the query.
     QueryPlannerParams params;
     fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
-
-    boost::optional<AutoGetCollectionForReadCommand> collLock;
-    collLock.emplace(opCtx(), nss);
 
     // Create the SubplanStage.
     WorkingSet workingSet;
@@ -636,13 +636,14 @@ TEST_F(QueryStageSubplanTest, ShouldNotThrowOnRestoreIfIndexDroppedAfterPlanSele
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(queryRequest)));
 
+    boost::optional<AutoGetCollectionForReadCommand> collLock;
+    collLock.emplace(opCtx(), nss);
+
+
     // Add 4 indices: 2 for each predicate to choose from, and one index which is not relevant to
     // the query.
     QueryPlannerParams params;
     fillOutPlannerParams(opCtx(), collection, canonicalQuery.get(), &params);
-
-    boost::optional<AutoGetCollectionForReadCommand> collLock;
-    collLock.emplace(opCtx(), nss);
 
     // Create the SubplanStage.
     WorkingSet workingSet;

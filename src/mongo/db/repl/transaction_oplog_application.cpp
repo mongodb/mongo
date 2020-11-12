@@ -136,6 +136,8 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
 
         status = _applyOperationsForTransaction(opCtx, ops, mode);
         if (status.isOK()) {
+            // If the transaction was empty then we have no locks, ensure at least Global IX.
+            Lock::GlobalLock lk(opCtx, MODE_IX);
             opCtx->recoveryUnit()->setPrepareTimestamp(commitTimestamp);
             wunit.prepare();
 

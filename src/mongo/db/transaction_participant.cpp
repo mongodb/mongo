@@ -124,6 +124,9 @@ struct ActiveTransactionHistory {
 
 ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                                                        const LogicalSessionId& lsid) {
+    // Storage engine operations require at least Global IS.
+    Lock::GlobalLock lk(opCtx, MODE_IS);
+
     // Restore the current timestamp read source after fetching transaction history using
     // DBDirectClient, which may change our ReadSource.
     ReadSourceScope readSourceScope(opCtx, RecoveryUnit::ReadSource::kNoTimestamp);
@@ -621,7 +624,7 @@ void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opC
     if (readConcernArgs.getArgsAtClusterTime()) {
         // Read concern code should have already set the timestamp on the recovery unit.
         const auto readTimestamp = readConcernArgs.getArgsAtClusterTime()->asTimestamp();
-        const auto ruTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+        const auto ruTs = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
         invariant(readTimestamp == ruTs,
                   "readTimestamp: {}, pointInTime: {}"_format(readTimestamp.toString(),
                                                               ruTs ? ruTs->toString() : "none"));

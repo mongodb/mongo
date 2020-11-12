@@ -1446,7 +1446,7 @@ Timestamp StorageInterfaceImpl::getOldestOpenReadTimestamp(ServiceContext* servi
 }
 
 Timestamp StorageInterfaceImpl::getPointInTimeReadTimestamp(OperationContext* opCtx) const {
-    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+    auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
     invariant(readTimestamp);
     return *readTimestamp;
 }

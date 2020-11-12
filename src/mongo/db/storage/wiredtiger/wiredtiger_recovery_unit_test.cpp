@@ -172,9 +172,11 @@ private:
 };
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, SetReadSource) {
+    // Storage engine operations require at least Global IS.
+    Lock::GlobalLock lk(clientAndCtx1.second.get(), MODE_IS);
     ru1->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, Timestamp(1, 1));
     ASSERT_EQ(RecoveryUnit::ReadSource::kProvided, ru1->getTimestampReadSource());
-    ASSERT_EQ(Timestamp(1, 1), ru1->getPointInTimeReadTimestamp());
+    ASSERT_EQ(Timestamp(1, 1), ru1->getPointInTimeReadTimestamp(clientAndCtx1.second.get()));
 }
 
 TEST_F(WiredTigerRecoveryUnitTestFixture, NoOverlapReadSource) {

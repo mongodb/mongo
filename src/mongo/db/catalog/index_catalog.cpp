@@ -67,8 +67,9 @@ const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
         ++_iterator;
 
         if (auto minSnapshot = entry->getMinimumVisibleSnapshot()) {
-            auto mySnapshot = _opCtx->recoveryUnit()->getPointInTimeReadTimestamp().get_value_or(
-                _opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+            auto mySnapshot =
+                _opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx).get_value_or(
+                    _opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
 
             if (!mySnapshot.isNull() && mySnapshot < minSnapshot.get()) {
                 // This index isn't finished in my snapshot.

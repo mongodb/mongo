@@ -351,7 +351,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedUnavailable) {
 
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
-    ASSERT_FALSE(client1.second.get()->recoveryUnit()->getPointInTimeReadTimestamp());
+    ASSERT_FALSE(
+        client1.second.get()->recoveryUnit()->getPointInTimeReadTimestamp(client1.second.get()));
     ASSERT_FALSE(client1.second.get()->lockState()->isLockHeldForMode(
         resourceIdParallelBatchWriterMode, MODE_IS));
 }

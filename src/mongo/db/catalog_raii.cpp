@@ -135,8 +135,9 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
             _resolvedNss != NamespaceString::kRsOplogNamespace) {
 
             if (auto minSnapshot = _coll->getMinimumVisibleSnapshot()) {
-                auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp().get_value_or(
-                    opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+                auto mySnapshot =
+                    opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).get_value_or(
+                        opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
 
                 uassert(ErrorCodes::SnapshotUnavailable,
                         str::stream()
@@ -393,7 +394,7 @@ ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
     : _opCtx(opCtx), _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()) {
 
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
-        _originalReadTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp();
+        _originalReadTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx);
     }
 
     _opCtx->recoveryUnit()->abandonSnapshot();

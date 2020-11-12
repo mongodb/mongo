@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
@@ -41,6 +42,9 @@ using ShardedProcessInterfaceTest = ShardedAggTestFixture;
 
 TEST_F(ShardedProcessInterfaceTest, TestInsert) {
     setupNShards(2);
+
+    // Need a real locker for storage operations.
+    getClient()->swapLockState(std::make_unique<LockerImpl>());
 
     const NamespaceString kOutNss = NamespaceString{"unittests-out", "sharded_agg_test"};
     auto outStage = DocumentSourceOut::create(kOutNss, expCtx());
