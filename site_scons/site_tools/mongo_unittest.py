@@ -30,6 +30,13 @@ def exists(env):
 
 
 def build_cpp_unit_test(env, target, source, **kwargs):
+    if not isinstance(target, list):
+        target = [target]
+
+    for t in target:
+        if not t.endswith('_test'):
+            env.ConfError(f"CppUnitTest target `{t}' does not end in `_test'")
+
     if not kwargs.get("UNITTEST_HAS_CUSTOM_MAINLINE", False):
         libdeps = kwargs.get("LIBDEPS", env.get("LIBDEPS", [])).copy()
         insort_wrapper(libdeps, "$BUILD_DIR/mongo/unittest/unittest_main")
