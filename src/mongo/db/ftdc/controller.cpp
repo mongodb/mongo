@@ -191,7 +191,7 @@ void FTDCController::stop() {
 void FTDCController::doLoop() noexcept {
     // Note: All exceptions thrown in this loop are considered process fatal. The default terminate
     // is used to provide a good stack trace of the issue.
-    Client::initThread("ftdc");
+    Client::initThread(kFTDCThreadName);
     Client* client = &cc();
 
     // Update config

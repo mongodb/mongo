@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+constexpr StringData kFTDCThreadName = "ftdc"_sd;
+
 /**
  * Utilities for inflating and deflating BSON documents and metric arrays
  */

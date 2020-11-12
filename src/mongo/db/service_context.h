@@ -404,9 +404,10 @@ public:
     //
 
     /**
-     * Signal all OperationContext(s) that they have been killed.
+     * Signal all OperationContext(s) that they have been killed except the ones belonging to the
+     * excluded clients.
      */
-    void setKillAllOperations();
+    void setKillAllOperations(const std::set<std::string>& excludedClients = {});
 
     /**
      * Reset the operation kill state after a killAllOperations.

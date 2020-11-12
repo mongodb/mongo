@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 class OplogStonesServerStatusSection : public ServerStatusSection {
@@ -54,6 +57,14 @@ public:
         if (!opCtx->getServiceContext()->getStorageEngine()->supportsOplogStones()) {
             return builder.obj();
         }
+
+        Lock::GlobalLock lk(
+            opCtx, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
+        if (!lk.isLocked()) {
+            LOGV2_DEBUG(4822100, 2, "Failed to retrieve oplogTruncation statistics");
+            return BSONObj();
+        }
+
         AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
         auto oplog = oplogRead.getCollection();
         if (oplog) {
