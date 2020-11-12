@@ -23,11 +23,19 @@ const testOptions = function(allowed,
                              timeseriesOptions = {
                                  timeField: "time"
                              },
-                             errorCode = ErrorCodes.InvalidOptions) {
+                             errorCode = ErrorCodes.InvalidOptions,
+                             fixture = {
+                                 // This method is run before creating time-series collection.
+                                 setUp: (testDB, collName) => {},
+                                 // This method is run at the end of this function after
+                                 // passing all the test assertions.
+                                 tearDown: (testDB, collName) => {},
+                             }) {
     const testDB = db.getSiblingDB(jsTestName());
     const collName = 'timeseries_' + collCount++;
     const bucketsCollName = 'system.buckets.' + collName;
 
+    fixture.setUp(testDB, collName);
     const res = testDB.runCommand(
         Object.extend({create: collName, timeseries: timeseriesOptions}, createOptions));
     if (allowed) {
@@ -44,6 +52,8 @@ const testOptions = function(allowed,
     } else {
         assert.commandFailedWithCode(res, errorCode);
     }
+
+    fixture.tearDown(testDB, collName);
 
     assert(!testDB.getCollectionNames().includes(collName));
     assert(!testDB.getCollectionNames().includes(bucketsCollName));
@@ -63,6 +73,15 @@ const testIncompatibleCreateOptions = function(createOptions) {
 
 const testCompatibleCreateOptions = function(createOptions) {
     testOptions(true, createOptions);
+};
+
+const testTimeseriesNamespaceExists = function(errorCode, setUp) {
+    testOptions(false, {}, {timeField: "time"}, errorCode, {
+        setUp: setUp,
+        tearDown: (testDB, collName) => {
+            assert.commandWorked(testDB.dropDatabase());
+        }
+    });
 };
 
 testValidTimeseriesOptions({timeField: "time"});
@@ -92,4 +111,11 @@ testIncompatibleCreateOptions({validationLevel: "off"});
 testIncompatibleCreateOptions({validationAction: "warn"});
 testIncompatibleCreateOptions({viewOn: "coll"});
 testIncompatibleCreateOptions({viewOn: "coll", pipeline: []});
+
+testTimeseriesNamespaceExists(17399, (testDB, collName) => {
+    assert.commandWorked(testDB.createCollection(collName));
+});
+testTimeseriesNamespaceExists(ErrorCodes.CommandNotSupportedOnView, (testDB, collName) => {
+    assert.commandWorked(testDB.createView(collName, collName + '_source', []));
+});
 })();
