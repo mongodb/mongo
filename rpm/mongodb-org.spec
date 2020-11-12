@@ -1,5 +1,11 @@
+%if ! %{defined _rundir}
+%define _rundir %{_localstatedir}/run
+%endif
+
 Name: mongodb-org
 Prefix: /usr
+Prefix: /var
+Prefix: /etc
 Conflicts: mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools
 Version: %{dynamic_version}
 Release: %{dynamic_release}%{?dist}
@@ -10,6 +16,10 @@ License: SSPL
 URL: http://www.mongodb.org
 Group: Applications/Databases
 Requires: mongodb-org-server = %{version}, mongodb-org-shell = %{version}, mongodb-org-mongos = %{version}, mongodb-org-tools = %{version}
+
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
+BuildRequires: /usr/bin/pathfix.py, python3-devel
+%endif
 
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
@@ -47,6 +57,13 @@ Requires: openssl, %{timezone_pkg}, %{python_pkg}
 Conflicts: mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-server, mongodb-dev, mongodb-clients, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-enterprise-unstable, mongodb-enterprise-unstable-mongos, mongodb-enterprise-unstable-server, mongodb-enterprise-unstable-shell, mongodb-enterprise-unstable-tools
 Obsoletes: mongo-10gen-server
 Provides: mongo-10gen-server
+
+%if 0%{?suse_version} >= 1210 || 0%{?rhel} >= 700 || 0%{?fedora} >= 15
+BuildRequires: systemd-rpm-macros
+%else
+BuildRequires: systemd
+%{?systemd_requires}
+%endif
 
 %description server
 MongoDB is built for scalability, performance and high availability, scaling from single server deployments to large, complex multi-site architectures. By leveraging in-memory computing, MongoDB provides high performance for both reads and writes. MongoDB’s native replication and automated failover enable enterprise-grade reliability and operational flexibility.
@@ -193,24 +210,30 @@ MongoDB features:
 
 This package provides the MongoDB static library and header files needed to develop MongoDB client software.
 
+#Release builds have no debug symbols, and this prevents packaging errors on RHEL 8.0
+%global debug_package %{nil}
+
 %prep
 %setup
+%if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
+pathfix.py -pni "%{__python3} %{py3_shbang_opts}" bin/install_compass
+%endif
 
 %build
 
 %install
-mkdir -p $RPM_BUILD_ROOT/usr
-cp -rv bin $RPM_BUILD_ROOT/usr
-mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
-cp debian/mongo{,d,s}.1 $RPM_BUILD_ROOT/usr/share/man/man1/
-mkdir -p $RPM_BUILD_ROOT/etc
-cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
-mkdir -p $RPM_BUILD_ROOT/lib/systemd/system
-cp -v rpm/mongod.service $RPM_BUILD_ROOT/lib/systemd/system
-mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
-mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
-mkdir -p $RPM_BUILD_ROOT/var/run/mongodb
-touch $RPM_BUILD_ROOT/var/log/mongodb/mongod.log
+mkdir -p $RPM_BUILD_ROOT%{_prefix}
+cp -rv bin $RPM_BUILD_ROOT%{_prefix}
+mkdir -p $RPM_BUILD_ROOT%{_mandir}/man1
+cp debian/mongo{,d,s}.1 $RPM_BUILD_ROOT%{_mandir}/man1/
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}
+cp -v rpm/mongod.conf $RPM_BUILD_ROOT%{_sysconfdir}/mongod.conf
+mkdir -p $RPM_BUILD_ROOT%{_unitdir}
+cp -v rpm/mongod.service $RPM_BUILD_ROOT%{_unitdir}
+mkdir -p $RPM_BUILD_ROOT%{_sharedstatedir}/mongo
+mkdir -p $RPM_BUILD_ROOT%{_localstatedir}/log/mongodb
+mkdir -p $RPM_BUILD_ROOT%{_rundir}/mongodb
+touch $RPM_BUILD_ROOT%{_localstatedir}/log/mongodb/mongod.log
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -249,14 +272,14 @@ fi
 
 %files server
 %defattr(-,root,root,-)
-%config(noreplace) /etc/mongod.conf
+%config(noreplace) %{_sysconfdir}/mongod.conf
 %{_bindir}/mongod
 %{_mandir}/man1/mongod.1*
-/lib/systemd/system/mongod.service
-%attr(0755,mongod,mongod) %dir /var/lib/mongo
-%attr(0755,mongod,mongod) %dir /var/log/mongodb
-%attr(0755,mongod,mongod) %dir /var/run/mongodb
-%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
+%{_unitdir}/mongod.service
+%attr(0755,mongod,mongod) %dir %{_sharedstatedir}/mongo
+%attr(0755,mongod,mongod) %dir %{_localstatedir}/log/mongodb
+%attr(0755,mongod,mongod) %dir %{_rundir}/mongodb
+%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) %{_localstatedir}/log/mongodb/mongod.log
 %doc LICENSE-Community.txt
 %doc README
 %doc THIRD-PARTY-NOTICES
