@@ -704,6 +704,20 @@ tasks:
       vars:
         test_control: "mixed_workloads"
 
+- name: mixed_workloads_genny_stepdowns
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: "mixed_workloads_genny_stepdowns"
+
+- name: mixed_workloads_genny_rolling_restarts
+  priority: 5
+  commands:
+    - func: f_run_dsi_workload
+      vars:
+        test_control: "mixed_workloads_genny_rolling_restarts"
+
 - name: misc_workloads
   priority: 5
   commands:
@@ -1481,6 +1495,8 @@ buildvariants:
     - name: linkbench_rolling_restarts
     - name: linkbench_non_retryable_writes_stepdowns
     - name: linkbench_non_retryable_writes_rolling_restarts
+    - name: mixed_workloads_genny_stepdowns
+    - name: mixed_workloads_genny_rolling_restarts
 
 - name: linux-3-node-replSet-initialsync
   display_name: Linux 3-Node ReplSet Initial Sync
