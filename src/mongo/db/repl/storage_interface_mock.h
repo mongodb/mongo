@@ -337,8 +337,6 @@ public:
 
     Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const override;
 
-    Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const override;
-
     Status isAdminDbValid(OperationContext* opCtx) override {
         return isAdminDbValidFn(opCtx);
     };

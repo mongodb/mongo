@@ -1004,10 +1004,6 @@ Timestamp StorageEngineImpl::getAllDurableTimestamp() const {
     return _engine->getAllDurableTimestamp();
 }
 
-Timestamp StorageEngineImpl::getOldestOpenReadTimestamp() const {
-    return _engine->getOldestOpenReadTimestamp();
-}
-
 boost::optional<Timestamp> StorageEngineImpl::getOplogNeededForCrashRecovery() const {
     return _engine->getOplogNeededForCrashRecovery();
 }

@@ -111,9 +111,6 @@ public:
     Timestamp getAllDurableTimestamp() const override {
         return {};
     }
-    Timestamp getOldestOpenReadTimestamp() const override {
-        return {};
-    }
 
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const override {
         return boost::none;

@@ -460,13 +460,6 @@ public:
     virtual Timestamp getAllDurableTimestamp(ServiceContext* serviceCtx) const = 0;
 
     /**
-     * Returns the oldest read timestamp in use by an open transaction. Storage engines that support
-     * the 'snapshot' ReadConcern must provide an implementation. Other storage engines may provide
-     * a no-op implementation.
-     */
-    virtual Timestamp getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const = 0;
-
-    /**
      * Registers a timestamp with the storage engine so that it can enforce oplog visiblity rules.
      * orderedCommit - specifies whether the timestamp provided is ordered w.r.t. commits; that is,
      * all commits with older timestamps have already occurred, and any commits with newer

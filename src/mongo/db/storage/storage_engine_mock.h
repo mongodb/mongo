@@ -160,9 +160,6 @@ public:
     Timestamp getAllDurableTimestamp() const final {
         return {};
     }
-    Timestamp getOldestOpenReadTimestamp() const final {
-        return {};
-    }
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
         return boost::none;
     }

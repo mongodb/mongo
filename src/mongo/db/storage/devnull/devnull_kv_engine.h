@@ -125,10 +125,6 @@ public:
         return Timestamp();
     }
 
-    virtual Timestamp getOldestOpenReadTimestamp() const override {
-        return Timestamp();
-    }
-
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final {
         return boost::none;
     }

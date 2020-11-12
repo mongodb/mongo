@@ -423,11 +423,6 @@ public:
     virtual Timestamp getAllDurableTimestamp() const = 0;
 
     /**
-     * See `StorageEngine::getOldestOpenReadTimestamp`
-     */
-    virtual Timestamp getOldestOpenReadTimestamp() const = 0;
-
-    /**
      * See `StorageEngine::getOplogNeededForCrashRecovery`
      */
     virtual boost::optional<Timestamp> getOplogNeededForCrashRecovery() const = 0;

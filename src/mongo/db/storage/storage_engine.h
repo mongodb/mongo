@@ -630,13 +630,6 @@ public:
     virtual Timestamp getAllDurableTimestamp() const = 0;
 
     /**
-     * Returns the oldest read timestamp in use by an open transaction. Storage engines that support
-     * the 'snapshot' ReadConcern must provide an implementation. Other storage engines may provide
-     * a no-op implementation.
-     */
-    virtual Timestamp getOldestOpenReadTimestamp() const = 0;
-
-    /**
      * Returns the minimum possible Timestamp value in the oplog that replication may need for
      * recovery in the event of a crash.
      *

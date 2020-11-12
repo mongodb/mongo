@@ -96,10 +96,6 @@ Timestamp StorageInterfaceMock::getAllDurableTimestamp(ServiceContext* serviceCt
     return allDurableTimestamp;
 }
 
-Timestamp StorageInterfaceMock::getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const {
-    return oldestOpenReadTimestamp;
-}
-
 Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
     LOGV2_DEBUG(21757, 1, "CollectionBulkLoaderMock::init called");
     stats->initCalled = true;

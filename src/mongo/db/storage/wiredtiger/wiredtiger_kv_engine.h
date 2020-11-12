@@ -286,8 +286,6 @@ public:
 
     Timestamp getAllDurableTimestamp() const override;
 
-    Timestamp getOldestOpenReadTimestamp() const override;
-
     bool supportsReadConcernSnapshot() const final override;
 
     bool supportsOplogStones() const final override;

@@ -151,8 +151,6 @@ public:
 
     virtual Timestamp getAllDurableTimestamp() const override;
 
-    virtual Timestamp getOldestOpenReadTimestamp() const override;
-
     boost::optional<Timestamp> getOplogNeededForCrashRecovery() const final;
 
     bool supportsReadConcernSnapshot() const final;

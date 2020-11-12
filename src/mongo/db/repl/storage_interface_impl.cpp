@@ -1441,10 +1441,6 @@ Timestamp StorageInterfaceImpl::getAllDurableTimestamp(ServiceContext* serviceCt
     return serviceCtx->getStorageEngine()->getAllDurableTimestamp();
 }
 
-Timestamp StorageInterfaceImpl::getOldestOpenReadTimestamp(ServiceContext* serviceCtx) const {
-    return serviceCtx->getStorageEngine()->getOldestOpenReadTimestamp();
-}
-
 Timestamp StorageInterfaceImpl::getPointInTimeReadTimestamp(OperationContext* opCtx) const {
     auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
     invariant(readTimestamp);
