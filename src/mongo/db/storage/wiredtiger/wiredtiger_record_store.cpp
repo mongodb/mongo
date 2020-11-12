@@ -1416,6 +1416,29 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
                               "stone_lastRecord"_attr = stone->lastRecord);
             }
 
+            // It is necessary that there exists a record after the stone but before or including
+            // the mayTruncateUpTo point.  Since the mayTruncateUpTo point may fall between
+            // records, the stone check is not sufficient.
+            setKey(cursor, stone->lastRecord);
+            ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->search(cursor); });
+            invariantWTOK(ret);
+            ret = wiredTigerPrepareConflictRetry(opCtx, [&] { return cursor->next(cursor); });
+            if (ret == WT_NOTFOUND) {
+                LOGV2_DEBUG(5140900, 0, "Will not truncate entire oplog");
+                return;
+            }
+            invariantWTOK(ret);
+            RecordId nextRecord = getKey(cursor);
+            if (static_cast<std::uint64_t>(nextRecord.repr()) > mayTruncateUpTo.asULL()) {
+                LOGV2_DEBUG(5140901,
+                            0,
+                            "Cannot truncate as there are no oplog entries after the stone but "
+                            "before the truncate-up-to point",
+                            "nextRecord"_attr = Timestamp(nextRecord.repr()),
+                            "mayTruncateUpTo"_attr = mayTruncateUpTo);
+                return;
+            }
+            invariantWTOK(cursor->reset(cursor));
             setKey(cursor, stone->lastRecord);
             invariantWTOK(session->truncate(session, nullptr, nullptr, cursor, nullptr));
             _changeNumRecords(opCtx, -stone->records);

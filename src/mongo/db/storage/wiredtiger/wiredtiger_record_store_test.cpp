@@ -817,6 +817,82 @@ TEST(WiredTigerRecordStoreTest, OplogStones_ReclaimStones) {
         ASSERT_EQ(1, oplogStones->currentRecords());
         ASSERT_EQ(50, oplogStones->currentBytes());
     }
+
+    // Don't truncate the last stone before the truncate point, even if the truncate point
+    // is ahead of it.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 7), 190), RecordId(1, 7));
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 9), 120), RecordId(1, 9));
+
+        ASSERT_EQ(4, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(500, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(0, oplogStones->currentRecords());
+        ASSERT_EQ(0, oplogStones->currentBytes());
+    }
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 8));
+
+        ASSERT_EQ(3, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(360, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(2U, oplogStones->numStones());
+        ASSERT_EQ(0, oplogStones->currentRecords());
+        ASSERT_EQ(0, oplogStones->currentBytes());
+    }
+
+    // Don't truncate entire oplog.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 10), 90), RecordId(1, 10));
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 11), 210),
+                  RecordId(1, 11));
+
+        ASSERT_EQ(5, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(660, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(3U, oplogStones->numStones());
+        ASSERT_EQ(0, oplogStones->currentRecords());
+        ASSERT_EQ(0, oplogStones->currentBytes());
+    }
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 12));
+
+        ASSERT_EQ(2, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(300, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(0, oplogStones->currentRecords());
+        ASSERT_EQ(0, oplogStones->currentBytes());
+    }
+
+    // OK to truncate all stones if there are records in the oplog that are before or at the
+    // truncate-up-to point, that have not yet created a stone.
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 12), 90), RecordId(1, 12));
+
+        ASSERT_EQ(3, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(390, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(1U, oplogStones->numStones());
+        ASSERT_EQ(1, oplogStones->currentRecords());
+        ASSERT_EQ(90, oplogStones->currentBytes());
+    }
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+
+        wtrs->reclaimOplog(opCtx.get(), Timestamp(1, 12));
+
+        ASSERT_EQ(1, rs->numRecords(opCtx.get()));
+        ASSERT_EQ(90, rs->dataSize(opCtx.get()));
+        ASSERT_EQ(0U, oplogStones->numStones());
+        ASSERT_EQ(1, oplogStones->currentRecords());
+        ASSERT_EQ(90, oplogStones->currentBytes());
+    }
 }
 
 // Verify that an oplog stone isn't created if it would cause the logical representation of the
