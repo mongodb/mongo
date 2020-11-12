@@ -328,16 +328,18 @@ std::shared_ptr<Shard> ShardRegistry::getConfigShard() const {
 
 StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opCtx,
                                                            const ShardId& shardId) {
-    // First check if this is a config shard lookup.
+    // First check if this is a non config shard lookup
+    // This call will may be blocking if there is an ongoing or a need of a cache rebuild
+    if (auto shard = _getData(opCtx)->findShard(shardId)) {
+        return shard;
+    }
+
+    // then check if this is a config shard (this call is blocking in any case)
     {
         stdx::lock_guard<Latch> lk(_mutex);
         if (auto shard = _configShardData.findShard(shardId)) {
             return shard;
         }
-    }
-
-    if (auto shard = _getData(opCtx)->findShard(shardId)) {
-        return shard;
     }
 
     // Reload and try again if the shard was not in the registry
