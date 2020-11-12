@@ -31,7 +31,7 @@ a notice will be included in
 | [ICU4]                     | ICU               | 67.1             | 57.1              |          ✗           |                ✗                |
 | [Intel Decimal FP Library] | BSD-3-Clause      | 2.0 Update 2     | 2.0 Update 1      |                      |                ✗                |
 | [JSON-Schema-Test-Suite]   | MIT               |                  | 728066f9c5        |                      |                                 |
-| [kms-message]              |                   |                  | 75e391a037        |                      |                ✗                |
+| [kms-message]              |                   | 1.0.4            | 1.0.1             |                      |                ✗                |
 | [libstemmer]               | BSD-3-Clause      |                  | Unknown           |          ✗           |                ✗                |
 | [linenoise]                | BSD-3-Clause      |                  | Unknown + changes |                      |                ✗                |
 | [MozJS]                    | MPL-2.0           | ESR 68.9         | ESR 60.3.0        |                      |                ✗                |
@@ -64,7 +64,7 @@ a notice will be included in
 [ICU4]: http://site.icu-project.org/download/
 [Intel Decimal FP Library]: https://software.intel.com/en-us/articles/intel-decimal-floating-point-math-library
 [JSON-Schema-Test-Suite]: https://github.com/json-schema-org/JSON-Schema-Test-Suite
-[kms-message]: https://github.com/mongodb-labs/kms-message
+[kms-message]: https://github.com/mongodb/libmongocrypt/kms-message
 [libstemmer]: https://github.com/snowballstem/snowball
 [linenoise]: https://github.com/antirez/linenoise
 [MozJS]: https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox-esr

@@ -169,6 +169,7 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/kms-message
     team_owner: "Security"
+    upgrade_suppression: TODO SERVER-52804
     # Note: libmongocrypt exists in Black Duck, but not OpenHub
 
   linenoise:
