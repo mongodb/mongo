@@ -62,7 +62,7 @@ def get_current_thread_name():
     fallback_name = '"%s"' % (gdb.selected_thread().name or '')
     try:
         # This goes through the pretty printer for StringData which adds "" around the name.
-        name = str(gdb.parse_and_eval("mongo::for_debuggers::threadName"))
+        name = str(gdb.parse_and_eval("mongo::ThreadName::getStaticString()"))
         if name == '""':
             return fallback_name
         return name

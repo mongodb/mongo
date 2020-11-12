@@ -35,6 +35,7 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/thread_context.h"
 
 namespace mongo {
 namespace {
@@ -66,12 +67,9 @@ void ClientStrand::_setCurrent() noexcept {
     Client::setCurrent(std::move(_client));
 
     // Set up the thread name.
-    auto oldThreadName = getThreadName();
-    StringData threadName = _clientPtr->desc();
-    if (oldThreadName != threadName) {
-        _oldThreadName = oldThreadName.toString();
-        setThreadName(threadName);
-        LOGV2_DEBUG(5127802, kDiagnosticLogLevel, "Set thread name", "name"_attr = threadName);
+    _oldThreadName = ThreadName::set(ThreadContext::get(), _threadName);
+    if (_oldThreadName) {
+        LOGV2_DEBUG(5127802, kDiagnosticLogLevel, "Set thread name", "name"_attr = *_threadName);
     }
 }
 
@@ -83,9 +81,12 @@ void ClientStrand::_releaseCurrent() noexcept {
     _client = Client::releaseCurrent();
     invariant(_client.get() == _clientPtr, kUnableToRecoverClient);
 
-    if (!_oldThreadName.empty()) {
-        // Reset the old thread name.
-        setThreadName(_oldThreadName);
+    if (_oldThreadName) {
+        // Reset the last thread name because it was previously set in the OS.
+        ThreadName::set(ThreadContext::get(), std::move(_oldThreadName));
+    } else {
+        // Release the thread name for reuse.
+        ThreadName::release(ThreadContext::get());
     }
 
     LOGV2_DEBUG(

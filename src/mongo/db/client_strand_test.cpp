@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/barrier.h"
@@ -39,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/executor_test_util.h"
+#include "mongo/util/thread_context.h"
 
 namespace mongo {
 namespace {
@@ -47,6 +49,24 @@ class ClientStrandTest : public unittest::Test, public ScopedGlobalServiceContex
 public:
     constexpr static auto kClientName1 = "foo";
     constexpr static auto kClientName2 = "bar";
+
+    /**
+     * Clean up any leftover thread_local pieces.
+     */
+    void releaseClient() {
+        ThreadName::release(ThreadContext::get());
+        if (haveClient()) {
+            Client::releaseCurrent();
+        }
+    }
+
+    void setUp() override {
+        releaseClient();
+    }
+
+    void tearDown() override {
+        releaseClient();
+    }
 
     void assertStrandNotBound(const ClientStrandPtr& strand) {
         ASSERT_FALSE(haveClient());
@@ -113,6 +133,8 @@ TEST_F(ClientStrandTest, BindMultipleTimes) {
 
         // We have no bound Client again.
         assertStrandNotBound(strand);
+        ASSERT_EQ(strand->getClientPointer()->desc(), getThreadName())
+            << "We should retain the previous strand's name";
     }
 }
 
@@ -129,6 +151,8 @@ TEST_F(ClientStrandTest, BindMultipleTimesAndDismiss) {
         // Dismiss the current guard.
         guard.dismiss();
         assertStrandNotBound(strand);
+        ASSERT_EQ(strand->getClientPointer()->desc(), getThreadName())
+            << "We should retain the previous strand's name";
 
         // Assign a new guard.
         guard = strand->bind();
@@ -285,8 +309,12 @@ TEST_F(ClientStrandTest, SwapStrands) {
     assertStrandNotBound(strand2);
 
     for (size_t i = 0; i < 100; ++i) {
-        // Alternate between binding strand1 and strand2.
-        auto& strand = (i % 2 == 0) ? strand1 : strand2;
+        // Alternate between binding strand1 and strand2. Start on strand2 so it has a different
+        // thread name than the previous test.
+        auto& strand = (i % 2 == 0) ? strand2 : strand1;
+
+        ASSERT_NE(strand->getClientPointer()->desc(), getThreadName())
+            << "We should be binding over the previous strand's name";
         auto guard = strand->bind();
 
         assertStrandBound(strand);

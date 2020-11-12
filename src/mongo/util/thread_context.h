@@ -29,9 +29,10 @@
 
 #pragma once
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -115,7 +116,7 @@ private:
         boost::intrusive_ptr<ThreadContext> instance;
     };
 
-    inline static thread_local auto _handle = Handle{};
+    static thread_local Handle _handle;
 
     const ProcessId _threadId = ProcessId::getCurrentThreadId();
     AtomicWord<bool> _isAlive{true};

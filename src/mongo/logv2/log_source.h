@@ -74,10 +74,10 @@ public:
         add_attribute_unlocked(attributes::timeStamp(), boost::log::attributes::make_function([]() {
                                    return Date_t::now();
                                }));
-        add_attribute_unlocked(attributes::threadName(),
-                               boost::log::attributes::make_function([isShutdown]() {
-                                   return isShutdown ? "shutdown"_sd : getThreadName();
-                               }));
+        add_attribute_unlocked(
+            attributes::threadName(), boost::log::attributes::make_function([isShutdown]() {
+                return isShutdown ? "shutdown"_sd : ThreadName::getStaticString();
+            }));
     }
 
     explicit LogSource(const LogDomain::Internal* domain) : LogSource(domain, false) {}

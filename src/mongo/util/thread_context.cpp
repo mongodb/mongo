@@ -27,18 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/thread_context.h"
 
 #include "mongo/base/init.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 const auto kMainThreadId = stdx::this_thread::get_id();
 AtomicWord<bool> gHasInitializedMain{false};
 }  // namespace
+
+thread_local ThreadContext::Handle ThreadContext::_handle;
 
 MONGO_INITIALIZER(ThreadContextsInitialized)(InitializerContext*) {
     ThreadContext::initializeMain();

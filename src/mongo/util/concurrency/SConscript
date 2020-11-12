@@ -38,6 +38,9 @@ env.Library(
     source=[
         "spin_lock.cpp",
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ]
 )
 
 env.CppUnitTest(

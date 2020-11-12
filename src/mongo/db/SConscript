@@ -515,6 +515,7 @@ env.Clone().InjectModule("enterprise").Library(
         "audit.cpp",
     ],
     LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
     ],
 )
 

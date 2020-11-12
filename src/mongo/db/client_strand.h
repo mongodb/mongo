@@ -33,6 +33,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
 
@@ -129,7 +130,9 @@ public:
     static boost::intrusive_ptr<ClientStrand> get(Client* client);
 
     ClientStrand(ServiceContext::UniqueClient client)
-        : _clientPtr(client.get()), _client(std::move(client)) {}
+        : _clientPtr(client.get()),
+          _client(std::move(client)),
+          _threadName(make_intrusive<ThreadName>(_client->desc())) {}
 
     /**
      * Get a pointer to the underlying Client.
@@ -200,7 +203,8 @@ private:
 
     ServiceContext::UniqueClient _client;
 
-    std::string _oldThreadName;
+    boost::intrusive_ptr<ThreadName> _threadName;
+    boost::intrusive_ptr<ThreadName> _oldThreadName;
 };
 
 inline void ClientStrand::Executor::schedule(Task task) {
