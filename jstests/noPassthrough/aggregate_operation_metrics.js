@@ -20,6 +20,8 @@ var rst = new ReplSetTest({
 rst.startSet();
 rst.initiate();
 
+const isLinux = getBuildInfo().buildEnvironment.target_os == "linux";
+
 let assertMetricsExist = function(metrics) {
     try {
         assert.neq(metrics, undefined);
@@ -147,8 +149,8 @@ const secondary = rst.getSecondary();
         lastDocBytesRead = allMetrics[db1Name].secondaryMetrics.docBytesRead;
     }
 
-    // CPU time aggregation is not supported on Windows.
-    if (!_isWindows()) {
+    // CPU time aggregation is only supported on Linux.
+    if (isLinux) {
         // Ensure the CPU time is increasing.
         let lastCpuTime = getGlobalCpuTime(adminDB);
         assert.gt(lastCpuTime, initialCpuTime);
