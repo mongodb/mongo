@@ -154,12 +154,26 @@ Status _createTimeseries(OperationContext* opCtx,
                            << "$assembledData"));
 
     return writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
-        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX, AutoGetCollectionViewMode::kViewsPermitted);
         Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_IX);
         Lock::CollectionLock systemDotViewsLock(
             opCtx,
             NamespaceString(ns.db(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
+
+        // This is a top-level handler for time-series creation name conflicts. New commands coming
+        // in, or commands that generated a WriteConflict must return a NamespaceExists error here
+        // on conflict.
+        if (CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, ns)) {
+            return Status(ErrorCodes::NamespaceExists,
+                          str::stream() << "Collection already exists. NS: " << ns);
+        }
+
+        auto db = autoColl.ensureDbExists();
+        if (ViewCatalog::get(db)->lookup(opCtx, ns.ns())) {
+            return {ErrorCodes::NamespaceExists,
+                    str::stream() << "A view already exists. NS: " << ns};
+        }
 
         if (opCtx->writesAreReplicated() &&
             !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
@@ -167,7 +181,6 @@ Status _createTimeseries(OperationContext* opCtx,
                     str::stream() << "Not primary while creating collection " << ns};
         }
 
-        auto db = autoColl.ensureDbExists();
         _createSystemDotViewsIfNecessary(opCtx, db);
 
         WriteUnitOfWork wuow(opCtx);
