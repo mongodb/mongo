@@ -45,7 +45,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
 
-        assertAlways.commandWorked(db[collName].createIndex({a: 1, b: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({a: 1, b: 1}));
     };
 
     return $config;

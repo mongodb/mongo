@@ -17,7 +17,7 @@ assert.commandWorked(
 
 assert.commandWorked(testDB.user.insert({_id: 0}));
 
-var res = testDB.user.createIndex({i: 1});
+var res = testDB.user.ensureIndex({i: 1});
 assert.commandWorked(res);
 
 var indexes = testDB.user.getIndexes();

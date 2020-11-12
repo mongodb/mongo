@@ -50,7 +50,7 @@ printjson(secondary1col.stats());
 // the correct number of docs age out
 var initialExpireAfterSeconds = 20000;
 assert.commandWorked(
-    primarycol.createIndex({x: 1}, {expireAfterSeconds: initialExpireAfterSeconds}));
+    primarycol.ensureIndex({x: 1}, {expireAfterSeconds: initialExpireAfterSeconds}));
 rt.awaitReplication();
 
 sleep(70 * 1000);  // TTL monitor runs every 60 seconds, so wait 70

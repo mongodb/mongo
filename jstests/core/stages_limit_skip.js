@@ -13,7 +13,7 @@ for (var i = 0; i < N; ++i) {
     t.insert({foo: i, bar: N - i, baz: i});
 }
 
-t.createIndex({foo: 1});
+t.ensureIndex({foo: 1});
 
 // foo <= 20, decreasing
 // Limit of 5 results.

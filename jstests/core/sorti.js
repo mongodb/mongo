@@ -20,6 +20,6 @@ function checkBOrder(query) {
 
 checkBOrder(t.find().sort({a: 1}));
 checkBOrder(t.find({}, {_id: 0, b: 1}).sort({a: 1}));
-t.createIndex({b: 1});
+t.ensureIndex({b: 1});
 checkBOrder(t.find({}, {_id: 0, b: 1}).sort({a: 1}));
 checkBOrder(t.find({}, {_id: 0, b: 1}).sort({a: 1}).hint({b: 1}));

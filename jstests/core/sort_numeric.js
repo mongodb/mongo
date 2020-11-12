@@ -27,7 +27,7 @@ for (var pass = 0; pass < 2; pass++) {
     assert(t.find({a: 3.0}).count() == 1);
     assert(t.find({a: 3.0}).length() == 1);
 
-    t.createIndex({a: 1});
+    t.ensureIndex({a: 1});
 }
 
 assert(t.validate().valid);

@@ -3,7 +3,7 @@
 t = db.jstests_exists6;
 t.drop();
 
-t.createIndex({b: 1});
+t.ensureIndex({b: 1});
 t.save({});
 t.save({b: 1});
 t.save({b: null});
@@ -14,7 +14,7 @@ assert.eq(1, t.find({b: {$exists: false}}).itcount());
 assert.eq(1, t.find({b: {$not: {$exists: true}}}).itcount());
 
 // Now check existence of second compound field.
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, b: 1});
 t.save({a: 1});
 t.save({a: 1, b: 1});
 t.save({a: 1, b: null});

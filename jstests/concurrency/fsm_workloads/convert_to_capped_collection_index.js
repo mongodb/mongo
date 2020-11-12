@@ -20,7 +20,7 @@ load('jstests/concurrency/fsm_workloads/convert_to_capped_collection.js');  // f
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.states.convertToCapped = function convertToCapped(db, collName) {
-        assertWhenOwnDB.commandWorked(db[this.threadCollName].createIndex({i: 1, rand: 1}));
+        assertWhenOwnDB.commandWorked(db[this.threadCollName].ensureIndex({i: 1, rand: 1}));
         assertWhenOwnDB.eq(2, db[this.threadCollName].getIndexes().length);
         $super.states.convertToCapped.apply(this, arguments);
     };

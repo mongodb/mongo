@@ -13,7 +13,7 @@ for (x = 1; x < 9; x++) {
     }
 }
 
-t.createIndex({loc: "2d"});
+t.ensureIndex({loc: "2d"});
 
 triangle = [[0, 0], [1, 1], [0, 2]];
 
@@ -50,7 +50,7 @@ pacman = [
 ];
 
 t.save({loc: [1, 3]});  // Add a point that's in
-assert.commandWorked(t.createIndex({loc: "2d"}));
+assert.commandWorked(t.ensureIndex({loc: "2d"}));
 
 assert.eq(1, t.find({loc: {$within: {$polygon: pacman}}}).count(), "Pacman single point");
 

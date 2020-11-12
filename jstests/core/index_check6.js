@@ -12,7 +12,7 @@ function keysExamined(query, hint) {
     return explain.executionStats.totalKeysExamined;
 }
 
-t.createIndex({age: 1, rating: 1});
+t.ensureIndex({age: 1, rating: 1});
 
 for (var age = 10; age < 50; age++) {
     for (var rating = 0; rating < 10; rating++) {
@@ -98,7 +98,7 @@ for (var a = -1; a <= 1; a += 2) {
         for (var c = -1; c <= 1; c += 2) {
             t.dropIndexes();
             var spec = {a: a, b: b, c: c};
-            t.createIndex(spec);
+            t.ensureIndex(spec);
             doTest(spec, spec);
             doTest({a: -a, b: -b, c: -c}, spec);
         }

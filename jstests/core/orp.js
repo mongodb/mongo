@@ -4,9 +4,9 @@
 t = db.jstests_orp;
 t.drop();
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
-t.createIndex({c: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
+t.ensureIndex({c: 1});
 
 for (i = 0; i < 200; ++i) {
     t.save({a: 1, b: 1});
@@ -23,7 +23,7 @@ assert.eq(201, t.count({$or: [{a: 1}, {c: 1}, {b: 1}]}));
 // Deduping results that would normally be index only matches on overlapping and double scanned $or
 // field regions.
 t.drop();
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, b: 1});
 for (i = 0; i < 16; ++i) {
     for (j = 0; j < 16; ++j) {
         t.save({a: i, b: j});
@@ -33,8 +33,8 @@ assert.eq(16 * 16, t.count({$or: [{a: {$gte: 0}, b: {$gte: 0}}, {a: {$lte: 16}, 
 
 // Deduping results from a clause that completed before the multi cursor takeover.
 t.drop();
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 t.save({a: 1, b: 200});
 for (i = 0; i < 200; ++i) {
     t.save({b: i});

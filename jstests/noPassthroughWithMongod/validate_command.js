@@ -27,8 +27,8 @@ for (var i = 0; i < count; i++) {
     t.insert({x: i});
 }
 
-t.createIndex({x: 1}, {name: "forward"});
-t.createIndex({x: -1}, {name: "reverse"});
+t.ensureIndex({x: 1}, {name: "forward"});
+t.ensureIndex({x: -1}, {name: "reverse"});
 
 // TEST NORMAL VALIDATE
 var output = t.validate();

@@ -6,5 +6,5 @@ t.save({x: 2});
 t.save({x: 3});
 
 assert.eq(2, t.find({x: {$ne: 2}}).itcount(), "A");
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 assert.eq(2, t.find({x: {$ne: 2}}).itcount(), "B");

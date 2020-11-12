@@ -14,8 +14,8 @@ for (var i = 0; i < N; ++i) {
     t.insert({baz: 1, bar: i});
 }
 
-t.createIndex({foo: 1, bar: 1});
-t.createIndex({baz: 1, bar: 1});
+t.ensureIndex({foo: 1, bar: 1});
+t.ensureIndex({baz: 1, bar: 1});
 
 // foo == 1
 // We would (internally) use "": MinKey and "": MaxKey for the bar index bounds.

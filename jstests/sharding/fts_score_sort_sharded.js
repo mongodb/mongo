@@ -26,7 +26,7 @@ assert.commandWorked(coll.insert({_id: 1, a: "pizza"}));
 assert.commandWorked(coll.insert({_id: -1, a: "pizza pizza"}));
 assert.commandWorked(coll.insert({_id: 2, a: "pizza pizza pizza"}));
 assert.commandWorked(coll.insert({_id: -2, a: "pizza pizza pizza pizza"}));
-assert.commandWorked(coll.createIndex({a: "text"}));
+assert.commandWorked(coll.ensureIndex({a: "text"}));
 
 //
 // Execute query with sort on document score, verify results are in correct order.
@@ -76,7 +76,7 @@ assert.commandWorked(coll.insert({_id: 0, a: "pizza", b: [1, 4]}));
 assert.commandWorked(coll.insert({_id: 1, a: "pizza pizza", b: [6, 7]}));
 assert.commandWorked(coll.insert({_id: 2, a: "pizza", b: [2, 3]}));
 assert.commandWorked(coll.insert({_id: 3, a: "pizza pizza", b: [5, 8]}));
-assert.commandWorked(coll.createIndex({a: "text"}));
+assert.commandWorked(coll.ensureIndex({a: "text"}));
 
 results = coll.find({$text: {$search: "pizza"}}, {s: {$meta: "textScore"}})
               .sort({s: {$meta: "textScore"}, b: 1})

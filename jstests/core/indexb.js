@@ -10,7 +10,7 @@
 
 t = db.indexb;
 t.drop();
-t.createIndex({a: 1}, true);
+t.ensureIndex({a: 1}, true);
 
 t.insert({a: 1});
 

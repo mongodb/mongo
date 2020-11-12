@@ -14,6 +14,6 @@ assert.eq(1, coll.find(x).count());
 assert.commandWorked(coll.insert(x));
 assert.eq(2, coll.find(x).count());
 
-assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.ensureIndex({a: 1}));
 assert.eq(2, coll.find(x).count());
 }());

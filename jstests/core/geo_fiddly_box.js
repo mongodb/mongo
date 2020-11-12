@@ -11,7 +11,7 @@
 t = db.geo_fiddly_box;
 
 t.drop();
-t.createIndex({loc: "2d"});
+t.ensureIndex({loc: "2d"});
 
 t.insert({"loc": [3, 1]});
 t.insert({"loc": [3, 0.5]});
@@ -35,7 +35,7 @@ step = 1;
 numItems = 0;
 
 t.drop();
-t.createIndex({loc: "2d"}, {max: max + epsilon / 2, min: min - epsilon / 2});
+t.ensureIndex({loc: "2d"}, {max: max + epsilon / 2, min: min - epsilon / 2});
 
 for (var x = min; x <= max; x += step) {
     for (var y = min; y <= max; y += step) {

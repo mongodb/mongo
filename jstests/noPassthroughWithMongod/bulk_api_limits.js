@@ -17,7 +17,7 @@ var executeTestsUnordered = function() {
     // Create unique index
     coll.dropIndexes();
     coll.remove({});
-    coll.createIndex({a: 1}, {unique: true});
+    coll.ensureIndex({a: 1}, {unique: true});
 
     /**
      * Fail during batch construction due to single document > maxBSONSize

@@ -16,7 +16,7 @@ assert.eq([4, 2, 3, 1],
               return z.x;
           }),
           "A no index");
-t.createIndex({"y.b": 1, "y.a": -1});
+t.ensureIndex({"y.b": 1, "y.a": -1});
 assert.eq([4, 2, 3, 1],
           t.find().sort({"y.b": 1, "y.a": -1}).map(function(z) {
               return z.x;
@@ -31,7 +31,7 @@ assert.eq([4, 2, 3, 1],
               return z.x;
           }),
           "B no index");
-t.createIndex({"y.b": 1, "_id": -1});
+t.ensureIndex({"y.b": 1, "_id": -1});
 assert.eq([4, 2, 3, 1],
           t.find().sort({"y.b": 1, _id: -1}).map(function(z) {
               return z.x;

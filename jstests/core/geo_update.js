@@ -11,7 +11,7 @@
 var coll = db.testGeoUpdate;
 coll.drop();
 
-coll.createIndex({loc: "2d"});
+coll.ensureIndex({loc: "2d"});
 
 // Test normal update
 print("Updating...");

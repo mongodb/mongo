@@ -14,7 +14,7 @@ t.save({a: "z"});
 assert.eq(1, t.find({a: {$lt: 2}}).itcount(), "A");
 assert.eq(1, t.find({a: {$gt: 2}}).itcount(), "B");
 
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 
 assert.eq(1, t.find({a: {$lt: 2}}).itcount(), "C");
 assert.eq(1, t.find({a: {$gt: 2}}).itcount(), "D");
@@ -28,7 +28,7 @@ for (var i = 0; i < 100; i++) {
     t.save(o);
 }
 
-t.createIndex({foo: 1});
+t.ensureIndex({foo: 1});
 
 var explain = t.find({foo: {$lt: 50}}).explain("executionStats");
 assert.gt(30, explain.executionStats.totalKeysExamined, "lt");
@@ -41,7 +41,7 @@ for (var i = 0; i < 10; ++i) {
     t.save({});
 }
 
-t.createIndex({i: 1});
+t.ensureIndex({i: 1});
 
 var explain = t.find({i: {$lte: 'a'}}).explain("executionStats");
 assert.gt(3, explain.executionStats.totalKeysExamined, "lte");

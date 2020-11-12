@@ -8,7 +8,7 @@ if (false) {
         t.insert({foo: i, bar: N - i});
     }
 
-    t.createIndex({foo: 1});
+    t.ensureIndex({foo: 1});
 
     // Foo <= 20, descending.
     ixscan1 = {

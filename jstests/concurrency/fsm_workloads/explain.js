@@ -26,7 +26,7 @@ var $config = (function() {
     };
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({j: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({j: 1}));
     }
 
     var states = (function() {

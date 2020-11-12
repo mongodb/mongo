@@ -18,7 +18,7 @@ for (i = 0; i < 1000; i++) {
     t.save({tags: getTags()});
 }
 
-t.createIndex({tags: 1});
+t.ensureIndex({tags: 1});
 
 for (i = 0; i < 200; i++) {
     for (var j = 0; j < 10; j++)

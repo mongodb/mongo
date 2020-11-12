@@ -6,7 +6,7 @@
 t = db.geo6;
 t.drop();
 
-t.createIndex({loc: "2d"});
+t.ensureIndex({loc: "2d"});
 
 assert.eq(0, t.find().itcount(), "pre0");
 assert.eq(0, t.find({loc: {$near: [50, 50]}}).itcount(), "pre1");

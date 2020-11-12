@@ -4,7 +4,7 @@
 
 var t = db.geo_2d_with_geojson_point;
 t.drop();
-t.createIndex({loc: '2d'});
+t.ensureIndex({loc: '2d'});
 
 var geoJSONPoint = {type: 'Point', coordinates: [0, 0]};
 

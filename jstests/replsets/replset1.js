@@ -123,7 +123,7 @@ var doTest = function(signal) {
     });
 
     t.save({a: 1000});
-    t.createIndex({a: 1});
+    t.ensureIndex({a: 1});
     replTest.awaitReplication();
 
     ts.forEach(function(z) {

@@ -202,7 +202,7 @@ var $config = (function() {
         var nSetupDocs = this.nDocumentsToSeed * 200;
         var coll = db[collName];
 
-        var res = coll.createIndex({tid: 1});
+        var res = coll.ensureIndex({tid: 1});
         assertAlways.commandWorked(res, tojson(res));
 
         var bulk = coll.initializeUnorderedBulkOp();

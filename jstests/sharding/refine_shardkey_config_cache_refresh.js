@@ -22,7 +22,7 @@ assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 10}}));
 
 assert.commandWorked(testDB.user.insert({x: 1, y: 1}));
 assert.commandWorked(testDB.user.insert({x: 10, y: 1}));
-testDB.user.createIndex({x: 1, y: 1});
+testDB.user.ensureIndex({x: 1, y: 1});
 
 let priConn = st.rs0.getPrimary();
 assert.commandWorked(

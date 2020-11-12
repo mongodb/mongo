@@ -13,7 +13,7 @@ t.insert({_id: 2, x: 1, y: "bar"});
 t.insert({_id: 3, x: 2, y: "foo"});
 t.insert({_id: 4, x: 2, y: "bar"});
 
-t.createIndex({x: 1, y: "text"});
+t.ensureIndex({x: 1, y: "text"});
 
 assert.throws(function() {
     const cursor = t.find({"$text": {"$search": "foo"}});

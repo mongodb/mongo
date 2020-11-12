@@ -19,7 +19,7 @@ function makeNestObj(depth) {
 let collection = db.objNestTest;
 collection.drop();
 
-assert.commandWorked(collection.createIndex({a: 1}));
+assert.commandWorked(collection.ensureIndex({a: 1}));
 
 const kMaxDocumentDepthSoftLimit = 100;
 const kJavaScriptMaxDepthLimit = 150;

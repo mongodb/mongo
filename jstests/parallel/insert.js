@@ -3,7 +3,7 @@ load('jstests/libs/parallelTester.js');
 
 f = db.jstests_parallel_insert;
 f.drop();
-f.createIndex({who: 1});
+f.ensureIndex({who: 1});
 
 Random.setRandomSeed();
 

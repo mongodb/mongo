@@ -43,7 +43,7 @@ var $config = (function() {
         fieldNames.slice(1).forEach(function(fieldName) {
             var indexSpec = {};
             indexSpec[fieldName] = 1;
-            assertAlways.commandWorked(db[collName].createIndex(indexSpec));
+            assertAlways.commandWorked(db[collName].ensureIndex(indexSpec));
         });
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.

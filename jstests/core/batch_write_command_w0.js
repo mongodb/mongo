@@ -76,7 +76,7 @@ countEventually(coll, 2);
 //
 // Upsert fail due to duplicate key index, w:0, ordered:true
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+coll.ensureIndex({a: 1}, {unique: true});
 request = {
     update: coll.getName(),
     updates: [

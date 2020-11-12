@@ -39,7 +39,7 @@ function test(st, db, sharded, indexType) {
     assert.commandWorked(bulk.execute());
     assert.eq(db[coll].count(), numPts);
 
-    assert.commandWorked(db[coll].createIndex({loc: indexType}));
+    assert.commandWorked(db[coll].ensureIndex({loc: indexType}));
 
     let res = assert.commandWorked(db.runCommand({
         aggregate: coll,

@@ -33,5 +33,5 @@ function doTest() {
 doTest();
 
 // SERVER-1943 not fixed yet
-t.createIndex({key: 1});
+t.ensureIndex({key: 1});
 doTest();

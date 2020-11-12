@@ -7,11 +7,11 @@ t.drop();
 
 assert(t.getIndexes().length == 0);
 
-t.createIndex({name: 1});
+t.ensureIndex({name: 1});
 
 t.save({name: "a"});
 
-t.createIndex({name: 1});
+t.ensureIndex({name: 1});
 
 assert(t.getIndexes().length == 2);
 

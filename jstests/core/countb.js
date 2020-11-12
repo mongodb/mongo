@@ -7,7 +7,7 @@
 t = db.jstests_countb;
 t.drop();
 
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 t.save({a: ['a', 'b']});
 assert.eq(0, t.find({a: {$in: ['a'], $gt: 'b'}}).count());
 assert.eq(0, t.find({$and: [{a: 'a'}, {a: {$gt: 'b'}}]}).count());

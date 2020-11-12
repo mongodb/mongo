@@ -18,7 +18,7 @@ function test(index) {
     db.server848.save({"_id": 8, "loc": {"x": 4.9999, "y": 51.9999}});
     db.server848.save({"_id": 9, "loc": {"x": 5.0001, "y": 51.9999}});
     if (index) {
-        db.server848.createIndex({loc: "2d"});
+        db.server848.ensureIndex({loc: "2d"});
     }
     r = db.server848.find({"loc": {"$within": {"$center": [center, radius]}}}, {_id: 1});
     assert.eq(5, r.count(), "A1");

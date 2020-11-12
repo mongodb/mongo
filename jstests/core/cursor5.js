@@ -26,7 +26,7 @@ function testBoundsWithSubobjectIndexes(db) {
         r.save(z[i]);
     idx = {"a.d": 1, a: 1, e: -1};
     rIdx = {"a.d": -1, a: -1, e: 1};
-    r.createIndex(idx);
+    r.ensureIndex(idx);
 
     checkResults([z[0], z[4], z[2]], r.find({e: 4}).sort(idx).hint(idx));
     checkResults([z[1], z[3]], r.find({e: {$gt: 4}, "a.b": 1}).sort(idx).hint(idx));

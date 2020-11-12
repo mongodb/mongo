@@ -50,7 +50,7 @@ var BackupRestoreTest = function(options) {
             let iteration = 0;
 
             var coll = db.getSiblingDB(dbName).getCollection(collectionName);
-            coll.createIndex({x: 1});
+            coll.ensureIndex({x: 1});
 
             var largeValue = new Array(1024).join('L');
 

@@ -29,5 +29,5 @@ function test() {
 }
 
 test();
-t.createIndex({d: 1});
+t.ensureIndex({d: 1});
 test();

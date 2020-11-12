@@ -25,7 +25,7 @@ var a3 = s3832.aggregate({$match: {b: "baz"}}, {$sort: {a: 1}});
 
 assert.eq(a3.toArray(), a1result, 's3832.a3 failed');
 
-db.s3832.createIndex({b: 1}, {name: "s3832_b"});
+db.s3832.ensureIndex({b: 1}, {name: "s3832_b"});
 
 var a4 = s3832.aggregate({$match: {b: "baz"}});
 
@@ -41,7 +41,7 @@ assert.eq(a6.toArray(), a1result, 's3832.a6 failed');
 
 var dropb = db.s3832.dropIndex("s3832_b");
 
-db.s3832.createIndex({a: 1}, {name: "s3832_a"});
+db.s3832.ensureIndex({a: 1}, {name: "s3832_a"});
 
 var a7 = s3832.aggregate({$match: {b: "baz"}});
 

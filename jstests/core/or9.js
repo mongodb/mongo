@@ -5,7 +5,7 @@
 t = db.jstests_or9;
 t.drop();
 
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, b: 1});
 
 t.save({a: 2, b: 2});
 

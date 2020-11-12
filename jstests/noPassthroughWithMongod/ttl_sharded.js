@@ -32,7 +32,7 @@ assert.commandWorked(bulk.execute());
 assert.eq(t.count(), 24, "initial docs not inserted");
 
 // create the TTL index which delete anything older than ~5.5 hours
-t.createIndex({x: 1}, {expireAfterSeconds: 20000});
+t.ensureIndex({x: 1}, {expireAfterSeconds: 20000});
 
 // split chunk in half by _id, and move one chunk to the other shard
 s.adminCommand({split: ns, middle: {_id: 12}});

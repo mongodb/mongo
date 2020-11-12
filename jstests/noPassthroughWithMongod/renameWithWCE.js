@@ -23,8 +23,8 @@ b.drop();
 a.save({a: 1});
 a.save({a: 2});
 a.save({a: 3});
-a.createIndex({a: 1});
-a.createIndex({b: 1});
+a.ensureIndex({a: 1});
+a.ensureIndex({b: 1});
 
 assert.commandWorked(admin.runCommand({renameCollection: "db_a.rename7", to: "db_b.rename7"}));
 

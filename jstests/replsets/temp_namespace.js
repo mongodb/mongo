@@ -26,10 +26,10 @@ var secondaryDB = secondary.getDB('test');
 // set up collections
 assert.commandWorked(primaryDB.runCommand(
     {applyOps: [{op: "c", ns: primaryDB.getName() + ".$cmd", o: {create: "temp1", temp: true}}]}));
-primaryDB.temp1.createIndex({x: 1});
+primaryDB.temp1.ensureIndex({x: 1});
 assert.commandWorked(primaryDB.runCommand(
     {applyOps: [{op: "c", ns: primaryDB.getName() + ".$cmd", o: {create: "temp2", temp: 1}}]}));
-primaryDB.temp2.createIndex({x: 1});
+primaryDB.temp2.ensureIndex({x: 1});
 assert.commandWorked(primaryDB.runCommand(
     {applyOps: [{op: "c", ns: primaryDB.getName() + ".$cmd", o: {create: "keep1", temp: false}}]}));
 assert.commandWorked(primaryDB.runCommand(

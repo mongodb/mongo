@@ -12,7 +12,7 @@ t = db[collName];
 t.drop();
 
 t.save({loc: [[20, 30], [40, 50]]});
-t.createIndex({loc: '2d'});
+t.ensureIndex({loc: '2d'});
 
 // Check exact matches of different locations.
 assert.eq(1, t.count({loc: [20, 30]}));
@@ -109,5 +109,5 @@ for (i = 0; i < 10000; ++i) {
 }
 arr.push([100, 100]);
 t.save({loc: arr});
-t.createIndex({loc: '2d'});
+t.ensureIndex({loc: '2d'});
 assert.eq(1, t.count({loc: {$within: {$center: [[99, 99], 5]}}}));

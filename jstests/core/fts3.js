@@ -12,7 +12,7 @@ t.drop();
 t.save({_id: 1, x: "az b x", y: "c d m", z: 1});
 t.save({_id: 2, x: "c d y", y: "az b n", z: 2});
 
-t.createIndex({x: "text", z: 1}, {weights: {x: 10, y: 1}});
+t.ensureIndex({x: "text", z: 1}, {weights: {x: 10, y: 1}});
 
 assert.eq([1, 2], queryIDS(t, "az"), "A1");
 assert.eq([2, 1], queryIDS(t, "d"), "A2");

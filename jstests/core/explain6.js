@@ -10,8 +10,8 @@
 t = db.jstests_explain6;
 t.drop();
 
-t.createIndex({a: 1, b: 1});
-t.createIndex({b: 1, a: 1});
+t.ensureIndex({a: 1, b: 1});
+t.ensureIndex({b: 1, a: 1});
 
 t.save({a: 0, b: 1});
 t.save({a: 1, b: 0});

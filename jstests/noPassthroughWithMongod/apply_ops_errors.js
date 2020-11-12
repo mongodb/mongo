@@ -19,7 +19,7 @@ coll.drop();
 
 // Scenario 1: only one operation
 assert.eq(0, coll.find().count(), "test collection not empty");
-coll.createIndex({x: 1}, {unique: true});
+coll.ensureIndex({x: 1}, {unique: true});
 coll.insert({_id: 1, x: "init"});
 
 var res = db.runCommand({
@@ -38,7 +38,7 @@ coll.drop();
 
 // Scenario 2: Three operations, first two should run, second should fail.
 assert.eq(0, coll.find().count(), "test collection not empty");
-coll.createIndex({x: 1}, {unique: true});
+coll.ensureIndex({x: 1}, {unique: true});
 coll.insert({_id: 1, x: "init"});
 
 var res = db.runCommand({

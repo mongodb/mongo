@@ -7,7 +7,7 @@
 // ]
 t = db.geo_s2dupe_points;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 
 function testDuplicates(shapeName, shapeWithDupes, shapeWithoutDupes) {
     // insert a doc with dupes

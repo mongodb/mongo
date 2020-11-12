@@ -13,7 +13,7 @@ var n = 1000;
 
 // insert n documents with integer _id, a can be 1-5, loc is close to [40, 40]
 t.drop();
-t.createIndex({loc: "2d", _id: 1});
+t.ensureIndex({loc: "2d", _id: 1});
 
 var x = 40;
 var y = 40;

@@ -15,7 +15,7 @@ assert.commandWorked(coll.insert({loc: {x: 30, y: 89}}));
 assert.commandWorked(coll.insert({loc: {x: 30, y: 89}}));
 assert.commandWorked(coll.insert({loc: {x: 30, y: 91}}));
 
-assert.commandWorked(coll.createIndex({loc: "2d"}));
+assert.commandWorked(coll.ensureIndex({loc: "2d"}));
 
 assert.throws(function() {
     coll.find({loc: {$nearSphere: [30, 91], $maxDistance: 0.25}}).count();

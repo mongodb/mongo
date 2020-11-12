@@ -57,12 +57,12 @@ var $config = (function() {
     var transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({a: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({b: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({a: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({b: 1}));
         // no index on c
 
-        assertAlways.commandWorked(db[collName].createIndex({x: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({y: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({x: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({y: 1}));
         // no index on z
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.

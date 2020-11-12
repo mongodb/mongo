@@ -39,7 +39,7 @@ outColl.drop();
     assert(outColl.drop());
 
     // Now test that we get the same results when there's an index present.
-    assert.commandWorked(coll.createIndex({arr: 1}));
+    assert.commandWorked(coll.ensureIndex({arr: 1}));
     res = assert.commandWorked(coll.mapReduce(
         mapFn, reduceFn, {out: {merge: outColl.getName()}, query: {arr: {$gte: 0}}}));
     assert(outColl.drop());
@@ -93,7 +93,7 @@ outColl.drop();
         resultsEq([{_id: "cat", value: 1}, {_id: "dog", value: 1}], resultsNoIndexEqualityOnName));
     assert(resultsEq(resultsNoIndexNoQuery, resultsNoIndexRangeOnName));
 
-    assert.commandWorked(coll.createIndex({name: 1, tags: 1}));
+    assert.commandWorked(coll.ensureIndex({name: 1, tags: 1}));
 
     const resultsIndexedNoQuery =
         assert

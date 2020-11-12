@@ -12,7 +12,7 @@ for (x = 0; x < 10; x++) {
     }
 }
 
-t.createIndex({loc: "2d", foo: 1});
+t.ensureIndex({loc: "2d", foo: 1});
 
 q = t.find({loc: {$near: [5, 5]}, foo: {$gt: 20}});
 m = function(z) {

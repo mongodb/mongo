@@ -23,9 +23,9 @@ function test(variant) {
 
 test("no index");
 
-c.createIndex({loc: "2d"});
+c.ensureIndex({loc: "2d"});
 test("2d index");
 
 c.dropIndex({loc: "2d"});
-c.createIndex({loc: "2dsphere"});
+c.ensureIndex({loc: "2dsphere"});
 test("2dsphere index");

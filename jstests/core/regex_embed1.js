@@ -23,5 +23,5 @@ function test(m) {
 
 test("A");
 
-t.createIndex({"a.x": 1});
+t.ensureIndex({"a.x": 1});
 test("B");

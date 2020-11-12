@@ -34,7 +34,7 @@ function f() {
 
 for (var pass = 0; pass <= 1; pass++) {
     f();
-    q.createIndex({a: 1});
+    q.ensureIndex({a: 1});
 }
 
 t = db.multidim;

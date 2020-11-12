@@ -13,7 +13,7 @@ assert.eq(1, t.find({x: {$type: 1}}).count(), "A2");
 assert.eq(3, t.find({x: {$type: 2}}).count(), "A3");
 assert.eq(0, t.find({x: {$type: 3}}).count(), "A4");
 
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 
 assert.eq(4, t.find().count(), "B1");
 assert.eq(1, t.find({x: {$type: 1}}).count(), "B2");

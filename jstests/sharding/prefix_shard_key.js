@@ -49,7 +49,7 @@ assert.throws(function() {
 });
 
 // create usable index
-assert.commandWorked(coll.createIndex({num: 1, x: 1}));
+assert.commandWorked(coll.ensureIndex({num: 1, x: 1}));
 
 // usable index, doc with empty 'num' value
 assert.commandWorked(coll.insert({x: -5}));
@@ -84,7 +84,7 @@ assert.commandWorked(s.s0.adminCommand({
 
 // Migrations and splits will still work on a sharded collection that only has multi key
 // index.
-db.user.createIndex({num: 1, x: 1});
+db.user.ensureIndex({num: 1, x: 1});
 db.adminCommand({shardCollection: 'test.user', key: {num: 1}});
 
 var indexCount = db.user.getIndexes().length;
@@ -152,11 +152,11 @@ for (i = 0; i < 3; i++) {
 
     // declare a longer index
     if (i == 0) {
-        assert.commandWorked(coll2.createIndex({skey: 1, extra: 1}));
+        assert.commandWorked(coll2.ensureIndex({skey: 1, extra: 1}));
     } else if (i == 1) {
-        assert.commandWorked(coll2.createIndex({skey: 1, extra: -1}));
+        assert.commandWorked(coll2.ensureIndex({skey: 1, extra: -1}));
     } else if (i == 2) {
-        assert.commandWorked(coll2.createIndex({skey: 1, extra: 1, superfluous: -1}));
+        assert.commandWorked(coll2.ensureIndex({skey: 1, extra: 1, superfluous: -1}));
     }
 
     // then shard collection on prefix

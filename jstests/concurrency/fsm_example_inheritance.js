@@ -16,7 +16,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // method on $super.
         $super.setup.apply(this, arguments);
 
-        db[collName].createIndex({exampleIndexedField: 1});
+        db[collName].ensureIndex({exampleIndexedField: 1});
     };
 
     return $config;

@@ -19,7 +19,7 @@ assert.eq(49, t.find(q).count(), "A");
 assert.eq(49, t.find(q).itcount(), "B");
 assert.eq(20, t.find(q).limit(20).itcount(), "C");
 
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 
 assert.eq(49, t.find(q).count(), "D");
 assert.eq(49, t.find(q).itcount(), "E");

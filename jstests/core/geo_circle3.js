@@ -14,7 +14,7 @@ db.places.save({"_id": n++, "loc": {"x": 4.9999, "y": 52.0001}});
 db.places.save({"_id": n++, "loc": {"x": 5.0001, "y": 52.0001}});
 db.places.save({"_id": n++, "loc": {"x": 4.9999, "y": 51.9999}});
 db.places.save({"_id": n++, "loc": {"x": 5.0001, "y": 51.9999}});
-db.places.createIndex({loc: "2d"});
+db.places.ensureIndex({loc: "2d"});
 radius = 0.0001;
 center = [5, 52];
 // print(db.places.find({"loc" : {"$within" : {"$center" : [center, radius]}}}).count())

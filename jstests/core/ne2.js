@@ -5,7 +5,7 @@
 
 t = db.jstests_ne2;
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 
 t.save({a: -0.5});
 t.save({a: 0});

@@ -56,7 +56,7 @@ while (1) {  // if indexing finishes before we can run checks, try indexing w/ m
     assert.commandWorked(bulk.execute());
     assert.eq(size, t.count());
 
-    bgIndexBuildPid = doParallel(fullName + ".createIndex( {i:1}, {background:true} )");
+    bgIndexBuildPid = doParallel(fullName + ".ensureIndex( {i:1}, {background:true} )");
     try {
         // wait for indexing to start
         print("wait for indexing to start");

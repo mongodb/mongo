@@ -42,7 +42,7 @@ var $config = (function() {
     var transitions = {insert: {insert: 0.2, query: 0.8}, query: {insert: 0.8, query: 0.2}};
 
     var setup = function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({tid: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({tid: 1}));
     };
 
     return {

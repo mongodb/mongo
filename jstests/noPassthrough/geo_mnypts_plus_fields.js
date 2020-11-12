@@ -57,7 +57,7 @@ for (var fields = 1; fields < maxFields; fields++) {
         queryFields["field" + j] = field;
     }
 
-    coll.createIndex({loc: "2d"});
+    coll.ensureIndex({loc: "2d"});
 
     // Check that quarter of points in each quadrant
     for (var i = 0; i < 4; i++) {

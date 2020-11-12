@@ -6,7 +6,7 @@ var t = db.jstests_skip1;
 if (0) {  // SERVER-2845
     t.drop();
 
-    t.createIndex({a: 1});
+    t.ensureIndex({a: 1});
     t.save({a: 5});
     t.save({a: 5});
     t.save({a: 5});

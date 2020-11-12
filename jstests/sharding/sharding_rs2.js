@@ -122,7 +122,7 @@ assert.lte(before.query + 10, after.query, "B3");
 
 // --- add more data ----
 
-db.foo.createIndex({x: 1});
+db.foo.ensureIndex({x: 1});
 
 var bulk = db.foo.initializeUnorderedBulkOp();
 for (var i = 0; i < 100; i++) {

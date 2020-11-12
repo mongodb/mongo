@@ -7,7 +7,7 @@
 t = db.indexf;
 t.drop();
 
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 
 t.save({x: 2});
 t.save({y: 3});

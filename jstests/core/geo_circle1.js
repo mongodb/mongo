@@ -29,7 +29,7 @@ for (x = 0; x <= 20; x++) {
     }
 }
 
-t.createIndex({loc: "2d"});
+t.ensureIndex({loc: "2d"});
 
 for (i = 0; i < searches.length; i++) {
     // print( tojson( searches[i] ) + "\t" + correct[i].length )

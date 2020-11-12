@@ -5,7 +5,7 @@
  */
 var t = db.geo_s2weirdpolys;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 
 var centerPoint = {"type": "Point", "coordinates": [0.5, 0.5]};
 var edgePoint = {"type": "Point", "coordinates": [0, 0.5]};

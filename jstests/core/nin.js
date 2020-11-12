@@ -57,5 +57,5 @@ doTest = function(n) {
 
 doTest("no index");
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 doTest("with index");

@@ -46,7 +46,7 @@ assert.eq(1, t.find().batchSize(-1).itcount());
 assert.eq(2, t.find().batchSize(-2).itcount());
 
 // Run the tests with the index twice in order to double check plan caching.
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 for (var i = 0; i < 2; i++) {
     runIndexedTests();
 }
@@ -54,8 +54,8 @@ for (var i = 0; i < 2; i++) {
 // The next tests make sure that we obey limit and batchSize properly when the sort could be
 // either indexed or unindexed.
 t.drop();
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 
 for (var i = 0; i < 100; i++) {
     t.save({_id: i, a: i, b: 1});
@@ -118,8 +118,8 @@ for (var i = 0; i < nDocs; i++) {
 }
 
 // Two indices needed in order to trigger plan ranking. Neither index provides the sort order.
-t.createIndex({x: 1});
-t.createIndex({y: 1});
+t.ensureIndex({x: 1});
+t.ensureIndex({y: 1});
 
 // We should only buffer 3 docs in memory.
 var cursor = t.find({x: 1, y: 1}).sort({z: -1}).limit(3);

@@ -12,7 +12,7 @@ t.drop();
 t.insert({loc: {type: 'Point', coordinates: [0, 0]}});
 t.insert({loc: {type: 'Point', coordinates: [-1, 0]}});
 
-t.createIndex({loc: '2dsphere'});
+t.ensureIndex({loc: '2dsphere'});
 
 // upper bound for half of earth's circumference in meters
 var dist = 40075000 / 2 + 1;

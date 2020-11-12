@@ -16,7 +16,7 @@ function checkResults(cursor) {
     assert(!cursor.hasNext());
 }
 
-t.createIndex({a: 1, b: "2dsphere"});
+t.ensureIndex({a: 1, b: "2dsphere"});
 
 t.insert({_id: 0, a: 0, b: {type: "Point", coordinates: [0, 0]}});
 t.insert({_id: 1, a: 0, b: {type: "Point", coordinates: [1, 1]}});
@@ -33,7 +33,7 @@ checkResults(cursor);
 
 // Repeat these tests for a 2d index.
 t.drop();
-t.createIndex({a: "2d", b: 1});
+t.ensureIndex({a: "2d", b: 1});
 t.insert({_id: 0, a: [0, 0], b: 0});
 t.insert({_id: 1, a: [1, 1], b: 1});
 t.insert({_id: 2, a: [2, 2], b: 2});
@@ -47,7 +47,7 @@ checkResults(cursor);
 
 // The fields in the compound 2dsphere index share a prefix.
 t.drop();
-t.createIndex({"a.b": 1, "a.c": "2dsphere"});
+t.ensureIndex({"a.b": 1, "a.c": "2dsphere"});
 t.insert({_id: 0, a: [{b: 0}, {c: {type: "Point", coordinates: [0, 0]}}]});
 t.insert({_id: 1, a: [{b: 1}, {c: {type: "Point", coordinates: [1, 1]}}]});
 t.insert({_id: 2, a: [{b: 2}, {c: {type: "Point", coordinates: [2, 2]}}]});
@@ -66,7 +66,7 @@ assert(!cursor.hasNext());
 
 // The fields in the compound 2d index share a prefix.
 t.drop();
-t.createIndex({"a.b": "2d", "a.c": 1});
+t.ensureIndex({"a.b": "2d", "a.c": 1});
 t.insert({_id: 0, a: [{b: [0, 0]}, {c: 0}]});
 t.insert({_id: 1, a: [{b: [1, 1]}, {c: 1}]});
 t.insert({_id: 2, a: [{b: [2, 2]}, {c: 2}]});

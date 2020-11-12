@@ -235,7 +235,7 @@ assert.eq(1, coll.count());
 //
 // Upsert fail due to duplicate key index, w:1, ordered:true
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+coll.ensureIndex({a: 1}, {unique: true});
 request = {
     update: coll.getName(),
     updates: [
@@ -266,7 +266,7 @@ assert.eq(1, coll.count({_id: result.upserted[1]._id}));
 //
 // Upsert fail due to duplicate key index, w:1, ordered:false
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+coll.ensureIndex({a: 1}, {unique: true});
 request = {
     update: coll.getName(),
     updates: [

@@ -25,7 +25,7 @@ function doIt() {
         alphas.push(Random.rand() > 0.5);
     }
 
-    t.createIndex(idx);
+    t.ensureIndex(idx);
 
     function obj() {
         var ret = {};

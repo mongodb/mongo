@@ -39,5 +39,5 @@ doTest = function() {
 
 doTest();
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 doTest();

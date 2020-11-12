@@ -13,7 +13,7 @@
 const t = db.jstests_removeb;
 t.drop();
 
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 
 // Make the index multikey to trigger cursor dedup checking.
 t.insert({a: [-1, -2]});

@@ -2,13 +2,13 @@
 t = db.geo_s2nonstring;
 t.drop();
 
-t.createIndex({geo: '2dsphere', x: 1});
+t.ensureIndex({geo: '2dsphere', x: 1});
 
 t.save({geo: {type: 'Point', coordinates: [0, 0]}, x: 'a'});
 t.save({geo: {type: 'Point', coordinates: [0, 0]}, x: 5});
 
 t.drop();
-t.createIndex({geo: '2dsphere', x: 1});
+t.ensureIndex({geo: '2dsphere', x: 1});
 
 t.save({geo: {type: 'Point', coordinates: [0, 0]}, x: 'a'});
 t.save({geo: {type: 'Point', coordinates: [0, 0]}});

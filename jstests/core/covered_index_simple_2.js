@@ -19,7 +19,7 @@ for (i = 0; i < 10; i++) {
 coll.insert({foo: "string"});
 coll.insert({foo: {bar: 1}});
 coll.insert({foo: null});
-coll.createIndex({foo: 1}, {unique: true});
+coll.ensureIndex({foo: 1}, {unique: true});
 
 // Test equality with int value
 var plan = coll.find({foo: 1}, {foo: 1, _id: 0}).hint({foo: 1}).explain("executionStats");

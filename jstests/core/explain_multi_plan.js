@@ -16,8 +16,8 @@ var coll = db.explainMultiPlan;
 coll.drop();
 
 // Create indices to ensure there are multiple plans available.
-assert.commandWorked(coll.createIndex({a: 1, b: 1}));
-assert.commandWorked(coll.createIndex({a: 1, b: -1}));
+assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+assert.commandWorked(coll.ensureIndex({a: 1, b: -1}));
 
 // Insert some data to work with.
 var bulk = coll.initializeOrderedBulkOp();

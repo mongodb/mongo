@@ -10,8 +10,8 @@ for (var i = 0; i < N; i++) {
 }
 bulk.execute();
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 
 s1 = startParallelShell("db.update_serializability1.update( { a : { $gte : 0 } }, { $set : { b : " +
                         (N + 1) + ", x : 2 } }, false, true );");

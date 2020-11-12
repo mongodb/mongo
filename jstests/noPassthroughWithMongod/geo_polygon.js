@@ -20,7 +20,7 @@ var numTests = 31;
 var start = (TestData.undoRecorderPath ? 20 : 0);
 for (var n = start; n < numTests; n++) {
     t.dropIndexes();
-    t.createIndex({loc: "2d"}, {bits: 2 + n});
+    t.ensureIndex({loc: "2d"}, {bits: 2 + n});
 
     assert.between(9 - 2,
                    t.find({loc: {"$within": {"$polygon": [[0, 0], [1, 1], [0, 2]]}}}).count(),

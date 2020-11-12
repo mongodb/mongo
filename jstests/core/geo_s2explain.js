@@ -11,7 +11,7 @@ var point1 = {loc: {type: "Point", coordinates: [10, 10]}};
 var point2 = {loc: {type: "Point", coordinates: [10.001, 10]}};
 assert.commandWorked(t.insert([point1, point2]));
 
-assert.commandWorked(t.createIndex({loc: "2dsphere"}));
+assert.commandWorked(t.ensureIndex({loc: "2dsphere"}));
 
 var explain = t.find({loc: {$nearSphere: {type: "Point", coordinates: [10, 10]}}})
                   .limit(1)

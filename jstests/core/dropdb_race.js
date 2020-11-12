@@ -25,7 +25,7 @@ for (var pass = 0; pass < 100; pass++) {
     }
     t.insert({x: 1});
     t.insert({x: 3});
-    t.createIndex({x: 1});
+    t.ensureIndex({x: 1});
     sleep(s);
     if (pass % 13 == 0)
         t.drop();

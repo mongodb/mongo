@@ -7,7 +7,7 @@ for (i = 0; i < 1000; i++) {
     t.insert({_id: i, k: i % 12, v: "v" + i % 12});
 }
 
-t.createIndex({k: 1});
+t.ensureIndex({k: 1});
 
 assert.eq(84, t.count({k: 2, v: "v2"}), "A0");
 

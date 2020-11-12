@@ -8,7 +8,7 @@ t.drop();
 
 db.createCollection(collName, {capped: true, size: 100000});
 t = db[collName];
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 
 a = startParallelShell('for( i = 0; i < 50000; ++i ) { db.' + collName + '.insert( {x:i,y:1} ); }');
 

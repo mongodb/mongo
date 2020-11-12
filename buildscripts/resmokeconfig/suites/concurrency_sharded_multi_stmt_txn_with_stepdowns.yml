@@ -66,7 +66,7 @@ selector:
   # can cause OOM kills on test hosts
   - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
 
-  # cannot createIndex after dropDatabase without sharding first
+  # cannot ensureIndex after dropDatabase without sharding first
   - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
 
   # reIndex is not supported in mongos.

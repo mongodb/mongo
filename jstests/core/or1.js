@@ -61,13 +61,13 @@ doTest();
 
 // not part of SERVER-1003, but good check for subseq. implementations
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 doTest();
 
 t.drop();
-t.createIndex({b: 1});
+t.ensureIndex({b: 1});
 doTest();
 
 t.drop();
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, b: 1});
 doTest();

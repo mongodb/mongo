@@ -16,5 +16,5 @@ function doTest() {
 
 doTest();
 t.drop();
-t.createIndex({'a.id': 1});
+t.ensureIndex({'a.id': 1});
 doTest();

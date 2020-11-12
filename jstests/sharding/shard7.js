@@ -47,7 +47,7 @@ assert.commandWorked(c.update(unsatisfiable, {$set: {c: 1}}, false, true));
 assert.eq(2, c.count());
 assert.eq(0, c.count({c: 1}));
 
-c.createIndex({loc: '2d'});
+c.ensureIndex({loc: '2d'});
 c.save({a: 2, b: 2, loc: [0, 0]});
 near =
     c.aggregate({$geoNear: {near: [0, 0], query: unsatisfiable, distanceField: "dist"}}).toArray();

@@ -17,7 +17,7 @@ assert.eq("1,2,3", order(), "A");
 t.update({_id: 1}, {$inc: {x: 4}});
 assert.eq("2,3,1", order(), "B");
 
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 assert.eq("2,3,1", order(), "C");
 
 t.update({_id: 3}, {$inc: {x: 4}});

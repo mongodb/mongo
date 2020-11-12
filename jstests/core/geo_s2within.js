@@ -4,7 +4,7 @@
 // ]
 t = db.geo_s2within;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 
 somepoly = {
     "type": "Polygon",
@@ -19,7 +19,7 @@ res = t.find({"geo": {"$within": {"$geometry": somepoly}}});
 assert.eq(res.itcount(), 1);
 
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 somepoly = {
     "type": "Polygon",
     "coordinates": [

@@ -15,7 +15,7 @@
 var testDB = db.getSiblingDB("geo_s2cursorlimitskip");
 var t = testDB.geo_s2getmmm;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 
 Random.setRandomSeed();
 var random = Random.rand;

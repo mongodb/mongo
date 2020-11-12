@@ -10,7 +10,7 @@
 var coll = db.getCollection("jstests_geo_update_btree");
 coll.drop();
 
-coll.createIndex({loc: '2d'});
+coll.ensureIndex({loc: '2d'});
 
 var big = new Array(3000).toString();
 

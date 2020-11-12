@@ -6,7 +6,7 @@
 var t = db.geo_s2overlappingpolys;
 t.drop();
 
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 
 var minError = 0.8e-13;
 

@@ -29,11 +29,11 @@ if (1) {
     var a = timed();
 
     // print("index");
-    t.createIndex({x: 1});
+    t.ensureIndex({x: 1});
     // print("index");
-    t.createIndex({y: 1});
+    t.ensureIndex({y: 1});
     // print("index");
-    t.createIndex({z: 1});
+    t.ensureIndex({z: 1});
 
     a += timed();
 

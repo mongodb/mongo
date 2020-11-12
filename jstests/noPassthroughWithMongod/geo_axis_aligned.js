@@ -62,9 +62,9 @@ for (var b = 0; b < bits.length; b++) {
                 {"_id": 9, "loc": {"x": center[j][0] + radius[i], "y": center[j][1] - radius[i]}});
 
             var res =
-                t.createIndex({loc: "2d"}, {max: bound[j][1], min: bound[j][0], bits: bits[b]});
+                t.ensureIndex({loc: "2d"}, {max: bound[j][1], min: bound[j][0], bits: bits[b]});
 
-            // createIndex fails when this iteration inserted coordinates that are out of bounds.
+            // ensureIndex fails when this iteration inserted coordinates that are out of bounds.
             // These are invalid cases, so we skip them.
             if (!res.ok)
                 continue;

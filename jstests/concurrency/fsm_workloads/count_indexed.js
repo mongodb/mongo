@@ -25,7 +25,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName) {
         this.threadCollName = this.prefix + '_' + this.tid;
         $super.states.init.apply(this, arguments);
-        assertAlways.commandWorked(db[this.threadCollName].createIndex({tid: 1, i: 1}));
+        assertAlways.commandWorked(db[this.threadCollName].ensureIndex({tid: 1, i: 1}));
     };
 
     return $config;

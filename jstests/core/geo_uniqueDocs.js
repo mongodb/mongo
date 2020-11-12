@@ -11,7 +11,7 @@ t.drop();
 assert.commandWorked(t.save({locs: [[0, 2], [3, 4]]}));
 assert.commandWorked(t.save({locs: [[6, 8], [10, 10]]}));
 
-assert.commandWorked(t.createIndex({locs: '2d'}));
+assert.commandWorked(t.ensureIndex({locs: '2d'}));
 
 // $geoNear tests
 // uniqueDocs option is ignored.

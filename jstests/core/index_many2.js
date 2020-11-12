@@ -16,7 +16,7 @@ function make(n) {
 }
 
 for (i = 1; i < 1000; i++) {
-    t.createIndex(make(i));
+    t.ensureIndex(make(i));
 }
 
 assert.eq(64, t.getIndexKeys().length, "A2");
@@ -26,7 +26,7 @@ num = t.getIndexKeys().length;
 t.dropIndex(make(num - 1));
 assert.eq(num - 1, t.getIndexKeys().length, "B0");
 
-t.createIndex({z: 1});
+t.ensureIndex({z: 1});
 assert.eq(num, t.getIndexKeys().length, "B1");
 
 t.dropIndexes("*");

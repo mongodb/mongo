@@ -20,12 +20,12 @@ function keysExamined(query, hint, sort) {
     return explain.executionStats.totalKeysExamined;
 }
 
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 t.save({a: 5});
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "A");
 
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 t.save({a: 4});
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "B");
 
@@ -39,7 +39,7 @@ t.save({a: 5});
 assert.eq(0, keysExamined({a: {$gt: 4, $lt: 5}}), "D");
 
 t.drop();
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, b: 1});
 t.save({a: 1, b: 1});
 t.save({a: 1, b: 2});
 t.save({a: 2, b: 1});

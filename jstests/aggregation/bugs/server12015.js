@@ -36,7 +36,7 @@ function assertResultsMatch(pipeline, ignoreSortOrder) {
     pipeline = [{$match: {a: {$gte: 0}}}].concat(pipeline);
 
     // Once with an index.
-    assert.commandWorked(coll.createIndex(indexSpec));
+    assert.commandWorked(coll.ensureIndex(indexSpec));
     var resultsWithIndex = coll.aggregate(pipeline).toArray();
 
     // Again without an index.

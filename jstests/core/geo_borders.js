@@ -24,11 +24,11 @@ overallMax = 1;
 
 // Create a point index slightly smaller than the points we have
 var res =
-    t.createIndex({loc: "2d"}, {max: overallMax - epsilon / 2, min: overallMin + epsilon / 2});
+    t.ensureIndex({loc: "2d"}, {max: overallMax - epsilon / 2, min: overallMin + epsilon / 2});
 assert.commandFailed(res);
 
 // Create a point index only slightly bigger than the points we have
-res = t.createIndex({loc: "2d"}, {max: overallMax + epsilon, min: overallMin - epsilon});
+res = t.ensureIndex({loc: "2d"}, {max: overallMax + epsilon, min: overallMin - epsilon});
 assert.commandWorked(res);
 
 // ************

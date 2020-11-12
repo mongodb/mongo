@@ -25,5 +25,5 @@ t.save({a: [{x: 3}, {x: 5}]});
 t.save({a: [{x: 3}, {x: 6}]});
 
 go("no index");
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 go("index(a)");

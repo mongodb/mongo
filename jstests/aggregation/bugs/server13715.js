@@ -12,7 +12,7 @@ assert.eq(1, cursor.next()["_id"]);
 assert.eq(0, cursor.next()["_id"]);
 
 // Repeat the test with an index.
-t.createIndex({name: 1});
+t.ensureIndex({name: 1});
 
 cursor = t.aggregate([{$match: {$or: [{name: "red"}, {name: "blue"}]}}, {$sort: {value: 1}}]);
 assert.eq(1, cursor.next()["_id"]);

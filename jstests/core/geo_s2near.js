@@ -14,7 +14,7 @@ goldenPoint = {
     coordinates: [31.0, 41.0]
 };
 t.insert({geo: goldenPoint});
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 resNear =
     t.aggregate([
          {$geoNear: {near: [30, 40], distanceField: "d", spherical: true, includeLocs: "loc"}},
@@ -40,7 +40,7 @@ origin = {
     "coordinates": [lng, lat]
 };
 
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 
 // Near only works when the query is a point.
 someline = {

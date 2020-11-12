@@ -15,7 +15,7 @@ for (var pass = 0; pass < 2; pass++) {
     assert(res[0].y.a == 2);
     assert(res[1].y.a == 5);
     assert(res.length == 4);
-    t.createIndex({"y.a": 1});
+    t.ensureIndex({"y.a": 1});
 }
 assert(t.validate().valid);
 
@@ -31,5 +31,5 @@ for (var pass = 0; pass < 2; pass++) {
     for (var i = 0; i < good.length; i++) {
         assert(good[i].toString() == res[i].x.toString());
     }
-    t.createIndex({x: 1});
+    t.ensureIndex({x: 1});
 }

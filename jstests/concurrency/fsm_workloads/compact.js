@@ -37,15 +37,15 @@ var $config = (function() {
 
         function createIndexes(db, collName) {
             // The number of indexes created here is also stored in data.nIndexes
-            var aResult = db[collName].createIndex({a: 1});
+            var aResult = db[collName].ensureIndex({a: 1});
 
             assertWorkedHandleTxnErrors(aResult, ErrorCodes.IndexBuildAlreadyInProgress);
 
-            var bResult = db[collName].createIndex({b: 1});
+            var bResult = db[collName].ensureIndex({b: 1});
 
             assertWorkedHandleTxnErrors(bResult, ErrorCodes.IndexBuildAlreadyInProgress);
 
-            var cResult = db[collName].createIndex({c: 1});
+            var cResult = db[collName].ensureIndex({c: 1});
 
             assertWorkedHandleTxnErrors(cResult, ErrorCodes.IndexBuildAlreadyInProgress);
         }

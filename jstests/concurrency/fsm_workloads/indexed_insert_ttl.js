@@ -27,7 +27,7 @@ var $config = (function() {
     var transitions = {init: {insert: 1}, insert: {insert: 1}};
 
     function setup(db, collName, cluster) {
-        var res = db[collName].createIndex({indexed_insert_ttl: 1},
+        var res = db[collName].ensureIndex({indexed_insert_ttl: 1},
                                            {expireAfterSeconds: this.ttlSeconds});
         assertAlways.commandWorked(res);
     }

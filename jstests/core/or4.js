@@ -14,8 +14,8 @@ const coll = db.or4;
 coll.drop();
 db.getCollection("mrOutput").drop();
 
-coll.createIndex({a: 1});
-coll.createIndex({b: 1});
+coll.ensureIndex({a: 1});
+coll.ensureIndex({b: 1});
 
 assert.commandWorked(coll.insert({a: 2}));
 assert.commandWorked(coll.insert({b: 3}));

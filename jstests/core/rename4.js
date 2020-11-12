@@ -124,7 +124,7 @@ good({a: 1, c: 4}, {$rename: {b: 'c.d'}}, {a: 1, c: 4});
 
 // check index
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 
 function l(start, mod, query, expected) {
     t.remove({});

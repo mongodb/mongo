@@ -4,7 +4,7 @@
 var t = db.jstests_not3;
 t.drop();
 
-t.createIndex({arr: 1});
+t.ensureIndex({arr: 1});
 t.save({_id: 0, arr: [1, 2, 3]});
 t.save({_id: 1, arr: [10, 11]});
 

@@ -23,7 +23,7 @@ var y;
 
 // Case #1: Text search with deletion invalidation.
 t.drop();
-assert.commandWorked(t.createIndex({a: "text"}));
+assert.commandWorked(t.ensureIndex({a: "text"}));
 assert.commandWorked(t.insert({_id: 1, a: "bar"}));
 assert.commandWorked(t.insert({_id: 2, a: "bar"}));
 assert.commandWorked(t.insert({_id: 3, a: "bar"}));
@@ -41,7 +41,7 @@ assert(count === 0 || count === 1);
 
 // Case #2: Text search with mutation invalidation.
 t.drop();
-assert.commandWorked(t.createIndex({a: "text"}));
+assert.commandWorked(t.ensureIndex({a: "text"}));
 assert.commandWorked(t.insert({_id: 1, a: "bar"}));
 assert.commandWorked(t.insert({_id: 2, a: "bar"}));
 assert.commandWorked(t.insert({_id: 3, a: "bar"}));
@@ -60,7 +60,7 @@ assert(!cursor.hasNext() || cursor.next()["a"] === "bar");
 
 // Case #3: Merge sort with deletion invalidation.
 t.drop();
-assert.commandWorked(t.createIndex({a: 1, b: 1}));
+assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
 assert.commandWorked(t.insert({a: 1, b: 1}));
 assert.commandWorked(t.insert({a: 1, b: 2}));
 assert.commandWorked(t.insert({a: 2, b: 3}));
@@ -77,7 +77,7 @@ assert(count === 1 || count === 2);
 
 // Case #4: Merge sort with mutation invalidation.
 t.drop();
-assert.commandWorked(t.createIndex({a: 1, b: 1}));
+assert.commandWorked(t.ensureIndex({a: 1, b: 1}));
 assert.commandWorked(t.insert({a: 1, b: 1}));
 assert.commandWorked(t.insert({a: 1, b: 2}));
 assert.commandWorked(t.insert({a: 2, b: 3}));
@@ -101,7 +101,7 @@ assert(!cursor.hasNext());
 
 // Case #5: 2d near with deletion invalidation.
 t.drop();
-t.createIndex({geo: "2d"});
+t.ensureIndex({geo: "2d"});
 for (x = -1; x < 1; x++) {
     for (y = -1; y < 1; y++) {
         assert.commandWorked(t.insert({geo: [x, y]}));
@@ -121,7 +121,7 @@ assert(cursor.hasNext());
 
 // Case #6: 2dsphere near with deletion invalidation.
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 for (x = -1; x < 1; x++) {
     for (y = -1; y < 1; y++) {
         assert.commandWorked(t.insert({geo: [x, y]}));
@@ -141,7 +141,7 @@ assert(cursor.hasNext());
 
 // Case #7: 2dsphere near with deletion invalidation (again).
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 for (x = 0; x < 6; x++) {
     assert.commandWorked(t.insert({geo: [x, x]}));
 }
@@ -159,7 +159,7 @@ assert.gte(cursor.itcount(), 0);
 
 // Case #8: 2d near with mutation invalidation.
 t.drop();
-t.createIndex({geo: "2d"});
+t.ensureIndex({geo: "2d"});
 for (x = -1; x < 1; x++) {
     for (y = -1; y < 1; y++) {
         assert.commandWorked(t.insert({geo: [x, y]}));
@@ -182,7 +182,7 @@ assert(nextDoc.geo[0] === 0 || nextDoc.geo[1] === 0);
 
 // Case #9: 2dsphere near with mutation invalidation.
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 for (x = -1; x < 1; x++) {
     for (y = -1; y < 1; y++) {
         assert.commandWorked(t.insert({geo: [x, y]}));
@@ -205,7 +205,7 @@ assert(nextDoc.geo[0] === 0 || nextDoc.geo[1] === 0);
 
 // Case #10: sort with deletion invalidation.
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 t.insert({a: 1, b: 2});
 t.insert({a: 3, b: 3});
 t.insert({a: 2, b: 1});
@@ -222,7 +222,7 @@ if (cursor.hasNext()) {
 
 // Case #11: sort with mutation invalidation.
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 t.insert({a: 1, b: 2});
 t.insert({a: 3, b: 3});
 t.insert({a: 2, b: 1});

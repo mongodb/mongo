@@ -14,5 +14,5 @@ t.save({
 });
 
 assert.eq(2, t.find({"scores.level": 2, "scores.score": {$gt: 30}}).itcount(), "A");
-t.createIndex({"scores.level": 1, "scores.score": 1});
+t.ensureIndex({"scores.level": 1, "scores.score": 1});
 assert.eq(2, t.find({"scores.level": 2, "scores.score": {$gt: 30}}).itcount(), "B");

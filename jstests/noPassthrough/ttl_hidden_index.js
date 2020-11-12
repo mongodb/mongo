@@ -6,7 +6,7 @@ let coll = runner.getDB("test").ttl_hiddenl_index;
 coll.drop();
 
 // Create TTL index.
-assert.commandWorked(coll.createIndex({x: 1}, {expireAfterSeconds: 0}));
+assert.commandWorked(coll.ensureIndex({x: 1}, {expireAfterSeconds: 0}));
 let now = new Date();
 
 assert.commandWorked(coll.hideIndex("x_1"));

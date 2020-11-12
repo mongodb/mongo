@@ -47,7 +47,7 @@ assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
 
 // Enable sharding on test db and its collection foo
 assert.commandWorked(mongosConn.getDB('admin').runCommand({enablesharding: testDBName}));
-testDB[testCollName].createIndex({x: 1});
+testDB[testCollName].ensureIndex({x: 1});
 assert.commandWorked(mongosConn.getDB('admin').runCommand(
     {shardcollection: testDBName + '.' + testCollName, key: {x: 1}}));
 

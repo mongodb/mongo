@@ -8,7 +8,7 @@ var coll = runner.getDB("test").ttl_partial_index;
 coll.drop();
 
 // Create TTL partial index.
-assert.commandWorked(coll.createIndex(
+assert.commandWorked(coll.ensureIndex(
     {x: 1}, {expireAfterSeconds: 0, partialFilterExpression: {z: {$exists: true}}}));
 
 var now = new Date();

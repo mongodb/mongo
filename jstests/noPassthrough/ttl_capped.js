@@ -38,7 +38,7 @@ for (var i = 0; i < numCollectionsToCreate; i++) {
     }
 
     // Create a TTL index on the 'date' field of the collection.
-    var res = testDB[collName].createIndex({date: 1}, {expireAfterSeconds: expireAfterSeconds});
+    var res = testDB[collName].ensureIndex({date: 1}, {expireAfterSeconds: expireAfterSeconds});
     assert.commandWorked(res);
 
     // Insert a single document with a 'date' field that is already expired according to the

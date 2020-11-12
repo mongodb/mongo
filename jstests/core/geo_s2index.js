@@ -10,7 +10,7 @@ someline = {
     "coordinates": [[40, 5], [40, 5], [40, 5], [41, 6], [41, 6]]
 };
 t.insert({geo: someline, nonGeo: "someline"});
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 foo = t.find({geo: {$geoIntersects: {$geometry: {type: "Point", coordinates: [40, 5]}}}}).next();
 assert.eq(foo.geo, someline);
 t.dropIndex({geo: "2dsphere"});
@@ -56,7 +56,7 @@ somepoly = {
 };
 t.insert({geo: somepoly, nonGeo: "somepoly"});
 
-var res = t.createIndex({geo: "2dsphere", nonGeo: 1});
+var res = t.ensureIndex({geo: "2dsphere", nonGeo: 1});
 // We have a point without any geo data.  Don't error.
 assert.commandWorked(res);
 
@@ -86,7 +86,7 @@ assert.eq(res.itcount(), 1);
 
 // Don't crash mongod if we give it bad input.
 t.drop();
-t.createIndex({loc: "2dsphere", x: 1});
+t.ensureIndex({loc: "2dsphere", x: 1});
 t.save({loc: [0, 0]});
 assert.throws(function() {
     return t.count({loc: {$foo: [0, 0]}});
@@ -102,7 +102,7 @@ assert.throws(function() {
 
 // If we specify a datum, it has to be valid (WGS84).
 t.drop();
-t.createIndex({loc: "2dsphere"});
+t.ensureIndex({loc: "2dsphere"});
 res = t.insert({
     loc: {type: 'Point', coordinates: [40, 5], crs: {type: 'name', properties: {name: 'EPSG:2000'}}}
 });
@@ -127,36 +127,36 @@ assert.commandWorked(res);
 // 0 <= coarsestIndexedLevel <= finestIndexedLevel <= 30.
 t.drop();
 t.save({loc: [0, 0]});
-res = t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 17, coarsestIndexedLevel: 5});
+res = t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 17, coarsestIndexedLevel: 5});
 assert.commandWorked(res);
 // Ensure the index actually works at a basic level
 assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}));
 
 t.drop();
 t.save({loc: [0, 0]});
-res = t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 31, coarsestIndexedLevel: 5});
+res = t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 31, coarsestIndexedLevel: 5});
 assert.commandFailed(res);
 
 t.drop();
 t.save({loc: [0, 0]});
-res = t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: 0});
+res = t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: 0});
 assert.commandWorked(res);
 // Ensure the index actually works at a basic level
 assert.neq(null, t.findOne({loc: {$geoNear: {$geometry: {type: 'Point', coordinates: [0, 0]}}}}));
 
 t.drop();
 t.save({loc: [0, 0]});
-res = t.createIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: -1});
+res = t.ensureIndex({loc: "2dsphere"}, {finestIndexedLevel: 30, coarsestIndexedLevel: -1});
 assert.commandFailed(res);
 
 // SERVER-21491 Verify that 2dsphere index options require correct types.
-res = t.createIndex({loc: '2dsphere'}, {'2dsphereIndexVersion': 'NOT_A_NUMBER'});
+res = t.ensureIndex({loc: '2dsphere'}, {'2dsphereIndexVersion': 'NOT_A_NUMBER'});
 assert.commandFailed(res);
 
-res = t.createIndex({loc: '2dsphere'}, {finestIndexedLevel: 'NOT_A_NUMBER'});
+res = t.ensureIndex({loc: '2dsphere'}, {finestIndexedLevel: 'NOT_A_NUMBER'});
 assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 
-res = t.createIndex({loc: '2dsphere'}, {coarsestIndexedLevel: 'NOT_A_NUMBER'});
+res = t.ensureIndex({loc: '2dsphere'}, {coarsestIndexedLevel: 'NOT_A_NUMBER'});
 assert.commandFailedWithCode(res, ErrorCodes.TypeMismatch);
 
 // Ensure polygon which previously triggered an assertion error in SERVER-19674

@@ -23,7 +23,7 @@ function test(n, idx) {
     pop();
     assert.eq(N, t.count(), n + " A " + idx);
     if (idx)
-        t.createIndex(idx);
+        t.ensureIndex(idx);
     var res = del();
     assert(!res.hasWriteError(), "error deleting: " + res.toString());
     assert.eq(0, t.count(), n + " B " + idx);

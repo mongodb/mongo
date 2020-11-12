@@ -40,7 +40,7 @@ index = {
     'a.b': 1,
     'a.c': 1
 };
-t.createIndex(index);
+t.ensureIndex(index);
 t.save({a: [{b: 1}, {c: 1}]});
 t.save({a: [{b: 1, c: 1}]});
 assert.eq(2, t.count());
@@ -68,7 +68,7 @@ index = {
     'd.e': 1,
     'd.f': 1
 };
-t.createIndex(index);
+t.ensureIndex(index);
 t.insert({a: [{b: 1}, {c: 1}], d: {e: 1, f: 1}});
 t.insert({a: [{b: 1, c: 1}], d: {e: 1, f: 1}});
 t.insert({a: {b: 1, c: 1}, d: [{e: 1, f: 1}]});
@@ -89,7 +89,7 @@ index = {
     'a.b.c': 1,
     'a.b.d': 1
 };
-t.createIndex(index);
+t.ensureIndex(index);
 t.insert({a: [{b: [{c: 1, d: 1}]}]});
 t.insert({a: [{b: [{c: 1}, {d: 1}]}]});
 assert.eq(2, t.count());
@@ -104,7 +104,7 @@ index = {
     'a.b.x': 1,
     'a.b.y': 1
 };
-t.createIndex(index);
+t.ensureIndex(index);
 t.save({a: {b: {x: 1, y: 1}}});
 t.save({a: [{b: {x: 1}}, {b: {y: 1}}]});
 t.save({a: [{b: [{x: 1}, {y: 1}]}]});
@@ -125,7 +125,7 @@ index = {
     'a.b.x': 1,
     'a.b.y': 1
 };
-t.createIndex(index);
+t.ensureIndex(index);
 
 // With $ne.
 assertResults({a: {$ne: 4}, 'a.b': {$elemMatch: {x: 1, y: 1}}});
@@ -141,7 +141,7 @@ index = {
     'a.b.d': 1,
     'a.e.g': 1
 };
-t.createIndex(index);
+t.ensureIndex(index);
 t.save({a: {b: {c: 1, d: 1}, e: {f: 1, g: 1}}});
 t.save({a: [{b: {c: 1}, e: {f: 1}}, {b: {d: 1}, e: {g: 1}}]});
 t.save({a: [{b: {c: 1}}, {e: {f: 1}}, {b: {d: 1}}, {e: {g: 1}}]});
@@ -166,7 +166,7 @@ index = {
     'a.b.d': 1,
     'a.e.d': 1
 };
-t.createIndex(index);
+t.ensureIndex(index);
 t.save({a: [{b: [{c: 1, d: 1}]}, {e: [{c: 1, d: 1}]}]});
 assert.eq(1, t.count());
 

@@ -350,7 +350,7 @@ function DataGenerator() {
 //     var nextIndexDocument = generator.next();
 //     var nextIndexSpec = nextIndexDocument["spec"];
 //     var nextIndexOptions = nextIndexDocument["options"];
-//     db.createIndex(nextIndexSpec, nextIndexOptions);
+//     db.ensureIndex(nextIndexSpec, nextIndexOptions);
 // }
 //
 function IndexDataGenerator(options) {

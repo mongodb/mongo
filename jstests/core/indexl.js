@@ -23,5 +23,5 @@ function test(t) {
 t.drop();
 test(t);
 t.drop();
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 test(t);

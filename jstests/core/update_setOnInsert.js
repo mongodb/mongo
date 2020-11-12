@@ -5,7 +5,7 @@ var res;
 function dotest(useIndex) {
     t.drop();
     if (useIndex) {
-        t.createIndex({a: 1});
+        t.ensureIndex({a: 1});
     }
 
     t.update({_id: 5}, {$inc: {x: 2}, $setOnInsert: {a: 3}}, true);

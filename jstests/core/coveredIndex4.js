@@ -9,8 +9,8 @@
 t = db.jstests_coveredIndex4;
 t.drop();
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 
 orClause = [];
 for (i = 0; i < 200; ++i) {

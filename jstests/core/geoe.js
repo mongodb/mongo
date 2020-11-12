@@ -22,7 +22,7 @@ t.insert({"_id": 12, "geo": [-122.3, 37.66]});
 t.insert({"_id": 13, "geo": [-122.2435, 37.637072]});
 t.insert({"_id": 14, "geo": [-122.289505, 37.695774]});
 
-t.createIndex({geo: "2d"});
+t.ensureIndex({geo: "2d"});
 
 c = t.find({geo: {"$within": {"$box": [[-125.078461, 36.494473], [-120.320648, 38.905199]]}}});
 assert.eq(11, c.count(), "A1");

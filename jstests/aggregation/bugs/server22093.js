@@ -26,7 +26,7 @@ for (var i = 0; i < 3; i++) {
     }
 }
 
-coll.createIndex({foo: 1});
+coll.ensureIndex({foo: 1});
 
 var simpleGroup = coll.aggregate([{$group: {_id: null, count: {$sum: 1}}}]).toArray();
 

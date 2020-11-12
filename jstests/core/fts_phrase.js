@@ -11,7 +11,7 @@ t.save({_id: 1, title: "my blog post", text: "i am writing a blog. yay"});
 t.save({_id: 2, title: "my 2nd post", text: "this is a new blog i am typing. yay"});
 t.save({_id: 3, title: "knives are Fun", text: "this is a new blog i am writing. yay"});
 
-t.createIndex({"title": "text", text: "text"}, {weights: {title: 10}});
+t.ensureIndex({"title": "text", text: "text"}, {weights: {title: 10}});
 
 res = t.find({"$text": {"$search": "blog write"}}, {score: {"$meta": "textScore"}}).sort({
     score: {"$meta": "textScore"}

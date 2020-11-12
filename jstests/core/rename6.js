@@ -17,7 +17,7 @@ const dbd = testDB.getCollection(d);
 dbc.drop();
 dbd.drop();
 
-dbc.createIndex({
+dbc.ensureIndex({
     "name": 1,
     "date": 1,
     "time": 1,

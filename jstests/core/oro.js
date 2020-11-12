@@ -13,7 +13,7 @@ orClauses = [];
 for (idxKey = 'a'; idxKey <= 'aaaaaaaaaa'; idxKey += 'a') {
     idx = {};
     idx[idxKey] = 1;
-    t.createIndex(idx);
+    t.ensureIndex(idx);
     for (i = 0; i < 200; ++i) {
         t.insert(idx);
     }

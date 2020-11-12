@@ -43,7 +43,7 @@ explain = db.runCommand({explain: {delete: collName, deletes: [{q: {a: 1}, limit
 checkNWouldDelete(explain, 0);
 
 // Add an index but no data, and check that the explain still works.
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 explain = db.runCommand({explain: {delete: collName, deletes: [{q: {a: 1}, limit: 0}]}});
 checkNWouldDelete(explain, 0);
 

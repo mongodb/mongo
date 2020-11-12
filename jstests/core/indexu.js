@@ -15,56 +15,56 @@ var noDupDoc = {a: [{'1': 1}]};
 
 // Test that we can't index dupDoc.
 assert.commandWorked(t.save(dupDoc));
-assert.commandFailedWithCode(t.createIndex({'a.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0': 1}), 16746);
 
 // Test that we can fail gracefully when dupDoc has a large array padded with nulls.
 // Index is based on max padding constant in mongo/db/update/path_support.h
 assert.commandWorked(t.update({_id: 0}, {$set: {'a.1500001': 1}}));
-assert.commandFailedWithCode(t.createIndex({'a.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0': 1}), 16746);
 
 t.remove({});
-assert.commandWorked(t.createIndex({'a.0': 1}));
+assert.commandWorked(t.ensureIndex({'a.0': 1}));
 assert.writeError(t.save(dupDoc));
 
 // Test that we can't index dupDoc2.
 t.drop();
 assert.commandWorked(t.save(dupDoc2));
-assert.commandFailedWithCode(t.createIndex({'a.1': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.1': 1}), 16746);
 
 t.remove({});
-assert.commandWorked(t.createIndex({'a.1': 1}));
+assert.commandWorked(t.ensureIndex({'a.1': 1}));
 assert.writeError(t.save(dupDoc2));
 
 // Test that we can index dupDoc with a different index.
 t.drop();
-t.createIndex({'a.b': 1});
+t.ensureIndex({'a.b': 1});
 assert.commandWorked(t.save(dupDoc));
 
 // Test number field starting with hyphen.
 t.drop();
-t.createIndex({'a.-1': 1});
+t.ensureIndex({'a.-1': 1});
 assert.commandWorked(t.save({a: [{'-1': 1}]}));
 
 // Test number field starting with zero.
 t.drop();
-t.createIndex({'a.00': 1});
+t.ensureIndex({'a.00': 1});
 assert.commandWorked(t.save({a: [{'00': 1}]}));
 
 // Test multiple array indexes
 t.drop();
-t.createIndex({'a.0': 1, 'a.1': 1});
+t.ensureIndex({'a.0': 1, 'a.1': 1});
 assert.commandWorked(t.save({a: [{'1': 1}]}));
 assert.writeError(t.save({a: [{'1': 1}, 4]}));
 
 // Test that we can index noDupDoc.
 t.drop();
 t.save(noDupDoc);
-assert.commandWorked(t.createIndex({'a.0': 1}));
-assert.commandWorked(t.createIndex({'a.1': 1}));
+assert.commandWorked(t.ensureIndex({'a.0': 1}));
+assert.commandWorked(t.ensureIndex({'a.1': 1}));
 
 t.drop();
-t.createIndex({'a.0': 1});
-t.createIndex({'a.1': 1});
+t.ensureIndex({'a.0': 1});
+t.ensureIndex({'a.1': 1});
 assert.commandWorked(t.save(noDupDoc));
 
 // Test that we can query noDupDoc.
@@ -76,7 +76,7 @@ assert.eq(1, t.find({'a.0': {'1': 1}}).hint({$natural: 1}).itcount());
 // Check multiple nested array fields.
 t.drop();
 t.save({a: [[1]]});
-assert.commandWorked(t.createIndex({'a.0.0': 1}));
+assert.commandWorked(t.ensureIndex({'a.0.0': 1}));
 assert.eq(1, t.find({'a.0.0': 1}).hint({$natural: 1}).itcount());
 assert.eq(1, t.find({'a.0.0': 1}).hint({'a.0.0': 1}).itcount());
 
@@ -84,36 +84,36 @@ assert.eq(1, t.find({'a.0.0': 1}).hint({'a.0.0': 1}).itcount());
 // field.
 t.drop();
 t.save({a: [[1], {'0': 1}]});
-assert.commandFailed(t.createIndex({'a.0.0': 1}));
+assert.commandFailed(t.ensureIndex({'a.0.0': 1}));
 
 // Check where there is a duplicate for a fully addressed field.
 t.drop();
 assert.commandWorked(t.save({a: [[1], {'0': [1]}]}));
-assert.commandFailedWithCode(t.createIndex({'a.0.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0.0': 1}), 16746);
 
 // Two ways of addressing parse to an array.
 t.drop();
 t.save({a: [{'0': 1}]});
-assert.commandFailedWithCode(t.createIndex({'a.0.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0.0': 1}), 16746);
 
 // Test several key depths - with same arrays being found.
 t.drop();
 t.save({a: [{'0': [{'0': 1}]}]});
-assert.commandFailedWithCode(t.createIndex({'a.0.0.0.0.0.0': 1}), 16746);
-assert.commandFailedWithCode(t.createIndex({'a.0.0.0.0.0': 1}), 16746);
-assert.commandFailedWithCode(t.createIndex({'a.0.0.0.0': 1}), 16746);
-assert.commandFailedWithCode(t.createIndex({'a.0.0.0': 1}), 16746);
-assert.commandFailedWithCode(t.createIndex({'a.0.0': 1}), 16746);
-assert.commandFailedWithCode(t.createIndex({'a.0': 1}), 16746);
-assert.commandWorked(t.createIndex({'a': 1}));
+assert.commandFailedWithCode(t.ensureIndex({'a.0.0.0.0.0.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0.0.0.0.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0.0.0.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0.0.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0.0': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0': 1}), 16746);
+assert.commandWorked(t.ensureIndex({'a': 1}));
 
 // Two prefixes extract docs, but one terminates extraction before array.
 t.drop();
 t.save({a: [{'0': {'c': []}}]});
-assert.commandFailedWithCode(t.createIndex({'a.0.c': 1}), 16746);
+assert.commandFailedWithCode(t.ensureIndex({'a.0.c': 1}), 16746);
 
 t.drop();
 t.save({a: [[{'b': 1}]]});
 assert.eq(1, t.find({'a.0.b': 1}).itcount());
-t.createIndex({'a.0.b': 1});
+t.ensureIndex({'a.0.b': 1});
 assert.eq(1, t.find({'a.0.b': 1}).itcount());

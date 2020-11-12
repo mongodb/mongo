@@ -15,27 +15,27 @@ coll.drop();
 //
 
 var res;
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": -1});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": -1});
 assert.commandFailed(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 0});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 0});
 assert.commandFailed(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 4});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 4});
 assert.commandFailed(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": Infinity});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": Infinity});
 assert.commandFailed(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": "foo"});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": "foo"});
 assert.commandFailed(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": {a: 1}});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": {a: 1}});
 assert.commandFailed(res);
 coll.drop();
 
@@ -43,31 +43,31 @@ coll.drop();
 // Index build should succeed for valid values of "2dsphereIndexVersion".
 //
 
-res = coll.createIndex({geo: "2dsphere"});
+res = coll.ensureIndex({geo: "2dsphere"});
 assert.commandWorked(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
 assert.commandWorked(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(1)});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(1)});
 assert.commandWorked(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(1)});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(1)});
 assert.commandWorked(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
 assert.commandWorked(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(2)});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberInt(2)});
 assert.commandWorked(res);
 coll.drop();
 
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(2)});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": NumberLong(2)});
 assert.commandWorked(res);
 coll.drop();
 
@@ -75,7 +75,7 @@ coll.drop();
 // {2dsphereIndexVersion: 3} should be the default for new indexes.
 //
 
-res = coll.createIndex({geo: "2dsphere"});
+res = coll.ensureIndex({geo: "2dsphere"});
 assert.commandWorked(res);
 var specObj = coll.getIndexes().filter(function(z) {
     return z.name == "geo_2dsphere";
@@ -85,26 +85,26 @@ coll.drop();
 
 //
 // Two index specs are considered equivalent if they differ only in '2dsphereIndexVersion', and
-// createIndex() should become a no-op on repeated requests that only differ in this way.
+// ensureIndex() should become a no-op on repeated requests that only differ in this way.
 //
 
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 assert.eq(1, coll.getIndexes().length);
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
 assert.eq(2, coll.getIndexes().length);
 coll.drop();
 
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
 assert.eq(1, coll.getIndexes().length);
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1}));
 assert.eq(2, coll.getIndexes().length);
-assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
+assert.commandWorked(coll.ensureIndex({geo: "2dsphere"}));
 assert.eq(2, coll.getIndexes().length);
 coll.drop();
 
@@ -175,7 +175,7 @@ var geometryCollectionDoc = {
 };
 
 // {2dsphereIndexVersion: 2} indexes allow all supported GeoJSON objects.
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 2});
 assert.commandWorked(res);
 res = coll.insert(pointDoc);
 assert.commandWorked(res);
@@ -194,7 +194,7 @@ assert.commandWorked(res);
 coll.drop();
 
 // {2dsphereIndexVersion: 1} indexes allow only Point, LineString, and Polygon.
-res = coll.createIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
+res = coll.ensureIndex({geo: "2dsphere"}, {"2dsphereIndexVersion": 1});
 assert.commandWorked(res);
 res = coll.insert(pointDoc);
 assert.commandWorked(res);

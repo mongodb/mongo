@@ -57,20 +57,20 @@ function checkExistsNull() {
 checkExistsNull();
 
 // try with a standard index
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 checkExistsNull();
 
 // try with a sparse index
 t.dropIndexes();
-t.createIndex({a: 1}, {sparse: true});
+t.ensureIndex({a: 1}, {sparse: true});
 checkExistsNull();
 
 // try with a compound index
 t.dropIndexes();
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, b: 1});
 checkExistsNull();
 
 // try with sparse compound index
 t.dropIndexes();
-t.createIndex({a: 1, b: 1}, {sparse: true});
+t.ensureIndex({a: 1, b: 1}, {sparse: true});
 checkExistsNull();

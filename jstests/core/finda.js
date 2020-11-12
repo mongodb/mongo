@@ -11,7 +11,7 @@ t.drop();
 numDocs = 200;
 
 function clearQueryPlanCache() {
-    t.createIndex({c: 1});
+    t.ensureIndex({c: 1});
     t.dropIndex({c: 1});
 }
 
@@ -92,7 +92,7 @@ function queryWithPlanTypes(withDups) {
     } else {
         t.save({_id: 0, a: 0, b: 0});
     }
-    t.createIndex({a: 1, _id: 1});  // Include _id for a covered index projection.
+    t.ensureIndex({a: 1, _id: 1});  // Include _id for a covered index projection.
 
     // All plans in order.
     checkCursorWithBatchSize({a: {$gte: 0}}, null, 150, 150);

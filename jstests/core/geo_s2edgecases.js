@@ -51,7 +51,7 @@ penguin2 = {
 };
 t.insert({geo: penguin2});
 
-t.createIndex({geo: "2dsphere", nonGeo: 1});
+t.ensureIndex({geo: "2dsphere", nonGeo: 1});
 
 res = t.find({"geo": {"$geoIntersects": {"$geometry": roundworldpoint}}});
 assert.eq(res.count(), 2);

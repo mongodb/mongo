@@ -307,7 +307,7 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
     cmdTest(
         {dbStats: 1}, allowedOnSecondary.kAlways, true, formatProfileQuery(kDbName, {dbStats: 1}));
 
-    assert.commandWorked(shardedColl.createIndex({loc: '2d'}));
+    assert.commandWorked(shardedColl.ensureIndex({loc: '2d'}));
 
     // TODO: SERVER-38961 Remove when simultaneous index builds complete.
     // Run a no-op command and wait for it to be applied on secondaries. Due to the asynchronous

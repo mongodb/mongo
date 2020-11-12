@@ -10,10 +10,10 @@ d = conn.getDB('test');
 assert.commandWorked(d.runCommand({
     applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + 'temp1', temp: true}}]
 }));
-d[testname + 'temp1'].createIndex({x: 1});
+d[testname + 'temp1'].ensureIndex({x: 1});
 assert.commandWorked(d.runCommand(
     {applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + 'temp2', temp: 1}}]}));
-d[testname + 'temp2'].createIndex({x: 1});
+d[testname + 'temp2'].ensureIndex({x: 1});
 assert.commandWorked(d.runCommand({
     applyOps: [{op: "c", ns: d.getName() + ".$cmd", o: {create: testname + 'keep1', temp: false}}]
 }));

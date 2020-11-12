@@ -56,7 +56,7 @@ for (var i = 0; i < scales.length; i++) {
 
     var t = db["geo_small_large"];
     t.drop();
-    t.createIndex({p: "2d"}, {min: min, max: max, bits: bits});
+    t.ensureIndex({p: "2d"}, {min: min, max: max, bits: bits});
 
     var outPoints = 0;
     var inPoints = 0;

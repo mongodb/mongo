@@ -179,7 +179,7 @@ assert(resultNOK(result), tojson(result));
 //
 // Should fail single insert due to duplicate key
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+coll.ensureIndex({a: 1}, {unique: true});
 coll.insert({a: 1});
 request = {
     insert: coll.getName(),
@@ -194,7 +194,7 @@ assert.eq(coll.count(), 1);
 //
 // Fail with duplicate key error on multiple document inserts, ordered false
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+coll.ensureIndex({a: 1}, {unique: true});
 request = {
     insert: coll.getName(),
     documents: [{a: 1}, {a: 1}, {a: 1}],
@@ -220,7 +220,7 @@ assert.eq(coll.count(), 1);
 //
 // Fail with duplicate key error on multiple document inserts, ordered true
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+coll.ensureIndex({a: 1}, {unique: true});
 request = {
     insert: coll.getName(),
     documents: [{a: 1}, {a: 1}, {a: 1}],
@@ -241,7 +241,7 @@ assert.eq(coll.count(), 1);
 //
 // Ensure _id is the first field in all documents
 coll.drop();
-coll.createIndex({a: 1}, {unique: true});
+coll.ensureIndex({a: 1}, {unique: true});
 request = {
     insert: coll.getName(),
     documents: [{a: 1}, {a: 2, _id: 2}]

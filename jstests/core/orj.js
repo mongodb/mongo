@@ -84,26 +84,26 @@ function check() {
 
 check();
 
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 check();
 t.dropIndexes();
 
-t.createIndex({b: 1});
+t.ensureIndex({b: 1});
 check();
 t.dropIndexes();
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 check();
 t.dropIndexes();
 
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1, b: 1});
 check();
 t.dropIndexes();
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
-t.createIndex({a: 1, b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
+t.ensureIndex({a: 1, b: 1});
 check();
 
 function checkHinted(hint) {

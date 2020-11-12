@@ -11,7 +11,7 @@ const expectedOrder = [{_id: 4, a: [2, 1]}, {_id: 2, a: [2, 3]}, {_id: 3, a: [2,
 assert.eq(coll.aggregate([{$sort: {a: 1, _id: 1}}]).toArray(), expectedOrder);
 assert.eq(coll.find().sort({a: 1, _id: 1}).toArray(), expectedOrder);
 
-assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.ensureIndex({a: 1}));
 assert.eq(coll.aggregate([{$sort: {a: 1, _id: 1}}]).toArray(), expectedOrder);
 assert.eq(coll.find().sort({a: 1, _id: 1}).toArray(), expectedOrder);
 }());

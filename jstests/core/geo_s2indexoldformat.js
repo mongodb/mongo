@@ -9,7 +9,7 @@ t.insert({geo: [41, 6], nonGeo: ["pointB"]});
 t.insert({geo: [41, 6]});
 t.insert({geo: {x: 40.6, y: 5.4}});
 
-t.createIndex({geo: "2dsphere", nonGeo: 1});
+t.ensureIndex({geo: "2dsphere", nonGeo: 1});
 
 res = t.find({"geo": {"$geoIntersects": {"$geometry": {x: 40, y: 5}}}});
 assert.eq(res.count(), 1);

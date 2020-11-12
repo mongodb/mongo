@@ -13,7 +13,7 @@ for (var i = 0; i < totalPts; i++) {
 }
 assert.commandWorked(bulk.execute());
 
-coll.createIndex({loc: "2d"});
+coll.ensureIndex({loc: "2d"});
 
 // Check that quarter of points in each quadrant
 for (var i = 0; i < 4; i++) {

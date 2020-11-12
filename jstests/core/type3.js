@@ -8,7 +8,7 @@
 t = db.jstests_type3;
 t.drop();
 
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 
 // Type Object
 t.save({a: {'': ''}});

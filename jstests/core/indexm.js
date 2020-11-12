@@ -13,12 +13,12 @@ function test() {
 test();
 
 // Now create an index.
-t.createIndex({"a": 1});
+t.ensureIndex({"a": 1});
 test();
 
 // Now create a different index.
 t.dropIndexes();
-t.createIndex({"a.x": 1});
+t.ensureIndex({"a.x": 1});
 test();
 
 // Drop the indexes.

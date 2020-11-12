@@ -22,7 +22,7 @@ function u() {
 // assert.throws( q , [] , "A1" );
 // assert.throws( u , [] , "B1" );
 
-t.createIndex({_id: 1});
+t.ensureIndex({_id: 1});
 
 assert.eq(1, q().x);
 q();

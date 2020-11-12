@@ -97,8 +97,8 @@ var $config = (function() {
         assertAlways.commandWorked(res);
         assertAlways.eq(this.numDocs, res.nInserted);
 
-        this.getIndexSpecs().forEach(function createIndex(indexSpec) {
-            assertAlways.commandWorked(db[collName].createIndex(indexSpec));
+        this.getIndexSpecs().forEach(function ensureIndex(indexSpec) {
+            assertAlways.commandWorked(db[collName].ensureIndex(indexSpec));
         });
     }
 

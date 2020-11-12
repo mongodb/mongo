@@ -16,6 +16,6 @@ assertExpectedMatch(t.find({a: {$elemMatch: {b: {$gte: 1}}}}));
 assertExpectedMatch(t.find({a: {$elemMatch: {b: 1}}}));
 
 // $elemMatch is not used to perform key matching.  SERVER-6001
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 assertExpectedMatch(t.find({a: {$elemMatch: {b: {$gte: 1}}}}).hint({a: 1}));
 assertExpectedMatch(t.find({a: {$elemMatch: {b: 1}}}).hint({a: 1}));

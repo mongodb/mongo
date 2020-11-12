@@ -23,8 +23,8 @@ for (var i = 0; i < 22; i++) {
 
     if (i == 0) {
         // Unique index exists, but not the right one.
-        coll.createIndex({num: 1}, {unique: true});
-        coll.createIndex({x: 1});
+        coll.ensureIndex({num: 1}, {unique: true});
+        coll.ensureIndex({x: 1});
 
         passed = false;
         try {
@@ -37,8 +37,8 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 1) {
         // Unique index exists as prefix, also index exists
-        coll.createIndex({x: 1});
-        coll.createIndex({x: 1, num: 1}, {unique: true});
+        coll.ensureIndex({x: 1});
+        coll.ensureIndex({x: 1, num: 1}, {unique: true});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {x: 1}});
@@ -49,8 +49,8 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 2) {
         // Non-unique index exists as prefix, also index exists.  No unique index.
-        coll.createIndex({x: 1});
-        coll.createIndex({x: 1, num: 1});
+        coll.ensureIndex({x: 1});
+        coll.ensureIndex({x: 1, num: 1});
 
         passed = false;
         try {
@@ -66,8 +66,8 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 3) {
         // Unique index exists as prefix, also unique index exists
-        coll.createIndex({num: 1}, {unique: true});
-        coll.createIndex({num: 1, x: 1}, {unique: true});
+        coll.ensureIndex({num: 1}, {unique: true});
+        coll.ensureIndex({num: 1, x: 1}, {unique: true});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {num: 1}, unique: true});
@@ -78,7 +78,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 4) {
         // Unique index exists as id, also unique prefix index exists
-        coll.createIndex({_id: 1, num: 1}, {unique: true});
+        coll.ensureIndex({_id: 1, num: 1}, {unique: true});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {_id: 1}, unique: true});
@@ -89,7 +89,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 5) {
         // Unique index exists as id, also unique prefix index exists
-        coll.createIndex({_id: 1, num: 1}, {unique: true});
+        coll.ensureIndex({_id: 1, num: 1}, {unique: true});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {_id: 1, num: 1}, unique: true});
@@ -102,7 +102,7 @@ for (var i = 0; i < 22; i++) {
         coll.remove({});
 
         // Unique index does not exist, also unique prefix index exists
-        coll.createIndex({num: 1, _id: 1}, {unique: true});
+        coll.ensureIndex({num: 1, _id: 1}, {unique: true});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {num: 1}, unique: true});
@@ -165,8 +165,8 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 9) {
         // Unique index exists on a different field as well
-        coll.createIndex({num: 1}, {unique: true});
-        coll.createIndex({x: 1});
+        coll.ensureIndex({num: 1}, {unique: true});
+        coll.ensureIndex({x: 1});
 
         passed = false;
         try {
@@ -189,7 +189,7 @@ for (var i = 0; i < 22; i++) {
         assert(!passed, "Should not be able to shard without index");
 
         // now add containing index and try sharding by prefix
-        coll.createIndex({num: 1, x: 1});
+        coll.ensureIndex({num: 1, x: 1});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {num: 1}});
@@ -208,7 +208,7 @@ for (var i = 0; i < 22; i++) {
         coll.remove({});
 
         // empty collection with useful index. check new index not created
-        coll.createIndex({num: 1, x: 1});
+        coll.ensureIndex({num: 1, x: 1});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {num: 1}});
@@ -226,7 +226,7 @@ for (var i = 0; i < 22; i++) {
     if (i == 12) {
         // check multikey values for x make index unusable for shard key
         coll.save({num: 100, x: [2, 3]});
-        coll.createIndex({num: 1, x: 1});
+        coll.ensureIndex({num: 1, x: 1});
 
         passed = false;
         try {
@@ -239,7 +239,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 13) {
         coll.save({num: [100, 200], x: 10});
-        coll.createIndex({num: 1, x: 1});
+        coll.ensureIndex({num: 1, x: 1});
 
         passed = false;
         try {
@@ -252,7 +252,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 14) {
         coll.save({num: 100, x: 10, y: [1, 2]});
-        coll.createIndex({num: 1, x: 1, y: 1});
+        coll.ensureIndex({num: 1, x: 1, y: 1});
 
         passed = false;
         try {
@@ -265,7 +265,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 15) {
         // try sharding with a hashed index
-        coll.createIndex({num: "hashed"});
+        coll.ensureIndex({num: "hashed"});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {num: "hashed"}});
@@ -276,7 +276,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 16) {
         // create hashed index, but try to declare it unique when sharding
-        coll.createIndex({num: "hashed"});
+        coll.ensureIndex({num: "hashed"});
 
         passed = false;
         try {
@@ -289,8 +289,8 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 17) {
         // create hashed index, but unrelated unique index present
-        coll.createIndex({x: "hashed"});
-        coll.createIndex({num: 1}, {unique: true});
+        coll.ensureIndex({x: "hashed"});
+        coll.ensureIndex({num: 1}, {unique: true});
 
         passed = false;
         try {
@@ -303,8 +303,8 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 18) {
         // create hashed index, and a regular unique index exists on same field
-        coll.createIndex({num: "hashed"});
-        coll.createIndex({num: 1}, {unique: true});
+        coll.ensureIndex({num: "hashed"});
+        coll.ensureIndex({num: 1}, {unique: true});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {num: "hashed"}});
@@ -315,7 +315,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 19) {
         // Create sparse index.
-        coll.createIndex({x: 1}, {sparse: true});
+        coll.ensureIndex({x: 1}, {sparse: true});
 
         passed = false;
         try {
@@ -328,7 +328,7 @@ for (var i = 0; i < 22; i++) {
     }
     if (i == 20) {
         // Create partial index.
-        coll.createIndex({x: 1}, {filter: {num: {$gt: 1}}});
+        coll.ensureIndex({x: 1}, {filter: {num: {$gt: 1}}});
 
         passed = false;
         try {
@@ -344,8 +344,8 @@ for (var i = 0; i < 22; i++) {
         // where
         // both are prefixed by the shard key.
 
-        coll.createIndex({x: 1, num: 1}, {filter: {num: {$gt: 1}}});
-        coll.createIndex({x: 1, num: -1});
+        coll.ensureIndex({x: 1, num: 1}, {filter: {num: {$gt: 1}}});
+        coll.ensureIndex({x: 1, num: -1});
 
         try {
             s.adminCommand({shardcollection: "" + coll, key: {x: 1}});

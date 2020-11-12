@@ -20,7 +20,7 @@ assert.throws(() => coll.createIndex(
                   {background: true},
                   {unique: true}));
 
-assert.throws(() => coll.createIndex(
+assert.throws(() => coll.ensureIndex(
                   /* keys */ {a: 1},
                   /* options */ {},
                   /* commitQuorum */ "majority",

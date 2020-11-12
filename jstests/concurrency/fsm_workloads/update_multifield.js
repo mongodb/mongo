@@ -52,10 +52,10 @@ var $config = (function() {
     var transitions = {update: {update: 1}};
 
     function setup(db, collName, cluster) {
-        assertAlways.commandWorked(db[collName].createIndex({x: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({y: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({z: 1}));
-        assertAlways.commandWorked(db[collName].createIndex({x: 1, y: 1, z: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({x: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({y: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({z: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({x: 1, y: 1, z: 1}));
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 3);

@@ -59,7 +59,7 @@ assert.eq(["_id_"], cursorGetIndexNames(getListIndexesCursor(coll)));
 
 coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
-assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
 specs = cursorGetIndexSpecs(getListIndexesCursor(coll));
 assert.eq(2, specs.length);
 assert.eq("_id_", specs[0].name);
@@ -84,7 +84,7 @@ assert.commandFailed(coll.getDB().runCommand({listIndexes: []}));
 
 coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
-assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
 
 cursor = getListIndexesCursor(coll, {cursor: {batchSize: 2}});
 assert.eq(2, cursor.objsLeftInBatch());
@@ -124,9 +124,9 @@ assert.eq(["_id_", "a_1"], cursorGetIndexNames(cursor));
 
 coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
-assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-assert.commandWorked(coll.createIndex({b: 1}, {unique: true}));
-assert.commandWorked(coll.createIndex({c: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({b: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({c: 1}, {unique: true}));
 
 cursor = getListIndexesCursor(coll, {cursor: {batchSize: 0}}, 2);
 assert.eq(0, cursor.objsLeftInBatch());
@@ -167,9 +167,9 @@ if (!FixtureHelpers.isMongos(db)) {
 
 coll.drop();
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
-assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
-assert.commandWorked(coll.createIndex({b: 1}, {unique: true}));
-assert.commandWorked(coll.createIndex({c: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({b: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({c: 1}, {unique: true}));
 
 res = coll.runCommand("listIndexes", {cursor: {batchSize: 0}});
 cursor = new DBCommandCursor(coll.getDB(), res, 2);

@@ -9,5 +9,5 @@ function doTest() {
 }
 
 doTest();
-t.createIndex({i: 1});
+t.ensureIndex({i: 1});
 doTest();

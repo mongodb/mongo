@@ -15,7 +15,7 @@ var coll = db.compact_keeps_indexes;
 
 coll.drop();
 coll.insert({_id: 1, x: 1});
-coll.createIndex({x: 1});
+coll.ensureIndex({x: 1});
 
 assert.eq(coll.getIndexes().length, 2);
 

@@ -49,8 +49,8 @@ assert.eq("3,6", s(), "B3");
 t.update({b: 3}, {$inc: {x: 1}}, false, true);
 assert.eq("3,6", s(), "B4");
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 
 t.update({a: 1}, {$inc: {x: 1}}, false, true);
 assert.eq("4,7", s(), "B5");
@@ -91,7 +91,7 @@ t.drop();
 
 t.save({_id: 1, x: 1, a: [1, 2]});
 t.save({_id: 2, x: 5, a: [2, 3]});
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 assert.eq("1,5", s(), "D1");
 
 t.update({a: 1}, {$inc: {x: 1}}, false, true);
@@ -134,7 +134,7 @@ t.save({x: 1});
 t.save({x: 2});
 t.save({x: 3});
 
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 
 assert.eq("1,2,3", s(), "F1");
 t.update({x: {$gt: 0}}, {$inc: {x: 5}}, false, true);

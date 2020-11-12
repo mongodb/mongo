@@ -20,5 +20,5 @@ function testPositionalInc() {
 testPositionalInc();
 
 // Now check with a non multikey index.
-t.createIndex({'a.b': 1});
+t.ensureIndex({'a.b': 1});
 testPositionalInc();

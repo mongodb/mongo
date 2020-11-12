@@ -18,5 +18,5 @@ function testIntegerExistsSpec() {
 }
 
 testIntegerExistsSpec();
-t.createIndex({b: 1});
+t.ensureIndex({b: 1});
 testIntegerExistsSpec();

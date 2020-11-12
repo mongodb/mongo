@@ -1,7 +1,7 @@
 // If polygons have holes, the holes cannot be equal to the entire geometry.
 var t = db.geo_s2holessameasshell;
 t.drop();
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 
 var centerPoint = {"type": "Point", "coordinates": [0.5, 0.5]};
 var edgePoint = {"type": "Point", "coordinates": [0, 0.5]};

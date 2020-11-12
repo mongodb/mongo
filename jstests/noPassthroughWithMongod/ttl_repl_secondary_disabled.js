@@ -33,7 +33,7 @@ let primarycol = primarydb['c'];
 let secondary1col = secondary1db['c'];
 
 // create TTL index, wait for TTL monitor to kick in, then check things
-primarycol.createIndex({x: 1}, {expireAfterSeconds: 10});
+primarycol.ensureIndex({x: 1}, {expireAfterSeconds: 10});
 
 rt.awaitReplication();
 

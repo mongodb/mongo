@@ -16,7 +16,7 @@ var res =
     t.insert({zip: "10003", data: [{loc: [30, 30], type: "home"}, {loc: [49, 49], type: "work"}]});
 assert.commandWorked(res);
 
-assert.commandWorked(t.createIndex({"data.loc": "2d", zip: 1}));
+assert.commandWorked(t.ensureIndex({"data.loc": "2d", zip: 1}));
 assert.eq(2, t.getIndexKeys().length);
 
 res =

@@ -13,7 +13,7 @@ function testBounds(min, max) {
     // Handle case where either 1. indexLambda will fail but not throw. We are asserting it
     // works, so the outer lambda generates an exception. 2. indexLambda itself will throw.
     const indexLambda = function(t) {
-        return t.createIndex({loc: '2d'}, indexBounds);
+        return t.ensureIndex({loc: '2d'}, indexBounds);
     };
     const assertLambda = function(t, lambda) {
         assert.commandWorked(lambda(t));

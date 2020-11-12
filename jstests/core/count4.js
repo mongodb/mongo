@@ -13,7 +13,7 @@ q = {
 assert.eq(50, t.find(q).count(), "A");
 assert.eq(50, t.find(q).itcount(), "B");
 
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 
 assert.eq(50, t.find(q).count(), "C");
 assert.eq(50, t.find(q).itcount(), "D");

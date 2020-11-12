@@ -7,8 +7,8 @@
 var t = db.jstests_fts6;
 t.drop();
 
-t.createIndex({a: 1});
-t.createIndex({b: "text"});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: "text"});
 
 t.save({_id: 1, a: 0});
 t.save({_id: 2, a: 0, b: "foo"});

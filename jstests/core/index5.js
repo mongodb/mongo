@@ -22,5 +22,5 @@ t.save({a: 2});
 
 validate();
 
-t.createIndex({a: -1});
+t.ensureIndex({a: -1});
 validate();

@@ -16,18 +16,18 @@ t.insert({"letter": "B", "position": [2, 0]});
 t.insert({"letter": "L", "position": [3, 0]});
 t.insert({"letter": "E", "position": [4, 0]});
 
-t.createIndex({position: "2d"});
+t.ensureIndex({position: "2d"});
 result = t.find({"position": {"$within": {"$box": [[-3, -1], [0, 1]]}}});
 assert.eq(4, result.count());
 
 t.dropIndex({position: "2d"});
-t.createIndex({position: "2d"}, {min: -10000000, max: 10000000});
+t.ensureIndex({position: "2d"}, {min: -10000000, max: 10000000});
 
 result = t.find({"position": {"$within": {"$box": [[-3, -1], [0, 1]]}}});
 assert.eq(4, result.count());
 
 t.dropIndex({position: "2d"});
-t.createIndex({position: "2d"}, {min: -1000000000, max: 1000000000});
+t.ensureIndex({position: "2d"}, {min: -1000000000, max: 1000000000});
 
 result = t.find({"position": {"$within": {"$box": [[-3, -1], [0, 1]]}}});
 assert.eq(4, result.count());

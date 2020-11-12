@@ -67,7 +67,7 @@ function test(db, indexType) {
 
     assert.eq(db[coll].count(), numPts);
 
-    db[coll].createIndex({loc: indexType});
+    db[coll].ensureIndex({loc: indexType});
 
     // Test $geoNear with spherical coordinates.
     testGeoNearStageOutput({

@@ -34,7 +34,7 @@ for (var t = 0; t < descriptors.length; t++) {
     jsTest.log("Trying 2dsphere index with descriptor " + tojson(descriptor));
 
     coll.drop();
-    coll.createIndex(descriptor);
+    coll.ensureIndex(descriptor);
 
     coll.insert(docA);
     coll.insert(docB);
@@ -55,7 +55,7 @@ for (var t = 0; t < descriptors.length; t++) {
 jsTest.log("Trying case found in wild...");
 
 coll.drop();
-coll.createIndex({coordinates: "2dsphere", field: -1});
+coll.ensureIndex({coordinates: "2dsphere", field: -1});
 coll.insert({coordinates: [-118.240013, 34.073893]});
 var query = {
     coordinates: {$geoWithin: {$centerSphere: [[-118.240013, 34.073893], 0.44915760491198753]}},

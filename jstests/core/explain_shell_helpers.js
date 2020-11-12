@@ -22,7 +22,7 @@ load("jstests/libs/analyze_plan.js");
 var explain;
 var stage;
 
-t.createIndex({a: 1});
+t.ensureIndex({a: 1});
 for (var i = 0; i < 10; i++) {
     t.insert({_id: i, a: i, b: 1});
 }
@@ -267,7 +267,7 @@ assert(planHasStage(db, explain.queryPlanner.winningPlan, "COUNT"));
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "COUNT_SCAN"));
 
 // Explainable count with hint.
-assert.commandWorked(t.createIndex({c: 1}, {sparse: true}));
+assert.commandWorked(t.ensureIndex({c: 1}, {sparse: true}));
 explain = t.explain().count({c: {$exists: false}}, {hint: "c_1"});
 assert.commandWorked(explain);
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "IXSCAN"));

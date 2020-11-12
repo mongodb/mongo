@@ -40,7 +40,7 @@ db.jstests_uniqueness2.drop();
 db.jstests_uniqueness2.insert({a: 3});
 db.jstests_uniqueness2.insert({a: 3});
 assert.eq(2, db.jstests_uniqueness2.count());
-res = db.jstests_uniqueness2.createIndex({a: 1}, true);
+res = db.jstests_uniqueness2.ensureIndex({a: 1}, true);
 assert.commandFailed(res);
 assert(res.errmsg.match(/E11000/));
 
@@ -49,7 +49,7 @@ db.jstests_uniqueness2.drop();
 db.jstests_uniqueness2.insert({a: 3});
 db.jstests_uniqueness2.insert({a: 3});
 assert.eq(2, db.jstests_uniqueness2.count());
-res = db.jstests_uniqueness2.createIndex({a: 1}, {unique: true, background: true});
+res = db.jstests_uniqueness2.ensureIndex({a: 1}, {unique: true, background: true});
 assert.commandFailed(res);
 assert(res.errmsg.match(/E11000/));
 

@@ -11,7 +11,7 @@ var collname = "stages_text";
 
 t.save({x: "az b x"});
 
-t.createIndex({x: "text"});
+t.ensureIndex({x: "text"});
 
 // We expect to retrieve 'b'
 res = db.runCommand({stageDebug: {collection: collname, plan: {text: {args: {search: "b"}}}}});

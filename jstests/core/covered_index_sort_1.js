@@ -25,7 +25,7 @@ for (i = 0; i < 5; i++) {
 coll.insert({foo: "1"});
 coll.insert({foo: {bar: 1}});
 coll.insert({foo: null});
-coll.createIndex({foo: 1});
+coll.ensureIndex({foo: 1});
 
 // Test no query and sort ascending
 var plan = coll.find({}, {foo: 1, _id: 0}).sort({foo: 1}).hint({foo: 1}).explain("executionStats");

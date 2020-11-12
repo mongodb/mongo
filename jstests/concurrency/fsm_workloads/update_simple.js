@@ -27,7 +27,7 @@ var $config = (function() {
 
     function setup(db, collName, cluster) {
         // index on 'value', the field being updated
-        assertAlways.commandWorked(db[collName].createIndex({value: 1}));
+        assertAlways.commandWorked(db[collName].ensureIndex({value: 1}));
 
         // numDocs should be much less than threadCount, to make more threads use the same docs.
         this.numDocs = Math.floor(this.threadCount / 5);

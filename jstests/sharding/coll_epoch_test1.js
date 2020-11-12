@@ -45,7 +45,7 @@ st.configRS.awaitLastOpCommitted();
 jsTest.log("Re-enabling sharding with a different key...");
 
 st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
-assert.commandWorked(coll.createIndex({notId: 1}));
+assert.commandWorked(coll.ensureIndex({notId: 1}));
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {notId: 1}}));
 
 bulk = insertMongos.getCollection(coll + "").initializeUnorderedBulkOp();

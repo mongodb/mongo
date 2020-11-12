@@ -6,10 +6,10 @@
 var t = db.index_partial_validate;
 t.drop();
 
-var res = t.createIndex({a: 1}, {partialFilterExpression: {a: {$lte: 1}}});
+var res = t.ensureIndex({a: 1}, {partialFilterExpression: {a: {$lte: 1}}});
 assert.commandWorked(res);
 
-res = t.createIndex({b: 1});
+res = t.ensureIndex({b: 1});
 assert.commandWorked(res);
 
 res = t.insert({non_indexed_field: 'x'});

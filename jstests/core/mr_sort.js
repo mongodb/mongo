@@ -12,7 +12,7 @@
 t = db.mr_sort;
 t.drop();
 
-t.createIndex({x: 1});
+t.ensureIndex({x: 1});
 
 t.insert({x: 1});
 t.insert({x: 10});

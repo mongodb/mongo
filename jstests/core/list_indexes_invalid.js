@@ -8,7 +8,7 @@ var coll = db.list_indexes_invalid;
 coll.drop();
 
 assert.commandWorked(coll.getDB().createCollection(coll.getName()));
-assert.commandWorked(coll.createIndex({a: 1}, {unique: true}));
+assert.commandWorked(coll.ensureIndex({a: 1}, {unique: true}));
 
 assert.throws(function() {
     getListIndexesCursor(coll, {cursor: 0});

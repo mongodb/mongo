@@ -11,7 +11,7 @@ assert.commandWorked(db.foo.insert({num: 1, name: "eliot"}));
 assert.commandWorked(db.foo.insert({num: 2, name: "sara"}));
 assert.commandWorked(db.foo.insert({num: -1, name: "joe"}));
 
-assert.commandWorked(db.foo.createIndex({num: 1}));
+assert.commandWorked(db.foo.ensureIndex({num: 1}));
 
 assert.eq(3, db.foo.find().length(), "A");
 

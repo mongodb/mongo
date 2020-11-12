@@ -38,7 +38,7 @@ var testDB2 = secConn.getDB('test');
 
 testDB.user.insert({x: 1});
 
-testDB.user.createIndex({x: 1});
+testDB.user.ensureIndex({x: 1});
 assert.gleOK(testDB.runCommand({getLastError: 1, w: 2}));
 
 replTest.awaitReplication();

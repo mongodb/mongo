@@ -18,7 +18,7 @@ let coll = db.getCollection(collName);
 
 coll.drop();
 
-assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.ensureIndex({a: 1}));
 for (let i = 0; i < 5; i++) {
     assert.commandWorked(coll.insert({a: i}));
 }

@@ -16,8 +16,8 @@ load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 const t = db.jstests_ord;
 t.drop();
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 
 for (let i = 0; i < 80; ++i) {
     t.save({a: 1});

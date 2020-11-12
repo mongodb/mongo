@@ -7,8 +7,8 @@
 t = db.jstests_explain5;
 t.drop();
 
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 
 for (i = 0; i < 1000; ++i) {
     t.save({a: i, b: i % 3});

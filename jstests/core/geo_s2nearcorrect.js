@@ -10,7 +10,7 @@ longline = {
     "coordinates": [[0, 0], [179, 89]]
 };
 t.insert({geo: longline});
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 origin = {
     "type": "Point",
     "coordinates": [45, 45]

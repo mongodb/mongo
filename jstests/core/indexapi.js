@@ -31,14 +31,14 @@ c.dropDups = true;
 assert.eq(c, t._indexSpec({x: 1}, [true, true]), "G");
 assert.eq(c, t._indexSpec({x: 1}, {unique: true, dropDups: true}), "F");
 
-t.createIndex({x: 1}, {unique: true});
+t.ensureIndex({x: 1}, {unique: true});
 idx = t.getIndexes();
 assert.eq(2, idx.length, "M1");
 assert.eq(key, idx[1].key, "M2");
 assert(idx[1].unique, "M3");
 
 t.drop();
-t.createIndex({x: 1}, {unique: 1});
+t.ensureIndex({x: 1}, {unique: 1});
 idx = t.getIndexes();
 assert.eq(2, idx.length, "M1");
 assert.eq(key, idx[1].key, "M2");

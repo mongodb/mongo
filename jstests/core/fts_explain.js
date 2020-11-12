@@ -14,7 +14,7 @@ const coll = db.fts_explain;
 let res;
 
 coll.drop();
-res = coll.createIndex({content: "text"}, {default_language: "none"});
+res = coll.ensureIndex({content: "text"}, {default_language: "none"});
 assert.commandWorked(res);
 
 res = coll.insert({content: "some data"});

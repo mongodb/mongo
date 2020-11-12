@@ -85,7 +85,7 @@ var executeTests = function() {
 
     // Create unique index
     coll.remove({});
-    coll.createIndex({a: 1}, {unique: true});
+    coll.ensureIndex({a: 1}, {unique: true});
 
     /**
      * Single error unordered bulk operation
@@ -118,7 +118,7 @@ var executeTests = function() {
     // Create unique index
     coll.dropIndexes();
     coll.remove({});
-    coll.createIndex({a: 1}, {unique: true});
+    coll.ensureIndex({a: 1}, {unique: true});
 
     /**
      * Multiple error unordered bulk operation
@@ -168,7 +168,7 @@ var executeTests = function() {
     // Create unique index
     coll.dropIndexes();
     coll.remove({});
-    coll.createIndex({a: 1}, {unique: true});
+    coll.ensureIndex({a: 1}, {unique: true});
 };
 
 var buildVersion = parseInt(db.runCommand({buildInfo: 1}).versionArray.slice(0, 3).join(""), 10);

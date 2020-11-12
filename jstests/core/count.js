@@ -17,13 +17,13 @@ assert.eq(2, coll.count());
 
 coll.drop();
 assert.commandWorked(coll.insert({a: true, b: false}));
-assert.commandWorked(coll.createIndex({b: 1, a: 1}));
+assert.commandWorked(coll.ensureIndex({b: 1, a: 1}));
 assert.eq(1, coll.find({a: true, b: false}).count());
 assert.eq(1, coll.find({b: false, a: true}).count());
 
 coll.drop();
 assert.commandWorked(coll.insert({a: true, b: false}));
-assert.commandWorked(coll.createIndex({b: 1, a: 1, c: 1}));
+assert.commandWorked(coll.ensureIndex({b: 1, a: 1, c: 1}));
 
 assert.eq(1, coll.find({a: true, b: false}).count());
 assert.eq(1, coll.find({b: false, a: true}).count());

@@ -29,7 +29,7 @@ check(1, {"a.x": {$all: [1, 2]}}, "F");
 check(1, {"a.x": {$all: [2, 3]}}, "G");
 check(0, {"a.x": {$all: [1, 3]}}, "H");
 
-t.createIndex({"a.x": 1});
+t.ensureIndex({"a.x": 1});
 state = "index";
 
 check(1, {"a.x": {$in: [1]}}, "A");
@@ -64,7 +64,7 @@ check(1, {"a": {$all: [1, 2]}}, "F");
 check(1, {"a": {$all: [2, 3]}}, "G");
 check(0, {"a": {$all: [1, 3]}}, "H");
 
-t.createIndex({"a": 1});
+t.ensureIndex({"a": 1});
 state = "more index";
 
 check(1, {"a": {$in: [1]}}, "A");
@@ -85,5 +85,5 @@ state = "more 2";
 t.drop();
 t.save({name: ["harry", "jack", "tom"]});
 check(0, {name: {$all: ["harry", "john"]}}, "A");
-t.createIndex({name: 1});
+t.ensureIndex({name: 1});
 check(0, {name: {$all: ["harry", "john"]}}, "B");

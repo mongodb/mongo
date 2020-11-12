@@ -6,7 +6,7 @@
 t = db.geo_s2dedupnear;
 t.drop();
 
-t.createIndex({geo: "2dsphere"});
+t.ensureIndex({geo: "2dsphere"});
 var x = {
     "type": "Polygon",
     "coordinates": [[[100.0, 0.0], [101.0, 0.0], [101.0, 1.0], [100.0, 1.0], [100.0, 0.0]]]

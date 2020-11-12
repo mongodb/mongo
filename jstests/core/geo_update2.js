@@ -11,7 +11,7 @@ for (var x = 0; x < 10; x++) {
     }
 }
 
-t.createIndex({loc: "2d"});
+t.ensureIndex({loc: "2d"});
 
 function p() {
     print("--------------");

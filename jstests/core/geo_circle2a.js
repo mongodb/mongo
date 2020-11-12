@@ -6,7 +6,7 @@
 var coll = db.geo_circle2a;
 coll.drop();
 coll.insert({p: [1112, 3473], t: [{k: 'a', v: 'b'}, {k: 'c', v: 'd'}]});
-coll.createIndex({p: '2d', 't.k': 1}, {min: 0, max: 10000});
+coll.ensureIndex({p: '2d', 't.k': 1}, {min: 0, max: 10000});
 
 // Succeeds, since on direct lookup should not use the index
 assert(1 == coll.find({p: [1112, 3473], 't.k': 'a'}).count(), "A");
@@ -18,7 +18,7 @@ coll.drop();
 coll.insert({point: [1, 10], tags: [{k: 'key', v: 'value'}, {k: 'key2', v: 123}]});
 coll.insert({point: [1, 10], tags: [{k: 'key', v: 'value'}]});
 
-coll.createIndex({point: "2d", "tags.k": 1, "tags.v": 1});
+coll.ensureIndex({point: "2d", "tags.k": 1, "tags.v": 1});
 
 // Succeeds, since should now lookup multi-keys correctly
 assert(2 == coll.find({point: {$within: {$box: [[0, 0], [12, 12]]}}}).count(), "C");
@@ -31,7 +31,7 @@ coll.drop();
 coll.insert({point: [1, 10], tags: [{k: {'hello': 'world'}, v: 'value'}, {k: 'key2', v: 123}]});
 coll.insert({point: [1, 10], tags: [{k: 'key', v: 'value'}]});
 
-coll.createIndex({point: "2d", "tags.k": 1, "tags.v": 1});
+coll.ensureIndex({point: "2d", "tags.k": 1, "tags.v": 1});
 
 // Succeeds, should be able to look up the complex element
 assert(1 ==

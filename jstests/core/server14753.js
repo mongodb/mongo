@@ -7,8 +7,8 @@
 var t = db.jstests_server14753;
 
 t.drop();
-t.createIndex({a: 1});
-t.createIndex({b: 1});
+t.ensureIndex({a: 1});
+t.ensureIndex({b: 1});
 for (var i = 0; i < 20; i++) {
     t.insert({b: i});
 }
