@@ -115,9 +115,46 @@ Status _createView(OperationContext* opCtx,
 Status _createTimeseries(OperationContext* opCtx,
                          const NamespaceString& ns,
                          CollectionOptions&& options) {
+    auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
+
+    options.viewOn = bucketsNs.coll().toString();
+
+    // The time field cannot be sparse, so we use it as the exit condition for the loop.
+    auto assembleData =
+        "function(dataArray) { \
+                const assembledData = []; \
+                if (dataArray.length === 0) { \
+                    return assembledData; \
+                } \
+                for (let i = 0;;i++) { \
+                    const assembledObj = {}; \
+                    for (const elem of dataArray) { \
+                        if (elem.v.hasOwnProperty(i)) { \
+                            assembledObj[elem.k] = elem.v[i]; \
+                        } else if (elem.k === '" +
+        options.timeseries->getTimeField() +
+        "') { \
+                            return assembledData; \
+                        } \
+                    } \
+                    assembledData.push(assembledObj); \
+                } \
+            }";
+    options.pipeline =
+        BSON_ARRAY(BSON("$project" << BSON("dataArray" << BSON("$objectToArray"
+                                                               << "$data")))
+                   << BSON("$project" << BSON(
+                               "assembledData" << BSON(
+                                   "$function" << BSON("body" << assembleData << "args"
+                                                              << BSON_ARRAY("$dataArray") << "lang"
+                                                              << "js"))))
+                   << BSON("$unwind"
+                           << "$assembledData")
+                   << BSON("$replaceWith"
+                           << "$assembledData"));
+
     return writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
         AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
         Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_IX);
         Lock::CollectionLock systemDotViewsLock(
             opCtx,
@@ -162,15 +199,13 @@ Status _createTimeseries(OperationContext* opCtx,
                   str::stream() << "Failed to create buckets collection " << bucketsNs
                                 << " for time-series collection " << ns);
 
-        // Create the time-series view.
-        options.viewOn = bucketsNs.coll().toString();
-
-        // Even though 'options' is passed by rvalue reference, it is not safe to move because
-        // 'userCreateNS' may throw a WriteConflictException.
+        // Create the time-series view. Even though 'options' is passed by rvalue reference, it is
+        // not safe to move because 'userCreateNS' may throw a WriteConflictException.
         auto status = db->userCreateNS(opCtx, ns, options);
         if (!status.isOK()) {
             return status.withContext(str::stream() << "Failed to create view on " << bucketsNs
-                                                    << " for time-series collection " << ns);
+                                                    << " for time-series collection " << ns
+                                                    << " with options " << options.toBSON());
         }
 
         wuow.commit();
