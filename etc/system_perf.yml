@@ -49,12 +49,15 @@ variables:
     - wtdevelop
 
     - dsi
-    - signal-processing
     - genny
+    - signal-processing
+    - workloads
     - linkbench
     - linkbench2
-    - workloads
     - mongo-perf
+    - YCSB
+    - benchmarks
+    - py-tpcc
 
 modules:
 ###
@@ -73,7 +76,7 @@ modules:
   branch: master
 - name: workloads
   repo: git@github.com:10gen/workloads.git
-  prefix: workloads
+  prefix: ../../src
   branch: master
 - name: wtdevelop
   repo: git@github.com:wiredtiger/wiredtiger.git
@@ -81,17 +84,31 @@ modules:
   branch: develop
 - name: linkbench
   repo: git@github.com:10gen/linkbench.git
-  prefix: linkbench
+  prefix: ../../src
   branch: master
 - name: linkbench2
   repo: git@github.com:mdcallag/linkbench.git
-  prefix: linkbench2
+  prefix: ../../src
   branch: master
   ref: 63207190657737b32eb0e81c5b81ad1b8bad0e5a
 - name: mongo-perf
   repo: git@github.com:mongodb/mongo-perf.git
   prefix: ../../src
   branch: master
+- name: YCSB
+  repo: git@github.com:mongodb-labs/YCSB.git
+  prefix: ../../src
+  branch: master
+  ref: 4e7287880c04514cad2df5761b9511c940a33059
+- name: benchmarks
+  repo: git@github.com:mongodb-labs/benchmarks.git
+  prefix: ../../src
+  branch: master
+- name: py-tpcc
+  repo: git@github.com:10gen/py-tpcc.git
+  prefix: ../../src
+  branch: master
+  ref: 52185e96bf28be6608ea65b61ff1d134b7cb3f13
 ###
 
 - name: enterprise
@@ -131,14 +148,17 @@ functions:
     - command: git.get_project
       params:
         directory: *src_dir
-        revisions:
+        revisions: &revisions_list
           dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          signal-processing: ${signal-processing_rev}
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
           workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
           mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          benchmarks: ${benchmarks_rev}
+          py-tpcc: ${py-tpcc_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
@@ -385,13 +405,7 @@ tasks:
     - command: git.get_project
       params:
         directory: *src_dir
-        revisions:
-          dsi: ${dsi_rev}
-          linkbench: ${linkbench_rev}
-          linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
-          workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
+        revisions: *revisions_list
     - command: expansions.write
       params:
         file: ./expansions.yml
@@ -407,13 +421,7 @@ tasks:
     - command: git.get_project
       params:
         directory: *src_dir
-        revisions:
-          dsi: ${dsi_rev}
-          linkbench: ${linkbench_rev}
-          linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
-          workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
+        revisions: *revisions_list
     - command: expansions.write
       params:
         file: ./expansions.yml
@@ -429,13 +437,7 @@ tasks:
     - command: git.get_project
       params:
         directory: *src_dir
-        revisions:
-          dsi: ${dsi_rev}
-          linkbench: ${linkbench_rev}
-          linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
-          workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
+        revisions: *revisions_list
     - command: expansions.write
       params:
         file: ./expansions.yml
