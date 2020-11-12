@@ -326,9 +326,7 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
     }
 
     auto validatedSpec = swValidatedAndFixed.getValue();
-    auto indexName = validatedSpec.getField("name").String();
-    // This gets hit twice per index, so we keep track of what we last logged to avoid logging the
-    // same line for the same index twice.
+
     // TODO SERVER-51871: Delete this block once 5.0 becomes last-lts.
     if (validatedSpec.hasField(IndexDescriptor::kGeoHaystackBucketSize)) {
         LOGV2_OPTIONS(4670601,
