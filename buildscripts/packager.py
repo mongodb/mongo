@@ -775,50 +775,7 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
         ensure_dir("%s/%s/" % (topdir, subdir))
     distro_arch = distro.archname(arch)
-    # RPM tools take these macro files that define variables in
-    # RPMland.  Unfortunately, there's no way to tell RPM tools to use
-    # a given file *in addition* to the files that it would already
-    # load, so we have to figure out what it would normally load,
-    # augment that list, and tell RPM to use the augmented list.  To
-    # figure out what macrofiles ordinarily get loaded, older RPM
-    # versions had a parameter called "macrofiles" that could be
-    # extracted from "rpm --showrc".  But newer RPM versions don't
-    # have this.  To tell RPM what macros to use, older versions of
-    # RPM have a --macros option that doesn't work; on these versions,
-    # you can put a "macrofiles" parameter into an rpmrc file.  But
-    # that "macrofiles" setting doesn't do anything for newer RPM
-    # versions, where you have to use the --macros flag instead.  And
-    # all of this is to let us do our work with some guarantee that
-    # we're not clobbering anything that doesn't belong to us.
-    #
-    # On RHEL systems, --rcfile will generally be used and
-    # --macros will be used in Ubuntu.
-    #
-    macrofiles = [
-        l for l in backtick(["rpm", "--showrc"]).decode('utf-8').split("\n")
-        if l.startswith("macrofiles")
-    ]
-    flags = []
-    macropath = os.getcwd() + "/macros"
 
-    write_rpm_macros_file(macropath, topdir, distro.release_dist(build_os))
-    if macrofiles:
-        macrofiles = macrofiles[0] + ":" + macropath
-        rcfile = os.getcwd() + "/rpmrc"
-        write_rpmrc_file(rcfile, macrofiles)
-        flags = ["--rcfile", rcfile]
-    else:
-        # This hard-coded hooey came from some box running RPM
-        # 4.4.2.3.  It may not work over time, but RPM isn't sanely
-        # configurable.
-        flags = [
-            "--macros",
-            "/usr/lib/rpm/macros:/usr/lib/rpm/%s-linux/macros:/usr/lib/rpm/suse/macros:/etc/rpm/macros.*:/etc/rpm/macros:/etc/rpm/%s-linux/macros:~/.rpmmacros:%s"
-            % (distro_arch, distro_arch, macropath)
-        ]
-    # Put the specfile and the tar'd up binaries and stuff in
-    # place.
-    #
     # The version of rpm and rpm tools in RHEL 5.5 can't interpolate the
     # %{dynamic_version} macro, so do it manually
     with open(specfile, "r") as spec_source:
@@ -840,10 +797,18 @@ def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-
         os.chdir(oldcwd)
     # Do the build.
 
-    flags.extend([
-        "-D", "dynamic_version " + spec.pversion(distro), "-D",
-        "dynamic_release " + spec.prelease(), "-D", "_topdir " + topdir
-    ])
+    flags = [
+        "-D",
+        f"_topdir {topdir}",
+        "-D",
+        f"dist .{distro.release_dist(build_os)}",
+        "-D",
+        f"_use_internal_dependency_generator 0",
+        "-D",
+        f"dynamic_version {spec.pversion(distro)}",
+        "-D",
+        f"dynamic_release {spec.prelease()}",
+    ]
 
     # Versions of RPM after 4.4 ignore our BuildRoot tag so we need to
     # specify it on the command line args to rpmbuild
@@ -872,20 +837,6 @@ def make_rpm_repo(repo):
         sysassert(["createrepo", "."])
     finally:
         os.chdir(oldpwd)
-
-
-def write_rpmrc_file(path, string):
-    """Write the RPM rc file."""
-    with open(path, 'w') as fh:
-        fh.write(string)
-
-
-def write_rpm_macros_file(path, topdir, release_dist):
-    """Write the RPM macros file."""
-    with open(path, 'w') as fh:
-        fh.write("%%_topdir	%s\n" % topdir)
-        fh.write("%%dist	.%s\n" % release_dist)
-        fh.write("%_use_internal_dependency_generator 0\n")
 
 
 def ensure_dir(filename):
