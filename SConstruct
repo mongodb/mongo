@@ -4924,3 +4924,9 @@ for i, s in enumerate(BUILD_TARGETS):
 # SConscripts have been read but before building begins.
 if get_option('build-tools') == 'next':
     libdeps.LibdepLinter(env).final_checks()
+    env.Command(
+        target="${BUILD_DIR}/libdeps/libdeps.graphml",
+        source=env.get('LIBDEPS_SYMBOL_DEP_FILES', []),
+        action=SCons.Action.FunctionAction(
+            libdeps.generate_graph,
+            {"cmdstr": "Generating libdeps graph"}))

@@ -56,10 +56,14 @@ import copy
 import os
 import textwrap
 
+
 import SCons.Errors
 import SCons.Scanner
 import SCons.Util
 import SCons
+from SCons.Script import COMMAND_LINE_TARGETS
+
+
 
 class Constants:
     Libdeps = "LIBDEPS"
@@ -810,6 +814,14 @@ def _get_node_with_ixes(env, node, node_builder_type):
 
 _get_node_with_ixes.node_type_ixes = dict()
 
+def add_libdeps_node(env, target, libdeps):
+    if str(target).endswith(env["SHLIBSUFFIX"]):
+        t_str = _get_node_with_ixes(env, str(target.abspath), target.get_builder().get_name(env)).abspath
+        env.GetLibdepsGraph().add_node(t_str)
+        for libdep in libdeps:
+            if str(libdep.target_node).endswith(env["SHLIBSUFFIX"]):
+                env.GetLibdepsGraph().add_edge(str(libdep.target_node.abspath), t_str, visibility=libdep.dependency_type)
+
 def make_libdeps_emitter(
     dependency_builder,
     dependency_map=dependency_visibility_ignored,
@@ -855,6 +867,10 @@ def make_libdeps_emitter(
         # and LIBDEPS_TAGS used.
         if not any("conftest" in str(t) for t in target):
             LibdepLinter(env, target).lint_libdeps(libdeps)
+
+        if env.get('SYMBOLDEPSSUFFIX', None):
+            for t in target:
+                add_libdeps_node(env, t, libdeps)
 
         # We ignored the dependency_map until now because we needed to use
         # original dependency value for linting. Now go back through and
@@ -1016,6 +1032,29 @@ def get_libdeps_ld_path(source, target, env, for_signature):
 
     return [result]
 
+
+def generate_graph(env, target, source):
+    import fileinput
+    import networkx
+    import json
+
+    for symbol_deps_file in source:
+        with open(str(symbol_deps_file)) as f:
+            for symbol, lib in json.load(f).items():
+                # ignore symbols from external libraries,
+                # they will just clutter the graph
+                if lib.startswith(env.Dir("$BUILD_DIR").path):
+                    env.GetLibdepsGraph().add_edges_from([(
+                        os.path.abspath(lib).strip(),
+                        os.path.abspath(str(symbol_deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])]),
+                        {symbol.strip(): "1"})])
+
+    libdeps_graph_file = f"{env.Dir('$BUILD_DIR').path}/libdeps/libdeps.graphml"
+    networkx.write_graphml(env.GetLibdepsGraph(), libdeps_graph_file, named_key_ids=True)
+    with fileinput.FileInput(libdeps_graph_file, inplace=True) as file:
+        for line in file:
+            print(line.replace(str(env.Dir("$BUILD_DIR").abspath + os.sep), ''), end='')
+
 def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinfo=False):
     """Set up the given build environment to do LIBDEPS tracking."""
 
@@ -1030,6 +1069,7 @@ def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinf
     env["_LIBDEPS_TAGS"] = expand_libdeps_tags
     env["_LIBDEPS_GET_LIBS"] = get_libdeps
     env["_LIBDEPS_OBJS"] = get_libdeps_objs
+    env["_LIBDEPS_LD_PATH"] = get_libdeps_ld_path
     env["_SYSLIBDEPS"] = make_get_syslibdeps_callable(emitting_shared)
 
     env[Constants.Libdeps] = SCons.Util.CLVar()
@@ -1046,7 +1086,6 @@ def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinf
         # mongo namespace using `ldd -r`.  See
         # https://jira.mongodb.org/browse/SERVER-49798 for more
         # details.
-        env["_LIBDEPS_LD_PATH"] = get_libdeps_ld_path
 
         base_action = env['BUILDERS']['SharedLibrary'].action
         if not isinstance(base_action, SCons.Action.ListAction):
@@ -1062,6 +1101,78 @@ def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinf
                     tag='libdeps-cyclic-typeinfo'),
                 None)
         ])
+
+    # Create the alias for graph generation, the existence of this alias
+    # on the command line will cause the libdeps-graph generation to be
+    # configured.
+    env['LIBDEPS_GRAPH_ALIAS'] = env.Alias(
+        'generate-libdeps-graph',
+        "${BUILD_DIR}/libdeps/libdeps.graphml")[0]
+
+    if str(env['LIBDEPS_GRAPH_ALIAS']) in COMMAND_LINE_TARGETS:
+        import networkx
+
+        # Detect if the current system has the tools to perform the generation.
+        if env.GetOption('ninja') != 'disabled':
+            env.FatalError("Libdeps graph generation is not supported with ninja builds.")
+        if not emitting_shared:
+            env.FatalError("Libdeps graph generation currently only supports dynamic builds.")
+        for bin in ['awk', 'grep', 'ldd', 'nm']:
+            if not env.WhereIs(bin):
+                env.FatalError(f"'{bin}' not found, Libdeps graph generation requires {bin}.")
+
+
+        # The find_symbols binary is a small fast C binary which will extract the missing
+        # symbols from the target library, and discover what linked libraries supply it. This
+        # setups the binary to be built.
+        find_symbols_env = env.Clone()
+        find_symbols_env.VariantDir('${BUILD_DIR}/libdeps', 'buildscripts/libdeps', duplicate = 0)
+        find_symbols_node = find_symbols_env.Program(
+            target='${BUILD_DIR}/libdeps/find_symbols',
+            source=['${BUILD_DIR}/libdeps/find_symbols.c'])
+
+        # Here we are setting up some functions which will return single instance of the
+        # network graph and symbol deps list. We also setup some environment variables
+        # which are used along side the functions.
+        symbol_deps = []
+        def append_symbol_deps(env, symbol_deps_file):
+            env.Depends("${BUILD_DIR}/libdeps/libdeps.graphml", symbol_deps_file)
+            symbol_deps.append(symbol_deps_file)
+        env.AddMethod(append_symbol_deps, "AppendSymbolDeps")
+
+        libdeps_graph = networkx.DiGraph()
+        def get_libdeps_graph(env):
+            return libdeps_graph
+        env.AddMethod(get_libdeps_graph, "GetLibdepsGraph")
+
+        env['LIBDEPS_SYMBOL_DEP_FILES'] = symbol_deps
+        env["SYMBOLDEPSSUFFIX"] = '.symbol_deps'
+
+        # Now we will setup an emitter, and an additional action for several
+        # of the builder involved with dynamic builds.
+        def libdeps_graph_emitter(target, source, env):
+            if "conftest" not in str(target[0]):
+                symbol_deps_file = target[0].path + env['SYMBOLDEPSSUFFIX']
+                env.Depends(target, '${BUILD_DIR}/libdeps/find_symbols')
+                env.SideEffect(symbol_deps_file, target)
+                env.AppendSymbolDeps(symbol_deps_file)
+
+            return target, source
+
+        for builder_name in ("Program", "SharedLibrary", "LoadableModule"):
+            builder = env['BUILDERS'][builder_name]
+            base_emitter = builder.emitter
+            new_emitter = SCons.Builder.ListEmitter([base_emitter, libdeps_graph_emitter])
+            builder.emitter = new_emitter
+
+            base_action = builder.action
+            if not isinstance(base_action, SCons.Action.ListAction):
+                base_action = SCons.Action.ListAction([base_action])
+            find_symbols = env.Dir("$BUILD_DIR").path + "/libdeps/find_symbols"
+            base_action.list.extend([
+                SCons.Action.Action(f'if [ -e {find_symbols} ]; then {find_symbols} $TARGET "$_LIBDEPS_LD_PATH" ${{TARGET}}.symbol_deps; fi', None)
+            ])
+            builder.action = base_action
 
     # We need a way for environments to alter just which libdeps
     # emitter they want, without altering the overall program or
