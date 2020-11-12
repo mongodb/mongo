@@ -399,11 +399,15 @@ tasks:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          signal-processing: ${signal-processing_rev}
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
           workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
+          mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          benchmarks: ${benchmarks_rev}
+          py-tpcc: ${py-tpcc_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
@@ -421,11 +425,15 @@ tasks:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          signal-processing: ${signal-processing_rev}
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
           workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
+          mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          benchmarks: ${benchmarks_rev}
+          py-tpcc: ${py-tpcc_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
@@ -443,11 +451,15 @@ tasks:
         directory: *src_dir
         revisions:
           dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          signal-processing: ${signal-processing_rev}
           linkbench: ${linkbench_rev}
           linkbench2: ${linkbench2_rev}
-          genny: ${genny_rev}
           workloads: ${workloads_rev}
-          signal-processing: ${signal-processing_rev}
+          mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          benchmarks: ${benchmarks_rev}
+          py-tpcc: ${py-tpcc_rev}
     - command: expansions.write
       params:
         file: ./expansions.yml
