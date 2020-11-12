@@ -97,6 +97,13 @@ repos:
     repos:
       - yum/amazon/2013.03/mongodb-org
 
+  - name: amazon2
+    type: rpm
+    edition: org
+    bucket: repo.mongodb.org
+    repos:
+      - yum/amazon/2/mongodb-org
+
   - name: suse11
     type: rpm
     edition: org
@@ -243,6 +250,13 @@ repos:
     bucket: repo.mongodb.com
     repos:
       - yum/amazon/2013.03/mongodb-enterprise
+
+  - name: amazon2
+    type: rpm
+    edition: enterprise
+    bucket: repo.mongodb.com
+    repos:
+      - yum/amazon/2/mongodb-enterprise
 
   - name: suse11
     type: rpm
