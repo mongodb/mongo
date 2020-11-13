@@ -386,26 +386,6 @@ TEST_F(CollectionCatalogIterationTest, EndAtEndOfSection) {
     checkCollections("bar");
 }
 
-// Delete an entry in the catalog while iterating.
-TEST_F(CollectionCatalogIterationTest, InvalidateEntry) {
-    auto it = catalog.begin(&opCtx, "bar");
-
-    // Invalidate bar.coll1.
-    for (auto collsIt = collsIterator("bar"); collsIt != collsIteratorEnd("bar"); ++collsIt) {
-        if (collsIt->second->ns().ns() == "bar.coll1") {
-            catalog.deregisterCollection(&opCtx, collsIt->first);
-            dropColl("bar", collsIt->first);
-            break;
-        }
-    }
-
-
-    for (; it != catalog.end(&opCtx); ++it) {
-        auto coll = *it;
-        ASSERT(coll && coll->ns().ns() != "bar.coll1");
-    }
-}
-
 TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
     auto it = catalog.begin(&opCtx, "bar");
     auto collsIt = collsIterator("bar");
