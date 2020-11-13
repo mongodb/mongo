@@ -5233,6 +5233,7 @@ tasks:
       suite: jstestfuzz_replication_fcv42
       is_jstestfuzz: true
       use_multiversion: /data/multiversion
+      task_path_suffix: /data/multiversion
       npm_command: jstestfuzz
       fallback_num_sub_suites: 4
 
@@ -5290,6 +5291,7 @@ tasks:
       suite: jstestfuzz_sharded_fcv42
       is_jstestfuzz: true
       use_multiversion: /data/multiversion
+      task_path_suffix: /data/multiversion
       npm_command: jstestfuzz
       fallback_num_sub_suites: 4
 
