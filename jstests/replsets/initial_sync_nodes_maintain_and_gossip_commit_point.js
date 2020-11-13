@@ -87,7 +87,7 @@ assert.eq(1, rs.compareOpTimes(secondCommitPointPrimary, firstCommitPoint));
 assert.eq(1, rs.compareOpTimes(secondCommitPointSecondary, firstCommitPoint));
 
 // Verify that the commit point has *NOT* advanced on the non-voting secondary.
-let commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
+const commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
 assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, secondCommitPointPrimary),
           -1,
           `commit point on the non-voting secondary should not have been advanced: ${
@@ -112,13 +112,6 @@ jsTestLog(`Third commit point: ${tojson(thirdCommitPointPrimary)}`);
 // Verify that the commit point has advanced on the primary and secondary.
 assert.eq(1, rs.compareOpTimes(thirdCommitPointPrimary, secondCommitPointPrimary));
 assert.eq(1, rs.compareOpTimes(thirdCommitPointSecondary, secondCommitPointSecondary));
-
-// Verify that the commit point has *NOT* advanced on the non-voting secondary.
-commitPointNonVotingSecondary = getLastCommittedOpTime(nonVotingSecondary);
-assert.eq(rs.compareOpTimes(commitPointNonVotingSecondary, thirdCommitPointPrimary),
-          -1,
-          `commit point on the non-voting secondary should not have been advanced: ${
-              tojson(commitPointNonVotingSecondary)}`);
 
 // Allow the initial sync node to complete oplog fetching but hang it before it completes initial
 // sync.
