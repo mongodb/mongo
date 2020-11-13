@@ -150,6 +150,7 @@ if get_option('ssl') == 'on':
             "kms.cpp",
             "kms_aws.cpp",
             "kms_local.cpp",
+            "kms_network.cpp",
             "kms.idl",
         ],
         LIBDEPS=[
