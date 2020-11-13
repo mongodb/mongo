@@ -45,11 +45,13 @@ namespace StorageControl {
 namespace {
 
 bool areControlsStarted = false;
+bool journalFlusherPaused = false;
 
 }  // namespace
 
 void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
     auto storageEngine = serviceContext->getStorageEngine();
+    invariant(!areControlsStarted);
 
     // Instantiate a thread to periodically, and upon request, flush writes to disk.
     //
@@ -67,18 +69,38 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
     //
     // (Note: the ephemeral engine returns false for isDurable(), so we must be careful not to
     // disable it.)
-    std::unique_ptr<JournalFlusher> journalFlusher = std::make_unique<JournalFlusher>(
-        /*disablePeriodicFlushes*/ forTestOnly ||
-        (!storageEngine->isDurable() && !storageEngine->isEphemeral()));
-    journalFlusher->go();
-    JournalFlusher::set(serviceContext, std::move(journalFlusher));
+    if (journalFlusherPaused) {
+        // This is a restart and the JournalListener was paused. Resume the existing JournalFlusher.
+        JournalFlusher::get(serviceContext)->resume();
+        journalFlusherPaused = false;
+    } else {
+        std::unique_ptr<JournalFlusher> journalFlusher = std::make_unique<JournalFlusher>(
+            /*disablePeriodicFlushes*/ forTestOnly ||
+            (!storageEngine->isDurable() && !storageEngine->isEphemeral()));
+        journalFlusher->go();
+        JournalFlusher::set(serviceContext, std::move(journalFlusher));
+    }
 
     areControlsStarted = true;
 }
 
-void stopStorageControls(ServiceContext* serviceContext, const Status& reason) {
+void stopStorageControls(ServiceContext* serviceContext, const Status& reason, bool forRestart) {
     if (areControlsStarted) {
-        JournalFlusher::get(serviceContext)->shutdown(reason);
+        if (forRestart) {
+            // Pausing instead of shutting down the journal flusher for restart.
+            JournalFlusher::get(serviceContext)->pause();
+            journalFlusherPaused = true;
+        } else {
+            JournalFlusher::get(serviceContext)->shutdown(reason);
+        }
+
+        areControlsStarted = false;
+    } else {
+        // The JournalFlusher was not resumed after being paused with forRestart.
+        invariant(!journalFlusherPaused);
+        // Cannot stop storage controls for restart if the controls were not started or were already
+        // stopped.
+        invariant(!forRestart);
     }
 }
 
