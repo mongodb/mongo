@@ -83,6 +83,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAndFailUnpreparedCommitAfterReservingOplogSlot);
+MONGO_FAIL_POINT_DEFINE(hangAfterLoggingApplyOpsForTransaction);
 
 constexpr auto kNumRecordsFieldName = "numRecords"_sd;
 constexpr auto kMsgFieldName = "msg"_sd;
@@ -1158,6 +1159,8 @@ int logOplogEntriesForTransaction(OperationContext* opCtx,
             : (implicitPrepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted);
         prevWriteOpTime =
             logApplyOpsForTransaction(opCtx, &oplogEntry, txnState, startOpTime, updateTxnTable);
+
+        hangAfterLoggingApplyOpsForTransaction.pauseWhileSet();
 
         // Advance the iterator to the beginning of the remaining unpacked statements.
         stmtsIter = nextStmt;
