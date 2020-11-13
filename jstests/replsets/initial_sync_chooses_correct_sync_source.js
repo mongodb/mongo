@@ -11,7 +11,7 @@
 
 load("jstests/libs/fail_point_util.js");
 
-const delayMillis = 50;  // Adds a delay long enough to make a node not the "nearest" sync source.
+const delayMillis = 300;  // Adds a delay long enough to make a node not the "nearest" sync source.
 const testName = "initial_sync_chooses_correct_sync_source";
 const rst =
     new ReplSetTest({name: testName, nodes: [{}, {rsConfig: {priority: 0}}], useBridge: true});
