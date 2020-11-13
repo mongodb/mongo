@@ -328,7 +328,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
      * Insert on primary until its lastApplied >= the rollback node's. Useful for testing rollback
      * via refetch, which completes rollback recovery when new lastApplied >= old top of oplog.
      */
-    const _awaitPrimaryAppliedSurpassesRollbackApplied = function() {
+    this.awaitPrimaryAppliedSurpassesRollbackApplied = function() {
         log(`Waiting for lastApplied on sync source ${curPrimary.host} to surpass lastApplied` +
             ` on rollback node ${curSecondary.host}`);
 
@@ -417,7 +417,7 @@ function RollbackTest(name = "RollbackTest", replSet) {
             assert.commandWorked(curSecondary.adminCommand({serverStatus: 1}))
                 .storageEngine.supportsCommittedReads;
         if (!isMajorityReadConcernEnabledOnRollbackNode) {
-            _awaitPrimaryAppliedSurpassesRollbackApplied();
+            this.awaitPrimaryAppliedSurpassesRollbackApplied();
         }
 
         return curPrimary;
