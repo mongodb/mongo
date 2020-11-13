@@ -16,7 +16,7 @@ rst.initiate();
 const password = "test_password";
 rst.getPrimary().getDB("admin").createUser(
     {user: "userAdmin", pwd: password, roles: [{db: "admin", role: "userAdminAnyDatabase"}]});
-rst.restart(0, {auth: ''});
+rst.restart(0, {auth: '', keyFile: 'jstests/libs/key1'});
 
 const db = rst.getPrimary().getDB("test");
 const coll = db.coll;

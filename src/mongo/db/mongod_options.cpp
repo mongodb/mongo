@@ -501,6 +501,17 @@ Status storeMongodOptions(const moe::Environment& params) {
         storageGlobalParams.allowOplogTruncation = false;
     }
 
+    if (!replSettings.getReplSetString().empty() &&
+        (params.count("security.authorization") &&
+         params["security.authorization"].as<std::string>() == "enabled") &&
+        serverGlobalParams.clusterAuthMode.load() != ServerGlobalParams::ClusterAuthMode_x509 &&
+        !params.count("security.keyFile")) {
+        return Status(
+            ErrorCodes::BadValue,
+            str::stream()
+                << "security.keyFile is required when authorization is enabled with replica sets");
+    }
+
     if (params.count("replication.enableMajorityReadConcern")) {
         serverGlobalParams.enableMajorityReadConcern =
             params["replication.enableMajorityReadConcern"].as<bool>();
