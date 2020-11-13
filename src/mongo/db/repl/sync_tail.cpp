@@ -815,9 +815,10 @@ void tryToGoLiveAsASecondary(OperationContext* opCtx,
     // Rolling back with eMRC false, we set initialDataTimestamp to max(local oplog top, source's
     // oplog top), then rollback via refetch. Data is inconsistent until lastApplied >=
     // initialDataTimestamp.
-    auto initialTs = opCtx->getServiceContext()->getStorageEngine()->getInitialDataTimestamp();
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto initialTs = storageEngine->getInitialDataTimestamp();
     if (lastApplied.getTimestamp() < initialTs) {
-        invariant(!serverGlobalParams.enableMajorityReadConcern);
+        invariant(!storageEngine->supportsRecoverToStableTimestamp());
         LOG(2) << "We cannot transition to SECONDARY state because our 'lastApplied' optime is "
                   "less than the initial data timestamp and enableMajorityReadConcern = false. "
                   "minValid optime: "
