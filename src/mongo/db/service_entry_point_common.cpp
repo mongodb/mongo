@@ -2327,8 +2327,11 @@ BSONObj ServiceEntryPointCommon::getRedactedCopyForLogging(const Command* comman
 }
 
 Future<DbResponse> ServiceEntryPointCommon::handleRequest(
-    OperationContext* opCtx, const Message& m, std::unique_ptr<const Hooks> behaviors) noexcept {
+    OperationContext* opCtx,
+    const Message& m,
+    std::unique_ptr<const Hooks> behaviors) noexcept try {
     auto hr = std::make_shared<HandleRequest>(opCtx, m, std::move(behaviors));
+
     return hr->startOperation()
         .then([hr]() -> Future<void> {
             auto opRunner = hr->makeOpRunner();
@@ -2347,6 +2350,8 @@ Future<DbResponse> ServiceEntryPointCommon::handleRequest(
             }
             return hr->executionContext->getResponse();
         });
+} catch (const DBException& ex) {
+    return ex.toStatus();
 }
 
 ServiceEntryPointCommon::Hooks::~Hooks() = default;

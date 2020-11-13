@@ -106,6 +106,8 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     mongo::Message msg(std::move(sb));
 
     try {
+        // TODO SERVER-51278: Replace `AlternativeClientRegion` with `ClientStrand`.
+        mongo::AlternativeClientRegion acr(client);
         serviceContext->getServiceEntryPoint()->handleRequest(opCtx.get(), msg).get();
     } catch (const mongo::AssertionException&) {
         // We need to catch exceptions caused by invalid inputs
