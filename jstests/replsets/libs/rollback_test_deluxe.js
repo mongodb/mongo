@@ -461,7 +461,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
      * Insert on primary until its lastApplied >= the rollback node's. Useful for testing rollback
      * via refetch, which completes rollback recovery when new lastApplied >= old top of oplog.
      */
-    const _awaitPrimaryAppliedSurpassesRollbackApplied = function() {
+    this.awaitPrimaryAppliedSurpassesRollbackApplied = function() {
         log(`Waiting for lastApplied on sync source ${curPrimary.host} to surpass lastApplied` +
             ` on rollback node ${rollbackSecondary.host}`);
 
@@ -544,7 +544,7 @@ function RollbackTestDeluxe(name = "FiveNodeDoubleRollbackTest", replSet) {
             assert.commandWorked(standbySecondary.adminCommand("replSetGetRBID")).rbid;
 
         if (jsTest.options().enableMajorityReadConcern === false) {
-            _awaitPrimaryAppliedSurpassesRollbackApplied();
+            this.awaitPrimaryAppliedSurpassesRollbackApplied();
         }
 
         return curPrimary;
