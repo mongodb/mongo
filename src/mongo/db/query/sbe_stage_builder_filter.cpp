@@ -249,19 +249,25 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
         projectEvalExpr(std::move(innerExpr), std::move(innerBranch), planNodeId, slotIdGenerator);
 
     // Generate the traverse stage for the current nested level.
-    auto outputSlot = slotIdGenerator->generate();
+    auto traverseOutputSlot = slotIdGenerator->generate();
     auto outputStage =
         makeTraverse(std::move(fromBranch),
                      std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
                      fieldSlot,
-                     outputSlot,
+                     traverseOutputSlot,
                      innerSlot,
                      sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
-                                                  sbe::makeE<sbe::EVariable>(outputSlot),
+                                                  sbe::makeE<sbe::EVariable>(traverseOutputSlot),
                                                   sbe::makeE<sbe::EVariable>(innerSlot)),
-                     sbe::makeE<sbe::EVariable>(outputSlot),
+                     sbe::makeE<sbe::EVariable>(traverseOutputSlot),
                      planNodeId,
                      1);
+
+    auto outputSlot = slotIdGenerator->generate();
+    outputStage = makeProject(std::move(outputStage),
+                              planNodeId,
+                              outputSlot,
+                              makeFillEmptyFalse(sbe::makeE<sbe::EVariable>(traverseOutputSlot)));
 
     if (isLeafField && mode == LeafTraversalMode::kArrayAndItsElements) {
         // For the last level, if 'mode' == kArrayAndItsElements and getField() returns an array we
@@ -275,7 +281,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
 
         outputExpr = sbe::makeE<sbe::EPrimBinary>(
             sbe::EPrimBinary::logicOr,
-            makeFillEmptyFalse(sbe::makeE<sbe::EVariable>(outputSlot)),
+            sbe::makeE<sbe::EVariable>(outputSlot),
             sbe::makeE<sbe::EPrimBinary>(
                 sbe::EPrimBinary::logicAnd,
                 makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(

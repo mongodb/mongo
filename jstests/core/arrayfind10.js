@@ -62,6 +62,27 @@ runWithAndWithoutIndex({"a.b": 1}, () => {
 
 assert(t.drop());
 
+assert.commandWorked(
+    t.insert([{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]));
+
+runWithAndWithoutIndex({"a.b": 1}, () => {
+    assert(arrayEq(t.find({"a.b.c": 5}, {_id: 0}).toArray(),
+                   [{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]));
+    assert(arrayEq(t.find({"a.b.c": {$eq: 5}}, {_id: 0}).toArray(),
+                   [{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]));
+
+    assert(arrayEq(t.find({"a.b.c": {$in: [5]}}, {_id: 0}).toArray(),
+                   [{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]));
+
+    assert(arrayEq(t.find({"a.b.c": {$size: 2}}, {_id: 0}).toArray(),
+                   [{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]));
+
+    assert(arrayEq(t.find({"a.b.c": {$elemMatch: {$eq: 5}}}, {_id: 0}).toArray(),
+                   [{"a": [{"b": [{"c": [5, 7]}]}]}, {"a": [{"b": []}, {"b": [{"c": [5, 7]}]}]}]));
+});
+
+assert(t.drop());
+
 assert.commandWorked(t.insert([
     {a: 1},
     {a: 2},
