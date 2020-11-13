@@ -1,4 +1,5 @@
 // Tests the behavior of $size for match expressions.
+
 (function() {
 "use strict";
 
@@ -83,10 +84,4 @@ badInputs.forEach(function(input) {
     assert.commandFailed(db.runCommand({find: coll.getName(), filter: {"a": {$size: input}}}),
                          "$size argument " + input + " should have failed");
 });
-
-assert(coll.drop());
-
-// Check nested arrays.
-assert.commandWorked(coll.insert([{a: 1, b: "foo"}, {a: 1, b: [7, 8, 9]}]));
-assert.eq(1, coll.find({$or: [{$and: [{b: {$size: 3}}, {a: 1}]}, {a: 0}]}).itcount());
 }());
