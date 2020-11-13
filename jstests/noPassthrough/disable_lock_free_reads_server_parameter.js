@@ -5,11 +5,15 @@
  *   - with enableMajorityReadConcern=false
  * Otherwise, the default for disableLockFreeReads is true.
  *
+ * This test is not compatible with the special Lock Free Reads build variant because
+ * disableLockFreeReads is overridden there.
+ *
  * @tags: [
  *     # This test expects enableMajorityReadConcern to be on by default and cannot run in suites
  *     # that explicitly change that.
  *     requires_majority_read_concern,
  *     requires_replication,
+ *     incompatible_with_lockfreereads, // This test is not compatible with special LFR builder
  * ]
  */
 

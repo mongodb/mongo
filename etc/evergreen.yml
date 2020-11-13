@@ -5163,7 +5163,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_one_shard_sharded_collections
-  tags: ["aggregation", "no_async"]
+  tags: ["aggregation", "no_async", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -5199,7 +5199,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_sharded_collections_passthrough
-  tags: ["aggregation", "common"]
+  tags: ["aggregation", "common", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -5210,7 +5210,7 @@ tasks:
 
 - <<: *task_template
   name: aggregation_sharded_collections_causally_consistent_passthrough
-  tags: ["aggregation", "secondary_reads"]
+  tags: ["aggregation", "secondary_reads", "sharded"]
   depends_on:
   - name: aggregation
   commands:
@@ -6583,7 +6583,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication
-  tags: ["concurrency", "common", "read_concern_maj", "large"]
+  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6604,7 +6604,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication_with_balancer
-  tags: ["concurrency", "common", "read_concern_maj", "large"]
+  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6614,7 +6614,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication_no_txns
-  tags: ["concurrency", "no_txns", "large"]
+  tags: ["concurrency", "no_txns", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6624,7 +6624,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_replication_no_txns_with_balancer
-  tags: ["concurrency", "no_txns", "large"]
+  tags: ["concurrency", "no_txns", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6634,7 +6634,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_clusterwide_ops_add_remove_shards
-  tags: ["concurrency", "common", "read_concern_maj", "large"]
+  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6643,7 +6643,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: concurrency_sharded_causal_consistency_gen
-  tags: ["concurrency", "non_live_record"]
+  tags: ["concurrency", "non_live_record", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6654,7 +6654,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_causal_consistency_and_balancer
-  tags: ["concurrency", "large", "non_live_record"]
+  tags: ["concurrency", "large", "non_live_record", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6664,7 +6664,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns
-  tags: ["concurrency", "stepdowns", "large"]
+  tags: ["concurrency", "stepdowns", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6674,7 +6674,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_with_stepdowns_and_balancer
-  tags: ["concurrency", "stepdowns", "large"]
+  tags: ["concurrency", "stepdowns", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6683,7 +6683,7 @@ tasks:
       resmoke_jobs_max: 1
 
 - name: concurrency_sharded_terminate_primary_with_balancer_gen
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6693,7 +6693,7 @@ tasks:
       fallback_num_sub_suites: 3
 
 - name: concurrency_sharded_kill_primary_with_balancer_gen
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6704,7 +6704,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn
-  tags: ["concurrency", "large"]
+  tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6714,7 +6714,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_with_balancer
-  tags: ["concurrency", "large"]
+  tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6724,7 +6724,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_local_read_write_multi_stmt_txn
-  tags: ["concurrency", "large"]
+  tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6734,7 +6734,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer
-  tags: ["concurrency", "large"]
+  tags: ["concurrency", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6744,7 +6744,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_with_stepdowns
-  tags: ["concurrency", "stepdowns", "large"]
+  tags: ["concurrency", "stepdowns", "large", "sharded"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6754,7 +6754,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_terminate_primary_gen
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6765,7 +6765,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_sharded_multi_stmt_txn_kill_primary_gen
-  tags: ["concurrency", "stepdowns", "kill_terminate"]
+  tags: ["concurrency", "stepdowns", "kill_terminate", "sharded"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -10943,8 +10943,13 @@ buildvariants:
   - name: compile_TG
     distros:
     - rhel62-large
-  # jsCore does not exercise the lock-free reads feature, as it is overridden to disabled on standalones, but is a pre-req for other tasks.
-  - name: jsCore
+  - name: .aggregation !.sharded
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.sharded
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.sharded
+    distros:
+    - rhel62-medium
+  - name: .jscore .common !.sharding
+  - name: .misc_js !.sharded
   - name: .replica_sets
 
 - name: enterprise-rhel-62-64-bit-time-series-collection
