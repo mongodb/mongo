@@ -1199,7 +1199,6 @@ Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterfac
         Status status = newSSLContext->manager->initSSLContext(
             newSSLContext->ingress->native_handle(),
             sslParams,
-            TransientSSLParams(),
             SSLManagerInterface::ConnectionDirection::kIncoming);
         if (!status.isOK()) {
             return status;
@@ -1220,7 +1219,6 @@ Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterfac
         Status status = newSSLContext->manager->initSSLContext(
             newSSLContext->egress->native_handle(),
             sslParams,
-            TransientSSLParams(),
             SSLManagerInterface::ConnectionDirection::kOutgoing);
         if (!status.isOK()) {
             return status;

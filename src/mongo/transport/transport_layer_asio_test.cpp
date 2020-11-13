@@ -50,12 +50,12 @@ public:
     void startSession(transport::SessionHandle session) override {
         stdx::unique_lock<Latch> lk(_mutex);
         _sessions.push_back(std::move(session));
-        LOGV2(2303201, "started session");
+        LOGV2(23032, "started session");
         _cv.notify_one();
     }
 
     void endAllSessions(transport::Session::TagMask tags) override {
-        LOGV2(2303301, "end all sessions");
+        LOGV2(23033, "end all sessions");
         std::vector<transport::SessionHandle> old_sessions;
         {
             stdx::unique_lock<Latch> lock(_mutex);
