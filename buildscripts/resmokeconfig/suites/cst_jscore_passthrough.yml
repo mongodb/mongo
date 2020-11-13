@@ -374,6 +374,7 @@ selector:
   - jstests/core/rollback_index_drop.js
   - jstests/core/server1470.js
   - jstests/core/server5346.js
+  - jstests/core/server50762.js
   - jstests/core/set7.js
   - jstests/core/single_field_hashed_index.js
   - jstests/core/sort1.js
