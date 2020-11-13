@@ -167,6 +167,7 @@ struct __wt_btree {
 
     uint64_t write_gen;      /* Write generation */
     uint64_t base_write_gen; /* Write generation on startup. */
+    uint64_t run_write_gen;  /* Runtime write generation. */
     uint64_t rec_max_txn;    /* Maximum txn seen (clean trees) */
     wt_timestamp_t rec_max_timestamp;
 

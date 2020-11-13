@@ -141,3 +141,102 @@ __wt_hs_cursor_search_near(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int *exa
       session, WT_ISO_READ_UNCOMMITTED, ret = cursor->search_near(cursor, exactp));
     return (ret);
 }
+
+/*
+ * __curhs_close --
+ *     WT_CURSOR->close method for the hs cursor type.
+ */
+static int
+__curhs_close(WT_CURSOR *cursor)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+    CURSOR_API_CALL_PREPARE_ALLOWED(
+      cursor, session, close, file_cursor == NULL ? NULL : CUR2BT(file_cursor));
+err:
+
+    if (file_cursor != NULL)
+        WT_TRET(file_cursor->close(file_cursor));
+    __wt_cursor_close(cursor);
+
+    API_END_RET(session, ret);
+}
+
+/*
+ * __curhs_reset --
+ *     Reset a history store cursor.
+ */
+static int
+__curhs_reset(WT_CURSOR *cursor)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, CUR2BT(file_cursor));
+
+    ret = file_cursor->reset(file_cursor);
+    F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+
+err:
+    API_END_RET(session, ret);
+}
+
+/*
+ * __wt_curhs_open --
+ *     Initialize a history store cursor.
+ */
+int
+__wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
+{
+    WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
+      __wt_cursor_get_value,                          /* get-value */
+      __wt_cursor_set_key,                            /* set-key */
+      __wt_cursor_set_value,                          /* set-value */
+      __wt_cursor_compare_notsup,                     /* compare */
+      __wt_cursor_equals_notsup,                      /* equals */
+      __wt_cursor_notsup,                             /* next */
+      __wt_cursor_notsup,                             /* prev */
+      __curhs_reset,                                  /* reset */
+      __wt_cursor_notsup,                             /* search */
+      __wt_cursor_search_near_notsup,                 /* search-near */
+      __wt_cursor_notsup,                             /* insert */
+      __wt_cursor_modify_value_format_notsup,         /* modify */
+      __wt_cursor_notsup,                             /* update */
+      __wt_cursor_notsup,                             /* remove */
+      __wt_cursor_notsup,                             /* reserve */
+      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_notsup,                             /* cache */
+      __wt_cursor_reopen_notsup,                      /* reopen */
+      __curhs_close);                                 /* close */
+    WT_CURSOR *cursor;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+
+    WT_RET(__wt_calloc_one(session, &hs_cursor));
+    cursor = (WT_CURSOR *)hs_cursor;
+    *cursor = iface;
+    cursor->session = (WT_SESSION *)session;
+    cursor->key_format = WT_HS_KEY_FORMAT;
+    cursor->value_format = WT_HS_VALUE_FORMAT;
+
+    /* Open the file cursor for operations on the regular history store .*/
+    WT_ERR(__hs_cursor_open_int(session, &hs_cursor->file_cursor));
+
+    WT_ERR(__wt_cursor_init(cursor, WT_HS_URI, owner, NULL, cursorp));
+
+    if (0) {
+err:
+        WT_TRET(__curhs_close(cursor));
+        *cursorp = NULL;
+    }
+    return (ret);
+}

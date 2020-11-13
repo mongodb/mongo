@@ -282,6 +282,12 @@ struct __wt_cursor_dump {
     WT_CURSOR *child;
 };
 
+struct __wt_cursor_hs {
+    WT_CURSOR iface;
+
+    WT_CURSOR *file_cursor; /* Queries of regular history store data */
+};
+
 struct __wt_cursor_index {
     WT_CURSOR iface;
 

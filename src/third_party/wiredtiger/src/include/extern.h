@@ -486,6 +486,8 @@ extern int __wt_curfile_next_random(WT_CURSOR *cursor)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
   const char *cfg[], WT_CURSOR **cursorp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_curindex_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner,
   const char *cfg[], WT_CURSOR **cursorp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_curjoin_join(WT_SESSION_IMPL *session, WT_CURSOR_JOIN *cjoin, WT_INDEX *idx,
@@ -775,7 +777,7 @@ extern int __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg, cons
   size_t from_len, WT_ITEM *to_buf) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_huffman_open(WT_SESSION_IMPL *session, void *symbol_frequency_array, u_int symcnt,
   u_int numbytes, void *retp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **fileconfp)
+extern int __wt_import_repair(WT_SESSION_IMPL *session, const char *uri, char **configp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_inmem_unsupported_op(WT_SESSION_IMPL *session, const char *tag)
   WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1036,12 +1038,14 @@ extern int __wt_meta_checkpoint_last_name(WT_SESSION_IMPL *session, const char *
   const char **namep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_ckptlist_get(WT_SESSION_IMPL *session, const char *fname, bool update,
   WT_CKPT **ckptbasep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_meta_ckptlist_get_with_config(WT_SESSION_IMPL *session, bool update,
+extern int __wt_meta_ckptlist_get_from_config(WT_SESSION_IMPL *session, bool update,
   WT_CKPT **ckptbasep, const char *config) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_ckptlist_set(WT_SESSION_IMPL *session, const char *fname, WT_CKPT *ckptbase,
   WT_LSN *ckptlsn) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_ckptlist_to_meta(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_ITEM *buf)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_meta_ckptlist_update_config(WT_SESSION_IMPL *session, WT_CKPT *ckptbase,
+  const char *oldcfg, char **newcfgp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_sysinfo_set(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_meta_track_checkpoint(WT_SESSION_IMPL *session)

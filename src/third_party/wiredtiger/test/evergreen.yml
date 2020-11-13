@@ -284,6 +284,38 @@ functions:
         rm -rf "wiredtiger"
         rm -rf "wiredtiger.tgz"
 
+  "run wt hang analyzer":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix"
+      script: |
+        set -o verbose
+
+        # Dump core (-c) and debugger outputs (-o)
+        wt_hang_analyzer_option="-c -o file -o stdout"
+
+        echo "Calling the wt hang analyzer ..."
+        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" ${python_binary|python3} ../test/wt_hang_analyzer/wt_hang_analyzer.py $wt_hang_analyzer_option
+
+  "save wt hang analyzer core/debugger files":
+    - command: archive.targz_pack
+      params:
+        target: "wt-hang-analyzer.tgz"
+        source_dir: "wiredtiger/build_posix"
+        include:
+          - "./*core*"
+          - "./debugger*.*"
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: wt-hang-analyzer.tgz
+        bucket: build_external
+        permissions: public-read
+        content_type: application/tar
+        display_name: WT Hang Analyzer Output - Execution ${execution}
+        remote_file: wiredtiger/${build_variant}/${revision}/wt_hang_analyzer/wt-hang-analyzer_${task_name}_${build_id}${postfix|}.tgz
+
   "dump stderr/stdout":
     command: shell.exec
     params:
@@ -423,8 +455,11 @@ post:
   - func: "upload artifact"
     vars:
       postfix: -${execution}
+  - func: "save wt hang analyzer core/debugger files"
   - func: "dump stderr/stdout"
   - func: "cleanup"
+timeout:
+  - func: "run wt hang analyzer"
 
 tasks:
   # Base compile task on posix flavours

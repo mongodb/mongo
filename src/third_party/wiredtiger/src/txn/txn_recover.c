@@ -841,11 +841,19 @@ __wt_txn_recover(WT_SESSION_IMPL *session, const char *cfg[])
         WT_ERR(ret);
     }
 
-    /* Check whether the history store exists. */
-    WT_ERR(__hs_exists(session, metac, cfg, &hs_exists));
-
     /* Scan the metadata to find the live files and their IDs. */
     WT_ERR(__recovery_file_scan(&r));
+
+    /*
+     * Check whether the history store exists.
+     *
+     * This will open a dhandle on the history store and initialize its write gen so we must ensure
+     * that the connection-wide base write generation is stable at this point. Performing a recovery
+     * file scan will involve updating the connection-wide base write generation so we MUST do this
+     * before checking for the existence of a history store file.
+     */
+    WT_ERR(__hs_exists(session, metac, cfg, &hs_exists));
+
     /*
      * Clear this out. We no longer need it and it could have been re-allocated when scanning the
      * files.
