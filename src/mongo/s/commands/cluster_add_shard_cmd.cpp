@@ -85,7 +85,8 @@ public:
             kPrimaryOnlyReadPreference,
             "admin",
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendPassthroughFields(cmdObj, parsedRequest.toCommandForConfig()),
+                CommandHelpers::appendGenericCommandArgs(cmdObj,
+                                                         parsedRequest.toCommandForConfig()),
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent);
 

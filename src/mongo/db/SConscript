@@ -568,6 +568,7 @@ env.Library(
     target="commands",
     source=[
         'commands.cpp',
+        'drop_database.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -62,6 +62,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/drop_database_gen.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -155,20 +156,21 @@ public:
                       str::stream()
                           << "Cannot drop '" << dbname << "' database while replication is active");
         }
-        BSONElement e = cmdObj.firstElement();
-        int p = (int)e.number();
-        if (p != 1) {
+
+        auto request = DropDatabase::parse(IDLParserErrorContext("dropDatabase"), cmdObj);
+        if (request.getCommandParameter() != 1) {
             uasserted(ErrorCodes::IllegalOperation, "have to pass 1 as db parameter");
         }
 
         Status status = dropDatabase(opCtx, dbname);
-        if (status == ErrorCodes::NamespaceNotFound) {
-            return true;
+        if (status != ErrorCodes::NamespaceNotFound) {
+            uassertStatusOK(status);
         }
+        DropDatabaseReply reply;
         if (status.isOK()) {
-            result.append("dropped", dbname);
+            reply.setDropped(request.getDbName());
         }
-        uassertStatusOK(status);
+        reply.serialize(&result);
         return true;
     }
 

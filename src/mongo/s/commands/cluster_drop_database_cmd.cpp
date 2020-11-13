@@ -33,6 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/drop_database_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -82,9 +83,10 @@ public:
                 "Cannot drop the admin database",
                 dbname != NamespaceString::kAdminDb);
 
+        auto request = DropDatabase::parse(IDLParserErrorContext("dropDatabase"), cmdObj);
         uassert(ErrorCodes::BadValue,
                 "have to pass 1 as db parameter",
-                cmdObj.firstElement().isNumber() && cmdObj.firstElement().number() == 1);
+                request.getCommandParameter() == 1);
 
         // Invalidate the database metadata so the next access kicks off a full reload, even if
         // sending the command to the config server fails due to e.g. a NetworkError.
@@ -97,12 +99,16 @@ public:
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
             CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendPassthroughFields(cmdObj,
-                                                        BSON("_configsvrDropDatabase" << dbname)),
+                CommandHelpers::appendGenericCommandArgs(cmdObj,
+                                                         BSON("_configsvrDropDatabase" << dbname)),
                 opCtx->getWriteConcern()),
             Shard::RetryPolicy::kIdempotent));
 
-        CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.response, &result);
+        // The cmdResponse status can be OK even if the config server replied ok: 0.
+        uassertStatusOK(cmdResponse.commandStatus);
+        auto reply = DropDatabaseReply::parse(IDLParserErrorContext("dropDatabase-reply"),
+                                              cmdResponse.response);
+        CommandHelpers::appendGenericReplyFields(cmdResponse.response, reply.toBSON(), &result);
         return true;
     }
 

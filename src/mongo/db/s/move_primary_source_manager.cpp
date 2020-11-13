@@ -238,7 +238,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
-        CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+        CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendGenericCommandArgs(
             finalCommandObj, commitMovePrimaryRequest.toBSON())),
         Shard::RetryPolicy::kIdempotent);
 

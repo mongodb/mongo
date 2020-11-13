@@ -396,16 +396,35 @@ void CommandHelpers::appendCommandWCStatus(BSONObjBuilder& result,
     }
 }
 
-BSONObj CommandHelpers::appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
-                                                const BSONObj& request) {
+BSONObj CommandHelpers::appendGenericCommandArgs(const BSONObj& cmdObjWithGenericArgs,
+                                                 const BSONObj& request) {
     BSONObjBuilder b;
     b.appendElements(request);
-    for (const auto& elem : filterCommandRequestForPassthrough(cmdObjWithPassthroughFields)) {
+    for (const auto& elem : filterCommandRequestForPassthrough(cmdObjWithGenericArgs)) {
         const auto name = elem.fieldNameStringData();
         if (isGenericArgument(name) && !request.hasField(name)) {
             b.append(elem);
         }
     }
+    return b.obj();
+}
+
+void CommandHelpers::appendGenericReplyFields(const BSONObj& replyObjWithGenericReplyFields,
+                                              const BSONObj& reply,
+                                              BSONObjBuilder* replyBuilder) {
+    replyBuilder->appendElements(reply);
+    for (const auto& elem : filterCommandReplyForPassthrough(replyObjWithGenericReplyFields)) {
+        const auto name = elem.fieldNameStringData();
+        if (isGenericArgument(name) && !reply.hasField(name)) {
+            replyBuilder->append(elem);
+        }
+    }
+}
+
+BSONObj CommandHelpers::appendGenericReplyFields(const BSONObj& replyObjWithGenericReplyFields,
+                                                 const BSONObj& reply) {
+    BSONObjBuilder b;
+    appendGenericReplyFields(replyObjWithGenericReplyFields, reply, &b);
     return b.obj();
 }
 

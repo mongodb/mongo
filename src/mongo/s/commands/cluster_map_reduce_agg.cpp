@@ -132,7 +132,7 @@ Document serializeToCommand(BSONObj originalCmd, const MapReduce& parsedMr, Pipe
     }
 
     // Append generic command options.
-    for (const auto& elem : CommandHelpers::appendPassthroughFields(originalCmd, BSONObj())) {
+    for (const auto& elem : CommandHelpers::appendGenericCommandArgs(originalCmd, BSONObj())) {
         translatedCmd[elem.fieldNameStringData()] = Value(elem);
     }
     return translatedCmd.freeze();

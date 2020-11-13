@@ -191,10 +191,19 @@ struct CommandHelpers {
                                       const WriteConcernResult& wcResult = WriteConcernResult());
 
     /**
-     * Appends passthrough fields from a cmdObj to a given request.
+     * Forward generic arguments from a client request to shards.
      */
-    static BSONObj appendPassthroughFields(const BSONObj& cmdObjWithPassthroughFields,
-                                           const BSONObj& request);
+    static BSONObj appendGenericCommandArgs(const BSONObj& cmdObjWithGenericArgs,
+                                            const BSONObj& request);
+
+    /**
+     * Forward generic reply fields from a shard's reply to the client.
+     */
+    static void appendGenericReplyFields(const BSONObj& replyObjWithGenericReplyFields,
+                                         const BSONObj& reply,
+                                         BSONObjBuilder* replyBuilder);
+    static BSONObj appendGenericReplyFields(const BSONObj& replyObjWithGenericReplyFields,
+                                            const BSONObj& reply);
 
     /**
      * Returns a copy of 'cmdObj' with a majority writeConcern appended.  If the command object does

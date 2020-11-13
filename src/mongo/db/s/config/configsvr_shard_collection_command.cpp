@@ -343,7 +343,7 @@ public:
             opCtx,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             "admin",
-            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendPassthroughFields(
+            CommandHelpers::appendMajorityWriteConcern(CommandHelpers::appendGenericCommandArgs(
                 cmdObj, shardsvrShardCollectionRequest.toBSON())),
             Shard::RetryPolicy::kIdempotent));
 
