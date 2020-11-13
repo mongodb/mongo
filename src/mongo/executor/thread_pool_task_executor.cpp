@@ -241,6 +241,11 @@ stdx::unique_lock<Latch> ThreadPoolTaskExecutor::_join(stdx::unique_lock<Latch> 
     return lk;
 }
 
+bool ThreadPoolTaskExecutor::isShuttingDown() const {
+    stdx::lock_guard lk(_mutex);
+    return _inShutdown_inlock();
+}
+
 void ThreadPoolTaskExecutor::appendDiagnosticBSON(BSONObjBuilder* b) const {
     stdx::lock_guard<Latch> lk(_mutex);
 

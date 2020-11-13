@@ -379,16 +379,20 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
     _createNewCursor(true /* initialFind */);
 
     while (true) {
-        bool isShuttingDown;
+        Status status{Status::OK()};
         {
             // Both of these checks need to happen while holding the mutex since they could race
             // with shutdown.
             stdx::lock_guard<Latch> lock(_mutex);
-            isShuttingDown = _isShuttingDown_inlock();
-            invariant(isShuttingDown || !_runQueryHandle.isCanceled());
+            if (_isShuttingDown_inlock()) {
+                status = {ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"};
+            } else if (_runQueryHandle.isCanceled()) {
+                invariant(_getExecutor()->isShuttingDown());
+                status = {ErrorCodes::CallbackCanceled, "oplog fetcher task executor shutdown"};
+            }
         }
-        if (isShuttingDown) {
-            _finishCallback(Status(ErrorCodes::CallbackCanceled, "oplog fetcher shutting down"));
+        if (!status.isOK()) {
+            _finishCallback(status);
             return;
         }
 
@@ -408,7 +412,7 @@ void OplogFetcher::_runQuery(const executor::TaskExecutor::CallbackArgs& callbac
         }
 
         // This will advance our view of _lastFetched.
-        auto status = _onSuccessfulBatch(batchResult.getValue());
+        status = _onSuccessfulBatch(batchResult.getValue());
         if (!status.isOK()) {
             // The stopReplProducer fail point expects this to return successfully. If another fail
             // point wants this to return unsuccessfully, it should use a different error code.

@@ -156,6 +156,11 @@ public:
     virtual SharedSemiFuture<void> joinAsync() = 0;
 
     /**
+     * Returns true if the executor is no longer active (i.e, no longer new tasks can be scheduled).
+     */
+    virtual bool isShuttingDown() const = 0;
+
+    /**
      * Writes diagnostic information into "b".
      */
     virtual void appendDiagnosticBSON(BSONObjBuilder* b) const = 0;

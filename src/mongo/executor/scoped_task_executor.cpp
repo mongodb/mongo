@@ -95,6 +95,11 @@ public:
         return _promise.getFuture();
     }
 
+    bool isShuttingDown() const override {
+        stdx::lock_guard lk(_mutex);
+        return _inShutdown;
+    }
+
     void appendDiagnosticBSON(BSONObjBuilder* b) const override {
         MONGO_UNREACHABLE;
     }
@@ -340,7 +345,7 @@ private:
         }
     }
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ScopedTaskExecutor::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ScopedTaskExecutor::_mutex");
     bool _inShutdown = false;
     std::shared_ptr<TaskExecutor> _executor;
     Status _shutdownStatus;

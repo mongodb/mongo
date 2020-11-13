@@ -62,6 +62,10 @@ SharedSemiFuture<void> TaskExecutorProxy::joinAsync() {
     return _executor.load()->joinAsync();
 }
 
+bool TaskExecutorProxy::isShuttingDown() const {
+    return _executor.load()->isShuttingDown();
+}
+
 void TaskExecutorProxy::appendDiagnosticBSON(mongo::BSONObjBuilder* builder) const {
     _executor.load()->appendDiagnosticBSON(builder);
 }
