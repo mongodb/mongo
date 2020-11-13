@@ -87,6 +87,18 @@ public:
     void shutdown(const Status& reason);
 
     /**
+     * Signals the thread to pause and then waits until it does.
+     * Callers of waitForJournalFlush() will continue to be blocked while the journal flusher is
+     * paused.
+     */
+    void pause();
+
+    /**
+     * Signals the thread to resume from a pause.
+     */
+    void resume();
+
+    /**
      * Signals an immediate journal flush and leaves.
      */
     void triggerJournalFlush();
@@ -96,6 +108,10 @@ public:
      *
      * Retries internally on InterruptedDueToReplStateChange errors.
      * Will throw ErrorCodes::isShutdownError errors.
+     *
+     * Warning: Timestamped writes are not guaranteed to be persisted when this function is called
+     * in parallel with replication rollback due to concurrent recoverToStableTimestamp(). But
+     * untimestamped writes will be retained.
      */
     void waitForJournalFlush();
 
@@ -106,6 +122,13 @@ public:
     void interruptJournalFlusherForReplStateChange();
 
 private:
+    // Journal flusher internal states.
+    enum class States {
+        Running,
+        Paused,
+        ShutDown,
+    };
+
     /**
      * Signals an immediate journal flush and waits for it to complete before returning.
      *
@@ -124,11 +147,18 @@ private:
     // Protects the state below.
     mutable Mutex _stateMutex = MONGO_MAKE_LATCH("JournalFlusherStateMutex");
 
-    // Signaled to wake up the thread, if the thread is waiting. The thread will check whether
-    // _flushJournalNow or _shuttingDown is set and flush or stop accordingly.
+    // Signaled to wake up the thread, if the thread is waiting or paused. The thread will check
+    // whether _flushJournalNow, _needToPause, or _shuttingDown is set and flush, pause, or stop
+    // accordingly.
     mutable stdx::condition_variable _flushJournalNowCV;
 
+    // Facilitates waiting for journal flusher state change after waking up the journal flusher
+    // thread.
+    mutable stdx::condition_variable _stateChangeCV;
+    States _state = States::Running;
+
     bool _flushJournalNow = false;
+    bool _needToPause = false;
     bool _shuttingDown = false;
     Status _shutdownReason = Status::OK();
 

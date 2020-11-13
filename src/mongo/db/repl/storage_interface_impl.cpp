@@ -1310,7 +1310,7 @@ Timestamp StorageInterfaceImpl::recoverToStableTimestamp(OperationContext* opCtx
     // Pass an InterruptedDueToReplStateChange error to async callers waiting on the JournalFlusher
     // thread for durability.
     Status reason = Status(ErrorCodes::InterruptedDueToReplStateChange, "Rollback in progress.");
-    StorageControl::stopStorageControls(serviceContext, reason);
+    StorageControl::stopStorageControls(serviceContext, reason, /*forRestart=*/true);
 
     auto swStableTimestamp = serviceContext->getStorageEngine()->recoverToStableTimestamp(opCtx);
     fassert(31049, swStableTimestamp);

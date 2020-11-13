@@ -192,7 +192,9 @@ void shutdownGlobalStorageEngineCleanly(ServiceContext* service) {
     auto storageEngine = service->getStorageEngine();
     invariant(storageEngine);
     StorageControl::stopStorageControls(
-        service, {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."});
+        service,
+        {ErrorCodes::ShutdownInProgress, "The storage catalog is being closed."},
+        /*forRestart=*/false);
     storageEngine->cleanShutdown();
     auto& lockFile = StorageEngineLockFile::get(service);
     if (lockFile) {

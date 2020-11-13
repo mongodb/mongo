@@ -127,11 +127,22 @@ void JournalFlusher::run() {
             // This is not an ideal solution for the failpoint usage because turning the failpoint
             // off at this point in the code would leave this thread sleeping until explicitly
             // pinged by an async thread to flush the journal.
-            _flushJournalNowCV.wait(lk, [&] { return _flushJournalNow || _shuttingDown; });
+            _flushJournalNowCV.wait(
+                lk, [&] { return _flushJournalNow || _needToPause || _shuttingDown; });
         } else {
             _flushJournalNowCV.wait_until(lk, deadline.toSystemTimePoint(), [&] {
-                return _flushJournalNow || _shuttingDown;
+                return _flushJournalNow || _needToPause || _shuttingDown;
             });
+        }
+
+        if (_needToPause) {
+            _state = States::Paused;
+            _stateChangeCV.notify_all();
+
+            _flushJournalNowCV.wait(lk, [&] { return !_needToPause || _shuttingDown; });
+
+            _state = States::Running;
+            _stateChangeCV.notify_all();
         }
 
         _flushJournalNow = false;
@@ -140,6 +151,10 @@ void JournalFlusher::run() {
             LOGV2_DEBUG(4584702, 1, "stopping {name} thread", "name"_attr = name());
             invariant(!_shutdownReason.isOK());
             _nextSharedPromise->setError(_shutdownReason);
+
+            _state = States::ShutDown;
+            _stateChangeCV.notify_all();
+
             stdx::lock_guard<Latch> lk(_opCtxMutex);
             _uniqueCtx.reset();
             return;
@@ -161,6 +176,27 @@ void JournalFlusher::shutdown(const Status& reason) {
     }
     wait();
     LOGV2(22321, "Finished shutting down journal flusher thread");
+}
+
+void JournalFlusher::pause() {
+    LOGV2(5142500, "Pausing journal flusher thread");
+    {
+        stdx::unique_lock<Latch> lk(_stateMutex);
+        _needToPause = true;
+        _stateChangeCV.wait(lk,
+                            [&] { return _state == States::Paused || _state == States::ShutDown; });
+    }
+    LOGV2(5142501, "Paused journal flusher thread");
+}
+
+void JournalFlusher::resume() {
+    LOGV2(5142502, "Resuming journal flusher thread");
+    {
+        stdx::lock_guard<Latch> lk(_stateMutex);
+        _needToPause = false;
+        _flushJournalNowCV.notify_one();
+    }
+    LOGV2(5142503, "Resumed journal flusher thread");
 }
 
 void JournalFlusher::triggerJournalFlush() {
