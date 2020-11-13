@@ -40,6 +40,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/net/sock.h"
@@ -77,6 +78,7 @@ Status validateDisableNonTLSConnectionLogging(const bool&);
 #ifdef MONGO_CONFIG_SSL
 namespace mongo {
 struct SSLParams;
+struct TransientSSLParams;
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 typedef SSL_CTX* SSLContextType;
@@ -164,6 +166,28 @@ struct CertInformationToLog {
     std::vector<char> thumbprint;
     Date_t validityNotBefore;
     Date_t validityNotAfter;
+    // If the certificate was loaded from file, this is the file name. If empty,
+    // it means the certificate came from memory payload.
+    std::optional<std::string> keyFile;
+    // If the certificate targets a particular cluster, this is cluster URI. If empty,
+    // it means the certificate is the default one for the local cluster.
+    std::optional<std::string> targetClusterURI;
+
+    logv2::DynamicAttributes getDynamicAttributes() const {
+        logv2::DynamicAttributes attrs;
+        attrs.add("subject", subject);
+        attrs.add("issuer", issuer);
+        attrs.add("thumbprint", StringData(hexblob::encode(thumbprint.data(), thumbprint.size())));
+        attrs.add("notValidBefore", validityNotBefore);
+        attrs.add("notValidAfter", validityNotAfter);
+        if (keyFile) {
+            attrs.add("keyFile", StringData(*keyFile));
+        }
+        if (targetClusterURI) {
+            attrs.add("targetClusterURI", StringData(*targetClusterURI));
+        }
+        return attrs;
+    }
 };
 
 struct CRLInformationToLog {
@@ -180,6 +204,10 @@ struct SSLInformationToLog {
 
 class SSLManagerInterface : public Decorable<SSLManagerInterface> {
 public:
+    /**
+     * Creates an instance of SSLManagerInterface.
+     * Note: as we normally have one instance of the manager, it cannot take TransientSSLParams.
+     */
     static std::shared_ptr<SSLManagerInterface> create(const SSLParams& params, bool isServer);
 
     virtual ~SSLManagerInterface();
@@ -232,6 +260,17 @@ public:
         ERR_error_string_n(code, msg, msglen);
         return msg;
     }
+
+    /**
+     * Utility class to capture a temporary string with SSL error message in DynamicAttributes.
+     */
+    struct CaptureSSLErrorInAttrs {
+        CaptureSSLErrorInAttrs(logv2::DynamicAttributes& attrs)
+            : _captured(getSSLErrorMessage(ERR_get_error())) {
+            attrs.add("error", _captured);
+        }
+        std::string _captured;
+    };
 #endif
 
     /**
@@ -252,6 +291,7 @@ public:
      */
     virtual Status initSSLContext(SSLContextType context,
                                   const SSLParams& params,
+                                  const TransientSSLParams& transientParams,
                                   ConnectionDirection direction) = 0;
 
     /**
@@ -389,6 +429,21 @@ void recordTLSVersion(TLSVersion version, const HostAndPort& hostForLogging);
  */
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer);
 void tlsEmitWarningExpiringClientCertificate(const SSLX509Name& peer, Days days);
+
+/**
+ * Logs the SSL information by dispatching to either logCert() or logCRL().
+ */
+void logSSLInfo(const SSLInformationToLog& info,
+                const int logNumPEM = 4913010,
+                const int logNumCluster = 4913011,
+                const int logNumCrl = 4913012);
+
+/**
+ * Logs the certificate.
+ * @param certType human-readable description of the certificate type.
+ */
+void logCert(const CertInformationToLog& cert, StringData certType, const int logNum);
+void logCRL(const CRLInformationToLog& crl, const int logNum);
 
 }  // namespace mongo
 #endif  // #ifdef MONGO_CONFIG_SSL

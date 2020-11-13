@@ -134,7 +134,6 @@ struct SSLParams {
 
 extern SSLParams sslGlobalParams;
 
-
 // Additional SSL Params that could be used to augment a particular connection
 // or have limited lifetime. In all cases, the fields stored here are not appropriate
 // to be part of sslGlobalParams.
