@@ -38,12 +38,13 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/shell/kms_network.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/kms_message_support.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/text.h"
@@ -51,6 +52,31 @@
 
 namespace mongo {
 namespace {
+
+/**
+ * Make a request to a AWS HTTP endpoint.
+ *
+ * Does not maintain a persistent HTTP connection.
+ */
+class AWSConnection {
+public:
+    AWSConnection(SSLManagerInterface* ssl)
+        : _sslManager(ssl), _socket(std::make_unique<Socket>(10, logv2::LogSeverity::Info())) {}
+
+    UniqueKmsResponse makeOneRequest(const HostAndPort& host, ConstDataRange request);
+
+private:
+    UniqueKmsResponse sendRequest(ConstDataRange request);
+
+    void connect(const HostAndPort& host);
+
+private:
+    // SSL Manager for connections
+    SSLManagerInterface* _sslManager;
+
+    // Synchronous socket
+    std::unique_ptr<Socket> _socket;
+};
 
 /**
  * AWS configuration settings
@@ -181,7 +207,7 @@ std::vector<uint8_t> AWSKMSService::encrypt(ConstDataRange cdr, StringData kmsKe
     auto buffer = UniqueKmsCharBuffer(kms_request_get_signed(request.get()));
     auto buffer_len = strlen(buffer.get());
 
-    KMSNetworkConnection connection(_sslManager.get());
+    AWSConnection connection(_sslManager.get());
     auto response = connection.makeOneRequest(_server, ConstDataRange(buffer.get(), buffer_len));
 
     auto body = kms_response_get_body(response.get(), nullptr);
@@ -242,7 +268,7 @@ SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
 
     auto buffer = UniqueKmsCharBuffer(kms_request_get_signed(request.get()));
     auto buffer_len = strlen(buffer.get());
-    KMSNetworkConnection connection(_sslManager.get());
+    AWSConnection connection(_sslManager.get());
     auto response = connection.makeOneRequest(_server, ConstDataRange(buffer.get(), buffer_len));
 
     auto body = kms_response_get_body(response.get(), nullptr);
@@ -273,6 +299,64 @@ SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
     return toSecureVector(blobStr);
 }
 
+void AWSConnection::connect(const HostAndPort& host) {
+    SockAddr server(host.host().c_str(), host.port(), AF_UNSPEC);
+
+    uassert(51136,
+            str::stream() << "AWS KMS server address " << host.host() << " is invalid.",
+            server.isValid());
+
+    int attempt = 0;
+    bool connected = false;
+    while ((connected == false) && (attempt < 20)) {
+        connected = _socket->connect(server);
+        attempt++;
+    }
+    uassert(51137,
+            str::stream() << "Could not connect to AWS KMS server " << server.toString(),
+            connected);
+
+    uassert(51138,
+            str::stream() << "Failed to perform SSL handshake with the AWS KMS server "
+                          << host.toString(),
+            _socket->secure(_sslManager, host.host()));
+}
+
+// Sends a request message to the AWS KMS server and creates a KMS Response.
+UniqueKmsResponse AWSConnection::sendRequest(ConstDataRange request) {
+    std::array<char, 512> resp;
+
+    _socket->send(
+        reinterpret_cast<const char*>(request.data()), request.length(), "AWS KMS request");
+
+    auto parser = UniqueKmsResponseParser(kms_response_parser_new());
+    int bytes_to_read = 0;
+
+    while ((bytes_to_read = kms_response_parser_wants_bytes(parser.get(), resp.size())) > 0) {
+        bytes_to_read = std::min(bytes_to_read, static_cast<int>(resp.size()));
+        bytes_to_read = _socket->unsafe_recv(resp.data(), bytes_to_read);
+
+        uassert(51139,
+                "kms_response_parser_feed failed",
+                kms_response_parser_feed(
+                    parser.get(), reinterpret_cast<uint8_t*>(resp.data()), bytes_to_read));
+    }
+
+    auto response = UniqueKmsResponse(kms_response_parser_get_response(parser.get()));
+
+    return response;
+}
+
+UniqueKmsResponse AWSConnection::makeOneRequest(const HostAndPort& host, ConstDataRange request) {
+    connect(host);
+
+    auto resp = sendRequest(request);
+
+    _socket->close();
+
+    return resp;
+}
+
 boost::optional<std::string> toString(boost::optional<StringData> str) {
     if (str) {
         return {str.get().toString()};
@@ -284,7 +368,23 @@ std::unique_ptr<KMSService> AWSKMSService::create(const AwsKMS& config) {
     auto awsKMS = std::make_unique<AWSKMSService>();
 
     SSLParams params;
-    getSSLParamsForNetworkKMS(&params);
+    params.sslPEMKeyFile = "";
+    params.sslPEMKeyPassword = "";
+    params.sslClusterFile = "";
+    params.sslClusterPassword = "";
+    params.sslCAFile = "";
+
+    params.sslCRLFile = "";
+
+    // Copy the rest from the global SSL manager options.
+    params.sslFIPSMode = sslGlobalParams.sslFIPSMode;
+
+    // KMS servers never should have invalid certificates
+    params.sslAllowInvalidCertificates = false;
+    params.sslAllowInvalidHostnames = false;
+
+    params.sslDisabledProtocols =
+        std::vector({SSLParams::Protocols::TLS1_0, SSLParams::Protocols::TLS1_1});
 
     // Leave the CA file empty so we default to system CA but for local testing allow it to inherit
     // the CA file.
