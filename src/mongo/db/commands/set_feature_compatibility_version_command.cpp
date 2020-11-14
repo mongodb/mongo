@@ -56,6 +56,7 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/database_version_helpers.h"
@@ -270,6 +271,25 @@ public:
                 requestedVersion,
                 isFromConfigServer);
         } else {
+            // Time-series collections are only supported in 5.0. If the user tries to downgrade the
+            // cluster to an earlier version, they must first remove all time-series collections.
+            // TODO(SERVER-52523): Use the bucket catalog to detect time-series collections.
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, dbName);
+                if (!viewCatalog) {
+                    continue;
+                }
+                viewCatalog->iterate(opCtx, [](const ViewDefinition& view) {
+                    uassert(ErrorCodes::CannotDowngrade,
+                            str::stream()
+                                << "Cannot downgrade the cluster when there are time-series "
+                                   "collections present; drop all time-series collections before "
+                                   "downgrading. First detected time-series collection: "
+                                << view.name(),
+                            !view.isTimeseries());
+                });
+            }
+
             auto replCoord = repl::ReplicationCoordinator::get(opCtx);
             const bool isReplSet =
                 replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;

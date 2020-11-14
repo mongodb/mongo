@@ -27,7 +27,8 @@ assert.commandWorked(
     testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
 
 // Downgrade the primary using the setFeatureCompatibilityVersion command.
-assert.commandWorked(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+assert.commandFailedWithCode(testDB.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
+                             ErrorCodes.CannotDowngrade);
 
 // This confirms that the downgrade command will complete successfully after the time-series
 // collection has been removed.

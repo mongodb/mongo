@@ -403,6 +403,8 @@ error_codes:
 
     - {code: 331, name: FailedToRunWithReplyBuilder}
 
+    - {code: 332, name: CannotDowngrade}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
