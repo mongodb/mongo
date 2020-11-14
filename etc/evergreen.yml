@@ -10974,6 +10974,7 @@ buildvariants:
     - rhel62-large
   - name: jsCore
   - name: jsCore_txns
+  - name: noPassthroughWithMongod_gen
   - name: .replica_sets
     distros:
     - rhel62-medium
