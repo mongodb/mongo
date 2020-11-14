@@ -418,6 +418,7 @@ class TestParser(testcase.IDLTestcase):
                         ignore: true
                         cpp_name: bar
                         comparison_order: 3
+                        unstable: true
             """))
 
         # Test false bools
@@ -432,6 +433,7 @@ class TestParser(testcase.IDLTestcase):
                         type: string
                         optional: false
                         ignore: false
+                        unstable: false
             """))
 
     def test_field_negative(self):
@@ -841,7 +843,6 @@ class TestParser(testcase.IDLTestcase):
                 namespace: ignored
                 api_version: 1
                 is_deprecated: true
-                unstable: true
                 immutable: true
                 inline_chained_structs: true
                 generate_comparison_operators: true
@@ -862,7 +863,6 @@ class TestParser(testcase.IDLTestcase):
                 namespace: ignored
                 api_version: 1
                 is_deprecated: false
-                unstable: false
                 immutable: false
                 inline_chained_structs: false
                 generate_comparison_operators: false
@@ -1074,60 +1074,6 @@ class TestParser(testcase.IDLTestcase):
                     foo: bar
                 reply_type: foo_reply_struct
             """), idl.errors.ERROR_ID_API_VERSION_NO_STRICT)
-
-        # Cannot specify unstable with empty api_version
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        commands:
-            foo:
-                description: foo
-                command_name: foo
-                namespace: ignored
-                api_version: ""
-                unstable: true
-                fields:
-                    foo: bar
-                reply_type: foo_reply_struct
-            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
-
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        commands:
-            foo:
-                description: foo
-                command_name: foo
-                namespace: ignored
-                api_version: ""
-                unstable: false
-                fields:
-                    foo: bar
-                reply_type: foo_reply_struct
-            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
-
-        # Cannot specify unstable without an api_version
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        commands:
-            foo:
-                description: foo
-                command_name: foo
-                namespace: ignored
-                unstable: true
-                fields:
-                    foo: bar
-            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
-
-        self.assert_parse_fail(
-            textwrap.dedent("""
-        commands:
-            foo:
-                description: foo
-                command_name: foo
-                namespace: ignored
-                unstable: false
-                fields:
-                    foo: bar
-            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
 
         # Must specify reply_type if api_version is non-empty
         self.assert_parse_fail(
@@ -1355,6 +1301,42 @@ class TestParser(testcase.IDLTestcase):
                 fields:
                     foo: bar
             """), idl.errors.ERROR_ID_MISSING_REQUIRED_FIELD)
+
+    def test_unstable_positive(self):
+        # type: () -> None
+        """Positive unstable-field test cases."""
+        for unstable in ("true", "false"):
+            self.assert_parse(
+                textwrap.dedent(f"""
+            commands:
+                foo:
+                    description: foo
+                    command_name: foo
+                    namespace: ignored
+                    api_version: "1"
+                    fields:
+                        foo:
+                            type: bar
+                            unstable: {unstable}
+                    reply_type: foo_reply_struct
+                """))
+
+    def test_unstable_negative(self):
+        # type: () -> None
+        """Negative unstable-field test cases."""
+        self.assert_parse_fail(
+            textwrap.dedent(f"""
+        commands:
+            foo:
+                description: foo
+                command_name: foo
+                namespace: ignored
+                fields:
+                    foo:
+                        type: bar
+                        unstable: true
+                reply_type: foo_reply_struct
+            """), idl.errors.ERROR_ID_UNSTABLE_NO_API_VERSION)
 
     def test_scalar_or_mapping_negative(self):
         # type: () -> None

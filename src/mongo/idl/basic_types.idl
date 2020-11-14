@@ -221,3 +221,12 @@ structs:
             errorLabels:
                 type: array<string>
                 optional: true
+
+    SimpleCursorOptions:
+        description: "Parser for cursor options, for commands with minimal cursor support"
+        strict: true
+        fields:
+            batchSize:
+                type: safeInt64
+                optional: true
+                validator: { gte: 0 }

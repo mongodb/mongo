@@ -76,6 +76,7 @@ class UUID {
     friend class idl::import::One_UUID;
     friend class IndexBuildEntry;
     friend class KeyStoreRecord;
+    friend class ListCollectionsReplyInfo;
     friend class LogicalSessionId;
     friend class LogicalSessionToClient;
     friend class LogicalSessionIdToClient;

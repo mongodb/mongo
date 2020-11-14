@@ -169,6 +169,7 @@ class Field(common.SourceLocation):
         self.chained = False  # type: bool
         self.comparison_order = -1  # type: int
         self.non_const_getter = False  # type: bool
+        self.unstable = False  # type: bool
 
         # Properties specific to fields which are types.
         self.cpp_type = None  # type: str
@@ -218,7 +219,6 @@ class Command(Struct):
         self.reply_type = None  # type: Field
         self.api_version = ""  # type: str
         self.is_deprecated = False  # type: bool
-        self.unstable = False  # type: bool
         super(Command, self).__init__(file_name, line, column)
 
 

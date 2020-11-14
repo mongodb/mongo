@@ -243,6 +243,42 @@ assert(cursor.hasNext());
 assert.eq(1, cursor.objsLeftInBatch());
 
 //
+// Test that batches are limited to ~16 MB
+//
+
+assert.commandWorked(mydb.dropDatabase());
+const validator = {
+    $jsonSchema: {
+        bsonType: "object",
+        properties: {
+            stringWith4mbDescription:
+                {bsonType: "string", description: "x".repeat(3 * 1024 * 1024)},
+
+        }
+    }
+};
+
+// Each collection's info is about 3 MB; 4 collections fit in the first batch and 2 in the second.
+const nCollections = 6;
+jsTestLog(`Creating ${nCollections} collections with huge validator objects....`);
+for (let i = 0; i < nCollections; i++) {
+    assert.commandWorked(mydb.createCollection("collection_" + i, {validator: validator}));
+}
+jsTestLog(`Done creating ${nCollections} collections`);
+cursor = getListCollectionsCursor();
+assert(cursor.hasNext());
+const firstBatchSize = cursor.objsLeftInBatch();
+assert.gt(firstBatchSize, 0);
+assert.lt(firstBatchSize, nCollections);
+// Exhaust the first batch..
+while (cursor.objsLeftInBatch()) {
+    cursor.next();
+}
+assert(cursor.hasNext());
+cursor.next();
+assert.eq(firstBatchSize + cursor.objsLeftInBatch() + 1, nCollections);
+
+//
 // Test on non-existent database.
 //
 

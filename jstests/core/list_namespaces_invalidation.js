@@ -1,4 +1,4 @@
-// @tags: [requires_non_retryable_commands, requires_fastcount]
+// @tags: [requires_non_retryable_commands, requires_fastcount, requires_getmore]
 (function() {
 'use strict';
 let dbInvalidName = 'system_namespaces_invalidations';
@@ -17,7 +17,7 @@ function testNamespaceInvalidation(namespaceAction, batchSize) {
 
     // Get the first two namespaces using listCollections.
     let cmd = {listCollections: dbInvalidName};
-    Object.extend(cmd, {batchSize: batchSize});
+    Object.extend(cmd, {cursor: {batchSize: batchSize}});
     let res = dbInvalid.runCommand(cmd);
     assert.commandWorked(res, 'could not run ' + tojson(cmd));
     printjson(res);

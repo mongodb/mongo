@@ -315,6 +315,7 @@ def _parse_field(ctxt, name, node):
             "comparison_order": _RuleDesc("int_scalar"),
             "validator": _RuleDesc('mapping', mapping_parser_func=_parse_validator),
             "non_const_getter": _RuleDesc("bool_scalar"),
+            "unstable": _RuleDesc("bool_scalar"),
         })
 
     return field
@@ -631,7 +632,6 @@ def _parse_command(ctxt, spec, name, node):
             "reply_type": _RuleDesc('scalar'),
             "api_version": _RuleDesc('scalar'),
             "is_deprecated": _RuleDesc('bool_scalar'),
-            "unstable": _RuleDesc("bool_scalar"),
             "strict": _RuleDesc("bool_scalar"),
             "inline_chained_structs": _RuleDesc("bool_scalar"),
             "immutable": _RuleDesc('bool_scalar'),
@@ -658,9 +658,6 @@ def _parse_command(ctxt, spec, name, node):
         if command.namespace != common.COMMAND_NAMESPACE_TYPE and command.type:
             ctxt.add_extranous_command_type(command, command.name)
 
-    if _has_field(node, "unstable") and not command.api_version:
-        ctxt.add_unstable_no_api_version(command, command.name)
-
     if command.api_version and command.reply_type is None:
         ctxt.add_missing_reply_type(command, command.name)
 
@@ -670,6 +667,11 @@ def _parse_command(ctxt, spec, name, node):
     # Commands may only have the first parameter, ensure the fields property is an empty array.
     if not command.fields:
         command.fields = []
+
+    if not command.api_version:
+        for field in command.fields:
+            if field.unstable:
+                ctxt.add_unstable_no_api_version(field, command.name)
 
     spec.symbols.add_command(ctxt, command)
 

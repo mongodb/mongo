@@ -492,6 +492,7 @@ def _bind_command(ctxt, parsed_spec, command):
     """
 
     ast_command = ast.Command(command.file_name, command.line, command.column)
+    ast_command.api_version = command.api_version
 
     # Inject special fields used for command parsing
     _inject_hidden_command_fields(command)
@@ -693,6 +694,7 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.constructed = field.constructed
     ast_field.comparison_order = field.comparison_order
     ast_field.non_const_getter = field.non_const_getter
+    ast_field.unstable = field.unstable
 
     ast_field.cpp_name = field.name
     if field.cpp_name:

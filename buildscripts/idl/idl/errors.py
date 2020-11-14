@@ -831,7 +831,7 @@ class ParserContext(object):
         # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_UNSTABLE_NO_API_VERSION,
-            ("Command '%s' specifies 'unstable' but has no 'api_version" % (command_name, )))
+            ("Command '%s' specifies 'unstable' but has no 'api_version'" % (command_name, )))
 
     def add_missing_reply_type(self, location, command_name):
         # type: (common.SourceLocation, str) -> None

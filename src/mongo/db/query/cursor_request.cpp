@@ -33,12 +33,13 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 
 Status CursorRequest::parseCommandCursorOptions(const BSONObj& cmdObj,
                                                 long long defaultBatchSize,
-                                                long long* batchSize) {
+                                                long long* batchSize) try {
     invariant(batchSize);
     *batchSize = defaultBatchSize;
 
@@ -52,30 +53,15 @@ Status CursorRequest::parseCommandCursorOptions(const BSONObj& cmdObj,
     }
 
     BSONObj cursor = cursorElem.embeddedObject();
-    BSONElement batchSizeElem = cursor["batchSize"];
-
-    const int expectedNumberOfCursorFields = batchSizeElem.eoo() ? 0 : 1;
-    if (cursor.nFields() != expectedNumberOfCursorFields) {
-        return Status(ErrorCodes::BadValue,
-                      "cursor object can't contain fields other than batchSize");
+    auto options =
+        SimpleCursorOptions::parse(IDLParserErrorContext("parseCommandCursorOptions"), cursor);
+    if (options.getBatchSize()) {
+        *batchSize = *options.getBatchSize();
     }
-
-    if (batchSizeElem.eoo()) {
-        return Status::OK();
-    }
-
-    if (!batchSizeElem.isNumber()) {
-        return Status(ErrorCodes::TypeMismatch, "cursor.batchSize must be a number");
-    }
-
-    // This can change in the future, but for now all negatives are reserved.
-    if (batchSizeElem.numberLong() < 0) {
-        return Status(ErrorCodes::BadValue, "cursor.batchSize must not be negative");
-    }
-
-    *batchSize = batchSizeElem.numberLong();
 
     return Status::OK();
+} catch (const DBException& exc) {
+    return exc.toStatus();
 }
 
 }  // namespace mongo
