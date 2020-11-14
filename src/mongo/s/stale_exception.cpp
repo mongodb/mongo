@@ -39,50 +39,7 @@ namespace {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
-boost::optional<ChunkVersion> extractOptionalChunkVersion(const BSONObj& obj, StringData field) {
-    auto swChunkVersion = ChunkVersion::parseLegacyWithField(obj, field);
-    if (swChunkVersion == ErrorCodes::NoSuchKey)
-        return boost::none;
-    return uassertStatusOK(std::move(swChunkVersion));
-}
-
 }  // namespace
-
-StaleConfigInfo::StaleConfigInfo(NamespaceString nss,
-                                 ChunkVersion received,
-                                 boost::optional<ChunkVersion> wanted,
-                                 ShardId shardId,
-                                 boost::optional<SharedSemiFuture<void>> criticalSectionSignal)
-    : _nss(std::move(nss)),
-      _received(received),
-      _wanted(wanted),
-      _shardId(shardId),
-      _criticalSectionSignal(criticalSectionSignal) {}
-
-void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
-    bob->append("ns", _nss.ns());
-    _received.appendLegacyWithField(bob, "vReceived");
-    if (_wanted) {
-        _wanted->appendLegacyWithField(bob, "vWanted");
-    }
-
-    invariant(_shardId != "");
-    bob->append("shardId", _shardId.toString());
-}
-
-std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj) {
-    return std::make_shared<StaleConfigInfo>(parseFromCommandError(obj));
-}
-
-StaleConfigInfo StaleConfigInfo::parseFromCommandError(const BSONObj& obj) {
-    const auto shardId = obj["shardId"].String();
-    invariant(shardId != "");
-
-    return StaleConfigInfo(NamespaceString(obj["ns"].String()),
-                           uassertStatusOK(ChunkVersion::parseLegacyWithField(obj, "vReceived")),
-                           extractOptionalChunkVersion(obj, "vWanted"),
-                           ShardId(shardId));
-}
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {
     bob->append("db", _db);
