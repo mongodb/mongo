@@ -75,8 +75,8 @@ const testCompatibleCreateOptions = function(createOptions) {
     testOptions(true, createOptions);
 };
 
-const testTimeseriesNamespaceExists = function(errorCode, setUp) {
-    testOptions(false, {}, {timeField: "time"}, errorCode, {
+const testTimeseriesNamespaceExists = function(setUp) {
+    testOptions(false, {}, {timeField: "time"}, ErrorCodes.NamespaceExists, {
         setUp: setUp,
         tearDown: (testDB, collName) => {
             assert.commandWorked(testDB.dropDatabase());
@@ -112,10 +112,10 @@ testIncompatibleCreateOptions({validationAction: "warn"});
 testIncompatibleCreateOptions({viewOn: "coll"});
 testIncompatibleCreateOptions({viewOn: "coll", pipeline: []});
 
-testTimeseriesNamespaceExists(17399, (testDB, collName) => {
+testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(testDB.createCollection(collName));
 });
-testTimeseriesNamespaceExists(ErrorCodes.CommandNotSupportedOnView, (testDB, collName) => {
+testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(testDB.createView(collName, collName + '_source', []));
 });
 })();
