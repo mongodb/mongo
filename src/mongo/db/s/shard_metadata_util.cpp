@@ -484,5 +484,32 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
     }
 }
 
+void downgradeShardConfigCollectionEntriesTo44(OperationContext* opCtx) {
+    // Clear the 'allowMigrations' field from config.cache.collections
+    LOGV2(5189100, "Starting downgrade of config.cache.collections");
+    write_ops::Update clearAllowMigrations(NamespaceString::kShardConfigCollectionsNamespace, [] {
+        write_ops::UpdateOpEntry u;
+        u.setQ({});
+        u.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$unset" << BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName
+                                  << ""))));
+        u.setMulti(true);
+        return std::vector{u};
+    }());
+
+    clearAllowMigrations.setWriteCommandBase([] {
+        write_ops::WriteCommandBase base;
+        base.setOrdered(false);
+        return base;
+    }());
+
+    DBDirectClient client(opCtx);
+    const auto commandResult = client.runCommand(clearAllowMigrations.serialize({}));
+
+    uassertStatusOK(getStatusFromWriteCommandResponse(commandResult->getCommandReply()));
+
+    LOGV2(5189101, "Succesfully downgraded config.cache.collections");
+}
+
 }  // namespace shardmetadatautil
 }  // namespace mongo

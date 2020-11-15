@@ -323,5 +323,35 @@ TEST_F(ShardMetadataUtilTest, DropChunksAndDeleteCollectionsEntry) {
     checkCollectionIsEmpty(NamespaceString::kShardConfigCollectionsNamespace);
 }
 
+TEST_F(ShardMetadataUtilTest, DowngradeShardConfigCollectionEntriesTo44) {
+    setUpShardChunkMetadata();
+
+    const auto checkShardCollectionAllowMigrationsFlag = [&](bool expectedValue) {
+        ShardCollectionType readShardCollectionType =
+            assertGet(readShardCollectionsEntry(operationContext(), kNss));
+
+        ASSERT_EQUALS(readShardCollectionType.getAllowMigrations(), expectedValue);
+    };
+
+    // allowMigrations is an optional field. If it is not present -> allowMigrations = true
+    checkShardCollectionAllowMigrationsFlag(/* expectedValue */ true);
+
+    ASSERT_OK(updateShardCollectionsEntry(
+        operationContext(),
+        BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
+        BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName << false),
+        BSONObj(),
+        /* upsert */ false));
+
+    // allowMigrations was explicitly defined to false by the previous statement
+    checkShardCollectionAllowMigrationsFlag(/* expectedValue */ false);
+
+    downgradeShardConfigCollectionEntriesTo44(operationContext());
+
+    // The downgrade process to 4.4 removes the allowMigration flag from all collections. Thus, this
+    // flag will not be present which implies that its value is true
+    checkShardCollectionAllowMigrationsFlag(/* expectedValue */ true);
+}
+
 }  // namespace
 }  // namespace mongo

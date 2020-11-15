@@ -221,5 +221,12 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss);
  */
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName);
 
+
+/**
+ * Downgrades the config.cache.collections entries to the 4.4 version. More specifically, it removes
+ * the allowMigrations field from all the documents of config.cache.collections
+ */
+void downgradeShardConfigCollectionEntriesTo44(OperationContext* opCtx);
+
 }  // namespace shardmetadatautil
 }  // namespace mongo
