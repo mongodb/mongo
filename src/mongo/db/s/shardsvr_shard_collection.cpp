@@ -108,15 +108,15 @@ boost::optional<CollectionType> checkIfCollectionAlreadyShardedWithSameOptions(
     OperationContext* opCtx, const ShardsvrShardCollectionRequest& request) {
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
 
-    auto swCollStatus = catalogClient->getCollection(opCtx,
-                                                     *request.get_shardsvrShardCollection(),
-                                                     repl::ReadConcernLevel::kMajorityReadConcern);
-    if (swCollStatus == ErrorCodes::NamespaceNotFound) {
+    CollectionType existingColl;
+    try {
+        existingColl = catalogClient->getCollection(opCtx,
+                                                    *request.get_shardsvrShardCollection(),
+                                                    repl::ReadConcernLevel::kMajorityReadConcern);
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // Not currently sharded.
         return boost::none;
     }
-
-    const auto existingColl = uassertStatusOK(std::move(swCollStatus)).value;
 
     CollectionType newColl(
         *request.get_shardsvrShardCollection(), OID::gen(), Date_t::now(), UUID::gen());

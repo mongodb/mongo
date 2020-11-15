@@ -130,21 +130,18 @@ public:
         // Invalidate the database metadata so the next access kicks off a full reload.
         ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
 
-        auto dbInfo =
-            catalogClient->getDatabase(opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
-
-        // If the namespace isn't found, treat the drop as a success. In case the drop just happened
-        // and has not fully propagated, set the client's last optime to the system's last optime to
-        // ensure the client waits.
-        if (dbInfo.getStatus() == ErrorCodes::NamespaceNotFound) {
+        DatabaseType dbType;
+        try {
+            dbType = catalogClient->getDatabase(
+                opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // If the namespace isn't found, treat the drop as a success. In case the drop just
+            // happened and has not fully propagated, set the client's last optime to the system's
+            // last optime to ensure the client waits.
             result.append("info", "database does not exist");
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
             return true;
         }
-
-        // If we didn't get a NamespaceNotFound error, make sure there wasn't some other type of
-        // error.
-        auto dbType = uassertStatusOK(dbInfo).value;
 
         uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,

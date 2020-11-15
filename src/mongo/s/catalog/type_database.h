@@ -57,13 +57,7 @@ public:
                  bool sharded,
                  DatabaseVersion);
 
-#ifdef _WIN32
-    // TODO: Remove this when Microsoft's implementation of std::future doesn't require a default
-    // constructor.
-    // This type should not normally have a default constructor, however Microsoft's implementation
-    // of future requires one in violation of the standard so we're providing one only for Windows.
     DatabaseType() = default;
-#endif
 
     // Name of the databases collection in the config server.
     static const NamespaceString ConfigNS;

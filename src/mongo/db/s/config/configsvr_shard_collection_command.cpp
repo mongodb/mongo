@@ -258,11 +258,8 @@ public:
         // Until all metadata commands are on the config server, the CatalogCache on the config
         // server may be stale. Read the database entry directly rather than purging and reloading
         // the database into the CatalogCache, which is very expensive.
-        auto dbType =
-            uassertStatusOK(
-                catalogClient->getDatabase(
-                    opCtx, nss.db().toString(), repl::ReadConcernArgs::get(opCtx).getLevel()))
-                .value;
+        auto dbType = catalogClient->getDatabase(
+            opCtx, nss.db(), repl::ReadConcernArgs::get(opCtx).getLevel());
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "sharding not enabled for db " << nss.db(),
                 dbType.getSharded());

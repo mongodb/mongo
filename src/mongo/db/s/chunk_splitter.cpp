@@ -204,17 +204,16 @@ bool isAutoBalanceEnabled(OperationContext* opCtx,
     if (!balancerConfig->shouldBalanceForAutoSplit())
         return false;
 
-    auto collStatus = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-    if (!collStatus.isOK()) {
+    try {
+        return Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss).getAllowBalance();
+    } catch (const DBException& ex) {
         LOGV2(21903,
               "Auto-split for {namespace} failed to load collection metadata: {error}",
               "Auto-split failed to load collection metadata",
               "namespace"_attr = nss,
-              "error"_attr = redact(collStatus.getStatus()));
+              "error"_attr = redact(ex));
         return false;
     }
-
-    return collStatus.getValue().value.getAllowBalance();
 }
 
 const auto getChunkSplitter = ServiceContext::declareDecoration<ChunkSplitter>();

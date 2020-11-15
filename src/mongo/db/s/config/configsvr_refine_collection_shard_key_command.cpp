@@ -87,15 +87,16 @@ public:
             // Validate the given namespace is (i) sharded, (ii) doesn't already have the proposed
             // key, and (iii) has the same epoch as the router that received
             // refineCollectionShardKey had in its routing table cache.
-            const auto collStatus =
-                catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+            CollectionType collType;
+            try {
+                collType = catalogClient->getCollection(
+                    opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                uasserted(ErrorCodes::NamespaceNotSharded,
+                          str::stream()
+                              << "refineCollectionShardKey namespace " << nss << " is not sharded");
+            }
 
-            uassert(ErrorCodes::NamespaceNotSharded,
-                    str::stream() << "refineCollectionShardKey namespace " << nss.toString()
-                                  << " is not sharded",
-                    collStatus != ErrorCodes::NamespaceNotFound);
-
-            const auto collType = uassertStatusOK(collStatus).value;
             const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
             const auto proposedKey = request().getKey().getOwned();
 

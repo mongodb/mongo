@@ -296,12 +296,8 @@ protected:
      * corresponding to 'expectedDB'.
      */
     void assertDatabaseExists(const DatabaseType& expectedDB) {
-        auto foundDB =
-            assertGet(catalogClient()->getDatabase(operationContext(),
-                                                   expectedDB.getName(),
-                                                   repl::ReadConcernLevel::kMajorityReadConcern))
-                .value;
-
+        auto foundDB = catalogClient()->getDatabase(
+            operationContext(), expectedDB.getName(), repl::ReadConcernLevel::kMajorityReadConcern);
         ASSERT_EQUALS(expectedDB.getName(), foundDB.getName());
         ASSERT_EQUALS(expectedDB.getPrimary(), foundDB.getPrimary());
         ASSERT_EQUALS(expectedDB.getSharded(), foundDB.getSharded());
@@ -1050,18 +1046,16 @@ TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
     assertShardExists(expectedShard);
 
     // Ensure that the databases detected from the shard were *not* added.
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  catalogClient()
-                      ->getDatabase(operationContext(),
-                                    discoveredDB1.getName(),
-                                    repl::ReadConcernLevel::kMajorityReadConcern)
-                      .getStatus());
-    ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
-                  catalogClient()
-                      ->getDatabase(operationContext(),
-                                    discoveredDB2.getName(),
-                                    repl::ReadConcernLevel::kMajorityReadConcern)
-                      .getStatus());
+    ASSERT_THROWS_CODE(catalogClient()->getDatabase(operationContext(),
+                                                    discoveredDB1.getName(),
+                                                    repl::ReadConcernLevel::kMajorityReadConcern),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
+    ASSERT_THROWS_CODE(catalogClient()->getDatabase(operationContext(),
+                                                    discoveredDB2.getName(),
+                                                    repl::ReadConcernLevel::kMajorityReadConcern),
+                       DBException,
+                       ErrorCodes::NamespaceNotFound);
 
     assertChangeWasLogged(expectedShard);
 }

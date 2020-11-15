@@ -133,10 +133,9 @@ public:
             return repl::OpTimeWith<std::vector<ShardType>>(_shards);
         }
 
-        StatusWith<std::vector<CollectionType>> getCollections(
+        std::vector<CollectionType> getCollections(
             OperationContext* opCtx,
-            const std::string* dbName,
-            repl::OpTime* optime,
+            StringData dbName,
             repl::ReadConcernLevel readConcernLevel) override {
             return _colls;
         }

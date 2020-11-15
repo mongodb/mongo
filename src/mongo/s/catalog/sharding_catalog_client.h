@@ -119,18 +119,17 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - database does not exist
      */
-    virtual StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
-        OperationContext* opCtx,
-        const std::string& dbName,
-        repl::ReadConcernLevel readConcernLevel) = 0;
+    virtual DatabaseType getDatabase(OperationContext* opCtx,
+                                     StringData db,
+                                     repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Retrieves all databases in a cluster.
      *
      * Returns a !OK status if an error occurs.
      */
-    virtual StatusWith<repl::OpTimeWith<std::vector<DatabaseType>>> getAllDBs(
-        OperationContext* opCtx, repl::ReadConcernLevel readConcern) = 0;
+    virtual std::vector<DatabaseType> getAllDBs(OperationContext* opCtx,
+                                                repl::ReadConcernLevel readConcern) = 0;
 
     /**
      * Retrieves the metadata for a given collection, if it exists.
@@ -142,26 +141,18 @@ public:
      * the failure. These are some of the known failures:
      *  - NamespaceNotFound - collection does not exist
      */
-    virtual StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
+    virtual CollectionType getCollection(
         OperationContext* opCtx,
         const NamespaceString& nss,
         repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**
-     * Retrieves all collections undera specified database (or in the system).
-     *
-     * @param dbName an optional database name. Must be nullptr or non-empty. If nullptr is
-     *      specified, all collections on the system are returned.
-     * @param optime an out parameter that will contain the opTime of the config server.
-     *      Can be null. Note that collections can be fetched in multiple batches and each batch
-     *      can have a unique opTime. This opTime will be the one from the last batch.
-     *
-     * Returns the set of collections, or a !OK status if an error occurs.
+     * Retrieves all collections under a specified database (or in the system). If the dbName
+     * parameter is empty, returns all collections.
      */
-    virtual StatusWith<std::vector<CollectionType>> getCollections(
+    virtual std::vector<CollectionType> getCollections(
         OperationContext* opCtx,
-        const std::string* dbName,
-        repl::OpTime* optime,
+        StringData db,
         repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
 
     /**

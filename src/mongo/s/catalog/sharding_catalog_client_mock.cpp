@@ -44,9 +44,6 @@
 
 namespace mongo {
 
-using std::string;
-using std::vector;
-
 ShardingCatalogClientMock::ShardingCatalogClientMock(
     std::unique_ptr<DistLockManager> distLockManager)
     : _distLockManager(std::move(distLockManager)) {}
@@ -65,27 +62,26 @@ void ShardingCatalogClientMock::shutDown(OperationContext* opCtx) {
     }
 }
 
-StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientMock::getDatabase(
-    OperationContext* opCtx, const string& dbName, repl::ReadConcernLevel readConcernLevel) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
+DatabaseType ShardingCatalogClientMock::getDatabase(OperationContext* opCtx,
+                                                    StringData db,
+                                                    repl::ReadConcernLevel readConcernLevel) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
-StatusWith<repl::OpTimeWith<std::vector<DatabaseType>>> ShardingCatalogClientMock::getAllDBs(
-    OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
+std::vector<DatabaseType> ShardingCatalogClientMock::getAllDBs(OperationContext* opCtx,
+                                                               repl::ReadConcernLevel readConcern) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
-StatusWith<repl::OpTimeWith<CollectionType>> ShardingCatalogClientMock::getCollection(
-    OperationContext* opCtx, const NamespaceString& nss, repl::ReadConcernLevel readConcernLevel) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
+CollectionType ShardingCatalogClientMock::getCollection(OperationContext* opCtx,
+                                                        const NamespaceString& nss,
+                                                        repl::ReadConcernLevel readConcernLevel) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
-StatusWith<std::vector<CollectionType>> ShardingCatalogClientMock::getCollections(
-    OperationContext* opCtx,
-    const string* dbName,
-    repl::OpTime* optime,
-    repl::ReadConcernLevel readConcernLevel) {
-    return {ErrorCodes::InternalError, "Method not implemented"};
+std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
+    OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcernLevel) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
 std::vector<NamespaceString> ShardingCatalogClientMock::getAllShardedCollectionsForDb(
@@ -119,7 +115,7 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::
 }
 
 bool ShardingCatalogClientMock::runUserManagementReadCommand(OperationContext* opCtx,
-                                                             const string& dbname,
+                                                             const std::string& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
     return true;

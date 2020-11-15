@@ -61,14 +61,6 @@ CollectionType::CollectionType(const BSONObj& obj) {
             getPre50CompatibleKeyPattern() || getDropped());
 }
 
-StatusWith<CollectionType> CollectionType::fromBSON(const BSONObj& obj) {
-    try {
-        return CollectionType(obj);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-}
-
 std::string CollectionType::toString() const {
     return toBSON().toString();
 }

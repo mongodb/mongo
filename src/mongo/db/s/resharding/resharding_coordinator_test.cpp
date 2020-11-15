@@ -288,9 +288,8 @@ protected:
     void readOriginalCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
         OperationContext* opCtx, CollectionType expectedCollType, bool doneState) {
         DBDirectClient client(opCtx);
-        auto doc =
-            client.findOne(CollectionType::ConfigNS.ns(), Query(BSON("_id" << _originalNss.ns())));
-        auto onDiskEntry = uassertStatusOK(CollectionType::fromBSON(doc));
+        CollectionType onDiskEntry(
+            client.findOne(CollectionType::ConfigNS.ns(), Query(BSON("_id" << _originalNss.ns()))));
 
         auto expectedReshardingFields = expectedCollType.getReshardingFields();
         if (doneState ||
@@ -332,7 +331,7 @@ protected:
         }
 
         auto expectedReshardingFields = expectedCollType->getReshardingFields().get();
-        auto onDiskEntry = uassertStatusOK(CollectionType::fromBSON(doc));
+        CollectionType onDiskEntry(doc);
         ASSERT(onDiskEntry.getReshardingFields());
 
         auto onDiskReshardingFields = onDiskEntry.getReshardingFields().get();

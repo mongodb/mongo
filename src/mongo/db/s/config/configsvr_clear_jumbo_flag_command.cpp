@@ -76,15 +76,14 @@ public:
                 uassertStatusOK(catalogClient->getDistLockManager()->lock(
                     opCtx, nss.ns(), "clearJumboFlag", DistLockManager::kDefaultLockTimeout)));
 
-            const auto collStatus =
-                catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
-
-            uassert(ErrorCodes::NamespaceNotSharded,
-                    str::stream() << "clearJumboFlag namespace " << nss.toString()
-                                  << " is not sharded",
-                    collStatus != ErrorCodes::NamespaceNotFound);
-
-            const auto collType = uassertStatusOK(collStatus).value;
+            CollectionType collType;
+            try {
+                collType = catalogClient->getCollection(
+                    opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
+            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                uasserted(ErrorCodes::NamespaceNotSharded,
+                          str::stream() << "clearJumboFlag namespace " << nss << " is not sharded");
+            }
 
             uassert(ErrorCodes::StaleEpoch,
                     str::stream()

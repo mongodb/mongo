@@ -566,8 +566,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     Timer executionTimer, totalTimer;
     const auto newEpoch = OID::gen();
 
-    auto collType =
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss)).value;
+    auto collType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
     const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
 
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(

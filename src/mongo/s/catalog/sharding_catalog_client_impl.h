@@ -72,24 +72,20 @@ public:
 
     void shutDown(OperationContext* opCtx) override;
 
-    StatusWith<repl::OpTimeWith<DatabaseType>> getDatabase(
-        OperationContext* opCtx,
-        const std::string& dbName,
-        repl::ReadConcernLevel readConcernLevel) override;
+    DatabaseType getDatabase(OperationContext* opCtx,
+                             StringData db,
+                             repl::ReadConcernLevel readConcernLevel) override;
 
-    StatusWith<repl::OpTimeWith<std::vector<DatabaseType>>> getAllDBs(
-        OperationContext* opCtx, repl::ReadConcernLevel readConcern) override;
+    std::vector<DatabaseType> getAllDBs(OperationContext* opCtx,
+                                        repl::ReadConcernLevel readConcern) override;
 
-    StatusWith<repl::OpTimeWith<CollectionType>> getCollection(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        repl::ReadConcernLevel readConcernLevel) override;
+    CollectionType getCollection(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 repl::ReadConcernLevel readConcernLevel) override;
 
-    StatusWith<std::vector<CollectionType>> getCollections(
-        OperationContext* opCtx,
-        const std::string* dbName,
-        repl::OpTime* optime,
-        repl::ReadConcernLevel readConcernLevel) override;
+    std::vector<CollectionType> getCollections(OperationContext* opCtx,
+                                               StringData db,
+                                               repl::ReadConcernLevel readConcernLevel) override;
 
     std::vector<NamespaceString> getAllShardedCollectionsForDb(
         OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) override;

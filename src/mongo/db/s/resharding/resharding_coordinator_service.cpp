@@ -509,9 +509,9 @@ void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
                                           const ReshardingCoordinatorDocument& coordinatorDoc,
                                           std::vector<ChunkType> initialChunks,
                                           std::vector<TagsType> newZones) {
-    auto originalCollType = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollection(
-        opCtx, coordinatorDoc.getNss(), repl::ReadConcernLevel::kMajorityReadConcern));
-    const auto collation = originalCollType.value.getDefaultCollation();
+    auto originalCollType = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, coordinatorDoc.getNss(), repl::ReadConcernLevel::kMajorityReadConcern);
+    const auto collation = originalCollType.getDefaultCollation();
 
     bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
         opCtx, coordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {

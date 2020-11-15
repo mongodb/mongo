@@ -44,7 +44,6 @@
 #include "mongo/s/query/cluster_aggregate.h"
 
 namespace mongo {
-
 namespace {
 
 const auto getPeriodicShardedIndexConsistencyChecker =
@@ -124,9 +123,8 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
 
             try {
                 long long numShardedCollsWithInconsistentIndexes = 0;
-                auto collections =
-                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->getCollections(
-                        opCtx, nullptr, nullptr, repl::ReadConcernLevel::kLocalReadConcern));
+                auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
+                    opCtx, {}, repl::ReadConcernLevel::kLocalReadConcern);
 
                 for (const auto& coll : collections) {
                     if (coll.getDropped()) {

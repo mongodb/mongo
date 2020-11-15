@@ -113,8 +113,6 @@ public:
 
     CollectionType() = default;
 
-    static StatusWith<CollectionType> fromBSON(const BSONObj& obj);
-
     std::string toString() const;
 
     const OID& getEpoch() const {

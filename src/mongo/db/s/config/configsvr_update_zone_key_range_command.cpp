@@ -106,14 +106,13 @@ public:
             uassertStatusOK(UpdateZoneKeyRangeRequest::parseFromConfigCommand(cmdObj));
 
         if (parsedRequest.isRemove()) {
-            uassertStatusOK(ShardingCatalogManager::get(opCtx)->removeKeyRangeFromZone(
-                opCtx, parsedRequest.getNS(), parsedRequest.getRange()));
+            ShardingCatalogManager::get(opCtx)->removeKeyRangeFromZone(
+                opCtx, parsedRequest.getNS(), parsedRequest.getRange());
         } else {
-            uassertStatusOK(ShardingCatalogManager::get(opCtx)->assignKeyRangeToZone(
-                opCtx,
-                parsedRequest.getNS(),
-                parsedRequest.getRange(),
-                parsedRequest.getZoneName()));
+            ShardingCatalogManager::get(opCtx)->assignKeyRangeToZone(opCtx,
+                                                                     parsedRequest.getNS(),
+                                                                     parsedRequest.getRange(),
+                                                                     parsedRequest.getZoneName());
         }
 
         return true;

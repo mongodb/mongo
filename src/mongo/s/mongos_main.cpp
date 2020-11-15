@@ -734,33 +734,33 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();
 
-    {
-        Status status = initializeSharding(opCtx);
-        if (!status.isOK()) {
-            if (status == ErrorCodes::CallbackCanceled) {
-                invariant(globalInShutdownDeprecated());
-                LOGV2(22850, "Shutdown called before mongos finished starting up");
-                return EXIT_CLEAN;
-            }
-            LOGV2_ERROR(22857,
-                        "Error initializing sharding system: {error}",
-                        "Error initializing sharding system",
-                        "error"_attr = status);
-            return EXIT_SHARDING_ERROR;
+    try {
+        uassertStatusOK(initializeSharding(opCtx));
+    } catch (const DBException& ex) {
+        if (ex.code() == ErrorCodes::CallbackCanceled) {
+            invariant(globalInShutdownDeprecated());
+            LOGV2(22850, "Shutdown called before mongos finished starting up");
+            return EXIT_CLEAN;
         }
 
-        Grid::get(serviceContext)
-            ->getBalancerConfiguration()
-            ->refreshAndCheck(opCtx)
-            .transitional_ignore();
+        LOGV2_ERROR(22857,
+                    "Error initializing sharding system: {error}",
+                    "Error initializing sharding system",
+                    "error"_attr = redact(ex));
+        return EXIT_SHARDING_ERROR;
+    }
 
-        try {
-            ReadWriteConcernDefaults::get(serviceContext).refreshIfNecessary(opCtx);
-        } catch (const DBException& ex) {
-            LOGV2_WARNING(22855,
-                          "Error loading read and write concern defaults at startup",
-                          "error"_attr = redact(ex));
-        }
+    Grid::get(serviceContext)
+        ->getBalancerConfiguration()
+        ->refreshAndCheck(opCtx)
+        .transitional_ignore();
+
+    try {
+        ReadWriteConcernDefaults::get(serviceContext).refreshIfNecessary(opCtx);
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(22855,
+                      "Error loading read and write concern defaults at startup",
+                      "error"_attr = redact(ex));
     }
 
     startMongoSFTDC();

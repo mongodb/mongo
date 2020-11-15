@@ -149,10 +149,7 @@ public:
             opCtx, dbname, "movePrimary", DistLockManager::kDefaultLockTimeout));
 
         auto dbType =
-            uassertStatusOK(catalogClient->getDatabase(
-                                opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel()))
-                .value;
-
+            catalogClient->getDatabase(opCtx, dbname, repl::ReadConcernArgs::get(opCtx).getLevel());
         const auto fromShard = uassertStatusOK(shardRegistry->getShard(opCtx, dbType.getPrimary()));
 
         const auto toShard = [&]() {

@@ -279,20 +279,14 @@ Status preCacheMongosRoutingInfo(OperationContext* opCtx) {
     }
 
     auto grid = Grid::get(opCtx);
+    auto catalogClient = grid->catalogClient();
+    auto catalogCache = grid->catalogCache();
+    auto allDbs = catalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
 
-    auto shardingCatalogClient = grid->catalogClient();
-    auto result =
-        shardingCatalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
-
-    if (!result.isOK()) {
-        return result.getStatus();
-    }
-
-    auto cache = grid->catalogCache();
-    for (auto& db : result.getValue().value) {
-        for (auto& coll : shardingCatalogClient->getAllShardedCollectionsForDb(
+    for (auto& db : allDbs) {
+        for (auto& coll : catalogClient->getAllShardedCollectionsForDb(
                  opCtx, db.getName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
-            auto resp = cache->getShardedCollectionRoutingInfoWithRefresh(opCtx, coll);
+            auto resp = catalogCache->getShardedCollectionRoutingInfoWithRefresh(opCtx, coll);
             if (!resp.isOK()) {
                 return resp.getStatus();
             }

@@ -82,7 +82,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Decide whether to do a full or partial load based on the state of the collection
-    const auto coll = uassertStatusOK(catalogClient->getCollection(opCtx, nss)).value;
+    const auto coll = catalogClient->getCollection(opCtx, nss);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << nss.ns() << " is dropped.",
             !coll.getDropped());
@@ -183,12 +183,9 @@ SemiFuture<DatabaseType> ConfigServerCatalogCacheLoader::getDatabase(StringData 
             ThreadClient tc("ConfigServerCatalogCacheLoader::getDatabase",
                             getGlobalServiceContext());
             auto opCtx = tc->makeOperationContext();
-            return uassertStatusOK(Grid::get(opCtx.get())
-                                       ->catalogClient()
-                                       ->getDatabase(opCtx.get(),
-                                                     name,
-                                                     repl::ReadConcernLevel::kMajorityReadConcern))
-                .value;
+            return Grid::get(opCtx.get())
+                ->catalogClient()
+                ->getDatabase(opCtx.get(), name, repl::ReadConcernLevel::kMajorityReadConcern);
         })
         .semi();
 }

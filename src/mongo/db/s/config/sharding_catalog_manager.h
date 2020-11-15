@@ -164,10 +164,10 @@ public:
      * the shard key, the range will be converted into a new range with full shard key filled with
      * MinKey values.
      */
-    Status assignKeyRangeToZone(OperationContext* opCtx,
-                                const NamespaceString& nss,
-                                const ChunkRange& range,
-                                const std::string& zoneName);
+    void assignKeyRangeToZone(OperationContext* opCtx,
+                              const NamespaceString& nss,
+                              const ChunkRange& range,
+                              const std::string& zoneName);
 
     /**
      * Removes a range from a zone.
@@ -175,9 +175,9 @@ public:
      * NOTE: unlike assignKeyRangeToZone, the given range will never be converted to include the
      * full shard key.
      */
-    Status removeKeyRangeFromZone(OperationContext* opCtx,
-                                  const NamespaceString& nss,
-                                  const ChunkRange& range);
+    void removeKeyRangeFromZone(OperationContext* opCtx,
+                                const NamespaceString& nss,
+                                const ChunkRange& range);
 
     /**
      * Exposes the zone operations mutex to external callers in order to allow them to synchronize

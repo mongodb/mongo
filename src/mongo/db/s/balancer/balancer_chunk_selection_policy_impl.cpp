@@ -287,13 +287,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
     const auto& shardStats = shardStatsStatus.getValue();
 
-    auto swCollections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
-    if (!swCollections.isOK()) {
-        return swCollections.getStatus();
-    }
-
-    auto& collections = swCollections.getValue();
-
+    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, {});
     if (collections.empty()) {
         return SplitInfoVector{};
     }
@@ -365,13 +359,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         return MigrateInfoVector{};
     }
 
-    auto swCollections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nullptr, nullptr);
-    if (!swCollections.isOK()) {
-        return swCollections.getStatus();
-    }
-
-    auto& collections = swCollections.getValue();
-
+    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, {});
     if (collections.empty()) {
         return MigrateInfoVector{};
     }
@@ -430,14 +418,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
 
     const auto& shardStats = shardStatsStatus.getValue();
 
-    // Validate collection information
-    auto swCollection = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
-    if (!swCollection.isOK()) {
-        return swCollection.getStatus();
-    }
-
-    const auto& collection = swCollection.getValue().value;
-
+    auto collection = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
     if (collection.getDropped()) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "collection " << nss.ns() << " not found");
