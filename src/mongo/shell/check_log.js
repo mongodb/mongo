@@ -76,6 +76,12 @@ checkLog = (function() {
                             allAttrMatch = false;
                             break;
                         }
+                    } else if (obj.attr[attrKey] !== attrValue &&
+                               typeof obj.attr[attrKey] == "object") {
+                        if (!_deepEqual(obj.attr[attrKey], attrValue)) {
+                            allAttrMatch = false;
+                            break;
+                        }
                     } else {
                         if (obj.attr[attrKey] !== attrValue) {
                             allAttrMatch = false;
@@ -245,6 +251,35 @@ checkLog = (function() {
             serialized.push(Array.isArray(value) ? valueStr : `"${fieldName}":${valueStr}`);
         }
         return (Array.isArray(value) ? `[${serialized.join(',')}]` : `{${serialized.join(',')}}`);
+    };
+
+    // Internal helper to compare objects filed by field.
+    const _deepEqual = function(object1, object2) {
+        if (object1 == null || object2 == null) {
+            return false;
+        }
+        const keys1 = Object.keys(object1);
+        const keys2 = Object.keys(object2);
+
+        if (keys1.length !== keys2.length) {
+            return false;
+        }
+
+        for (const key of keys1) {
+            const val1 = object1[key];
+            const val2 = object2[key];
+            const areObjects = _isObject(val1) && _isObject(val2);
+            if (areObjects && !_deepEqual(val1, val2) || !areObjects && val1 !== val2) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+    // Internal helper to check that the argument is a non-null object.
+    const _isObject = function(object) {
+        return object != null && typeof object === 'object';
     };
 
     return {

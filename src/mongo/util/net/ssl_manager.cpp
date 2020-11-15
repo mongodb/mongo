@@ -335,14 +335,9 @@ std::shared_ptr<SSLManagerInterface> SSLManagerCoordinator::getSSLManager() {
 }
 
 void logCert(const CertInformationToLog& cert, StringData certType, const int logNum) {
-    LOGV2(logNum,
-          "Certificate information",
-          "type"_attr = certType,
-          "subject"_attr = cert.subject.toString(),
-          "issuer"_attr = cert.issuer.toString(),
-          "thumbprint"_attr = hexblob::encode(cert.thumbprint.data(), cert.thumbprint.size()),
-          "notValidBefore"_attr = cert.validityNotBefore.toString(),
-          "notValidAfter"_attr = cert.validityNotAfter.toString());
+    auto attrs = cert.getDynamicAttributes();
+    attrs.add("type", certType);
+    LOGV2(logNum, "Certificate information", attrs);
 }
 
 void logCRL(const CRLInformationToLog& crl, const int logNum) {
@@ -353,15 +348,18 @@ void logCRL(const CRLInformationToLog& crl, const int logNum) {
           "notValidAfter"_attr = crl.validityNotAfter.toString());
 }
 
-void logSSLInfo(const SSLInformationToLog& info) {
+void logSSLInfo(const SSLInformationToLog& info,
+                const int logNumPEM,
+                const int logNumCluster,
+                const int logNumCrl) {
     if (!(sslGlobalParams.sslPEMKeyFile.empty())) {
-        logCert(info.server, "Server", 4913010);
+        logCert(info.server, "Server", logNumPEM);
     }
     if (info.cluster.has_value()) {
-        logCert(info.cluster.get(), "Cluster", 4913011);
+        logCert(info.cluster.get(), "Cluster", logNumCluster);
     }
     if (info.crl.has_value()) {
-        logCRL(info.crl.get(), 4913012);
+        logCRL(info.crl.get(), logNumCrl);
     }
 }
 
