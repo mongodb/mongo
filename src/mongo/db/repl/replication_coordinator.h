@@ -215,10 +215,10 @@ public:
     virtual bool isInPrimaryOrSecondaryState_UNSAFE() const = 0;
 
     /**
-     * Returns how slave delayed this node is configured to be, or 0 seconds if this node is not a
-     * member of the current replica set configuration.
+     * Returns how secondary delayed this node is configured to be, or 0 seconds if this node is not
+     * a member of the current replica set configuration.
      */
-    virtual Seconds getSlaveDelaySecs() const = 0;
+    virtual Seconds getSecondaryDelaySecs() const = 0;
 
     /**
      * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "opTime" has
@@ -250,10 +250,10 @@ public:
                           const Milliseconds& stepdownTime) = 0;
 
     /**
-     * Returns true if the node can be considered master for the purpose of introspective
+     * Returns true if the primary can be considered writable for the purpose of introspective
      * commands such as hello() and rs.status().
      */
-    virtual bool isMasterForReportingPurposes() = 0;
+    virtual bool isWritablePrimaryForReportingPurposes() = 0;
 
     /**
      * Returns true if it is valid for this node to accept writes on the given database.  Currently
@@ -322,7 +322,7 @@ public:
      */
     virtual Status checkCanServeReadsFor(OperationContext* opCtx,
                                          const NamespaceString& ns,
-                                         bool slaveOk) = 0;
+                                         bool secondaryOk) = 0;
 
     /**
      * Version which does not check for the RSTL.  Do not use in new code. Without the RSTL held,
@@ -330,7 +330,7 @@ public:
      */
     virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                                 const NamespaceString& ns,
-                                                bool slaveOk) = 0;
+                                                bool secondaryOk) = 0;
 
     /**
      * Returns true if this node should ignore index constraints for idempotency reasons.
@@ -532,14 +532,14 @@ public:
      *      |
      *      | applier signals drain is complete
      *      V
-     * - primary is in master mode
+     * - primary is in writable mode
      * (producer: Stopped, applier: Stopped)
      *
      *
      * Step-down
      * =========
      * The state transitions become:
-     * - primary is in master mode
+     * - primary is in writable mode
      * (producer: Stopped, applier: Stopped)
      *      |
      *      | step down
@@ -606,10 +606,10 @@ public:
                                            ReplSetGetStatusResponseStyle responseStyle) = 0;
 
     /**
-     * Adds to "result" a description of the slaveInfo data structure used to map RIDs to their
+     * Adds to "result" a description of the memberData data structure used to map RIDs to their
      * last known optimes.
      */
-    virtual void appendSlaveInfoData(BSONObjBuilder* result) = 0;
+    virtual void appendSecondaryInfoData(BSONObjBuilder* result) = 0;
 
     /**
      * Returns a copy of the current ReplSetConfig.
@@ -977,7 +977,7 @@ public:
 
     /**
      * Increment the server TopologyVersion and fulfill the promise of any currently waiting
-     * isMaster request.
+     * hello request.
      */
     virtual void incrementTopologyVersion() = 0;
 

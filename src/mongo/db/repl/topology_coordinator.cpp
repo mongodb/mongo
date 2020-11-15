@@ -1666,7 +1666,8 @@ TopologyCoordinator::prepareForStepDownAttempt() {
         return Status{ErrorCodes::NotWritablePrimary, "This node is not a primary."};
     }
 
-    invariant(_leaderMode == LeaderMode::kMaster || _leaderMode == LeaderMode::kLeaderElect);
+    invariant(_leaderMode == LeaderMode::kWritablePrimary ||
+              _leaderMode == LeaderMode::kLeaderElect);
     const auto previousLeaderMode = _leaderMode;
     _setLeaderMode(LeaderMode::kAttemptingStepDown);
 
@@ -2071,8 +2072,8 @@ void TopologyCoordinator::fillMemberData(BSONObjBuilder* result) {
     }
 }
 
-void TopologyCoordinator::fillIsMasterForReplSet(std::shared_ptr<HelloResponse> response,
-                                                 const StringData& horizonString) const {
+void TopologyCoordinator::fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
+                                              const StringData& horizonString) const {
     invariant(_rsConfig.isInitialized());
     response->setTopologyVersion(getTopologyVersion());
     const MemberState myState = getMemberState();
@@ -2485,17 +2486,18 @@ void TopologyCoordinator::_setLeaderMode(TopologyCoordinator::LeaderMode newMode
             break;
         case LeaderMode::kLeaderElect:
             invariant(newMode == LeaderMode::kNotLeader ||  // TODO(SERVER-30852): remove this case
-                      newMode == LeaderMode::kMaster ||
+                      newMode == LeaderMode::kWritablePrimary ||
                       newMode == LeaderMode::kAttemptingStepDown ||
                       newMode == LeaderMode::kSteppingDown);
             break;
-        case LeaderMode::kMaster:
+        case LeaderMode::kWritablePrimary:
             invariant(newMode == LeaderMode::kNotLeader ||  // TODO(SERVER-30852): remove this case
                       newMode == LeaderMode::kAttemptingStepDown ||
                       newMode == LeaderMode::kSteppingDown);
             break;
         case LeaderMode::kAttemptingStepDown:
-            invariant(newMode == LeaderMode::kNotLeader || newMode == LeaderMode::kMaster ||
+            invariant(newMode == LeaderMode::kNotLeader ||
+                      newMode == LeaderMode::kWritablePrimary ||
                       newMode == LeaderMode::kSteppingDown || newMode == LeaderMode::kLeaderElect);
             break;
         case LeaderMode::kSteppingDown:
@@ -2549,7 +2551,7 @@ std::vector<MemberData> TopologyCoordinator::getMemberData() const {
 }
 
 bool TopologyCoordinator::canAcceptWrites() const {
-    return _leaderMode == LeaderMode::kMaster;
+    return _leaderMode == LeaderMode::kWritablePrimary;
 }
 
 void TopologyCoordinator::setElectionInfo(OID electionId, Timestamp electionOpTime) {
@@ -2899,7 +2901,7 @@ void TopologyCoordinator::completeTransitionToPrimary(const OpTime& firstOpTimeO
     invariant(canCompleteTransitionToPrimary(firstOpTimeOfTerm.getTerm()));
 
     if (_leaderMode == LeaderMode::kLeaderElect) {
-        _setLeaderMode(LeaderMode::kMaster);
+        _setLeaderMode(LeaderMode::kWritablePrimary);
     }
 
     _firstOpTimeOfMyTerm = firstOpTimeOfTerm;

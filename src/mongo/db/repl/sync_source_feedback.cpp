@@ -96,7 +96,7 @@ Reporter::PrepareReplSetUpdatePositionCommandFn makePrepareReplSetUpdatePosition
 
 }  // namespace
 
-void SyncSourceFeedback::forwardSlaveProgress() {
+void SyncSourceFeedback::forwardSecondaryProgress() {
     {
         stdx::unique_lock<Latch> lock(_mtx);
         _positionChanged = true;

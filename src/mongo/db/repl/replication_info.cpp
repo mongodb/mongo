@@ -91,7 +91,7 @@ void appendPrimaryOnlyServiceInfo(ServiceContext* serviceContext, BSONObjBuilder
 }
 
 /**
- * Appends replication-related fields to the isMaster response. Returns the topology version that
+ * Appends replication-related fields to the hello response. Returns the topology version that
  * was included in the response.
  */
 TopologyVersion appendReplicationInfo(OperationContext* opCtx,
@@ -114,7 +114,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
             replCoord->awaitHelloResponse(opCtx, horizonParams, clientTopologyVersion, deadline);
         result->appendElements(helloResponse->toBSON(useLegacyResponseFields));
         if (appendReplicationProcess) {
-            replCoord->appendSlaveInfoData(result);
+            replCoord->appendSecondaryInfoData(result);
         }
         invariant(helloResponse->getTopologyVersion());
         return helloResponse->getTopologyVersion().get();
@@ -147,7 +147,7 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
     }
 
     result->appendBool((useLegacyResponseFields ? "ismaster" : "isWritablePrimary"),
-                       ReplicationCoordinator::get(opCtx)->isMasterForReportingPurposes());
+                       ReplicationCoordinator::get(opCtx)->isWritablePrimaryForReportingPurposes());
 
     BSONObjBuilder topologyVersionBuilder(result->subobjStart("topologyVersion"));
     currentTopologyVersion.serialize(&topologyVersionBuilder);
@@ -365,7 +365,7 @@ public:
                 });
         }
 
-        // If a client is following the awaitable isMaster protocol, maxAwaitTimeMS should be
+        // If a client is following the awaitable hello protocol, maxAwaitTimeMS should be
         // present if and only if topologyVersion is present in the request.
         auto topologyVersionElement = cmdObj["topologyVersion"];
         auto maxAwaitTimeMSField = cmdObj["maxAwaitTimeMS"];
@@ -387,9 +387,9 @@ public:
 
             uassert(31373, "maxAwaitTimeMS must be a non-negative integer", *maxAwaitTimeMS >= 0);
 
-            LOGV2_DEBUG(23904, 3, "Using maxAwaitTimeMS for awaitable isMaster protocol.");
+            LOGV2_DEBUG(23904, 3, "Using maxAwaitTimeMS for awaitable hello protocol.");
 
-            // Awaitable isMaster commands have high latency by design.
+            // Awaitable hello commands have high latency by design.
             opCtx->setShouldIncrementLatencyStats(false);
         } else {
             uassert(31368,
@@ -487,7 +487,7 @@ public:
             }
         }
 
-        handleIsMasterSpeculativeAuth(opCtx, cmdObj, &result);
+        handleHelloSpeculativeAuth(opCtx, cmdObj, &result);
 
         return true;
     }

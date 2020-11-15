@@ -36,21 +36,19 @@
 
 namespace mongo {
 
-void handleIsMasterSpeculativeAuth(OperationContext* opCtx,
-                                   BSONObj cmdObj,
-                                   BSONObjBuilder* result) {
+void handleHelloSpeculativeAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result) {
     auto sae = cmdObj[auth::kSpeculativeAuthenticate];
     if (sae.eoo()) {
         return;
     }
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << "isMaster." << auth::kSpeculativeAuthenticate << " must be an Object",
+            str::stream() << "hello." << auth::kSpeculativeAuthenticate << " must be an Object",
             sae.type() == Object);
     auto specAuth = sae.Obj();
 
     uassert(ErrorCodes::BadValue,
-            str::stream() << "isMaster." << auth::kSpeculativeAuthenticate
+            str::stream() << "hello." << auth::kSpeculativeAuthenticate
                           << " must be a non-empty Object",
             !specAuth.isEmpty());
     auto specCmd = specAuth.firstElementFieldNameStringData();
@@ -61,7 +59,7 @@ void handleIsMasterSpeculativeAuth(OperationContext* opCtx,
         doSpeculativeAuthenticate(opCtx, specAuth, result);
     } else {
         uasserted(51769,
-                  str::stream() << "isMaster." << auth::kSpeculativeAuthenticate
+                  str::stream() << "hello." << auth::kSpeculativeAuthenticate
                                 << " unknown command: " << specCmd);
     }
 }

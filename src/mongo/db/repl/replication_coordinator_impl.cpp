@@ -1062,7 +1062,7 @@ Status ReplicationCoordinatorImpl::waitForMemberState(MemberState expectedState,
     return Status::OK();
 }
 
-Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
+Seconds ReplicationCoordinatorImpl::getSecondaryDelaySecs() const {
     stdx::lock_guard<Latch> lk(_mutex);
     invariant(_rsConfig.isInitialized());
     if (_selfIndex == -1) {
@@ -1184,7 +1184,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
     lk.lock();
 
     // Exit drain mode only if we're actually in draining mode, the apply buffer is empty in the
-    // current term, and we're allowed to become the write master.
+    // current term, and we're allowed to become the writable primary.
     if (_applierState != ApplierState::Draining ||
         !_topCoord->canCompleteTransitionToPrimary(termWhenBufferIsEmpty)) {
         return;
@@ -1267,7 +1267,7 @@ void ReplicationCoordinatorImpl::signalDrainComplete(OperationContext* opCtx,
 }
 
 void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
-    _externalState->forwardSlaveProgress();
+    _externalState->forwardSecondaryProgress();
 }
 
 void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
@@ -1366,7 +1366,7 @@ void ReplicationCoordinatorImpl::_reportUpstream_inlock(stdx::unique_lock<Latch>
 
     lock.unlock();
 
-    _externalState->forwardSlaveProgress();  // Must do this outside _mutex
+    _externalState->forwardSecondaryProgress();  // Must do this outside _mutex
 }
 
 void ReplicationCoordinatorImpl::_setMyLastAppliedOpTimeAndWallTime(
@@ -2154,7 +2154,7 @@ std::shared_ptr<HelloResponse> ReplicationCoordinatorImpl::_makeHelloResponse(
     invariant(horizonString);
     auto response = std::make_shared<HelloResponse>();
     invariant(getSettings().usingReplSets());
-    _topCoord->fillIsMasterForReplSet(response, *horizonString);
+    _topCoord->fillHelloForReplSet(response, *horizonString);
 
     OpTime lastOpTime = _getMyLastAppliedOpTime_inlock();
 
@@ -2296,9 +2296,9 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
                 "Waiting for a hello response from a topology change or until deadline",
                 "deadline"_attr = deadline.get(),
                 "currentTopologyVersionCounter"_attr = topologyVersion.getCounter());
-    auto statusWithIsMaster =
+    auto statusWithHello =
         futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
-    auto status = statusWithIsMaster.getStatus();
+    auto status = statusWithHello.getStatus();
 
     if (MONGO_unlikely(hangAfterWaitingForTopologyChangeTimesOut.shouldFail())) {
         LOGV2(4783200, "Hanging due to hangAfterWaitingForTopologyChangeTimesOut failpoint");
@@ -2319,7 +2319,7 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
     // A topology change has happened so we return a HelloResponse with the updated
     // topology version.
     uassertStatusOK(status);
-    return statusWithIsMaster.getValue();
+    return statusWithHello.getValue();
 }
 
 StatusWith<OpTime> ReplicationCoordinatorImpl::getLatestWriteOpTime(OperationContext* opCtx) const
@@ -2786,7 +2786,7 @@ void ReplicationCoordinatorImpl::_handleTimePassing(
     _startElectSelfIfEligibleV1(StartElectionReasonEnum::kSingleNodePromptElection);
 }
 
-bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
+bool ReplicationCoordinatorImpl::isWritablePrimaryForReportingPurposes() {
     if (!_settings.usingReplSets()) {
         return true;
     }
@@ -2880,14 +2880,14 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
 
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* opCtx,
                                                          const NamespaceString& ns,
-                                                         bool slaveOk) {
+                                                         bool secondaryOk) {
     invariant(opCtx->lockState()->isRSTLLocked() || opCtx->isLockFreeReadsOp());
-    return checkCanServeReadsFor_UNSAFE(opCtx, ns, slaveOk);
+    return checkCanServeReadsFor_UNSAFE(opCtx, ns, secondaryOk);
 }
 
 Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                                                 const NamespaceString& ns,
-                                                                bool slaveOk) {
+                                                                bool secondaryOk) {
     auto client = opCtx->getClient();
     bool isPrimaryOrSecondary = _readWriteAbility->canServeNonLocalReads_UNSAFE();
 
@@ -2919,7 +2919,7 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         }
     }
 
-    if (slaveOk) {
+    if (secondaryOk) {
         if (isPrimaryOrSecondary) {
             return Status::OK();
         }
@@ -3020,7 +3020,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
     return result;
 }
 
-void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
+void ReplicationCoordinatorImpl::appendSecondaryInfoData(BSONObjBuilder* result) {
     stdx::lock_guard<Latch> lock(_mutex);
     _topCoord->fillMemberData(result);
 }
@@ -4594,7 +4594,7 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePosi
     if (somethingChanged && !_getMemberState_inlock().primary()) {
         lock.unlock();
         // Must do this outside _mutex
-        _externalState->forwardSlaveProgress();
+        _externalState->forwardSecondaryProgress();
     }
     return status;
 }

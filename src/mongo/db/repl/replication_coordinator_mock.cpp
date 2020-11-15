@@ -154,7 +154,7 @@ bool ReplicationCoordinatorMock::isInPrimaryOrSecondaryState_UNSAFE() const {
     return _memberState.primary() || _memberState.secondary();
 }
 
-Seconds ReplicationCoordinatorMock::getSlaveDelaySecs() const {
+Seconds ReplicationCoordinatorMock::getSecondaryDelaySecs() const {
     return Seconds(0);
 }
 
@@ -175,7 +175,7 @@ void ReplicationCoordinatorMock::stepDown(OperationContext* opCtx,
                                           const Milliseconds& waitTime,
                                           const Milliseconds& stepdownTime) {}
 
-bool ReplicationCoordinatorMock::isMasterForReportingPurposes() {
+bool ReplicationCoordinatorMock::isWritablePrimaryForReportingPurposes() {
     // TODO
     return true;
 }
@@ -211,15 +211,15 @@ bool ReplicationCoordinatorMock::canAcceptWritesFor_UNSAFE(OperationContext* opC
 
 Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* opCtx,
                                                          const NamespaceString& ns,
-                                                         bool slaveOk) {
+                                                         bool secondaryOk) {
     // TODO
     return Status::OK();
 }
 
 Status ReplicationCoordinatorMock::checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                                                 const NamespaceString& ns,
-                                                                bool slaveOk) {
-    return checkCanServeReadsFor(opCtx, ns, slaveOk);
+                                                                bool secondaryOk) {
+    return checkCanServeReadsFor(opCtx, ns, secondaryOk);
 }
 
 bool ReplicationCoordinatorMock::shouldRelaxIndexConstraints(OperationContext* opCtx,
@@ -394,7 +394,7 @@ Status ReplicationCoordinatorMock::processReplSetGetStatus(BSONObjBuilder*,
     return Status::OK();
 }
 
-void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
+void ReplicationCoordinatorMock::appendSecondaryInfoData(BSONObjBuilder* result) {}
 
 void ReplicationCoordinatorMock::appendConnectionStats(executor::ConnectionPoolStats* stats) const {
 }

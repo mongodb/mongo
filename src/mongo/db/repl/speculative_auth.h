@@ -36,9 +36,9 @@
 namespace mongo {
 
 /**
- * Check an isMaster sent to mongod in ReplSet mode or mongos for "speculativeAuthenticate".
+ * Check a hello sent to mongod in ReplSet mode or mongos for "speculativeAuthenticate".
  * If present, dispatch to saslStart or authenticate commands as appropriate.
  */
-void handleIsMasterSpeculativeAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result);
+void handleHelloSpeculativeAuth(OperationContext* opCtx, BSONObj cmdObj, BSONObjBuilder* result);
 
 }  // namespace mongo

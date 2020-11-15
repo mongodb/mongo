@@ -54,9 +54,9 @@ class SyncSourceFeedback {
 public:
     SyncSourceFeedback() = default;
 
-    /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of slave
+    /// Notifies the SyncSourceFeedbackThread to wake up and send an update upstream of secondary
     /// replication progress.
-    void forwardSlaveProgress();
+    void forwardSecondaryProgress();
 
     /**
      * Loops continuously until shutdown() is called, passing updates when they are present. If no

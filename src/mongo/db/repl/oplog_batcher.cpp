@@ -232,7 +232,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
 boost::optional<Date_t> OplogBatcher::_calculateSlaveDelayLatestTimestamp() {
     auto service = cc().getServiceContext();
     auto replCoord = ReplicationCoordinator::get(service);
-    auto slaveDelay = replCoord->getSlaveDelaySecs();
+    auto slaveDelay = replCoord->getSecondaryDelaySecs();
     if (slaveDelay <= Seconds(0)) {
         return {};
     }

@@ -318,7 +318,7 @@ public:
     OpTimeAndWallTime getLastCommittedOpTimeAndWallTime() const;
 
     /**
-     * Returns true if it's safe to transition to LeaderMode::kMaster.
+     * Returns true if it's safe to transition to LeaderMode::kWritablePrimary.
      */
     bool canCompleteTransitionToPrimary(long long termWhenDrainCompleted) const;
 
@@ -383,11 +383,11 @@ public:
     StatusWith<BSONObj> prepareReplSetUpdatePositionCommand(
         OpTime currentCommittedSnapshotOpTime) const;
 
-    // Produce a reply to an ismaster request.  It is only valid to call this if we are a
-    // replset.  Drivers interpret the isMaster fields according to the Server Discovery and
+    // Produce a reply to a hello request.  It is only valid to call this if we are a
+    // replset.  Drivers interpret the hello fields according to the Server Discovery and
     // Monitoring Spec, see the "Parsing an isMaster response" section.
-    void fillIsMasterForReplSet(std::shared_ptr<HelloResponse> response,
-                                const StringData& horizonString) const;
+    void fillHelloForReplSet(std::shared_ptr<HelloResponse> response,
+                             const StringData& horizonString) const;
 
     // Produce member data for the serverStatus command and diagnostic logging.
     void fillMemberData(BSONObjBuilder* result);
@@ -852,7 +852,7 @@ private:
      *          |    ^  |                |                |
      *          |    |  |                |                |
      *          v    |  |                |                |
-     *       kMaster --------------------------           |
+     *       kWritablePrimary -----------------           |
      *        |  ^   |  |                |    |           |
      *        |  |   |  |                |    |           |
      *        |  |   |  |                |    |           |
@@ -860,11 +860,12 @@ private:
      *  kAttemptingStepDown----------->kSteppingDown------|
      */
     enum class LeaderMode {
-        kNotLeader,           // This node is not currently a leader.
-        kLeaderElect,         // This node has been elected leader, but can't yet accept writes.
-        kMaster,              // This node reports ismaster:true and can accept writes.
-        kSteppingDown,        // This node is in the middle of a hb, force reconfig or stepdown
-                              // command that must complete.
+        kNotLeader,        // This node is not currently a leader.
+        kLeaderElect,      // This node has been elected leader, but can't yet accept writes.
+        kWritablePrimary,  // This node can accept writes. Depending on whether the client sent
+                           // hello or isMaster, will report isWritablePrimary:true or ismaster:true
+        kSteppingDown,     // This node is in the middle of a hb, force reconfig or stepdown
+                           // command that must complete.
         kAttemptingStepDown,  // This node is in the middle of a cmd initiated step down that might
                               // fail.
     };

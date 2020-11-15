@@ -148,11 +148,11 @@ public:
     virtual OpTime onTransitionToPrimary(OperationContext* opCtx) = 0;
 
     /**
-     * Simple wrapper around SyncSourceFeedback::forwardSlaveProgress.  Signals to the
+     * Simple wrapper around SyncSourceFeedback::forwardSecondaryProgress.  Signals to the
      * SyncSourceFeedback thread that it needs to wake up and send a replSetUpdatePosition
      * command upstream.
      */
-    virtual void forwardSlaveProgress() = 0;
+    virtual void forwardSecondaryProgress() = 0;
 
     /**
      * Returns true if "host" is one of the network identities of this node.

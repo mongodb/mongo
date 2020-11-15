@@ -97,7 +97,7 @@ public:
 
     virtual bool isInPrimaryOrSecondaryState_UNSAFE() const;
 
-    virtual Seconds getSlaveDelaySecs() const;
+    virtual Seconds getSecondaryDelaySecs() const;
 
     virtual void clearSyncSourceBlacklist();
 
@@ -109,7 +109,7 @@ public:
                   const Milliseconds& waitTime,
                   const Milliseconds& stepdownTime) override;
 
-    virtual bool isMasterForReportingPurposes();
+    virtual bool isWritablePrimaryForReportingPurposes();
 
     virtual bool canAcceptWritesForDatabase(OperationContext* opCtx, StringData dbName);
 
@@ -130,10 +130,10 @@ public:
 
     virtual Status checkCanServeReadsFor(OperationContext* opCtx,
                                          const NamespaceString& ns,
-                                         bool slaveOk);
+                                         bool secondaryOk);
     virtual Status checkCanServeReadsFor_UNSAFE(OperationContext* opCtx,
                                                 const NamespaceString& ns,
-                                                bool slaveOk);
+                                                bool secondaryOk);
 
     virtual bool shouldRelaxIndexConstraints(OperationContext* opCtx, const NamespaceString& ns);
 
@@ -188,7 +188,7 @@ public:
 
     virtual Status processReplSetGetStatus(BSONObjBuilder*, ReplSetGetStatusResponseStyle);
 
-    virtual void appendSlaveInfoData(BSONObjBuilder* result);
+    virtual void appendSecondaryInfoData(BSONObjBuilder* result);
 
     void appendConnectionStats(executor::ConnectionPoolStats* stats) const override;
 

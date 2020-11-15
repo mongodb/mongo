@@ -215,7 +215,7 @@ public:
             }
         }
 
-        handleIsMasterSpeculativeAuth(opCtx, cmdObj, &result);
+        handleHelloSpeculativeAuth(opCtx, cmdObj, &result);
 
         return true;
     }
