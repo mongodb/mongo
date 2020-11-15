@@ -31,6 +31,7 @@
 
 #include <fstream>
 
+#include "mongo/config.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/transport/service_entry_point.h"
@@ -39,7 +40,6 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 
-#include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 
@@ -547,7 +547,7 @@ TEST(SSLManager, RotateClusterCertificatesFromFile) {
     uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
 }
 
-#if MONGO_CONFIG_SSL_PROVIDER != MONGO_CONFIG_SSL_PROVIDER_APPLE
+#if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 
 TEST(SSLManager, InitContextFromFile) {
     SSLParams params;
