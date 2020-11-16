@@ -30,14 +30,22 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/transaction_participant.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -77,6 +85,18 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                             postImageOpTime,  // post-image optime
                             boost::none,      // ShardId of resharding recipient
                             boost::none);     // _id
+}
+
+void setUpReplication(ServiceContext* svcCtx) {
+    auto replMock = std::make_unique<repl::ReplicationCoordinatorMock>(svcCtx);
+    replMock->alwaysAllowWrites(true);
+    repl::ReplicationCoordinator::set(svcCtx, std::move(replMock));
+}
+
+void setUpTxnParticipant(OperationContext* opCtx, std::vector<int> executedStmtIds) {
+    opCtx->setTxnNumber(1);
+    auto txnPart = TransactionParticipant::get(opCtx);
+    txnPart.setCommittedStmtIdsForTest(std::move(executedStmtIds));
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
@@ -155,6 +175,98 @@ TEST_F(WriteOpsRetryability, ShouldFailIfParsingDeleteOplogForUpdate) {
 
     ASSERT_THROWS(parseOplogEntryForUpdate(deleteOplog), AssertionException);
 }
+
+TEST_F(WriteOpsRetryability, PerformInsertsSuccess) {
+    auto opCtxRaii = makeOperationContext();
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    write_ops::Insert insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandBase().setOrdered(true);
+    insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 1)});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    ASSERT_EQ(2, result.results.size());
+    ASSERT_TRUE(result.results[0].isOK());
+    ASSERT_TRUE(result.results[1].isOK());
+}
+
+TEST_F(WriteOpsRetryability, PerformRetryableInsertsSuccess) {
+    auto opCtxRaii = makeOperationContext();
+    opCtxRaii->setLogicalSessionId({UUID::gen(), {}});
+    OperationContextSession session(opCtxRaii.get());
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    // Set up a retryable write where statements 1 and 2 have already executed.
+    setUpTxnParticipant(opCtxRaii.get(), {1, 2});
+
+    write_ops::Insert insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandBase().setOrdered(true);
+    // Setup documents that cannot be successfully inserted to show that the retryable logic was
+    // exercised.
+    insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 0)});
+    insertOp.getWriteCommandBase().setStmtIds({{1, 2}});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    // Assert that both writes "succeeded". While there should have been a duplicate key error, the
+    // `performInserts` obeyed the contract of not re-inserting a document that was declared to have
+    // been inserted.
+    ASSERT_EQ(2, result.results.size());
+    ASSERT_TRUE(result.results[0].isOK());
+    ASSERT_TRUE(result.results[1].isOK());
+}
+
+TEST_F(WriteOpsRetryability, PerformRetryableInsertsWithBatchedFailure) {
+    auto opCtxRaii = makeOperationContext();
+    opCtxRaii->setLogicalSessionId({UUID::gen(), {}});
+    OperationContextSession session(opCtxRaii.get());
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    // Set up a retryable write where statement 3 has already executed.
+    setUpTxnParticipant(opCtxRaii.get(), {3});
+
+    write_ops::Insert insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandBase().setOrdered(false);
+    // Setup documents such that the second will fail insertion.
+    insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 0), BSON("_id" << 1)});
+    insertOp.getWriteCommandBase().setStmtIds({{1, 2, 3}});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    // Assert that the third (already executed) write succeeds, despite the second write failing
+    // because this is an unordered insert.
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_TRUE(result.results[0].isOK());
+    ASSERT_FALSE(result.results[1].isOK());
+    ASSERT_EQ(ErrorCodes::DuplicateKey, result.results[1].getStatus());
+    ASSERT_TRUE(result.results[2].isOK());
+}
+
+TEST_F(WriteOpsRetryability, PerformOrderedInsertsStopsAtError) {
+    auto opCtxRaii = makeOperationContext();
+    opCtxRaii->setLogicalSessionId({UUID::gen(), {}});
+    OperationContextSession session(opCtxRaii.get());
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    write_ops::Insert insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandBase().setOrdered(true);
+    // Setup documents such that the second cannot be successfully inserted.
+    insertOp.setDocuments({BSON("_id" << 0), BSON("_id" << 0), BSON("_id" << 1)});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    // Assert that the third write is not attempted because this is an ordered insert.
+    ASSERT_EQ(2, result.results.size());
+    ASSERT_TRUE(result.results[0].isOK());
+    ASSERT_FALSE(result.results[1].isOK());
+    ASSERT_EQ(ErrorCodes::DuplicateKey, result.results[1].getStatus());
+}
+
 
 class FindAndModifyRetryability : public MockReplCoordServerFixture {
 public:

@@ -2375,6 +2375,14 @@ UpdateRequest TransactionParticipant::Participant::_makeUpdateRequest(
     return updateRequest;
 }
 
+void TransactionParticipant::Participant::setCommittedStmtIdsForTest(
+    std::vector<int> stmtIdsCommitted) {
+    p().isValid = true;
+    for (auto stmtId : stmtIdsCommitted) {
+        p().activeTxnCommittedStatements.emplace(stmtId, repl::OpTime());
+    }
+}
+
 void TransactionParticipant::Participant::_registerUpdateCacheOnCommit(
     OperationContext* opCtx,
     std::vector<StmtId> stmtIdsWritten,

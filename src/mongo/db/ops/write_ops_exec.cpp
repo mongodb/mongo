@@ -568,25 +568,23 @@ WriteResult performInserts(OperationContext* opCtx,
     for (auto&& doc : wholeOp.getDocuments()) {
         const bool isLastDoc = (&doc == &wholeOp.getDocuments().back());
         auto fixedDoc = fixDocumentForInsert(opCtx, doc);
+        const StmtId stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
+        const bool wasAlreadyExecuted = opCtx->getTxnNumber() &&
+            !opCtx->inMultiDocumentTransaction() &&
+            txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId);
+
         if (!fixedDoc.isOK()) {
             // Handled after we insert anything in the batch to be sure we report errors in the
             // correct order. In an ordered insert, if one of the docs ahead of us fails, we should
             // behave as-if we never got to this document.
+        } else if (wasAlreadyExecuted) {
+            // Similarly, if the insert was already executed as part of a retryable write, flush the
+            // current batch to preserve the error results order.
         } else {
-            const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, stmtIdIndex++);
-            if (opCtx->getTxnNumber()) {
-                if (!opCtx->inMultiDocumentTransaction() &&
-                    txnParticipant.checkStatementExecutedNoOplogEntryFetch(stmtId)) {
-                    containsRetry = true;
-                    RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-                    out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
-                    continue;
-                }
-            }
-
             BSONObj toInsert = fixedDoc.getValue().isEmpty() ? doc : std::move(fixedDoc.getValue());
             batch.emplace_back(stmtId, toInsert);
             bytesInBatch += batch.back().doc.objsize();
+
             if (!isLastDoc && batch.size() < maxBatchSize && bytesInBatch < maxBatchBytes)
                 continue;  // Add more to batch before inserting.
         }
@@ -596,7 +594,12 @@ WriteResult performInserts(OperationContext* opCtx,
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 
-        if (canContinue && !fixedDoc.isOK()) {
+        if (!canContinue)
+            break;
+
+        // Revisit any conditions that may have caused the batch to be flushed. In those cases,
+        // append the appropriate result to the output.
+        if (!fixedDoc.isOK()) {
             globalOpCounters.gotInsert();
             ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
                 opCtx->getWriteConcern());
@@ -607,11 +610,13 @@ WriteResult performInserts(OperationContext* opCtx,
                 canContinue = handleError(
                     opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
             }
+        } else if (wasAlreadyExecuted) {
+            containsRetry = true;
+            RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
+            out.results.emplace_back(makeWriteResultForInsertOrDeleteRetry());
         }
-
-        if (!canContinue)
-            break;
     }
+    invariant(batch.empty());
 
     return out;
 }

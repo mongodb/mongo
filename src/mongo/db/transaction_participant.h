@@ -671,6 +671,8 @@ public:
             o(lk).txnState.transitionTo(TransactionState::kAbortedWithPrepare);
         }
 
+        void setCommittedStmtIdsForTest(std::vector<int> stmtIdsCommitted);
+
     private:
         boost::optional<repl::OpTime> _checkStatementExecuted(StmtId stmtId) const;
 
