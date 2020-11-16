@@ -116,14 +116,7 @@ rst.awaitReplication();
 
 // There should be no activity on the secondary.
 assertMetrics(secondary, (metrics) => {
-    assert.eq(metrics[dbName].secondaryMetrics.docBytesRead, 0);
-    assert.eq(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
-    assert.eq(metrics[dbName].docBytesWritten, 0);
-    assert.eq(metrics[dbName].docUnitsWritten, 0);
-    assert.eq(metrics[dbName].idxEntryUnitsWritten, 0);
-    assert.eq(metrics[dbName].idxEntryBytesWritten, 0);
-    assert.eq(metrics[dbName].primaryMetrics.idxEntryBytesRead, 0);
-    assert.eq(metrics[dbName].primaryMetrics.idxEntryUnitsRead, 0);
+    assert(!metrics.hasOwnProperty(dbName));
 });
 
 // Ensure the last document was not deleted.

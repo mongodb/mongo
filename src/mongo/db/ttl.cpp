@@ -303,9 +303,6 @@ private:
             hangTTLMonitorWithLock.pauseWhileSet(opCtx);
         }
 
-        ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx,
-                                                                  collectionNSS.db().toString());
-
         if (!collection) {
             // Collection was dropped.
             return;
@@ -314,6 +311,9 @@ private:
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionNSS)) {
             return;
         }
+
+        ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx,
+                                                                  collectionNSS.db().toString());
 
         const IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName(opCtx, name);
         if (!desc) {
