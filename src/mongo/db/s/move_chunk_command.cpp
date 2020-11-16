@@ -85,7 +85,6 @@ MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep3);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep6);
-MONGO_FAIL_POINT_DEFINE(moveChunkHangAtStep7);
 
 class MoveChunkCommand : public BasicCommand {
 public:
@@ -145,6 +144,11 @@ public:
                     .then([moveChunkRequest,
                            scopedMigration = std::move(scopedMigration),
                            serviceContext = opCtx->getServiceContext()]() mutable {
+                        // This local variable is created to enforce that the scopedMigration is
+                        // destroyed before setting the shared state as ready.
+                        // Note that captured objects of the lambda are destroyed by the executor
+                        // thread after setting the shared state as ready.
+                        auto scopedMigrationLocal(std::move(scopedMigration));
                         ThreadClient tc("MoveChunk", serviceContext);
                         {
                             stdx::lock_guard<Client> lk(*tc.get());
@@ -168,7 +172,7 @@ public:
                                     .countDonorMoveChunkLockTimeout.addAndFetch(1);
                             }
                         } catch (const std::exception& e) {
-                            scopedMigration.signalComplete(
+                            scopedMigrationLocal.signalComplete(
                                 {ErrorCodes::InternalError,
                                  str::stream()
                                      << "Severe error occurred while running moveChunk command: "
@@ -176,7 +180,7 @@ public:
                             throw;
                         }
 
-                        scopedMigration.signalComplete(status);
+                        scopedMigrationLocal.signalComplete(status);
                         uassertStatusOK(status);
                     });
             moveChunkComplete.get(opCtx);
