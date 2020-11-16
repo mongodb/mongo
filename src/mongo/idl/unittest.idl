@@ -608,6 +608,11 @@ structs:
                 optional: true
                 validator: { callback: "validateStartsWith<'x'>" }
 
+    chained_validators:
+        description: Uses a chained struct that includes fields with validators
+        chained_structs:
+            int_basic_ranges: int_basic_ranges
+
     unusual_callback_validators:
         description: Struct using fields with unusual callback validators
         fields:

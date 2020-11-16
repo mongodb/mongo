@@ -1021,8 +1021,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     if [field for field in struct.fields if field.validator]:
                         self.write_unindented_line('private:')
                         for field in struct.fields:
-                            if not field.ignore and not struct.immutable and \
-                                not field.chained_struct_field and field.validator:
+                            if not field.ignore and not struct.immutable and field.validator:
                                 self.gen_validators(field)
 
                     self.write_unindented_line('private:')
