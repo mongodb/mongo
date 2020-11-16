@@ -326,6 +326,14 @@ TEST(ErrorExtraInfo, OptionalExtraInfoStatusParserWorks) {
     ASSERT_EQ(status.extraInfo<OptionalErrorExtraInfoExample>()->data, 123);
 }
 
+TEST(ErrorExtraInfo, MissingOptionalExtraInfoStatus) {
+    OptionalErrorExtraInfoExample::EnableParserForTest whenInScope;
+    const auto status = Status(ErrorCodes::ForTestingOptionalErrorExtraInfo, "");
+    ASSERT_EQ(status, ErrorCodes::ForTestingOptionalErrorExtraInfo);
+    ASSERT_FALSE(status.extraInfo());
+    ASSERT_FALSE(status.extraInfo<OptionalErrorExtraInfoExample>());
+}
+
 TEST(ErrorExtraInfo, TypedConstructorWorks) {
     const auto status = Status(ErrorExtraInfoExample(123), "");
     ASSERT_EQ(status, ErrorCodes::ForTestingErrorExtraInfo);

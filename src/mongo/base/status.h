@@ -168,27 +168,31 @@ public:
     /**
      * Returns the generic ErrorExtraInfo if present.
      */
-    const ErrorExtraInfo* extraInfo() const {
-        return isOK() ? nullptr : _error->extra.get();
+    const std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
+        return isOK() ? nullptr : _error->extra;
     }
 
     /**
      * Returns a specific subclass of ErrorExtraInfo if the error code matches that type.
      */
     template <typename T>
-    const T* extraInfo() const {
+    std::shared_ptr<const T> extraInfo() const {
         MONGO_STATIC_ASSERT(std::is_base_of<ErrorExtraInfo, T>());
         MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
 
         if (isOK())
-            return nullptr;
+            return {};
         if (code() != T::code)
-            return nullptr;
+            return {};
+
+        if (!_error->extra) {
+            invariant(!ErrorCodes::mustHaveExtraInfo(_error->code));
+            return {};
+        }
 
         // Can't use checked_cast due to include cycle.
-        invariant(_error->extra);
         dassert(dynamic_cast<const T*>(_error->extra.get()));
-        return static_cast<const T*>(_error->extra.get());
+        return std::static_pointer_cast<const T>(_error->extra);
     }
 
     std::string toString() const;

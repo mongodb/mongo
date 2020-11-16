@@ -62,8 +62,6 @@ public:
 };
 
 extern AssertionCount assertionCount;
-
-
 class DBException;
 std::string causedBy(const DBException& e);
 std::string causedBy(const std::string& e);
@@ -117,7 +115,7 @@ public:
     /**
      * Returns the generic ErrorExtraInfo if present.
      */
-    const ErrorExtraInfo* extraInfo() const {
+    const std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
         return _status.extraInfo();
     }
 
@@ -125,7 +123,7 @@ public:
      * Returns a specific subclass of ErrorExtraInfo if the error code matches that type.
      */
     template <typename ErrorDetail>
-    const ErrorDetail* extraInfo() const {
+    std::shared_ptr<const ErrorDetail> extraInfo() const {
         return _status.extraInfo<ErrorDetail>();
     }
 
@@ -189,7 +187,7 @@ public:
     // This is only a template to enable SFINAE. It will only be instantiated with the default
     // value.
     template <ErrorCodes::Error code_copy = kCode>
-    const ErrorExtraInfoFor<code_copy>* operator->() const {
+    std::shared_ptr<const ErrorExtraInfoFor<code_copy>> operator->() const {
         MONGO_STATIC_ASSERT(code_copy == kCode);
         return this->template extraInfo<ErrorExtraInfoFor<kCode>>();
     }
