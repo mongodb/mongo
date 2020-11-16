@@ -142,6 +142,7 @@ kmsEnv.Library(
         "kms.cpp",
         "kms_aws.cpp",
         "kms_local.cpp",
+        "kms_network.cpp",
         "kms.idl",
     ],
     LIBDEPS=[
