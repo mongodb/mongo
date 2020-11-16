@@ -146,7 +146,6 @@ env.CppUnitTest(
     source=[
         "async_results_merger_test.cpp",
         "blocking_results_merger_test.cpp",
-        "cluster_aggregate_test.cpp",
         "cluster_client_cursor_impl_test.cpp",
         "cluster_cursor_manager_test.cpp",
         "cluster_exchange_test.cpp",
@@ -164,8 +163,8 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/query/query_request",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
-        "$BUILD_DIR/mongo/s/commands/cluster_command_test_fixture",
         "$BUILD_DIR/mongo/s/sharding_router_test_fixture",
+        "$BUILD_DIR/mongo/s/vector_clock_mongos",
         "$BUILD_DIR/mongo/util/clock_source_mock",
         "async_results_merger",
         "cluster_aggregate",

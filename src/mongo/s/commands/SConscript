@@ -101,9 +101,6 @@ env.Library(
         'strategy.cpp',
         'cluster_commands.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/servers',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/auth',
@@ -118,6 +115,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/profile_common',
         '$BUILD_DIR/mongo/db/commands/rename_collection_idl',
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/commands/set_feature_compatibility_version_idl',
         '$BUILD_DIR/mongo/db/commands/set_index_commit_quorum_idl',
         '$BUILD_DIR/mongo/db/commands/shutdown_idl',
@@ -151,20 +149,11 @@ env.Library(
     ]
 )
 
-env.Library(
-    target='cluster_command_test_fixture',
-    source=[
-        'cluster_command_test_fixture.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        'cluster_commands',
-    ]
-)
-
 env.CppUnitTest(
     target="s_commands_test",
     source=[
+        "cluster_aggregate_test.cpp",
+        "cluster_command_test_fixture.cpp",
         "cluster_delete_test.cpp",
         "cluster_distinct_test.cpp",
         "cluster_find_and_modify_test.cpp",
@@ -177,7 +166,8 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/saslauth',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
-        'cluster_command_test_fixture',
+        '$BUILD_DIR/mongo/s/query/cluster_aggregate',
+        '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
         'cluster_commands',
     ],
 )

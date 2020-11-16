@@ -495,6 +495,7 @@ env.Library(
         # mongos_initializers.
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/authmongos',
+        '$BUILD_DIR/mongo/db/commands/servers',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_mongos',
         '$BUILD_DIR/mongo/db/initialize_server_security_state',
         '$BUILD_DIR/mongo/db/log_process_details',
