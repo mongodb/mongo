@@ -142,6 +142,7 @@ bool
 boolean
 booleans
 br
+btmem
 btree
 btrees
 bufs
@@ -238,6 +239,7 @@ eq
 erlang
 errno
 exe
+extensibility
 fadvise
 failchk
 fallocate
@@ -264,6 +266,7 @@ fnv
 forw
 fput
 freelist
+fs
 fsync
 ftruncate
 fvisibility

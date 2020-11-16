@@ -397,7 +397,8 @@ __ckpt_add_blkmod_entry(
  *     Add the checkpoint's allocated blocks to all valid incremental backup source identifiers.
  */
 static int
-__ckpt_add_blk_mods_alloc(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_BLOCK_CKPT *ci)
+__ckpt_add_blk_mods_alloc(
+  WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_BLOCK_CKPT *ci, WT_BLOCK *block)
 {
     WT_BLOCK_MODS *blk_mod;
     WT_CKPT *ckpt;
@@ -417,10 +418,13 @@ __ckpt_add_blk_mods_alloc(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, WT_BLOCK_
         if (!F_ISSET(blk_mod, WT_BLOCK_MODS_VALID))
             continue;
 
+        if (block->created_during_backup)
+            WT_RET(__ckpt_add_blkmod_entry(session, blk_mod, 0, block->allocsize));
         WT_EXT_FOREACH (ext, ci->alloc.off) {
             WT_RET(__ckpt_add_blkmod_entry(session, blk_mod, ext->off, ext->size));
         }
     }
+    block->created_during_backup = false;
     return (0);
 }
 
@@ -595,7 +599,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
      * Record the checkpoint's allocated blocks. Do so before skipping any processing and before
      * possibly merging in blocks from any previous checkpoint.
      */
-    WT_ERR(__ckpt_add_blk_mods_alloc(session, ckptbase, ci));
+    WT_ERR(__ckpt_add_blk_mods_alloc(session, ckptbase, ci, block));
 
     /* Skip the additional processing if we aren't deleting checkpoints. */
     if (!deleting)

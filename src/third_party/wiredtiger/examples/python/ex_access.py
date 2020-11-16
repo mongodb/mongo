@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
+#! [python simple example]
 import os
 from wiredtiger import wiredtiger_open
 
@@ -53,3 +54,4 @@ for key, value in cursor:
     print('Got record: %s : %s' % (key, value))
 
 conn.close()
+#! [python simple example]

@@ -47,8 +47,12 @@
 #define URI_MAX_LEN 32
 #define URI_FORMAT "table:t%d-%d"
 #define KEY_FORMAT "key-%d-%d"
+#define TABLE_FORMAT "key_format=S,value_format=u"
 
 #define CONN_CONFIG_COMMON "timing_stress_for_test=[backup_rename]"
+
+#define NUM_ALLOC 5
+static const char *alloc_sizes[] = {"512B", "8K", "64K", "1M", "16M"};
 
 static int verbose_level = 0;
 static uint64_t seed = 0;
@@ -404,17 +408,31 @@ table_changes(WT_SESSION *session, TABLE *table)
  *     Create a table for the given slot.
  */
 static void
-create_table(WT_SESSION *session, TABLE_INFO *tinfo, uint32_t slot)
+create_table(WT_SESSION *session, WT_RAND_STATE *rand, TABLE_INFO *tinfo, uint32_t slot)
 {
-    char *uri;
+    uint32_t alloc;
+    char buf[4096], *uri;
+    const char *allocstr;
 
     testutil_assert(!TABLE_VALID(&tinfo->table[slot]));
     uri = dcalloc(1, URI_MAX_LEN);
     testutil_check(
       __wt_snprintf(uri, URI_MAX_LEN, URI_FORMAT, (int)slot, (int)tinfo->table[slot].name_index++));
 
-    VERBOSE(3, "create %s\n", uri);
-    testutil_check(session->create(session, uri, "key_format=S,value_format=u"));
+    /*
+     * A quarter of the time use a non-default allocation size on the table. This is set
+     * independently of the granularity to stress mismatched values.
+     */
+    if (__wt_random(rand) % 4 == 0) {
+        alloc = __wt_random(rand) % NUM_ALLOC;
+        allocstr = alloc_sizes[alloc];
+        testutil_check(__wt_snprintf(buf, sizeof(buf),
+          "%s,allocation_size=%s,internal_page_max=%s,leaf_page_max=%s", TABLE_FORMAT, allocstr,
+          allocstr, allocstr));
+    } else
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", TABLE_FORMAT));
+    VERBOSE(3, "create %s: %s\n", uri, buf);
+    testutil_check(session->create(session, uri, buf));
     tinfo->table[slot].name = uri;
     tinfo->tables_in_use++;
 }
@@ -753,11 +771,11 @@ main(int argc, char *argv[])
     WT_RAND_STATE rnd;
     WT_SESSION *session;
     uint32_t file_max, iter, max_value_size, next_checkpoint, rough_size, slot;
-    int ch, ncheckpoints, status;
+    int ch, ncheckpoints, nreopens, status;
     const char *backup_verbose, *working_dir;
     char conf[1024], home[1024], backup_check[1024], backup_dir[1024], command[4096];
 
-    ncheckpoints = 0;
+    ncheckpoints = nreopens = 0;
     (void)testutil_set_progname(argv);
     custom_die = die; /* Set our own abort handler */
     WT_CLEAR(tinfo);
@@ -859,7 +877,7 @@ main(int argc, char *argv[])
                  */
                 slot = __wt_random(&rnd) % tinfo.table_count;
                 if (!TABLE_VALID(&tinfo.table[slot]))
-                    create_table(session, &tinfo, slot);
+                    create_table(session, &rnd, &tinfo, slot);
                 else if (__wt_random(&rnd) % 3 == 0 && do_rename)
                     rename_table(session, &tinfo, slot);
                 else if (do_drop)
@@ -875,6 +893,15 @@ main(int argc, char *argv[])
                 next_checkpoint = __wt_random(&rnd) % tinfo.table_count;
                 ncheckpoints++;
             }
+        }
+
+        /* Close and reopen the connection once in a while. */
+        if (__wt_random(&rnd) % 10 == 0) {
+            VERBOSE(2, "Close and reopen the connection %d\n", nreopens);
+            testutil_check(conn->close(conn, NULL));
+            testutil_check(wiredtiger_open(home, NULL, conf, &conn));
+            testutil_check(conn->open_session(conn, NULL, NULL, &session));
+            nreopens++;
         }
 
         if (iter == 0) {

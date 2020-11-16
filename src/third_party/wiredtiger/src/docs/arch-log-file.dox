@@ -1,0 +1,7 @@
+/*! @arch_page arch-log-file Log File Format
+
+The format of a WiredTiger log file is defined in \c log.h .
+Each file begins with a fixed length header, followed by a set of
+variable length log records.  Though the records may have varying
+length, they all begin on boundaries aligned to 128 bytes.
+*/

@@ -1,0 +1,10 @@
+/*! @arch_page arch-fs-os File System and Operating System Interface
+
+Internally, a layer of abstraction is above all operating system calls,
+allowing main line WiredTiger code to make a call to single set of interfaces.
+There are currently OS specific APIs for POSIX and Windows.
+
+Additionally, a program can use WT_CONNECTION::set_file_system to register
+a set of functions that will be called for each file system operation.
+WiredTiger will then call these functions at the appropriate time.
+*/

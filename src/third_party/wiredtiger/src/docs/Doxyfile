@@ -796,7 +796,8 @@ EXCLUDE_SYMBOLS        = __F \
 EXAMPLE_PATH           = ../../examples/c \
 			 ../../ext/compressors/nop \
 			 ../../ext/encryptors/nop \
-			 ../../ext/encryptors/rotn
+			 ../../ext/encryptors/rotn \
+			 ../../examples/python
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 

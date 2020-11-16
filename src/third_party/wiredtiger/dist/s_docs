@@ -96,7 +96,8 @@ spellchk()
 	type aspell > /dev/null 2>&1 || return
 
 	(cd ../src/docs &&
-	cat *.dox |
+	# Separate quoted newlines "line\nline" so "nline" is not reported.
+        sed -e 's/\("[^"]*\)\\n\([^"]*"\)/\1 \2/' *.dox | \
 	aspell --encoding=iso-8859-1 --lang=en_US --personal=./spell.ok list) |
 	sort -u > $t
 	test -s $t && {

@@ -1,0 +1,8 @@
+/*! @arch_page arch-logging Logging
+
+WiredTiger writes all changes into a write-ahead log when configured.
+Log files are shared among all writers, so changes made to
+different tables, by different threads, are interleaved.
+
+Internally, the current logging state is represented by the WT_LOG structure.
+*/

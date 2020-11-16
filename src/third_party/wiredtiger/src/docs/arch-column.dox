@@ -1,0 +1,23 @@
+/*! @arch_page arch-column Column Store
+
+Column Stores are Btrees stored in WiredTiger that have as their
+key a record id, that is, a 64 bit unsigned integer.  Thus, they implement
+a specialized version of a Btree, where the key is a predictable length.
+
+A particular kind of column store is the fixed length column store.
+As its name implies, the value is fixed length, and furthermore the
+value is restricted to 1 and 8 bits in length.  The bit length is specified
+when the column store is created.  The fixed length column store
+has specialized use cases like bitmaps.
+
+The more general case is the variable length column store which allows
+for values that have any length, and may have arbitrary types, including
+aggregates of various types.
+
+Internally, row stores and both kinds of column stores all use a common
+\c WT_BTREE structure.  Column stores are distinguished in that
+<code>WT_BTREE->type == BTREE_COL_VAR</code> for variable length column stores
+and <code>WT_BTREE->type == BTREE_COL_FIX</code> for fixed length column stores.
+Internal functions that navigate, access and manipulate Btrees have
+code sprinkled throughout that is conditional on <code>WT_BTREE->type</code>.
+*/

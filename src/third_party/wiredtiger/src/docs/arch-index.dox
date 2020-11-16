@@ -28,46 +28,50 @@ skinparam fileShadowing false
 ' with most nesting within the "engine" rectangle.
 
 together {
-  rectangle "Python API" as python_api
+  rectangle "[[arch-python.html Python API]]" as python_api
   ' "storage" displays as an oval.
   storage "       C/C++  \n   applications   " as application
-  rectangle "wt Utility" as utility
+  rectangle "[[command_line.html wt Utility]]" as utility
 }
 
 ' Trailing spaces for this label puts the text to the left.
 rectangle "**WiredTiger Engine**                                                                 " as wt_engine {
   ' Leading and trailing spaces make a wide rectangle.
   together {
+    ' Putting two invisible file boxes on either side centers the middle box.
     file "____" as SPACE_api
-    rectangle "                                        C API                                        " as c_api
+    rectangle "                                        [[modules.html C API]]                                        " as c_api
     file "____" as SPACE_api2
+    ' Influence the ordering of the invisible boxes using (hidden) arrows.
+    SPACE_api -[hidden]right-> c_api
+    c_api -[hidden]right-> SPACE_api2
   }
   rectangle "[[arch-schema.html Schema]]" as schema
-  rectangle "Cursor" as cursor
+  rectangle "[[arch-cursor.html Cursor]]" as cursor
   rectangle "[[arch-transaction.html Transactions]]" as txn
-  rectangle "Metadata" as meta
-  rectangle "[[arch-dhandle.html  dhandle/\n Btree]]" as btree
-  rectangle " Row\n storage" as row
-  rectangle " Column\n storage" as column
-  rectangle "History\n Store" as history
-  rectangle "Snapshots" as snapshot
-  rectangle "Cache" as cache
-  rectangle "Eviction" as evict
+  rectangle "[[arch-metadata.html Metadata]]" as meta
+  rectangle "[[arch-dhandle.html dhandle/\nBtree]]" as btree
+  rectangle "[[arch-row.html Row\nStorage]]" as row
+  rectangle "[[arch-column.html Column\nStorage]]" as column
+  rectangle "[[arch-hs.html History\nStore]]" as history
+  rectangle "[[arch-snapshot.html Snapshots]]" as snapshot
+  rectangle "[[arch-cache.html Cache]]" as cache
+  rectangle "[[arch-eviction.html Eviction]]" as evict
 
   together {
-    rectangle "  Block\n Manager" as block
+    rectangle "[[arch-block.html Block\nManager]]" as block
     file "__________" as SPACE_log
-    rectangle "Logging" as log
+    rectangle "[[arch-logging.html Logging]]" as log
     file "___" as SPACE_log2
   }
-  rectangle "                                         File System & OS                                               \n                                                interface" as os
+  rectangle "                              [[arch-fs-os.html File System & OS interface]]                              " as os
 }
 together {
-  database "Database\n   Files" as wt_file
-  database "   Log   \n  Files" as log_file
+  database "[[arch-data-file.html Database\nFiles]]" as wt_file
+  database "  [[arch-log-file.html Log\nFiles]]" as log_file
 }
 
-' Influence the ordering at the top using (hidden) directed labels
+' Influence the ordering at the top using (hidden) arrows.
 python_api -[hidden]right-> application
 application -[hidden]right-> utility
 
@@ -78,8 +82,6 @@ utility -down-> c_api
 c_api -down-> schema
 c_api -down-> cursor
 c_api -down-> txn
-SPACE_api -[hidden]right-> c_api
-c_api -[hidden]right-> SPACE_api2
 
 schema -down-> meta
 schema -down-> btree
@@ -121,14 +123,75 @@ wt_file -[hidden]right-> log_file
 
 We go into some detail for some of the internal components.
 
+@subpage arch-block
+
+The Block Manager manages the reading and writing of disk blocks.
+
+@subpage arch-cache
+
+Cache is represented by the various shared data structures that
+make up in-memory Btrees and subordinate data structures.
+
+@subpage arch-column
+
+Column Stores are Btrees that have as their key a record id.
+
+@subpage arch-cursor
+
+Cursors are used to get and modify data.
+
+@subpage arch-data-file
+
+The format of the data file is given by structures in \c block.h .
+
 @subpage arch-dhandle
 
 An internal structure called a Data Handle (dhandle) is used to represent and
 access Btrees and other data sources in WiredTiger.
 
+@subpage arch-eviction
+
+Eviction represents the process or removing old data from the cache,
+writing it to disk if it is dirty.
+
+@subpage arch-fs-os
+
+A layer of abstraction is above all operating system calls and
+a set of functions can be registered to be called for each file system
+operation.
+
+@subpage arch-hs
+
+The History Store tracks old versions of records.
+
+@subpage arch-logging
+
+WiredTiger writes all changes into a write-ahead log when configured.
+
+@subpage arch-log-file
+
+The format of a log file is defined in \c log.h .
+
+@subpage arch-metadata
+
+Metadata is stored as <code>uri, config</code> K/V pairs in a designated table.
+
+@subpage arch-python
+
+WiredTiger has a Python API that is useful for scripting and experimentation.
+
+@subpage arch-row
+
+Row Stores are Btrees that have a variable size key and data.
+
 @subpage arch-schema
 
 A schema defines the format of the application data in WiredTiger.
+
+@subpage arch-snapshot
+
+Snapshots are implemented by storing transaction ids committed before
+the transaction started.
 
 @subpage arch-transaction
 
