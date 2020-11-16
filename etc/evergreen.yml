@@ -1568,7 +1568,7 @@ functions:
           set -o verbose
 
           # Only run on master branch
-          if [[ "${project}" == "mongodb-mongo-master" -a "${is_patch}" == "true" ]]; then
+          if [ "${project}" == "mongodb-mongo-master" -a "${is_patch}" == "true" ]; then
             ${activate_virtualenv}
             PATH=$PATH:$HOME $python buildscripts/selected_tests.py --expansion-file expansions.yml --selected-tests-config .selected_tests.yml
           fi
