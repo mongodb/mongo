@@ -489,11 +489,7 @@ protected:
                                             Timestamp fetchTimestamp,
                                             std::vector<ChunkType> expectedChunks,
                                             std::vector<TagsType> expectedZones) {
-        resharding::persistCommittedState(operationContext(),
-                                          expectedCoordinatorDoc,
-                                          _finalEpoch,
-                                          expectedChunks.size(),
-                                          expectedZones.size());
+        resharding::persistCommittedState(operationContext(), expectedCoordinatorDoc, _finalEpoch);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -697,35 +693,6 @@ TEST_F(ReshardingCoordinatorPersistenceTest,
                            operationContext(), coordinatorDoc),
                        AssertionException,
                        50577);
-}
-
-TEST_F(ReshardingCoordinatorPersistenceTest, PersistCommitDoesNotMatchChunksFails) {
-    // Insert entries to config.reshardingOperations, config.collections, and config.chunks (for the
-    // original shard key), but do not insert initital chunks entries for the new shard key into
-    // config.chunks to mock a scenario where the initial chunks entries are missing
-    Timestamp fetchTimestamp = Timestamp(1, 1);
-    auto coordinatorDoc = insertStateAndCatalogEntries(
-        CoordinatorStateEnum::kMirroring, _originalEpoch, fetchTimestamp);
-
-    // Only insert chunks for the original namespace
-    insertChunkAndZoneEntries(
-        makeChunks(_originalNss, OID::gen(), _oldShardKey, std::vector{OID::gen(), OID::gen()}),
-        {});
-
-    // Persist the updates on disk
-    auto expectedCoordinatorDoc = coordinatorDoc;
-    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitted);
-
-    // The new epoch to use for the resharded collection to indicate that the collection is a
-    // new incarnation of the namespace
-    auto updatedChunks =
-        makeChunks(_originalNss, _finalEpoch, _newShardKey, std::vector{OID::gen(), OID::gen()});
-
-    ASSERT_THROWS_CODE(
-        resharding::persistCommittedState(
-            operationContext(), expectedCoordinatorDoc, _finalEpoch, updatedChunks.size(), 0),
-        AssertionException,
-        5030401);
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest,

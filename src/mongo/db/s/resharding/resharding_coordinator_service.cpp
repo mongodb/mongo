@@ -334,8 +334,6 @@ void removeChunkAndTagsDocsForOriginalNss(OperationContext* opCtx,
 void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
                                       const ReshardingCoordinatorDocument& coordinatorDoc,
                                       OID newCollectionEpoch,
-                                      boost::optional<int> expectedNumChunksModified,
-                                      boost::optional<int> expectedNumZonesModified,
                                       TxnNumber txnNumber) {
     // Update all chunk documents that currently have 'ns' as the temporary collection namespace
     // such that 'ns' is now the original collection namespace and 'lastmodEpoch' is
@@ -352,10 +350,6 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
     auto chunksRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, ChunkType::ConfigNS, chunksRequest, txnNumber);
 
-    if (expectedNumChunksModified) {
-        assertNumDocsModifiedMatchesExpected(chunksRequest, chunksRes, *expectedNumChunksModified);
-    }
-
     auto tagsRequest =
         buildUpdateOp(TagsType::ConfigNS,
                       BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns())),  // query
@@ -368,10 +362,6 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
     // currently have 'ns' as the temporary collection namespace
     auto tagsRes = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
         opCtx, TagsType::ConfigNS, tagsRequest, txnNumber);
-
-    if (expectedNumZonesModified) {
-        assertNumDocsModifiedMatchesExpected(tagsRequest, tagsRes, *expectedNumZonesModified);
-    }
 }
 
 /**
@@ -536,9 +526,7 @@ void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
 
 void persistCommittedState(OperationContext* opCtx,
                            const ReshardingCoordinatorDocument& coordinatorDoc,
-                           OID newCollectionEpoch,
-                           boost::optional<int> expectedNumChunksModified,
-                           boost::optional<int> expectedNumZonesModified) {
+                           OID newCollectionEpoch) {
     executeStateTransitionAndMetadataChangesInTxn(
         opCtx, coordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {
             // Update the config.reshardingOperations entry
@@ -557,12 +545,7 @@ void persistCommittedState(OperationContext* opCtx,
             // update the chunk and tag docs currently associated with the temp nss to be associated
             // with the original nss
             removeChunkAndTagsDocsForOriginalNss(opCtx, coordinatorDoc, txnNumber);
-            updateChunkAndTagsDocsForTempNss(opCtx,
-                                             coordinatorDoc,
-                                             newCollectionEpoch,
-                                             expectedNumChunksModified,
-                                             expectedNumZonesModified,
-                                             txnNumber);
+            updateChunkAndTagsDocsForTempNss(opCtx, coordinatorDoc, newCollectionEpoch, txnNumber);
         });
 }
 
@@ -829,31 +812,12 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kCommitted);
 
-    // Get the number of initial chunks and new zones that we inserted during initialization in
-    // order to assert we match the same number when updating below.
-    boost::optional<int> expectedNumChunksModified;
-    boost::optional<int> expectedNumZonesModified;
-    if (_initialChunksAndZonesPromise.getFuture().isReady()) {
-        auto chunksAndZones =
-            uassertStatusOK(_initialChunksAndZonesPromise.getFuture().getNoThrow());
-        // TODO asserting that the updates to config.chunks and config.tags (run in
-        // persistCommittedState) match 'expectedNumChunksModified' and 'expectedNumZonesModified'
-        // is dependent on both the balancer and auto-splitter being off for the temporary
-        // collection. If we decide to leave the auto-splitter enabled, we will need to revisit this
-        // assumption.
-        expectedNumChunksModified = chunksAndZones.initialChunks.size();
-        expectedNumZonesModified = chunksAndZones.newZones.size();
-    }
     auto opCtx = cc().makeOperationContext();
 
     // The new epoch to use for the resharded collection to indicate that the collection is a
     // new incarnation of the namespace
     auto newCollectionEpoch = OID::gen();
-    resharding::persistCommittedState(opCtx.get(),
-                                      updatedCoordinatorDoc,
-                                      newCollectionEpoch,
-                                      expectedNumChunksModified,
-                                      expectedNumZonesModified);
+    resharding::persistCommittedState(opCtx.get(), updatedCoordinatorDoc, newCollectionEpoch);
 
     // Update the in memory state
     _coordinatorDoc = updatedCoordinatorDoc;
