@@ -105,6 +105,10 @@ void HashAggStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
 
+    if (reOpen) {
+        _ht.clear();
+    }
+
     while (_children[0]->getNext() == PlanState::ADVANCED) {
         value::MaterializedRow key{_inKeyAccessors.size()};
         // Copy keys in order to do the lookup.
@@ -161,6 +165,7 @@ const SpecificStats* HashAggStage::getSpecificStats() const {
 
 void HashAggStage::close() {
     _commonStats.closes++;
+    _ht.clear();
 }
 
 std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {

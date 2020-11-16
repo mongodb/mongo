@@ -32,6 +32,7 @@
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
@@ -126,6 +127,12 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
     return defaultCase;
 }
 
+std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,
+                                              PlanNodeId planNodeId,
+                                              long long limit) {
+    return sbe::makeS<sbe::LimitSkipStage>(std::move(inputStage), limit, boost::none, planNodeId);
+}
+
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit) {
     return sbe::makeS<sbe::LimitSkipStage>(
         sbe::makeS<sbe::CoScanStage>(planNodeId), limit, boost::none, planNodeId);
@@ -202,6 +209,36 @@ EvalStage makeLoopJoin(EvalStage left,
             std::move(outSlots)};
 }
 
+EvalStage makeUnwind(EvalStage inputEvalStage,
+                     sbe::value::SlotIdGenerator* slotIdGenerator,
+                     PlanNodeId planNodeId,
+                     bool preserveNullAndEmptyArrays) {
+    auto unwindSlot = slotIdGenerator->generate();
+    auto unwindStage = sbe::makeS<sbe::UnwindStage>(std::move(inputEvalStage.stage),
+                                                    inputEvalStage.outSlots.front(),
+                                                    unwindSlot,
+                                                    slotIdGenerator->generate(),
+                                                    preserveNullAndEmptyArrays,
+                                                    planNodeId);
+    return {std::move(unwindStage), sbe::makeSV(unwindSlot)};
+}
+
+EvalStage makeBranch(std::unique_ptr<sbe::EExpression> ifExpr,
+                     EvalStage thenStage,
+                     EvalStage elseStage,
+                     sbe::value::SlotIdGenerator* slotIdGenerator,
+                     PlanNodeId planNodeId) {
+    auto outSlots = slotIdGenerator->generateMultiple(thenStage.outSlots.size());
+    auto branchStage = sbe::makeS<sbe::BranchStage>(std::move(thenStage.stage),
+                                                    std::move(elseStage.stage),
+                                                    std::move(ifExpr),
+                                                    thenStage.outSlots,
+                                                    elseStage.outSlots,
+                                                    outSlots,
+                                                    planNodeId);
+    return {std::move(branchStage), std::move(outSlots)};
+}
+
 EvalStage makeTraverse(EvalStage outer,
                        EvalStage inner,
                        sbe::value::SlotId inField,
@@ -238,10 +275,10 @@ EvalStage makeTraverse(EvalStage outer,
             std::move(outSlots)};
 }
 
-EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branches,
-                                            BranchFn branchFn,
-                                            PlanNodeId planNodeId,
-                                            sbe::value::SlotIdGenerator* slotIdGenerator) {
+EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
+                                BranchFn branchFn,
+                                PlanNodeId planNodeId,
+                                sbe::value::SlotIdGenerator* slotIdGenerator) {
     std::vector<std::unique_ptr<sbe::PlanStage>> stages;
     std::vector<sbe::value::SlotVector> inputs;
     stages.reserve(branches.size());
@@ -266,11 +303,20 @@ EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branc
     auto outputSlot = slotIdGenerator->generate();
     auto unionStage = sbe::makeS<sbe::UnionStage>(
         std::move(stages), std::move(inputs), sbe::makeSV(outputSlot), planNodeId);
-    EvalStage outputStage = {
-        sbe::makeS<sbe::LimitSkipStage>(std::move(unionStage), 1, boost::none, planNodeId),
-        sbe::makeSV(outputSlot)};
+    EvalStage outputStage{std::move(unionStage), sbe::makeSV(outputSlot)};
 
     return {outputSlot, std::move(outputStage)};
+}
+
+EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branches,
+                                            BranchFn branchFn,
+                                            PlanNodeId planNodeId,
+                                            sbe::value::SlotIdGenerator* slotIdGenerator) {
+    auto [unionEvalExpr, unionEvalStage] =
+        generateUnion(std::move(branches), std::move(branchFn), planNodeId, slotIdGenerator);
+    return {std::move(unionEvalExpr),
+            EvalStage{makeLimitTree(std::move(unionEvalStage.stage), planNodeId),
+                      std::move(unionEvalStage.outSlots)}};
 }
 
 EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,

@@ -124,6 +124,13 @@ std::unique_ptr<sbe::EExpression> buildMultiBranchConditional(
     std::unique_ptr<sbe::EExpression> defaultCase);
 
 /**
+ * Insert a limit stage on top of the 'input' stage.
+ */
+std::unique_ptr<sbe::PlanStage> makeLimitTree(std::unique_ptr<sbe::PlanStage> inputStage,
+                                              PlanNodeId planNodeId,
+                                              long long limit = 1);
+
+/**
  * Create tree consisting of coscan stage followed by limit stage.
  */
 std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long long limit = 1);
@@ -150,6 +157,14 @@ std::unique_ptr<sbe::EExpression> makeNot(std::unique_ptr<sbe::EExpression> e);
 std::unique_ptr<sbe::EExpression> makeFillEmptyFalse(std::unique_ptr<sbe::EExpression> e);
 
 /**
+ * Creates an EFunction expression with the given name and arguments.
+ */
+template <typename... Args>
+inline std::unique_ptr<sbe::EExpression> makeFunction(std::string_view name, Args&&... args) {
+    return sbe::makeE<sbe::EFunction>(name, sbe::makeEs(std::forward<Args>(args)...));
+}
+
+/**
  * If given 'EvalExpr' already contains a slot, simply returns it. Otherwise, allocates a new slot
  * and creates project stage to assign expression to this new slot. After that, new slot and project
  * stage are returned.
@@ -160,13 +175,13 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     PlanNodeId planNodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator);
 
-template <bool IsConst>
+template <bool IsConst, bool IsEof = false>
 EvalStage makeFilter(EvalStage stage,
                      std::unique_ptr<sbe::EExpression> filter,
                      PlanNodeId planNodeId) {
     stage = stageOrLimitCoScan(std::move(stage), planNodeId);
 
-    return {sbe::makeS<sbe::FilterStage<IsConst>>(
+    return {sbe::makeS<sbe::FilterStage<IsConst, IsEof>>(
                 std::move(stage.stage), std::move(filter), planNodeId),
             std::move(stage.outSlots)};
 }
@@ -199,6 +214,27 @@ EvalStage makeLoopJoin(EvalStage left,
                        const sbe::value::SlotVector& lexicalEnvironment = {});
 
 /**
+ * Creates an unwind stage and an output slot for it using the first slot in the outSlots vector of
+ * the inputEvalStage as the input slot to the new stage. The preserveNullAndEmptyArrays is passed
+ * to the UnwindStage constructor to specify the treatment of null or missing inputs.
+ */
+EvalStage makeUnwind(EvalStage inputEvalStage,
+                     sbe::value::SlotIdGenerator* slotIdGenerator,
+                     PlanNodeId planNodeId,
+                     bool preserveNullAndEmptyArrays = true);
+
+/**
+ * Creates a branch stage with the specified condition ifExpr and creates output slots for the
+ * branch stage. This forwards the outputs of the thenStage to the output slots of the branchStage
+ * if the condition evaluates to true, and forwards the elseStage outputs if the condition is false.
+ */
+EvalStage makeBranch(std::unique_ptr<sbe::EExpression> ifExpr,
+                     EvalStage thenStage,
+                     EvalStage elseStage,
+                     sbe::value::SlotIdGenerator* slotIdGenerator,
+                     PlanNodeId planNodeId);
+
+/**
  * Creates traverse stage. All 'outSlots' from 'outer' argument (except for 'inField') along with
  * slots from the 'lexicalEnvironment' argument are passed as correlated.
  */
@@ -219,6 +255,14 @@ using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
     PlanNodeId planNodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator)>;
 
+/**
+ * Creates a union stage with specified branches. Each branch is passed to 'branchFn' first. If
+ * 'branchFn' is not set, expression from branch is simply projected to a slot.
+ */
+EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
+                                BranchFn branchFn,
+                                PlanNodeId planNodeId,
+                                sbe::value::SlotIdGenerator* slotIdGenerator);
 /**
  * Creates limit-1/union stage with specified branches. Each branch is passed to 'branchFn' first.
  * If 'branchFn' is not set, expression from branch is simply projected to a slot.

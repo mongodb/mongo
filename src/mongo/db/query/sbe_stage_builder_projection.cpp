@@ -233,7 +233,7 @@ public:
         // existing 'fieldPathExpressionsTraverseStage' sub-tree.
         auto [outputSlot, expr, stage] =
             generateExpression(_context->opCtx,
-                               node->expressionRaw(),
+                               node->expression()->optimize().get(),
                                std::move(_context->topLevel().fieldPathExpressionsTraverseStage),
                                _context->slotIdGenerator,
                                _context->frameIdGenerator,
