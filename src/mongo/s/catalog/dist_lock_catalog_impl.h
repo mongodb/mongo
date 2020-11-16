@@ -35,13 +35,13 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/find_and_modify_command_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/dist_lock_catalog.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
-class FindAndModifyRequest;
 struct ReadPreferenceSetting;
 
 class DistLockCatalogImpl final : public DistLockCatalog {
@@ -86,7 +86,7 @@ public:
     Status stopPing(OperationContext* opCtx, StringData processId) override;
 
 private:
-    Status _unlock(OperationContext* opCtx, const FindAndModifyRequest& request);
+    Status _unlock(OperationContext* opCtx, const write_ops::FindAndModifyCommand& request);
 
     StatusWith<std::vector<BSONObj>> _findOnConfig(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& readPref,

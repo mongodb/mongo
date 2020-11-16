@@ -34,7 +34,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/find_and_modify_result.h"
-#include "mongo/db/query/find_and_modify_request.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/logv2/redaction.h"
 
 namespace mongo {
@@ -45,7 +45,7 @@ namespace {
  * In the case of nested oplog entry where the correct links are in the top level
  * oplog, oplogWithCorrectLinks can be used to specify the outer oplog.
  */
-void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
+void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommand& request,
                                        const repl::OplogEntry& oplogEntry,
                                        const repl::OplogEntry& oplogWithCorrectLinks) {
     auto opType = oplogEntry.getOpType();
@@ -58,7 +58,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                           << " is not compatible with previous write in the transaction of type: "
                           << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
-            request.isRemove());
+            request.getRemove().value_or(false));
         uassert(40607,
                 str::stream() << "No pre-image available for findAndModify retry request:"
                               << redact(request.toBSON({})),
@@ -70,7 +70,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                           << " is not compatible with previous write in the transaction of type: "
                           << OpType_serializer(oplogEntry.getOpType()) << ", oplogTs: "
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
-            request.isUpsert());
+            request.getUpsert().value_or(false));
     } else {
         uassert(
             40609,
@@ -80,7 +80,7 @@ void validateFindAndModifyRetryability(const FindAndModifyRequest& request,
                           << ts.toString() << ", oplog: " << redact(oplogEntry.toBSON()),
             opType == repl::OpTypeEnum::kUpdate);
 
-        if (request.shouldReturnNew()) {
+        if (request.getNew().value_or(false)) {
             uassert(40611,
                     str::stream() << "findAndModify retry request: " << redact(request.toBSON({}))
                                   << " wants the document after update returned, but only before "
@@ -127,7 +127,7 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
  * are in the top level oplog, oplogWithCorrectLinks can be used to specify the outer oplog.
  */
 void parseOplogEntryForFindAndModify(OperationContext* opCtx,
-                                     const FindAndModifyRequest& request,
+                                     const write_ops::FindAndModifyCommand& request,
                                      const repl::OplogEntry& oplogEntry,
                                      const repl::OplogEntry& oplogWithCorrectLinks,
                                      BSONObjBuilder* builder) {
@@ -135,12 +135,13 @@ void parseOplogEntryForFindAndModify(OperationContext* opCtx,
 
     switch (oplogEntry.getOpType()) {
         case repl::OpTypeEnum::kInsert:
-            return find_and_modify::serializeUpsert(
-                1,
-                request.shouldReturnNew() ? oplogEntry.getObject() : boost::optional<BSONObj>(),
-                false,
-                oplogEntry.getObject()["_id"],
-                builder);
+            return find_and_modify::serializeUpsert(1,
+                                                    request.getNew().value_or(false)
+                                                        ? oplogEntry.getObject()
+                                                        : boost::optional<BSONObj>(),
+                                                    false,
+                                                    oplogEntry.getObject()["_id"],
+                                                    builder);
         case repl::OpTypeEnum::kUpdate:
             return find_and_modify::serializeUpsert(
                 1, extractPreOrPostImage(opCtx, oplogWithCorrectLinks), true, {}, builder);
@@ -191,7 +192,7 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
 }
 
 void parseOplogEntryForFindAndModify(OperationContext* opCtx,
-                                     const FindAndModifyRequest& request,
+                                     const write_ops::FindAndModifyCommand& request,
                                      const repl::OplogEntry& oplogEntry,
                                      BSONObjBuilder* builder) {
     // Migrated op case.

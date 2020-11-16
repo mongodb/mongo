@@ -47,7 +47,7 @@ assert.commandWorked(m2.getCollection("test.foo").insert({m2: 97}));
 var sixthOp = m2.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 // No-op find-and-modify delete
-m1.getCollection("test.foo").findAndModify({query: {m1: 1}, remove: 'true'});
+m1.getCollection("test.foo").findAndModify({query: {m1: 1}, remove: true});
 noOp = m1.getCollection("test.foo").getDB().getLastErrorObj().lastOp;
 
 assert.eq(noOp, sixthOp);

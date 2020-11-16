@@ -35,7 +35,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"

@@ -36,7 +36,7 @@ assert.commandFailedWithCode(explainDB.runCommand({explain: {distinct: uuid, key
 const expectedCode = TestData.auth ? 17137 : ErrorCodes.InvalidNamespace;
 assert.commandFailedWithCode(
     explainDB.runCommand({explain: {findAndModify: uuid, query: {a: 1}, remove: true}}),
-    expectedCode);
+    [expectedCode, ErrorCodes.BadValue]);
 
 assert.commandFailedWithCode(
     explainDB.runCommand({explain: {delete: uuid, deletes: [{q: {}, limit: 1}]}}),

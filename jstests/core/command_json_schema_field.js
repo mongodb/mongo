@@ -30,7 +30,7 @@ assertCommandFailsWithCorrectError({find: coll.getName(), jsonSchema: {}},
 // FindAndModify
 assertCommandFailsWithCorrectError(
     {findAndModify: coll.getName(), query: {_id: 0}, remove: true, jsonSchema: {}},
-    ErrorCodes.FailedToParse);
+    [ErrorCodes.FailedToParse, 4662500]);
 
 // Count
 assertCommandFailsWithCorrectError({count: coll.getName(), jsonSchema: {}}, 4662500);

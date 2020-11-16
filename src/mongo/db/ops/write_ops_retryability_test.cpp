@@ -37,7 +37,6 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_retryability.h"
-#include "mongo/db/query/find_and_modify_request.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -97,6 +96,16 @@ void setUpTxnParticipant(OperationContext* opCtx, std::vector<int> executedStmtI
     opCtx->setTxnNumber(1);
     auto txnPart = TransactionParticipant::get(opCtx);
     txnPart.setCommittedStmtIdsForTest(std::move(executedStmtIds));
+}
+
+write_ops::FindAndModifyCommand makeFindAndModifyRequest(
+    NamespaceString fullNs, BSONObj query, boost::optional<write_ops::UpdateModification> update) {
+    auto request = write_ops::FindAndModifyCommand(fullNs);
+    request.setQuery(query);
+    if (update) {
+        request.setUpdate(std::move(update));
+    }
+    return request;
 }
 
 TEST_F(WriteOpsRetryability, ParseOplogEntryForUpdate) {
@@ -343,7 +352,7 @@ protected:
      * BSONObjBuilder.
      */
     static BSONObj constructFindAndModifyRetryResult(OperationContext* opCtx,
-                                                     const FindAndModifyRequest& request,
+                                                     const write_ops::FindAndModifyCommand& request,
                                                      const repl::OplogEntry& oplogEntry) {
         BSONObjBuilder builder;
         parseOplogEntryForFindAndModify(opCtx, request, oplogEntry, &builder);
@@ -354,10 +363,10 @@ protected:
 const NamespaceString kNs("test.user");
 
 TEST_F(FindAndModifyRetryability, BasicUpsertReturnNew) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
     request.setUpsert(true);
-    request.setShouldReturnNew(true);
+    request.setNew(true);
 
     auto insertOplog = makeOplogEntry(repl::OpTime(),             // optime
                                       repl::OpTypeEnum::kInsert,  // op type
@@ -378,10 +387,10 @@ TEST_F(FindAndModifyRetryability, BasicUpsertReturnNew) {
 }
 
 TEST_F(FindAndModifyRetryability, BasicUpsertReturnOld) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
     request.setUpsert(true);
-    request.setShouldReturnNew(false);
+    request.setNew(false);
 
     auto insertOplog = makeOplogEntry(repl::OpTime(),             // optime
                                       repl::OpTypeEnum::kInsert,  // op type
@@ -399,10 +408,10 @@ TEST_F(FindAndModifyRetryability, BasicUpsertReturnOld) {
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpsert) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
     request.setUpsert(true);
-    request.setShouldReturnNew(true);
+    request.setNew(true);
 
     auto innerOplog = makeOplogEntry(repl::OpTime(),                       // optime
                                      repl::OpTypeEnum::kInsert,            // op type
@@ -422,7 +431,7 @@ TEST_F(FindAndModifyRetryability, NestedUpsert) {
 }
 
 TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithUpdateWithoutUpsertErrors) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
     request.setUpsert(false);
 
@@ -436,9 +445,9 @@ TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithUpdateWithoutUpsert
 }
 
 TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPostImageButOplogHasPre) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(true);
+    request.setNew(true);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                    // optime
@@ -461,9 +470,9 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPostImageButOplogHasPre) {
 }
 
 TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpdateButOplogIsDelete) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(true);
+    request.setNew(true);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                    // optime
@@ -485,9 +494,9 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsUpdateButOplogIsDelete) {
 }
 
 TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(false);
+    request.setNew(false);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                    // optime
@@ -510,9 +519,9 @@ TEST_F(FindAndModifyRetryability, ErrorIfRequestIsPreImageButOplogHasPost) {
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(false);
+    request.setNew(false);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                    // optime
@@ -537,9 +546,9 @@ TEST_F(FindAndModifyRetryability, UpdateWithPreImage) {
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(false);
+    request.setNew(false);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                    // optime
@@ -570,9 +579,9 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPreImage) {
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(true);
+    request.setNew(true);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                  // optime
@@ -597,9 +606,9 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImage) {
 }
 
 TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(true);
+    request.setNew(true);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                  // optime
@@ -630,9 +639,9 @@ TEST_F(FindAndModifyRetryability, NestedUpdateWithPostImage) {
 }
 
 TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldError) {
-    auto request = FindAndModifyRequest::makeUpdate(
+    auto request = makeFindAndModifyRequest(
         kNs, BSONObj(), write_ops::UpdateModification::parseFromClassicUpdate(BSONObj()));
-    request.setShouldReturnNew(true);
+    request.setNew(true);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto updateOplog = makeOplogEntry(repl::OpTime(),                // optime
@@ -648,7 +657,8 @@ TEST_F(FindAndModifyRetryability, UpdateWithPostImageButOplogDoesNotExistShouldE
 }
 
 TEST_F(FindAndModifyRetryability, BasicRemove) {
-    auto request = FindAndModifyRequest::makeRemove(kNs, BSONObj());
+    auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
+    request.setRemove(true);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                     // optime
@@ -673,7 +683,8 @@ TEST_F(FindAndModifyRetryability, BasicRemove) {
 }
 
 TEST_F(FindAndModifyRetryability, NestedRemove) {
-    auto request = FindAndModifyRequest::makeRemove(kNs, BSONObj());
+    auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
+    request.setRemove(true);
 
     repl::OpTime imageOpTime(Timestamp(120, 3), 1);
     auto noteOplog = makeOplogEntry(imageOpTime,                     // optime
@@ -703,7 +714,7 @@ TEST_F(FindAndModifyRetryability, NestedRemove) {
 }
 
 TEST_F(FindAndModifyRetryability, AttemptingToRetryUpsertWithRemoveErrors) {
-    auto request = FindAndModifyRequest::makeRemove(kNs, BSONObj());
+    auto request = makeFindAndModifyRequest(kNs, BSONObj(), boost::none);
 
     auto insertOplog = makeOplogEntry(repl::OpTime(),             // optime
                                       repl::OpTypeEnum::kInsert,  // op type
