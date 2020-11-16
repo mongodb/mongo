@@ -1224,13 +1224,13 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
         bool positioned = false;  // Mark if the cursor is on the first key
         RecordId savedFirstKey;
 
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+
         // If we know where the first record is, go to it
         if (_cappedFirstRecord != RecordId()) {
             setKey(truncateEnd, _cappedFirstRecord);
             ret = wiredTigerPrepareConflictRetry(opCtx,
                                                  [&] { return truncateEnd->search(truncateEnd); });
-
-            auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
             metricsCollector.incrementOneCursorSeek();
 
             if (ret == 0) {
@@ -1253,6 +1253,7 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
 
             WT_ITEM old_value;
             invariantWTOK(truncateEnd->get_value(truncateEnd, &old_value));
+            metricsCollector.incrementOneDocRead(old_value.size);
 
             ++docsRemoved;
             sizeSaved += old_value.size;
@@ -1303,7 +1304,10 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
                     if (--toRemove > 0) {
                         firstRecordId = getKey(truncateEnd);
                     }
+                    WT_ITEM old_value;
+                    ret = truncateEnd->get_value(truncateEnd, &old_value);
                     invariantWTOK(wiredTigerCursorRemove(opCtx, truncateEnd));
+                    metricsCollector.incrementOneDocWritten(old_value.size);
                 }
                 ret = 0;
             } else {
@@ -1317,6 +1321,12 @@ int64_t WiredTigerRecordStore::_cappedDeleteAsNeeded_inlock(OperationContext* op
                 // operation faster.
                 _positionAtFirstRecordId(opCtx, truncateStart, savedFirstKey, true);
                 ret = session->truncate(session, nullptr, truncateStart, truncateEnd, nullptr);
+                // We do not count the truncate operation in the write metrics because truncate
+                // is very efficient. We do count the reads performed above (that determine the
+                // number of documents to delete) because reading at the beginning of a capped
+                // collection is the most expensive part due to the data almost always being out of
+                // cache. By counting the read operations but not the truncate operation we are able
+                // to represent the cost of this operation most accurately.
             }
 
             invariantWTOK(ret);

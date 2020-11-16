@@ -2,6 +2,7 @@
  * Tests that resource consumption metrics are reported in the profiler.
  *
  *  @tags: [
+ *    requires_capped,
  *    requires_fcv_47,
  *    requires_replication,
  *    requires_wiredtiger,
@@ -1133,6 +1134,117 @@ const operations = [
             assert.eq(profileDoc.sorterSpills, 0);
         },
     },
+    {
+        name: 'cappedInitialSetup',
+        command: (db) => {
+            db.capped.drop();
+            assert.commandWorked(
+                db.createCollection("capped", {capped: true, size: 4096, max: 10}));
+            db.capped.insert({_id: 0, a: 0});
+        },
+        profileFilter: {op: 'insert', 'command.insert': 'capped'},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.docUnitsRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 29);
+            assert.eq(profileDoc.docUnitsWritten, 1);
+            assert.eq(profileDoc.idxEntryBytesWritten, 2);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+        }
+    },
+    resetProfileColl,
+    {
+        name: 'cappedFillWithNineDocs',
+        command: (db) => {
+            let docs = [];
+            for (let i = 1; i < 10; i++) {
+                docs.push({_id: i, a: i});
+            }
+            db.capped.insertMany(docs);
+            assert.eq(db.capped.find({_id: 0}).itcount(), 1);
+        },
+        profileFilter: {op: 'insert', 'command.insert': 'capped'},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 0);
+            assert.eq(profileDoc.docUnitsRead, 0);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 261);
+            assert.eq(profileDoc.docUnitsWritten, 9);
+            assert.eq(profileDoc.idxEntryBytesWritten, 27);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 9);
+        }
+    },
+    resetProfileColl,
+    {
+        name: 'cappedExtraOne',
+        command: (db) => {
+            db.capped.insert({_id: 10, a: 10});
+            assert.eq(db.capped.find({a: 0}).itcount(), 0);
+        },
+        profileFilter: {op: 'insert', 'command.insert': 'capped'},
+        profileAssert: (db, profileDoc) => {
+            if (!isDebugBuild(db)) {
+                // Should read exactly as many bytes as are in the document that is being deleted.
+                // Debug builds may perform extra reads of the _mdb_catalog.
+                assert.eq(profileDoc.docBytesRead, 29);
+                assert.eq(profileDoc.docUnitsRead, 1);
+                // The first time doing a capped delete, we don't know what the _cappedFirstRecord
+                // should be so we cannot seek to it.
+                assert.eq(profileDoc.cursorSeeks, 0);
+            } else {
+                assert.gte(profileDoc.docBytesRead, 29);
+                assert.gte(profileDoc.docUnitsRead, 1);
+                assert.gte(profileDoc.cursorSeeks, 0);
+            }
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.docBytesWritten, 58);
+            assert.eq(profileDoc.docUnitsWritten, 2);
+            assert.eq(profileDoc.idxEntryBytesWritten, 5);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+        }
+    },
+    resetProfileColl,
+    {
+        name: 'cappedExtraNine',
+        command: (db) => {
+            let docs = [];
+            for (let i = 11; i < 20; i++) {
+                docs.push({_id: i, a: i});
+            }
+            db.capped.insertMany(docs);
+            assert.eq(db.capped.find({a: 9}).itcount(), 0);
+            assert.eq(db.capped.find({a: 10}).itcount(), 1);
+        },
+        profileFilter: {op: 'insert', 'command.insert': 'capped'},
+        profileAssert: (db, profileDoc) => {
+            if (!isDebugBuild(db)) {
+                // Should read exactly as many bytes as are in the documents that are being deleted.
+                // Debug builds may perform extra reads of the _mdb_catalog.
+                assert.eq(profileDoc.docBytesRead, 261);
+                assert.eq(profileDoc.docUnitsRead, 9);
+                // Each capped delete seeks twice if it knows what record to start at. Once at the
+                // start of the delete process and then once again to reposition itself at the first
+                // record to delete after it figures out how many documents must be deleted.
+                assert.eq(profileDoc.cursorSeeks, 18);
+            } else {
+                assert.gte(profileDoc.docBytesRead, 261);
+                assert.gte(profileDoc.docUnitsRead, 9);
+                assert.gte(profileDoc.cursorSeeks, 18);
+            }
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.docBytesWritten, 522);
+            assert.eq(profileDoc.docUnitsWritten, 18);
+            assert.eq(profileDoc.idxEntryBytesWritten, 54);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 18);
+        }
+    }
 ];
 
 const testOperation = (db, operation) => {
