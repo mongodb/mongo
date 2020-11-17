@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/mock_fixture.h"
+#include "mongo/executor/mock_network_fixture.h"
 
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/executor/network_interface_mock.h"

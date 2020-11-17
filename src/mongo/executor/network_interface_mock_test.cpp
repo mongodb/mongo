@@ -36,67 +36,12 @@
 #include "mongo/base/status.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
-#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/network_interface_mock_test_fixture.h"
 #include "mongo/executor/test_network_connection_hook.h"
-#include "mongo/executor/thread_pool_mock.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace executor {
 namespace {
-
-class NetworkInterfaceMockTest : public mongo::unittest::Test {
-public:
-    NetworkInterfaceMockTest()
-        : _net{}, _executor(&_net, 1, ThreadPoolMock::Options()), _tearDownCalled(false) {}
-
-    NetworkInterfaceMock& net() {
-        return _net;
-    }
-
-    ThreadPoolMock& executor() {
-        return _executor;
-    }
-
-    HostAndPort testHost() {
-        return {"localHost", 27017};
-    }
-
-    // intentionally not done in setUp as some methods need to be called prior to starting
-    // the network.
-    void startNetwork() {
-        net().startup();
-        executor().startup();
-    }
-
-    virtual void setUp() override {
-        _tearDownCalled = false;
-    }
-
-    virtual void tearDown() override {
-        // We're calling tearDown() manually in some tests so
-        // we can check post-conditions.
-        if (_tearDownCalled) {
-            return;
-        }
-        _tearDownCalled = true;
-
-        net().exitNetwork();
-        executor().shutdown();
-        // Wake up sleeping executor threads so they clean up.
-        net().signalWorkAvailable();
-        executor().join();
-        net().shutdown();
-    }
-
-    RemoteCommandRequestOnAny kUnimportantRequest{
-        {testHost()}, "testDB", BSON("test" << 1), rpc::makeEmptyMetadata(), nullptr};
-
-private:
-    NetworkInterfaceMock _net;
-    ThreadPoolMock _executor;
-    bool _tearDownCalled;
-};
 
 TEST_F(NetworkInterfaceMockTest, ConnectionHook) {
     bool validateCalled = false;

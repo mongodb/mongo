@@ -790,7 +790,6 @@ env.Library(
 env.Library(
     target='replmocks',
     source=[
-        'mock_fixture.cpp',
         'replication_consistency_markers_mock.cpp',
         'replication_coordinator_external_state_mock.cpp',
         'replication_coordinator_mock.cpp',
@@ -806,9 +805,6 @@ env.Library(
         'repl_settings',
         'replica_set_messages',
         'storage_interface',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
     ],
 )
 

@@ -85,6 +85,7 @@ env.Library(
 env.Library(
     target='network_interface_mock',
     source=[
+        'mock_network_fixture.cpp',
         'network_interface_mock.cpp',
         'thread_pool_mock.cpp',
     ],
@@ -95,7 +96,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         'network_interface',
         'task_executor_interface',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+    ],
 )
 
 env.Library(
@@ -281,7 +285,9 @@ env.CppUnitTest(
     source=[
         'connection_pool_test.cpp',
         'connection_pool_test_fixture.cpp',
+        'mock_network_fixture_test.cpp',
         'network_interface_mock_test.cpp',
+        'network_interface_mock_test_fixture.cpp',
         'scoped_task_executor_test.cpp',
         'task_executor_cursor_test.cpp',
         'thread_pool_task_executor_test.cpp',
