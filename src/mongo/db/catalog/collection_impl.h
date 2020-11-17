@@ -462,8 +462,10 @@ private:
     // The validator is using shared state internally. Collections share validator until a new
     // validator is set in setValidator which sets a new instance.
     Validator _validator;
-    ValidationAction _validationAction;
-    ValidationLevel _validationLevel;
+    // The default values match the defaults of the functions that parse the validation action and
+    // level.
+    ValidationAction _validationAction = ERROR_V;
+    ValidationLevel _validationLevel = STRICT_V;
 
     bool _recordPreImages = false;
 
