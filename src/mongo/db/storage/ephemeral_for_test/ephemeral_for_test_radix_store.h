@@ -1843,7 +1843,7 @@ private:
         node_ptr newNode;
         if (childType == NodeType::LEAF) {
             newNode = make_intrusive_node<NodeLeaf>(key);
-        } else if (childType == NodeType::NODE4) {
+        } else {
             newNode = make_intrusive_node<Node4>(key);
         }
         newNode->_depth = node->_depth + node->_trieKey.size();
