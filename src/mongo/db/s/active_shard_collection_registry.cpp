@@ -127,7 +127,7 @@ void ActiveShardCollectionRegistry::_setUUIDOrError(std::string nss,
     auto iter = _activeShardCollectionMap.find(nss);
     invariant(iter != _activeShardCollectionMap.end());
     auto activeShardCollectionState = iter->second;
-    activeShardCollectionState->_uuidPromise.setFromStatusWith(swUUID);
+    activeShardCollectionState->_uuidPromise.setFrom(swUUID);
 }
 
 Status ActiveShardCollectionRegistry::ActiveShardCollectionState::constructErrorStatus(

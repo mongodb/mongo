@@ -434,7 +434,7 @@ TEST_F(ReadThroughCacheAsyncTest, FailedInProgressLookupForNotCausallyConsistent
     ASSERT(inProgress.valid(WithLock::withoutLock()));
     auto promisesToSet = inProgress.getAllPromisesOnError(WithLock::withoutLock());
     ASSERT_EQ(1U, promisesToSet.size());
-    promisesToSet.front()->setFromStatusWith(asyncLookupResult.getStatus());
+    promisesToSet.front()->setError(asyncLookupResult.getStatus());
 
     ASSERT(future.isReady());
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::InternalError);

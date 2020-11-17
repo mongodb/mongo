@@ -34,13 +34,19 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/concepts.h"
 
 #include "mongo/util/future_test_utils.h"
 
 namespace mongo {
 namespace {
 
-TEST(Promise, Success_setFrom) {
+static_assert(!canSetFrom<Promise<int>, int>, "Use Promise<T>::emplaceValue(...) instead");
+static_assert(!canSetFrom<Promise<int>, Status>, "Use Promise<T>::setError(...) instead");
+static_assert(canSetFrom<Promise<int>, StatusWith<int>>);
+static_assert(canSetFrom<Promise<int>, Future<int>>);
+
+TEST(Promise, Success_setFrom_future) {
     FUTURE_SUCCESS_TEST<kNoExecutorFuture_needsPromiseSetFrom>(
         [] { return 1; },
         [](/*Future<int>*/ auto&& fut) {
@@ -50,12 +56,24 @@ TEST(Promise, Success_setFrom) {
         });
 }
 
-TEST(Promise, Fail_setFrom) {
+TEST(Promise, Success_setFrom_statusWith) {
+    auto pf = makePromiseFuture<int>();
+    pf.promise.setFrom(StatusWith<int>(3));
+    ASSERT_EQ(std::move(pf.future).getNoThrow(), 3);
+}
+
+TEST(Promise, Fail_setFrom_future) {
     FUTURE_FAIL_TEST<int, kNoExecutorFuture_needsPromiseSetFrom>([](/*Future<int>*/ auto&& fut) {
         auto pf = makePromiseFuture<int>();
         pf.promise.setFrom(std::move(fut));
         ASSERT_THROWS_failStatus(std::move(pf.future).get());
     });
+}
+
+TEST(Promise, Fail_setFrom_statusWith_error) {
+    auto pf = makePromiseFuture<int>();
+    pf.promise.setFrom(StatusWith<int>(failStatus()));
+    ASSERT_THROWS_failStatus(std::move(pf.future).get());
 }
 
 TEST(Promise, Success_setWith_value) {

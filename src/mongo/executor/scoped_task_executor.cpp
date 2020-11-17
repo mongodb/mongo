@@ -68,7 +68,7 @@ public:
                 // We are guaranteed that no more callbacks can be added to _cbHandles after
                 // _inShutdown is set to true. If there aren't any callbacks outstanding, then it is
                 // shutdown()'s responsibility to make the futures returned by joinAll() ready.
-                _promise.setWith([] {});
+                _promise.emplaceValue();
             }
             _inShutdown = true;
 
@@ -341,7 +341,7 @@ private:
             // We are guaranteed that no more callbacks can be added to _cbHandles after _inShutdown
             // is set to true. If there are no more callbacks outstanding, then it is the last
             // callback's responsibility to make the futures returned by joinAll() ready.
-            _promise.setWith([] {});
+            _promise.emplaceValue();
         }
     }
 

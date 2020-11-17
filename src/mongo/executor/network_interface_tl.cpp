@@ -608,7 +608,7 @@ void NetworkInterfaceTL::CommandStateBase::doMetadataHook(
 
 void NetworkInterfaceTL::CommandState::fulfillFinalPromise(
     StatusWith<RemoteCommandOnAnyResponse> response) {
-    promise.setFromStatusWith(std::move(response));
+    promise.setFrom(std::move(response));
 }
 
 NetworkInterfaceTL::RequestManager::RequestManager(CommandStateBase* cmdState_)

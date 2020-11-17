@@ -380,7 +380,7 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
         })
         .getAsync([this, promise = std::move(p)](
                       StatusWith<std::pair<uint64_t, VectorTime>> swResult) mutable {
-            promise.setFromStatusWith(std::move(swResult));
+            promise.setFrom(std::move(swResult));
         });
 
     return future;

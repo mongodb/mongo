@@ -40,7 +40,11 @@
 namespace mongo {
 namespace {
 
-TEST(Promise_void, Success_setFrom) {
+static_assert(!canSetFrom<Promise<void>, void>, "Use Promise<T>::emplaceValue() instead");
+static_assert(canSetFrom<Promise<void>, Status>);
+static_assert(canSetFrom<Promise<void>, Future<void>>);
+
+TEST(Promise_void, Success_setFrom_future) {
     FUTURE_SUCCESS_TEST<kNoExecutorFuture_needsPromiseSetFrom>(
         [] {},
         [](/*Future<void>*/ auto&& fut) {
@@ -51,12 +55,24 @@ TEST(Promise_void, Success_setFrom) {
         });
 }
 
-TEST(Promise_void, Fail_setFrom) {
+TEST(Promise_void, Success_setFrom_status) {
+    auto pf = makePromiseFuture<void>();
+    pf.promise.setFrom(Status::OK());
+    ASSERT_OK(std::move(pf.future).getNoThrow());
+}
+
+TEST(Promise_void, Fail_setFrom_future) {
     FUTURE_FAIL_TEST<void, kNoExecutorFuture_needsPromiseSetFrom>([](/*Future<void>*/ auto&& fut) {
         auto pf = makePromiseFuture<void>();
         pf.promise.setFrom(std::move(fut));
         ASSERT_THROWS_failStatus(std::move(pf.future).get());
     });
+}
+
+TEST(Promise_void, Fail_setFrom_status) {
+    auto pf = makePromiseFuture<void>();
+    pf.promise.setFrom(failStatus());
+    ASSERT_THROWS_failStatus(std::move(pf.future).get());
 }
 
 TEST(Promise_void, Success_setWith_value) {

@@ -541,9 +541,9 @@ private:
             promisesToSet.pop_back();
 
             if (promisesToSet.empty())
-                p->setFromStatusWith(std::move(result));
+                p->setFrom(std::move(result));
             else
-                p->setFromStatusWith(result);
+                p->setFrom(result);
         }
 
         return mustDoAnotherLoop
