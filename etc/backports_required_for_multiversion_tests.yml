@@ -106,6 +106,8 @@ all:
     test_file: jstests/replsets/not_primary_errors_returned_if_client_sends_helloOk.js
   - ticket: SERVER-50412
     test_file: jstests/sharding/mongos_helloOk_protocol.js
+  - ticket: SERVER-50414
+    test_file: jstests/replsets/not_primary_errors_returned_during_rollback_if_helloOk.js
 
 # Tests that should only be excluded from particular suites should be listed under that suite.
 suites:

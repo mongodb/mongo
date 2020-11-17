@@ -2603,7 +2603,7 @@ TEST_F(StepDownTest, InterruptingAfterUnconditionalStepdownDoesNotRestoreWriteAv
            stepDownStatus == ErrorCodes::Interrupted);
     ASSERT_TRUE(getReplCoord()->getMemberState().secondary());
 
-    // We should still be indicating that we are not master.
+    // We should still be indicating that we are not a writable primary.
     getReplCoord()->fillIsMasterForReplSet(&response, {});
     ASSERT_FALSE(response.isMaster());
 
