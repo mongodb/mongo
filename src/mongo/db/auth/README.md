@@ -11,6 +11,17 @@
   - [Cluster Authentication](#cluster-authentication)
   - [Localhost Auth Bypass](#localhost-auth-bypass)
 - [Authorization](#authorization)
+  - [Users](#users)
+    - [User Roles](#user-roles)
+    - [User Credentials](#user-credentials)
+    - [User Authentication Restrictions](#user-authentication-restrictions)
+  - [Roles](#roles)
+    - [Role subordinate Roles](#role-subordinate-roles)
+    - [Role Privileges](#role-privileges)
+    - [Role Authentication Restrictions](#role-authentication-restrictions)
+  - [User and Role Management](#user-and-role-management)
+    - [UMC Transactions](#umc-transactions)
+  - [Command Execution](#command-execution)
   - [Authorization Caching](#authorization-caching)
   - [Authorization Manager External State](#authorization-manager-external-state)
   - [Types of Authorization](#types-of-authorization)
@@ -18,6 +29,7 @@
     - [LDAP Authorization](#ldap-authorization)
     - [X.509 Authorization](#x509-authorization)
   - [Cursors and Operations](#cursors-and-operations)
+- [External References](#external-references)
 
 ## High Level Overview
 
@@ -74,7 +86,7 @@ on the chosen mechanism (more on the mechanisms in the [SASL](#sasl) section). T
 a reply to the client with information regarding the status of authentication. If both
 authentication and authorization are complete, the client can begin executing commands against the
 server. If authentication requires more information to complete, the server requests this
-information. If authentication fails, then the client recieves that information and potentially
+information. If authentication fails, then the client receives that information and potentially
 closes the session.
 
 If, after the first SASL step, there is more work to be done, the client sends a
@@ -225,7 +237,7 @@ most actions.
 
 Auth**orization** describes the set of access controls conferred by the system on a connected
 client. It naturally flows from Auth**entication**, as authenticated clients may be trusted with
-addition access, thus upon completing [authentication](#Authentication), a client's authorization
+additional access, thus upon completing [authentication](#Authentication), a client's authorization
 tends to expand. Similarly, upon logout a client's authorization tends to shrink. It is important to
 pay attention to the distinction between these two similar, closely related words.
 
@@ -235,11 +247,11 @@ attached to the `Client` object as a decoration. The Authorization Session's job
 the authorization information for a single `Client` object. Note that if auth is not enabled, this
 decoration remains uninitialized, and all further steps are skipped. Until the client chooses to
 authenticate, this AuthorizationSession contains an empty AuthorizedUsers set (and by extension an
-empty AuthorizedRoles set), and is this "unauthorized", also known as "pre-auth".
+empty AuthorizedRoles set), and is thus "unauthorized", also known as "pre-auth".
 
 When a client connects to a database and authorization is enabled, authentication sends a request to
 get the authorization information of a specific user by calling addAndAuthorizeUser() on the
-AuthorizationSession and passing in the UserName as an identifier.  The `AuthorizationSession` calls
+AuthorizationSession and passing in the `UserName` as an identifier.  The `AuthorizationSession` calls
 functions defined in the
 [`AuthorizationManager`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/authorization_manager.h)
 (described in the next paragraph) to both get the correct `User` object (defined below) from the
@@ -248,29 +260,223 @@ execute commands.
 [Here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session_impl.cpp#L126)
 is the authorization session calling into the authorization manager to acquire a user.
 
+### User
+
 `User` objects contain authorization information with regards to a specific user in a database. The
 `AuthorizationManager` has control over creation, management, and deletion of a `UserHandle` object,
 which is a cache value object from the ReadThroughCache (described in [Authorization
 Caching](#authorization-caching)). There can be multiple authenticated users for a single `Client`
 object. The most important elements of a `User` document are the username and the roles set that the
-user has. A single `User` can have multiple `Roles`. `Roles` can contain a set of `Privileges`,
-which is a `Resource` and a set of `ActionTypes` performable on that `Resource`, and other Roles.
-The ultimate privilege set of a user is the union of all the privileges across all roles contained
-by a `User`. A `Role` is represented as a `RoleName`, which the `AuthorizationManager` uses to look
-up the details of the `Role`. A `Resource` is either a collection, a database, or a cluster. A
-"normal" `Resource` is any database and non-system collection. `ActionTypes` are used when checking
-whether a user is able to perform an action. For example, if a user wants to drop a database, they
-would need `ActionType::dropDatabase` on the specific database resource (see
-[here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/commands/dbcommands.cpp#L119-L120)).
-The `User` objects are stored in the `AuthorizationSession` in a structure called the UserSet. Below
-are links to all the types referred to in this paragraph.
+user has.  While each `AuthorizationManagerExternalState` implementation may define its own
+storage mechanism for `User` object data, they all ultimately surface this data in a format
+compatible with the `Local` implementation, stored in the `admin.system.users` collection
+with a schema as follows:
 
-- [`Client`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/client.h)
-- [`User`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user.h)
-- [`RoleName`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/role_name.h)
-- [`Privilege`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/privilege.h)
-- [`Resource`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/resource_pattern.h)
-- [`ActionTypes`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/action_type.h)
+```javascript
+{
+    _id: "dbname.username",
+    db: "dbname",
+    user: "username",
+    userId: UUIDv4(...),
+    roles: [
+      { db: "dbname", role: "role1" },
+      { db: "dbname", role: "role2" },
+      { db: "dbname", role: "role3" },
+    ],
+    credentials: {
+        // This subdocument will contain $external: 1 *or* one or more SCRAM docs.
+        "SCRAM-SHA-1": {
+            iterationCount: 10000,
+            salt: "base64DataForSCRAMsalt",
+            serverKey: "base64DataForServerKey",
+            storedKey: "base64DataForStoredKey",
+        },
+        "SCRAM-SHA-256": {
+            iterationCount: 15000,
+            salt: "base64DataForSCRAMsalt",
+            serverKey: "base64DataForServerKey",
+            storedKey: "base64DataForStoredKey",
+        },
+        "$external": 1,
+    },
+    authenticationRestrictions: [
+        { clientSource: [ "127.0.0.1/8" ] },
+        { serverAddress: [ "::1/128" ] },
+        {
+            clientSource: "172.16.12.34/32",
+            serverAddress: "fe80::dead:beef:cafe/128",
+        },
+    ],
+}
+```
+
+#### User Roles
+
+In order to define a set of privileges (see [role privileges](#role-privileges) below)
+granted to a given user, the user must be granted one or more `roles` on their user document,
+or by their external authentication provider.  Again, a user with no roles has no privileges.
+
+#### User Credentials
+
+The contents of the `credentials` field will depend on the configured authentication
+mechanisms enabled for the user.  For external authentication providers,
+this will simply contain `$external: 1`.  For `local` authentication providers,
+this will contain any necessary parameters for validating authentications
+such as the `SCRAM-SHA-256` example above.
+
+#### User Authentication Restrictions
+
+A user definition may optionally list any number of authentication restrictions.
+Currently, only endpoint based restrictions are permitted.  These require that a
+connecting client must come from a specific IP address range (given in
+[CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)) and/or
+connect to a specific server address.
+
+#### Any versus All criteria
+
+For a given `authenticationRestriction` document to be satisfied,
+all restrictions types (`clientSource` and/or `serverAddress` when provided)
+must be satisfied.
+
+Each of these restrictions types are considered to be satisfied when
+the client endpoint is in a range specified by either the string `CIDR`
+range, or any **one** of the elements of a list of ranges.
+
+For example, a client connecting from `172.16.30.40` to a server at
+address `192.168.70.80` will satisfy (or not) the following individual rules.
+
+```javascript
+// Succeeds as the clientSource is in range, and the server address is ignored.
+{ clientSource: "172.16.0.0/12" }
+
+// Fails as the client source is in range, but the serverAddress is not.
+{ clientSource: "172.16.0.0/12", serverAddress: "10.0.0.0/8" }
+
+// Succeeds as both addresses are in rage.
+{ clientSource: "172.16.70.0/25", serverAddress: "192.168.70.80" }
+
+// Succeeds as client address is in one of the allowed ranges.
+{ clientSource: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fe80::/10"] }
+
+// Fails as the server address is in none of the allowed ranges.
+{ serverAddress: ["127.0.0.0/8", "::1"] }
+```
+
+Only **one** of the specified top-level `authenticationRestrictions` must be met
+for a connection to be permitted.
+
+Note that `authenticationRestrictions` may also be inherited from direct roles
+and/or subordinate roles.
+See [Role Authentication Restrictions](#role-authentication-restrictions) below.
+
+The `{usersInfo: ...}` and `{rolesInfo: ...}` commands may be used to see
+the combined, effective set of authentication restrictions by specifying
+the `showAuthenticationRestrictions: true` argument.
+
+### Roles
+
+Similar to local user documents, role documents are managed in the `admin.system.roles`
+collection on config and standalone servers.
+Unlike users, the roles collection is always used regardless of external state implementation.
+The schema of the `roles` collection is as follows:
+
+```javascript
+{
+    _id: "dbname.rolename",
+    db: "dbname",
+    role: "rolename",
+    roles: [
+      // Subordinate roles
+      { db: "dbname", roles: "otherRole1" },
+      { db: "dbname", roles: "otherRole2" },
+      { db: "dbname", roles: "otherRole3" },
+    ],
+    privileges: [
+        // Cluster-wide
+        { resource: { cluster: true }, actions: ['shutdown'] },
+        // Specific database
+        { resource: { db: "test", collection: "" }, actions: ['dropDatabase'] },
+        // Collection name on any database
+        { resource: { db: "", collection: "system.views" }, actions: ['insert'] },
+        // Specific namespace
+        { resource: { db: "admin", collection: "system.views", actions: ['update'] } },
+        // Any "normal" resource
+        { resource: {}, actions: ['find'] },
+    ],
+    authenticationRestrictions: [
+        // See admin.system.users{authenticationRestrictions}
+    ],
+}
+```
+
+#### Role subordinate roles
+
+The `roles` field in a role document defines the path of a tree with
+each role "possessing" other roles, which in turn may possess others still.
+For users possessing a given set of roles, their effective privileges and
+`authenticationRestrictions` make up the union of all roles throughout the tree.
+
+#### Role Privileges
+
+Each role imparts privileges in the form of a set of `actions` permitted
+against a given `resource`.  The strings in the `actions` list correspond
+1:1 with `ActionType` values as specified [here](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/auth/action_type.h).
+Resources may be specified in any of the following five formats:
+
+| `resource` | Meaning |
+| --- | --- |
+| {} | Any `normal` collection |
+| { db: 'test', collection: '' } | All `normal` collections on the named DB |
+| { db: '', collection: 'system.views' } | The specific named collection on all DBs |
+| { db: 'test', collection: 'system.view' } | The specific namespace (db+collection) as written |
+| { cluster: true } | Used only by cluster-level actions such as `replsetConfigure`. |
+
+#### Normal resources
+
+Collection names starting with `system.` on any database,
+or starting with `replset.` on the `local` database are considered "special"
+and are not covered by the "Any normal collection" resource case.
+All other collections are considered `normal` collections.
+
+#### Role Authentication Restrictions
+
+Authentication restrictions defined on a role have the same meaning as
+those defined directly on users.  The effective set of `authenticationRestrictions`
+imposed on a user is the union of all direct and indirect authentication restrictions.
+
+### User and Role Management
+
+`User Management Commands`, sometimes referred to as `UMCs` provide an
+abstraction for mutating the contents of the local authentication database
+in the `admin.system.users` and `admin.system.roles` collections.
+These commands are implemented primarily for config and standalone nodes in
+[user\_management\_commands.cpp](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.cpp),
+and as passthrough proxies for mongos in
+[cluster\_user\_management\_commands.cpp](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/s/commands/cluster_user_management_commands.cpp).
+All command payloads and responses are defined via IDL in
+[user\_management\_commands.idl](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.idl)
+
+#### UMC Transactions
+
+Most command implementations issue a single `CRUD` op against the
+relevant underlying collection using `DBDirectClient` after
+validating that the command's arguments refer to extant roles, actions,
+and other user-defined values.
+
+The `dropRole` and `dropAllRolesFromDatabase` commands can not be
+expressed as a single CRUD op.  Instead, they must issue all three of the following ops:
+
+1. `Update` the users collection to strip the role(s) from all users possessing it directly.
+1. `Update` the roles collection to strip the role(s) from all other roles possessing it as a subordinate.
+1. `Remove` the role(s) from the roles collection entirely.
+
+In order to maintain consistency during replication and possible conflicts,
+these `UMC` commands leverage transactions through the `applyOps` command
+allowing a rollback.
+The [UMCTransaction](https://github.com/mongodb/mongo/blob/92cc84b0171942375ccbd2312a052bc7e9f159dd/src/mongo/db/commands/user_management_commands.cpp#L756)
+class provides an abstraction around this mechanism.
+
+### Command Execution
 
 When a client attempts to execute a command, the service entry point calls
 [`checkAuthorization`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/service_entry_point_common.cpp#L1026),
@@ -281,8 +487,8 @@ overrides the `CommandInvocation` class with its own implementation of
 [`Invocation`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/commands/find_cmd.cpp#L182).
 That class implements its own version of
 [`doCheckAuthorization`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/commands/find_cmd.cpp#L218).
-`doCheckAuthorization` gets the authorizationSession for the Client that is executing the command
-and checks all the permissioning of the `Client` and either throws if there is an issue or returns
+`doCheckAuthorization` gets the `AuthorizationSession` for the `Client` that is executing the command
+and checks all the privileges of the `Client` and either throws if there is an issue or returns
 if all the authorization checks are complete.
 
 ### Authorization Caching
@@ -341,80 +547,6 @@ the collection
 [`admin.system.users`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.cpp#L56).
 The user must supply roles when running the `createUser` command. Roles are stored in
 [`admin.system.roles`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.cpp#L52).
-Below are the schema documents that these collections use; you can see how these documents are
-parsed
-[here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user_document_parser.cpp).
-
-`admin.system.users` schema:
-
-```C++
-{
-    _id: "dbname.username",
-    db: "dbname",
-    user: "username",
-    userId: UUIDv4(...),
-    roles: [
-      { db: "dbname", role: "role1" },
-      { db: "dbname", role: "role2" },
-      { db: "dbname", role: "role3" },
-    ],
-    credentials: {
-        // This subdocument will contain $external: 1 *or* one or more SCRAM docs.
-        "SCRAM-SHA-1": {
-            iterationCount: 10000,
-            salt: "base64DataForSCRAMsalt",
-            serverKey: "base64DataForServerKey",
-            storedKey: "base64DataForStoredKey",
-        },
-        "SCRAM-SHA-256": {
-            iterationCount: 15000,
-            salt: "base64DataForSCRAMsalt",
-            serverKey: "base64DataForServerKey",
-            storedKey: "base64DataForStoredKey",
-        },
-        "$external": 1,
-    },
-    authenticationRestrictions: [
-        { clientSource: [ "127.0.0.1/8" ] },
-        { serverAddress: [ "::1/128" ] },
-        {
-            clientSource: "172.16.12.34/32",
-            serverAddress: "fe80::dead:beef:cafe/128",
-        },
-    ],
-}
-```
-
-`admin.system.roles` schema:
-
-```C++
-{
-    _id: "dbname.rolename",
-    db: "dbname",
-    role: "rolename",
-    roles: [
-      // Subordinate roles
-      { db: "dbname", roles: "otherRole1" },
-      { db: "dbname", roles: "otherRole2" },
-      { db: "dbname", roles: "otherRole3" },
-    ],
-    privileges: [
-        // Cluster-wide
-        { resource: { cluster: true }, actions: ['shutdown'] },
-        // Specific database
-        { resource: { db: "test" }, actions: ['dropDatabase'] },
-        // Collection name on any database
-        { resource: { collection: "system.views" }, actions: ['insert'] },
-        // Specific namespace
-        { resource: { db: "admin", collection: "system.views", actions: ['update'] } },
-        // Any "normal" resource
-        { resource: {}, actions: ['find'] },
-    ],
-    authenticationRestrictions: [
-        // See admin.system.users{authenticationRestrictions}
-    ],
-}
-```
 
 #### LDAP Authorization
 
@@ -423,7 +555,7 @@ there are roles stored in the User document specified by the LDAP system. The LD
 the
 [`AuthzManagerExternalStateLDAP`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h)
 to make external requests to the LDAP server. The `AuthzManagerExternalStateLDAP` wraps the
-`AuthzManagerExternalStateLocal` for the current process, initally attempting to route all
+`AuthzManagerExternalStateLocal` for the current process, initially attempting to route all
 Authorization requests to LDAP and falling back on Local Authorization. LDAP queries are generated
 from
 [`UserRequest`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.cpp#L75-L113)
@@ -445,7 +577,7 @@ wire to the LDAP server, all other classes decompose the information to send and
 actually send the information. The `LDAPConnectionFactory` has its own thread pool and executor to
 drive throughput for authorization. LDAP has an
 [`LDAPUserCacheInvalidator`](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/ldap_user_cache_invalidator_job.h)
-that periodically sweeps the AuthorizationManager and deletes user entries that have `$external` as
+that periodically sweeps the `AuthorizationManager` and deletes user entries that have `$external` as
 their authentication database.
 
 There are a few thread safety concerns when making connections to the LDAP server. MongoDB uses
@@ -477,7 +609,7 @@ of the results by calling
 [`getMore`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/commands/getmore_cmd.cpp). In
 order to ensure correct authorization rights to run the `getMore` command, there are some extra
 authorization checks that need to be run using cursors and operations. When a CRUD operation is run,
-a cursor is created with client information and registered with the CursorManager. When `getMore` is
+a cursor is created with client information and registered with the `CursorManager`. When `getMore` is
 called, the command uses the cursor to gather the next batch of results for the request. When a
 cursor is created, a list of the client's authenticated users and privileges required to run the
 command are added to the cursor. When the getMore command is issued, before continuing the CRUD
@@ -499,3 +631,21 @@ operations if it has the same users (impersonated or otherwise) as the client th
 `OperationContext` by issuing a `{killOp: 1}` command. When the command is issued, it calls
 [`isCoauthorizedWithClient`](https://github.com/mongodb/mongo/blob/r4.7.0/src/mongo/db/auth/authorization_session.h#L332-L341)
 and checks the current client's authorized users and authorized impersonated users.
+
+## External References
+
+Refer to the following links for definitions of the Classes referenced in this document:
+
+| Class | File | Description |
+| --- | --- | --- |
+| `ActionType` | [mongo/db/auth/action\_type.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/action_type.h) | High level categories of actions which may be performed against a given resource (e.g. `find`, `insert`, `update`, etc...) |
+| `AuthorizationManager` | [mongo/db/auth/authorization\_manager.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_manager.h) | Interface to external state providers |
+| `AuthorizationSession` | [mongo/db/auth/authorization\_session.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authorization_session.h) | Representation of currently authenticated and authorized users on the `Client` connection |
+| `AuthzManagerExternalStateLocal` | [.../authz\_manager\_external\_state\_local.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/authz_manager_external_state_local.h) | `Local` implementation of user/role provider |
+| `AuthzManagerExternalStateLDAP` | [.../authz\_manager\_external\_state\_ldap.h](https://github.com/10gen/mongo-enterprise-modules/blob/r4.4.0/src/ldap/authz_manager_external_state_ldap.h) | `LDAP` implementation of users/role provider |
+| `Client` | [mongo/db/client.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/client.h) | An active client session, typically representing a remote driver or shell |
+| `Privilege` | [mongo/db/auth/privilege.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/privilege.h) | A set of `ActionType`s permitted on a particular `resource' |
+| `ResourcePattern` | [mongo/db/auth/resource\_pattern.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/resource_pattern.h) | A reference to a namespace, db, collection, or cluster to apply a set of `ActionType` privileges to |
+| `RoleName` | [mongo/db/auth/role\_name.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/role_name.h) | A typed tuple containing a named role on a particular database |
+| `User` | [mongo/db/auth/user.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user.h) | A representation of a authorization user, including all direct and subordinte roles and their privileges and authentication restrictions |
+| `UserName` | [mongo/db/auth/user\_name.h](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/auth/user_name.h) | A typed tuple containing a named user on a particular database |
