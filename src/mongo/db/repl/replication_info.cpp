@@ -73,6 +73,8 @@ MONGO_FAIL_POINT_DEFINE(waitInHello);
 // standalones. This failpoint will hang right before doing this sleep when set.
 MONGO_FAIL_POINT_DEFINE(hangWaitingForHelloResponseOnStandalone);
 
+MONGO_FAIL_POINT_DEFINE(appendHelloOkToHelloResponse);
+
 using std::list;
 using std::string;
 using std::stringstream;
@@ -416,6 +418,10 @@ public:
             result.append("helloOk", true);
         } else if (status.code() != ErrorCodes::NoSuchKey) {
             uassertStatusOK(status);
+        }
+
+        if (MONGO_unlikely(appendHelloOkToHelloResponse.shouldFail())) {
+            result.append("clientSupportsHello", client->supportsHello());
         }
 
         auto currentTopologyVersion = appendReplicationInfo(

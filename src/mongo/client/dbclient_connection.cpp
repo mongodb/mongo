@@ -188,6 +188,12 @@ executor::RemoteCommandResponse initWireVersion(
     BSONObjBuilder bob;
     bob.append("isMaster", 1);
 
+    if (uri.isHelloOk()) {
+        // Attach "helloOk: true" to the initial handshake to indicate that the client supports the
+        // hello command.
+        bob.append("helloOk", true);
+    }
+
     *speculativeAuthType = auth::speculateAuth(&bob, uri, saslClientSession);
     if (!uri.getUser().empty()) {
         UserName user(uri.getUser(), uri.getAuthenticationDatabase());

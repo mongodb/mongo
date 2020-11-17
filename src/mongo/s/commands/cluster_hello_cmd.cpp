@@ -53,6 +53,8 @@ namespace mongo {
 // Hangs in the beginning of each hello command when set.
 MONGO_FAIL_POINT_DEFINE(waitInHello);
 
+MONGO_FAIL_POINT_DEFINE(appendHelloOkToHelloResponse);
+
 namespace {
 
 constexpr auto kHelloString = "hello"_sd;
@@ -150,11 +152,18 @@ public:
         bool helloOk;
         Status status = bsonExtractBooleanField(cmdObj, "helloOk", &helloOk);
         if (status.isOK()) {
+            // If the hello request contains a "helloOk" field, set _supportsHello on the Client
+            // to the value.
+            client->setSupportsHello(helloOk);
             // Attach helloOk: true to the response so that the client knows the server supports
             // the hello command.
             result.append("helloOk", true);
         } else if (status.code() != ErrorCodes::NoSuchKey) {
             uassertStatusOK(status);
+        }
+
+        if (MONGO_unlikely(appendHelloOkToHelloResponse.shouldFail())) {
+            result.append("clientSupportsHello", client->supportsHello());
         }
 
         result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);

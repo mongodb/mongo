@@ -484,6 +484,20 @@ MongoURI MongoURI::parseImpl(StringData url) {
         }
     }
 
+    const auto helloOk = [&options]() -> boost::optional<bool> {
+        if (auto optIter = options.find("helloOk"); optIter != end(options)) {
+            if (auto value = optIter->second; value == "true") {
+                return true;
+            } else if (value == "false") {
+                return false;
+            } else {
+                uasserted(ErrorCodes::FailedToParse,
+                          "helloOk must be either \"true\" or \"false\"");
+            }
+        }
+        return boost::none;
+    }();
+
     transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode;
     auto sslModeIter = std::find_if(options.begin(), options.end(), [](auto pred) {
         return pred.first == CaseInsensitiveString("ssl") ||
@@ -509,6 +523,7 @@ MongoURI MongoURI::parseImpl(StringData url) {
                     database,
                     std::move(retryWrites),
                     sslMode,
+                    helloOk,
                     std::move(options));
 }
 
