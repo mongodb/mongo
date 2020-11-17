@@ -111,6 +111,7 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
 
 // Default for control.version in time-series bucket collection.
 const int kTimeseriesControlVersion = 1;
+const int kTimeseriesBucketMaxCount = 1000;
 
 /**
  * Returns min/max $set expressions for the bucket's control field.
@@ -153,8 +154,13 @@ BSONObj makeTimeseriesDataStages(const BSONObj& doc) {
  */
 BSONObj makeTimeseriesUpsertRequest(const BSONObj& doc) {
     BSONObjBuilder builder;
-    // TODO(SERVER-52523): Obtain _id of bucket to update from in-memory catalog.
-    builder.append(write_ops::UpdateOpEntry::kQFieldName, BSONObj());  // one bucket for now
+    // TODO(SERVER-52523): Obtain _id of bucket to update  and name of time field from in-memory
+    // catalog.
+    const auto timeField = "time"_sd;
+    auto query = BSON(
+        std::string(str::stream() << "data." << timeField << "." << (kTimeseriesBucketMaxCount - 1))
+        << BSON("$exists" << false));
+    builder.append(write_ops::UpdateOpEntry::kQFieldName, query);
     builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
     builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
     {
