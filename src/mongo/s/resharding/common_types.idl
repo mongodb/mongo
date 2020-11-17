@@ -49,7 +49,6 @@ enums:
             kMirroring: "mirroring"
             kCommitted: "committed"
             kRenaming: "renaming"
-            kDropping: "dropping"
             kDone: "done"
             kError: "error"
 

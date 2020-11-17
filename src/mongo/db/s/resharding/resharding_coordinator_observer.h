@@ -92,16 +92,16 @@ public:
     SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsInStrictConsistency();
 
     /**
-     * Fulfills the '_allDonorsDroppedOriginalCollection' promise when the last donor writes that it
-     * is in 'done' state.
-     */
-    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllDonorsDroppedOriginalCollection();
-
-    /**
      * Fulfills the '_allRecipientsRenamedCollection' promise when the last recipient writes
      * that it is in 'done' state.
      */
     SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllRecipientsRenamedCollection();
+
+    /**
+     * Fulfills the '_allDonorsDroppedOriginalCollection' promise when the last donor writes that it
+     * is in 'done' state.
+     */
+    SharedSemiFuture<ReshardingCoordinatorDocument> awaitAllDonorsDroppedOriginalCollection();
 
     /**
      * Sets errors on any promises that have not yet been fulfilled.

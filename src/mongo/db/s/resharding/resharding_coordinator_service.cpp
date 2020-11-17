@@ -44,6 +44,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
@@ -398,17 +399,16 @@ std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntri
 /**
  * Maps which participants are to be notified when the coordinator transitions into a given state.
  */
-enum class ParticipantsToNofityEnum { kDonors, kRecipientsTempNss, kRecipientsOrigNss, kNone };
+enum class ParticipantsToNofityEnum { kDonors, kRecipients, kAllParticipantsPostCommit, kNone };
 stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNofityEnum> notifyForStateTransition{
     {CoordinatorStateEnum::kUnused, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kInitializing, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kPreparingToDonate, ParticipantsToNofityEnum::kDonors},
-    {CoordinatorStateEnum::kCloning, ParticipantsToNofityEnum::kRecipientsTempNss},
+    {CoordinatorStateEnum::kCloning, ParticipantsToNofityEnum::kRecipients},
     {CoordinatorStateEnum::kApplying, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kMirroring, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kCommitted, ParticipantsToNofityEnum::kNone},
-    {CoordinatorStateEnum::kRenaming, ParticipantsToNofityEnum::kRecipientsOrigNss},
-    {CoordinatorStateEnum::kDropping, ParticipantsToNofityEnum::kDonors},
+    {CoordinatorStateEnum::kRenaming, ParticipantsToNofityEnum::kAllParticipantsPostCommit},
     {CoordinatorStateEnum::kDone, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kError, ParticipantsToNofityEnum::kNone},
 };
@@ -462,7 +462,7 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
             updatedCoordinatorDoc.getNss(),
             extractShardIds(updatedCoordinatorDoc.getDonorShards()),
             std::move(changeMetadataFunc));
-    } else if (participantsToNotify == ParticipantsToNofityEnum::kRecipientsTempNss) {
+    } else if (participantsToNotify == ParticipantsToNofityEnum::kRecipients) {
         // Bump the recipient shard versions for the temporary resharding namespace along with
         // updating the metadata.
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
@@ -470,9 +470,10 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
             updatedCoordinatorDoc.getTempReshardingNss(),
             extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
             std::move(changeMetadataFunc));
-    } else if (participantsToNotify == ParticipantsToNofityEnum::kRecipientsOrigNss) {
+    } else if (participantsToNotify == ParticipantsToNofityEnum::kAllParticipantsPostCommit) {
         // Bump the recipient shard versions for the original resharding namespace along with
-        // updating the metadata.
+        // updating the metadata. Only the recipient shards will have chunks for the namespace
+        // after commit, bumping chunk versions on the donor shards would not apply.
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
             updatedCoordinatorDoc.getNss(),
@@ -678,11 +679,10 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
                                                         _coordinatorDoc);
             return;
         })
-        .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
-        .then([this, executor] { return _awaitAllRecipientsRenamedCollection(executor); })
-        .then([this, executor] { _tellAllDonorsToRefresh(executor); })
-        .then([this, executor] { return _awaitAllDonorsDroppedOriginalCollection(executor); })
         .then([this, executor] { _tellAllParticipantsToRefresh(executor); })
+        .then([this, executor] {
+            return _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(executor);
+        })
         .onError([this, executor](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
@@ -859,33 +859,26 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
     return Status::OK();
 };
 
-ExecutorFuture<void>
-ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllRecipientsRenamedCollection(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+ExecutorFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::
+    _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_coordinatorDoc.getState() > CoordinatorStateEnum::kRenaming) {
         return ExecutorFuture<void>(**executor, Status::OK());
     }
 
-    return _reshardingCoordinatorObserver->awaitAllRecipientsRenamedCollection()
-        .thenRunOn(**executor)
-        .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
-            _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kDropping,
-                                                        coordinatorDocChangedOnDisk);
-        });
-}
+    std::vector<ExecutorFuture<ReshardingCoordinatorDocument>> futures;
+    futures.emplace_back(
+        _reshardingCoordinatorObserver->awaitAllRecipientsRenamedCollection().thenRunOn(
+            **executor));
+    futures.emplace_back(
+        _reshardingCoordinatorObserver->awaitAllDonorsDroppedOriginalCollection().thenRunOn(
+            **executor));
 
-ExecutorFuture<void>
-ReshardingCoordinatorService::ReshardingCoordinator::_awaitAllDonorsDroppedOriginalCollection(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    if (_coordinatorDoc.getState() > CoordinatorStateEnum::kDropping) {
-        return ExecutorFuture<void>(**executor, Status::OK());
-    }
-
-    return _reshardingCoordinatorObserver->awaitAllDonorsDroppedOriginalCollection()
+    return whenAllSucceed(std::move(futures))
         .thenRunOn(**executor)
-        .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
+        .then([this, executor](const auto& coordinatorDocsChangedOnDisk) {
             _updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kDone,
-                                                        coordinatorDocChangedOnDisk);
+                                                        coordinatorDocsChangedOnDisk[1]);
         });
 }
 

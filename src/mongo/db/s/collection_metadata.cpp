@@ -70,7 +70,6 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
         case CoordinatorStateEnum::kMirroring:
         case CoordinatorStateEnum::kCommitted:
         case CoordinatorStateEnum::kRenaming:
-        case CoordinatorStateEnum::kDropping:
         case CoordinatorStateEnum::kDone:
         case CoordinatorStateEnum::kError:
             return boost::none;
@@ -109,7 +108,6 @@ bool CollectionMetadata::writesShouldRunInDistributedTransaction(const OID& orig
             return true;
         case CoordinatorStateEnum::kRenaming:
             break;
-        case CoordinatorStateEnum::kDropping:
         case CoordinatorStateEnum::kDone:
         case CoordinatorStateEnum::kError:
             return false;

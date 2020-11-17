@@ -182,17 +182,15 @@ private:
     Future<void> _commit(const ReshardingCoordinatorDocument& updatedDoc);
 
     /**
-     * Waits on _reshardingCoordinatorObserver to notify that all recipients have renamed the
-     * temporary collection to the original collection namespace. Transitions to 'kDropping'.
+     * Waits on _reshardingCoordinatorObserver to notify that:
+     * 1. All recipient shards have renamed the temporary collection to the original collection
+     *    namespace, and
+     * 2. All donor shards that were not also recipient shards have dropped the original
+     *    collection.
+     *
+     * Transitions to 'kDone'.
      */
-    ExecutorFuture<void> _awaitAllRecipientsRenamedCollection(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
-    /**
-     * Waits on _reshardingCoordinatorObserver to notify that all donors have dropped the
-     * original collection. Transitions to 'kDone'.
-     */
-    ExecutorFuture<void> _awaitAllDonorsDroppedOriginalCollection(
+    ExecutorFuture<void> _awaitAllParticipantShardsRenamedOrDroppedOriginalCollection(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**

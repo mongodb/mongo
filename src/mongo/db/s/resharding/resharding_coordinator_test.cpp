@@ -681,7 +681,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, PersistTransitionToErrorSucceeds) {
 
 TEST_F(ReshardingCoordinatorPersistenceTest, PersistTransitionToDoneSucceeds) {
     auto coordinatorDoc =
-        insertStateAndCatalogEntries(CoordinatorStateEnum::kDropping, _finalEpoch);
+        insertStateAndCatalogEntries(CoordinatorStateEnum::kRenaming, _finalEpoch);
 
     // Persist the updates on disk
     auto expectedCoordinatorDoc = coordinatorDoc;
