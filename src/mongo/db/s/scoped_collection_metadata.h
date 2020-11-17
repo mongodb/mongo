@@ -61,6 +61,10 @@ public:
         return _impl->get().isValidKey(key);
     }
 
+    boost::optional<ShardKeyPattern> getReshardingKeyIfShouldForwardOps() const {
+        return _impl->get().getReshardingKeyIfShouldForwardOps();
+    }
+
     const BSONObj& getKeyPattern() const {
         return _impl->get().getKeyPattern();
     }

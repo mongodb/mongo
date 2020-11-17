@@ -198,6 +198,7 @@ protected:
         TypeCollectionReshardingFields reshardingFields;
         reshardingFields.setUuid(UUID::gen());
         reshardingFields.setDonorFields(TypeCollectionDonorFields{BSON("y" << 1)});
+        reshardingFields.setState(CoordinatorStateEnum::kPreparingToDonate);
 
         CollectionType coll(kNss, env.version.epoch(), Date_t::now(), UUID::gen());
         coll.setKeyPattern(BSON(kShardKey << 1));

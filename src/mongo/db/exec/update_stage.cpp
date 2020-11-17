@@ -575,13 +575,15 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
 
 bool UpdateStage::wasReshardingKeyUpdated(const BSONObj& newObj,
                                           const Snapshotted<BSONObj>& oldObj) {
-    auto donorFields = resharding::getDonorFields(opCtx(), collection()->ns(), newObj);
-    if (!donorFields)
+    auto css = CollectionShardingState::get(opCtx(), collection()->ns());
+
+    auto reshardingKeyPattern =
+        css->getCollectionDescription(opCtx()).getReshardingKeyIfShouldForwardOps();
+    if (!reshardingKeyPattern)
         return false;
 
-    auto reshardingKeyPattern = ShardKeyPattern(donorFields->getReshardingKey());
-    auto oldShardKey = reshardingKeyPattern.extractShardKeyFromDoc(oldObj.value());
-    auto newShardKey = reshardingKeyPattern.extractShardKeyFromDoc(newObj);
+    auto oldShardKey = reshardingKeyPattern->extractShardKeyFromDoc(oldObj.value());
+    auto newShardKey = reshardingKeyPattern->extractShardKeyFromDoc(newObj);
 
     if (newShardKey.binaryEqual(oldShardKey))
         return false;

@@ -84,7 +84,6 @@ bool documentBelongsToMe(OperationContext* opCtx,
 
     return ownershipFilter.keyBelongsToMe(currentKeyPattern.extractShardKeyFromDoc(doc));
 }
-
 }  // namespace
 
 DonorShardEntry makeDonorShard(ShardId shardId,
@@ -539,38 +538,17 @@ std::unique_ptr<Pipeline, PipelineDeleter> createOplogFetchingPipelineForReshard
     return Pipeline::create(std::move(stages), expCtx);
 }
 
-namespace resharding {
-
-boost::optional<TypeCollectionDonorFields> getDonorFields(OperationContext* opCtx,
-                                                          const NamespaceString& sourceNss,
-                                                          const BSONObj& fullDocument) {
-    auto css = CollectionShardingState::get(opCtx, sourceNss);
-    auto collDesc = css->getCollectionDescription(opCtx);
-
-    if (!collDesc.isSharded())
-        return boost::none;
-
-    const auto& reshardingFields = collDesc.getReshardingFields();
-    if (!reshardingFields)
-        return boost::none;
-
-    const auto& donorFields = reshardingFields->getDonorFields();
-    if (!donorFields)
-        return boost::none;
-
-    return donorFields;
-}
-
-}  // namespace resharding
-
 boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
                                               const NamespaceString& sourceNss,
                                               const BSONObj& fullDocument) {
-    auto donorFields = resharding::getDonorFields(opCtx, sourceNss, fullDocument);
-    if (!donorFields)
+    auto css = CollectionShardingState::get(opCtx, sourceNss);
+
+    auto reshardingKeyPattern =
+        css->getCollectionDescription(opCtx).getReshardingKeyIfShouldForwardOps();
+    if (!reshardingKeyPattern)
         return boost::none;
 
-    if (!documentBelongsToMe(opCtx, CollectionShardingState::get(opCtx, sourceNss), fullDocument))
+    if (!documentBelongsToMe(opCtx, css, fullDocument))
         return boost::none;
 
     bool allowLocks = true;
@@ -585,8 +563,7 @@ boost::optional<ShardId> getDestinedRecipient(OperationContext* opCtx,
 
     uassertStatusOK(tempNssRoutingInfo);
 
-    auto reshardingKeyPattern = ShardKeyPattern(donorFields->getReshardingKey());
-    auto shardKey = reshardingKeyPattern.extractShardKeyFromDoc(fullDocument);
+    auto shardKey = reshardingKeyPattern->extractShardKeyFromDoc(fullDocument);
 
     return tempNssRoutingInfo.getValue()
         .findIntersectingChunkWithSimpleCollation(shardKey)

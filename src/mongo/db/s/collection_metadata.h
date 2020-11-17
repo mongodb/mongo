@@ -72,6 +72,12 @@ public:
     bool allowMigrations() const;
 
     /**
+     * Returns the resharding key if the coordinator state is such that the recipient is tailing
+     * the donor's oplog.
+     */
+    boost::optional<ShardKeyPattern> getReshardingKeyIfShouldForwardOps() const;
+
+    /**
      * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
      *
      * Will throw ShardInvalidatedForTargeting if _thisShardId is marked as stale by

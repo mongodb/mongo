@@ -48,7 +48,7 @@ assert.commandWorked(
 jsTestLog("Updating resharding fields");
 let donorReshardingFields = {
     "uuid": uuid,
-    "state": "initializing",
+    "state": "preparing-to-donate",
     "donorFields": {"reshardingKey": {y: 1}}
 };
 assert.commandWorked(st.configRS.getPrimary().getDB("config").collections.update(

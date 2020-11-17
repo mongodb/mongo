@@ -48,6 +48,49 @@ bool CollectionMetadata::allowMigrations() const {
     return _cm ? _cm->allowMigrations() : true;
 }
 
+boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldForwardOps() const {
+    if (!isSharded())
+        return boost::none;
+
+    const auto& reshardingFields = getReshardingFields();
+
+    // A resharding operation should be taking place, and additionally, the coordinator must
+    // be in the states during which the recipient tails the donor's oplog. In these states, the
+    // donor annotates each of its oplog entries with the appropriate recipients; thus, checking if
+    // the coordinator is within these states is equivalent to checking if the donor should
+    // append the resharding recipients.
+    if (!reshardingFields)
+        return boost::none;
+
+    // Used a switch statement so that the compiler warns anyone who modifies the coordinator
+    // states enum.
+    switch (reshardingFields.get().getState()) {
+        case CoordinatorStateEnum::kUnused:
+        case CoordinatorStateEnum::kInitializing:
+        case CoordinatorStateEnum::kMirroring:
+        case CoordinatorStateEnum::kCommitted:
+        case CoordinatorStateEnum::kRenaming:
+        case CoordinatorStateEnum::kDropping:
+        case CoordinatorStateEnum::kDone:
+        case CoordinatorStateEnum::kError:
+            return boost::none;
+        case CoordinatorStateEnum::kPreparingToDonate:
+        case CoordinatorStateEnum::kCloning:
+        case CoordinatorStateEnum::kApplying:
+            // We will actually return a resharding key for these cases.
+            break;
+    }
+
+    const auto& donorFields = reshardingFields->getDonorFields();
+
+    // If 'reshardingFields' doesn't contain 'donorFields', then it must contain 'recipientFields',
+    // implying that collection represents the target collection in a resharding operation.
+    if (!donorFields)
+        return boost::none;
+
+    return ShardKeyPattern(donorFields->getReshardingKey());
+}
+
 BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
     BSONObj key;
 
