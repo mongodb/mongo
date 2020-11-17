@@ -1349,7 +1349,10 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
             fmt::format("Invalid database name: '{}'", dbname),
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
-    _scopedMetrics.emplace(opCtx, dbname, command->collectsResourceConsumptionMetrics());
+    // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should
+    // not contribute to resource consumption metrics.
+    const bool collect = command->collectsResourceConsumptionMetrics() && !_isInternalClient();
+    _scopedMetrics.emplace(opCtx, dbname, collect);
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
