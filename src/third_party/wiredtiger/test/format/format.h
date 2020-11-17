@@ -53,6 +53,7 @@
 
 #define BACKUP_INFO_FILE "BACKUP_INFO"         /* Format's backup information for restart */
 #define BACKUP_INFO_FILE_TMP "BACKUP_INFO.TMP" /* Format's backup information for restart */
+#define BACKUP_MAX_COPY MEGABYTE(64)           /* Maximum size we'll read/write at a time */
 #define WT_NAME "wt"                           /* Object name */
 
 #define DATASOURCE(v) (strcmp(v, g.c_data_source) == 0 ? 1 : 0)

@@ -159,7 +159,6 @@ __curhs_close(WT_CURSOR *cursor)
     CURSOR_API_CALL_PREPARE_ALLOWED(
       cursor, session, close, file_cursor == NULL ? NULL : CUR2BT(file_cursor));
 err:
-
     if (file_cursor != NULL)
         WT_TRET(file_cursor->close(file_cursor));
     __wt_cursor_close(cursor);
@@ -185,8 +184,158 @@ __curhs_reset(WT_CURSOR *cursor)
 
     ret = file_cursor->reset(file_cursor);
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+    WT_TIME_WINDOW_INIT(&hs_cursor->time_window);
 
 err:
+    API_END_RET(session, ret);
+}
+
+/*
+ * __curhs_set_key --
+ *     WT_CURSOR->set_key method for the hs cursor type.
+ */
+static void
+__curhs_set_key(WT_CURSOR *cursor, ...)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    va_list ap;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+
+    va_start(ap, cursor);
+    file_cursor->set_key(file_cursor, va_arg(ap, uint32_t), va_arg(ap, WT_ITEM *),
+      va_arg(ap, wt_timestamp_t), va_arg(ap, uint64_t));
+    va_end(ap);
+}
+
+/*
+ * __curhs_get_key --
+ *     WT_CURSOR->get_key method for the hs cursor type.
+ */
+static int
+__curhs_get_key(WT_CURSOR *cursor, ...)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    va_list ap;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+
+    va_start(ap, cursor);
+    ret = file_cursor->get_key(file_cursor, va_arg(ap, uint32_t *), va_arg(ap, WT_ITEM **),
+      va_arg(ap, wt_timestamp_t *), va_arg(ap, uint64_t *));
+    va_end(ap);
+
+    return (ret);
+}
+
+/*
+ * __curhs_get_value --
+ *     WT_CURSOR->get_value method for the hs cursor type.
+ */
+static int
+__curhs_get_value(WT_CURSOR *cursor, ...)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    va_list ap;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+
+    va_start(ap, cursor);
+    ret = file_cursor->get_value(file_cursor, va_arg(ap, wt_timestamp_t *),
+      va_arg(ap, wt_timestamp_t *), va_arg(ap, uint64_t *), va_arg(ap, WT_ITEM **));
+    va_end(ap);
+
+    return (ret);
+}
+
+/*
+ * __curhs_set_value --
+ *     WT_CURSOR->set_value method for the hs cursor type.
+ */
+static void
+__curhs_set_value(WT_CURSOR *cursor, ...)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_HS *hs_cursor;
+    va_list ap;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+    va_start(ap, cursor);
+    hs_cursor->time_window = *va_arg(ap, WT_TIME_WINDOW *);
+
+    file_cursor->set_value(file_cursor, va_arg(ap, wt_timestamp_t), va_arg(ap, wt_timestamp_t),
+      va_arg(ap, uint64_t), va_arg(ap, WT_ITEM *));
+    va_end(ap);
+}
+
+/*
+ * __curhs_insert --
+ *     WT_CURSOR->insert method for the hs cursor type.
+ */
+static int
+__curhs_insert(WT_CURSOR *cursor)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_BTREE *cbt;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    WT_UPDATE *hs_tombstone, *hs_upd;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+    cbt = (WT_CURSOR_BTREE *)file_cursor;
+    hs_tombstone = hs_upd = NULL;
+
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, insert, CUR2BT(file_cursor));
+
+    /* Allocate a tombstone only when there is a valid stop time point. */
+    if (WT_TIME_WINDOW_HAS_STOP(&hs_cursor->time_window)) {
+        /*
+         * Insert a delete record to represent stop time point for the actual record to be inserted.
+         * Set the stop time point as the commit time point of the history store delete record.
+         */
+        WT_ERR(__wt_upd_alloc_tombstone(session, &hs_tombstone, NULL));
+        hs_tombstone->start_ts = hs_cursor->time_window.stop_ts;
+        hs_tombstone->durable_ts = hs_cursor->time_window.durable_stop_ts;
+        hs_tombstone->txnid = hs_cursor->time_window.stop_txn;
+    }
+
+    /*
+     * Append to the delete record, the actual record to be inserted into the history store. Set the
+     * current update start time point as the commit time point to the history store record.
+     */
+    WT_ERR(__wt_upd_alloc(session, &file_cursor->value, WT_UPDATE_STANDARD, &hs_upd, NULL));
+    hs_upd->start_ts = hs_cursor->time_window.start_ts;
+    hs_upd->durable_ts = hs_cursor->time_window.durable_start_ts;
+    hs_upd->txnid = hs_cursor->time_window.start_txn;
+
+    /* Insert the standard update as next update if there is a tombstone. */
+    if (hs_tombstone != NULL) {
+        hs_tombstone->next = hs_upd;
+        hs_upd = hs_tombstone;
+        hs_tombstone = NULL;
+    }
+
+    /* Search the page and insert the updates. */
+    WT_WITH_PAGE_INDEX(session, ret = __wt_hs_row_search(cbt, &file_cursor->key, true));
+    WT_ERR(ret);
+    WT_ERR(__wt_hs_modify(cbt, hs_upd));
+
+    if (0) {
+err:
+        __wt_free(session, hs_tombstone);
+        __wt_free(session, hs_upd);
+    }
     API_END_RET(session, ret);
 }
 
@@ -197,26 +346,26 @@ err:
 int
 __wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
-    WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
-      __wt_cursor_get_value,                          /* get-value */
-      __wt_cursor_set_key,                            /* set-key */
-      __wt_cursor_set_value,                          /* set-value */
-      __wt_cursor_compare_notsup,                     /* compare */
-      __wt_cursor_equals_notsup,                      /* equals */
-      __wt_cursor_notsup,                             /* next */
-      __wt_cursor_notsup,                             /* prev */
-      __curhs_reset,                                  /* reset */
-      __wt_cursor_notsup,                             /* search */
-      __wt_cursor_search_near_notsup,                 /* search-near */
-      __wt_cursor_notsup,                             /* insert */
-      __wt_cursor_modify_value_format_notsup,         /* modify */
-      __wt_cursor_notsup,                             /* update */
-      __wt_cursor_notsup,                             /* remove */
-      __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
-      __wt_cursor_notsup,                             /* cache */
-      __wt_cursor_reopen_notsup,                      /* reopen */
-      __curhs_close);                                 /* close */
+    WT_CURSOR_STATIC_INIT(iface, __curhs_get_key, /* get-key */
+      __curhs_get_value,                          /* get-value */
+      __curhs_set_key,                            /* set-key */
+      __curhs_set_value,                          /* set-value */
+      __wt_cursor_compare_notsup,                 /* compare */
+      __wt_cursor_equals_notsup,                  /* equals */
+      __wt_cursor_notsup,                         /* next */
+      __wt_cursor_notsup,                         /* prev */
+      __curhs_reset,                              /* reset */
+      __wt_cursor_notsup,                         /* search */
+      __wt_cursor_search_near_notsup,             /* search-near */
+      __curhs_insert,                             /* insert */
+      __wt_cursor_modify_value_format_notsup,     /* modify */
+      __wt_cursor_notsup,                         /* update */
+      __wt_cursor_notsup,                         /* remove */
+      __wt_cursor_notsup,                         /* reserve */
+      __wt_cursor_reconfigure_notsup,             /* reconfigure */
+      __wt_cursor_notsup,                         /* cache */
+      __wt_cursor_reopen_notsup,                  /* reopen */
+      __curhs_close);                             /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_HS *hs_cursor;
     WT_DECL_RET;
@@ -232,6 +381,8 @@ __wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
     WT_ERR(__hs_cursor_open_int(session, &hs_cursor->file_cursor));
 
     WT_ERR(__wt_cursor_init(cursor, WT_HS_URI, owner, NULL, cursorp));
+
+    WT_TIME_WINDOW_INIT(&hs_cursor->time_window);
 
     if (0) {
 err:
