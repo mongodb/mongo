@@ -4,7 +4,7 @@ error_categories:
     - NetworkTimeoutError
     - Interruption
     # isNotPrimaryError() includes all codes that indicate that the node that received the request
-    # was not master at some point during command processing,regardless of whether some write may
+    # was not primary at some point during command processing,regardless of whether some write may
     # have happened. If you care about whether a write could have happened,check for individual
     # codes.
     - NotPrimaryError

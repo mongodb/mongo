@@ -2922,10 +2922,15 @@ Status ReplicationCoordinatorImpl::checkCanServeReadsFor_UNSAFE(OperationContext
         if (isPrimaryOrSecondary) {
             return Status::OK();
         }
-        return Status(ErrorCodes::NotPrimaryOrSecondary,
-                      "not master or secondary; cannot currently read from this replSet member");
+        const auto msg = client->supportsHello()
+            ? "not primary or secondary; cannot currently read from this replSet member"_sd
+            : "not master or secondary; cannot currently read from this replSet member"_sd;
+        return Status(ErrorCodes::NotPrimaryOrSecondary, msg);
     }
-    return Status(ErrorCodes::NotPrimaryNoSecondaryOk, "not master and slaveOk=false");
+
+    const auto msg = client->supportsHello() ? "not primary and secondaryOk=false"_sd
+                                             : "not master and slaveOk=false"_sd;
+    return Status(ErrorCodes::NotPrimaryNoSecondaryOk, msg);
 }
 
 bool ReplicationCoordinatorImpl::isInPrimaryOrSecondaryState(OperationContext* opCtx) const {

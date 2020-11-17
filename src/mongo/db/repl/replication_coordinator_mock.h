@@ -305,7 +305,7 @@ public:
         AwaitReplicationReturnValueFunction returnValueFunction);
 
     /**
-     * Always allow writes even if this node is not master. Used by sharding unit tests.
+     * Always allow writes even if this node is a writable primary. Used by sharding unit tests.
      */
     void alwaysAllowWrites(bool allowWrites);
 
