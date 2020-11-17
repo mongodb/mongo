@@ -150,7 +150,9 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     bob.append("desc", "tenant donor migration");
     bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
     bob.append("instanceID", _stateDoc.getId().toBSON());
+    bob.append("tenantId", _stateDoc.getTenantId());
     bob.append("recipientConnectionString", _stateDoc.getRecipientConnectionString());
+    bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
     bob.append("lastDurableState", _durableState.state);
     if (_stateDoc.getExpireAt()) {
         bob.append("expireAt", _stateDoc.getExpireAt()->toString());

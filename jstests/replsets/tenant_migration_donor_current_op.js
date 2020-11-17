@@ -38,6 +38,9 @@ recipientRst.initiate();
 
 const kRecipientConnString = recipientRst.getURL();
 const kTenantId = 'testTenantId';
+const kReadPreference = {
+    mode: "primary"
+};
 
 (() => {
     jsTestLog("Testing currentOp output for migration in data sync state");
@@ -53,6 +56,7 @@ const kTenantId = 'testTenantId';
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: kTenantId,
+        readPreference: kReadPreference
     };
     let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterDataSync");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
@@ -62,7 +66,9 @@ const kTenantId = 'testTenantId';
         donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
     assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kDataSync);
     assert.eq(res.inprog[0].migrationCompleted, false);
 
@@ -84,6 +90,7 @@ const kTenantId = 'testTenantId';
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: kTenantId,
+        readPreference: kReadPreference
     };
     let fp = configureFailPoint(donorPrimary, "pauseTenantMigrationAfterBlockingStarts");
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
@@ -93,7 +100,9 @@ const kTenantId = 'testTenantId';
         donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
     assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kBlocking);
     assert(res.inprog[0].blockTimestamp);
     assert.eq(res.inprog[0].migrationCompleted, false);
@@ -116,6 +125,7 @@ const kTenantId = 'testTenantId';
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: kTenantId,
+        readPreference: kReadPreference
     };
     configureFailPoint(donorPrimary, "abortTenantMigrationAfterBlockingStarts");
     assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
@@ -124,7 +134,9 @@ const kTenantId = 'testTenantId';
         donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"}));
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
     assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kAborted);
     assert(res.inprog[0].blockTimestamp);
     assert(res.inprog[0].commitOrAbortOpTime);
@@ -147,13 +159,16 @@ const kTenantId = 'testTenantId';
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: kTenantId,
+        readPreference: kReadPreference
     };
     assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
 
     let res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
     assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kCommitted);
     assert(res.inprog[0].blockTimestamp);
     assert(res.inprog[0].commitOrAbortOpTime);
@@ -166,7 +181,9 @@ const kTenantId = 'testTenantId';
     res = donorPrimary.adminCommand({currentOp: true, desc: "tenant donor migration"});
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
+    assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
     assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kCommitted);
     assert(res.inprog[0].blockTimestamp);
     assert(res.inprog[0].commitOrAbortOpTime);

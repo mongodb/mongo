@@ -21,6 +21,15 @@ function checkNumRecipientSyncDataCmdExecuted(recipientPrimary, expectedNumExecu
     assert.eq(expectedNumExecuted, recipientSyncDataMetrics.total);
 }
 
+/**
+ * Returns an array of currentOp entries for the TenantMigrationDonorService instances that match
+ * the given query.
+ */
+function getTenantMigrationDonorCurrentOpEntries(donorPrimary, query) {
+    const cmdObj = Object.assign({currentOp: true, desc: "tenant donor migration"}, query);
+    return assert.commandWorked(donorPrimary.adminCommand(cmdObj)).inprog;
+}
+
 const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 let charIndex = 0;
 
@@ -52,7 +61,7 @@ let numRecipientSyncDataCmdSent = 0;
 // Test that a retry of a donorStartMigration command joins the existing migration that has
 // completed but has not been garbage-collected.
 (() => {
-    const tenantId = `${generateUniqueTenantId()}_RetryAfterMigrationCompletes`;
+    const tenantId = `${generateUniqueTenantId()}RetryAfterMigrationCompletes`;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId,
@@ -69,7 +78,7 @@ let numRecipientSyncDataCmdSent = 0;
 
 // Test that a retry of a donorStartMigration command joins the ongoing migration.
 (() => {
-    const tenantId = `${generateUniqueTenantId()}_RetryBeforeMigrationCompletes`;
+    const tenantId = `${generateUniqueTenantId()}RetryBeforeMigrationCompletes`;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
         tenantId,
@@ -99,9 +108,23 @@ function testStartingConflictingMigrationAfterInitialMigrationCommitted(
                                  ErrorCodes.ConflictingOperationInProgress);
 
     // If the second donorStartMigration had started a duplicate migration, there would be two donor
-    // state docs.
+    // state docs and TenantMigrationDonorService instances.
     let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
-    assert.eq(1, configDonorsColl.count({tenantId: migrationOpts0.tenantId}));
+    assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
+    assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                     "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                 }).length);
+    if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
+        assert.eq(0, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
+        assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                         "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                     }).length);
+    } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
+        assert.eq(0, configDonorsColl.count({tenantId: migrationOpts1.tenantId}));
+        assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                         tenantId: migrationOpts1.tenantId
+                     }).length);
+    }
 }
 
 /**
@@ -115,21 +138,43 @@ function testConcurrentConflictingMigrations(
 
     let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
 
-    // Verify that only one migration succeeded.
+    // Verify that exactly one migration succeeded.
     assert(res0.ok || res1.ok);
     assert(!res0.ok || !res1.ok);
 
     if (res0.ok) {
         assert.commandFailedWithCode(res1, ErrorCodes.ConflictingOperationInProgress);
-        assert.eq(1, configDonorsColl.count({tenantId: migrationOpts0.tenantId}));
-        if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
+        assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
+        assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                         "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                     }).length);
+        if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
+            assert.eq(0, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
+            assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                             "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                         }).length);
+        } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
             assert.eq(0, configDonorsColl.count({tenantId: migrationOpts1.tenantId}));
+            assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                             tenantId: migrationOpts1.tenantId
+                         }).length);
         }
     } else {
         assert.commandFailedWithCode(res0, ErrorCodes.ConflictingOperationInProgress);
-        assert.eq(1, configDonorsColl.count({tenantId: migrationOpts1.tenantId}));
-        if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
+        assert.eq(1, configDonorsColl.count({_id: UUID(migrationOpts1.migrationIdString)}));
+        assert.eq(1, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                         "instanceID.uuid": UUID(migrationOpts1.migrationIdString)
+                     }).length);
+        if (migrationOpts0.migrationIdString != migrationOpts1.migrationIdString) {
+            assert.eq(0, configDonorsColl.count({_id: UUID(migrationOpts0.migrationIdString)}));
+            assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                             "instanceID.uuid": UUID(migrationOpts0.migrationIdString)
+                         }).length);
+        } else if (migrationOpts0.tenantId != migrationOpts1.tenantId) {
             assert.eq(0, configDonorsColl.count({tenantId: migrationOpts0.tenantId}));
+            assert.eq(0, getTenantMigrationDonorCurrentOpEntries(donorPrimary, {
+                             tenantId: migrationOpts0.tenantId
+                         }).length);
         }
     }
 }
