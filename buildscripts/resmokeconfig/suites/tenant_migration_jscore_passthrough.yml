@@ -96,7 +96,6 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        enableTenantMigrations: true
         # TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
         failpoint.returnResponseOkForRecipientSyncDataCmd:
             mode: alwaysOn

@@ -14,6 +14,10 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kTenantIdPrefix = "testTenantId";
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    return;
+}
 
 /**
  * Starts a migration and forces the write to insert the donor's state doc to abort on the first few

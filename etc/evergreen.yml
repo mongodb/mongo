@@ -8825,7 +8825,6 @@ buildvariants:
   - name: libunwind_tests
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: tenant_migration_jscore_passthrough_gen
   - name: .ocsp
   - name: .read_write_concern
   - name: .replica_sets !.encrypt
@@ -10448,7 +10447,6 @@ buildvariants:
   - name: mqlrun
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
-  - name: tenant_migration_jscore_passthrough_gen
   - name: multiversion_gen
   - name: .query_fuzzer
   - name: .random_multiversion_ds
@@ -10516,7 +10514,7 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem linux-64-duroff enterprise-rhel-62-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true}"
+        --mongodSetParameters="{featureFlagToaster: true, featureFlagSpoon: true, featureFlagTenantMigrations: true}"
   tasks:
   - name: compile_parallel_TG
     distros:
@@ -13195,7 +13193,6 @@ buildvariants:
 #  - name: multiversion_sanity_check_gen
 #  - name: mqlrun
 #  - name: .multi_shard
-#  - name: tenant_migration_jscore_passthrough_gen
 #  - name: .query_fuzzer
 #  - name: .read_write_concern
 #  - name: .replica_sets !.encrypt !.auth !.non_live_record

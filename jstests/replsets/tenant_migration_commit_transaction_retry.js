@@ -20,8 +20,6 @@ const donorRst = new ReplSetTest({
     name: "donor",
     nodeOptions: {
         setParameter: {
-            enableTenantMigrations: true,
-
             // Set the delay before a donor state doc is garbage collected to be short to speed up
             // the test.
             tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
@@ -36,7 +34,6 @@ const recipientRst = new ReplSetTest({
     name: "recipient",
     nodeOptions: {
         setParameter: {
-            enableTenantMigrations: true,
             // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
             'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
         }
@@ -50,6 +47,12 @@ recipientRst.startSet();
 recipientRst.initiate();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    donorRst.stopSet();
+    recipientRst.stopSet();
+    return;
+}
 
 const kTenantId = "testTenantId";
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");

@@ -28,7 +28,6 @@ const donorRst = new ReplSetTest({
     name: 'donor',
     nodeOptions: {
         setParameter: {
-            enableTenantMigrations: true,
             tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
             ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
         }
@@ -50,6 +49,11 @@ function insertDocument(primaryHost, dbName, collName) {
     donorRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        return;
+    }
 
     const migrationId = UUID();
     const tenantId = "migrationOutcome-committed";
@@ -107,6 +111,11 @@ function insertDocument(primaryHost, dbName, collName) {
     donorRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        return;
+    }
 
     const migrationId = UUID();
     const tenantId = "migrationOutcome-aborted";

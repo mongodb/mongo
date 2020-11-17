@@ -258,7 +258,10 @@ void _logOpsInner(OperationContext* opCtx,
     // entry for renameCollection has 'nss' set to the fromCollection's ns. renameCollection can be
     // across databases, but a tenant will never be able to rename into a database with a different
     // prefix, so it is safe to use the fromCollection's db's prefix for this check.
-    if (repl::enableTenantMigrations) {
+    //
+    // We ignore FCV here when checking the feature flag since the FCV may not have been initialized
+    // yet. This is safe since tenant migrations does not have any upgrade/downgrade behavior.
+    if (repl::feature_flags::gTenantMigrations.isEnabledAndIgnoreFCV()) {
         // Skip the check if this is an "abortIndexBuild" oplog entry since it is safe to the abort
         // an index build on the donor after the blockTimestamp, plus if an index build fails to
         // commit due to TenantMigrationConflict, we need to be able to abort the index build and

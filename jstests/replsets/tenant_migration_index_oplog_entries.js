@@ -8,14 +8,20 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kDbName = "testDb";
 const kCollName = "testColl";
 const kNs = kDbName + "." + kCollName;
 
-const rst = new ReplSetTest({nodes: [{setParameter: {enableTenantMigrations: true}}]});
+const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
+if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    rst.stopSet();
+    return;
+}
 
 const primary = rst.getPrimary();
 const testDB = primary.getDB(kDbName);

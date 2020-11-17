@@ -17,6 +17,10 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const kTenantIdPrefix = "testTenantId";
 let testNum = 0;
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    return;
+}
 
 function makeTenantId() {
     return kTenantIdPrefix + testNum++;

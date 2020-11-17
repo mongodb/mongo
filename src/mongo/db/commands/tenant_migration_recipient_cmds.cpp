@@ -54,7 +54,8 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     "recipientSyncData command not enabled",
-                    repl::enableTenantMigrations);
+                    repl::feature_flags::gTenantMigrations.isEnabled(
+                        serverGlobalParams.featureCompatibility));
 
             const auto& cmd = request();
 
@@ -126,7 +127,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     "recipientForgetMigration command not enabled",
-                    repl::enableTenantMigrations);
+                    repl::feature_flags::gTenantMigrations.isEnabled(
+                        serverGlobalParams.featureCompatibility));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const {}

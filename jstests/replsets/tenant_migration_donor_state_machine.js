@@ -61,8 +61,6 @@ const donorRst = new ReplSetTest({
     name: "donor",
     nodeOptions: {
         setParameter: {
-            enableTenantMigrations: true,
-
             // Set the delay before a donor state doc is garbage collected to be short to speed up
             // the test.
             tenantMigrationGarbageCollectionDelayMS: 3 * 1000,
@@ -77,6 +75,11 @@ donorRst.startSet();
 donorRst.initiate();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    donorRst.stopSet();
+    return;
+}
 const recipientRst = tenantMigrationTest.getRecipientRst();
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

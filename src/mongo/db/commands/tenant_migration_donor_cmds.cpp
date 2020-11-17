@@ -51,7 +51,8 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     "donorStartMigration command not enabled",
-                    repl::enableTenantMigrations);
+                    repl::feature_flags::gTenantMigrations.isEnabled(
+                        serverGlobalParams.featureCompatibility));
 
             const RequestType& requestBody = request();
 
@@ -118,7 +119,8 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     "donorForgetMigration command not enabled",
-                    repl::enableTenantMigrations);
+                    repl::feature_flags::gTenantMigrations.isEnabled(
+                        serverGlobalParams.featureCompatibility));
 
             const RequestType& requestBody = request();
 

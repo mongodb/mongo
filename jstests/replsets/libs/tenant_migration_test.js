@@ -36,7 +36,7 @@ function TenantMigrationTest({name = "TenantMigrationTest", donorRst, recipientR
      * Creates a ReplSetTest instance. The repl set will have 2 nodes.
      */
     function performSetUp(isDonor) {
-        let setParameterOpts = {"enableTenantMigrations": true};
+        let setParameterOpts = {};
         if (TestData.logComponentVerbosity) {
             setParameterOpts["logComponentVerbosity"] =
                 tojsononeline(TestData.logComponentVerbosity);
@@ -58,6 +58,30 @@ function TenantMigrationTest({name = "TenantMigrationTest", donorRst, recipientR
 
         return rst;
     }
+
+    /**
+     * Returns whether tenant migration commands are supported.
+     */
+    this.isFeatureFlagEnabled = function() {
+        const donorPrimary = this.getDonorPrimary();
+        const recipientPrimary = this.getRecipientPrimary();
+
+        function supportsTenantMigrations(conn) {
+            return assert
+                .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTenantMigrations: 1}))
+                .featureFlagTenantMigrations.value;
+        }
+        const retVal =
+            (supportsTenantMigrations(donorPrimary) && supportsTenantMigrations(recipientPrimary));
+        if (!retVal) {
+            jsTestLog("At least one of the donor or recipient replica sets do not support tenant " +
+                      "migration commands. Terminating any replica sets started by the " +
+                      "TenantMigrationTest fixture.");
+            // Stop any replica sets started by the TenantMigrationTest fixture.
+            this.stop();
+        }
+        return retVal;
+    };
 
     /**
      * Runs a tenant migration with the given migration options and waits for the migration to be

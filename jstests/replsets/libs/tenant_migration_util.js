@@ -5,6 +5,15 @@ var TenantMigrationUtil = (function() {
     load("jstests/replsets/libs/tenant_migration_test.js");
 
     /**
+     * Returns whether tenant migration commands are supported.
+     */
+    function isFeatureFlagEnabled(conn) {
+        return assert
+            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTenantMigrations: 1}))
+            .featureFlagTenantMigrations.value;
+    }
+
+    /**
      * Runs the donorStartMigration command with the given migration options
      * until the migration commits or aborts, or until the command fails. Returns the last command
      * response.
@@ -109,5 +118,5 @@ var TenantMigrationUtil = (function() {
         return donorRstArgs;
     }
 
-    return {runMigrationAsync, forgetMigrationAsync, createRstArgs};
+    return {runMigrationAsync, forgetMigrationAsync, createRstArgs, isFeatureFlagEnabled};
 })();

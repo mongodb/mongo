@@ -19,10 +19,8 @@ const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donor',
     nodeOptions: {
-        setParameter: {
-            enableTenantMigrations: true,
-            "failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})
-        }
+        setParameter:
+            {"failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})}
     }
 });
 
@@ -30,6 +28,11 @@ donorRst.startSet();
 donorRst.initiate();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    donorRst.stopSet();
+    return;
+}
 
 const kMaxSleepTimeMS = 1000;
 const kTenantId = 'testTenantId';
@@ -68,10 +71,7 @@ sleep(Math.random() * kMaxSleepTimeMS);
 donorRst.stopSet(null /* signal */, true /*forRestart */);
 donorRst.startSet({
     restart: true,
-    setParameter: {
-        enableTenantMigrations: true,
-        "failpoint.PrimaryOnlyServiceSkipRebuildingInstances": "{'mode':'alwaysOn'}"
-    }
+    setParameter: {"failpoint.PrimaryOnlyServiceSkipRebuildingInstances": "{'mode':'alwaysOn'}"}
 });
 
 donorPrimary = donorRst.getPrimary();

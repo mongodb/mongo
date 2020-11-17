@@ -8,10 +8,16 @@
 "use strict";
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/curop_helpers.js");  // for waitForCurOpByFailPoint().
+load("jstests/replsets/libs/tenant_migration_util.js");
 
-var rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+var rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
+if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    rst.stopSet();
+    return;
+}
 
 const primary = rst.getPrimary();
 const configDB = primary.getDB("config");

@@ -23,6 +23,10 @@ const kTenantId = "testTenantId";
  */
 function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
@@ -58,6 +62,10 @@ function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) 
  */
 function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();

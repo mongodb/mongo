@@ -23,7 +23,6 @@ const recipientRst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         setParameter: {
-            enableTenantMigrations: true,
             // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
             'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
         }
@@ -31,6 +30,11 @@ const recipientRst = new ReplSetTest({
 });
 recipientRst.startSet();
 recipientRst.initiate();
+if (!TenantMigrationUtil.isFeatureFlagEnabled(recipientRst.getPrimary())) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    recipientRst.stopSet();
+    return;
+}
 
 function makeMigrationOpts(migrationId, tenantId) {
     return {
@@ -57,7 +61,6 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
         settings: {chainingAllowed: false},
         nodeOptions: {
             setParameter: {
-                enableTenantMigrations: true,
                 // Set the delay before a donor state doc is garbage collected to be short to speed
                 // up the test.
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,

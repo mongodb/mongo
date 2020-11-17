@@ -324,14 +324,6 @@ server_parameters:
         cpp_varname: disableSplitHorizonIPCheck
         default: false
 
-    enableTenantMigrations:
-        description: >-
-            If true, enables tenant migration commands.
-        set_at: startup
-        cpp_vartype: bool
-        cpp_varname: enableTenantMigrations
-        default: false
-
     tenantMigrationGarbageCollectionDelayMS:
         description: >-
             The amount of time in milliseconds that the donor or recipient should wait before
@@ -363,3 +355,10 @@ server_parameters:
         #     defaultBatchSize to use.
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
+
+feature_flags:
+    featureFlagTenantMigrations:
+        description: >-
+            When enabled, tenant migration commands are supported.
+        cpp_varname: feature_flags::gTenantMigrations
+        default: false

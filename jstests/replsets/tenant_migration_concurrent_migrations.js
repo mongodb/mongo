@@ -18,7 +18,7 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
 let startupParams = {};
-startupParams["enableTenantMigrations"] = true;
+
 // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
 startupParams["failpoint.returnResponseOkForRecipientSyncDataCmd"] = tojson({mode: 'alwaysOn'});
 
@@ -40,6 +40,10 @@ const kTenantIdPrefix = "testTenantId";
 // Test concurrent outgoing migrations to different recipients.
 (() => {
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
+    if (!tenantMigrationTest0.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
     const tenantId0 = `${kTenantIdPrefix}_ConcurrentOutgoingMigrationsToDifferentRecipient0`;
     const tenantId1 = `${kTenantIdPrefix}_ConcurrentOutgoingMigrationsToDifferentRecipient1`;
@@ -69,6 +73,10 @@ const kTenantIdPrefix = "testTenantId";
 // Test concurrent incoming migrations from different donors.
 (() => {
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
+    if (!tenantMigrationTest0.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        return;
+    }
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst1, recipientRst: rst2});
     const tenantId0 = `${kTenantIdPrefix}_ConcurrentIncomingMigrations0`;
     const tenantId1 = `${kTenantIdPrefix}_ConcurrentIncomingMigrations1`;

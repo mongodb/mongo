@@ -33,7 +33,6 @@ const donorRst = new ReplSetTest({
     name: 'donor',
     nodeOptions: {
         setParameter: {
-            enableTenantMigrations: true,
             internalInsertMaxBatchSize:
                 kMaxBatchSize /* Decrease internal max batch size so we can still show writes are
                                  batched without inserting hundreds of documents. */
@@ -45,7 +44,6 @@ const recipientRst = new ReplSetTest({
     name: 'recipient',
     nodeOptions: {
         setParameter: {
-            enableTenantMigrations: true,
             internalInsertMaxBatchSize:
                 kMaxBatchSize /* Decrease internal max batch size so we can still show writes are
                                  batched without inserting hundreds of documents. */
@@ -121,11 +119,18 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     donorRst.startSet();
     donorRst.initiate();
+
     recipientRst.startSet();
     recipientRst.initiate();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
 
     const tenantId = "bulkUnorderedInserts-committed";
     const migrationOpts = {
@@ -184,11 +189,18 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     donorRst.startSet();
     donorRst.initiate();
+
     recipientRst.startSet();
     recipientRst.initiate();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
 
     const tenantId = "bulkUnorderedInserts-committed";
     const migrationOpts = {
@@ -259,12 +271,19 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     donorRst.startSet();
     donorRst.initiate();
+
     recipientRst.startSet();
     recipientRst.initiate();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
 
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
     const tenantId = "bulkUnorderedInserts-aborted";
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -337,11 +356,18 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     donorRst.startSet();
     donorRst.initiate();
+
     recipientRst.startSet();
     recipientRst.initiate();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
 
     const tenantId = "bulkOrderedInserts-committed";
     const migrationOpts = {
@@ -395,11 +421,18 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     donorRst.startSet();
     donorRst.initiate();
+
     recipientRst.startSet();
     recipientRst.initiate();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
 
     const tenantId = "bulkOrderedInserts-committed";
     const migrationOpts = {
@@ -465,11 +498,18 @@ function retryFailedWrites(primaryDB, collName, writeErrors, ops) {
 
     donorRst.startSet();
     donorRst.initiate();
+
     recipientRst.startSet();
     recipientRst.initiate();
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
 
     const tenantId = "bulkOrderedInserts-aborted";
     const migrationOpts = {

@@ -9,10 +9,16 @@
 (function() {
 "use strict";
 
-const rst =
-    new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+load("jstests/replsets/libs/tenant_migration_util.js");
+
+const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
+if (!TenantMigrationUtil.isFeatureFlagEnabled(rst.getPrimary())) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    rst.stopSet();
+    return;
+}
 const primary = rst.getPrimary();
 const tenantId = "test";
 const connectionString = "foo/bar:12345";

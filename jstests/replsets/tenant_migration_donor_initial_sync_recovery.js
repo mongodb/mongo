@@ -16,6 +16,10 @@ load("jstests/libs/parallelTester.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
+if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+    jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+    return;
+}
 
 const kMaxSleepTimeMS = 1000;
 const kTenantId = 'testTenantId';
@@ -44,8 +48,7 @@ sleep(Math.random() * kMaxSleepTimeMS);
 
 // Add the initial sync node and make sure that it does not step up.
 const donorRst = tenantMigrationTest.getDonorRst();
-const initialSyncNode =
-    donorRst.add({rsConfig: {priority: 0, votes: 0}, setParameter: {enableTenantMigrations: true}});
+const initialSyncNode = donorRst.add({rsConfig: {priority: 0, votes: 0}});
 
 donorRst.reInitiate();
 jsTestLog("Waiting for initial sync to finish.");

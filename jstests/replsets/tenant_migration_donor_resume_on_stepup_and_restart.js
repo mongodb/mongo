@@ -43,13 +43,17 @@ function assertMigrationCommitsIfDurableStateExists(tenantMigrationTest, migrati
  * donor using the 'interruptFunc', and asserts that migration eventually commits.
  */
 function testDonorStartMigrationInterrupt(interruptFunc) {
-    const donorRst = new ReplSetTest(
-        {nodes: 3, name: "donorRst", nodeOptions: {setParameter: {enableTenantMigrations: true}}});
+    const donorRst = new ReplSetTest({nodes: 3, name: "donorRst"});
 
     donorRst.startSet();
     donorRst.initiate();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        return;
+    }
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
@@ -92,7 +96,6 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         name: "donorRst",
         nodeOptions: {
             setParameter: {
-                enableTenantMigrations: true,
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
                 ttlMonitorSleepSecs: kTTLMonitorSleepSecs,
             }
@@ -103,7 +106,6 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         name: "recipientRst",
         nodeOptions: {
             setParameter: {
-                enableTenantMigrations: true,
                 // TODO SERVER-51734: Remove the failpoint
                 // 'returnResponseOkForRecipientSyncDataCmd'.
                 'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
@@ -121,6 +123,12 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
+    if (!tenantMigrationTest.isFeatureFlagEnabled()) {
+        jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
+        donorRst.stopSet();
+        recipientRst.stopSet();
+        return;
+    }
     let donorPrimary = tenantMigrationTest.getDonorPrimary();
 
     const migrationId = UUID();
