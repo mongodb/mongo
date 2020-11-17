@@ -10493,7 +10493,7 @@ buildvariants:
   - name: cst_jscore_passthrough
 
 - name: enterprise-rhel-62-64-bit-dynamic-disabled-feature-flags
-  display_name: "~ Shared Library Enterprise RHEL 6.2 (disabled feature flags)"
+  display_name: "! Shared Library Enterprise RHEL 6.2 (disabled feature flags)"
   batchtime: 60 # 1 hour
   stepback: false
   modules:
