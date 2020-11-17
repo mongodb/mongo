@@ -511,7 +511,7 @@ var Cluster = function(options) {
             res.databases.forEach(dbInfo => {
                 // Don't perform listCollections on the admin or config database through a mongos
                 // connection when stepping down the config server primary, because both are stored
-                // on the config server, and listCollections may return a not master error if the
+                // on the config server, and listCollections may return a NotPrimaryError if the
                 // mongos is stale.
                 //
                 // TODO SERVER-30949: listCollections through mongos should automatically retry on
