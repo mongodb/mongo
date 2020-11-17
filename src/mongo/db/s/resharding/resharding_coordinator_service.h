@@ -55,7 +55,8 @@ void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
 
 void persistCommittedState(OperationContext* opCtx,
                            const ReshardingCoordinatorDocument& coordinatorDoc,
-                           OID newCollectionEpoch);
+                           OID newCollectionEpoch,
+                           boost::optional<Timestamp> newCollectionTimestamp);
 
 void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc);

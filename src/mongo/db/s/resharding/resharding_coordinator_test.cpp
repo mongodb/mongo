@@ -489,7 +489,8 @@ protected:
                                             Timestamp fetchTimestamp,
                                             std::vector<ChunkType> expectedChunks,
                                             std::vector<TagsType> expectedZones) {
-        resharding::persistCommittedState(operationContext(), expectedCoordinatorDoc, _finalEpoch);
+        resharding::persistCommittedState(
+            operationContext(), expectedCoordinatorDoc, _finalEpoch, _finalTimestamp);
 
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
@@ -555,6 +556,8 @@ protected:
     OID _tempEpoch = OID::gen();
 
     OID _finalEpoch = OID::gen();
+    boost::optional<Timestamp>
+        _finalTimestamp;  // TODO: SERVER-53066 Initialize it with a Timestamp.
 
     ShardKeyPattern _oldShardKey = ShardKeyPattern(BSON("oldSK" << 1));
     ShardKeyPattern _newShardKey = ShardKeyPattern(BSON("newSK" << 1));

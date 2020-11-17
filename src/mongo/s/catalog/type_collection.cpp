@@ -48,6 +48,17 @@ CollectionType::CollectionType(NamespaceString nss, OID epoch, Date_t updatedAt,
     setUuid(std::move(uuid));
 }
 
+CollectionType::CollectionType(NamespaceString nss,
+                               OID epoch,
+                               boost::optional<Timestamp> creationTime,
+                               Date_t updatedAt,
+                               UUID uuid)
+    : CollectionTypeBase(std::move(nss), std::move(updatedAt)) {
+    setEpoch(std::move(epoch));
+    setUuid(std::move(uuid));
+    setTimestamp(creationTime);
+}
+
 CollectionType::CollectionType(const BSONObj& obj) {
     CollectionType::parseProtected(IDLParserErrorContext("CollectionType"), obj);
     uassert(ErrorCodes::BadValue,

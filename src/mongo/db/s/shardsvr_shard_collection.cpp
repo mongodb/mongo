@@ -63,6 +63,7 @@
 #include "mongo/s/request_types/clone_collection_options_from_primary_shard_gen.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -471,8 +472,13 @@ void updateShardingCatalogEntryForCollection(
                                               ->makeFromBSON(defaultCollation));
     }
 
+    boost::optional<Timestamp> creationTime;
+    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+        creationTime = initialChunks.creationTime;
+    }
+
     CollectionType coll(
-        nss, initialChunks.collVersion().epoch(), Date_t::now(), prerequisites.uuid);
+        nss, initialChunks.collVersion().epoch(), creationTime, Date_t::now(), prerequisites.uuid);
     coll.setKeyPattern(prerequisites.shardKeyPattern.toBSON());
     if (defaultCollator) {
         coll.setDefaultCollation(defaultCollator->getSpec().toBSON());

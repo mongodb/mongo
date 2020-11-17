@@ -54,6 +54,7 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
@@ -70,6 +71,7 @@
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/transport/service_entry_point.h"
@@ -583,6 +585,12 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
 
     collType.setEpoch(newEpoch);
     collType.setKeyPattern(newShardKeyPattern.getKeyPattern());
+
+    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto now = VectorClock::get(opCtx)->getTime();
+        auto newClusterTime = now.clusterTime().asTimestamp();
+        collType.setTimestamp(newClusterTime);
+    }
 
     auto updateCollectionAndChunksFn = [&](OperationContext* opCtx, TxnNumber txnNumber) {
         // Update the config.collections entry for the given namespace.

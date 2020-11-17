@@ -123,7 +123,7 @@ InitialSplitPolicy::ShardCollectionConfig createChunks(const ShardKeyPattern& sh
         appendChunk(params.nss, min, max, &version, validAfter, shardId, &chunks);
     }
 
-    return {std::move(chunks)};
+    return {std::move(chunks), validAfter};
 }
 
 }  // namespace
@@ -281,6 +281,7 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::creat
                 currentTime.clusterTime().asTimestamp(),
                 params.primaryShardId,
                 &initialChunks.chunks);
+    initialChunks.creationTime = currentTime.clusterTime().asTimestamp();
     return initialChunks;
 }
 
@@ -434,7 +435,7 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
                     &chunks);
     }
 
-    return {std::move(chunks)};
+    return {std::move(chunks), validAfter};
 }
 
 AbstractTagsBasedSplitPolicy::SplitInfo PresplitHashedZonesSplitPolicy::buildSplitInfoForTag(

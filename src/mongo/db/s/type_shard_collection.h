@@ -57,6 +57,7 @@ public:
     using ShardCollectionTypeBase::getNss;
     using ShardCollectionTypeBase::getRefreshing;
     using ShardCollectionTypeBase::getReshardingFields;
+    using ShardCollectionTypeBase::getTimestamp;
     using ShardCollectionTypeBase::getUnique;
     using ShardCollectionTypeBase::getUuid;
     using ShardCollectionTypeBase::setDefaultCollation;
@@ -72,6 +73,13 @@ public:
 
     ShardCollectionType(
         NamespaceString nss, OID epoch, UUID uuid, KeyPattern keyPattern, bool unique);
+
+    ShardCollectionType(NamespaceString nss,
+                        OID epoch,
+                        boost::optional<Timestamp> creationTime,
+                        UUID uuid,
+                        KeyPattern keyPattern,
+                        bool unique);
 
     explicit ShardCollectionType(const BSONObj& obj);
 

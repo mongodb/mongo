@@ -96,6 +96,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     // Update the collections collection entry for 'nss' in case there are any new updates.
     ShardCollectionType update(nss,
                                collAndChunks.epoch,
+                               collAndChunks.creationTime,
                                *collAndChunks.uuid,
                                collAndChunks.shardKeyPattern,
                                collAndChunks.shardKeyIsUnique);
@@ -231,6 +232,7 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
         readShardChunks(opCtx, nss, diff.query, diff.sort, boost::none, startingVersion.epoch()));
 
     return CollectionAndChangedChunks{shardCollectionEntry.getEpoch(),
+                                      shardCollectionEntry.getTimestamp(),
                                       shardCollectionEntry.getUuid(),
                                       shardCollectionEntry.getKeyPattern().toBSON(),
                                       shardCollectionEntry.getDefaultCollation(),

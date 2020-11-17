@@ -38,11 +38,13 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/string_map.h"
@@ -150,7 +152,8 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
 BSONObj createReshardingFieldsUpdateForOriginalNss(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<OID> newCollectionEpoch) {
+    boost::optional<OID> newCollectionEpoch,
+    boost::optional<Timestamp> newCollectionTimestamp) {
     auto nextState = coordinatorDoc.getState();
     switch (nextState) {
         case CoordinatorStateEnum::kPreparingToDonate: {
@@ -166,19 +169,26 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
                                        << opCtx->getServiceContext()->getPreciseClockSource()->now()
                                        << CollectionType::kAllowMigrationsFieldName << false));
         }
-        case CoordinatorStateEnum::kCommitted:
+        case CoordinatorStateEnum::kCommitted: {
             // Update the config.collections entry for the original nss to reflect
             // the new sharded collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard
-            // key, and 'lastmodEpoch' to newCollectionEpoch. Also update the 'state' field in the
+            // key, 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to
+            // newCollectionTimestamp (if newCollectionTimestamp has a value; i.e. when the
+            // shardingFullDDLSupport feature flag is enabled). Also update the 'state' field in the
             // 'reshardingFields' section
-            return BSON("$set" << BSON(
-                            "uuid"
-                            << coordinatorDoc.get_id() << "key"
+            BSONObj setFields =
+                BSON("uuid" << coordinatorDoc.get_id() << "key"
                             << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
                             << newCollectionEpoch.get() << "lastmod"
                             << opCtx->getServiceContext()->getPreciseClockSource()->now()
                             << "reshardingFields.state"
-                            << CoordinatorState_serializer(coordinatorDoc.getState()).toString()));
+                            << CoordinatorState_serializer(coordinatorDoc.getState()).toString());
+            if (newCollectionTimestamp.has_value()) {
+                setFields = setFields.addFields(BSON("timestamp" << newCollectionTimestamp.get()));
+            }
+
+            return BSON("$set" << setFields);
+        }
         case mongo::CoordinatorStateEnum::kDone:
             // Remove 'reshardingFields' from the config.collections entry
             return BSON(
@@ -199,9 +209,10 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
 void updateConfigCollectionsForOriginalNss(OperationContext* opCtx,
                                            const ReshardingCoordinatorDocument& coordinatorDoc,
                                            boost::optional<OID> newCollectionEpoch,
+                                           boost::optional<Timestamp> newCollectionTimestamp,
                                            TxnNumber txnNumber) {
-    auto writeOp =
-        createReshardingFieldsUpdateForOriginalNss(opCtx, coordinatorDoc, newCollectionEpoch);
+    auto writeOp = createReshardingFieldsUpdateForOriginalNss(
+        opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
 
     auto request =
         buildUpdateOp(CollectionType::ConfigNS,
@@ -525,7 +536,8 @@ void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
 
             // Update the config.collections entry for the original collection to include
             // 'reshardingFields'
-            updateConfigCollectionsForOriginalNss(opCtx, coordinatorDoc, boost::none, txnNumber);
+            updateConfigCollectionsForOriginalNss(
+                opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
 
             // Insert the config.collections entry for the temporary resharding collection. The
             // chunks all have the same epoch, so picking the last chunk here is arbitrary.
@@ -541,7 +553,8 @@ void persistInitialStateAndCatalogUpdates(OperationContext* opCtx,
 
 void persistCommittedState(OperationContext* opCtx,
                            const ReshardingCoordinatorDocument& coordinatorDoc,
-                           OID newCollectionEpoch) {
+                           OID newCollectionEpoch,
+                           boost::optional<Timestamp> newCollectionTimestamp) {
     executeStateTransitionAndMetadataChangesInTxn(
         opCtx, coordinatorDoc, [&](OperationContext* opCtx, TxnNumber txnNumber) {
             // Update the config.reshardingOperations entry
@@ -554,7 +567,7 @@ void persistCommittedState(OperationContext* opCtx,
             // Update the config.collections entry for the original namespace to reflect the new
             // shard key, new epoch, and new UUID
             updateConfigCollectionsForOriginalNss(
-                opCtx, coordinatorDoc, newCollectionEpoch, txnNumber);
+                opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
 
             // Remove all chunk and tag documents associated with the original collection, then
             // update the chunk and tag docs currently associated with the temp nss to be associated
@@ -579,7 +592,8 @@ void persistStateTransitionAndCatalogUpdatesThenBumpShardVersions(
         writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
 
         // Update the config.collections entry for the original collection
-        updateConfigCollectionsForOriginalNss(opCtx, coordinatorDoc, boost::none, txnNumber);
+        updateConfigCollectionsForOriginalNss(
+            opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
 
         // Update the config.collections entry for the temporary resharding collection. If we've
         // already committed this operation, we've removed the entry for the temporary
@@ -611,7 +625,8 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
             writeToCoordinatorStateNss(opCtx, coordinatorDoc, txnNumber);
 
             // Remove the resharding fields from the config.collections entry
-            updateConfigCollectionsForOriginalNss(opCtx, coordinatorDoc, boost::none, txnNumber);
+            updateConfigCollectionsForOriginalNss(
+                opCtx, coordinatorDoc, boost::none, boost::none, txnNumber);
         });
 }
 }  // namespace resharding
@@ -848,10 +863,17 @@ Future<void> ReshardingCoordinatorService::ReshardingCoordinator::_commit(
 
     auto opCtx = cc().makeOperationContext();
 
-    // The new epoch to use for the resharded collection to indicate that the collection is a
-    // new incarnation of the namespace
+    // The new epoch and timestamp to use for the resharded collection to indicate that the
+    // collection is a new incarnation of the namespace
     auto newCollectionEpoch = OID::gen();
-    resharding::persistCommittedState(opCtx.get(), updatedCoordinatorDoc, newCollectionEpoch);
+    boost::optional<Timestamp> newCollectionTimestamp;
+    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto now = VectorClock::get(opCtx.get())->getTime();
+        newCollectionTimestamp = now.clusterTime().asTimestamp();
+    }
+
+    resharding::persistCommittedState(
+        opCtx.get(), updatedCoordinatorDoc, newCollectionEpoch, newCollectionTimestamp);
 
     // Update the in memory state
     _coordinatorDoc = updatedCoordinatorDoc;

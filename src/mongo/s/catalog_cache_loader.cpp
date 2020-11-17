@@ -43,6 +43,7 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks() = d
 
 CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     OID collEpoch,
+    boost::optional<Timestamp> collCreationTime,
     UUID collUuid,
     const BSONObj& collShardKeyPattern,
     const BSONObj& collDefaultCollation,
@@ -51,6 +52,7 @@ CatalogCacheLoader::CollectionAndChangedChunks::CollectionAndChangedChunks(
     bool allowMigrations,
     std::vector<ChunkType> chunks)
     : epoch(std::move(collEpoch)),
+      creationTime(std::move(collCreationTime)),
       uuid(std::move(collUuid)),
       shardKeyPattern(collShardKeyPattern),
       defaultCollation(collDefaultCollation),

@@ -109,6 +109,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
             !changedChunks.empty());
 
     return CollectionAndChangedChunks{coll.getEpoch(),
+                                      coll.getTimestamp(),
                                       coll.getUuid(),
                                       coll.getKeyPattern().toBSON(),
                                       coll.getDefaultCollation(),

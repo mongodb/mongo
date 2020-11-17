@@ -90,6 +90,7 @@ CollectionAndChangedChunks getCollectionRefresh(
     swChunksReturnValue.getValue().swap(chunks);
 
     return CollectionAndChangedChunks{swCollectionReturnValue.getValue().getEpoch(),
+                                      swCollectionReturnValue.getValue().getTimestamp(),
                                       swCollectionReturnValue.getValue().getUuid(),
                                       swCollectionReturnValue.getValue().getKeyPattern().toBSON(),
                                       swCollectionReturnValue.getValue().getDefaultCollation(),
