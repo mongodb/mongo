@@ -666,7 +666,6 @@ icuEnv.CppUnitTest(
         'strong_weak_finish_line_test.cpp',
         'summation_test.cpp',
         'text_test.cpp',
-        'thread_context_test.cpp',
         'tick_source_test.cpp',
         'time_support_test.cpp',
         'unique_function_test.cpp',
