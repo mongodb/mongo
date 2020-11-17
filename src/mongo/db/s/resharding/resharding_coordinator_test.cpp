@@ -631,7 +631,7 @@ TEST_F(ReshardingCoordinatorPersistenceTest, PersistFetchTimestampStateTransitio
     assertChunkVersionIncreasedAfterStateTransition(recipientChunk, collectionVersion);
 }
 
-TEST_F(ReshardingCoordinatorPersistenceTest, PersistCommitSucceeds) {
+TEST_F(ReshardingCoordinatorPersistenceTest, PersistCommitIntoRenamingSucceeds) {
     Timestamp fetchTimestamp = Timestamp(1, 1);
     auto coordinatorDoc = insertStateAndCatalogEntries(
         CoordinatorStateEnum::kMirroring, _originalEpoch, fetchTimestamp);
@@ -659,6 +659,13 @@ TEST_F(ReshardingCoordinatorPersistenceTest, PersistCommitSucceeds) {
 
     assertChunkVersionDidNotIncreaseAfterStateTransition(recipientChunk,
                                                          recipientChunk.getVersion());
+
+    expectedCoordinatorDoc.setState(CoordinatorStateEnum::kRenaming);
+
+    persistStateTransitionUpdateExpectSuccess(operationContext(), expectedCoordinatorDoc);
+    // This check will still pass even after renaming back to the original namespace since internal
+    // checks find by shard key, not namespace.
+    assertChunkVersionIncreasedAfterStateTransition(recipientChunk, recipientChunk.getVersion());
 }
 
 TEST_F(ReshardingCoordinatorPersistenceTest, PersistTransitionToErrorSucceeds) {

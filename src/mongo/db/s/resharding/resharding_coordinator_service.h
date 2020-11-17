@@ -205,16 +205,26 @@ private:
         boost::optional<Timestamp> fetchTimestamp = boost::none);
 
     /**
-     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' for the temporary namespace to all
-     * recipient shards.
+     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' to all recipient shards.
+     *
+     * When the coordinator is in a state before 'kCommitting', refreshes the temporary namespace.
+     * When the coordinator is in a state at or after 'kCommitting', refreshes the original
+     * namespace.
      */
     void _tellAllRecipientsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     /**
-     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' for the original namespace to all donor
-     * shards.
+     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' for the original namespace to all
+     * donor shards.
      */
     void _tellAllDonorsToRefresh(const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Sends 'flushRoutingTableCacheUpdatesWithWriteConcern' for the original namespace to all
+     * participant shards.
+     */
+    void _tellAllParticipantsToRefresh(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     // The unique key for a given resharding operation. InstanceID is an alias for BSONObj. The
     // value of this is the UUID that will be used as the collection UUID for the new sharded

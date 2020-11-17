@@ -382,27 +382,32 @@ std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntri
 // Helper methods for ensuring donors/ recipients are able to notice when certain state transitions
 // occur.
 //
-// Donors/ recipients learn when to transition states by noticing a change in shard versions for one
+// Donors/recipients learn when to transition states by noticing a change in shard versions for one
 // of the two collections involved in the resharding operations.
 //
-// Donors are notified when shard versions spanning the original resharding collection are
-// incremented. Recipients are notified when shard versions spanning the temporary resharding
-// collection are incremented.
+// Before the resharding operation commits:
+// * Donors are notified when the original resharding collection's shard versions are incremented.
+// * Recipients are notified when the temporary resharding collection's shard versions are
+//   incremented.
+//
+// After the resharding operation commits:
+// * Both donors and recipients are notified when the original resharding collection's shard
+//   versions are incremented.
 //
 
 /**
  * Maps which participants are to be notified when the coordinator transitions into a given state.
  */
-enum class ParticipantsToNofityEnum { kDonors, kRecipients, kNone };
+enum class ParticipantsToNofityEnum { kDonors, kRecipientsTempNss, kRecipientsOrigNss, kNone };
 stdx::unordered_map<CoordinatorStateEnum, ParticipantsToNofityEnum> notifyForStateTransition{
     {CoordinatorStateEnum::kUnused, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kInitializing, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kPreparingToDonate, ParticipantsToNofityEnum::kDonors},
-    {CoordinatorStateEnum::kCloning, ParticipantsToNofityEnum::kRecipients},
+    {CoordinatorStateEnum::kCloning, ParticipantsToNofityEnum::kRecipientsTempNss},
     {CoordinatorStateEnum::kApplying, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kMirroring, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kCommitted, ParticipantsToNofityEnum::kNone},
-    {CoordinatorStateEnum::kRenaming, ParticipantsToNofityEnum::kRecipients},
+    {CoordinatorStateEnum::kRenaming, ParticipantsToNofityEnum::kRecipientsOrigNss},
     {CoordinatorStateEnum::kDropping, ParticipantsToNofityEnum::kDonors},
     {CoordinatorStateEnum::kDone, ParticipantsToNofityEnum::kNone},
     {CoordinatorStateEnum::kError, ParticipantsToNofityEnum::kNone},
@@ -457,12 +462,20 @@ void bumpShardVersionsThenExecuteStateTransitionAndMetadataChangesInTxn(
             updatedCoordinatorDoc.getNss(),
             extractShardIds(updatedCoordinatorDoc.getDonorShards()),
             std::move(changeMetadataFunc));
-    } else if (participantsToNotify == ParticipantsToNofityEnum::kRecipients) {
-        // Bump the recipient shard versions for the original namespace along with updating the
-        // metadata.
+    } else if (participantsToNotify == ParticipantsToNofityEnum::kRecipientsTempNss) {
+        // Bump the recipient shard versions for the temporary resharding namespace along with
+        // updating the metadata.
         ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
             opCtx,
             updatedCoordinatorDoc.getTempReshardingNss(),
+            extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
+            std::move(changeMetadataFunc));
+    } else if (participantsToNotify == ParticipantsToNofityEnum::kRecipientsOrigNss) {
+        // Bump the recipient shard versions for the original resharding namespace along with
+        // updating the metadata.
+        ShardingCatalogManager::get(opCtx)->bumpCollShardVersionsAndChangeMetadataInTxn(
+            opCtx,
+            updatedCoordinatorDoc.getNss(),
             extractShardIds(updatedCoordinatorDoc.getRecipientShards()),
             std::move(changeMetadataFunc));
     }
@@ -669,8 +682,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         .then([this, executor] { return _awaitAllRecipientsRenamedCollection(executor); })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllDonorsDroppedOriginalCollection(executor); })
-        .then([this, executor] { _tellAllRecipientsToRefresh(executor); })
-        .then([this, executor] { _tellAllDonorsToRefresh(executor); })
+        .then([this, executor] { _tellAllParticipantsToRefresh(executor); })
         .onError([this, executor](Status status) {
             stdx::lock_guard<Latch> lg(_mutex);
             if (_completionPromise.getFuture().isReady()) {
@@ -689,7 +701,7 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
 
             // TODO wait for donors and recipients to abort the operation and clean up state
             _tellAllRecipientsToRefresh(executor);
-            _tellAllDonorsToRefresh(executor);
+            _tellAllParticipantsToRefresh(executor);
 
             return status;
         })
@@ -898,8 +910,20 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllRecipientsToRe
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     auto opCtx = cc().makeOperationContext();
     auto recipientIds = extractShardIds(_coordinatorDoc.getRecipientShards());
-    tellShardsToRefresh(
-        opCtx.get(), recipientIds, _coordinatorDoc.getTempReshardingNss(), **executor);
+
+    NamespaceString nssToRefresh;
+    // Refresh the temporary namespace if the coordinator is in state 'kError' just in case the
+    // previous state was before 'kCommitted'. A refresh of recipients while in 'kCommitted'
+    // should be accompanied by a refresh of all participants for the original namespace to ensure
+    // correctness.
+    if (_coordinatorDoc.getState() < CoordinatorStateEnum::kCommitted ||
+        _coordinatorDoc.getState() == CoordinatorStateEnum::kError) {
+        nssToRefresh = _coordinatorDoc.getTempReshardingNss();
+    } else {
+        nssToRefresh = _coordinatorDoc.getNss();
+    }
+
+    tellShardsToRefresh(opCtx.get(), recipientIds, nssToRefresh, **executor);
 }
 
 void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefresh(
@@ -907,6 +931,21 @@ void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllDonorsToRefres
     auto opCtx = cc().makeOperationContext();
     auto donorIds = extractShardIds(_coordinatorDoc.getDonorShards());
     tellShardsToRefresh(opCtx.get(), donorIds, _coordinatorDoc.getNss(), **executor);
+}
+
+void ReshardingCoordinatorService::ReshardingCoordinator::_tellAllParticipantsToRefresh(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    auto opCtx = cc().makeOperationContext();
+
+    auto donorShardIds = extractShardIds(_coordinatorDoc.getDonorShards());
+    auto recipientShardIds = extractShardIds(_coordinatorDoc.getRecipientShards());
+    std::set<ShardId> participantShardIds{donorShardIds.begin(), donorShardIds.end()};
+    participantShardIds.insert(recipientShardIds.begin(), recipientShardIds.end());
+
+    tellShardsToRefresh(opCtx.get(),
+                        {participantShardIds.begin(), participantShardIds.end()},
+                        _coordinatorDoc.getNss(),
+                        **executor);
 }
 
 }  // namespace mongo
