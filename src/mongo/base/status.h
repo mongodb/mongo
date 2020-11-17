@@ -31,76 +31,100 @@
 
 #include <iosfwd>
 #include <string>
+#include <type_traits>
+
+#include <boost/intrusive_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ref_counter.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/util/static_immortal.h"
+
+#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#include "mongo/util/invariant.h"
+#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
 namespace mongo {
-
-namespace str {
-class stream;
-}  // namespace str
-
-// Including builder.h here would cause a cycle.
-template <typename Allocator>
-class StringBuilderImpl;
 
 /**
  * Status represents an error state or the absence thereof.
  *
- * A Status uses the standardized error codes -- from file 'error_codes.err' -- to
+ * A Status uses the standardized error codes from file "error_codes.yml" to
  * determine an error's cause. It further clarifies the error with a textual
  * description, and code-specific extra info (a subclass of ErrorExtraInfo).
  */
 class MONGO_WARN_UNUSED_RESULT_CLASS Status {
 public:
-    /**
-     * This is the best way to construct an OK status.
-     */
-    static inline Status OK();
+    /** This is the best way to construct an OK status. */
+    static Status OK() {
+        return {};
+    }
 
     /**
-     * Builds an error status given the error code and a textual description of what
-     * caused the error.
+     * Builds an error Status given the error code and a textual description of the error.
      *
-     * For OK Statuses prefer using Status::OK(). If code is OK, the remaining arguments are
-     * ignored.
+     * In all Status constructors, the `reason` is natively a `std::string`, but
+     * as a convenience it can be given as any type explicitly convertible to
+     * `std::string`, such as `const char*`, `StringData`, or `str::stream`, or
+     * `std::string_view`.
+     *
+     * If code is ErrorCodes::OK, the remaining arguments are ignored. Prefer
+     * using Status::OK(), to make an OK Status.
      *
      * For adding context to the reason string, use withContext/addContext rather than making a new
-     * Status manually.
+     * Status manually, as these functions apply a formatting convention.
      *
-     * If the status comes from a command reply, use getStatusFromCommandResult() instead of manual
+     * If the Status comes from a command reply, use getStatusFromCommandResult() instead of manual
      * parsing. If the status is round-tripping through non-command BSON, use the constructor that
      * takes a BSONObj so that it can extract the extra info if the code is supposed to have any.
      */
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const std::string& reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const char* reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, StringData reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, const str::stream& reason);
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
-                                        StringData message,
-                                        const BSONObj& extraInfoHolder);
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, std::string reason)
+        : Status{code, std::move(reason), nullptr} {}
+
+    template <typename Reason,
+              std::enable_if_t<std::is_constructible_v<std::string, Reason&&>, int> = 0>
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code, Reason&& reason)
+        : Status{code, std::string{std::forward<Reason>(reason)}} {}
 
     /**
-     * Constructs a Status with a subclass of ErrorExtraInfo.
+     * Same as above, but with an attached BSON object carrying errorExtraInfo to be parsed.
+     * Parse is performed according to `code` and its associated ErrorExtraInfo subclass.
      */
-    template <typename T, typename = stdx::enable_if_t<std::is_base_of<ErrorExtraInfo, T>::value>>
-    MONGO_COMPILER_COLD_FUNCTION Status(T&& detail, StringData message)
-        : Status(T::code,
-                 message,
-                 std::make_shared<const std::remove_reference_t<T>>(std::forward<T>(detail))) {
-        MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+                                        std::string reason,
+                                        const BSONObj& extraObj)
+        : _error{_parseErrorInfo(code, std::move(reason), extraObj)} {}
+
+    template <typename Reason,
+              std::enable_if_t<std::is_constructible_v<std::string, Reason&&>, int> = 0>
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+                                        Reason&& reason,
+                                        const BSONObj& extraObj)
+        : Status{code, std::string{std::forward<Reason>(reason)}, extraObj} {}
+
+    /**
+     * Builds a Status with a subclass of ErrorExtraInfo.
+     * The Status code is inferred from the static type of the `extra` parameter.
+     */
+    template <typename Extra, std::enable_if_t<std::is_base_of_v<ErrorExtraInfo, Extra>, int> = 0>
+    MONGO_COMPILER_COLD_FUNCTION Status(Extra&& extra, std::string reason)
+        : Status{
+              Extra::code,
+              std::move(reason),
+              std::make_shared<const std::remove_reference_t<Extra>>(std::forward<Extra>(extra))} {
+        MONGO_STATIC_ASSERT(std::is_same_v<error_details::ErrorExtraInfoFor<Extra::code>, Extra>);
     }
 
-    inline Status(const Status& other);
-    inline Status& operator=(const Status& other);
-
-    inline Status(Status&& other) noexcept;
-    inline Status& operator=(Status&& other) noexcept;
-
-    inline ~Status();
+    template <typename Extra,
+              typename Reason,
+              std::enable_if_t<std::is_base_of_v<ErrorExtraInfo, Extra> &&
+                                   std::is_constructible_v<std::string, Reason&&>,
+                               int> = 0>
+    MONGO_COMPILER_COLD_FUNCTION Status(Extra&& extra, Reason&& reason)
+        : Status{std::forward<Extra>(extra), std::string{std::forward<Reason>(reason)}} {}
 
     /**
      * Returns a new Status with the same data as this, but with the reason string replaced with
@@ -109,7 +133,15 @@ public:
      *
      * No-op when called on an OK status.
      */
-    Status withReason(StringData newReason) const;
+    Status withReason(std::string newReason) const {
+        return isOK() ? OK() : Status(code(), std::move(newReason), _error->extra);
+    }
+
+    template <typename Reason,
+              std::enable_if_t<std::is_constructible_v<std::string, Reason&&>, int> = 0>
+    Status withReason(Reason&& newReason) const {
+        return withReason(std::string{std::forward<Reason>(newReason)});
+    }
 
     /**
      * Returns a new Status with the same data as this, but with the reason string prefixed with
@@ -119,75 +151,50 @@ public:
      * No-op when called on an OK status.
      */
     Status withContext(StringData reasonPrefix) const;
+
     void addContext(StringData reasonPrefix) {
-        *this = this->withContext(reasonPrefix);
+        _error = withContext(reasonPrefix)._error;
     }
 
-    /**
-     * Only compares codes. Ignores reason strings.
-     */
-    bool operator==(const Status& other) const {
-        return code() == other.code();
-    }
-    bool operator!=(const Status& other) const {
-        return !(*this == other);
+    bool isOK() const {
+        return !_error;
     }
 
-    /**
-     * Compares this Status's code with an error code.
-     */
-    bool operator==(const ErrorCodes::Error other) const {
-        return code() == other;
-    }
-    bool operator!=(const ErrorCodes::Error other) const {
-        return !(*this == other);
+    ErrorCodes::Error code() const {
+        return _error ? _error->code : ErrorCodes::OK;
     }
 
-    //
-    // accessors
-    //
+    std::string codeString() const {
+        return ErrorCodes::errorString(code());
+    }
 
-    inline bool isOK() const;
-
-    inline ErrorCodes::Error code() const;
-
-    inline std::string codeString() const;
-
-
-    /**
-     * Returns the reason string or the empty string if isOK().
-     */
+    /** Returns the reason string or the empty string if isOK(). */
     const std::string& reason() const {
         if (_error)
             return _error->reason;
-
-        static const std::string empty;
-        return empty;
+        static StaticImmortal<const std::string> empty;
+        return *empty;
     }
 
-    /**
-     * Returns the generic ErrorExtraInfo if present.
-     */
-    const std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
+    /** Returns the generic ErrorExtraInfo if present. */
+    std::shared_ptr<const ErrorExtraInfo> extraInfo() const {
         return isOK() ? nullptr : _error->extra;
     }
 
-    /**
-     * Returns a specific subclass of ErrorExtraInfo if the error code matches that type.
-     */
+    /** Returns a specific subclass of ErrorExtraInfo if the error code matches that type. */
     template <typename T>
     std::shared_ptr<const T> extraInfo() const {
-        MONGO_STATIC_ASSERT(std::is_base_of<ErrorExtraInfo, T>());
-        MONGO_STATIC_ASSERT(std::is_same<error_details::ErrorExtraInfoFor<T::code>, T>());
+        MONGO_STATIC_ASSERT(std::is_base_of_v<ErrorExtraInfo, T>);
+        MONGO_STATIC_ASSERT(std::is_same_v<error_details::ErrorExtraInfoFor<T::code>, T>);
 
         if (isOK())
-            return {};
+            return nullptr;
         if (code() != T::code)
-            return {};
+            return nullptr;
 
         if (!_error->extra) {
             invariant(!ErrorCodes::mustHaveExtraInfo(_error->code));
-            return {};
+            return nullptr;
         }
 
         // Can't use checked_cast due to include cycle.
@@ -197,20 +204,23 @@ public:
 
     std::string toString() const;
 
+    /**
+     * Serializes the "code", "codeName", "errmsg" (aka `Status::reason()`) in
+     * the canonical format used in the server command responses. If present,
+     * the `extraInfo()` object is also serialized to the builder.
+     */
     void serialize(BSONObjBuilder* builder) const;
 
-    /**
-     * May only be called if the status is *not OK*. Serializes the code, code name and reason in
-     * the canonical code/codeName/errmsg format used in the server command responses.
-     */
-    void serializeErrorToBSON(BSONObjBuilder* builder) const;
+    /** Same as `serialize`, but may only be called on non-OK Status. */
+    void serializeErrorToBSON(BSONObjBuilder* builder) const {
+        invariant(!isOK());
+        serialize(builder);
+    }
 
-    /**
-     * Returns true if this Status's code is a member of the given category.
-     */
+    /** Returns true if this Status's code is a member of the given category. */
     template <ErrorCategory category>
     bool isA() const {
-        return ErrorCodes::isA<category>(*this);
+        return ErrorCodes::isA<category>(code());
     }
 
     /**
@@ -231,117 +241,82 @@ public:
     void transitional_ignore() && noexcept {};
     void transitional_ignore() const& noexcept = delete;
 
-    //
-    // Below interface used for testing code only.
-    //
+    /** Only compares codes. Ignores reason strings. */
+    friend bool operator==(const Status& a, const Status& b) {
+        return a.code() == b.code();
+    }
+    friend bool operator!=(const Status& a, const Status& b) {
+        return !(a == b);
+    }
 
-    inline unsigned refCount() const;
-
-private:
-    // Private since it could result in a type mismatch between code and extraInfo.
-    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
-                                        StringData reason,
-                                        std::shared_ptr<const ErrorExtraInfo>);
-    inline Status();
-
-    struct ErrorInfo {
-        AtomicWord<unsigned> refs;     // reference counter
-        const ErrorCodes::Error code;  // error code
-        const std::string reason;      // description of error cause
-        const std::shared_ptr<const ErrorExtraInfo> extra;
-
-        static ErrorInfo* create(ErrorCodes::Error code,
-                                 StringData reason,
-                                 std::shared_ptr<const ErrorExtraInfo> extra);
-
-        ErrorInfo(ErrorCodes::Error code, StringData reason, std::shared_ptr<const ErrorExtraInfo>);
-    };
-
-    ErrorInfo* _error;
+    /** Status and ErrorCodes::Error are symmetrically EqualityComparable. */
+    friend bool operator==(const Status& a, ErrorCodes::Error b) {
+        return a.code() == b;
+    }
+    friend bool operator!=(const Status& a, ErrorCodes::Error b) {
+        return !(a == b);
+    }
+    friend bool operator==(ErrorCodes::Error a, const Status& b) {
+        return b == a;
+    }
+    friend bool operator!=(ErrorCodes::Error a, const Status& b) {
+        return b != a;
+    }
 
     /**
-     * Increment/Decrement the reference counter inside an ErrorInfo
-     *
-     * @param error  ErrorInfo to be incremented
+     * A `std::ostream` receives a minimal Status representation:
+     *     os << codeString() << " " << reason();
+     * This leaves a trailing space if reason is empty (e.g. the OK Status).
      */
-    static inline void ref(ErrorInfo* error);
-    static inline void unref(ErrorInfo* error);
+    friend std::ostream& operator<<(std::ostream& os, const Status& status) {
+        return status._streamTo(os);
+    }
+
+    /**
+     * A `StringBuilder` receives the serialized errorInfo:
+     *
+     * For an isOK() Status:
+     *     os << codeString();
+     * Otherwise:
+     *     os << codeString()
+     *        << serializedErrorInfo // if present
+     *        << ": " << reason()
+     */
+    friend StringBuilder& operator<<(StringBuilder& os, const Status& status) {
+        return status._streamTo(os);
+    }
+
+private:
+    struct ErrorInfo : boost::intrusive_ref_counter<ErrorInfo> {
+        ErrorInfo(ErrorCodes::Error code,
+                  std::string reason,
+                  std::shared_ptr<const ErrorExtraInfo> extra)
+            : code{code}, reason{std::move(reason)}, extra{std::move(extra)} {}
+
+        ErrorCodes::Error code;
+        std::string reason;
+        std::shared_ptr<const ErrorExtraInfo> extra;
+    };
+
+    static boost::intrusive_ptr<const ErrorInfo> _createErrorInfo(
+        ErrorCodes::Error code, std::string reason, std::shared_ptr<const ErrorExtraInfo> extra);
+
+    static boost::intrusive_ptr<const ErrorInfo> _parseErrorInfo(ErrorCodes::Error code,
+                                                                 std::string reason,
+                                                                 const BSONObj& extraObj);
+
+    Status() = default;
+
+    // Private since it could result in a type mismatch between code and extraInfo.
+    MONGO_COMPILER_COLD_FUNCTION Status(ErrorCodes::Error code,
+                                        std::string reason,
+                                        std::shared_ptr<const ErrorExtraInfo> extra)
+        : _error{_createErrorInfo(code, std::move(reason), std::move(extra))} {}
+
+    std::ostream& _streamTo(std::ostream& os) const;
+    StringBuilder& _streamTo(StringBuilder& os) const;
+
+    boost::intrusive_ptr<const ErrorInfo> _error;
 };
-
-inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs);
-
-inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs);
-
-std::ostream& operator<<(std::ostream& os, const Status& status);
-
-// This is only implemented for StringBuilder, not StackStringBuilder.
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& os, const Status& status);
-
-inline Status Status::OK() {
-    return Status();
-}
-
-inline Status::Status(const Status& other) : _error(other._error) {
-    ref(_error);
-}
-
-inline Status& Status::operator=(const Status& other) {
-    ref(other._error);
-    unref(_error);
-    _error = other._error;
-    return *this;
-}
-
-inline Status::Status(Status&& other) noexcept : _error(other._error) {
-    other._error = nullptr;
-}
-
-inline Status& Status::operator=(Status&& other) noexcept {
-    unref(_error);
-    _error = other._error;
-    other._error = nullptr;
-    return *this;
-}
-
-inline Status::~Status() {
-    unref(_error);
-}
-
-inline bool Status::isOK() const {
-    return !_error;
-}
-
-inline ErrorCodes::Error Status::code() const {
-    return _error ? _error->code : ErrorCodes::OK;
-}
-
-inline std::string Status::codeString() const {
-    return ErrorCodes::errorString(code());
-}
-
-inline unsigned Status::refCount() const {
-    return _error ? _error->refs.load() : 0;
-}
-
-inline Status::Status() : _error(nullptr) {}
-
-inline void Status::ref(ErrorInfo* error) {
-    if (error)
-        error->refs.fetchAndAdd(1);
-}
-
-inline void Status::unref(ErrorInfo* error) {
-    if (error && (error->refs.subtractAndFetch(1) == 0))
-        delete error;
-}
-
-inline bool operator==(const ErrorCodes::Error lhs, const Status& rhs) {
-    return rhs == lhs;
-}
-
-inline bool operator!=(const ErrorCodes::Error lhs, const Status& rhs) {
-    return rhs != lhs;
-}
 
 }  // namespace mongo

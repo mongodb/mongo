@@ -36,6 +36,7 @@
 
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/compiler.h"
 
 #define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
@@ -44,10 +45,6 @@
 
 
 namespace mongo {
-
-// Including builder.h here would cause a cycle.
-template <typename Allocator>
-class StringBuilderImpl;
 
 template <typename T>
 class StatusWith;
@@ -102,16 +99,16 @@ public:
     using value_type = T;
 
     /**
-     * for the error case
+     * For the error case.
+     * As with the `Status` constructors, `reason` can be `std::string` or
+     * anything that can construct one (e.g. `StringData`, `str::stream`).
      */
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, StringData reason)
-        : _status(code, reason) {}
     MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, std::string reason)
         : _status(code, std::move(reason)) {}
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const char* reason)
-        : _status(code, reason) {}
-    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, const str::stream& reason)
-        : _status(code, reason) {}
+    template <typename Reason,
+              std::enable_if_t<std::is_constructible_v<std::string, Reason&&>, int> = 0>
+    MONGO_COMPILER_COLD_FUNCTION StatusWith(ErrorCodes::Error code, Reason&& reason)
+        : StatusWith(code, std::string{std::forward<Reason>(reason)}) {}
 
     /**
      * for the error case

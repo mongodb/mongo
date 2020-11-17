@@ -29,28 +29,43 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/str.h"
-
 #include <ostream>
 #include <sstream>
 
+#include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 
-Status::ErrorInfo::ErrorInfo(ErrorCodes::Error code,
-                             StringData reason,
-                             std::shared_ptr<const ErrorExtraInfo> extra)
-    : code(code), reason(reason.toString()), extra(std::move(extra)) {}
+Status Status::withContext(StringData reasonPrefix) const {
+    return isOK() ? OK() : withReason(reasonPrefix + causedBy(reason()));
+}
 
-Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error code,
-                                             StringData reason,
-                                             std::shared_ptr<const ErrorExtraInfo> extra) {
+std::string Status::toString() const {
+    StringBuilder sb;
+    sb << *this;
+    return sb.str();
+}
+
+void Status::serialize(BSONObjBuilder* builder) const {
+    builder->append("code", code());
+    builder->append("codeName", ErrorCodes::errorString(code()));
+    if (!isOK()) {
+        builder->append("errmsg", reason());
+        if (const auto& ei = extraInfo())
+            ei->serialize(builder);
+    }
+}
+
+boost::intrusive_ptr<const Status::ErrorInfo> Status::_createErrorInfo(
+    ErrorCodes::Error code, std::string reason, std::shared_ptr<const ErrorExtraInfo> extra) {
     if (code == ErrorCodes::OK)
         return nullptr;
     if (extra) {
-        // The public API prevents getting in to this state.
+        // The public API prevents getting into this state.
         invariant(ErrorCodes::canHaveExtraInfo(code));
     } else if (ErrorCodes::mustHaveExtraInfo(code)) {
         // If an ErrorExtraInfo class is non-optional, return an error.
@@ -69,63 +84,37 @@ Status::ErrorInfo* Status::ErrorInfo::create(ErrorCodes::Error code,
                              str::stream() << "Missing required extra info for error code " << code,
                              std::move(extra)};
     }
-    return new ErrorInfo{code, reason, std::move(extra)};
+    return new ErrorInfo{code, std::move(reason), std::move(extra)};
 }
 
-
-Status::Status(ErrorCodes::Error code,
-               StringData reason,
-               std::shared_ptr<const ErrorExtraInfo> extra)
-    : _error(ErrorInfo::create(code, reason, std::move(extra))) {
-    ref(_error);
-}
-
-Status::Status(ErrorCodes::Error code, const std::string& reason) : Status(code, reason, nullptr) {}
-Status::Status(ErrorCodes::Error code, const char* reason)
-    : Status(code, StringData(reason), nullptr) {}
-Status::Status(ErrorCodes::Error code, StringData reason) : Status(code, reason, nullptr) {}
-
-Status::Status(ErrorCodes::Error code, StringData reason, const BSONObj& extraInfoHolder)
-    : Status(OK()) {
+boost::intrusive_ptr<const Status::ErrorInfo> Status::_parseErrorInfo(ErrorCodes::Error code,
+                                                                      std::string reason,
+                                                                      const BSONObj& extraObj) {
+    std::shared_ptr<const ErrorExtraInfo> extra;
     if (auto parser = ErrorExtraInfo::parserFor(code)) {
         try {
-            *this = Status(code, reason, parser(extraInfoHolder));
+            extra = parser(extraObj);
         } catch (const DBException& ex) {
             if (ErrorCodes::mustHaveExtraInfo(code)) {
-                *this = ex.toStatus(str::stream() << "Error parsing extra info for " << code);
-            } else {
-                *this = Status(code, reason);
+                return ex.toStatus(str::stream() << "Error parsing extra info for " << code)._error;
             }
         }
-    } else {
-        *this = Status(code, reason);
     }
+    return _createErrorInfo(code, std::move(reason), std::move(extra));
 }
 
-Status::Status(ErrorCodes::Error code, const str::stream& reason)
-    : Status(code, std::string(reason)) {}
-
-Status Status::withReason(StringData newReason) const {
-    return isOK() ? OK() : Status(code(), newReason, _error->extra);
+std::ostream& Status::_streamTo(std::ostream& os) const {
+    return os << codeString() << " " << reason();
 }
 
-Status Status::withContext(StringData reasonPrefix) const {
-    return isOK() ? OK() : withReason(reasonPrefix + causedBy(reason()));
-}
-
-std::ostream& operator<<(std::ostream& os, const Status& status) {
-    return os << status.codeString() << " " << status.reason();
-}
-
-template <typename Allocator>
-StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& sb, const Status& status) {
-    sb << status.codeString();
-    if (!status.isOK()) {
+StringBuilder& Status::_streamTo(StringBuilder& sb) const {
+    sb << codeString();
+    if (!isOK()) {
         try {
-            if (auto extra = status.extraInfo()) {
+            if (const auto& extra = extraInfo()) {
                 BSONObjBuilder bob;
                 extra->serialize(&bob);
-                sb << bob.obj();
+                sb << bob.done();
             }
         } catch (const DBException&) {
             // This really shouldn't happen but it would be really annoying if it broke error
@@ -134,40 +123,13 @@ StringBuilderImpl<Allocator>& operator<<(StringBuilderImpl<Allocator>& sb, const
                 LOGV2_FATAL_CONTINUE(
                     23806,
                     "Error serializing extra info for {status_code} in Status::toString()",
-                    "status_code"_attr = status.code());
+                    "status_code"_attr = code());
                 std::terminate();
             }
         }
-        sb << ": " << status.reason();
+        sb << ": " << reason();
     }
     return sb;
-}
-template StringBuilder& operator<<(StringBuilder& sb, const Status& status);
-
-std::string Status::toString() const {
-    StringBuilder sb;
-    sb << *this;
-    return sb.str();
-}
-
-void Status::serialize(BSONObjBuilder* builder) const {
-    if (isOK()) {
-        builder->append("code", code());
-        builder->append("codeName", ErrorCodes::errorString(code()));
-    } else {
-        serializeErrorToBSON(builder);
-    }
-}
-
-void Status::serializeErrorToBSON(BSONObjBuilder* builder) const {
-    invariant(!isOK());
-
-    builder->append("code", code());
-    builder->append("codeName", ErrorCodes::errorString(code()));
-    builder->append("errmsg", reason());
-
-    if (auto ei = extraInfo())
-        ei->serialize(builder);
 }
 
 }  // namespace mongo
