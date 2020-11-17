@@ -77,7 +77,7 @@ tc.save({
 // -------------------------------------------- INDEXING & WEIGHTING -------------------------------
 
 // start with basic index, one item with default weight
-tc.ensureIndex({"title": "text"});
+tc.createIndex({"title": "text"});
 
 // test the single result case..
 res = tc.find({"$text": {"$search": "Victoria"}});
@@ -87,19 +87,19 @@ assert.eq(10, res[0]._id);
 tc.dropIndexes();
 
 // now let's see about multiple fields, with specific weighting
-tc.ensureIndex({"title": "text", "text": "text"}, {weights: {"title": 10}});
+tc.createIndex({"title": "text", "text": "text"}, {weights: {"title": 10}});
 assert(resultsEq([9, 7, 8], queryIDS(tc, "members physics")));
 
 tc.dropIndexes();
 
 // test all-1 weighting with "$**"
-tc.ensureIndex({"$**": "text"});
+tc.createIndex({"$**": "text"});
 assert(resultsEq([2, 8, 7], queryIDS(tc, "family tea estate")));
 
 tc.dropIndexes();
 
 // non-1 weight on "$**" + other weight specified for some field
-tc.ensureIndex({"$**": "text"}, {weights: {"$**": 10, "text": 2}});
+tc.createIndex({"$**": "text"}, {weights: {"$**": 10, "text": 2}});
 assert(resultsEq([7, 5], queryIDS(tc, "Olympic Games gold medal")));
 
 tc.dropIndexes();
@@ -108,7 +108,7 @@ tc.dropIndexes();
 // ------------------------------------------
 
 // go back to "$**": 1, "title": 10.. and test more specific "search" functionality!
-tc.ensureIndex({"$**": "text"}, {weights: {"title": 10}});
+tc.createIndex({"$**": "text"}, {weights: {"title": 10}});
 
 // -------------------------------------------- STEMMING -------------------------------------------
 

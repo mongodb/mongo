@@ -21,7 +21,7 @@ function test(index) {
     }
 
     if (index) {
-        t.ensureIndex({loc: "2d"});
+        t.createIndex({loc: "2d"});
     }
 
     // Pull them back

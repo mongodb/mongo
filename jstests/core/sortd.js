@@ -21,7 +21,7 @@ t.drop();
 
 t.save({a: [1, 2, 3, 4, 5]});
 t.save({a: 10});
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 assert.eq(2, t.find({a: {$gt: 0}}).sort({a: 1}).itcount());
 assert.eq(2, t.find({a: {$gt: 0}, b: null}).sort({a: 1}).itcount());
@@ -38,7 +38,7 @@ for (i = 2; i <= 9; ++i) {
 for (i = 0; i < 30; ++i) {
     t.save({a: 100});
 }
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 checkNumSorted(10, t.find({a: {$gte: 0, $lte: 10}}).sort({a: 1}));
 checkNumSorted(10, t.find({a: {$gte: 0, $lte: 10}, b: null}).sort({a: 1}));
@@ -56,7 +56,7 @@ for (i = 2; i <= 199; ++i) {
 for (i = 0; i < 30; ++i) {
     t.save({a: 2000});
 }
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 checkNumSorted(200, t.find({a: {$gte: 0, $lte: 200}}).sort({a: 1}));
 checkNumSorted(200, t.find({a: {$gte: 0, $lte: 200}, b: null}).sort({a: 1}));
@@ -69,6 +69,6 @@ t.drop();
 for (i = 399; i >= 0; --i) {
     t.save({a: i});
 }
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 checkNumSorted(400, t.find({a: {$gte: 0, $lte: 400}, b: null}).batchSize(50).sort({a: 1}));

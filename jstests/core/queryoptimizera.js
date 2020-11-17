@@ -83,7 +83,7 @@ t.find({_id: 0, a: 0}).itcount();
 assertNoNewWarnings();
 
 // Warnings should not be printed when an index is added on _id.
-t.ensureIndex({_id: 1});
+t.createIndex({_id: 1});
 
 t.find({_id: 0}).itcount();
 assertNoNewWarnings();

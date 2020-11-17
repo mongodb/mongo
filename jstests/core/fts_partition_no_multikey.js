@@ -1,7 +1,7 @@
 t = db.fts_partition_no_multikey;
 t.drop();
 
-t.ensureIndex({x: 1, y: "text"});
+t.createIndex({x: 1, y: "text"});
 
 assert.commandWorked(t.insert({x: 5, y: "this is fun"}));
 

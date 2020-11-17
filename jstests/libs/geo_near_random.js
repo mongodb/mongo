@@ -40,9 +40,9 @@ GeoNearRandomTest.prototype.insertPts = function(nPts, indexBounds, scale, skipI
 
     if (!skipIndex) {
         if (!indexBounds)
-            this.t.ensureIndex({loc: '2d'});
+            this.t.createIndex({loc: '2d'});
         else
-            this.t.ensureIndex({loc: '2d'}, indexBounds);
+            this.t.createIndex({loc: '2d'}, indexBounds);
     }
 };
 

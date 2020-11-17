@@ -5,7 +5,7 @@
 // ]
 t = db.geo_s2largewithin;
 t.drop();
-t.ensureIndex({geo: "2dsphere"});
+t.createIndex({geo: "2dsphere"});
 
 testPoint = {
     name: "origin",

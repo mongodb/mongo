@@ -115,7 +115,7 @@ config.getCollectionInfos().forEach(function(c) {
         delete i.key;
         delete i.ns;
         delete i.v;
-        assert.commandWorked(configCopy.getCollection(c.name).ensureIndex(key, i));
+        assert.commandWorked(configCopy.getCollection(c.name).createIndex(key, i));
     });
 });
 

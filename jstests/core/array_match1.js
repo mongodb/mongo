@@ -16,7 +16,7 @@ function test(f, m) {
 }
 
 test("a", "A");
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 test("a", "B");
 
 t.drop();
@@ -26,5 +26,5 @@ t.insert({_id: 2, a: {b: [6, 6]}});
 t.insert({_id: 3, a: {b: [5, 5]}});
 
 test("a.b", "C");
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 test("a.b", "D");

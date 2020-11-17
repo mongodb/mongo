@@ -38,10 +38,10 @@ f();
 t.drop();
 g();
 
-t.ensureIndex({x: 1});
+t.createIndex({x: 1});
 t.remove({});
 f();
 t.drop();
-t.ensureIndex({x: 1});
+t.createIndex({x: 1});
 g();
 })();

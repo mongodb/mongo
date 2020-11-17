@@ -12,8 +12,8 @@ var explain;
 // 'b'.
 var collSharded = db.getCollection("mongos_explain_cmd");
 collSharded.drop();
-collSharded.ensureIndex({a: 1});
-collSharded.ensureIndex({b: 1});
+collSharded.createIndex({a: 1});
+collSharded.createIndex({b: 1});
 
 // Enable sharding.
 assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
@@ -65,8 +65,8 @@ assert.commandFailed(explain);
 // Setup a collection that is not sharded.
 var collUnsharded = db.getCollection("mongos_explain_cmd_unsharded");
 collUnsharded.drop();
-collUnsharded.ensureIndex({a: 1});
-collUnsharded.ensureIndex({b: 1});
+collUnsharded.createIndex({a: 1});
+collUnsharded.createIndex({b: 1});
 
 for (var i = 0; i < 3; i++) {
     collUnsharded.insert({_id: i, a: i, b: 1});

@@ -60,7 +60,7 @@ z = [{a: 1, b: 1}, {a: 1, b: 2}, {a: 2, b: 1}, {a: 2, b: 2}];
 for (i = 0; i < z.length; ++i)
     r.save(z[i]);
 
-r.ensureIndex({a: 1, b: -1});
+r.createIndex({a: 1, b: -1});
 
 check(false);
 check(true);

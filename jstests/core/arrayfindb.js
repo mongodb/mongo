@@ -12,7 +12,7 @@ assert.eq(0,
           t.find({a: {$elemMatch: {b: {$gte: 2, $lt: 4}, c: 25}}}).itcount(),
           "Case #1: wrong number of results returned -- unindexed");
 
-t.ensureIndex({"a.b": 1, "a.c": 1});
+t.createIndex({"a.b": 1, "a.c": 1});
 assert.eq(0,
           t.find({a: {$elemMatch: {b: {$gte: 2, $lt: 4}, c: 25}}}).itcount(),
           "Case #1: wrong number of results returned -- indexed");
@@ -26,8 +26,8 @@ assert.eq(2,
           t.find({a: {$elemMatch: {$or: [{b: 2}, {c: 2}]}}}).itcount(),
           "Case #2: wrong number of results returned -- unindexed");
 
-t.ensureIndex({"a.b": 1});
-t.ensureIndex({"a.c": 1});
+t.createIndex({"a.b": 1});
+t.createIndex({"a.c": 1});
 assert.eq(2,
           t.find({a: {$elemMatch: {$or: [{b: 2}, {c: 2}]}}}).itcount(),
           "Case #2: wrong number of results returned -- indexed");

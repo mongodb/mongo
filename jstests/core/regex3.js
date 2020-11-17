@@ -14,7 +14,7 @@ t.save({name: "aaron"});
 assert.eq(2, t.find({name: /^e.*/}).itcount(), "no index count");
 assert.eq(
     4, t.find({name: /^e.*/}).explain(true).executionStats.totalDocsExamined, "no index explain");
-t.ensureIndex({name: 1});
+t.createIndex({name: 1});
 assert.eq(2, t.find({name: /^e.*/}).itcount(), "index count");
 assert.eq(2,
           t.find({name: /^e.*/}).explain(true).executionStats.totalKeysExamined,
@@ -28,7 +28,7 @@ t.save({name: "ac"});
 t.save({name: "c"});
 
 assert.eq(3, t.find({name: /^aa*/}).itcount(), "B ni");
-t.ensureIndex({name: 1});
+t.createIndex({name: 1});
 assert.eq(3, t.find({name: /^aa*/}).itcount(), "B i 1");
 assert.eq(4, t.find({name: /^aa*/}).explain(true).executionStats.totalKeysExamined, "B i 1 e");
 
@@ -39,5 +39,5 @@ t.drop();
 
 t.save({name: ""});
 assert.eq(1, t.find({name: /^a?/}).itcount(), "C 1");
-t.ensureIndex({name: 1});
+t.createIndex({name: 1});
 assert.eq(1, t.find({name: /^a?/}).itcount(), "C 2");

@@ -9,8 +9,8 @@ t.drop();
 
 t.save({a: 1, b: [1, 2]});
 
-t.ensureIndex({a: 1});
-t.ensureIndex({b: 1});
+t.createIndex({a: 1});
+t.createIndex({b: 1});
 
 // {a:1} is a single key index, so no matches are possible for this query
 assert.eq(0, t.count({a: {$gt: 5, $lt: 0}}));

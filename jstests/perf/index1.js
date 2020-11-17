@@ -12,11 +12,11 @@ printjson(db.serverStatus().mem);
 
 for (var i = 0; i < 5; i++) {
     nonu = Date.timeFunc(function() {
-        t.ensureIndex({x: 1});
+        t.createIndex({x: 1});
     });
     t.dropIndex({x: 1});
     u = Date.timeFunc(function() {
-        t.ensureIndex({x: 1}, {unique: 1});
+        t.createIndex({x: 1}, {unique: 1});
     });
     t.dropIndex({x: 1});
     print("non unique: " + nonu + "   unique: " + u);

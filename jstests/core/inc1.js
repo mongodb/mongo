@@ -26,7 +26,7 @@ test(5, "E");
 t.update({_id: 1}, {$inc: {x: -1}});
 test(4, "F");
 
-t.ensureIndex({x: 1});
+t.createIndex({x: 1});
 
 t.update({_id: 1}, {$inc: {x: 1}});
 test(5, "G");

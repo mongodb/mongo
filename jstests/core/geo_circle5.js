@@ -8,7 +8,7 @@ db.server1238.drop();
 db.server1238.remove({});
 db.server1238.save({loc: [5000000, 900000], id: 1});
 db.server1238.save({loc: [5000000, 900000], id: 2});
-db.server1238.ensureIndex({loc: "2d"}, {min: -21000000, max: 21000000});
+db.server1238.createIndex({loc: "2d"}, {min: -21000000, max: 21000000});
 db.server1238.save({loc: [5000000, 900000], id: 3});
 db.server1238.save({loc: [5000000, 900000], id: 4});
 

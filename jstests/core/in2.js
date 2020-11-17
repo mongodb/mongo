@@ -17,7 +17,7 @@ function go(name, index) {
     t.save({a: 3, b: 1});
 
     if (index)
-        t.ensureIndex(index);
+        t.createIndex(index);
 
     assert.eq(7, t.find({a: {$in: [1, 2]}}).count(), name + " A");
 

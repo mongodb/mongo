@@ -12,7 +12,7 @@
 
 var coll = db.set_type_change;
 coll.drop();
-assert.commandWorked(coll.ensureIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
 
 assert.commandWorked(coll.insert({a: 2}));
 

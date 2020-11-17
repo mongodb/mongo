@@ -8,7 +8,7 @@
 t = db.jstests_numberlong2;
 t.drop();
 
-t.ensureIndex({x: 1});
+t.createIndex({x: 1});
 
 function chk(longNum) {
     t.remove({});

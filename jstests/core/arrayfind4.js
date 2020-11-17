@@ -8,7 +8,7 @@ t = db.jstests_arrayfind4;
 t.drop();
 
 t.save({a: []});
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 assert.eq(1, t.find({a: []}).hint({$natural: 1}).itcount());
 assert.eq(1, t.find({a: []}).hint({a: 1}).itcount());

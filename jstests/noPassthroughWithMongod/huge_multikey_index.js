@@ -13,9 +13,9 @@ function doit() {
 
     t.insert({a: arr});
 
-    // t.ensureIndex({a:1}, {background:true}) // always worked
+    // t.createIndex({a:1}, {background:true}) // always worked
 
-    t.ensureIndex({a: 1});  // used to fail server with out of fds error
+    t.createIndex({a: 1});  // used to fail server with out of fds error
 }
 
 doit();

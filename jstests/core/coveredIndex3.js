@@ -30,7 +30,7 @@ if (0) {  // SERVER-4975
 
         for (i = 0; i < 30; ++i) {
             t.drop();
-            t.ensureIndex({a: 1});
+            t.createIndex({a: 1});
 
             for (j = 0; j < 1000; ++j) {
                 t.save({a: j});

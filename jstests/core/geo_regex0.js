@@ -4,7 +4,7 @@
 t = db.regex0;
 t.drop();
 
-t.ensureIndex({point: '2d', words: 1});
+t.createIndex({point: '2d', words: 1});
 t.insert({point: [1, 1], words: ['foo', 'bar']});
 
 regex = {

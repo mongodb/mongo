@@ -14,7 +14,7 @@ coll1.drop();
 coll2.drop();
 
 assert.commandWorked(coll1.insert({a: {b: "some content"}}));
-assert.commandWorked(coll1.ensureIndex({"$**": "text"}));
+assert.commandWorked(coll1.createIndex({"$**": "text"}));
 assert.eq(1, coll1.count({$text: {$search: "content"}}));
 
 // Rename within same database.

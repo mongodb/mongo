@@ -13,7 +13,7 @@ function testSetup(dbConn) {
     for (var i = 0; i < size; i++) {
         t.save({num: i});
         if (i == 0)
-            t.ensureIndex({num: 1});
+            t.createIndex({num: 1});
     }
 }
 

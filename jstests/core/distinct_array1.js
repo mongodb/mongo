@@ -19,7 +19,7 @@ res = t.distinct("a.1").sort();
 assert.eq("2,3,4", res.toString());
 
 // With index.
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 res = t.distinct("a").sort();
 assert.eq("1,2,3,4,5,9", res.toString());
 
@@ -51,7 +51,7 @@ res = t.distinct("a.1.b").sort();
 assert.eq("d,e,f", res.toString());
 
 // With index.
-t.ensureIndex({"a.b": 1});
+t.createIndex({"a.b": 1});
 res = t.distinct("a.b");
 res.sort();
 // TODO SERVER-14832 The presence of an index may change results, but only if the index is not
@@ -85,7 +85,7 @@ res = t.distinct("_id.a.1").sort();
 assert.eq("2,3,4", res.toString());
 
 // With index.
-t.ensureIndex({"_id.a": 1});
+t.createIndex({"_id.a": 1});
 res = t.distinct("_id.a").sort();
 // TODO SERVER-14832: distinct() may incorrectly return null in presence of index.
 assert.eq([1, 2, 3, 4, 5, 9, null], res);

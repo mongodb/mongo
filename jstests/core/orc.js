@@ -20,7 +20,7 @@ t.drop();
 // possible to write a more
 // robust test.
 
-t.ensureIndex({a: -1, b: 1, c: 1});
+t.createIndex({a: -1, b: 1, c: 1});
 
 // sanity test
 t.save({a: null, b: 4, c: 4});

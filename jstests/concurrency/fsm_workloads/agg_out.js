@@ -38,7 +38,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.transitions = {
         query: {
             query: 0.68,
-            ensureIndexes: 0.1,
+            createIndexes: 0.1,
             dropIndex: 0.1,
             collMod: 0.1,
             // Converting the target collection to a capped collection or a sharded collection will
@@ -47,7 +47,7 @@ var $config = extendWorkload($config, function($config, $super) {
             convertToCapped: 0.01,
             shardCollection: 0.01,
         },
-        ensureIndexes: {query: 1},
+        createIndexes: {query: 1},
         dropIndex: {query: 1},
         collMod: {query: 1},
         convertToCapped: {query: 1},
@@ -85,9 +85,9 @@ var $config = extendWorkload($config, function($config, $super) {
      * Ensures all the indexes exist. This will have no affect unless some thread has already
      * dropped an index.
      */
-    $config.states.ensureIndexes = function ensureIndexes(db, unusedCollName) {
+    $config.states.createIndexes = function createIndexes(db, unusedCollName) {
         for (var i = 0; i < this.indexSpecs; ++i) {
-            assertWhenOwnDB.commandWorked(db[this.outputCollName].ensureIndex(this.indexSpecs[i]));
+            assertWhenOwnDB.commandWorked(db[this.outputCollName].createIndex(this.indexSpecs[i]));
         }
     };
 

@@ -78,7 +78,7 @@ for (var idx = 0; idx < dropAction.length; idx++) {
     assert.commandWorked(bulk.execute());
 
     jsTest.log("Starting background indexing for test of: " + JSON.stringify(dc));
-    primaryDB.getCollection(collection).ensureIndex({i: 1}, {background: true});
+    primaryDB.getCollection(collection).createIndex({i: 1}, {background: true});
     assert.eq(2, primaryDB.getCollection(collection).getIndexes().length);
 
     // Wait for the secondary to get the index entry

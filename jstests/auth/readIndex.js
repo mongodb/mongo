@@ -12,7 +12,7 @@ testDB.createUser({user: 'dbAdmin', pwd: 'password', roles: ['dbAdmin']});
 adminDB.logout();
 
 testDB.auth('dbAdmin', 'password');
-testDB.foo.ensureIndex({a: 1}, {name: indexName});
+testDB.foo.createIndex({a: 1}, {name: indexName});
 assert.eq(2, testDB.foo.getIndexes().length);  // index on 'a' plus default _id index
 var indexList = testDB.foo.getIndexes().filter(function(idx) {
     return idx.name === indexName;

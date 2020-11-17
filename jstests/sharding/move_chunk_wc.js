@@ -30,7 +30,7 @@ var numberDoc = 20;
 var s0 = st.shard0.shardName;
 var s1 = st.shard1.shardName;
 
-coll.ensureIndex({x: 1}, {unique: true});
+coll.createIndex({x: 1}, {unique: true});
 st.ensurePrimaryShard(db.toString(), s0);
 st.shardColl(collName, {x: 1}, {x: numberDoc / 2}, {x: numberDoc / 2}, db.toString(), true);
 

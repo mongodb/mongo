@@ -3481,7 +3481,7 @@ var authCommandsLib = {
           setup: function(db) {
               db.fs.chunks.drop();
               assert.writeOK(db.fs.chunks.insert({files_id: 1, n: 0, data: new BinData(0, "test")}));
-              assert.commandWorked(db.fs.chunks.ensureIndex({files_id: 1, n: 1}));
+              assert.commandWorked(db.fs.chunks.createIndex({files_id: 1, n: 1}));
           },
           teardown: function(db) {
               db.fs.chunks.drop();

@@ -109,7 +109,7 @@ var $config = (function() {
 
     function setup(db, collName, cluster) {
         // index on 'arr', the field being updated
-        assertAlways.commandWorked(db[collName].ensureIndex({arr: 1}));
+        assertAlways.commandWorked(db[collName].createIndex({arr: 1}));
         for (var i = 0; i < this.numDocs; ++i) {
             var res = db[collName].insert({_id: i, arr: []});
             assertWhenOwnColl.commandWorked(res);

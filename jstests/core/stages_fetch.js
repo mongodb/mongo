@@ -13,7 +13,7 @@ for (var i = 0; i < N; ++i) {
     t.insert({foo: i, bar: N - i, baz: i});
 }
 
-t.ensureIndex({foo: 1});
+t.createIndex({foo: 1});
 
 // 20 <= foo <= 30
 // bar == 25 (not covered, should error.)

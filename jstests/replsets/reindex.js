@@ -26,7 +26,7 @@ const secondaryDB = secondary.getDB(dbName);
 const secondaryColl = secondaryDB.getCollection(collName);
 
 assert.commandWorked(primaryColl.insert({a: 1000}));
-assert.commandWorked(primaryColl.ensureIndex({a: 1}));
+assert.commandWorked(primaryColl.createIndex({a: 1}));
 
 replTest.awaitReplication();
 replTest.awaitReplication();
@@ -59,7 +59,7 @@ const testDB = standalone.getDB(dbName);
 const testColl = testDB.getCollection(collName);
 
 assert.commandWorked(testColl.insert({a: 1000}));
-assert.commandWorked(testColl.ensureIndex({a: 1}));
+assert.commandWorked(testColl.createIndex({a: 1}));
 assert.eq(2, testColl.getIndexes().length, "Standalone didn't have proper indexes before reindex");
 
 assert.commandWorked(testColl.reIndex());

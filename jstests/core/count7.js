@@ -5,7 +5,7 @@
 t = db.jstests_count7;
 t.drop();
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 t.save({a: 'algebra'});
 t.save({a: 'apple'});
 t.save({a: 'azores'});

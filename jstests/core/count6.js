@@ -6,7 +6,7 @@ t = db.jstests_count6;
 
 function checkCountForObject(obj) {
     t.drop();
-    t.ensureIndex({b: 1, a: 1});
+    t.createIndex({b: 1, a: 1});
 
     function checkCounts(query, expected) {
         assert.eq(expected, t.count(query), "A1");

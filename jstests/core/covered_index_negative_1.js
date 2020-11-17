@@ -16,10 +16,10 @@ for (i = 0; i < 100; i++) {
     coll.insert(
         {a: i, b: "strvar_" + (i % 13), c: NumberInt(i % 10), d: i * 10, e: [i, i % 10], f: i});
 }
-coll.ensureIndex({a: 1, b: -1, c: 1});
-coll.ensureIndex({e: 1});
-coll.ensureIndex({d: 1});
-coll.ensureIndex({f: "hashed"});
+coll.createIndex({a: 1, b: -1, c: 1});
+coll.createIndex({e: 1});
+coll.createIndex({d: 1});
+coll.createIndex({f: "hashed"});
 
 // Test no projection
 var plan =

@@ -11,8 +11,8 @@ for (var i = 0; i < N; i++) {
 }
 bulk.execute();
 
-t.ensureIndex({a: 1});
-t.ensureIndex({b: 1});
+t.createIndex({a: 1});
+t.createIndex({b: 1});
 
 var s1 = startParallelShell(
     "db.update_serializability1.update( { a : { $gte : 0 } }, { $set : { x : 2 } }, false, true );");

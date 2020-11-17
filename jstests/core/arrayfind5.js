@@ -16,12 +16,12 @@ function check(nullElemMatch) {
 
 t.save({a: [{}, {b: 1}]});
 check(true);
-t.ensureIndex({'a.b': 1});
+t.createIndex({'a.b': 1});
 check(true);
 
 t.drop();
 
 t.save({a: [5, {b: 1}]});
 check(false);
-t.ensureIndex({'a.b': 1});
+t.createIndex({'a.b': 1});
 check(false);

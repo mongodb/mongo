@@ -8,7 +8,7 @@ function checkResults(query) {
     assert.eq(4, t.find(query).itcount());
 }
 
-t.ensureIndex({x: 1});
+t.createIndex({x: 1});
 t.save({x: 'aa'});
 t.save({x: 'ab'});
 t.save({x: 'ac'});

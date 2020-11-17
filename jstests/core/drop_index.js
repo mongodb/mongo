@@ -57,7 +57,7 @@ assert.commandFailedWithCode(t.dropIndex({_id: 1}), ErrorCodes.InvalidOptions);
 
 // Ensure you can recreate indexes, even if you don't use dropIndex method.
 // Prior to SERVER-7168, the shell used to cache names of indexes created using
-// Collection.ensureIndex().
+// Collection.createIndex().
 assert.commandWorked(t.createIndex({a: 1}));
 assertIndexes(['a_1', 'c_1', 'd_1', 'e_1'], 'recreating {a: 1}');
 

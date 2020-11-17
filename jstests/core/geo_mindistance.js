@@ -56,7 +56,7 @@ for (var x = 0; x <= 10; x += 1) {
     }
 }
 
-t.ensureIndex({loc: "2dsphere"});
+t.createIndex({loc: "2dsphere"});
 
 var n_docs = t.count(), geoJSONPoint = {type: 'Point', coordinates: [0, 0]}, legacyPoint = [0, 0];
 

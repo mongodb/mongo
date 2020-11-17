@@ -52,8 +52,8 @@ let shortIndexName = "short_name";
 
 // In the target collection, which will be dropped, create one index with a "too long" name, and
 // one with a name of acceptable size.
-assert.commandWorked(toColl.ensureIndex({a: 1}, {name: longIndexName}));
-assert.commandWorked(toColl.ensureIndex({b: 1}, {name: shortIndexName}));
+assert.commandWorked(toColl.createIndex({a: 1}, {name: longIndexName}));
+assert.commandWorked(toColl.createIndex({b: 1}, {name: shortIndexName}));
 
 // Insert documents into both collections so that we can tell them apart.
 assert.commandWorked(fromColl.insert({_id: 'from'}));

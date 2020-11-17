@@ -13,7 +13,7 @@ t.save(o);
 assert(t.findOne().z.a == 17);
 assert(t.findOne({z: {a: 17}}) == null);
 
-t.ensureIndex({"z.a": 1});
+t.createIndex({"z.a": 1});
 
 assert(t.findOne().z.a == 17);
 assert(t.findOne({z: {a: 17}}) == null);

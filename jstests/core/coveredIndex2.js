@@ -19,7 +19,7 @@ assert.eq(t.findOne({a: 1}).a, 1, "Cannot find right record");
 assert.eq(t.count(), 2, "Not right length");
 
 // use simple index
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 var plan = t.find({a: 1}).explain();
 assert(!isIndexOnly(db, plan.queryPlanner.winningPlan),
        "Find using covered index but all fields are returned");

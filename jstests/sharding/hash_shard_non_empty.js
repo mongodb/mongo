@@ -12,7 +12,7 @@ s.stopBalancer();
 
 db.getCollection(coll).insert({a: 1});
 
-db.getCollection(coll).ensureIndex({a: "hashed"});
+db.getCollection(coll).createIndex({a: "hashed"});
 var res = db.adminCommand({shardcollection: dbname + "." + coll, key: {a: "hashed"}});
 assert.eq(res.ok, 1, "shardcollection didn't work");
 s.printShardingStatus();

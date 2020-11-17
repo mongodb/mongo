@@ -21,7 +21,7 @@ var $config = (function() {
             var res = bulk.execute();
             assertAlways.commandWorked(res);
             assertAlways.eq(this.numDocs, res.nInserted);
-            assertAlways.commandWorked(db[this.threadCollName].ensureIndex({i: 1}));
+            assertAlways.commandWorked(db[this.threadCollName].createIndex({i: 1}));
         }
 
         function distinct(db, collName) {

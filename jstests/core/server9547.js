@@ -8,7 +8,7 @@ for (var i = 0; i < 10; i++) {
     t.save({a: i});
 }
 
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 
 // note: max() value is exclusive upper bound
 assert.eq(4, t.find({}).max({a: 4}).hint({a: 1}).toArray().length, "no order");

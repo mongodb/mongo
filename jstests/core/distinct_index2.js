@@ -1,8 +1,8 @@
 t = db.distinct_index2;
 t.drop();
 
-t.ensureIndex({a: 1, b: 1});
-t.ensureIndex({c: 1});
+t.createIndex({a: 1, b: 1});
+t.createIndex({c: 1});
 
 // Uniformly distributed dataset.
 // If we use a randomly generated dataset, we might not
@@ -37,5 +37,5 @@ check("c");
 
 // hashed index should produce same results.
 t.dropIndexes();
-t.ensureIndex({a: "hashed"});
+t.createIndex({a: "hashed"});
 check("a");

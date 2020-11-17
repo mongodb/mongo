@@ -19,10 +19,10 @@ assert.commandWorked(t.insert({zip: "94061", loc: [37.463911, 122.23396]}));
 
 // test "2d" has to be first
 assert.eq(1, t.getIndexKeys().length, "S1");
-t.ensureIndex({zip: 1, loc: "2d"});
+t.createIndex({zip: 1, loc: "2d"});
 assert.eq(1, t.getIndexKeys().length, "S2");
 
-t.ensureIndex(idx);
+t.createIndex(idx);
 assert.eq(2, t.getIndexKeys().length, "S3");
 
 assert.eq(3, t.count(), "B1");
@@ -42,5 +42,5 @@ assert.eq("06525", t.find({loc: wb.loc})[0].zip, "C3");
 
 t.drop();
 
-t.ensureIndex({loc: "2d"}, {min: -500, max: 500, bits: 4});
+t.createIndex({loc: "2d"}, {min: -500, max: 500, bits: 4});
 assert.commandWorked(t.insert({loc: [200, 200]}));

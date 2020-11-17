@@ -27,7 +27,7 @@ for (var i = -1; i < 2; i++) {
     }
 }
 
-assert.commandWorked(t.ensureIndex({loc: "2d", type: 1}));
+assert.commandWorked(t.createIndex({loc: "2d", type: 1}));
 
 print("Starting testing phase... ");
 

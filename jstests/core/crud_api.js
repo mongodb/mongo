@@ -700,7 +700,7 @@ var crudAPISpecTests = function crudAPISpecTests() {
 
     // Drop collection
     coll.drop();
-    coll.ensureIndex({a: 1}, {unique: true});
+    coll.createIndex({a: 1}, {unique: true});
 
     // Should throw duplicate key error
     assert.throws(function() {

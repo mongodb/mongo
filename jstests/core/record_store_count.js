@@ -15,7 +15,7 @@ coll.drop();
 assert.commandWorked(coll.insert({x: 0}));
 assert.commandWorked(coll.insert({x: 1}));
 
-assert.commandWorked(coll.ensureIndex({x: 1}));
+assert.commandWorked(coll.createIndex({x: 1}));
 
 //
 // Logically empty predicates should use the record store's count.
@@ -78,7 +78,7 @@ const kNewIndexSpec = {
     x: 1,
     _id: 1
 };
-assert.commandWorked(coll.ensureIndex(kNewIndexSpec));
+assert.commandWorked(coll.createIndex(kNewIndexSpec));
 testExplainAndExpectStage({
     expectedStages: ["COUNT", "SHARDING_FILTER"],
     unexpectedStages: ["FETCH"],

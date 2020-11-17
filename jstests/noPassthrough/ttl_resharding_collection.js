@@ -7,7 +7,7 @@ const collName = "system.resharding.mycoll";
 const coll = runner.getDB(jsTestName())[collName];
 coll.drop();
 
-assert.commandWorked(coll.ensureIndex({x: 1}, {expireAfterSeconds: 0}));
+assert.commandWorked(coll.createIndex({x: 1}, {expireAfterSeconds: 0}));
 
 const now = new Date();
 assert.commandWorked(coll.insert({x: now}));

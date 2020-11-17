@@ -47,7 +47,7 @@ test = function() {
 };
 
 test();
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 test();
 
 // Test an inequality base match.
@@ -91,5 +91,5 @@ test = function() {
 t.drop();
 t.save({a: 1});
 test();
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 test();

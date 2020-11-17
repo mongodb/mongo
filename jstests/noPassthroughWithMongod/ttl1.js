@@ -33,7 +33,7 @@ sleep(70 * 1000);
 assert.eq(t.count(), 30);
 
 // Part 2
-t.ensureIndex({x: 1}, {expireAfterSeconds: 20000});
+t.createIndex({x: 1}, {expireAfterSeconds: 20000});
 
 assert.soon(function() {
     return t.count() < 30;
@@ -49,7 +49,7 @@ assert.lte(18, db.serverStatus().metrics.ttl.deletedDocuments);
 assert.lte(1, db.serverStatus().metrics.ttl.passes);
 
 // Part 3
-t.ensureIndex({y: 1}, {expireAfterSeconds: 10000});
+t.createIndex({y: 1}, {expireAfterSeconds: 10000});
 
 assert.soon(function() {
     return t.count() < 12;

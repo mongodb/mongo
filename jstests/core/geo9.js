@@ -14,8 +14,8 @@ t.save({_id: 4, a: [50, 50], b: [10, 10]});
 t.save({_id: 5, a: [51, 51], b: [11, 11]});
 t.save({_id: 6, a: [52, 52], b: [12, 12]});
 
-t.ensureIndex({a: "2d"});
-t.ensureIndex({b: "2d"});
+t.createIndex({a: "2d"});
+t.createIndex({b: "2d"});
 
 function check(field) {
     var q = {};

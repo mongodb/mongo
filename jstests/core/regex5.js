@@ -31,7 +31,7 @@ doit = function() {
 };
 
 doit();
-t.ensureIndex({x: 1});
+t.createIndex({x: 1});
 print("now indexed");
 doit();
 

@@ -15,7 +15,7 @@ var $config = (function() {
 
             assertWhenOwnColl.commandWorked(db[collName].dropIndex(spec));
             sleep(100);
-            assertWhenOwnColl.commandWorked(db[collName].ensureIndex(spec));
+            assertWhenOwnColl.commandWorked(db[collName].createIndex(spec));
         }
 
         // List indexes, using a batchSize of 2 to ensure getmores happen.
@@ -38,7 +38,7 @@ var $config = (function() {
         for (var i = 0; i < this.threadCount; ++i) {
             var spec = {};
             spec['foo' + i] = 1;
-            assertAlways.commandWorked(db[collName].ensureIndex(spec));
+            assertAlways.commandWorked(db[collName].createIndex(spec));
         }
     }
 

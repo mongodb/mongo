@@ -3,7 +3,7 @@
 t = db.factories;
 t.drop();
 t.insert({name: "xyz", metro: {city: "New York", state: "NY"}});
-t.ensureIndex({metro: 1});
+t.createIndex({metro: 1});
 
 assert(db.factories.find().count());
 

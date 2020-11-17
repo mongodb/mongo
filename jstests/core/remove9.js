@@ -13,7 +13,7 @@
 
 const t = db.jstests_remove9;
 t.drop();
-t.ensureIndex({i: 1});
+t.createIndex({i: 1});
 
 const bulk = t.initializeUnorderedBulkOp();
 for (let i = 0; i < 1000; ++i) {

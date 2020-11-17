@@ -13,7 +13,7 @@ function check() {
 t.save({a: 'a'});
 
 check();
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 if (1) {  // SERVER-3298
     check();
 }

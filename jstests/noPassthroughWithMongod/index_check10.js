@@ -108,7 +108,7 @@ function doIt() {
     }
     assert.commandWorked(bulk.execute());
 
-    t.ensureIndex(idx);
+    t.createIndex(idx);
     check();
 
     bulk = t.initializeUnorderedBulkOp();

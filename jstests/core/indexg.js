@@ -9,5 +9,5 @@ doit = function() {
     assert.eq(1, f.count({list: {$in: [1], $not: {$in: [3]}}}));
 };
 doit();
-f.ensureIndex({list: 1});
+f.createIndex({list: 1});
 doit();

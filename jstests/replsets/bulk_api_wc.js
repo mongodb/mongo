@@ -28,7 +28,7 @@ var executeTests = function() {
     // Create a unique index, legacy writes validate too early to use invalid documents for
     // write
     // error testing
-    coll.ensureIndex({a: 1}, {unique: true});
+    coll.createIndex({a: 1}, {unique: true});
 
     //
     // Ordered

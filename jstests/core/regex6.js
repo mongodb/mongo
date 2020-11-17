@@ -14,7 +14,7 @@ t.save({name: "bob"});
 t.save({name: "aaron"});
 t.save({name: "[with]some?symbols"});
 
-t.ensureIndex({name: 1});
+t.createIndex({name: 1});
 
 assert.eq(0, t.find({name: /^\//}).count(), "index count");
 assert.eq(

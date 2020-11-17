@@ -11,7 +11,7 @@ function checkSorting1(opts) {
     var d = new Date(-50);
     for (var pass = 0; pass < 2; pass++) {
         assert(t.find().sort({x: 1})[0].x.valueOf() == d.valueOf());
-        t.ensureIndex({x: 1}, opts);
+        t.createIndex({x: 1}, opts);
         t.insert({x: new Date()});
     }
 }
@@ -42,10 +42,10 @@ reverseDates = dates.slice(0).reverse();
 
 checkSorting2(dates, 1);
 checkSorting2(reverseDates, -1);
-t.ensureIndex({x: 1});
+t.createIndex({x: 1});
 checkSorting2(dates, 1);
 checkSorting2(reverseDates, -1);
 t.dropIndexes();
-t.ensureIndex({x: -1});
+t.createIndex({x: -1});
 checkSorting2(dates, 1);
 checkSorting2(reverseDates, -1);

@@ -19,7 +19,7 @@ function setIndex(_indexKeyField) {
     indexKeyField = _indexKeyField;
     indexKeySpec = {};
     indexKeySpec[indexKeyField] = 1;
-    coll.ensureIndex(indexKeySpec, {sparse: true});
+    coll.createIndex(indexKeySpec, {sparse: true});
 }
 setIndex('a');
 
@@ -106,6 +106,6 @@ assertExistsUnindexed({'a.b': {$elemMatch: {$gt: 0, $not: {$exists: false}}}}, 1
 // A non sparse index will not be disallowed.
 coll.drop();
 assert.commandWorked(coll.insert({}));
-coll.ensureIndex({a: 1});
+coll.createIndex({a: 1});
 assert.eq(1, coll.find({a: {$exists: false}}).itcount());
 })();

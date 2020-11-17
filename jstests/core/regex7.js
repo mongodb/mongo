@@ -17,7 +17,7 @@ assert.eq(/^b/, t.findOne({r: /^b/}).r, '3 1 a');
 assert.eq(1, t.count({r: /^b/}), '3 2 a');
 
 // with index
-t.ensureIndex({r: 1});
+t.createIndex({r: 1});
 assert.eq(/^a/, t.findOne({r: /^a/}).r, '1 1 b');
 assert.eq(1, t.count({r: /^a/}), '1 2 b');
 assert.eq(/^a/i, t.findOne({r: /^a/i}).r, '2 1 b');

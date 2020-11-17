@@ -111,7 +111,7 @@ assert.eq(
 // -------------------------
 // Case 3: empty collection
 
-f.ensureIndex({x: 1});
+f.createIndex({x: 1});
 assert.eq(
     [],
     db.runCommand({splitVector: "test.jstests_splitvector", keyPattern: {x: 1}, maxChunkSize: 1})
@@ -122,7 +122,7 @@ assert.eq(
 // Case 4: uniform collection
 
 resetCollection();
-f.ensureIndex({x: 1});
+f.createIndex({x: 1});
 
 var case4 = function() {
     // Get baseline document size
@@ -156,7 +156,7 @@ case4();
 // Case 5: limit number of split points
 
 resetCollection();
-f.ensureIndex({x: 1});
+f.createIndex({x: 1});
 
 var case5 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
@@ -180,7 +180,7 @@ case5();
 // Case 6: limit number of objects in a chunk
 
 resetCollection();
-f.ensureIndex({x: 1});
+f.createIndex({x: 1});
 
 var case6 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
@@ -205,7 +205,7 @@ case6();
 // [1111111111111111,2,3)
 
 resetCollection();
-f.ensureIndex({x: 1});
+f.createIndex({x: 1});
 
 var case7 = function() {
     // Fill collection and get split vector for 1MB maxChunkSize
@@ -227,7 +227,7 @@ case7();
 // [1, 22222222222222, 3)
 
 resetCollection();
-f.ensureIndex({x: 1});
+f.createIndex({x: 1});
 
 var case8 = function() {
     bulkInsertDocsFixedX(f, 9, filler, 1);
@@ -251,7 +251,7 @@ case8();
 //
 
 resetCollection();
-f.ensureIndex({x: 1});
+f.createIndex({x: 1});
 
 var case9 = function() {
     f.save({x: 1});
@@ -286,51 +286,51 @@ case9();
 //
 
 resetCollection();
-f.ensureIndex({x: 1, y: 1});
+f.createIndex({x: 1, y: 1});
 case4();
 
 resetCollection();
-f.ensureIndex({x: 1, y: -1, z: 1});
+f.createIndex({x: 1, y: -1, z: 1});
 case4();
 
 resetCollection();
-f.ensureIndex({x: 1, y: 1});
+f.createIndex({x: 1, y: 1});
 case5();
 
 resetCollection();
-f.ensureIndex({x: 1, y: -1, z: 1});
+f.createIndex({x: 1, y: -1, z: 1});
 case5();
 
 resetCollection();
-f.ensureIndex({x: 1, y: 1});
+f.createIndex({x: 1, y: 1});
 case6();
 
 resetCollection();
-f.ensureIndex({x: 1, y: -1, z: 1});
+f.createIndex({x: 1, y: -1, z: 1});
 case6();
 
 resetCollection();
-f.ensureIndex({x: 1, y: 1});
+f.createIndex({x: 1, y: 1});
 case7();
 
 resetCollection();
-f.ensureIndex({x: 1, y: -1, z: 1});
+f.createIndex({x: 1, y: -1, z: 1});
 case7();
 
 resetCollection();
-f.ensureIndex({x: 1, y: 1});
+f.createIndex({x: 1, y: 1});
 case8();
 
 resetCollection();
-f.ensureIndex({x: 1, y: -1, z: 1});
+f.createIndex({x: 1, y: -1, z: 1});
 case8();
 
 resetCollection();
-f.ensureIndex({x: 1, y: 1});
+f.createIndex({x: 1, y: 1});
 case9();
 
 resetCollection();
-f.ensureIndex({x: 1, y: -1, z: 1});
+f.createIndex({x: 1, y: -1, z: 1});
 case9();
 
 print("PASSED");

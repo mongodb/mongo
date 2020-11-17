@@ -99,7 +99,7 @@ assert.eq(0, db.getCollection("test_db").getIndexes().length, "13");
 db.getCollection("test_db").save({a: 10});
 assert.eq(1, db.getCollection("test_db").getIndexes().length, "14");
 
-db.getCollection("test_db").ensureIndex({a: 1});
+db.getCollection("test_db").createIndex({a: 1});
 db.getCollection("test_db").save({a: 10});
 
 print(tojson(db.getCollection("test_db").getIndexes()));
@@ -109,7 +109,7 @@ db.getCollection("test_db").dropIndex({a: 1});
 assert.eq(1, db.getCollection("test_db").getIndexes().length, "16");
 
 db.getCollection("test_db").save({a: 10});
-db.getCollection("test_db").ensureIndex({a: 1});
+db.getCollection("test_db").createIndex({a: 1});
 db.getCollection("test_db").save({a: 10});
 
 assert.eq(2, db.getCollection("test_db").getIndexes().length, "17");
@@ -118,8 +118,8 @@ db.getCollection("test_db").dropIndex("a_1");
 assert.eq(1, db.getCollection("test_db").getIndexes().length, "18");
 
 db.getCollection("test_db").save({a: 10, b: 11});
-db.getCollection("test_db").ensureIndex({a: 1});
-db.getCollection("test_db").ensureIndex({b: 1});
+db.getCollection("test_db").createIndex({a: 1});
+db.getCollection("test_db").createIndex({b: 1});
 db.getCollection("test_db").save({a: 10, b: 12});
 
 assert.eq(3, db.getCollection("test_db").getIndexes().length, "19");
@@ -130,8 +130,8 @@ db.getCollection("test_db").dropIndex({a: 1});
 assert.eq(1, db.getCollection("test_db").getIndexes().length, "21");
 
 db.getCollection("test_db").save({a: 10, b: 11});
-db.getCollection("test_db").ensureIndex({a: 1});
-db.getCollection("test_db").ensureIndex({b: 1});
+db.getCollection("test_db").createIndex({a: 1});
+db.getCollection("test_db").createIndex({b: 1});
 db.getCollection("test_db").save({a: 10, b: 12});
 
 assert.eq(3, db.getCollection("test_db").getIndexes().length, "22");
@@ -179,7 +179,7 @@ assert.eq(10,
 // indexDetails - If true, includes 'indexDetails' field in results. Default: false.
 t.drop();
 t.save({a: 1});
-t.ensureIndex({a: 1});
+t.createIndex({a: 1});
 collectionStats = assert.commandWorked(t.stats());
 assert(!collectionStats.hasOwnProperty('indexDetails'),
        'unexpected indexDetails found in db.collection.stats() result: ' + tojson(collectionStats));

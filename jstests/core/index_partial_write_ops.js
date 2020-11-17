@@ -21,7 +21,7 @@ var getNumKeys = function(idxName) {
 coll.drop();
 
 // Create partial index.
-assert.commandWorked(coll.ensureIndex({x: 1}, {unique: true, partialFilterExpression: {a: 1}}));
+assert.commandWorked(coll.createIndex({x: 1}, {unique: true, partialFilterExpression: {a: 1}}));
 
 assert.commandWorked(coll.insert({_id: 1, x: 5, a: 2, b: 1}));  // Not in index.
 assert.commandWorked(coll.insert({_id: 2, x: 6, a: 1, b: 1}));  // In index.

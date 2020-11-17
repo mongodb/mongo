@@ -19,7 +19,7 @@ const numIndexes = 5;
 for (let i = 0; i < numIndexes; ++i) {
     let indexSpec = {};
     indexSpec["fakeField_" + i] = 1;
-    assert.commandWorked(testColl.ensureIndex(indexSpec));
+    assert.commandWorked(testColl.createIndex(indexSpec));
 }
 
 testDB.setProfilingLevel(2);

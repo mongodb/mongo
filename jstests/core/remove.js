@@ -6,7 +6,7 @@
 t = db.removetest;
 
 function f(n, dir) {
-    t.ensureIndex({x: dir || 1});
+    t.createIndex({x: dir || 1});
     for (i = 0; i < n; i++)
         t.save({x: 3, z: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"});
 

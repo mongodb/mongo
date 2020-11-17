@@ -16,7 +16,7 @@ function addData() {
     assert.commandWorked(coll.save({a: 2, b: 2}));
 }
 
-assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 addData();
 
 assert.eq(1, coll.find().hint({a: 1, b: 1}).min({a: 1, b: 2}).max({a: 2, b: 1}).toArray().length);
@@ -31,7 +31,7 @@ assert.eq(3,
           coll.find().hint({a: 1, b: 1}).max({a: 2, b: 1.5}).hint({a: 1, b: 1}).toArray().length);
 
 coll.drop();
-assert.commandWorked(coll.ensureIndex({a: 1, b: -1}));
+assert.commandWorked(coll.createIndex({a: 1, b: -1}));
 addData();
 assert.eq(4, coll.find().hint({a: 1, b: -1}).min({a: 1, b: 2}).toArray().length);
 assert.eq(4, coll.find().hint({a: 1, b: -1}).max({a: 2, b: 0.5}).toArray().length);
@@ -78,7 +78,7 @@ error = assert.throws(function() {
 assert.eq(error.code, ErrorCodes.NoQueryExecutionPlans);
 
 coll.drop();
-assert.commandWorked(coll.ensureIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
 for (let i = 0; i < 10; ++i) {
     assert.commandWorked(coll.save({_id: i, a: i}));
 }
@@ -103,7 +103,7 @@ assert.eq(error.code, 51175);
 
 coll.drop();
 addData();
-assert.commandWorked(coll.ensureIndex({a: 1, b: 1}));
+assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 error = assert.throws(function() {
     coll.find().min({a: 1, b: 2}).max({a: 1, b: 2}).hint({a: 1, b: 1}).toArray();
@@ -112,7 +112,7 @@ assert.eq(error.code, 51175);
 
 // Test ascending index.
 coll.drop();
-assert.commandWorked(coll.ensureIndex({a: 1}));
+assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.insert({a: 3}));
 assert.commandWorked(coll.insert({a: 4}));
 assert.commandWorked(coll.insert({a: 5}));
@@ -134,7 +134,7 @@ assert(!cursor.hasNext());
 
 // Test descending index.
 assert.commandWorked(coll.dropIndexes());
-assert.commandWorked(coll.ensureIndex({a: -1}));
+assert.commandWorked(coll.createIndex({a: -1}));
 
 cursor = coll.find().hint({a: -1}).min({a: 4});
 if (FixtureHelpers.numberOfShardsForCollection(coll) === 1) {

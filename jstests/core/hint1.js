@@ -2,7 +2,7 @@ p = db.jstests_hint1;
 p.drop();
 
 p.save({ts: new Date(1), cls: "entry", verticals: "alleyinsider", live: true});
-p.ensureIndex({ts: 1});
+p.createIndex({ts: 1});
 
 assert.eq(
     1,

@@ -19,5 +19,5 @@ function doTest() {
 }
 
 doTest();
-t.ensureIndex({key: 1});
+t.createIndex({key: 1});
 doTest();

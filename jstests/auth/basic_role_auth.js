@@ -129,7 +129,7 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('index_w'), function() {
-        var res = db.user.ensureIndex({x: 1});
+        var res = db.user.createIndex({x: 1});
         if (res.code == 13) {  // Unauthorized
             throw Error("unauthorized currentOp");
         }

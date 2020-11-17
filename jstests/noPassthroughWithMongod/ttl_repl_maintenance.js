@@ -16,7 +16,7 @@ var primeSystemReplset = function() {
 
     print("create a TTL collection");
     var testDB = conn.getDB("test");
-    assert.commandWorked(testDB.foo.ensureIndex({x: 1}, {expireAfterSeconds: 2}));
+    assert.commandWorked(testDB.foo.createIndex({x: 1}, {expireAfterSeconds: 2}));
 };
 
 var restartWithConfig = function() {

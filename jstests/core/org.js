@@ -5,8 +5,8 @@
 t = db.jstests_org;
 t.drop();
 
-t.ensureIndex({a: 1}, {sparse: true});
-t.ensureIndex({b: 1});
+t.createIndex({a: 1}, {sparse: true});
+t.createIndex({b: 1});
 
 t.remove({});
 t.save({a: 1, b: 2});

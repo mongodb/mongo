@@ -15,7 +15,7 @@ var indexName = 'geo_2dsphere_nonGeo_1';
 
 // Clean up.
 coll.drop();
-coll.ensureIndex(indexSpec);
+coll.createIndex(indexSpec);
 
 var bulkInsertDocs = function(coll, numDocs, makeDocFn) {
     print("Bulk inserting " + numDocs + " documents");
@@ -77,7 +77,7 @@ assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
 //
 
 coll.drop();
-coll.ensureIndex(indexSpec, {"2dsphereIndexVersion": 1});
+coll.createIndex(indexSpec, {"2dsphereIndexVersion": 1});
 
 // Insert N documents with the geo field.
 bulkInsertDocs(coll, N, function(i) {
@@ -101,7 +101,7 @@ assert.eq(N + N, coll.validate().keysPerIndex[indexName]);
 
 // Clean up.
 coll.drop();
-coll.ensureIndex({geo: "2dsphere", otherGeo: "2dsphere"});
+coll.createIndex({geo: "2dsphere", otherGeo: "2dsphere"});
 
 indexName = 'geo_2dsphere_otherGeo_2dsphere';
 

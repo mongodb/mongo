@@ -30,7 +30,7 @@ let doParallel = function(work) {
 
 let indexBuild = function() {
     let fullName = "db." + baseName;
-    return doParallel(fullName + ".ensureIndex( {i:1}, {background:true, unique:true} )");
+    return doParallel(fullName + ".createIndex( {i:1}, {background:true, unique:true} )");
 };
 
 let doneParallel = function() {

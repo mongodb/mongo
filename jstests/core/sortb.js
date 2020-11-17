@@ -8,7 +8,7 @@ load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 const t = db.jstests_sortb;
 t.drop();
 
-t.ensureIndex({b: 1});
+t.createIndex({b: 1});
 
 let i;
 for (i = 0; i < 100; ++i) {
