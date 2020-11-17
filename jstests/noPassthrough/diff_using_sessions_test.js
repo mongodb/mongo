@@ -1,6 +1,6 @@
 /**
- * Tests the ReplSetTest#getCollectionDiffUsingSessions() method for comparing the contents between
- * a primary and secondary server.
+ * Tests the DataConsistencyChecker#getCollectionDiffUsingSessions() method for comparing the
+ * contents between a primary and secondary server.
  *
  * @tags: [requires_replication]
  */
@@ -21,11 +21,10 @@ assert.commandWorked(primaryDB[collName].insert(
     Array.from({length: 100}, (_, i) => ({_id: i, num: i * 2})), {writeConcern: {w: 2}}));
 
 // There should be no missing or mismatched documents after having waited for replication.
-let diff = rst.getCollectionDiffUsingSessions(
+let diff = DataConsistencyChecker.getCollectionDiffUsingSessions(
     primaryDB.getSession(), secondaryDB.getSession(), dbName, collName);
 
-assert.eq(diff,
-          {docsWithDifferentContents: [], docsMissingOnPrimary: [], docsMissingOnSecondary: []});
+assert.eq(diff, {docsWithDifferentContents: [], docsMissingOnSource: [], docsMissingOnSyncing: []});
 
 // We pause replication on the secondary to intentionally cause the contents between the primary and
 // the secondary to differ.
@@ -45,17 +44,17 @@ assert.commandWorked(
 // distinct but equivalent BSON types.
 assert.commandWorked(primaryDB[collName].update({_id: 2}, {$set: {num: NumberLong(4)}}));
 
-diff = rst.getCollectionDiffUsingSessions(
+diff = DataConsistencyChecker.getCollectionDiffUsingSessions(
     primaryDB.getSession(), secondaryDB.getSession(), dbName, collName);
 
 assert.eq(diff, {
     docsWithDifferentContents: [
-        {primary: {_id: 2, num: NumberLong(4)}, secondary: {_id: 2, num: 4}},
-        {primary: {_id: 40, num: 80, extra: "yes"}, secondary: {_id: 40, num: 80}},
-        {primary: {_id: 90, num: 180, extra: "yes"}, secondary: {_id: 90, num: 180}},
+        {sourceNode: {_id: 2, num: NumberLong(4)}, syncingNode: {_id: 2, num: 4}},
+        {sourceNode: {_id: 40, num: 80, extra: "yes"}, syncingNode: {_id: 40, num: 80}},
+        {sourceNode: {_id: 90, num: 180, extra: "yes"}, syncingNode: {_id: 90, num: 180}},
     ],
-    docsMissingOnPrimary: expectedMissingOnPrimary,
-    docsMissingOnSecondary: expectedMissingOnSecondary
+    docsMissingOnSource: expectedMissingOnPrimary,
+    docsMissingOnSyncing: expectedMissingOnSecondary
 });
 
 assert.commandWorked(

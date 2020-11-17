@@ -91,13 +91,16 @@ function TenantMigrationTest(
      * returns the command response containing the migration state on the donor after the migration
      * has completed.
      */
-    this.runMigration = function(migrationOpts, retryOnRetryableErrors = false) {
-        const res = this.startMigration(migrationOpts, retryOnRetryableErrors);
+    this.runMigration = function(
+        migrationOpts, retryOnRetryableErrors = false, skipTenantDBHashCheck = false) {
+        const res =
+            this.startMigration(migrationOpts, retryOnRetryableErrors, skipTenantDBHashCheck);
         if (!res.ok) {
             return res;
         }
 
-        return this.waitForMigrationToComplete(migrationOpts, retryOnRetryableErrors);
+        return this.waitForMigrationToComplete(
+            migrationOpts, retryOnRetryableErrors, skipTenantDBHashCheck);
     };
 
     /**
@@ -105,9 +108,12 @@ function TenantMigrationTest(
      *
      * Returns the result of the 'donorStartMigration' command.
      */
-    this.startMigration = function(migrationOpts, retryOnRetryableErrors = false) {
-        return this.runDonorStartMigration(
-            migrationOpts, false /* waitForMigrationToComplete */, retryOnRetryableErrors);
+    this.startMigration = function(
+        migrationOpts, retryOnRetryableErrors = false, skipTenantDBHashCheck = false) {
+        return this.runDonorStartMigration(migrationOpts,
+                                           false /* waitForMigrationToComplete */,
+                                           retryOnRetryableErrors,
+                                           skipTenantDBHashCheck);
     };
 
     /**
@@ -117,14 +123,17 @@ function TenantMigrationTest(
      *
      * Returns the result of the last 'donorStartMigration' command executed.
      */
-    this.waitForMigrationToComplete = function(migrationOpts, retryOnRetryableErrors = false) {
+    this.waitForMigrationToComplete = function(
+        migrationOpts, retryOnRetryableErrors = false, skipTenantDBHashCheck = false) {
         // Assert that the migration has already been started.
         const tenantId = migrationOpts.tenantId;
         assert(this.getDonorPrimary()
                    .getCollection(TenantMigrationTest.kConfigDonorsNS)
                    .findOne({tenantId}));
-        return this.runDonorStartMigration(
-            migrationOpts, true /* waitForMigrationToComplete */, retryOnRetryableErrors);
+        return this.runDonorStartMigration(migrationOpts,
+                                           true /* waitForMigrationToComplete */,
+                                           retryOnRetryableErrors,
+                                           skipTenantDBHashCheck);
     };
 
     /**
@@ -144,7 +153,8 @@ function TenantMigrationTest(
         readPreference = {mode: "primary"},
     },
                                            waitForMigrationToComplete,
-                                           retryOnRetryableErrors) {
+                                           retryOnRetryableErrors,
+                                           skipTenantDBHashCheck) {
         const cmdObj = {
             donorStartMigration: 1,
             tenantId,
@@ -187,6 +197,13 @@ function TenantMigrationTest(
                 throw e;
             }
         });
+
+        // If the migration has been successfully committed, check the db hashes for the tenantId
+        // between the donor and recipient.
+        if (!skipTenantDBHashCheck && (stateRes.state === TenantMigrationTest.State.kCommitted)) {
+            this.checkTenantDBHashes(tenantId);
+        }
+
         return stateRes;
     };
 
@@ -402,6 +419,62 @@ function TenantMigrationTest(
      */
     this.getRecipientConnString = function() {
         return this.getRecipientRst().getURL();
+    };
+
+    /**
+     * Compares the hashes for DBs that belong to the specified tenant between the donor and
+     * recipient primaries.
+     */
+    this.checkTenantDBHashes = function(
+        tenantId, excludedDBs = [], msgPrefix = 'checkTenantDBHashes', ignoreUUIDs = false) {
+        // Always skip db hash checks for the local database.
+        excludedDBs = [...excludedDBs, "local"];
+
+        const donorPrimary = this.getDonorRst().getPrimary();
+        const recipientPrimary = this.getRecipientRst().getPrimary();
+
+        // Filter out all dbs that don't belong to the tenant.
+        let combinedDBNames = [...donorPrimary.getDBNames(), ...recipientPrimary.getDBNames()];
+        combinedDBNames =
+            combinedDBNames.filter(dbName => (this.isNamespaceForTenant(tenantId, dbName) &&
+                                              !excludedDBs.includes(dbName)));
+        combinedDBNames = new Set(combinedDBNames);
+
+        for (const dbName of combinedDBNames) {
+            // Pass in an empty array for the secondaries, since we only wish to compare the DB
+            // hashes between the donor and recipient primary in this test.
+            const donorDBHash =
+                assert.commandWorked(this.getDonorRst().getHashes(dbName, []).primary);
+            const recipientDBHash =
+                assert.commandWorked(this.getRecipientRst().getHashes(dbName, []).primary);
+
+            const donorCollections = Object.keys(donorDBHash.collections);
+            const donorCollInfos = new CollInfos(donorPrimary, 'donorPrimary', dbName);
+            donorCollInfos.filter(donorCollections);
+
+            const recipientCollections = Object.keys(recipientDBHash.collections);
+            const recipientCollInfos = new CollInfos(recipientPrimary, 'recipientPrimary', dbName);
+            recipientCollInfos.filter(recipientCollections);
+
+            print(`checking db hash between donor: ${donorPrimary} and recipient: ${
+                recipientPrimary}`);
+
+            const collectionPrinted = new Set();
+            const success = DataConsistencyChecker.checkDBHash(donorDBHash,
+                                                               donorCollInfos,
+                                                               recipientDBHash,
+                                                               recipientCollInfos,
+                                                               msgPrefix,
+                                                               ignoreUUIDs,
+                                                               true, /* syncingHasIndexes */
+                                                               collectionPrinted);
+            if (!success) {
+                print(`checkTenantDBHashes dumping donor and recipient primary oplogs`);
+                this.getDonorRst().dumpOplog(donorPrimary, {}, 100);
+                this.getRecipientRst().dumpOplog(recipientPrimary, {}, 100);
+            }
+            assert(success, 'dbhash mismatch between donor and recipient primaries');
+        }
     };
 
     /**

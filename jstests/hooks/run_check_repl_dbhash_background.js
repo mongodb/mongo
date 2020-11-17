@@ -245,7 +245,7 @@ function checkReplDbhashBackgroundThread(hosts) {
                     print("DBHash mismatch found for collection with uuid: " + uuid +
                           ". Primary info: " + tojsononeline(primaryInfo) +
                           ". Secondary info: " + tojsononeline(secondaryInfo));
-                    const diff = rst.getCollectionDiffUsingSessions(
+                    const diff = DataConsistencyChecker.getCollectionDiffUsingSessions(
                         primarySession, secondarySession, dbName, primaryInfo.uuid);
 
                     result.push({
@@ -284,9 +284,9 @@ function checkReplDbhashBackgroundThread(hosts) {
             // Note that unlike auto_retry_transaction.js, we do not treat CursorKilled or
             // CursorNotFound error responses as transient errors because the
             // run_check_repl_dbhash_background.js hook would only establish a cursor via
-            // ReplSetTest#getCollectionDiffUsingSessions() upon detecting a dbHash mismatch. It
-            // is presumed to still useful to know that a bug exists even if we cannot get more
-            // diagnostics for it.
+            // DataConsistencyChecker#getCollectionDiffUsingSessions() upon detecting a dbHash
+            // mismatch. It is still useful to know that a bug exists even if we cannot
+            // get more diagnostics for it.
             if (e.code === ErrorCodes.Interrupted) {
                 hasTransientError = true;
             }

@@ -240,7 +240,9 @@ function testWriteIsRejectedIfSentAfterMigrationHasCommitted(testCase, testOpts)
         tenantId,
     };
 
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     runCommand(testOpts, ErrorCodes.TenantMigrationCommitted);
@@ -258,7 +260,9 @@ function testWriteIsAcceptedIfSentAfterMigrationHasAborted(testCase, testOpts) {
     };
 
     let abortFp = configureFailPoint(testOpts.primaryDB, "abortTenantMigrationAfterBlockingStarts");
-    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(migrationOpts));
+    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
+    const stateRes = assert.commandWorked(tenantMigrationTest.runMigration(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
     abortFp.off();
 
@@ -297,8 +301,9 @@ function testWriteBlocksIfMigrationIsInBlocking(testCase, testOpts) {
 
     // Allow the migration to complete.
     blockingFp.off();
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
+    const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
@@ -338,8 +343,9 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationCommits(testCase, te
 
     // Verify that the migration succeeded.
     resumeMigrationThread.join();
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
+    const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     testCase.assertCommandFailed(testOpts.primaryDB, testOpts.dbName, testOpts.collName);
@@ -380,8 +386,9 @@ function testBlockedWriteGetsUnblockedAndRejectedIfMigrationAborts(testCase, tes
 
     // Verify that the migration aborted due to the simulated error.
     resumeMigrationThread.join();
-    const stateRes =
-        assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+    // TODO SERVER-53107: Investigate if we should not skip the DB hash check.
+    const stateRes = assert.commandWorked(tenantMigrationTest.waitForMigrationToComplete(
+        migrationOpts, false /* retryOnRetryableErrors */, true /* skipTenantDBHashCheck */));
     abortFp.off();
     assert.eq(stateRes.state, TenantMigrationTest.State.kAborted);
 

@@ -177,47 +177,262 @@ var {DataConsistencyChecker} = (function() {
             return {docsWithDifferentContents, docsMissingOnFirst, docsMissingOnSecond};
         }
 
-        static dumpCollectionDiff(
-            rst, collectionPrinted, primaryCollInfos, secondaryCollInfos, collName) {
-            print('Dumping collection: ' + primaryCollInfos.ns(collName));
+        static getCollectionDiffUsingSessions(sourceSession,
+                                              syncingSession,
+                                              dbName,
+                                              collNameOrUUID) {
+            const sourceDB = sourceSession.getDatabase(dbName);
+            const syncingDB = syncingSession.getDatabase(dbName);
 
-            const primaryExists = primaryCollInfos.print(collectionPrinted, collName);
-            const secondaryExists = secondaryCollInfos.print(collectionPrinted, collName);
+            const commandObj = {find: collNameOrUUID, sort: {_id: 1}};
+            const sourceCursor = new DBCommandCursor(sourceDB, sourceDB.runCommand(commandObj));
+            const syncingCursor = new DBCommandCursor(syncingDB, syncingDB.runCommand(commandObj));
+            const diff = this.getDiff(sourceCursor, syncingCursor);
 
-            if (!primaryExists || !secondaryExists) {
+            return {
+                docsWithDifferentContents: diff.docsWithDifferentContents.map(
+                    ({first, second}) => ({sourceNode: first, syncingNode: second})),
+                docsMissingOnSource: diff.docsMissingOnFirst,
+                docsMissingOnSyncing: diff.docsMissingOnSecond
+            };
+        }
+
+        static dumpCollectionDiff(collectionPrinted, sourceCollInfos, syncingCollInfos, collName) {
+            print('Dumping collection: ' + sourceCollInfos.ns(collName));
+
+            const sourceExists = sourceCollInfos.print(collectionPrinted, collName);
+            const syncingExists = syncingCollInfos.print(collectionPrinted, collName);
+
+            if (!sourceExists || !syncingExists) {
                 print(`Skipping checking collection differences for ${
-                    primaryCollInfos.ns(
-                        collName)} since it does not exist on primary and secondary`);
+                    sourceCollInfos.ns(collName)} since it does not exist on both nodes`);
                 return;
             }
 
-            const primary = primaryCollInfos.conn;
-            const secondary = secondaryCollInfos.conn;
+            const sourceNode = sourceCollInfos.conn;
+            const syncingNode = syncingCollInfos.conn;
 
-            const primarySession = primary.getDB('test').getSession();
-            const secondarySession = secondary.getDB('test').getSession();
-            const diff = rst.getCollectionDiffUsingSessions(
-                primarySession, secondarySession, primaryCollInfos.dbName, collName);
+            const sourceSession = sourceNode.getDB('test').getSession();
+            const syncingSession = syncingNode.getDB('test').getSession();
+            const diff = this.getCollectionDiffUsingSessions(
+                sourceSession, syncingSession, sourceCollInfos.dbName, collName);
 
             for (let {
-                     primary: primaryDoc,
-                     secondary: secondaryDoc,
+                     sourceNode: sourceDoc,
+                     syncingNode: syncingDoc,
                  } of diff.docsWithDifferentContents) {
-                print(`Mismatching documents between the primary ${primary.host}` +
-                      ` and the secondary ${secondary.host}:`);
-                print('    primary:   ' + tojsononeline(primaryDoc));
-                print('    secondary: ' + tojsononeline(secondaryDoc));
+                print(`Mismatching documents between the source node ${sourceNode.host}` +
+                      ` and the syncing node ${syncingNode.host}:`);
+                print('    sourceNode:   ' + tojsononeline(sourceDoc));
+                print('    syncingNode: ' + tojsononeline(syncingDoc));
             }
 
-            if (diff.docsMissingOnPrimary.length > 0) {
-                print(`The following documents are missing on the primary ${primary.host}:`);
-                print(diff.docsMissingOnPrimary.map(doc => tojsononeline(doc)).join('\n'));
+            if (diff.docsMissingOnSource.length > 0) {
+                print(`The following documents are missing on the source node ${sourceNode.host}:`);
+                print(diff.docsMissingOnSource.map(doc => tojsononeline(doc)).join('\n'));
             }
 
-            if (diff.docsMissingOnSecondary.length > 0) {
-                print(`The following documents are missing on the secondary ${secondary.host}:`);
-                print(diff.docsMissingOnSecondary.map(doc => tojsononeline(doc)).join('\n'));
+            if (diff.docsMissingOnSyncing.length > 0) {
+                print(
+                    `The following documents are missing on the syncing node ${syncingNode.host}:`);
+                print(diff.docsMissingOnSyncing.map(doc => tojsononeline(doc)).join('\n'));
             }
+        }
+
+        static checkDBHash(sourceDBHash,
+                           sourceCollInfos,
+                           syncingDBHash,
+                           syncingCollInfos,
+                           msgPrefix,
+                           ignoreUUIDs,
+                           syncingHasIndexes,
+                           collectionPrinted) {
+            let success = true;
+
+            const sourceDBName = sourceCollInfos.dbName;
+            const syncingDBName = syncingCollInfos.dbName;
+            assert.eq(
+                sourceDBName,
+                syncingDBName,
+                `dbName was not the same: source: ${sourceDBName}, syncing: ${syncingDBName}`);
+            const dbName = syncingDBName;
+
+            const sourceCollections = Object.keys(sourceDBHash.collections);
+            const syncingCollections = Object.keys(syncingDBHash.collections);
+
+            const dbHashesMsg =
+                `source: ${tojson(sourceDBHash)}, syncing: ${tojson(syncingDBHash)}`;
+            const prettyPrint = (outputMsg => {
+                print(`${msgPrefix}, ${outputMsg}`);
+            });
+
+            const arraySymmetricDifference = ((a, b) => {
+                const inAOnly = a.filter(function(elem) {
+                    return b.indexOf(elem) < 0;
+                });
+
+                const inBOnly = b.filter(function(elem) {
+                    return a.indexOf(elem) < 0;
+                });
+
+                return inAOnly.concat(inBOnly);
+            });
+
+            if (sourceCollections.length !== syncingCollections.length) {
+                prettyPrint(`the two nodes have a different number of collections: ${dbHashesMsg}`);
+                for (const diffColl of arraySymmetricDifference(sourceCollections,
+                                                                syncingCollections)) {
+                    this.dumpCollectionDiff(
+                        collectionPrinted, sourceCollInfos, syncingCollInfos, diffColl);
+                }
+                success = false;
+            }
+
+            const nonCappedCollNames = sourceCollInfos.getNonCappedCollNames();
+            // Only compare the dbhashes of non-capped collections because capped
+            // collections are not necessarily truncated at the same points between the source and
+            // syncing nodes.
+            nonCappedCollNames.forEach(collName => {
+                if (sourceDBHash.collections[collName] !== syncingDBHash.collections[collName]) {
+                    prettyPrint(`the two nodes have a different hash for the collection ${dbName}.${
+                        collName}: ${dbHashesMsg}`);
+                    this.dumpCollectionDiff(
+                        collectionPrinted, sourceCollInfos, syncingCollInfos, collName);
+                    success = false;
+                }
+            });
+
+            syncingCollInfos.collInfosRes.forEach(syncingInfo => {
+                sourceCollInfos.collInfosRes.forEach(sourceInfo => {
+                    if (syncingInfo.name === sourceInfo.name &&
+                        syncingInfo.type === sourceInfo.type) {
+                        if (ignoreUUIDs) {
+                            prettyPrint(`skipping UUID check for ${[sourceInfo.name]}`);
+                            sourceInfo.info.uuid = null;
+                            syncingInfo.info.uuid = null;
+                        }
+
+                        // Ignore the 'flags' collection option as it was removed in 4.2
+                        sourceInfo.options.flags = null;
+                        syncingInfo.options.flags = null;
+
+                        // Ignore the 'ns' field in the 'idIndex' field as 'ns' was removed
+                        // from index specs in 4.4.
+                        if (sourceInfo.idIndex) {
+                            delete sourceInfo.idIndex.ns;
+                            delete syncingInfo.idIndex.ns;
+                        }
+
+                        if (!bsonBinaryEqual(syncingInfo, sourceInfo)) {
+                            prettyPrint(
+                                `the two nodes have different attributes for the collection or view ${
+                                    dbName}.${syncingInfo.name}`);
+                            this.dumpCollectionDiff(collectionPrinted,
+                                                    sourceCollInfos,
+                                                    syncingCollInfos,
+                                                    syncingInfo.name);
+                            success = false;
+                        }
+                    }
+                });
+            });
+
+            // Treats each array as a set and returns true if the contents match. Assumes
+            // the contents of each array are unique.
+            const compareSets = function(leftArr, rightArr) {
+                if (leftArr === undefined) {
+                    return rightArr === undefined;
+                }
+
+                if (rightArr === undefined) {
+                    return false;
+                }
+
+                const map = {};
+                leftArr.forEach(key => {
+                    map[key] = 1;
+                });
+
+                rightArr.forEach(key => {
+                    if (map[key] === undefined) {
+                        map[key] = -1;
+                    } else {
+                        delete map[key];
+                    }
+                });
+
+                // The map is empty when both sets match.
+                for (let key in map) {
+                    if (map.hasOwnProperty(key)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
+            const sourceNode = sourceCollInfos.conn;
+            const syncingNode = syncingCollInfos.conn;
+
+            // Check that the following collection stats are the same between the source and syncing
+            // nodes:
+            //  capped
+            //  nindexes, except on nodes with buildIndexes: false
+            //  ns
+            sourceCollections.forEach(collName => {
+                const sourceCollStats = sourceNode.getDB(dbName).runCommand({collStats: collName});
+                const syncingCollStats =
+                    syncingNode.getDB(dbName).runCommand({collStats: collName});
+
+                if (sourceCollStats.ok !== 1 || syncingCollStats.ok !== 1) {
+                    sourceCollInfos.print(collectionPrinted, collName);
+                    syncingCollInfos.print(collectionPrinted, collName);
+                    success = false;
+                    return;
+                }
+
+                // Provide hint on where to look within stats.
+                let reasons = [];
+                if (sourceCollStats.capped !== syncingCollStats.capped) {
+                    reasons.push('capped');
+                }
+
+                if (sourceCollStats.ns !== syncingCollStats.ns) {
+                    reasons.push('ns');
+                }
+
+                if (syncingHasIndexes && sourceCollStats.nindexes !== syncingCollStats.nindexes) {
+                    reasons.push('indexes');
+                }
+
+                const indexBuildsMatch =
+                    compareSets(sourceCollStats.indexBuilds, syncingCollStats.indexBuilds);
+                if (syncingHasIndexes && !indexBuildsMatch) {
+                    reasons.push('indexBuilds');
+                }
+
+                if (reasons.length === 0) {
+                    return;
+                }
+
+                prettyPrint(`the two nodes have different states for the collection ${dbName}.${
+                    collName}: ${reasons.join(', ')}`);
+                this.dumpCollectionDiff(
+                    collectionPrinted, sourceCollInfos, syncingCollInfos, collName);
+                success = false;
+            });
+
+            if (nonCappedCollNames.length === sourceCollections.length) {
+                // If the two nodes have the same hashes for all the
+                // collections in the database and there aren't any capped collections,
+                // then the hashes for the whole database should match.
+                if (sourceDBHash.md5 !== syncingDBHash.md5) {
+                    prettyPrint(`the two nodes have a different has for the ${dbName} database: ${
+                        dbHashesMsg}`);
+                    success = false;
+                }
+            }
+
+            return success;
         }
     }
 

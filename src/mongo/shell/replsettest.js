@@ -2161,25 +2161,6 @@ var ReplSetTest = function(opts) {
         });
     };
 
-    this.getCollectionDiffUsingSessions = function(
-        primarySession, secondarySession, dbName, collNameOrUUID) {
-        const primaryDB = primarySession.getDatabase(dbName);
-        const secondaryDB = secondarySession.getDatabase(dbName);
-
-        const commandObj = {find: collNameOrUUID, sort: {_id: 1}};
-        const primaryCursor = new DBCommandCursor(primaryDB, primaryDB.runCommand(commandObj));
-        const secondaryCursor =
-            new DBCommandCursor(secondaryDB, secondaryDB.runCommand(commandObj));
-        const diff = DataConsistencyChecker.getDiff(primaryCursor, secondaryCursor);
-
-        return {
-            docsWithDifferentContents: diff.docsWithDifferentContents.map(
-                ({first, second}) => ({primary: first, secondary: second})),
-            docsMissingOnPrimary: diff.docsMissingOnFirst,
-            docsMissingOnSecondary: diff.docsMissingOnSecond
-        };
-    };
-
     // Gets the dbhash for the current primary and for all secondaries (or the members of
     // 'secondaries', if specified).
     this.getHashes = function(dbName, secondaries) {
@@ -2190,7 +2171,7 @@ var ReplSetTest = function(opts) {
         secondaries = secondaries || _determineLiveSecondaries();
 
         const sessions = [
-            this._primary,
+            self._primary,
             ...secondaries.filter(conn => {
                 return !conn.adminCommand({isMaster: 1}).arbiterOnly;
             })
@@ -2296,18 +2277,6 @@ var ReplSetTest = function(opts) {
 
         var collectionPrinted = new Set();
 
-        function arraySymmetricDifference(a, b) {
-            var inAOnly = a.filter(function(elem) {
-                return b.indexOf(elem) < 0;
-            });
-
-            var inBOnly = b.filter(function(elem) {
-                return a.indexOf(elem) < 0;
-            });
-
-            return inAOnly.concat(inBOnly);
-        }
-
         function checkDBHashesForReplSet(
             rst, dbBlacklist = [], secondaries, msgPrefix, ignoreUUIDs) {
             // We don't expect the local database to match because some of its
@@ -2315,13 +2284,13 @@ var ReplSetTest = function(opts) {
             dbBlacklist.push('local');
             secondaries = secondaries || rst._secondaries;
 
-            var success = true;
-            var hasDumpedOplog = false;
+            let success = true;
+            let hasDumpedOplog = false;
 
             // Use '_primary' instead of getPrimary() to avoid the detection of a new primary.
             // '_primary' must have been populated.
-            var primary = rst._primary;
-            var combinedDBs = new Set(primary.getDBNames());
+            const primary = rst._primary;
+            let combinedDBs = new Set(primary.getDBNames());
             const replSetConfig = rst.getReplSetConfigFromNode();
 
             print("checkDBHashesForReplSet waiting for secondaries to be ready: " +
@@ -2341,7 +2310,7 @@ var ReplSetTest = function(opts) {
                 node.getDBNames().forEach(dbName => combinedDBs.add(dbName));
             });
 
-            for (var dbName of combinedDBs) {
+            for (const dbName of combinedDBs) {
                 if (Array.contains(dbBlacklist, dbName)) {
                     continue;
                 }
@@ -2359,187 +2328,26 @@ var ReplSetTest = function(opts) {
                 dbHashes.secondaries.forEach(secondaryDBHash => {
                     assert.commandWorked(secondaryDBHash);
 
-                    var secondary = secondaryDBHash._mongo;
-                    var secondaryCollections = Object.keys(secondaryDBHash.collections);
+                    const secondary = secondaryDBHash._mongo;
+                    const secondaryCollections = Object.keys(secondaryDBHash.collections);
                     // Check that collection information is consistent on the primary and
                     // secondaries.
                     const secondaryCollInfos = new CollInfos(secondary, 'secondary', dbName);
                     secondaryCollInfos.filter(secondaryCollections);
 
-                    if (primaryCollections.length !== secondaryCollections.length) {
-                        print(
-                            msgPrefix +
-                            ', the primary and secondary have a different number of collections: ' +
-                            tojson(dbHashes));
-                        for (var diffColl of arraySymmetricDifference(primaryCollections,
-                                                                      secondaryCollections)) {
-                            DataConsistencyChecker.dumpCollectionDiff(this,
-                                                                      collectionPrinted,
-                                                                      primaryCollInfos,
-                                                                      secondaryCollInfos,
-                                                                      diffColl);
-                        }
-                        success = false;
-                    }
-
-                    const nonCappedCollNames = primaryCollInfos.getNonCappedCollNames();
-                    // Only compare the dbhashes of non-capped collections because capped
-                    // collections are not necessarily truncated at the same points
-                    // across replica set members.
-                    nonCappedCollNames.forEach(collName => {
-                        if (primaryDBHash.collections[collName] !==
-                            secondaryDBHash.collections[collName]) {
-                            print(msgPrefix +
-                                  ', the primary and secondary have a different hash for the' +
-                                  ' collection ' + dbName + '.' + collName + ': ' +
-                                  tojson(dbHashes));
-                            DataConsistencyChecker.dumpCollectionDiff(this,
-                                                                      collectionPrinted,
-                                                                      primaryCollInfos,
-                                                                      secondaryCollInfos,
-                                                                      collName);
-                            success = false;
-                        }
-                    });
-
-                    secondaryCollInfos.collInfosRes.forEach(secondaryInfo => {
-                        primaryCollInfos.collInfosRes.forEach(primaryInfo => {
-                            if (secondaryInfo.name === primaryInfo.name &&
-                                secondaryInfo.type === primaryInfo.type) {
-                                if (ignoreUUIDs) {
-                                    print(msgPrefix + ", skipping UUID check for " +
-                                          primaryInfo.name);
-                                    primaryInfo.info.uuid = null;
-                                    secondaryInfo.info.uuid = null;
-                                }
-
-                                // Ignore the 'flags' collection option as it was removed in 4.2
-                                primaryInfo.options.flags = null;
-                                secondaryInfo.options.flags = null;
-
-                                // Ignore the 'ns' field in the 'idIndex' field as 'ns' was removed
-                                // from index specs in 4.4.
-                                if (primaryInfo.idIndex) {
-                                    delete primaryInfo.idIndex.ns;
-                                    delete secondaryInfo.idIndex.ns;
-                                }
-
-                                if (!bsonBinaryEqual(secondaryInfo, primaryInfo)) {
-                                    print(msgPrefix +
-                                          ', the primary and secondary have different ' +
-                                          'attributes for the collection or view ' + dbName + '.' +
-                                          secondaryInfo.name);
-                                    DataConsistencyChecker.dumpCollectionDiff(this,
-                                                                              collectionPrinted,
-                                                                              primaryCollInfos,
-                                                                              secondaryCollInfos,
-                                                                              secondaryInfo.name);
-                                    success = false;
-                                }
-                            }
-                        });
-                    });
-
-                    // Treats each array as a set and returns true if the contents match. Assumes
-                    // the contents of each array are unique.
-                    const compareSets = function(leftArr, rightArr) {
-                        if (leftArr === undefined) {
-                            return rightArr === undefined;
-                        }
-
-                        if (rightArr === undefined) {
-                            return false;
-                        }
-
-                        const map = {};
-                        leftArr.forEach(key => {
-                            map[key] = 1;
-                        });
-
-                        rightArr.forEach(key => {
-                            if (map[key] === undefined) {
-                                map[key] = -1;
-                            } else {
-                                delete map[key];
-                            }
-                        });
-
-                        // The map is empty when both sets match.
-                        for (let key in map) {
-                            if (map.hasOwnProperty(key)) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    };
-
-                    // Check that the following collection stats are the same across replica set
-                    // members:
-                    //  capped
-                    //  nindexes, except on nodes with buildIndexes: false
-                    //  ns
                     const hasSecondaryIndexes =
                         replSetConfig.members[rst.getNodeId(secondary)].buildIndexes !== false;
-                    primaryCollections.forEach(collName => {
-                        var primaryCollStats =
-                            primary.getDB(dbName).runCommand({collStats: collName});
-                        var secondaryCollStats =
-                            secondary.getDB(dbName).runCommand({collStats: collName});
 
-                        if (primaryCollStats.ok !== 1 || secondaryCollStats.ok !== 1) {
-                            primaryCollInfos.print(collectionPrinted, collName);
-                            secondaryCollInfos.print(collectionPrinted, collName);
-                            success = false;
-                            return;
-                        }
-
-                        // Provide hint on where to look within stats.
-                        let reasons = [];
-                        if (primaryCollStats.capped !== secondaryCollStats.capped) {
-                            reasons.push('capped');
-                        }
-
-                        if (primaryCollStats.ns !== secondaryCollStats.ns) {
-                            reasons.push('ns');
-                        }
-
-                        if (hasSecondaryIndexes &&
-                            primaryCollStats.nindexes !== secondaryCollStats.nindexes) {
-                            reasons.push('indexes');
-                        }
-
-                        const indexBuildsMatch = compareSets(primaryCollStats.indexBuilds,
-                                                             secondaryCollStats.indexBuilds);
-                        if (hasSecondaryIndexes && !indexBuildsMatch) {
-                            reasons.push('indexBuilds');
-                        }
-
-                        if (reasons.length === 0) {
-                            return;
-                        }
-
-                        print(msgPrefix +
-                              ', the primary and secondary have different stats for the ' +
-                              'collection ' + dbName + '.' + collName + ': ' + reasons.join(', '));
-                        DataConsistencyChecker.dumpCollectionDiff(this,
-                                                                  collectionPrinted,
-                                                                  primaryCollInfos,
-                                                                  secondaryCollInfos,
-                                                                  collName);
-                        success = false;
-                    });
-
-                    if (nonCappedCollNames.length === primaryCollections.length) {
-                        // If the primary and secondary have the same hashes for all the
-                        // collections in the database and there aren't any capped collections,
-                        // then the hashes for the whole database should match.
-                        if (primaryDBHash.md5 !== secondaryDBHash.md5) {
-                            print(msgPrefix +
-                                  ', the primary and secondary have a different hash for ' +
-                                  'the ' + dbName + ' database: ' + tojson(dbHashes));
-                            success = false;
-                        }
-                    }
+                    print(
+                        `checking db hash between primary: ${primary} and secondary ${secondary}`);
+                    success = DataConsistencyChecker.checkDBHash(primaryDBHash,
+                                                                 primaryCollInfos,
+                                                                 secondaryDBHash,
+                                                                 secondaryCollInfos,
+                                                                 msgPrefix,
+                                                                 ignoreUUIDs,
+                                                                 hasSecondaryIndexes,
+                                                                 collectionPrinted);
 
                     if (!success) {
                         if (!hasDumpedOplog) {
@@ -2556,7 +2364,7 @@ var ReplSetTest = function(opts) {
             assert(success, 'dbhash mismatch between primary and secondary');
         }
 
-        var liveSecondaries = _determineLiveSecondaries();
+        const liveSecondaries = _determineLiveSecondaries();
         this.checkReplicaSet(checkDBHashesForReplSet,
                              liveSecondaries,
                              this,
