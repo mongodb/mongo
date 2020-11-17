@@ -410,6 +410,12 @@ private:
     Cache::ValueHandle _getData(OperationContext* opCtx);
 
     /**
+     * Gets a causally-consistent (ie. latest-known) copy of the ShardRegistryData asynchronously,
+     * refreshing from the config servers if necessary.
+     */
+    SharedSemiFuture<Cache::ValueHandle> _getDataAsync();
+
+    /**
      * Gets the latest-cached copy of the ShardRegistryData.  Never fetches from the config servers.
      * Only used by the "NoReload" accessors.
      * TODO SERVER-50206: Remove usage of this non-causally consistent accessor.
