@@ -273,6 +273,31 @@ public:
     virtual StatusWith<CallbackHandle> scheduleWorkAt(Date_t when, CallbackFn&& work) = 0;
 
     /**
+     * Returns an ExecutorFuture that will be resolved with success when the given date is reached.
+     *
+     * If the executor is already shut down when this is called, the resulting future will be set
+     * with ErrorCodes::ShutdownInProgress.
+     *
+     * Otherwise, if the executor shuts down or the token is canceled prior to the deadline being
+     * reached, the resulting ExecutorFuture will be set with ErrorCodes::CallbackCanceled.
+     */
+    ExecutorFuture<void> sleepUntil(Date_t when, const CancelationToken& token);
+
+    /**
+     * Returns an ExecutorFuture that will be resolved with success after the given duration has
+     * passed.
+     *
+     * If the executor is already shut down when this is called, the resulting future will be set
+     * with ErrorCodes::ShutdownInProgress.
+     *
+     * Otherwise, if the executor shuts down or the token is canceled prior to the deadline being
+     * reached, the resulting ExecutorFuture will be set with ErrorCodes::CallbackCanceled.
+     */
+    ExecutorFuture<void> sleepFor(Milliseconds duration, const CancelationToken& token) {
+        return sleepUntil(now() + duration, token);
+    }
+
+    /**
      * Schedules "cb" to be run by the executor with the result of executing the remote command
      * described by "request".
      *

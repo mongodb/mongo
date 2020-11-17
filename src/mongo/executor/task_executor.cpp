@@ -114,6 +114,56 @@ void TaskExecutor::schedule(OutOfLineExecutor::Task func) {
     }
 }
 
+ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancelationToken& token) {
+    if (token.isCanceled()) {
+        return ExecutorFuture<void>(shared_from_this(), TaskExecutor::kCallbackCanceledErrorStatus);
+    }
+
+    if (when <= now()) {
+        return ExecutorFuture<void>(shared_from_this());
+    }
+
+    /**
+     * Encapsulates the promise associated with the result future.
+     */
+    struct AlarmState {
+        void signal(const Status& status) {
+            if (status.isOK()) {
+                promise.emplaceValue();
+            } else {
+                promise.setError(status);
+            }
+        }
+
+        Promise<void> promise;
+    };
+
+    auto [promise, future] = makePromiseFuture<void>();
+    // This has to be shared because Promises (and therefore AlarmState) are move-only and we need
+    // to maintain two copies: One to capture in the scheduleWorkAt callback, and one locally in
+    // case scheduling the request fails.
+    auto alarmState = std::make_shared<AlarmState>(AlarmState{std::move(promise)});
+
+    // Schedule a task to signal the alarm when the deadline is reached.
+    auto cbHandle = scheduleWorkAt(
+        when, [alarmState](const auto& args) mutable { alarmState->signal(args.status); });
+
+    // Handle cancelation via the input CancelationToken.
+    auto scheduleStatus =
+        wrapCallbackHandleWithCancelToken(shared_from_this(), std::move(cbHandle), token);
+
+    if (!scheduleStatus.isOK()) {
+        // If scheduleStatus is not okay, then the callback passed to scheduleWorkAt should never
+        // run, meaning that it will be okay to set the promise here.
+        alarmState->signal(scheduleStatus);
+    }
+
+    // TODO (SERVER-51285): Optimize to avoid an additional call to schedule to run the callback
+    // chained by the caller of sleepUntil.
+    return std::move(future).thenRunOn(shared_from_this());
+}
+
+
 TaskExecutor::CallbackState::CallbackState() = default;
 TaskExecutor::CallbackState::~CallbackState() = default;
 

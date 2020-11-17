@@ -382,6 +382,135 @@ COMMON_EXECUTOR_TEST(EventSignalWithTimeoutTest) {
     joinExecutorThread();
 }
 
+COMMON_EXECUTOR_TEST(SleepUntilReturnsReadyFutureWithSuccessWhenDeadlineAlreadyPassed) {
+    NetworkInterfaceMock* net = getNet();
+    TaskExecutor& executor = getExecutor();
+    launchExecutorThread();
+
+    const Date_t now = net->now();
+
+    auto alarm = executor.sleepUntil(now, CancelationToken::uncancelable());
+    ASSERT(alarm.isReady());
+    ASSERT_OK(alarm.getNoThrow());
+    shutdownExecutorThread();
+    joinExecutorThread();
+}
+
+COMMON_EXECUTOR_TEST(
+    SleepUntilReturnsReadyFutureWithShutdownInProgressWhenExecutorAlreadyShutdown) {
+    NetworkInterfaceMock* net = getNet();
+    TaskExecutor& executor = getExecutor();
+    launchExecutorThread();
+    shutdownExecutorThread();
+    joinExecutorThread();
+
+    const Date_t now = net->now();
+    const Milliseconds sleepDuration{1000};
+    const auto deadline = now + sleepDuration;
+    auto alarm = executor.sleepUntil(deadline, CancelationToken::uncancelable());
+
+    ASSERT(alarm.isReady());
+    ASSERT_EQ(alarm.getNoThrow().code(), ErrorCodes::ShutdownInProgress);
+}
+
+COMMON_EXECUTOR_TEST(SleepUntilReturnsReadyFutureWithCallbackCanceledWhenTokenAlreadyCanceled) {
+    NetworkInterfaceMock* net = getNet();
+    TaskExecutor& executor = getExecutor();
+    const Date_t now = net->now();
+    const Milliseconds sleepDuration{1000};
+    const auto deadline = now + sleepDuration;
+    CancelationSource cancelSource;
+    cancelSource.cancel();
+    auto alarm = executor.sleepUntil(deadline, cancelSource.token());
+
+    ASSERT(alarm.isReady());
+    ASSERT_EQ(alarm.getNoThrow().code(), ErrorCodes::CallbackCanceled);
+}
+
+COMMON_EXECUTOR_TEST(
+    SleepUntilResolvesOutputFutureWithCallbackCanceledWhenTokenCanceledBeforeDeadline) {
+    NetworkInterfaceMock* net = getNet();
+    TaskExecutor& executor = getExecutor();
+    launchExecutorThread();
+
+    const Date_t now = net->now();
+    const Milliseconds sleepDuration{1000};
+    const auto deadline = now + sleepDuration;
+    CancelationSource cancelSource;
+    auto alarm = executor.sleepUntil(deadline, cancelSource.token());
+
+    ASSERT_FALSE(alarm.isReady());
+
+    net->enterNetwork();
+    // Run almost until the deadline. This isn't really necessary for the test since we could just
+    // skip running the clock at all, so just doing this for some "realism".
+    net->runUntil(deadline - Milliseconds(1));
+    net->exitNetwork();
+
+    // Cancel before deadline.
+    cancelSource.cancel();
+    // Required to process the cancelation.
+    net->enterNetwork();
+    net->exitNetwork();
+
+    ASSERT(alarm.isReady());
+    ASSERT_EQ(alarm.getNoThrow().code(), ErrorCodes::CallbackCanceled);
+
+    shutdownExecutorThread();
+    joinExecutorThread();
+}
+
+COMMON_EXECUTOR_TEST(
+    SleepUntilResolvesOutputFutureWithCallbackCanceledWhenExecutorShutsDownBeforeDeadline) {
+    NetworkInterfaceMock* net = getNet();
+    TaskExecutor& executor = getExecutor();
+    launchExecutorThread();
+
+    const Date_t now = net->now();
+    const Milliseconds sleepDuration{1000};
+    const auto deadline = now + sleepDuration;
+    CancelationSource cancelSource;
+    auto alarm = executor.sleepUntil(deadline, cancelSource.token());
+
+    ASSERT_FALSE(alarm.isReady());
+
+    net->enterNetwork();
+    // Run almost until the deadline. This isn't really necessary for the test since we could just
+    // skip running the clock at all, so just doing this for some "realism".
+    net->runUntil(deadline - Milliseconds(1));
+    net->exitNetwork();
+
+    // Shut down before deadline.
+    shutdownExecutorThread();
+    joinExecutorThread();
+
+    ASSERT(alarm.isReady());
+    ASSERT_EQ(alarm.getNoThrow().code(), ErrorCodes::CallbackCanceled);
+}
+
+COMMON_EXECUTOR_TEST(SleepUntilResolvesOutputFutureWithSuccessWhenDeadlinePasses) {
+    NetworkInterfaceMock* net = getNet();
+    TaskExecutor& executor = getExecutor();
+    launchExecutorThread();
+
+    const Date_t now = net->now();
+    const Milliseconds sleepDuration{1000};
+    const auto deadline = now + sleepDuration;
+
+    auto alarm = executor.sleepUntil(deadline, CancelationToken::uncancelable());
+    ASSERT_FALSE(alarm.isReady());
+
+    net->enterNetwork();
+    net->runUntil(deadline);
+    net->exitNetwork();
+
+    ASSERT(alarm.isReady());
+    ASSERT_OK(alarm.getNoThrow());
+
+    executor.shutdown();
+    joinExecutorThread();
+}
+
 COMMON_EXECUTOR_TEST(ScheduleWorkAt) {
     NetworkInterfaceMock* net = getNet();
     TaskExecutor& executor = getExecutor();
