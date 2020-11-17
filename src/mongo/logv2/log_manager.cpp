@@ -101,7 +101,7 @@ LogComponentSettings& LogManager::getGlobalSettings() {
 }
 
 MONGO_INITIALIZER(GlobalLogRotator)(InitializerContext*) {
-    addLogRotator([](bool renameFiles, StringData suffix) {
+    addLogRotator(logv2::kServerLogTag, [](bool renameFiles, StringData suffix) {
         return LogManager::global().getGlobalDomainInternal().rotate(renameFiles, suffix);
     });
 }

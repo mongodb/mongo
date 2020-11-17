@@ -39,33 +39,49 @@
 #include <vector>
 
 namespace mongo::logv2 {
+
 namespace {
 AtomicWord<bool> redactionEnabled{false};
-std::vector<LogRotateCallback> logRotateCallbacks;
+std::map<StringData, LogRotateCallback> logRotateCallbacks;
 }  // namespace
 
-void addLogRotator(LogRotateCallback cb) {
-    logRotateCallbacks.push_back(std::move(cb));
+void addLogRotator(StringData logType, LogRotateCallback cb) {
+    logRotateCallbacks.emplace(logType, std::move(cb));
 }
 
-bool rotateLogs(bool renameFiles) {
-    // Rotate on both logv1 and logv2 so all files that need rotation gets rotated
+bool rotateLogs(bool renameFiles, boost::optional<StringData> logType) {
     std::string suffix = "." + terseCurrentTimeForFilename();
-    LOGV2(23166, "Log rotation initiated", "suffix"_attr = suffix);
-    bool success = true;
 
-    // Call each callback in turn.
-    // If they fail, they must log why.
-    // We only return true if all succeed.
-    for (const auto& cb : logRotateCallbacks) {
-        auto status = cb(renameFiles, suffix);
-        if (!status.isOK()) {
-            LOGV2_WARNING(23168, "Log rotation failed", "reason"_attr = status);
-            success = false;
+    LOGV2(23166, "Log rotation initiated", "suffix"_attr = suffix, "logType"_attr = logType);
+
+    if (logType) {
+        auto it = logRotateCallbacks.find(logType.get());
+        if (it == logRotateCallbacks.end()) {
+            LOGV2_WARNING(
+                ErrorCodes::NoSuchKey, "Unknown log type for rotate", "logType"_attr = logType);
+            return false;
         }
+        auto status = it->second(renameFiles, suffix);
+        if (!status.isOK()) {
+            LOGV2_WARNING(
+                1947001, "Log rotation failed", "reason"_attr = status, "logType"_attr = logType);
+            return false;
+        }
+        return true;
+    } else {
+        bool ret = true;
+        for (const auto& entry : logRotateCallbacks) {
+            auto status = entry.second(renameFiles, suffix);
+            if (!status.isOK()) {
+                LOGV2_WARNING(23168,
+                              "Log rotation failed",
+                              "reason"_attr = status,
+                              "logType"_attr = entry.first);
+                ret = false;
+            }
+        }
+        return ret;
     }
-
-    return success;
 }
 
 bool shouldRedactLogs() {

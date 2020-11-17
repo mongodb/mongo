@@ -193,11 +193,19 @@ public:
                      const std::string& ns,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        bool didRotate = logv2::rotateLogs(serverGlobalParams.logRenameOnRotate);
-        if (didRotate)
+        BSONElement val = cmdObj.firstElement();
+
+        boost::optional<StringData> logType = boost::none;
+        if (val.type() == String) {
+            logType = val.checkAndGetStringData();
+        }
+
+        if (logv2::rotateLogs(serverGlobalParams.logRenameOnRotate, logType)) {
             logProcessDetailsForLogRotate(opCtx->getServiceContext());
-        return didRotate;
-        return true;
+            return true;
+        }
+
+        return false;
     }
 
 } logRotateCmd;
