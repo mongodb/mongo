@@ -19,6 +19,7 @@ function runTest(inbound, outbound) {
         sslClusterCAFile: inbound,
     });
     assert(mongod);
+    assert.commandWorked(mongod.getDB('admin').runCommand('serverStatus'));
     assert.eq(mongod.getDB('admin').system.users.find({}).toArray(), []);
     MongoRunner.stopMongod(mongod);
 }
@@ -50,6 +51,42 @@ runTest(VALID_CA, INVALID_CA);
                                   VALID_CA,
                                   "--sslPEMKeyFile",
                                   "jstests/libs/server-intermediate-ca.pem",
+                                  "--eval",
+                                  "1;");
+    assert.eq(smoke, 0, "Could not connect with intermediate certificate");
+
+    MongoRunner.stopMongod(mongod);
+}
+
+// Validate we can make a chain with intermediate certs in ca file instead of key file
+if (determineSSLProvider() === 'apple') {
+    // TODO SERVER-52923
+    print("Skipping test with Apple pending SERVER-52923");
+    return;
+}
+
+// Validate the server can build a certificate chain when the chain is split across the CA and PEM
+// files.
+{
+    const mongod = MongoRunner.runMongod({
+        sslMode: 'requireSSL',
+        sslAllowConnectionsWithoutCertificates: '',
+        sslPEMKeyFile: 'jstests/libs/server-intermediate-leaf.pem',
+        sslCAFile: 'jstests/libs/intermediate-ca-chain.pem',
+    });
+    assert(mongod);
+    assert.eq(mongod.getDB('admin').system.users.find({}).toArray(), []);
+
+    const smoke = runMongoProgram("mongo",
+                                  "--host",
+                                  "localhost",
+                                  "--port",
+                                  mongod.port,
+                                  "--ssl",
+                                  "--sslCAFile",
+                                  VALID_CA,
+                                  "--sslPEMKeyFile",
+                                  "jstests/libs/client.pem",
                                   "--eval",
                                   "1;");
     assert.eq(smoke, 0, "Could not connect with intermediate certificate");

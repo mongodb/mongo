@@ -529,10 +529,24 @@ certs:
   Issuer: 'ca.pem'
 
 - name: 'server-intermediate-ca.pem'
-  description: Server certificate signed by intermediate CA, including root CA in bundle.
+  description: Server certificate signed by intermediate CA, including intermediate CA in bundle.
   Subject: {CN: 'Server Via Intermediate'}
   Issuer: 'intermediate-ca.pem'
   append_cert: 'intermediate-ca.pem'
+
+- name: 'server-intermediate-leaf.pem'
+  description: Server certificate signed by intermediate CA.
+  Subject: {CN: 'Server Leaf Via Intermediate'}
+  extensions:
+    subjectAltName:
+      DNS: ['localhost', '127.0.0.1']
+  Issuer: 'intermediate-ca.pem'
+
+- name: 'intermediate-ca-chain.pem'
+  description: CA pem including intermediate certs.
+  append_cert:
+  - 'ca.pem'
+  - 'intermediate-ca.pem'
 
 ###
 # Split Horizon
