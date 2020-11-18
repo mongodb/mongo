@@ -63,11 +63,6 @@ public:
         // collection is installed in the catalog during commit and discarded on rollback.
         kManagedInWriteUnitOfWork,
 
-        // Writable Collection commitable outside of write unit of work. Users need to commit the
-        // Collection to the catalog. Requires a write unit of work, rollback is managed like
-        // kManagedInWriteUnitOfWork.
-        kUnmanagedCommitManagedRollback,
-
         // Inplace writable access to the Collection currently installed in the catalog. This is
         // only safe when the server is in a state where there can be no concurrent readers. Does
         // not require an active write unit of work.
@@ -357,12 +352,6 @@ public:
      * Inserts a new ResourceId 'rid' into the map with namespace 'entry'.
      */
     void addResource(const ResourceId& rid, const std::string& entry);
-
-    /**
-     * Commit unmanaged Collection that was acquired by lookupCollectionBy***ForMetadataWrite and
-     * lifetime mode kUnmanagedClone.
-     */
-    static void commitUnmanagedClone(OperationContext* opCtx, Collection* collection);
 
 private:
     friend class CollectionCatalog::iterator;

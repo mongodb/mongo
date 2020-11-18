@@ -529,26 +529,22 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     auto cloned = coll->clone();
     uncommittedWritableCollections.insert(cloned);
 
-    if (mode == LifetimeMode::kManagedInWriteUnitOfWork) {
-        opCtx->recoveryUnit()->onCommit(
-            [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
-                boost::optional<Timestamp> commitTime) {
-                auto [collection, commitHandlers] =
-                    uncommittedWritableCollections.remove(clonedPtr);
-                if (collection) {
-                    CollectionCatalog::write(
-                        opCtx,
-                        [collection = std::move(collection),
-                         &commitTime,
-                         commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
-                            catalog._commitWritableClone(
-                                std::move(collection), commitTime, *commitHandlers);
-                        });
-                }
-            });
-    }
-    // mode is kManagedInWriteUnitOfWork or kUnmanagedCommitManagedRollback where rollback is
-    // managed
+    opCtx->recoveryUnit()->onCommit(
+        [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
+            boost::optional<Timestamp> commitTime) {
+            auto [collection, commitHandlers] = uncommittedWritableCollections.remove(clonedPtr);
+            if (collection) {
+                CollectionCatalog::write(
+                    opCtx,
+                    [collection = std::move(collection),
+                     &commitTime,
+                     commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
+                        catalog._commitWritableClone(
+                            std::move(collection), commitTime, *commitHandlers);
+                    });
+            }
+        });
+
     opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
         uncommittedWritableCollections.remove(cloned.get());
     });
@@ -621,26 +617,22 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     auto cloned = coll->clone();
     uncommittedWritableCollections.insert(cloned);
 
-    if (mode == LifetimeMode::kManagedInWriteUnitOfWork) {
-        opCtx->recoveryUnit()->onCommit(
-            [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
-                boost::optional<Timestamp> commitTime) {
-                auto [collection, commitHandlers] =
-                    uncommittedWritableCollections.remove(clonedPtr);
-                if (collection) {
-                    CollectionCatalog::write(
-                        opCtx,
-                        [collection = std::move(collection),
-                         &commitTime,
-                         commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
-                            catalog._commitWritableClone(
-                                std::move(collection), commitTime, *commitHandlers);
-                        });
-                }
-            });
-    }
-    // mode is kManagedInWriteUnitOfWork or kUnmanagedCommitManagedRollback where rollback is
-    // managed
+    opCtx->recoveryUnit()->onCommit(
+        [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
+            boost::optional<Timestamp> commitTime) {
+            auto [collection, commitHandlers] = uncommittedWritableCollections.remove(clonedPtr);
+            if (collection) {
+                CollectionCatalog::write(
+                    opCtx,
+                    [collection = std::move(collection),
+                     &commitTime,
+                     commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
+                        catalog._commitWritableClone(
+                            std::move(collection), commitTime, *commitHandlers);
+                    });
+            }
+        });
+
     opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
         uncommittedWritableCollections.remove(cloned.get());
     });
@@ -990,19 +982,6 @@ void CollectionCatalog::_commitWritableClone(
 
     for (auto&& commitHandler : commitHandlers) {
         commitHandler(*this, commitTime);
-    }
-}
-
-void CollectionCatalog::commitUnmanagedClone(OperationContext* opCtx, Collection* collection) {
-    auto& uncommittedWritableCollections = getUncommittedWritableCollections(opCtx);
-    auto [cloned, commitHandlers] = uncommittedWritableCollections.remove(collection);
-    if (cloned) {
-        CollectionCatalog::write(opCtx,
-                                 [cloned = std::move(cloned),
-                                  commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
-                                     catalog._commitWritableClone(
-                                         std::move(cloned), boost::none, *commitHandlers);
-                                 });
     }
 }
 

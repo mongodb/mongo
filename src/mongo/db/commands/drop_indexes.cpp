@@ -159,8 +159,7 @@ public:
                 uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
         }
 
-        CollectionWriter collection(
-            autoColl, CollectionCatalog::LifetimeMode::kUnmanagedCommitManagedRollback);
+        CollectionWriter collection(autoColl);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 
@@ -258,15 +257,6 @@ public:
             wunit.commit();
         });
         abortOnExit.dismiss();
-
-        // Do not allow majority reads from this collection until all original indexes are visible.
-        // This was also done when dropAllIndexes() committed, but we need to ensure that no one
-        // tries to read in the intermediate state where all indexes are newer than the current
-        // snapshot so are unable to be used.
-        const auto currentTime = VectorClock::get(opCtx)->getTime();
-        collection.getWritableCollection()->setMinimumVisibleSnapshot(
-            currentTime.clusterTime().asTimestamp());
-        collection.commitToCatalog();
 
         result.append("nIndexes", static_cast<int>(swIndexesToRebuild.getValue().size()));
         result.append("indexes", swIndexesToRebuild.getValue());

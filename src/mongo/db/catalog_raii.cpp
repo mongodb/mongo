@@ -166,24 +166,17 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
 
         // Makes the internal CollectionPtr Yieldable and resets the writable Collection when the
         // write unit of work finishes so we re-fetches and re-clones the Collection if a new write
-        // unit of work is opened. The manage commit flag is used to control if this logic should
-        // happen on commit or not. This depends on the lifetime mode that was used to request the
-        // writable collection.
+        // unit of work is opened.
         class WritableCollectionReset : public RecoveryUnit::Change {
         public:
             WritableCollectionReset(AutoGetCollection& autoColl,
-                                    const Collection* originalCollection,
-                                    bool manageCommit)
-                : _autoColl(autoColl),
-                  _originalCollection(originalCollection),
-                  _manageCommit(manageCommit) {}
+                                    const Collection* originalCollection)
+                : _autoColl(autoColl), _originalCollection(originalCollection) {}
             void commit(boost::optional<Timestamp> commitTime) final {
-                if (_manageCommit) {
-                    _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
-                                                    _autoColl._coll.get(),
-                                                    LookupCollectionForYieldRestore());
-                    _autoColl._writableColl = nullptr;
-                }
+                _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
+                                                _autoColl._coll.get(),
+                                                LookupCollectionForYieldRestore());
+                _autoColl._writableColl = nullptr;
             }
             void rollback() final {
                 _autoColl._coll = CollectionPtr(_autoColl.getOperationContext(),
@@ -196,16 +189,14 @@ Collection* AutoGetCollection::getWritableCollection(CollectionCatalog::Lifetime
             AutoGetCollection& _autoColl;
             // Used to be able to restore to the original pointer in case of a rollback
             const Collection* _originalCollection;
-            bool _manageCommit;
         };
 
         auto catalog = CollectionCatalog::get(_opCtx);
         _writableColl =
             catalog->lookupCollectionByNamespaceForMetadataWrite(_opCtx, mode, _resolvedNss);
         if (mode != CollectionCatalog::LifetimeMode::kInplace) {
-            bool peformCommit = mode == CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork;
             _opCtx->recoveryUnit()->registerChange(
-                std::make_unique<WritableCollectionReset>(*this, _coll.get(), peformCommit));
+                std::make_unique<WritableCollectionReset>(*this, _coll.get()));
         }
 
         // Set to writable collection. We are no longer yieldable.
@@ -331,19 +322,14 @@ Collection* CollectionWriter::getWritableCollection() {
         // Resets the writable Collection when the write unit of work finishes so we re-fetch and
         // re-clone the Collection if a new write unit of work is opened. Holds the back pointer to
         // the CollectionWriter via a shared_ptr so we can detect if the instance is already
-        // destroyed. The manage commit flag is used to control if this logic should
-        // happen on commit or not. This depends on the lifetime mode that was used to request the
-        // writable collection.
+        // destroyed.
         class WritableCollectionReset : public RecoveryUnit::Change {
         public:
             WritableCollectionReset(std::shared_ptr<SharedImpl> shared,
-                                    CollectionPtr rollbackCollection,
-                                    bool manageCommit)
-                : _shared(std::move(shared)),
-                  _rollbackCollection(std::move(rollbackCollection)),
-                  _manageCommit(manageCommit) {}
+                                    CollectionPtr rollbackCollection)
+                : _shared(std::move(shared)), _rollbackCollection(std::move(rollbackCollection)) {}
             void commit(boost::optional<Timestamp> commitTime) final {
-                if (_manageCommit && _shared->_parent)
+                if (_shared->_parent)
                     _shared->_parent->_writableCollection = nullptr;
             }
             void rollback() final {
@@ -356,32 +342,21 @@ Collection* CollectionWriter::getWritableCollection() {
         private:
             std::shared_ptr<SharedImpl> _shared;
             CollectionPtr _rollbackCollection;
-            bool _manageCommit;
         };
 
         // If we are using our stored Collection then we are not managed by an AutoGetCollection and
         // we need to manage lifetime here.
         if (_mode != CollectionCatalog::LifetimeMode::kInplace) {
             bool usingStoredCollection = *_collection == _storedCollection;
-            bool performCommit =
-                _mode == CollectionCatalog::LifetimeMode::kManagedInWriteUnitOfWork;
             _opCtx->recoveryUnit()->registerChange(std::make_unique<WritableCollectionReset>(
                 _sharedImpl,
-                usingStoredCollection ? std::move(_storedCollection) : CollectionPtr(),
-                performCommit));
+                usingStoredCollection ? std::move(_storedCollection) : CollectionPtr()));
             if (usingStoredCollection) {
                 _storedCollection = _writableCollection;
             }
         }
     }
     return _writableCollection;
-}
-
-void CollectionWriter::commitToCatalog() {
-    invariant(_mode == CollectionCatalog::LifetimeMode::kUnmanagedCommitManagedRollback);
-    invariant(_writableCollection);
-    CollectionCatalog::commitUnmanagedClone(_opCtx, _writableCollection);
-    _writableCollection = nullptr;
 }
 
 LockMode fixLockModeForSystemDotViewsChanges(const NamespaceString& nss, LockMode mode) {

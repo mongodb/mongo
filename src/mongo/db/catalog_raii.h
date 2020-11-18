@@ -349,9 +349,6 @@ public:
     // invalidated.
     Collection* getWritableCollection();
 
-    // Commits unmanaged Collection to the catalog
-    void commitToCatalog();
-
 private:
     // If this class is instantiated with the constructors that take UUID or nss we need somewhere
     // to store the CollectionPtr used. But if it is instantiated with an AutoGetCollection then the
