@@ -651,7 +651,8 @@ ReshardingCoordinatorService::ReshardingCoordinator::~ReshardingCoordinator() {
 }
 
 SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancelationToken& token) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, executor] { return _init(executor); })
         .then([this, executor] {

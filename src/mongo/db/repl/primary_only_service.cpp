@@ -392,6 +392,10 @@ void PrimaryOnlyService::onStepDown() {
                "numInstances"_attr = _instances.size(),
                "numOperationContexts"_attr = _opCtxs.size());
 
+    // Reset the cancelation source on stepdown to prepare for the next elected primary.
+    _source.cancel();
+    _source = CancelationSource();
+
     if (_scopedExecutor) {
         (*_scopedExecutor)->shutdown();
     }
@@ -441,6 +445,8 @@ void PrimaryOnlyService::shutdown() {
         // shutdown can race with startup, so access _hasExecutor in this critical section.
         hasExecutor = _getHasExecutor();
     }
+
+    _source.cancel();
 
     for (auto& instance : savedInstances) {
         instance.second->interrupt(
@@ -686,7 +692,9 @@ void PrimaryOnlyService::_scheduleRun(WithLock wl,
                 "Starting instance of PrimaryOnlyService",
                 "service"_attr = getServiceName(),
                 "instanceID"_attr = instanceID);
-            instance->_finishedNotifyFuture = instance->run(std::move(scopedExecutor));
+            instance->_source = CancelationSource(_source.token());
+            instance->_finishedNotifyFuture =
+                instance->run(std::move(scopedExecutor), instance->_source.token());
         });
 }
 

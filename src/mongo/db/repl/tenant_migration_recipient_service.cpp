@@ -824,7 +824,8 @@ BSONObj TenantMigrationRecipientService::Instance::_getOplogFetcherFilter() cons
 }
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::run(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancelationToken& token) noexcept {
     _scopedExecutor = executor;
     pauseBeforeRunTenantMigrationRecipientInstance.pauseWhileSet();
 

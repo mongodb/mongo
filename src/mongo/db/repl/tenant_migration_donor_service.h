@@ -78,8 +78,8 @@ public:
 
         ~Instance();
 
-        SemiFuture<void> run(
-            std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+        SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                             const CancelationToken& token) noexcept override;
 
         void interrupt(Status status) override;
 
@@ -151,24 +151,26 @@ public:
         ExecutorFuture<void> _sendCommandToRecipient(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-            const BSONObj& cmdObj);
+            const BSONObj& cmdObj,
+            const CancelationToken& token);
 
         /**
          * Sends the recipientSyncData command to the recipient replica set.
          */
         ExecutorFuture<void> _sendRecipientSyncDataCommand(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancelationToken& token);
 
         /**
          * Sends the recipientForgetMigration command to the recipient replica set.
          */
         ExecutorFuture<void> _sendRecipientForgetMigrationCommand(
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
-            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS);
+            std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+            const CancelationToken& token);
 
         ServiceContext* _serviceContext;
-        CancelationSource _source;
 
         TenantMigrationDonorDocument _stateDoc;
         boost::optional<Status> _abortReason;

@@ -415,30 +415,35 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWrit
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipient(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
-    const BSONObj& cmdObj) {
-    return AsyncTry([this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj] {
-               return recipientTargeterRS
-                   ->findHostWithMaxWait(ReadPreferenceSetting(),
-                                         ReplicaSetMonitorInterface::kDefaultFindHostTimeout)
-                   .thenRunOn(**executor)
-                   .then([this, self = shared_from_this(), executor, cmdObj](auto recipientHost) {
-                       executor::RemoteCommandRequest request(std::move(recipientHost),
-                                                              NamespaceString::kAdminDb.toString(),
-                                                              std::move(cmdObj),
-                                                              rpc::makeEmptyMetadata(),
-                                                              nullptr,
-                                                              kRecipientSyncDataTimeout);
+    const BSONObj& cmdObj,
+    const CancelationToken& token) {
+    return AsyncTry(
+               [this, self = shared_from_this(), executor, recipientTargeterRS, cmdObj, token] {
+                   return recipientTargeterRS
+                       ->findHostWithMaxWait(ReadPreferenceSetting(),
+                                             ReplicaSetMonitorInterface::kDefaultFindHostTimeout)
+                       .thenRunOn(**executor)
+                       .then([this, self = shared_from_this(), executor, cmdObj, token](
+                                 auto recipientHost) {
+                           executor::RemoteCommandRequest request(
+                               std::move(recipientHost),
+                               NamespaceString::kAdminDb.toString(),
+                               std::move(cmdObj),
+                               rpc::makeEmptyMetadata(),
+                               nullptr,
+                               kRecipientSyncDataTimeout);
 
-                       return (**executor)
-                           ->scheduleRemoteCommand(std::move(request), _source.token())
-                           .then([this, self = shared_from_this()](const auto& response) -> Status {
-                               if (!response.isOK()) {
-                                   return response.status;
-                               }
-                               return getStatusFromCommandResult(response.data);
-                           });
-                   });
-           })
+                           return (**executor)
+                               ->scheduleRemoteCommand(std::move(request), token)
+                               .then([this,
+                                      self = shared_from_this()](const auto& response) -> Status {
+                                   if (!response.isOK()) {
+                                       return response.status;
+                                   }
+                                   return getStatusFromCommandResult(response.data);
+                               });
+                       });
+               })
         .until([](Status status) { return shouldStopSendingRecipientCommand(status); })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor);
@@ -446,7 +451,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS) {
+    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+    const CancelationToken& token) {
 
     auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
@@ -462,19 +468,22 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
         return request.toBSON(BSONObj());
     }());
 
-    return _sendCommandToRecipient(executor, recipientTargeterRS, cmdObj);
+    return _sendCommandToRecipient(executor, recipientTargeterRS, cmdObj, token);
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForgetMigrationCommand(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS) {
+    std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
+    const CancelationToken& token) {
     return _sendCommandToRecipient(executor,
                                    recipientTargeterRS,
-                                   RecipientForgetMigration(_stateDoc.getId()).toBSON(BSONObj()));
+                                   RecipientForgetMigration(_stateDoc.getId()).toBSON(BSONObj()),
+                                   token);
 }
 
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancelationToken& token) noexcept {
     auto recipientUri =
         uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()));
     auto recipientTargeterRS = std::shared_ptr<RemoteCommandTargeterRS>(
@@ -497,12 +506,12 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     return _waitForMajorityWriteConcern(executor, std::move(opTime));
                 });
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kDataSync) {
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
-            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
+            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS, token)
                 .then([this, self = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
@@ -516,14 +525,14 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                         });
                 });
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
             if (_stateDoc.getState() > TenantMigrationDonorStateEnum::kBlocking) {
                 return ExecutorFuture<void>(**executor, Status::OK());
             }
 
             invariant(_stateDoc.getBlockTimestamp());
 
-            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS)
+            return _sendRecipientSyncDataCommand(executor, recipientTargeterRS, token)
                 .then([this, self = shared_from_this()] {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
@@ -582,7 +591,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "status"_attr = status,
                   "abortReason"_attr = _abortReason);
         })
-        .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
+        .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
             if (_stateDoc.getExpireAt()) {
                 // The migration state has already been marked as garbage collectable. Set the
                 // donorForgetMigration promise here since the Instance's destructor has an
@@ -594,8 +603,9 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
             // Wait for the donorForgetMigration command.
             return std::move(_receiveDonorForgetMigrationPromise.getFuture())
                 .thenRunOn(**executor)
-                .then([this, self = shared_from_this(), executor, recipientTargeterRS] {
-                    return _sendRecipientForgetMigrationCommand(executor, recipientTargeterRS);
+                .then([this, self = shared_from_this(), executor, recipientTargeterRS, token] {
+                    return _sendRecipientForgetMigrationCommand(
+                        executor, recipientTargeterRS, token);
                 })
                 .then([this, self = shared_from_this(), executor] {
                     return _markStateDocumentAsGarbageCollectable(executor);

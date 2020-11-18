@@ -100,7 +100,8 @@ public:
     explicit ReshardingCoordinator(const BSONObj& state);
     ~ReshardingCoordinator();
 
-    SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept override;
+    SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                         const CancelationToken& token) noexcept override;
 
     void interrupt(Status status) override;
 
