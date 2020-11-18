@@ -131,7 +131,7 @@ struct __wt_lsm_chunk {
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_LSM_WORK_BLOOM 0x01u        /* Create a bloom filter */
 #define WT_LSM_WORK_DROP 0x02u         /* Drop unused chunks */
-#define WT_LSM_WORK_ENABLE_EVICT 0x04u /* Create a bloom filter */
+#define WT_LSM_WORK_ENABLE_EVICT 0x04u /* Allow eviction of pinned chunk */
 #define WT_LSM_WORK_FLUSH 0x08u        /* Flush a chunk to disk */
 #define WT_LSM_WORK_MERGE 0x10u        /* Look for a tree merge */
 #define WT_LSM_WORK_SWITCH 0x20u       /* Switch the in-memory chunk */

@@ -500,6 +500,7 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
     char buf[4096];
     char *filename;
     char granularity_unit;
+    const char *cons;
 
     nfiles = 0;
 
@@ -523,9 +524,13 @@ base_backup(WT_CONNECTION *conn, WT_RAND_STATE *rand, const char *home, const ch
         granularity_unit = 'M';
         granularity += 1;
     }
+    if (__wt_random(rand) % 2 == 0)
+        cons = ",consolidate=true";
+    else
+        cons = ",consolidate=false";
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "incremental=(granularity=%" PRIu32 "%c,enabled=true,this_id=ID%" PRIu32 ")", granularity,
-      granularity_unit, tinfo->full_backup_number));
+      "incremental=(granularity=%" PRIu32 "%c,enabled=true,%s,this_id=ID%" PRIu32 ")", granularity,
+      granularity_unit, cons, tinfo->full_backup_number));
     VERBOSE(3, "open_cursor(session, \"backup:\", NULL, \"%s\", &cursor)\n", buf);
     testutil_check(session->open_cursor(session, "backup:", NULL, buf, &cursor));
 
