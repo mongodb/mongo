@@ -80,9 +80,14 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
         // The record referenced by this index entry is gone. If the query yielded some time after
         // we first examined the index entry, then it's likely that the record was deleted while we
         // were yielding. However, if the snapshot id hasn't changed since the index lookup, then
-        // there could not have been a yield, and the only explanation is corruption.
+        // there could not have been a yield, meaning the document we are searching for has been
+        // deleted.
+        // One possibility is that the record was deleted by a prepared transaction, but if we are
+        // not ignoring prepare conflicts, then this definitely indicates an error.
         std::vector<IndexKeyDatum>::iterator keyDataIt;
         if (member->getState() == WorkingSetMember::RID_AND_IDX &&
+            opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+                PrepareConflictBehavior::kEnforce &&
             (keyDataIt = std::find_if(member->keyData.begin(),
                                       member->keyData.end(),
                                       [currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId()](
