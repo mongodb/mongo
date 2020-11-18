@@ -262,7 +262,6 @@ void removeJournalFiles() {
         log() << "error removing journal files " << e.what() << endl;
         throw;
     }
-    verify(!haveJournalFiles());
 
     flushMyDirectory(getJournalDir() /
                      "file");  // flushes parent of argument (in this case journal dir)
