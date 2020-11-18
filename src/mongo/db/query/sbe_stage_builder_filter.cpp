@@ -1058,10 +1058,12 @@ public:
                 // FROM branch binds an array constant carrying the regex patterns to a slot. Then
                 // the inner branch executes 'regexMatch' once per regex.
                 auto [regexTag, regexVal] = sbe::value::copyValue(arrTag, arrVal);
-                auto regexFromStage = makeProject(EvalStage{},
-                                                  _context->planNodeId,
-                                                  regexArraySlot,
-                                                  sbe::makeE<sbe::EConstant>(regexTag, regexVal));
+
+                auto regexFromStage =
+                    makeProject(equalities.size() > 0 ? EvalStage{} : std::move(inputStage),
+                                _context->planNodeId,
+                                regexArraySlot,
+                                sbe::makeE<sbe::EConstant>(regexTag, regexVal));
 
                 auto regexInnerStage =
                     makeProject(EvalStage{},
@@ -1100,10 +1102,17 @@ public:
                         EvalStage{});
                     branches.emplace_back(regexOutputSlot, std::move(regexStage));
 
-                    return generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicOr,
-                                                            std::move(branches),
-                                                            _context->planNodeId,
-                                                            _context->slotIdGenerator);
+                    auto [shortCircuitingExpr, shortCircuitingStage] =
+                        generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicOr,
+                                                         std::move(branches),
+                                                         _context->planNodeId,
+                                                         _context->slotIdGenerator);
+
+                    inputStage = makeLoopJoin(std::move(inputStage),
+                                              std::move(shortCircuitingStage),
+                                              _context->planNodeId);
+
+                    return {std::move(shortCircuitingExpr), std::move(inputStage)};
                 }
 
                 return {regexOutputSlot, std::move(regexStage)};
@@ -1111,7 +1120,7 @@ public:
             generatePredicate(_context,
                               expr->path(),
                               std::move(makePredicate),
-                              LeafTraversalMode::kArrayElementsOnly);
+                              LeafTraversalMode::kArrayAndItsElements);
         }
     }
 

@@ -46,6 +46,8 @@ assert.commandWorked(coll.insert(docs));
 
 assert.eq(8, coll.find({x: {$in: [1, /^a/]}}).itcount());
 assert.eq(7, coll.find({x: {$in: [2, /^a/]}}).itcount());
+assert.eq(6, coll.find({x: {$in: [[1, 2], /^a/]}}).itcount());
+assert.eq(5, coll.find({x: {$in: [/^a/]}}).itcount());
 assert.eq(1, coll.find({'x.y': {$in: [1, 2]}}).itcount());
 assert.eq(2, coll.find({'x.y': {$in: [1, /^a/]}}).itcount());
 assert.eq(1, coll.find({'x': {$in: [{y: 1}, /^z/]}}).itcount());
