@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
+#include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
@@ -276,9 +277,19 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
 
 void ReshardingRecipientService::RecipientStateMachine::
     _renameTemporaryReshardingCollectionThenDeleteLocalState() {
+
     if (_recipientDoc.getState() > RecipientStateEnum::kRenaming) {
         return;
     }
+
+    auto opCtx = cc().makeOperationContext();
+
+    auto reshardingNss = constructTemporaryReshardingNss(_recipientDoc.getNss().db(),
+                                                         _recipientDoc.getExistingUUID());
+
+    RenameCollectionOptions options;
+    options.dropTarget = true;
+    uassertStatusOK(renameCollection(opCtx.get(), reshardingNss, _recipientDoc.getNss(), options));
 
     _transitionState(RecipientStateEnum::kDone);
 }
