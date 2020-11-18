@@ -36,6 +36,8 @@
 
 namespace mongo {
 
+class ReshardingCollectionCloner;
+
 namespace resharding {
 
 /**
@@ -119,7 +121,8 @@ private:
 
     void _createTemporaryReshardingCollectionThenTransitionToCloning();
 
-    void _cloneThenTransitionToApplying();
+    ExecutorFuture<void> _cloneThenTransitionToApplying(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
     void _applyThenTransitionToSteadyState();
 
@@ -154,6 +157,8 @@ private:
 
     // The id both for the resharding operation and for the primary-only-service instance.
     const UUID _id;
+
+    std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
 
     // Protects the promises below
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingRecipient::_mutex");

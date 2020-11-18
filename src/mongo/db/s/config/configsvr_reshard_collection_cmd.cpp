@@ -209,10 +209,10 @@ public:
 
             instance->setInitialChunksAndZones(std::move(initialChunks), std::move(newZones));
 
-            instance->getObserver()->awaitAllDonorsReadyToDonate().wait();
+            instance->getObserver()->awaitAllDonorsReadyToDonate().wait(opCtx);
             // This promise is currently automatically filled by recipient shards after creating
             // the temporary resharding collection.
-            instance->getObserver()->awaitAllRecipientsFinishedApplying().wait();
+            instance->getObserver()->awaitAllRecipientsFinishedApplying().wait(opCtx);
 
             instance->interrupt(
                 {ErrorCodes::InternalError, "Artificial interruption to enable jsTests"});

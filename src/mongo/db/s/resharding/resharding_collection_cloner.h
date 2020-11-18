@@ -67,9 +67,8 @@ public:
                              std::shared_ptr<executor::TaskExecutor>);
 
 private:
-    static constexpr StringData kClientName = "ReshardingCollectionCloner"_sd;
-
-    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(const Pipeline& pipeline);
+    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,
+                                                                         const Pipeline& pipeline);
 
     std::vector<InsertStatement> _fillBatch(Pipeline& pipeline);
     void _insertBatch(OperationContext* opCtx, std::vector<InsertStatement>& batch);

@@ -172,8 +172,9 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             // 'reshardingFields' section
             return BSON("$set" << BSON(
                             "uuid"
-                            << coordinatorDoc.get_id() << "key" << coordinatorDoc.getReshardingKey()
-                            << "lastmodEpoch" << newCollectionEpoch.get() << "lastmod"
+                            << coordinatorDoc.get_id() << "key"
+                            << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
+                            << newCollectionEpoch.get() << "lastmod"
                             << opCtx->getServiceContext()->getPreciseClockSource()->now()
                             << "reshardingFields.state"
                             << CoordinatorState_serializer(coordinatorDoc.getState()).toString()));
@@ -624,6 +625,26 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept {
     return ExecutorFuture<void>(**executor)
         .then([this, executor] { return _init(executor); })
+        .then([this, executor] {
+            // Recipient shards expect to read from the donor shard's existing sharded collection
+            // and the config.cache.chunks collection of the temporary resharding collection using
+            // {atClusterTime: <fetchTimestamp>}. Refreshing the temporary resharding collection on
+            // the donor shards causes them to create the config.cache.chunks collection. Without
+            // this refresh, the {atClusterTime: <fetchTimestamp>} read on the config.cache.chunks
+            // namespace would fail with a SnapshotUnavailable error response.
+            //
+            // TODO SERVER-52924: There is the possibility of donor shards refreshing the existing
+            // sharded collection independently of the coodinator instructing them to do so. This
+            // means the coordinator triggering the refresh here isn't a robust way to ensure donor
+            // shards have always created the
+            // config.cache.chunks.<database>.system.resharding.<existingUUID> collection before
+            // calculating their minFetchTimestamp. Donor shards ought to instead refresh on their
+            // own before reporting to the coordinator they are prepared to donate.
+            auto opCtx = cc().makeOperationContext();
+            auto donorIds = extractShardIds(_coordinatorDoc.getDonorShards());
+            tellShardsToRefresh(
+                opCtx.get(), donorIds, _coordinatorDoc.getTempReshardingNss(), **executor);
+        })
         .then([this, executor] { _tellAllDonorsToRefresh(executor); })
         .then([this, executor] { return _awaitAllDonorsReadyToDonate(executor); })
         .then([this, executor] { _tellAllRecipientsToRefresh(executor); })

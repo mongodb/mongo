@@ -32,6 +32,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
+    - "mongo/db/keypattern.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
@@ -96,7 +97,7 @@ structs:
                 type: uuid
                 description: "The UUID of the original collection being resharded."
             reshardingKey:
-                type: object_owned
+                type: KeyPattern
                 description: "The index specification document to use as the new shard key."
 
     MinFetchTimestamp:

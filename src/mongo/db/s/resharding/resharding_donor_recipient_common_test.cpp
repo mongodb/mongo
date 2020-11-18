@@ -154,7 +154,7 @@ protected:
         ASSERT_EQ(reshardingDoc.get_id(), reshardingUUID);
         ASSERT_EQ(reshardingDoc.getNss(), nss);
         ASSERT_EQ(reshardingDoc.getExistingUUID(), existingUUID);
-        ASSERT_BSONOBJ_EQ(reshardingDoc.getReshardingKey(), reshardingKey);
+        ASSERT_BSONOBJ_EQ(reshardingDoc.getReshardingKey().toBSON(), reshardingKey);
     }
 
     void assertDonorDocMatchesReshardingFields(const NamespaceString& nss,

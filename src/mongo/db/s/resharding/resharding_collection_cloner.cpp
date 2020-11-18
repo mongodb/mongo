@@ -158,7 +158,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
-    const Pipeline& pipeline) {
+    OperationContext* opCtx, const Pipeline& pipeline) {
     AggregationRequest request(_sourceNss, pipeline.serializeToBson());
     request.setCollectionUUID(_sourceUUID);
     request.setHint(BSON("_id" << 1));
@@ -169,8 +169,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
     // TODO SERVER-52692: Set read preference to nearest.
     // request.setUnwrappedReadPref();
 
-    return sharded_agg_helpers::targetShardsAndAddMergeCursors(pipeline.getContext(),
-                                                               std::move(request));
+    return sharded_agg_helpers::shardVersionRetry(
+        opCtx,
+        Grid::get(opCtx)->catalogCache(),
+        _sourceNss,
+        "targeting donor shards for resharding collection cloning"_sd,
+        [&] {
+            return sharded_agg_helpers::targetShardsAndAddMergeCursors(pipeline.getContext(),
+                                                                       request);
+        });
 }
 
 std::vector<InsertStatement> ReshardingCollectionCloner::_fillBatch(Pipeline& pipeline) {
@@ -238,13 +245,13 @@ void ReshardingCollectionCloner::_insertBatch(OperationContext* opCtx,
 template <typename Callable>
 auto ReshardingCollectionCloner::_withTemporaryOperationContext(ServiceContext* serviceContext,
                                                                 Callable&& callable) {
-    ThreadClient tc(kClientName, serviceContext);
+    auto* client = Client::getCurrent();
     {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc->setSystemOperationKillableByStepdown(lk);
+        stdx::lock_guard<Client> lk(*client);
+        invariant(client->canKillSystemOperationInStepdown(lk));
     }
 
-    auto opCtx = tc->makeOperationContext();
+    auto opCtx = client->makeOperationContext();
     opCtx->setAlwaysInterruptAtStepDownOrUp();
 
     // The BlockingResultsMerger underlying by the $mergeCursors stage records how long the
@@ -292,7 +299,7 @@ ExecutorFuture<void> ReshardingCollectionCloner::run(
         .then([this, serviceContext] {
             return _withTemporaryOperationContext(serviceContext, [&](auto* opCtx) {
                 auto pipeline = _targetAggregationRequest(
-                    *makePipeline(opCtx, MongoProcessInterface::create(opCtx)));
+                    opCtx, *makePipeline(opCtx, MongoProcessInterface::create(opCtx)));
 
                 pipeline->detachFromOperationContext();
                 return pipeline;

@@ -107,7 +107,13 @@ void processReshardingFieldsForRecipientCollection(OperationContext* opCtx,
     // document in-memory, this means that the document will be recovered by the
     // ReshardingRecipientService, and at that time the latest instance of 'reshardingFields'
     // will be read. Return no-op.
-    if (reshardingFields.getState() > CoordinatorStateEnum::kCloning) {
+    //
+    // The RecipientStateMachine creates the temporary resharding collection immediately after being
+    // constructed. If a resharding operation has yet to reach state kCloning, then some donor
+    // shards may not be prepared for the recipient to start cloning. We avoid constructing the
+    // RecipientStateMachine until all donor shards are known to be prepared for the recipient to
+    // start cloning.
+    if (reshardingFields.getState() != CoordinatorStateEnum::kCloning) {
         return;
     }
 

@@ -31,12 +31,18 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/resharding_test_commands_gen.h"
+#include "mongo/db/logical_time_metadata_hook.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
-#include "mongo/s/grid.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 namespace {
@@ -51,6 +57,34 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            // The ReshardingCollectionCloner expects there to already be a Client associated with
+            // the thread from the thread pool. We set up the ThreadPoolTaskExecutor identically to
+            // how the recipient's primary-only service is set up.
+            ThreadPool::Options threadPoolOptions;
+            threadPoolOptions.maxThreads = 1;
+            threadPoolOptions.threadNamePrefix = "TestReshardCloneCollection-";
+            threadPoolOptions.poolName = "TestReshardCloneCollectionThreadPool";
+            threadPoolOptions.onCreateThread = [](const std::string& threadName) {
+                Client::initThread(threadName.c_str());
+                auto* client = Client::getCurrent();
+                AuthorizationSession::get(*client)->grantInternalAuthorization(client);
+
+                {
+                    stdx::lock_guard<Client> lk(*client);
+                    client->setSystemOperationKillableByStepdown(lk);
+                }
+            };
+
+            auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
+            hookList->addHook(
+                std::make_unique<rpc::LogicalTimeMetadataHook>(opCtx->getServiceContext()));
+
+            auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+                std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
+                executor::makeNetworkInterface(
+                    "TestReshardCloneCollectionNetwork", nullptr, std::move(hookList)));
+            executor->startup();
+
             ReshardingCollectionCloner cloner(ShardKeyPattern(request().getShardKey()),
                                               ns(),
                                               request().getUuid(),
@@ -58,10 +92,7 @@ public:
                                               request().getAtClusterTime(),
                                               request().getOutputNs());
 
-            cloner
-                .run(opCtx->getServiceContext(),
-                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
-                .get();
+            cloner.run(opCtx->getServiceContext(), executor).get(opCtx);
         }
 
     private:

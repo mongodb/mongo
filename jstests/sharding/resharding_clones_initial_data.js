@@ -1,5 +1,5 @@
 /**
- * Tests the cloning portion of a resharding operation in isolation.
+ * Tests the cloning portion of a resharding operation as part of the reshardCollection command.
  *
  * @tags: [
  *   requires_fcv_49,
@@ -12,7 +12,17 @@
 load("jstests/libs/uuid_util.js");
 load("jstests/sharding/libs/create_sharded_collection_util.js");
 
-const st = new ShardingTest({mongos: 1, config: 1, shards: 2, rs: {nodes: 1}});
+const st = new ShardingTest({
+    mongos: 1,
+    config: 1,
+    shards: 2,
+    rs: {nodes: 1},
+    rsOptions: {
+        setParameter: {
+            "failpoint.WTPreserveSnapshotHistoryIndefinitely": tojson({mode: "alwaysOn"}),
+        }
+    }
+});
 
 const inputCollection = st.s.getCollection("reshardingDb.coll");
 
@@ -28,11 +38,6 @@ const inputCollectionUUIDString = extractUUIDFromObject(inputCollectionUUID);
 const temporaryReshardingCollection =
     st.s.getCollection(`reshardingDb.system.resharding.${inputCollectionUUIDString}`);
 
-CreateShardedCollectionUtil.shardCollectionWithChunks(temporaryReshardingCollection, {newKey: 1}, [
-    {min: {newKey: MinKey}, max: {newKey: 0}, shard: st.shard0.shardName},
-    {min: {newKey: 0}, max: {newKey: MaxKey}, shard: st.shard1.shardName},
-]);
-
 assert.commandWorked(inputCollection.insert(
     [
         {_id: "stays on shard0", oldKey: -10, newKey: -10},
@@ -42,27 +47,16 @@ assert.commandWorked(inputCollection.insert(
     ],
     {writeConcern: {w: "majority"}}));
 
-const atClusterTime = inputCollection.getDB().getSession().getOperationTime();
-
-assert.commandWorked(inputCollection.insert(
-    [
-        {_id: "not visible, but would stay on shard0", oldKey: -10, newKey: -10},
-        {_id: "not visible, but would move to shard0", oldKey: 10, newKey: -10},
-        {_id: "not visible, but would move to shard1", oldKey: -10, newKey: 10},
-        {_id: "not visible, but would stay on shard1", oldKey: 10, newKey: 10},
+assert.commandWorked(st.s.adminCommand({
+    reshardCollection: inputCollection.getFullName(),
+    key: {newKey: 1},
+    _presetReshardedChunks: [
+        {min: {newKey: MinKey}, max: {newKey: 0}, recipientShardId: st.shard0.shardName},
+        {min: {newKey: 0}, max: {newKey: MaxKey}, recipientShardId: st.shard1.shardName},
     ],
-    {writeConcern: {w: "majority"}}));
+}));
 
-function testReshardCloneCollection(shard, expectedDocs) {
-    assert.commandWorked(shard.rs.getPrimary().adminCommand({
-        testReshardCloneCollection: inputCollection.getFullName(),
-        shardKey: {newKey: 1},
-        uuid: inputCollectionUUID,
-        shardId: shard.shardName,
-        atClusterTime: atClusterTime,
-        outputNs: temporaryReshardingCollection.getFullName(),
-    }));
-
+function assertClonedContents(shard, expectedDocs) {
     // We sort by oldKey so the order of `expectedDocs` can be deterministic.
     assert.eq(expectedDocs,
               shard.rs.getPrimary()
@@ -72,12 +66,12 @@ function testReshardCloneCollection(shard, expectedDocs) {
                   .toArray());
 }
 
-testReshardCloneCollection(st.shard0, [
+assertClonedContents(st.shard0, [
     {_id: "stays on shard0", oldKey: -10, newKey: -10},
     {_id: "moves to shard0", oldKey: 10, newKey: -10},
 ]);
 
-testReshardCloneCollection(st.shard1, [
+assertClonedContents(st.shard1, [
     {_id: "moves to shard1", oldKey: -10, newKey: 10},
     {_id: "stays on shard1", oldKey: 10, newKey: 10},
 ]);

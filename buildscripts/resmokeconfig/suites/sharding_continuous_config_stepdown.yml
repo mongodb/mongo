@@ -231,6 +231,10 @@ selector:
   # SERVER-51495 reenable after resharding M3
   - jstests/sharding/reshard_collection_basic.js
 
+  # TODO SERVER-50584: Re-enable after reshardCollection command errors when one of the recipient
+  # shards error.
+  - jstests/sharding/resharding_clones_duplicate_key.js
+
   # SERVER-51805 splitChunk op is not idempotent
   - jstests/sharding/mongos_get_shard_version.js
 

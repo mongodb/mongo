@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/migration_destination_manager.h"
+#include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
@@ -132,7 +133,7 @@ SemiFuture<void> ReshardingRecipientService::RecipientStateMachine::run(
     return ExecutorFuture<void>(**executor)
         .then([this] { _transitionToCreatingTemporaryReshardingCollection(); })
         .then([this] { _createTemporaryReshardingCollectionThenTransitionToCloning(); })
-        .then([this] { return _cloneThenTransitionToApplying(); })
+        .then([this, executor] { return _cloneThenTransitionToApplying(executor); })
         .then([this] { return _applyThenTransitionToSteadyState(); })
         .then([this, executor] {
             return _awaitAllDonorsMirroringThenTransitionToStrictConsistency(executor);
@@ -216,12 +217,28 @@ void ReshardingRecipientService::RecipientStateMachine::
     _transitionState(RecipientStateEnum::kCloning);
 }
 
-void ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying() {
+ExecutorFuture<void>
+ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplying(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     if (_recipientDoc.getState() > RecipientStateEnum::kCloning) {
-        return;
+        return ExecutorFuture(**executor);
     }
 
-    _transitionState(RecipientStateEnum::kApplying);
+    auto* serviceContext = Client::getCurrent()->getServiceContext();
+    auto tempNss = constructTemporaryReshardingNss(_recipientDoc.getNss().db(),
+                                                   _recipientDoc.getExistingUUID());
+
+    _collectionCloner = std::make_unique<ReshardingCollectionCloner>(
+        ShardKeyPattern(_recipientDoc.getReshardingKey()),
+        _recipientDoc.getNss(),
+        _recipientDoc.getExistingUUID(),
+        ShardingState::get(serviceContext)->shardId(),
+        *_recipientDoc.getFetchTimestamp(),
+        std::move(tempNss));
+
+    return _collectionCloner->run(serviceContext, **executor).then([this] {
+        _transitionState(RecipientStateEnum::kApplying);
+    });
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_applyThenTransitionToSteadyState() {

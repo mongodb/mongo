@@ -233,9 +233,9 @@ protected:
         ASSERT_EQUALS(coordinatorDoc.getNss(), expectedCoordinatorDoc.getNss());
         ASSERT_EQUALS(coordinatorDoc.getTempReshardingNss(),
                       expectedCoordinatorDoc.getTempReshardingNss());
-        ASSERT_EQUALS(
-            coordinatorDoc.getReshardingKey().woCompare(expectedCoordinatorDoc.getReshardingKey()),
-            0);
+        ASSERT_EQUALS(coordinatorDoc.getReshardingKey().toBSON().woCompare(
+                          expectedCoordinatorDoc.getReshardingKey().toBSON()),
+                      0);
         ASSERT(coordinatorDoc.getState() == expectedCoordinatorDoc.getState());
         if (expectedCoordinatorDoc.getFetchTimestamp()) {
             ASSERT_EQUALS(coordinatorDoc.getFetchTimestamp().get(),
