@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
+#include <string>
+
 #include "mongo/util/kms_message_support.h"
-#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -42,8 +44,11 @@ namespace mongo {
  */
 class KMSNetworkConnection {
 public:
+    static constexpr double so_timeout_seconds = 10;
+
     KMSNetworkConnection(SSLManagerInterface* ssl)
-        : _sslManager(ssl), _socket(std::make_unique<Socket>(10, logv2::LogSeverity::Info())) {}
+        : _sslManager(ssl),
+          _socket(std::make_unique<Socket>(so_timeout_seconds, logv2::LogSeverity::Info())) {}
 
     UniqueKmsResponse makeOneRequest(const HostAndPort& host, ConstDataRange request);
 
@@ -64,5 +69,46 @@ private:
  * Creates an initial SSLParams object for KMS over the network.
  */
 void getSSLParamsForNetworkKMS(SSLParams*);
+
+/**
+ * Base class for KMS services that use OAuth for authorization.
+ *
+ * Each service only talks to one OAuth endpoint so caching bearer tokens is simple.
+ */
+class KMSOAuthService {
+public:
+    KMSOAuthService(HostAndPort oAuthEndpoint, std::shared_ptr<SSLManagerInterface> sslManager)
+        : _oAuthEndpoint(oAuthEndpoint), _sslManager(sslManager) {}
+
+    /**
+     * Get a bearer token to use to make requests. It may be cached.
+     */
+    StringData getBearerToken();
+
+protected:
+    /**
+     * Construct a valid kms request for retrieving a new OAuth Bearer token
+     */
+    virtual UniqueKmsRequest getOAuthRequest() = 0;
+
+private:
+    /**
+     * Make a TLS request to a service to fetch a bearer token.
+     */
+    void makeBearerTokenRequest();
+
+private:
+    // OAuth Service endpoint
+    HostAndPort _oAuthEndpoint;
+
+    // SSL Manager
+    std::shared_ptr<SSLManagerInterface> _sslManager;
+
+    // Cached access token
+    std::string _cachedToken;
+
+    // Expiration datetime of access token
+    Date_t _expirationDateTime;
+};
 
 }  // namespace mongo
