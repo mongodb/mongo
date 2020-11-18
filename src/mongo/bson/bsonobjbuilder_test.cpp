@@ -491,6 +491,93 @@ TEST(BSONObjBuilderTest, SizeChecks) {
     }
 }
 
+TEST(BSONObjBuilderTest, UniqueBuilderNoop) {
+    UniqueBSONObjBuilder bob;
 
+    // No invariants should trip in destroying a default constructed UniqueBSONObjBuilder.
+}
+
+TEST(BSONObjBuilderTest, UniqueBuilderFromPrefix) {
+    UniqueBSONObjBuilder bob(BSON("a" << 1 << "b" << 2));
+
+    bob.append("c", 3);
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("a" << 1 << "b" << 2 << "c" << 3));
+}
+
+TEST(BSONObjBuilderTest, UniqueBuilderReleaseToObj) {
+    UniqueBSONObjBuilder bob;
+    {
+        UniqueBSONObjBuilder inner(bob.subobjStart("nested"));
+        inner.append("a", 1);
+
+        UniqueBSONObjBuilder inner2(std::move(inner));
+        ASSERT(!inner2.owned());
+        ASSERT_EQ(&inner2.bb(), &bob.bb());
+    }
+
+    bob.append("b", 2);
+
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("nested" << BSON("a" << 1) << "b" << 2));
+}
+
+TEST(BSONObjBuilderTest, UniqueBuilderReleaseToBuffer) {
+    UniqueBSONObjBuilder bob;
+    {
+        UniqueBSONObjBuilder inner(bob.subobjStart("nested"));
+        inner.append("a", 1);
+
+        UniqueBSONObjBuilder inner2(std::move(inner));
+        ASSERT(!inner2.owned());
+        ASSERT_EQ(&inner2.bb(), &bob.bb());
+    }
+
+    bob.append("b", 2);
+
+    bob.doneFast();
+    char* rawData = bob.bb().release().release();
+    ASSERT_BSONOBJ_EQ(BSONObj(rawData), BSON("nested" << BSON("a" << 1) << "b" << 2));
+
+    {
+        // The memory will be freed when this goes out of scope.
+        auto tmp = UniqueBuffer::reclaim(rawData);
+    }
+}
+
+TEST(BSONObjBuilderTest, UniqueBuilderResetToEmpty) {
+    UniqueBSONObjBuilder bob;
+    bob.append("a", 1);
+    bob.append("b", 2);
+    bob.resetToEmpty();
+
+    bob.append("x", 1);
+    bob.append("y", 2);
+
+    ASSERT_BSONOBJ_EQ(bob.obj(), BSON("x" << 1 << "y" << 2));
+}
+
+TEST(BSONObjBuilderTest, UniqueArrayBuilderReleaseToObj) {
+    UniqueBSONArrayBuilder bab;
+    bab.append(1);
+    bab.append("hello");
+
+    BSONArray arr = bab.arr();
+    ASSERT_BSONOBJ_EQ(arr, BSON_ARRAY(1 << "hello"));
+}
+
+TEST(BSONObjBuilderTest, UniqueArrayBuilderReleaseToBuffer) {
+    UniqueBSONArrayBuilder bab;
+    bab.append(1);
+    bab.append("hello");
+
+    bab.doneFast();
+
+    char* rawData = bab.bb().release().release();
+    ASSERT_BSONOBJ_EQ(BSONObj(rawData), BSON_ARRAY(1 << "hello"));
+
+    {
+        // The memory will be freed when this goes out of scope.
+        auto tmp = UniqueBuffer::reclaim(rawData);
+    }
+}
 }  // namespace
 }  // namespace mongo

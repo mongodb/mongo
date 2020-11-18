@@ -49,14 +49,6 @@ Timestamp Timestamp::max() {
     return Timestamp(t, i);
 }
 
-void Timestamp::append(BufBuilder& builder, const StringData& fieldName) const {
-    // No endian conversions needed, since we store in-memory representation
-    // in little endian format, regardless of target endian.
-    builder.appendNum(static_cast<char>(bsonTimestamp));
-    builder.appendStr(fieldName);
-    builder.appendNum(asULL());
-}
-
 std::string Timestamp::toStringPretty() const {
     std::stringstream ss;
     ss << time_t_to_String_short(secs) << ':' << i;

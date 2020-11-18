@@ -122,7 +122,15 @@ public:
 
     // Append the BSON representation of this Timestamp to the given BufBuilder with the given
     // name. This lives here because Timestamp manages its own serialization format.
-    void append(BufBuilder& builder, const StringData& fieldName) const;
+
+    template <class Builder>
+    void append(Builder& builder, const StringData& fieldName) const {
+        // No endian conversions needed, since we store in-memory representation
+        // in little endian format, regardless of target endian.
+        builder.appendNum(static_cast<char>(bsonTimestamp));
+        builder.appendStr(fieldName);
+        builder.appendNum(asULL());
+    }
     BSONObj toBSON() const;
 
 private:

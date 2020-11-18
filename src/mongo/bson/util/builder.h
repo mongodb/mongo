@@ -176,6 +176,50 @@ private:
     SharedBufferFragmentBuilder& _fragmentBuilder;
 };
 
+class UniqueBufferAllocator {
+    UniqueBufferAllocator(const UniqueBufferAllocator&) = delete;
+    UniqueBufferAllocator& operator=(const UniqueBufferAllocator&) = delete;
+
+public:
+    UniqueBufferAllocator() = default;
+    UniqueBufferAllocator(size_t sz) {
+        if (sz > 0)
+            malloc(sz);
+    }
+
+    // Allow moving but not copying. It would be an error for two UniqueBufferAllocators to use the
+    // same underlying buffer.
+    UniqueBufferAllocator(UniqueBufferAllocator&&) = default;
+    UniqueBufferAllocator& operator=(UniqueBufferAllocator&&) = default;
+
+    void malloc(size_t sz) {
+        _buf = UniqueBuffer::allocate(sz);
+    }
+
+    void realloc(size_t sz) {
+        _buf.realloc(sz);
+    }
+
+    void free() {
+        _buf = {};
+    }
+
+    UniqueBuffer release() {
+        return std::move(_buf);
+    }
+
+    size_t capacity() const {
+        return _buf.capacity();
+    }
+
+    char* get() const {
+        return _buf.get();
+    }
+
+private:
+    UniqueBuffer _buf;
+};
+
 enum { StackSizeDefault = 512 };
 template <size_t SZ>
 class StackAllocator {
@@ -457,6 +501,17 @@ public:
     }
 };
 MONGO_STATIC_ASSERT(std::is_move_constructible_v<BufBuilder>);
+
+class UniqueBufBuilder : public BasicBufBuilder<UniqueBufferAllocator> {
+public:
+    static constexpr size_t kDefaultInitSizeBytes = 512;
+    UniqueBufBuilder(size_t initsize = kDefaultInitSizeBytes) : BasicBufBuilder(initsize) {}
+
+    /* assume ownership of the buffer */
+    UniqueBuffer release() {
+        return _buf.release();
+    }
+};
 
 /** The StackBufBuilder builds smaller datasets on the stack instead of using malloc.
       this can be significantly faster for small bufs.  However, you can not release() the

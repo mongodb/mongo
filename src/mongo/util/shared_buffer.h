@@ -41,12 +41,14 @@
 
 namespace mongo {
 
+class UniqueBuffer;
 /**
  * A mutable, ref-counted buffer.
  */
 class SharedBuffer {
 public:
     SharedBuffer() = default;
+    explicit SharedBuffer(UniqueBuffer&& uniqueBuf);
 
     void swap(SharedBuffer& other) {
         _holder.swap(other._holder);
@@ -177,6 +179,10 @@ private:
     }
 
     boost::intrusive_ptr<Holder> _holder;
+
+public:
+    // Declared here so definition of 'Holder' is available.
+    static constexpr size_t kHolderSize = sizeof(Holder);
 };
 
 MONGO_STATIC_ASSERT(std::is_nothrow_move_constructible_v<SharedBuffer>);
@@ -231,5 +237,101 @@ private:
 
 inline void swap(ConstSharedBuffer& one, ConstSharedBuffer& two) {
     one.swap(two);
+}
+
+/**
+ * A uniquely owned buffer. Has the same memory layout as SharedBuffer so that it
+ * can be easily converted into a SharedBuffer.
+ *
+ * Layout:
+ * | <size (4 bytes)> <unused (4 bytes)> | <data> |
+ *
+ * When converting to SharedBuffer, the entire prefix region is turned into a Holder.
+ */
+class UniqueBuffer {
+public:
+    static UniqueBuffer allocate(uint32_t sz) {
+        return UniqueBuffer(mongoMalloc(SharedBuffer::kHolderSize + sz), sz);
+    }
+
+    /**
+     * Given memory which was released from a UniqueBuffer using the release() method,
+     * returns a UniqueBuffer owning that memory.
+     */
+    static UniqueBuffer reclaim(char* data) {
+        return UniqueBuffer(data - SharedBuffer::kHolderSize);
+    }
+
+    UniqueBuffer() = default;
+    UniqueBuffer(const UniqueBuffer&) = delete;
+    UniqueBuffer(UniqueBuffer&& other) : _data(other._data) {
+        other._data = nullptr;
+    }
+    ~UniqueBuffer() {
+        freeBuffer();
+    }
+
+    UniqueBuffer& operator=(const UniqueBuffer&) = delete;
+    UniqueBuffer& operator=(UniqueBuffer&& other) {
+        freeBuffer();
+        _data = other._data;
+        other._data = nullptr;
+        return *this;
+    }
+
+    void swap(UniqueBuffer& other) {
+        std::swap(_data, other._data);
+    }
+
+    void realloc(uint32_t size) {
+        size_t realSize = size + SharedBuffer::kHolderSize;
+        _data = reinterpret_cast<char*>(mongoRealloc(_data, realSize));
+    }
+
+    char* get() const {
+        return _data + SharedBuffer::kHolderSize;
+    }
+
+    explicit operator bool() const {
+        return _data != nullptr;
+    }
+
+    size_t capacity() const {
+        return _data ? *reinterpret_cast<const uint32_t*>(_data) : 0;
+    }
+
+    /**
+     * Releases the buffer to the caller. The caller may not free the buffer themselves,
+     * and must eventually turn it back into a UniqueBuffer using the reclaim() method.
+     */
+    char* release() {
+        auto ret = _data;
+        _data = nullptr;
+        return ret + SharedBuffer::kHolderSize;
+    }
+
+private:
+    friend class SharedBuffer;
+
+    // Assumes the size has already been initialized.
+    UniqueBuffer(void* buffer) : _data(static_cast<char*>(buffer)) {}
+
+    UniqueBuffer(void* buffer, uint32_t sz) : _data(static_cast<char*>(buffer)) {
+        *reinterpret_cast<uint32_t*>(_data) = sz;
+    }
+
+    void freeBuffer() {
+        if (_data) {
+            free(_data);
+            _data = nullptr;
+        }
+    }
+
+    char* _data = nullptr;
+};
+
+inline SharedBuffer::SharedBuffer(UniqueBuffer&& other) {
+    *this = takeOwnership(other._data, other.capacity());
+    other._data = nullptr;
 }
 }  // namespace mongo
