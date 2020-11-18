@@ -11,9 +11,6 @@ selector:
   - jstests/core/txns/transactions_profiling.js
   - jstests/core/txns/transactions_profiling_with_drops.js
 
-  # No featureCompatibilityVersion parameter on mongos.
-  - jstests/core/txns/abort_unprepared_transactions_on_FCV_downgrade.js
-
   # Implicitly creates a database through a collection rename, which does not
   # work in a sharded cluster.
   - jstests/core/txns/transactions_block_ddl.js
