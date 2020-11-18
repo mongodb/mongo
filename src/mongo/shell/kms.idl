@@ -168,3 +168,31 @@ structs:
               type: array<string>
               ignore: true
 
+    # Defined in 4.2.2. in RFC 6749
+    OAuthResponse:
+        description: "An oauth response with a token"
+        strict: false
+        fields:
+          access_token: string
+          token_type: string
+          # Expires_in is in seconds
+          expires_in: 
+            type: int
+            optional: true
+          scope: 
+            type: string
+            optional: true
+
+    # Defined in 4.2.2.1. in RFC 6749
+    OAuthErrorResponse:
+        description: "An oauth response with a token"
+        strict: false
+        fields:
+          error: string
+          error_description: 
+            type: string
+            optional: true
+          error_uri: 
+            type: string
+            optional: true
+
