@@ -113,6 +113,7 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
 const int kTimeseriesControlVersion = 1;
 const int kTimeseriesBucketMaxCount = 1000;
 const int kTimeseriesBucketMaxSizeKB = 125;
+const Hours kTimeseriesBucketMaxTimeRange(1);
 
 /**
  * Returns min/max $set expressions for the bucket's control field.
@@ -171,6 +172,14 @@ BSONObj makeTimeseriesUpsertRequest(const BSONObj& doc) {
         // but $expr is not allowed in an upsert. See SERVER-30731.
         andBuilder.append(BSON(
             "control.size" << BSON("$lte" << (kTimeseriesBucketMaxSizeKB * 1024 - doc.objsize()))));
+        // The maximum time-range of a bucket is limited, so index scans looking for buckets
+        // containing a time T only need to consider buckets that are newer than
+        // T - 'kTimeseriesBucketMaxTimeRange'.
+        auto docTime = doc[timeField].Date();
+        const std::string minTimeFieldName = str::stream() << "control.min." << timeField;
+        andBuilder.append(BSON(minTimeFieldName << BSON("$lte" << docTime)));
+        andBuilder.append(
+            BSON(minTimeFieldName << BSON("$gte" << (docTime - kTimeseriesBucketMaxTimeRange))));
     }
     builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
     builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);

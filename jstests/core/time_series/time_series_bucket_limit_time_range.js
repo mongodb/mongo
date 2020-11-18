@@ -31,7 +31,7 @@ assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 const controlVersion = 1;
 
-// Assumes the measurements in each bucket spans at most one hour (based on the time field).
+// Assumes the measurements in each bucket span at most one hour (based on the time field).
 const bucketMaxTimeRangeHours = 1;
 const numDocs = 2;
 const now = ISODate();
@@ -58,13 +58,13 @@ for (let i = 0; i < numDocs; i++) {
 
 // Check bucket collection.
 const bucketDocs = bucketsColl.find().sort({_id: 1}).toArray();
-assert.eq(1, bucketDocs.length, bucketDocs);
+assert.eq(2, bucketDocs.length, bucketDocs);
 
 // Check both buckets.
 // First bucket should be not contain both documents because the time of the second measurement is
 // ahead of the first document by more than 'bucketMaxTimeRangeHours'.
 assert.eq(
-    2, bucketDocs[0].control.count, 'invalid count in first bucket: ' + tojson(bucketDocs[0]));
+    1, bucketDocs[0].control.count, 'invalid count in first bucket: ' + tojson(bucketDocs[0]));
 assert.eq(0,
           bucketDocs[0].control.min._id,
           'invalid control.min for _id in first bucket: ' + tojson(bucketDocs[0].control));
@@ -74,13 +74,35 @@ assert.eq(0,
 assert.eq(docTimes[0],
           bucketDocs[0].control.min[timeFieldName],
           'invalid control.min for time in first bucket: ' + tojson(bucketDocs[0].control));
-assert.eq(numDocs - 1,
+assert.eq(0,
           bucketDocs[0].control.max._id,
           'invalid control.max for _id in first bucket: ' + tojson(bucketDocs[0].control));
-assert.eq(numDocs - 1,
+assert.eq(0,
           bucketDocs[0].control.max.x,
           'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
-assert.eq(docTimes[numDocs - 1],
+assert.eq(docTimes[0],
           bucketDocs[0].control.max[timeFieldName],
           'invalid control.max for time in first bucket: ' + tojson(bucketDocs[0].control));
+
+// Second bucket should contain the remaining document.
+assert.eq(
+    1, bucketDocs[1].control.count, 'invalid count in second bucket: ' + tojson(bucketDocs[1]));
+assert.eq(numDocs - 1,
+          bucketDocs[1].control.min._id,
+          'invalid control.min for _id in second bucket: ' + tojson(bucketDocs[1].control));
+assert.eq(numDocs - 1,
+          bucketDocs[1].control.min.x,
+          'invalid control.min for x in second bucket: ' + tojson(bucketDocs[1].control));
+assert.eq(docTimes[numDocs - 1],
+          bucketDocs[1].control.min[timeFieldName],
+          'invalid control.min for time in second bucket: ' + tojson(bucketDocs[1].control));
+assert.eq(numDocs - 1,
+          bucketDocs[1].control.max._id,
+          'invalid control.max for _id in second bucket: ' + tojson(bucketDocs[1].control));
+assert.eq(numDocs - 1,
+          bucketDocs[1].control.max.x,
+          'invalid control.max for x in second bucket: ' + tojson(bucketDocs[1].control));
+assert.eq(docTimes[numDocs - 1],
+          bucketDocs[1].control.max[timeFieldName],
+          'invalid control.max for time in second bucket: ' + tojson(bucketDocs[1].control));
 })();
