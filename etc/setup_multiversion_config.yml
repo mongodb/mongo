@@ -1,0 +1,308 @@
+evergreen_projects:
+  - mongodb-mongo-master
+  - mongodb-mongo-v4.8
+  - mongodb-mongo-v4.7
+  - mongodb-mongo-v4.4
+  - mongodb-mongo-v4.2
+  - mongodb-mongo-v4.0
+  - mongodb-mongo-v3.6
+  - mongodb-mongo-v3.4
+
+
+evergreen_buildvariants:
+
+  - name: ubuntu1604
+    edition: targeted
+    platform: ubuntu1604
+    architecture: x86_64
+
+  - name: enterprise-ubuntu1604-64
+    edition: enterprise
+    platform: ubuntu1604
+    architecture: x86_64
+
+  - name: enterprise-ubuntu1604-arm64
+    edition: enterprise
+    platform: ubuntu1604
+    architecture: aarch64
+
+  - name: enterprise-ubuntu1604-arm64
+    edition: enterprise
+    platform: ubuntu1604
+    architecture: arm64
+    versions: ["3.4", "3.6", "4.0"]
+
+  - name: ubuntu1804
+    edition: targeted
+    platform: ubuntu1804
+    architecture: x86_64
+
+  - name: enterprise-ubuntu1804-64
+    edition: enterprise
+    platform: ubuntu1804
+    architecture: x86_64
+
+  - name: ubuntu1804-arm64
+    edition: targeted
+    platform: ubuntu1804
+    architecture: aarch64
+
+  - name: enterprise-ubuntu1804-arm64
+    edition: enterprise
+    platform: ubuntu1804
+    architecture: aarch64
+
+  - name: enterprise-ubuntu1804-ppc64le
+    edition: enterprise
+    platform: ubuntu1804
+    architecture: ppc64le
+
+  - name: ubuntu1804-s390x
+    edition: targeted
+    platform: ubuntu1804
+    architecture: s390x
+
+  - name: enterprise-ubuntu1804-s390x
+    edition: enterprise
+    platform: ubuntu1804
+    architecture: s390x
+
+  - name: ubuntu2004
+    edition: targeted
+    platform: ubuntu2004
+    architecture: x86_64
+
+  - name: enterprise-ubuntu2004-64
+    edition: enterprise
+    platform: ubuntu2004
+    architecture: x86_64
+
+  - name: ubuntu2004-arm64
+    edition: targeted
+    platform: ubuntu2004
+    architecture: aarch64
+
+  - name: enterprise-ubuntu2004-arm64
+    edition: enterprise
+    platform: ubuntu2004
+    architecture: aarch64
+
+  - name: amazon
+    edition: targeted
+    platform: amazon
+    architecture: x86_64
+
+  - name: enterprise-linux-64-amazon-ami
+    edition: enterprise
+    platform: amazon
+    architecture: x86_64
+
+  - name: amazon2
+    edition: targeted
+    platform: amazon2
+    architecture: x86_64
+
+  - name: enterprise-amazon2
+    edition: enterprise
+    platform: amazon2
+    architecture: x86_64
+
+  - name: rhel62
+    edition: targeted
+    platform: rhel62
+    architecture: x86_64
+
+  - name: enterprise-rhel-62-64-bit
+    edition: enterprise
+    platform: rhel62
+    architecture: x86_64
+
+  - name: rhel70
+    edition: targeted
+    platform: rhel70
+    architecture: x86_64
+
+  - name: enterprise-rhel-70-64-bit
+    edition: enterprise
+    platform: rhel70
+    architecture: x86_64
+
+  - name: rhel80
+    edition: targeted
+    platform: rhel80
+    architecture: x86_64
+
+  - name: enterprise-rhel-80-64-bit
+    edition: enterprise
+    platform: rhel80
+    architecture: x86_64
+
+  - name: rhel-82-arm64
+    edition: targeted
+    platform: rhel82
+    architecture: arm64
+
+  - name: enterprise-rhel-82-arm64
+    edition: enterprise
+    platform: rhel82
+    architecture: arm64
+
+  - name: enterprise-rhel-71-ppc64le
+    edition: enterprise
+    platform: rhel71
+    architecture: ppc64le
+
+  - name: enterprise-rhel-81-ppc64le
+    edition: enterprise
+    platform: rhel81
+    architecture: ppc64le
+
+  - name: rhel-67-s390x
+    edition: targeted
+    platform: rhel67
+    architecture: s390x
+
+  - name: enterprise-rhel-67-s390x
+    edition: enterprise
+    platform: rhel67
+    architecture: s390x
+
+  - name: rhel-72-s390x
+    edition: targeted
+    platform: rhel72
+    architecture: s390x
+
+  - name: enterprise-rhel-72-s390x
+    edition: enterprise
+    platform: rhel72
+    architecture: s390x
+
+  - name: suse12
+    edition: targeted
+    platform: suse12
+    architecture: x86_64
+
+  - name: enterprise-suse12-64
+    edition: enterprise
+    platform: suse12
+    architecture: x86_64
+
+  - name: suse12-s390x
+    edition: targeted
+    platform: suse12
+    architecture: s390x
+
+  - name: enterprise-suse12-s390x
+    edition: enterprise
+    platform: suse12
+    architecture: s390x
+
+  - name: suse15
+    edition: targeted
+    platform: suse15
+    architecture: x86_64
+
+  - name: enterprise-suse15-64
+    edition: enterprise
+    platform: suse15
+    architecture: x86_64
+
+  - name: debian92
+    edition: targeted
+    platform: debian92
+    architecture: x86_64
+
+  - name: enterprise-debian92-64
+    edition: enterprise
+    platform: debian92
+    architecture: x86_64
+
+  - name: debian10
+    edition: targeted
+    platform: debian10
+    architecture: x86_64
+
+  - name: enterprise-debian10-64
+    edition: enterprise
+    platform: debian10
+    architecture: x86_64
+
+  - name: windows
+    edition: base
+    platform: windows
+    architecture: x86_64
+
+  - name: windows-64-2k8-ssl
+    edition: base
+    platform: windows_x86_64-2012plus
+    architecture: x86_64
+    versions: ["4.2"]
+
+  - name: windows-64-2k8-ssl
+    edition: base
+    platform: windows_x86_64-2008plus-ssl
+    architecture: x86_64
+    versions: ["3.4", "3.6", "4.0"]
+
+  - name: enterprise-windows
+    edition: enterprise
+    platform: windows
+    architecture: x86_64
+
+  - name: enterprise-windows-64-2k8
+    edition: enterprise
+    platform: windows
+    architecture: x86_64
+    versions: ["3.6", "4.0", "4.2"]
+
+  - name: enterprise-windows-64
+    edition: enterprise
+    platform: windows
+    architecture: x86_64
+    versions: ["3.4"]
+
+  - name: macos
+    edition: base
+    platform: osx
+    architecture: x86_64
+
+  - name: osx-1010
+    edition: base
+    platform: osx-ssl
+    architecture: x86_64
+    versions: ["4.0"]
+
+  - name: osx-1010-ssl
+    edition: base
+    platform: osx-ssl
+    architecture: x86_64
+    versions: ["3.6"]
+
+  - name: osx-108-ssl
+    edition: base
+    platform: osx-ssl
+    architecture: x86_64
+    versions: ["3.4"]
+
+  - name: enterprise-macos
+    edition: enterprise
+    platform: osx
+    architecture: x86_64
+
+  - name: enterprise-osx-1010
+    edition: enterprise
+    platform: osx
+    architecture: x86_64
+    versions: ["3.6", "4.0"]
+
+  - name: enterprise-osx-108
+    edition: enterprise
+    platform: osx
+    architecture: x86_64
+    versions: ["3.4"]
+
+  - name: linux-64
+    edition: base
+    platform: linux_x86_64
+    architecture: x86_64
+    versions: ["3.4", "3.6", "4.0"]

@@ -7,102 +7,170 @@ enterprise builds.
 """
 import logging
 import os
+import re
 import sys
-import tempfile
 
-import boto3
 import structlog
-from botocore import UNSIGNED
-from botocore.config import Config
-from botocore.exceptions import ClientError
-from evergreen import RetryingEvergreenApi
+import yaml
 
 from buildscripts.resmokelib.plugin import PluginInterface, Subcommand
+from buildscripts.resmokelib.setup_multiversion import config, download, evergreen_conn, github_conn
 
 SUBCOMMAND = "setup-multiversion"
-EVERGREEN_CONFIG_LOCATIONS = (
-    # Common for machines in Evergreen
-    os.path.join(os.getcwd(), ".evergreen.yml"),
-    # Common for local machines
-    os.path.expanduser(os.path.join("~", ".evergreen.yml")),
-)
-S3_BUCKET = "mciuploads"
 
 LOGGER = structlog.getLogger(__name__)
 
 
-def setup_logging():
-    """Enable INFO level logging."""
+def setup_logging(debug=False):
+    """Enable logging."""
+    log_level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
         format="[%(asctime)s - %(name)s - %(levelname)s] %(message)s",
-        level=logging.INFO,
+        level=log_level,
         stream=sys.stdout,
     )
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("s3transfer").setLevel(logging.WARNING)
+    logging.getLogger("botocore").setLevel(logging.WARNING)
+    logging.getLogger("boto3").setLevel(logging.WARNING)
+    logging.getLogger("evergreen").setLevel(logging.WARNING)
+    logging.getLogger("github").setLevel(logging.WARNING)
     structlog.configure(logger_factory=structlog.stdlib.LoggerFactory())
 
 
-def get_evergreen_api(evergreen_config):
-    """Return evergreen API."""
-    config_to_pass = evergreen_config
-    if not config_to_pass:
-        # Pickup the first config file found in common locations.
-        for file in EVERGREEN_CONFIG_LOCATIONS:
-            if os.path.isfile(file):
-                config_to_pass = file
-                break
-    try:
-        evg_api = RetryingEvergreenApi.get_api(config_file=config_to_pass)
-    except Exception as ex:
-        LOGGER.error("Most likely something is wrong with evergreen config file.",
-                     config_file=config_to_pass)
-        raise ex
-    else:
-        return evg_api
-
-
-def download_mongodb(url):
-    """Download file from S3 bucket by a given URL."""
-
-    LOGGER.info("Downloading mongodb.", url=url)
-    s3_key = url.split('/', 3)[-1].replace(f"{S3_BUCKET}/", "")
-    filename = os.path.join(tempfile.gettempdir(), url.split('/')[-1])
-
-    LOGGER.info("Downloading mongodb from S3.", s3_bucket=S3_BUCKET, s3_key=s3_key,
-                filename=filename)
-    s3_client = boto3.client("s3", config=Config(signature_version=UNSIGNED))
-    try:
-        s3_client.download_file(S3_BUCKET, s3_key, filename)
-    except ClientError as s3_client_error:
-        LOGGER.error("Download failed due to S3 client error.")
-        raise s3_client_error
-    except Exception as ex:  # pylint: disable=broad-except
-        LOGGER.error("Download failed.")
-        raise ex
-    else:
-        LOGGER.info("Download completed.", filename=filename)
-
-    return filename
-
-
 class SetupMultiversion(Subcommand):
-    """Main class for the hang analyzer subcommand."""
+    """Main class for the setup multiversion subcommand."""
 
     # pylint: disable=too-many-instance-attributes
     def __init__(self, options):
         """Initialize."""
-        self.install_dir = options.install_dir
-        self.link_dir = options.link_dir
-        self.edition = options.edition.lower()
-        self.platform = options.platform.lower()
-        self.architecture = options.architecture.lower()
+        setup_logging(options.debug)
+        cwd = os.getcwd()
+        self.install_dir = os.path.join(cwd, options.install_dir)
+        self.link_dir = os.path.join(cwd, options.link_dir)
+
+        self.edition = options.edition.lower() if options.edition else None
+        self.platform = options.platform.lower() if options.platform else None
+        self.architecture = options.architecture.lower() if options.architecture else None
         self.use_latest = options.use_latest
         self.versions = options.versions
-        self.evg_api = get_evergreen_api(options.evergreen_config)
-        self.git_token = options.git_token
+
+        self.evg_api = evergreen_conn.get_evergreen_api(options.evergreen_config)
+        # In evergreen github oauth token is stored as `token ******`, so we remove the leading part
+        self.github_oauth_token = options.github_oauth_token.replace(
+            "token ", "") if options.github_oauth_token else None
+        with open(config.SETUP_MULTIVERSION_CONFIG) as file_handle:
+            raw_yaml = yaml.safe_load(file_handle)
+        self.config = config.SetupMultiversionConfig(raw_yaml)
 
     def execute(self):
         """Execute setup multiversion mongodb."""
-        pass  # Not implemented yet.
+
+        for version in self.versions:
+            LOGGER.info("Setting up version.", version=version)
+            LOGGER.info("Fetching download URL from Evergreen.")
+
+            try:
+                re.match(r"\d+\.\d+", version).group(0)
+            except AttributeError:
+                LOGGER.error(
+                    "Input version is not recognized. Some correct examples: 4.0, 4.0.1, 4.0.0-rc0")
+                exit(1)
+
+            try:
+                urls = {}
+                if self.use_latest:
+                    urls = self.get_latest_urls(version)
+                if not urls:
+                    LOGGER.warning("Latest URL is not available or not requested, "
+                                   "we fallback to getting the URL for the version.")
+                    urls = self.get_urls(version)
+
+                binaries_url = urls.get("Binaries", "")
+                mongodb_archive = download.download_mongodb(binaries_url)
+                installed_dir = download.extract_archive(mongodb_archive, self.install_dir)
+                os.remove(mongodb_archive)
+                download.symlink_version(version, installed_dir, self.link_dir)
+
+            except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
+                    download.DownloadError) as ex:
+                LOGGER.error(ex)
+                exit(1)
+
+            else:
+                LOGGER.info("Setup version completed.", version=version)
+                LOGGER.info("-" * 50)
+
+    def get_latest_urls(self, version):
+        """Return latest urls."""
+        urls = {}
+
+        evg_project = f"mongodb-mongo-v{version}"
+        if evg_project not in self.config.evergreen_projects:
+            return urls
+
+        LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
+        # Assuming that project names contain <major>.<minor> version
+        major_minor_version = version
+
+        buildvariant_name = self.get_buildvariant_name(major_minor_version)
+        LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
+
+        evg_versions = evergreen_conn.get_evergreen_versions(self.evg_api, evg_project)
+
+        for evg_version in evg_versions:
+            if buildvariant_name not in evg_version.build_variants_map:
+                buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
+
+            curr_urls = evergreen_conn.get_compile_artifact_urls(self.evg_api, evg_version,
+                                                                 buildvariant_name)
+            if "Binaries" in curr_urls:
+                urls = curr_urls
+                break
+
+        return urls
+
+    def get_urls(self, version):
+        """Return urls."""
+        git_tag, commit_hash = github_conn.get_git_tag_and_commit(self.github_oauth_token, version)
+        LOGGER.info("Found git attributes.", git_tag=git_tag, commit_hash=commit_hash)
+
+        evg_project, evg_version = evergreen_conn.get_evergreen_project_and_version(
+            self.config, self.evg_api, commit_hash)
+        LOGGER.debug("Found evergreen project.", evergreen_project=evg_project)
+        try:
+            major_minor_version = re.findall(r"\d+\.\d+", evg_project)[-1]
+        except IndexError:
+            major_minor_version = "master"
+
+        buildvariant_name = self.get_buildvariant_name(major_minor_version)
+        LOGGER.debug("Found buildvariant.", buildvariant_name=buildvariant_name)
+        if buildvariant_name not in evg_version.build_variants_map:
+            buildvariant_name = self.fallback_to_generic_buildvariant(major_minor_version)
+
+        urls = evergreen_conn.get_compile_artifact_urls(self.evg_api, evg_version,
+                                                        buildvariant_name)
+
+        return urls
+
+    def get_buildvariant_name(self, major_minor_version):
+        """Return buildvariant name.
+
+        Wrapper around evergreen_conn.get_buildvariant_name().
+        """
+
+        return evergreen_conn.get_buildvariant_name(
+            config=self.config, edition=self.edition, platform=self.platform,
+            architecture=self.architecture, major_minor_version=major_minor_version)
+
+    def fallback_to_generic_buildvariant(self, major_minor_version):
+        """Return generic buildvariant name.
+
+        Wrapper around evergreen_conn.get_generic_buildvariant_name().
+        """
+
+        return evergreen_conn.get_generic_buildvariant_name(config=self.config,
+                                                            major_minor_version=major_minor_version)
 
 
 class SetupMultiversionPlugin(PluginInterface):
@@ -110,7 +178,6 @@ class SetupMultiversionPlugin(PluginInterface):
 
     def parse(self, subcommand, parser, parsed_args, **kwargs):
         """Parse command-line options."""
-        setup_logging()
 
         if subcommand == SUBCOMMAND:
             return SetupMultiversion(parsed_args)
@@ -128,33 +195,36 @@ class SetupMultiversionPlugin(PluginInterface):
             help="Directory to contain links to all binaries for each version "
             "in the install directory. [REQUIRED]")
         editions = ("base", "enterprise", "targeted")
-        parser.add_argument("-e", "--edition", dest="edition", choices=editions, default="base",
+        parser.add_argument("-e", "--edition", dest="edition", choices=editions,
+                            default="enterprise",
                             help="Edition of the build to download, [default: %(default)s].")
         parser.add_argument(
             "-p", "--platform", dest="platform", required=True,
-            help="Platform to download [REQUIRED]. Examples include: 'linux', "
-            "'ubuntu1804', 'osx', 'rhel62', 'windows'.")
+            help="Platform to download [REQUIRED]. "
+            f"Available platforms can be found in {config.SETUP_MULTIVERSION_CONFIG}.")
         parser.add_argument(
             "-a", "--architecture", dest="architecture", default="x86_64",
             help="Architecture to download, [default: %(default)s]. Examples include: "
             "'arm64', 'ppc64le', 's390x' and 'x86_64'.")
         parser.add_argument(
             "-u", "--useLatest", dest="use_latest", action="store_true",
-            help="If specified, the latest (nightly) version will be downloaded, "
-            "if it exists, for the version specified. For example, if specifying "
-            "version 3.2 for download, the nightly version for 3.2 will be "
-            "downloaded if it exists, otherwise the 'highest' version will be "
-            "downloaded, i.e., '3.2.17'")
+            help="If specified, the latest version from Evergreen will be downloaded, if it exists, "
+            "for the version specified. For example, if specifying version 4.4 for download, the latest "
+            "version from `mongodb-mongo-v4.4` Evergreen project will be downloaded. Otherwise the latest "
+            "by git tag version will be downloaded.")
         parser.add_argument(
             "versions", nargs="*", help=
-            "Examples: 4.2 4.2.1 4.4. If 'rc' is included in the version name, we'll use the exact rc, "
+            "Examples: 4.0, 4.0.1, 4.0.0-rc0. If 'rc' is included in the version name, we'll use the exact rc, "
             "otherwise we'll pull the highest non-rc version compatible with the version specified."
         )
         parser.add_argument(
-            "--evergreen-config", dest="evergreen_config",
+            "-ec", "--evergreenConfig", dest="evergreen_config",
             help="Location of evergreen configuration file. If not specified it will look "
-            f"for it in the following locations: {EVERGREEN_CONFIG_LOCATIONS}")
+            f"for it in the following locations: {evergreen_conn.EVERGREEN_CONFIG_LOCATIONS}")
         parser.add_argument(
-            "--git-token", dest="git_token", help=
-            "In most cases it works without git auth. Otherwise you can pass OAth token to increase "
-            "the github API rate limit. See https://developer.github.com/v3/#rate-limiting")
+            "-gt", "--githubOauthToken", dest="github_oauth_token",
+            help="Set the token to increase your rate limit. In most cases it works without auth. "
+            "Otherwise you can pass OAuth token to increase the github API rate limit. See "
+            "https://developer.github.com/v3/#rate-limiting")
+        parser.add_argument("-d", "--debug", dest="debug", action="store_true", default=False,
+                            help="Set DEBUG logging level.")

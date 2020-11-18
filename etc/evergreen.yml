@@ -10041,6 +10041,7 @@ buildvariants:
     multiversion_platform: windows_x86_64-2008plus-ssl
     multiversion_platform_42_or_later: windows_x86_64-2012plus
     multiversion_platform_44_or_later: windows
+    multiversion_edition: base
     content_type: application/zip
     compile_flags: --ssl MONGO_DISTMOD=windows -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     num_scons_link_jobs_available: 0.5
