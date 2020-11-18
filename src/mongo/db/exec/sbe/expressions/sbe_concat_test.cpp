@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
 
 namespace mongo::sbe {
 class SBEConcatTest : public EExpressionTestFixture {
@@ -137,6 +138,26 @@ TEST_F(SBEConcatTest, ComputesManyStringsConcat) {
     slotAccessor3.reset(tag3, val3);
     slotAccessor4.reset(tag4, val4);
     runAndAssertExpression(compiledExpr.get(), "Test for many strings concat");
+}
+
+TEST_F(SBEConcatTest, ComputesManyMoreStringsConcat) {
+    const size_t smallArityLimit = std::numeric_limits<vm::SmallArityType>::max();
+
+    for (auto arity : {smallArityLimit / 2,
+                       smallArityLimit,
+                       smallArityLimit - 1,
+                       smallArityLimit + 1,
+                       smallArityLimit * 10}) {
+        std::vector<std::unique_ptr<EExpression>> args;
+        args.reserve(arity);
+        for (size_t idx = 0; idx < arity; ++idx) {
+            args.push_back(makeE<EConstant>("x"));
+        }
+
+        auto concatExpr = makeE<EFunction>("concat", std::move(args));
+        auto compiledExpr = compileExpression(*concatExpr);
+        runAndAssertExpression(compiledExpr.get(), std::string(arity, 'x'));
+    }
 }
 
 TEST_F(SBEConcatTest, ReturnsNothingForNonStringsConcat) {
