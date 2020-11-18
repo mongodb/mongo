@@ -2247,7 +2247,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFindAll(Ar
     return {true, arrTag, arrVal};
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardFilter(uint8_t arity) {
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardFilter(ArityType arity) {
     invariant(arity == 2);
 
     auto [ownedFilter, filterTag, filterValue] = getFromStack(0);
@@ -2272,6 +2272,116 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinShardFilter(uin
             value::TypeTags::Boolean,
             value::bitcastFrom<bool>(
                 value::getShardFiltererView(filterValue)->keyBelongsToMe(bob.done()))};
+}
+
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray(ArityType arity) {
+    // We need to ensure that 'size_t' is wide enough to store 32-bit index.
+    static_assert(sizeof(size_t) >= sizeof(int32_t), "size_t must be at least 32-bits");
+
+    auto [arrayOwned, arrayTag, arrayValue] = getFromStack(0);
+    auto [limitOwned, limitTag, limitValue] = getFromStack(1);
+
+    if (!value::isArray(arrayTag) || limitTag != value::TypeTags::NumberInt32) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto limit = value::bitcastTo<int32_t>(limitValue);
+
+    auto absWithSign = [](int32_t value) -> std::pair<bool, size_t> {
+        if (value < 0) {
+            // Upcast 'value' to 'int64_t' prevent overflow during the sign change.
+            return {true, -static_cast<int64_t>(value)};
+        }
+        return {false, value};
+    };
+
+    size_t start = 0;
+    bool isNegativeStart = false;
+    size_t length = 0;
+    if (arity == 2) {
+        std::tie(isNegativeStart, start) = absWithSign(limit);
+        length = start;
+        if (!isNegativeStart) {
+            start = 0;
+        }
+    } else {
+        if (limit < 0) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        length = limit;
+
+        auto [skipOwned, skipTag, skipValue] = getFromStack(2);
+        if (skipTag != value::TypeTags::NumberInt32) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        auto skip = value::bitcastTo<int32_t>(skipValue);
+        std::tie(isNegativeStart, start) = absWithSign(skip);
+    }
+
+    auto [resultTag, resultValue] = value::makeNewArray();
+    value::ValueGuard resultGuard{resultTag, resultValue};
+    auto resultView = value::getArrayView(resultValue);
+
+    if (arrayTag == value::TypeTags::Array) {
+        auto arrayView = value::getArrayView(arrayValue);
+        auto arraySize = arrayView->size();
+
+        auto convertedStart = [&]() -> size_t {
+            if (isNegativeStart) {
+                if (start > arraySize) {
+                    return 0;
+                } else {
+                    return arraySize - start;
+                }
+            } else {
+                return std::min(start, arraySize);
+            }
+        }();
+
+        size_t end = convertedStart + std::min(length, arraySize - convertedStart);
+
+        for (size_t i = convertedStart; i < end; i++) {
+            auto [tag, value] = arrayView->getAt(i);
+            auto [copyTag, copyValue] = value::copyValue(tag, value);
+            resultView->push_back(copyTag, copyValue);
+        }
+    } else {
+        auto advance = [](value::ArrayEnumerator& enumerator, size_t offset) {
+            size_t i = 0;
+            while (i < offset && !enumerator.atEnd()) {
+                i++;
+                enumerator.advance();
+            }
+        };
+
+        value::ArrayEnumerator startEnumerator{arrayTag, arrayValue};
+        if (isNegativeStart) {
+            value::ArrayEnumerator windowEndEnumerator{arrayTag, arrayValue};
+            advance(windowEndEnumerator, start);
+
+            while (!startEnumerator.atEnd() && !windowEndEnumerator.atEnd()) {
+                startEnumerator.advance();
+                windowEndEnumerator.advance();
+            }
+            invariant(windowEndEnumerator.atEnd());
+        } else {
+            advance(startEnumerator, start);
+        }
+
+        size_t i = 0;
+        while (i < length && !startEnumerator.atEnd()) {
+            auto [tag, value] = startEnumerator.getViewOfValue();
+            auto [copyTag, copyValue] = value::copyValue(tag, value);
+            resultView->push_back(copyTag, copyValue);
+
+            i++;
+            startEnumerator.advance();
+        }
+    }
+
+    resultGuard.reset();
+    return {true, resultTag, resultValue};
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
@@ -2397,6 +2507,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinRegexFindAll(arity);
         case Builtin::shardFilter:
             return builtinShardFilter(arity);
+        case Builtin::extractSubArray:
+            return builtinExtractSubArray(arity);
     }
 
     MONGO_UNREACHABLE;
