@@ -75,40 +75,49 @@ CollectionBulkLoaderImpl::~CollectionBulkLoaderImpl() {
 
 Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndexSpecs) {
     return _runTaskReleaseResourcesOnFailure([&secondaryIndexSpecs, this]() -> Status {
-        WriteUnitOfWork wuow(_opCtx.get());
-        // All writes in CollectionBulkLoaderImpl should be unreplicated.
-        // The opCtx is accessed indirectly through _secondaryIndexesBlock.
-        UnreplicatedWritesBlock uwb(_opCtx.get());
-        // This enforces the buildIndexes setting in the replica set configuration.
-        CollectionWriter collWriter(*_collection);
-        auto indexCatalog = collWriter.getWritableCollection()->getIndexCatalog();
-        auto specs = indexCatalog->removeExistingIndexesNoChecks(_opCtx.get(), secondaryIndexSpecs);
-        if (specs.size()) {
-            _secondaryIndexesBlock->ignoreUniqueConstraint();
-            auto status =
-                _secondaryIndexesBlock
-                    ->init(_opCtx.get(), collWriter, specs, MultiIndexBlock::kNoopOnInitFn)
-                    .getStatus();
-            if (!status.isOK()) {
-                return status;
-            }
-        } else {
-            _secondaryIndexesBlock.reset();
-        }
-        if (!_idIndexSpec.isEmpty()) {
-            auto status =
-                _idIndexBlock
-                    ->init(_opCtx.get(), collWriter, _idIndexSpec, MultiIndexBlock::kNoopOnInitFn)
-                    .getStatus();
-            if (!status.isOK()) {
-                return status;
-            }
-        } else {
-            _idIndexBlock.reset();
-        }
+        return writeConflictRetry(
+            _opCtx.get(),
+            "CollectionBulkLoader::init",
+            _collection->getNss().ns(),
+            [&secondaryIndexSpecs, this] {
+                WriteUnitOfWork wuow(_opCtx.get());
+                // All writes in CollectionBulkLoaderImpl should be unreplicated.
+                // The opCtx is accessed indirectly through _secondaryIndexesBlock.
+                UnreplicatedWritesBlock uwb(_opCtx.get());
+                // This enforces the buildIndexes setting in the replica set configuration.
+                CollectionWriter collWriter(*_collection);
+                auto indexCatalog = collWriter.getWritableCollection()->getIndexCatalog();
+                auto specs =
+                    indexCatalog->removeExistingIndexesNoChecks(_opCtx.get(), secondaryIndexSpecs);
+                if (specs.size()) {
+                    _secondaryIndexesBlock->ignoreUniqueConstraint();
+                    auto status =
+                        _secondaryIndexesBlock
+                            ->init(_opCtx.get(), collWriter, specs, MultiIndexBlock::kNoopOnInitFn)
+                            .getStatus();
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                } else {
+                    _secondaryIndexesBlock.reset();
+                }
+                if (!_idIndexSpec.isEmpty()) {
+                    auto status = _idIndexBlock
+                                      ->init(_opCtx.get(),
+                                             collWriter,
+                                             _idIndexSpec,
+                                             MultiIndexBlock::kNoopOnInitFn)
+                                      .getStatus();
+                    if (!status.isOK()) {
+                        return status;
+                    }
+                } else {
+                    _idIndexBlock.reset();
+                }
 
-        wuow.commit();
-        return Status::OK();
+                wuow.commit();
+                return Status::OK();
+            });
     });
 }
 
