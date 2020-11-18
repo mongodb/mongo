@@ -157,10 +157,14 @@ BSONObj makeTimeseriesUpsertRequest(const BSONObj& doc) {
     // TODO(SERVER-52523): Obtain _id of bucket to update  and name of time field from in-memory
     // catalog.
     const auto timeField = "time"_sd;
-    auto query = BSON(
-        std::string(str::stream() << "data." << timeField << "." << (kTimeseriesBucketMaxCount - 1))
-        << BSON("$exists" << false));
-    builder.append(write_ops::UpdateOpEntry::kQFieldName, query);
+    {
+        BSONObjBuilder queryBuilder(builder.subobjStart(write_ops::UpdateOpEntry::kQFieldName));
+        BSONArrayBuilder andBuilder(queryBuilder.subarrayStart("$and"));
+        // Each bucket can hold up to 'kTimeseriesBucketMaxCount' measurements.
+        andBuilder.append(BSON(std::string(str::stream() << "data." << timeField << "."
+                                                         << (kTimeseriesBucketMaxCount - 1))
+                               << BSON("$exists" << false)));
+    }
     builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
     builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
     {
