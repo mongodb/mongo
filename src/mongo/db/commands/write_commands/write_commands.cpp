@@ -112,6 +112,7 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
 // Default for control.version in time-series bucket collection.
 const int kTimeseriesControlVersion = 1;
 const int kTimeseriesBucketMaxCount = 1000;
+const int kTimeseriesBucketMaxSizeKB = 125;
 
 /**
  * Returns min/max $set expressions for the bucket's control field.
@@ -164,6 +165,12 @@ BSONObj makeTimeseriesUpsertRequest(const BSONObj& doc) {
         andBuilder.append(BSON(std::string(str::stream() << "data." << timeField << "."
                                                          << (kTimeseriesBucketMaxCount - 1))
                                << BSON("$exists" << false)));
+        // The total size of measurements in a bucket cannot exceed 'kTimeseriesBucketMaxSizeKB'.
+        // Ideally, we would use the following expression to avoid relying on 'control.size':
+        //     {$expr: {$lte: [{$bsonSize: '$data'}, (bucketMaxSizeKB * 1024 - doc.objsize())]}}
+        // but $expr is not allowed in an upsert. See SERVER-30731.
+        andBuilder.append(BSON(
+            "control.size" << BSON("$lte" << (kTimeseriesBucketMaxSizeKB * 1024 - doc.objsize()))));
     }
     builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
     builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
