@@ -617,10 +617,11 @@ jsTest.log('Starting test for mongos connection');
 const replicaSetMonitorProtocol =
     assert.commandWorked(st.s.adminCommand({getParameter: 1, replicaSetMonitorProtocol: 1}))
         .replicaSetMonitorProtocol;
-let failPoint = configureFailPoint(st.s,
-                                   replicaSetMonitorProtocol === "scanning"
-                                       ? "scanningServerSelectorIgnoreLatencyWindow"
-                                       : "sdamServerSelectorIgnoreLatencyWindow");
+
+assert(replicaSetMonitorProtocol === "streamable" || replicaSetMonitorProtocol === "sdam");
+
+let failPoint = configureFailPoint(st.s, "sdamServerSelectorIgnoreLatencyWindow");
+
 testAllModes(st.s, st.rs0.nodes, true);
 failPoint.off();
 

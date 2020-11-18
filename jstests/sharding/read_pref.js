@@ -1,6 +1,5 @@
 /**
- * Integration test for read preference and tagging. The more comprehensive unit test can be found
- * in dbtests/scanning_replica_set_monitor_test.cpp.
+ * Integration test for read preference and tagging.
  */
 
 // This test shuts down a shard's node and because of this consistency checking

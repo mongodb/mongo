@@ -92,10 +92,10 @@ st.ensurePrimaryShard(dbName, st.shard0.shardName);
 const replicaSetMonitorProtocol =
     assert.commandWorked(st.s.adminCommand({getParameter: 1, replicaSetMonitorProtocol: 1}))
         .replicaSetMonitorProtocol;
-let serverSelectorFailPoint = configureFailPoint(st.s,
-                                                 replicaSetMonitorProtocol === "scanning"
-                                                     ? "scanningServerSelectorIgnoreLatencyWindow"
-                                                     : "sdamServerSelectorIgnoreLatencyWindow");
+
+assert(replicaSetMonitorProtocol === "streamable" || replicaSetMonitorProtocol === "sdam");
+
+let serverSelectorFailPoint = configureFailPoint(st.s, "sdamServerSelectorIgnoreLatencyWindow");
 
 // Force the mongos to send requests to hosts in alphabetical order of host names.
 let sendRequestsFailPoint =

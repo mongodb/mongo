@@ -29,8 +29,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/replica_set_monitor_manager.h"
-#include "mongo/client/scanning_replica_set_monitor.h"
-#include "mongo/client/scanning_replica_set_monitor_internal.h"
 #include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -156,21 +154,6 @@ TEST_F(ReplicaSetMonitorFixture, StreamableRSMWireVersion) {
     auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri);
 
     // Schedule isMaster requests and wait for the responses.
-    auto primaryFuture =
-        rsm->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly));
-    primaryFuture.get();
-
-    ASSERT_EQ(rsm->getMinWireVersion(), WireVersion::LATEST_WIRE_VERSION);
-    ASSERT_EQ(rsm->getMaxWireVersion(), WireVersion::LATEST_WIRE_VERSION);
-}
-
-TEST_F(ReplicaSetMonitorFixture, ScanningRSMWireVersion) {
-    auto state = std::make_shared<ScanningReplicaSetMonitor::SetState>(
-        replSetUri, &notifier, executor.get());
-    auto rsm = std::make_shared<ScanningReplicaSetMonitor>(state);
-
-    // Schedule isMaster requests and wait for the responses.
-    rsm->init();
     auto primaryFuture =
         rsm->getHostOrRefresh(ReadPreferenceSetting(mongo::ReadPreference::PrimaryOnly));
     primaryFuture.get();

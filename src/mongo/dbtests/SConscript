@@ -125,7 +125,6 @@ if not has_option('noshell') and usemozjs:
             'repltests.cpp',
             'resharding_tests.cpp',
             'rollbacktests.cpp',
-            'scanning_replica_set_monitor_test.cpp',
             'socktests.cpp',
             'storage_timestamp_tests.cpp',
             'threadedtests.cpp',

@@ -13041,37 +13041,6 @@ buildvariants:
     distros:
     - ubuntu1804-build
 
-- name: enterprise-ubuntu-scanning-replica-set-monitor-1604-64-bit
-  display_name: "~ Enterprise Ubuntu 16.04 (with ScanningReplicaSetMonitor)"
-  batchtime: 1440 # 1 day
-  run_on:
-    - ubuntu1604-test
-  modules:
-  - enterprise
-  expansions:
-    scons_cache_scope: shared
-    compile_flags: MONGO_DISTMOD=ubuntu1604 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
-    multiversion_platform: ubuntu1604
-    multiversion_edition: enterprise
-    test_flags: >-
-      --mongosSetParameters="{replicaSetMonitorProtocol: scanning}"
-      --mongodSetParameters="{replicaSetMonitorProtocol: scanning}"
-      --excludeWithAnyTags=requires_streamable_rsm
-
-  tasks:
-  - name: compile_all_run_unittests_TG
-    distros:
-    - ubuntu1604-build
-  - name: .aggregation !.no_async
-  - name: .sharding .auth
-  - name: .sharding .causally_consistent !.wo_snapshot
-  - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
-  - name: .jscore .common
-  - name: .logical_session_cache .one_sec
-  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
-  - name: .sharding .common !.csrs
-
 - name: enterprise-ubuntu-sdam-replica-set-monitor-1604-64-bit
   display_name: "~ Enterprise Ubuntu 16.04 (with SdamReplicaSetMonitor)"
   batchtime: 1440 # 1 day
