@@ -117,7 +117,7 @@ void launchDebugger(Exec debugger) {
 
 #if defined(USE_GDBSERVER)
 
-void execCallback(int) {
+extern "C" void execCallback(int) {
     launchDebugger([](char* pidToDebug) {
         execlp("gdbserver", "gdbserver", "--attach", ":0", pidToDebug, nullptr);
     });
@@ -125,7 +125,7 @@ void execCallback(int) {
 
 #elif defined(USE_LLDB_SERVER)
 
-void execCallback(int) {
+extern "C" void execCallback(int) {
     launchDebugger([](char* pidToDebug) {
 #ifdef __linux__
         execlp("lldb-server", "lldb-server", "g", "--attach", pidToDebug, "*:12345", nullptr);

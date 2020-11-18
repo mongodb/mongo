@@ -638,6 +638,9 @@ void State::action(siginfo_t* si) {
 }
 
 State* stateSingleton = new State{};
+extern "C" void stateSingletonAction(int, siginfo_t* si, void*) {
+    stateSingleton->action(si);
+}
 
 /**
  * Called from single-thread init time. The stack tracer will use the specified `signal`.
@@ -650,7 +653,7 @@ void initialize(int signal) {
     // We should never need to add to this lambda because it simply sets up handler
     // execution. Any changes should either be in State::action or in the signal
     // handler itself.
-    sa.sa_sigaction = [](int, siginfo_t* si, void*) { stateSingleton->action(si); };
+    sa.sa_sigaction = stateSingletonAction;
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESTART;
     if (sigaction(signal, &sa, nullptr) != 0) {
         int savedErr = errno;

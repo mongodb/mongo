@@ -377,6 +377,8 @@ TEST(StackTrace, MetadataGeneratorFunctionMeasure) {
 #endif  // _WIN32
 
 #ifdef HAVE_SIGALTSTACK
+extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
+
 class StackTraceSigAltStackTest : public unittest::Test {
 public:
     using unittest::Test::Test;
@@ -398,7 +400,7 @@ public:
             23388, "Local var", "var"_attr = "{:X}"_format(reinterpret_cast<uintptr_t>(&storage)));
     }
 
-    static void tryHandler(void (*handler)(int, siginfo_t*, void*)) {
+    static void tryHandler(sigAction_t* handler) {
         constexpr int sig = SIGUSR1;
         constexpr size_t kStackSize = size_t{1} << 20;  // 1 MiB
         auto buf = std::make_unique<std::array<unsigned char, kStackSize>>();
@@ -447,23 +449,31 @@ public:
     }
 };
 
+extern "C" void stackTraceSigAltStackMinimalAction(int sig, siginfo_t*, void*) {
+    StackTraceSigAltStackTest::handlerPreamble(sig);
+}
+
 TEST_F(StackTraceSigAltStackTest, Minimal) {
-    tryHandler([](int sig, siginfo_t*, void*) { handlerPreamble(sig); });
+    StackTraceSigAltStackTest::tryHandler(stackTraceSigAltStackMinimalAction);
+}
+
+extern "C" void stackTraceSigAltStackPrintAction(int sig, siginfo_t*, void*) {
+    StackTraceSigAltStackTest::handlerPreamble(sig);
+    printStackTrace();
 }
 
 TEST_F(StackTraceSigAltStackTest, Print) {
-    tryHandler([](int sig, siginfo_t*, void*) {
-        handlerPreamble(sig);
-        printStackTrace();
-    });
+    StackTraceSigAltStackTest::tryHandler(&stackTraceSigAltStackPrintAction);
+}
+
+extern "C" void stackTraceSigAltStackBacktraceAction(int sig, siginfo_t*, void*) {
+    StackTraceSigAltStackTest::handlerPreamble(sig);
+    std::array<void*, kStackTraceFrameMax> addrs;
+    rawBacktrace(addrs.data(), addrs.size());
 }
 
 TEST_F(StackTraceSigAltStackTest, Backtrace) {
-    tryHandler([](int sig, siginfo_t*, void*) {
-        handlerPreamble(sig);
-        std::array<void*, kStackTraceFrameMax> addrs;
-        rawBacktrace(addrs.data(), addrs.size());
-    });
+    StackTraceSigAltStackTest::tryHandler(stackTraceSigAltStackBacktraceAction);
 }
 #endif  // HAVE_SIGALTSTACK
 

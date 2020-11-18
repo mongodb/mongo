@@ -257,7 +257,7 @@ void myTerminate() {
     endProcessWithSignal(SIGABRT);
 }
 
-void abruptQuit(int signalNum) {
+extern "C" void abruptQuit(int signalNum) {
     MallocFreeOStreamGuard lk{};
     printSignalAndBacktrace(signalNum);
     breakpoint();
@@ -292,11 +292,11 @@ void myPureCallHandler() {
 
 #else
 
-void abruptQuitAction(int signalNum, siginfo_t*, void*) {
+extern "C" void abruptQuitAction(int signalNum, siginfo_t*, void*) {
     abruptQuit(signalNum);
 };
 
-void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_erased) {
+extern "C" void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_erased) {
     // For convenient debugger access.
     MONGO_COMPILER_VARIABLE_UNUSED auto ucontext = static_cast<const ucontext_t*>(ucontext_erased);
 
@@ -319,6 +319,10 @@ void abruptQuitWithAddrSignal(int signalNum, siginfo_t* siginfo, void* ucontext_
 
 }  // namespace
 
+#if !defined(_WIN32)
+extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
+#endif
+
 void setupSynchronousSignalHandlers() {
     stdx::set_terminate(myTerminate);
     std::set_new_handler(reportOutOfMemoryErrorAndExit);
@@ -331,7 +335,7 @@ void setupSynchronousSignalHandlers() {
 #else
     static constexpr struct {
         int signal;
-        void (*function)(int, siginfo_t*, void*);  // signal ignored if nullptr
+        sigAction_t* function;  // signal ignored if nullptr
     } kSignalSpecs[] = {
         {SIGHUP, nullptr},
         {SIGUSR2, nullptr},

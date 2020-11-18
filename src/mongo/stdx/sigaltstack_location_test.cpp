@@ -69,8 +69,10 @@ void unblockSignal(int sig) {
     }
 }
 
+extern "C" typedef void(sigAction_t)(int signum, siginfo_t* info, void* context);
+
 /** Install action for signal sig. Be careful to specify SA_ONSTACK. */
-void installAction(int sig, void (*action)(int, siginfo_t*, void*)) {
+void installAction(int sig, sigAction_t* action) {
     struct sigaction sa;
     sa.sa_sigaction = action;
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
@@ -100,39 +102,42 @@ struct Hex {
     const T& _t;
 };
 
+struct StackLocationTestChildThreadInfo {
+    stack_t ss;
+    const char* handlerLocal;
+};
+static StackLocationTestChildThreadInfo stackLocationTestChildInfo{};
+
+extern "C" void stackLocationTestAction(int, siginfo_t*, void*) {
+    char n;
+    stackLocationTestChildInfo.handlerLocal = &n;
+}
+
 int stackLocationTest() {
-    struct ChildThreadInfo {
-        stack_t ss;
-        const char* handlerLocal;
-    };
-    static ChildThreadInfo childInfo{};
 
     stdx::thread childThread([&] {
         static const int kSignal = SIGUSR1;
         // Use sigaltstack's `old_ss` parameter to query the installed sigaltstack.
-        if (sigaltstack(nullptr, &childInfo.ss)) {
+        if (sigaltstack(nullptr, &stackLocationTestChildInfo.ss)) {
             perror("sigaltstack");
             abort();
         }
         unblockSignal(kSignal);
-        installAction(kSignal, [](int, siginfo_t*, void*) {
-            char n;
-            childInfo.handlerLocal = &n;
-        });
+        installAction(kSignal, &stackLocationTestAction);
         // `raise` waits for signal handler to complete.
         // https://pubs.opengroup.org/onlinepubs/009695399/functions/raise.html
         raise(kSignal);
     });
     childThread.join();
 
-    if (childInfo.ss.ss_flags & SS_DISABLE) {
+    if (stackLocationTestChildInfo.ss.ss_flags & SS_DISABLE) {
         std::cerr << "Child thread unexpectedly had sigaltstack disabled." << std::endl;
         exit(EXIT_FAILURE);
     }
 
-    uintptr_t altStackBegin = reinterpret_cast<uintptr_t>(childInfo.ss.ss_sp);
-    uintptr_t altStackEnd = altStackBegin + childInfo.ss.ss_size;
-    uintptr_t handlerLocal = reinterpret_cast<uintptr_t>(childInfo.handlerLocal);
+    uintptr_t altStackBegin = reinterpret_cast<uintptr_t>(stackLocationTestChildInfo.ss.ss_sp);
+    uintptr_t altStackEnd = altStackBegin + stackLocationTestChildInfo.ss.ss_size;
+    uintptr_t handlerLocal = reinterpret_cast<uintptr_t>(stackLocationTestChildInfo.handlerLocal);
 
     std::cerr << "child sigaltstack[" << Hex(altStackEnd - altStackBegin) << "] = ["
               << Hex(altStackBegin) << ", " << Hex(altStackEnd) << ")\n"
@@ -144,6 +149,12 @@ int stackLocationTest() {
         exit(EXIT_FAILURE);
     }
     return EXIT_SUCCESS;
+}
+
+static sigjmp_buf sigjmp;
+
+extern "C" void siglongjmpAction(int, siginfo_t*, void*) {
+    siglongjmp(sigjmp, 1);
 }
 
 /**
@@ -160,10 +171,9 @@ int stackLocationTest() {
  * SIGSEGV is process-fatal.
  */
 int recursionTestImpl(bool useSigAltStack) {
-    static sigjmp_buf sigjmp;
 
     unblockSignal(SIGSEGV);
-    installAction(SIGSEGV, [](int, siginfo_t*, void*) { siglongjmp(sigjmp, 1); });
+    installAction(SIGSEGV, siglongjmpAction);
 
     stdx::thread childThread([=] {
         if (!useSigAltStack) {

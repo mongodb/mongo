@@ -304,7 +304,7 @@ void killOps() {
         !shellGlobalParams.autoKillOp);
 }
 
-void quitNicely(int sig) {
+extern "C" void quitNicely(int sig) {
     shutdown(EXIT_CLEAN);
 }
 
