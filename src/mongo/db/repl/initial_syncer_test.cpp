@@ -374,10 +374,6 @@ protected:
         _mock = std::make_unique<MockNetwork>(getNet());
         // Default behavior for all tests using this mock.
         _mock->defaultExpect("replSetGetRBID", makeRollbackCheckerResponse(1));
-        _mock->defaultExpect(BSON("find"
-                                  << "oplog.rs"),
-                             makeCursorResponse(
-                                 0LL, _options.localOplogNS, {makeOplogEntryObj(1)}));
         _mock->defaultExpect(
             BSON("find"
                  << "transactions"),
@@ -1746,6 +1742,12 @@ TEST_F(InitialSyncerTest, InitialSyncerPassesThroughFCVFetcherCallbackError_Mock
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 12345));
 
+    _mock
+        ->expect(BSON("find"
+                      << "oplog.rs"),
+                 makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}))
+        .times(2);
+
     // This is what we want to test.
     _mock
         ->expect(BSON("find"
@@ -2007,6 +2009,13 @@ TEST_F(
     const std::uint32_t initialSyncMaxAttempts = 2U;
 
     auto lastOp = makeOplogEntry(2);
+
+    // Only respond to oplog queries twice to block the initial syncer on getting stopTimestamp.
+    _mock
+        ->expect(BSON("find"
+                      << "oplog.rs"),
+                 makeCursorResponse(0LL, _options.localOplogNS, {makeOplogEntryObj(1)}))
+        .times(2);
 
     // This is what we want to test.
     // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
