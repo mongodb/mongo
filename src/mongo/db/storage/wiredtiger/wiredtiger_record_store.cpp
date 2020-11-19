@@ -671,7 +671,7 @@ public:
         invariantWTOK(_cursor->get_value(_cursor, &value));
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneDocRead(_opCtx, value.size);
+        metricsCollector.incrementOneDocRead(value.size);
 
         return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
     }
@@ -1036,7 +1036,7 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 
     *out = _getData(curwrap);
 
-    metricsCollector.incrementOneDocRead(opCtx, out->size());
+    metricsCollector.incrementOneDocRead(out->size());
 
     return true;
 }
@@ -2272,7 +2272,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     invariantWTOK(c->get_value(c, &value));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneDocRead(_opCtx, value.size);
+    metricsCollector.incrementOneDocRead(value.size);
 
     _lastReturnedId = id;
     return {{id, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
@@ -2308,7 +2308,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     WT_ITEM value;
     invariantWTOK(c->get_value(c, &value));
 
-    metricsCollector.incrementOneDocRead(_opCtx, value.size);
+    metricsCollector.incrementOneDocRead(value.size);
 
     _lastReturnedId = id;
     _eof = false;

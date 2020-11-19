@@ -116,9 +116,7 @@ public:
 
     void spool(WorkingSetID wsid) override final;
 
-    void loadingDone() override final {
-        _sortExecutor.loadingDone();
-    }
+    void loadingDone() override final;
 
     StageState unspool(WorkingSetID* out) override final;
 
@@ -159,9 +157,7 @@ public:
 
     virtual void spool(WorkingSetID wsid) override final;
 
-    void loadingDone() override final {
-        _sortExecutor.loadingDone();
-    }
+    void loadingDone() override final;
 
     virtual StageState unspool(WorkingSetID* out) override final;
 

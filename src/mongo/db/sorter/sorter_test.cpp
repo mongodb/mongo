@@ -388,6 +388,7 @@ public:
                 std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
                 addData(sorter);
                 ASSERT_ITERATORS_EQUIVALENT(done(sorter), correct());
+                ASSERT_EQ(numAdded(), sorter->numSorted());
                 if (assertRanges) {
                     assertRangeInfo(sorter, opts);
                 }
@@ -396,6 +397,7 @@ public:
                 std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
                 addData(sorter);
                 ASSERT_ITERATORS_EQUIVALENT(done(sorter), correctReverse());
+                ASSERT_EQ(numAdded(), sorter->numSorted());
                 if (assertRanges) {
                     assertRangeInfo(sorter, opts);
                 }
@@ -467,6 +469,10 @@ public:
         sorter->add(3, -3);
     }
 
+    virtual size_t numAdded() const {
+        return 5;
+    }
+
     // returns an iterator with the correct results
     virtual std::shared_ptr<IWIterator> correct() {
         return std::make_shared<IntIterator>(0, 5);  // 0, 1, ... 4
@@ -521,6 +527,9 @@ class Limit : public Basic {
         sorter->add(1, -1);
         sorter->add(-1, 1);
     }
+    size_t numAdded() const override {
+        return 6;
+    }
     std::shared_ptr<IWIterator> correct() override {
         return std::make_shared<IntIterator>(-1, 4);
     }
@@ -548,6 +557,9 @@ class Dupes : public Basic {
         sorter->add(-1, 1);
         sorter->add(2, -2);
         sorter->add(3, -3);
+    }
+    size_t numAdded() const override {
+        return 10;
     }
     std::shared_ptr<IWIterator> correct() override {
         const int array[] = {-1, -1, -1, 0, 1, 1, 1, 2, 2, 3};
@@ -581,6 +593,10 @@ public:
     void addData(unowned_ptr<IWSorter> sorter) override {
         for (int i = 0; i < NUM_ITEMS; i++)
             sorter->add(_array[i], -_array[i]);
+    }
+
+    size_t numAdded() const override {
+        return NUM_ITEMS;
     }
 
     std::shared_ptr<IWIterator> correct() override {
@@ -727,10 +743,11 @@ TEST_F(SorterMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     auto sorter = std::unique_ptr<IWSorter>(
         IWSorter::makeFromExistingRanges(fileName, {}, opts, IWComparator(ASC)));
 
-    // Sorter::_usedDisk is set when NoLimitSorter is constructed from existing ranges.
-    ASSERT_TRUE(sorter->usedDisk());
+    ASSERT_EQ(0, sorter->numSpills());
 
     auto iter = std::unique_ptr<IWIterator>(sorter->done());
+    ASSERT_EQ(0, sorter->numSorted());
+
     iter->openSource();
     ASSERT_FALSE(iter->more());
     iter->closeSource();
@@ -776,8 +793,9 @@ TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
     auto sorter = std::unique_ptr<IWSorter>(
         IWSorter::makeFromExistingRanges(fileName, makeSampleRanges(), opts, IWComparator(ASC)));
 
-    // Sorter::_usedDisk is set when NoLimitSorter is constructed from existing ranges.
-    ASSERT_TRUE(sorter->usedDisk());
+    // Sorter::_numSpills is set when NoLimitSorter is constructed from existing ranges.
+    ASSERT_EQ(makeSampleRanges().size(), sorter->numSpills());
+    ASSERT_EQ(0, sorter->numSorted());
 
     // 16817 - error reading file.
     ASSERT_THROWS_CODE(sorter->done(), DBException, 16817);
@@ -805,18 +823,22 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
         state = sorterBeforeShutdown->persistDataForShutdown();
         ASSERT_FALSE(state.fileName.empty());
         ASSERT_EQUALS(1U, state.ranges.size()) << state.ranges.size();
+        ASSERT_EQ(1, sorterBeforeShutdown->numSorted());
     }
 
     // On restart, reconstruct sorter from persisted state.
     auto sorter = std::unique_ptr<IWSorter>(
         IWSorter::makeFromExistingRanges(state.fileName, state.ranges, opts, IWComparator(ASC)));
 
-    // Sorter::_usedDisk is set when NoLimitSorter is constructed from existing ranges.
-    ASSERT_TRUE(sorter->usedDisk());
+    // Sorter::_numSpills is set when NoLimitSorter is constructed from existing ranges.
+    ASSERT_EQ(state.ranges.size(), sorter->numSpills());
 
     // Ensure that the restored sorter can accept additional data.
     IWPair pairInsertedAfterStartup(2, 200);
     sorter->add(pairInsertedAfterStartup.first, pairInsertedAfterStartup.second);
+
+    // Technically this sorter has not sorted anything. It is just merging files.
+    ASSERT_EQ(0, sorter->numSorted());
 
     // Read data from sorter.
     {

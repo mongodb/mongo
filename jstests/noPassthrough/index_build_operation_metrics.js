@@ -107,6 +107,11 @@ assert.commandWorked(primaryDB.createCollection(collName));
         assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 29 * nDocs);
         assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 1 * nDocs);
 
+        // We intentionally do not collect sorting metrics for index builds due to their already
+        // high impact on the server.
+        assert.eq(metrics[dbName].primaryMetrics.keysSorted, 0);
+        assert.eq(metrics[dbName].primaryMetrics.sorterSpills, 0);
+
         // Some bytes are written to the catalog and config.system.indexBuilds collection.
         assert.gt(metrics[dbName].docBytesWritten, 0);
         assert.gt(metrics[dbName].docUnitsWritten, 0);
@@ -143,6 +148,11 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
         // randomized fields, so we don't make any exact assertions.
         assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 29 * nDocs);
         assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 1 * nDocs);
+
+        // We intentionally do not collect sorting metrics for index builds due to their already
+        // high impact on the server.
+        assert.eq(metrics[dbName].primaryMetrics.keysSorted, 0);
+        assert.eq(metrics[dbName].primaryMetrics.sorterSpills, 0);
 
         // Some bytes are written to the catalog and config.system.indexBuilds collection.
         assert.gt(metrics[dbName].docBytesWritten, 0);
@@ -185,6 +195,11 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
         // randomized fields, so we don't make any exact assertions.
         assert.gt(metrics[dbName].primaryMetrics.docBytesRead, 29 * nDocs);
         assert.gt(metrics[dbName].primaryMetrics.docUnitsRead, 1 * nDocs);
+
+        // We intentionally do not collect sorting metrics for index builds due to their already
+        // high impact on the server.
+        assert.eq(metrics[dbName].primaryMetrics.keysSorted, 0);
+        assert.eq(metrics[dbName].primaryMetrics.sorterSpills, 0);
 
         // Some bytes are written to the catalog and config.system.indexBuilds collection.
         assert.gt(metrics[dbName].docBytesWritten, 0);
@@ -249,6 +264,13 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
         assert.eq(metrics[dbName].secondaryMetrics.docBytesRead, 0);
         assert.eq(metrics[dbName].secondaryMetrics.docUnitsRead, 0);
 
+        // We intentionally do not collect sorting metrics for index builds due to their already
+        // high impact on the server.
+        assert.eq(metrics[dbName].primaryMetrics.keysSorted, 0);
+        assert.eq(metrics[dbName].primaryMetrics.sorterSpills, 0);
+        assert.eq(metrics[dbName].secondaryMetrics.keysSorted, 0);
+        assert.eq(metrics[dbName].secondaryMetrics.sorterSpills, 0);
+
         // Some bytes are written to the catalog and config.system.indexBuilds collection.
         assert.gt(metrics[dbName].docBytesWritten, 0);
         assert.gt(metrics[dbName].docUnitsWritten, 0);
@@ -272,6 +294,14 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
         assert.gte(metrics[dbName].primaryMetrics.docBytesRead, 0);
         assert.lt(metrics[dbName].primaryMetrics.docBytesRead, 29 * nDocs);
         assert.lt(metrics[dbName].secondaryMetrics.docBytesRead, 29 * nDocs);
+
+        // We intentionally do not collect sorting metrics for index builds due to their already
+        // high impact on the server.
+        assert.eq(metrics[dbName].primaryMetrics.keysSorted, 0);
+        assert.eq(metrics[dbName].primaryMetrics.sorterSpills, 0);
+        assert.eq(metrics[dbName].secondaryMetrics.keysSorted, 0);
+        assert.eq(metrics[dbName].secondaryMetrics.sorterSpills, 0);
+
         assert.eq(metrics[dbName].docBytesWritten, 0);
         assert.eq(metrics[dbName].docUnitsWritten, 0);
         assert.eq(metrics[dbName].idxEntryBytesWritten, 0);

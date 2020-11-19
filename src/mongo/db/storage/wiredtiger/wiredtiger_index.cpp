@@ -117,7 +117,7 @@ void WiredTigerIndex::getKey(OperationContext* opCtx, WT_CURSOR* cursor, WT_ITEM
     }
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-    metricsCollector.incrementOneIdxEntryRead(opCtx, key->size);
+    metricsCollector.incrementOneIdxEntryRead(key->size);
 }
 
 // static
@@ -1052,7 +1052,7 @@ protected:
         }
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryRead(_opCtx, key->size);
+        metricsCollector.incrementOneIdxEntryRead(key->size);
     }
 
     bool hasWrongPrefix(WT_CURSOR* cursor) {

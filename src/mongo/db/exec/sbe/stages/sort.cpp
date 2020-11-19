@@ -190,7 +190,7 @@ void SortStage::open(bool reOpen) {
     }
 
     _mergeIt.reset(_sorter->done());
-    _specificStats.wasDiskUsed = _specificStats.wasDiskUsed || _sorter->usedDisk();
+    _specificStats.spills += _sorter->numSpills();
 
     _children[0]->close();
 }

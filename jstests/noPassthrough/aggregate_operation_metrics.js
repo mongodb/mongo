@@ -33,6 +33,7 @@ let assertMetricsExist = function(metrics) {
             assert.gte(readMetrics.idxEntryBytesRead, 0);
             assert.gte(readMetrics.idxEntryUnitsRead, 0);
             assert.gte(readMetrics.keysSorted, 0);
+            assert.gte(readMetrics.sorterSpills, 0);
             assert.gte(readMetrics.docUnitsReturned, 0);
             assert.gte(readMetrics.cursorSeeks, 0);
         });

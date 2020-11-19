@@ -564,8 +564,7 @@ public:
           _nextSortedFileWriterOffset(!ranges.empty() ? ranges.back().getEndOffset() : 0) {
         invariant(opts.extSortAllowed);
 
-        this->_usedDisk = true;
-
+        this->_numSpills += ranges.size();
         std::transform(ranges.begin(),
                        ranges.end(),
                        std::back_inserter(this->_iters),
@@ -638,14 +637,11 @@ private:
     void sort() {
         STLComparator less(_comp);
         std::stable_sort(_data.begin(), _data.end(), less);
-
-        // Does 2x more compares than stable_sort
-        // TODO test on windows
-        // std::sort(_data.begin(), _data.end(), comp);
+        this->_numSorted += _data.size();
     }
 
     void spill() {
-        this->_usedDisk = true;
+        this->_numSpills++;
         if (_data.empty())
             return;
 
@@ -699,6 +695,7 @@ public:
     void add(const Key& key, const Value& val) {
         Data contender(key, val);
 
+        this->_numSorted += 1;
         if (_haveData) {
             dassertCompIsSane(_comp, _best, contender);
             if (_comp(_best, contender) <= 0)
@@ -768,6 +765,8 @@ public:
 
     void add(const Key& key, const Value& val) {
         invariant(!_done);
+
+        this->_numSorted += 1;
 
         STLComparator less(_comp);
         Data contender(key, val);
@@ -927,7 +926,7 @@ private:
     void spill() {
         invariant(!_done);
 
-        this->_usedDisk = true;
+        this->_numSpills += 1;
         if (_data.empty())
             return;
 

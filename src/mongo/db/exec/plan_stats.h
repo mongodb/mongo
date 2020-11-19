@@ -625,7 +625,7 @@ struct SortStats : public SpecificStats {
     void accumulate(PlanSummaryStats& summary) const final {
         summary.hasSortStage = true;
 
-        if (wasDiskUsed) {
+        if (spills > 0) {
             summary.usedDisk = true;
         }
     }
@@ -646,8 +646,11 @@ struct SortStats : public SpecificStats {
     // disk use is allowed.
     uint64_t totalDataSizeBytes = 0u;
 
-    // Whether we spilled data to disk during the execution of this query.
-    bool wasDiskUsed = false;
+    // The number of keys that we've sorted.
+    uint64_t keysSorted = 0u;
+
+    // The number of times that we spilled data to disk during the execution of this query.
+    uint64_t spills = 0u;
 };
 
 struct MergeSortStats : public SpecificStats {

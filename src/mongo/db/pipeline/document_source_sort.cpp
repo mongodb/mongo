@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/skip_and_limit.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 
@@ -219,6 +220,9 @@ void DocumentSourceSort::loadDocument(Document&& doc) {
 
 void DocumentSourceSort::loadingDone() {
     _sortExecutor->loadingDone();
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(pExpCtx->opCtx);
+    metricsCollector.incrementKeysSorted(_sortExecutor->stats().keysSorted);
+    metricsCollector.incrementSorterSpills(_sortExecutor->stats().spills);
     _populated = true;
 }
 

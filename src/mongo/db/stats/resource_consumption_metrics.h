@@ -59,6 +59,7 @@ public:
             idxEntryBytesRead += other.idxEntryBytesRead;
             idxEntryUnitsRead += other.idxEntryUnitsRead;
             keysSorted += other.keysSorted;
+            sorterSpills += other.sorterSpills;
             docUnitsReturned += other.docUnitsReturned;
             cursorSeeks += other.cursorSeeks;
         }
@@ -83,6 +84,8 @@ public:
         long long idxEntryUnitsRead = 0;
         // Number of keys sorted for query operations
         long long keysSorted = 0;
+        // Number of individual spills of data to disk by the sorter
+        long long sorterSpills = 0;
         // Number of document units returned by a query
         long long docUnitsReturned = 0;
         // Number of cursor seeks
@@ -186,6 +189,13 @@ public:
      */
     class MetricsCollector {
     public:
+        MetricsCollector() = default;
+
+        // Delete copy constructors to prevent callers from accidentally copying when this is
+        // decorated on the OperationContext by reference.
+        MetricsCollector(const MetricsCollector&) = delete;
+        MetricsCollector operator=(const MetricsCollector&) = delete;
+
         static MetricsCollector& get(OperationContext* opCtx);
 
         /**
@@ -255,16 +265,27 @@ public:
          * This should be called once per document read with the number of bytes read for that
          * document.  This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneDocRead(OperationContext* opCtx, size_t docBytesRead);
+        void incrementOneDocRead(size_t docBytesRead);
 
         /**
          * This should be called once per index entry read with the number of bytes read for that
          * entry. This is a no-op when metrics collection is disabled on this operation.
          */
-        void incrementOneIdxEntryRead(OperationContext* opCtx, size_t idxEntryBytesRead);
+        void incrementOneIdxEntryRead(size_t idxEntryBytesRead);
 
-        void incrementKeysSorted(OperationContext* opCtx, size_t keysSorted);
-        void incrementDocUnitsReturned(OperationContext* opCtx, size_t docUnitsReturned);
+        /**
+         * Increments the number of keys sorted for a query operation. This is a no-op when metrics
+         * collection is disabled on this operation.
+         */
+        void incrementKeysSorted(size_t keysSorted);
+
+        /**
+         * Increments the number of number of individual spills to disk by the sorter for query
+         * operations. This is a no-op when metrics collection is disabled on this operation.
+         */
+        void incrementSorterSpills(size_t spills);
+
+        void incrementDocUnitsReturned(size_t docUnitsReturned);
 
         /**
          * This should be called once per document written with the number of bytes written for that

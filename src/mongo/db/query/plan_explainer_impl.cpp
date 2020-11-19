@@ -422,7 +422,7 @@ void statsToBSON(const PlanStageStats& stats,
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendIntOrLL("totalDataSizeSorted", spec->totalDataSizeBytes);
-            bob->appendBool("usedDisk", spec->wasDiskUsed);
+            bob->appendBool("usedDisk", (spec->spills > 0));
         }
     } else if (STAGE_SORT_MERGE == stats.stageType) {
         MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());
@@ -591,7 +591,7 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
 
             auto sortStage = static_cast<const SortStage*>(stages[i]);
             auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
-            statsOut->usedDisk = sortStats->wasDiskUsed;
+            statsOut->usedDisk = sortStats->spills > 0;
         }
 
         if (STAGE_IXSCAN == stages[i]->stageType()) {

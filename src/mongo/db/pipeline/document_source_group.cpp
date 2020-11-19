@@ -41,6 +41,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {
@@ -660,6 +661,10 @@ shared_ptr<Sorter<Value, Value>::Iterator> DocumentSourceGroup::spill() {
             }
             break;
     }
+
+    auto& metricsCollector = ResourceConsumption::MetricsCollector::get(pExpCtx->opCtx);
+    metricsCollector.incrementKeysSorted(ptrs.size());
+    metricsCollector.incrementSorterSpills(1);
 
     _groups->clear();
 

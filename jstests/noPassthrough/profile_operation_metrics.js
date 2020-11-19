@@ -2,13 +2,9 @@
  * Tests that resource consumption metrics are reported in the profiler.
  *
  *  @tags: [
- *    does_not_support_stepdowns,
  *    requires_fcv_47,
- *    requires_getmore,
- *    requires_non_retryable_writes,
- *    requires_profiling,
+ *    requires_replication,
  *    requires_wiredtiger,
- *    sbe_incompatible,
  *  ]
  */
 (function() {
@@ -16,22 +12,13 @@
 
 load("jstests/libs/fixture_helpers.js");  // For isReplSet().
 
-let res = assert.commandWorked(
-    db.adminCommand({getParameter: 1, measureOperationResourceConsumption: 1}));
-if (!res.measureOperationResourceConsumption.value) {
-    jsTestLog("Skipping test because the 'measureOperationResourceConsumption' flag is disabled");
-    return;
-}
-
 const dbName = jsTestName();
-const testDB = db.getSiblingDB(dbName);
 const collName = 'coll';
-const debugBuild = db.adminCommand('buildInfo').debug;
-const isReplSet = FixtureHelpers.isReplSet(db);
 
-testDB.dropDatabase();
-
-testDB.setProfilingLevel(2, 0);
+const isLinux = getBuildInfo().buildEnvironment.target_os == "linux";
+const isDebugBuild = (db) => {
+    return db.adminCommand('buildInfo').debug;
+};
 
 const assertMetricsExist = (profilerEntry) => {
     let metrics = profilerEntry.operationMetrics;
@@ -42,13 +29,14 @@ const assertMetricsExist = (profilerEntry) => {
     assert.gte(metrics.idxEntryBytesRead, 0);
     assert.gte(metrics.idxEntryUnitsRead, 0);
     assert.gte(metrics.keysSorted, 0);
+    assert.gte(metrics.sorterSpills, 0);
     assert.gte(metrics.docUnitsReturned, 0);
     assert.gte(metrics.cursorSeeks, 0);
 
     // Every test should perform enough work to be measured as non-zero CPU activity in
     // nanoseconds.
-    // The CPU time metrics is not collected on Windows.
-    if (!_isWindows()) {
+    // The CPU time metrics are only collected on Linux.
+    if (isLinux) {
         assert.gt(metrics.cpuNanos, 0);
     }
     assert.gte(metrics.docBytesWritten, 0);
@@ -94,7 +82,7 @@ const operations = [
             assert.commandWorked(db.createCollection(collName));
         },
         profileFilter: {op: 'command', 'command.create': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // The size of the collection document in the _mdb_catalog may not be the same every
             // test run, so only assert this is non-zero.
             assert.gt(profileDoc.docBytesRead, 0);
@@ -106,6 +94,8 @@ const operations = [
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             assert.gt(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -114,7 +104,7 @@ const operations = [
             assert.commandWorked(db[collName].createIndex({a: 1}));
         },
         profileFilter: {op: 'command', 'command.createIndexes': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // The size of the collection document in the _mdb_catalog may not be the same every
             // test run, so only assert this is non-zero.
             // Index builds run on a separate thread and don't report their metrics with the
@@ -128,6 +118,8 @@ const operations = [
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             assert.gt(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -136,7 +128,7 @@ const operations = [
             assert.eq(db[collName].find({a: 1}).itcount(), 0);
         },
         profileFilter: {op: 'query', 'command.find': collName, 'command.filter': {a: 1}},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
@@ -148,6 +140,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -156,7 +150,7 @@ const operations = [
             assert.commandWorked(db[collName].insert({_id: 1, a: 0}));
         },
         profileFilter: {op: 'insert', 'command.insert': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -167,6 +161,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 7);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -186,7 +182,7 @@ const operations = [
             });
         },
         profileFilter: {op: 'query', 'command.find': collName, 'command.filter': {_id: 1}},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
@@ -197,6 +193,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -205,7 +203,7 @@ const operations = [
             assert.eq(db[collName].find().itcount(), 1);
         },
         profileFilter: {op: 'query', 'command.find': collName, 'command.filter': {}},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
@@ -216,6 +214,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -224,7 +224,7 @@ const operations = [
             assert.eq(db[collName].aggregate([{$project: {_id: 1}}]).itcount(), 1);
         },
         profileFilter: {op: 'command', 'command.aggregate': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document.
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
@@ -235,6 +235,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -243,7 +245,7 @@ const operations = [
             assert.eq(db[collName].distinct("_id").length, 1);
         },
         profileFilter: {op: 'command', 'command.distinct': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Does not read from the collection.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -254,6 +256,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -262,10 +266,10 @@ const operations = [
             assert(db[collName].findAndModify({query: {_id: 1}, update: {$set: {a: 1}}}));
         },
         profileFilter: {op: 'command', 'command.findandmodify': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document. Debug builds may perform extra
             // reads of the _mdb_catalog.
-            if (!debugBuild) {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.cursorSeeks, 3);
@@ -283,6 +287,8 @@ const operations = [
             // Deletes one index entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 9);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -291,10 +297,10 @@ const operations = [
             assert.commandWorked(db[collName].update({_id: 1}, {$set: {a: 2}}));
         },
         profileFilter: {op: 'update', 'command.q': {_id: 1}},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document. Debug builds may perform extra
             // reads of the _mdb_catalog.
-            if (!debugBuild) {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.cursorSeeks, 3);
@@ -312,6 +318,8 @@ const operations = [
             // Deletes one index entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -320,7 +328,7 @@ const operations = [
             assert.eq(1, db[collName].count());
         },
         profileFilter: {op: 'command', 'command.count': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Reads from the fast-count, not the collection.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -338,7 +346,7 @@ const operations = [
             assert.commandWorked(db[collName].find().explain());
         },
         profileFilter: {op: 'command', 'command.explain.find': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should not read from the collection.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -349,6 +357,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     // Clear the profile collection so we can easily identify new operations with similar filters as
@@ -360,7 +370,7 @@ const operations = [
             assert.commandWorked(db[collName].find().explain('allPlansExecution'));
         },
         profileFilter: {op: 'command', 'command.explain.find': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read from the collection.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
@@ -378,7 +388,7 @@ const operations = [
             assert.eq(db[collName].getIndexes().length, 2);
         },
         profileFilter: {op: 'command', 'command.listIndexes': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // This reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
@@ -388,6 +398,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -396,7 +408,7 @@ const operations = [
             assert.commandWorked(db[collName].dropIndex({a: 1}));
         },
         profileFilter: {op: 'command', 'command.dropIndexes': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // This reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
@@ -407,6 +419,8 @@ const operations = [
             assert.gt(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     resetProfileColl,
@@ -421,9 +435,9 @@ const operations = [
             cursor.next();
         },
         profileFilter: {op: 'getmore', 'command.collection': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Debug builds may perform extra reads of the _mdb_catalog.
-            if (!debugBuild) {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.cursorSeeks, 0);
@@ -438,6 +452,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -446,8 +462,8 @@ const operations = [
             assert.commandWorked(db[collName].remove({_id: 1}));
         },
         profileFilter: {op: 'remove', 'command.q': {_id: 1}},
-        profileAssert: (profileDoc) => {
-            if (!debugBuild) {
+        profileAssert: (db, profileDoc) => {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.cursorSeeks, 3);
@@ -463,6 +479,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -471,8 +489,8 @@ const operations = [
             assert.commandWorked(db[collName].remove({}));
         },
         profileFilter: {op: 'remove', 'command.q': {}},
-        profileAssert: (profileDoc) => {
-            if (!debugBuild) {
+        profileAssert: (db, profileDoc) => {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.cursorSeeks, 1);
@@ -496,7 +514,7 @@ const operations = [
             assert(db[collName].drop());
         },
         profileFilter: {op: 'command', 'command.drop': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Reads from the collection catalog.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
@@ -507,6 +525,8 @@ const operations = [
             assert.gt(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     resetProfileColl,
@@ -521,7 +541,7 @@ const operations = [
             assert.eq(db[collName].aggregate([{$sample: {size: 5}}]).itcount(), 5);
         },
         profileFilter: {op: 'command', 'command.aggregate': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // The exact amount of data read is not easily calculable.
             assert.gt(profileDoc.docBytesRead, 0);
             assert.gt(profileDoc.docUnitsRead, 0);
@@ -532,6 +552,31 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
+        }
+    },
+    resetProfileColl,
+    {
+        name: 'sampleWithSort',
+        command: (db) => {
+            // For $sample to not use a random cursor and use sorting, we must use a sample size
+            // larger than 5%.
+            assert.eq(db[collName].aggregate([{$sample: {size: 10}}]).itcount(), 10);
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            // This operation will read all documents and sort a random sample of them.
+            assert.eq(profileDoc.docBytesRead, 29 * 150);
+            assert.eq(profileDoc.docUnitsRead, 150);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 150);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -540,7 +585,7 @@ const operations = [
             assert.commandWorked(db[collName].createIndex({a: 1}, {unique: true}));
         },
         profileFilter: {op: 'command', 'command.createIndexes': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // The size of the collection document in the _mdb_catalog may not be the same every
             // test run, so only assert this is non-zero.
             // Index builds run on a separate thread and don't report their metrics with the
@@ -554,6 +599,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     resetProfileColl,
@@ -563,7 +610,7 @@ const operations = [
             assert.commandWorked(db[collName].insert({_id: 150, a: 150}));
         },
         profileFilter: {op: 'insert', 'command.insert': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -576,6 +623,8 @@ const operations = [
             // Deletes one entry and writes another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     resetProfileColl,
@@ -587,7 +636,7 @@ const operations = [
                                          ErrorCodes.DuplicateKey);
         },
         profileFilter: {op: 'insert', 'command.insert': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -602,6 +651,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 4);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -610,10 +661,10 @@ const operations = [
             assert.commandWorked(db[collName].update({_id: 1}, {$set: {a: 151}}));
         },
         profileFilter: {op: 'update', 'command.q': {_id: 1}},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document. Debug builds may perform extra
             // reads of the _mdb_catalog.
-            if (!debugBuild) {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 // There are 4 seeks:
@@ -637,6 +688,8 @@ const operations = [
             // Removes one entry and inserts another.
             assert.eq(profileDoc.idxEntryBytesWritten, 11);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -651,10 +704,10 @@ const operations = [
             assert.commandWorked(db[collName].update({_id: 200}, {$set: {a: 200}}));
         },
         profileFilter: {op: 'update', 'command.q': {_id: 200}},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document. Debug builds may perform extra
             // reads of the _mdb_catalog.
-            if (!debugBuild) {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 1050);
                 assert.eq(profileDoc.docUnitsRead, 9);
                 assert.eq(profileDoc.cursorSeeks, 4);
@@ -666,7 +719,7 @@ const operations = [
             // Reads index entries on '_id' for the lookup and 'a' to ensure uniqueness.
             assert.eq(profileDoc.idxEntryBytesRead, 10);
             assert.eq(profileDoc.idxEntryUnitsRead, 2);
-            if (isReplSet) {
+            if (FixtureHelpers.isReplSet(db)) {
                 // When WT_MODIFY is used on a replicated collection fewer bytes are written per the
                 // comment about WT_MODIFY above.
                 assert.eq(profileDoc.docBytesWritten, 13);
@@ -678,6 +731,8 @@ const operations = [
             // Removes one entry and inserts another.
             assert.eq(profileDoc.idxEntryBytesWritten, 10);
             assert.eq(profileDoc.idxEntryUnitsWritten, 2);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -692,10 +747,10 @@ const operations = [
             assert.commandWorked(db[collName].update({_id: 201}, {$set: {b: 1}}));
         },
         profileFilter: {op: 'update', 'command.q': {_id: 201}},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Should read exactly as many bytes are in the document. Debug builds may perform extra
             // reads of the _mdb_catalog.
-            if (!debugBuild) {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.cursorSeeks, 2);
@@ -712,6 +767,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     resetProfileColl,
@@ -724,7 +781,7 @@ const operations = [
             });
         },
         profileFilter: {op: 'insert'},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             // Insert should not perform any reads.
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
@@ -735,6 +792,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -745,7 +804,7 @@ const operations = [
             });
         },
         profileFilter: {op: 'query', 'command.find': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 29);
             assert.eq(profileDoc.docUnitsRead, 1);
             assert.eq(profileDoc.idxEntryBytesRead, 3);
@@ -755,6 +814,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     resetProfileColl,
@@ -775,7 +836,7 @@ const operations = [
             });
         },
         profileFilter: {op: 'getmore'},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 18);
             assert.eq(profileDoc.docUnitsRead, 1);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
@@ -785,6 +846,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 0);
             assert.eq(profileDoc.idxEntryBytesWritten, 0);
             assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     {
@@ -795,8 +858,8 @@ const operations = [
             });
         },
         profileFilter: {op: 'update'},
-        profileAssert: (profileDoc) => {
-            if (!debugBuild) {
+        profileAssert: (db, profileDoc) => {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.cursorSeeks, 2);
@@ -821,8 +884,8 @@ const operations = [
             });
         },
         profileFilter: {op: 'remove'},
-        profileAssert: (profileDoc) => {
-            if (!debugBuild) {
+        profileAssert: (db, profileDoc) => {
+            if (!isDebugBuild(db)) {
                 assert.eq(profileDoc.docBytesRead, 29);
                 assert.eq(profileDoc.docUnitsRead, 1);
                 assert.eq(profileDoc.cursorSeeks, 3);
@@ -837,6 +900,8 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 1);
             assert.eq(profileDoc.idxEntryBytesWritten, 3);
             assert.eq(profileDoc.idxEntryUnitsWritten, 1);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
     resetProfileColl,
@@ -846,12 +911,13 @@ const operations = [
         command: (db) => {
             let bulk = db[collName].initializeUnorderedBulkOp();
             for (let i = 0; i < 100; i++) {
-                bulk.insert({_id: i, a: 0});
+                // There should be 10 distinct values of 'a' from 0 to 9.
+                bulk.insert({_id: i, a: Math.floor(i / 10)});
             }
             assert.commandWorked(bulk.execute());
         },
         profileFilter: {op: 'insert', 'command.insert': collName},
-        profileAssert: (profileDoc) => {
+        profileAssert: (db, profileDoc) => {
             assert.eq(profileDoc.docBytesRead, 0);
             assert.eq(profileDoc.docUnitsRead, 0);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
@@ -861,19 +927,222 @@ const operations = [
             assert.eq(profileDoc.docUnitsWritten, 100);
             assert.eq(profileDoc.idxEntryBytesWritten, 299);
             assert.eq(profileDoc.idxEntryUnitsWritten, 100);
+            assert.eq(profileDoc.keysSorted, 0);
+            assert.eq(profileDoc.sorterSpills, 0);
         }
     },
-
+    {
+        name: 'sortSimple',
+        command: (db) => {
+            // This uses a sort plan for queries that only need to sort keys that are returned, and
+            // no additional metadata. This is achieved by projecting and sorting on the same field.
+            let cur = db[collName].find({}, {a: 1}).sort({a: 1});
+            assert.eq(100, cur.itcount());
+        },
+        profileFilter: {op: 'query', 'command.find': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 100);
+            assert.eq(profileDoc.sorterSpills, 0);
+        },
+    },
+    resetProfileColl,
+    {
+        name: 'sortDefault',
+        command: (db) => {
+            // This uses a sort plan for queries that sort on one field but return full documents.
+            let cur = db[collName].find({}).sort({a: 1});
+            assert.eq(100, cur.itcount());
+        },
+        profileFilter: {op: 'query', 'command.find': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 100);
+            assert.eq(profileDoc.sorterSpills, 0);
+        },
+    },
+    {
+        name: 'sortStage',
+        command: (db) => {
+            let cur = db[collName].aggregate([{$sort: {a: 1}}]);
+            assert.eq(100, cur.itcount());
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 100);
+            assert.eq(profileDoc.sorterSpills, 0);
+        },
+    },
+    resetProfileColl,
+    {
+        name: 'sortLimitOne',
+        command: (db) => {
+            let cur = db[collName].aggregate([{$sort: {a: 1}}, {$limit: 1}]);
+            assert.eq(1, cur.itcount());
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 100);
+            assert.eq(profileDoc.sorterSpills, 0);
+        },
+    },
+    resetProfileColl,
+    {
+        name: 'sortTopK',
+        command: (db) => {
+            let cur = db[collName].aggregate([{$sort: {a: 1}}, {$limit: 5}]);
+            assert.eq(5, cur.itcount());
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 100);
+            assert.eq(profileDoc.sorterSpills, 0);
+        },
+    },
+    resetProfileColl,
+    {
+        name: 'sortSpills',
+        command: (db) => {
+            // Force the sorter to spill for every document by lowering the memory usage limit.
+            const originalSortBytes =
+                assert
+                    .commandWorked(db.adminCommand(
+                        {getParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1}))
+                    .internalQueryMaxBlockingSortMemoryUsageBytes;
+            assert.commandWorked(db.adminCommand(
+                {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: 1}));
+            let cur = db[collName].aggregate([{$sort: {a: 1}}], {allowDiskUse: true});
+            assert.eq(100, cur.itcount());
+            assert.commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalQueryMaxBlockingSortMemoryUsageBytes: originalSortBytes
+            }));
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 100);
+            assert.eq(profileDoc.sorterSpills, 101);
+        },
+    },
+    resetProfileColl,
+    {
+        name: 'groupStage',
+        command: (db) => {
+            // There should be 10 distinct values for 'a'.
+            let cur = db[collName].aggregate([{$group: {_id: "$a", count: {$sum: 1}}}]);
+            assert.eq(cur.itcount(), 10);
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            if (isDebugBuild(db)) {
+                // In debug builds we sort and spill for each of the first 20 documents. Once we
+                // reach that limit, we stop spilling as often. This 26 is the sum of 20 debug sorts
+                // and spills of documents in groups 0 through 3 plus 6 debug spills and sorts for
+                // groups 4 through 10.
+                assert.eq(profileDoc.keysSorted, 26);
+                // This 21 is the sum of 20 debug spills plus 1 final debug spill
+                assert.eq(profileDoc.sorterSpills, 21);
+            } else {
+                // No sorts required.
+                assert.eq(profileDoc.keysSorted, 0);
+                assert.eq(profileDoc.sorterSpills, 0);
+            }
+        },
+    },
+    resetProfileColl,
+    {
+        name: 'bucketAuto',
+        command: (db) => {
+            // This uses the aggregation pipeline sort stage.
+            let cur = db[collName].aggregate([{$bucketAuto: {groupBy: "$a", buckets: 10}}]);
+            assert.eq(cur.next().count, 10);
+        },
+        profileFilter: {op: 'command', 'command.aggregate': collName},
+        profileAssert: (db, profileDoc) => {
+            assert.eq(profileDoc.docBytesRead, 29 * 100);
+            assert.eq(profileDoc.docUnitsRead, 100);
+            assert.eq(profileDoc.idxEntryBytesRead, 0);
+            assert.eq(profileDoc.idxEntryUnitsRead, 0);
+            assert.eq(profileDoc.cursorSeeks, 0);
+            assert.eq(profileDoc.docBytesWritten, 0);
+            assert.eq(profileDoc.docUnitsWritten, 0);
+            assert.eq(profileDoc.idxEntryBytesWritten, 0);
+            assert.eq(profileDoc.idxEntryUnitsWritten, 0);
+            assert.eq(profileDoc.keysSorted, 100);
+            assert.eq(profileDoc.sorterSpills, 0);
+        },
+    },
 ];
 
-const profileColl = testDB.system.profile;
-const testOperation = (operation) => {
+const testOperation = (db, operation) => {
     jsTestLog("Testing operation: " + operation.name);
-    operation.command(testDB);
+    operation.command(db);
     if (!operation.profileFilter) {
         return;
     }
 
+    const profileColl = db.system.profile;
     const cursor = profileColl.find(operation.profileFilter);
     assert(cursor.hasNext(), () => {
         // Get the last operation that was not a find on the profile collection.
@@ -893,7 +1162,7 @@ const testOperation = (operation) => {
     assertMetricsExist(entry);
     if (operation.profileAssert) {
         try {
-            operation.profileAssert(entry.operationMetrics);
+            operation.profileAssert(db, entry.operationMetrics);
         } catch (e) {
             print("Caught exception while checking profile entry for '" + operation.name +
                   "' : " + tojson(entry));
@@ -902,7 +1171,33 @@ const testOperation = (operation) => {
     }
 };
 
-operations.forEach((op) => {
-    testOperation(op);
-});
+const setParams = {
+    measureOperationResourceConsumption: true
+};
+
+const runTest = (db) => {
+    db.setProfilingLevel(2, 0);
+    operations.forEach((op) => {
+        testOperation(db, op);
+    });
+};
+
+jsTestLog("Testing standalone");
+(function testStandalone() {
+    const conn = MongoRunner.runMongod({setParameter: setParams});
+    const db = conn.getDB(dbName);
+    runTest(db);
+    MongoRunner.stopMongod(conn);
+})();
+
+jsTestLog("Testing replica set");
+(function testReplicaSet() {
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: setParams}});
+    rst.startSet();
+    rst.initiate();
+
+    const db = rst.getPrimary().getDB(dbName);
+    runTest(db);
+    rst.stopSet();
+})();
 })();

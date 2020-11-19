@@ -52,6 +52,7 @@ static const char kDocUnitsRead[] = "docUnitsRead";
 static const char kIdxEntryBytesRead[] = "idxEntryBytesRead";
 static const char kIdxEntryUnitsRead[] = "idxEntryUnitsRead";
 static const char kKeysSorted[] = "keysSorted";
+static const char kSorterSpills[] = "sorterSpills";
 static const char kCpuNanos[] = "cpuNanos";
 static const char kDocBytesWritten[] = "docBytesWritten";
 static const char kDocUnitsWritten[] = "docUnitsWritten";
@@ -121,6 +122,7 @@ void ResourceConsumption::ReadMetrics::toBson(BSONObjBuilder* builder) const {
     builder->appendNumber(kIdxEntryBytesRead, idxEntryBytesRead);
     builder->appendNumber(kIdxEntryUnitsRead, idxEntryUnitsRead);
     builder->appendNumber(kKeysSorted, keysSorted);
+    builder->appendNumber(kSorterSpills, sorterSpills);
     builder->appendNumber(kDocUnitsReturned, docUnitsReturned);
     builder->appendNumber(kCursorSeeks, cursorSeeks);
 }
@@ -163,6 +165,7 @@ void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* 
     appendNonZeroMetric(builder, kIdxEntryBytesRead, readMetrics.idxEntryBytesRead);
     appendNonZeroMetric(builder, kIdxEntryUnitsRead, readMetrics.idxEntryUnitsRead);
     appendNonZeroMetric(builder, kKeysSorted, readMetrics.keysSorted);
+    appendNonZeroMetric(builder, kSorterSpills, readMetrics.sorterSpills);
     appendNonZeroMetric(builder, kDocUnitsReturned, readMetrics.docUnitsReturned);
     appendNonZeroMetric(builder, kCursorSeeks, readMetrics.cursorSeeks);
 
@@ -183,8 +186,7 @@ inline void ResourceConsumption::MetricsCollector::_doIfCollecting(Func&& func) 
     func();
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneDocRead(OperationContext* opCtx,
-                                                                size_t docBytesRead) {
+void ResourceConsumption::MetricsCollector::incrementOneDocRead(size_t docBytesRead) {
     _doIfCollecting([&]() {
         size_t docUnits = std::ceil(docBytesRead / static_cast<float>(gDocumentUnitSizeBytes));
         _metrics.readMetrics.docBytesRead += docBytesRead;
@@ -192,8 +194,7 @@ void ResourceConsumption::MetricsCollector::incrementOneDocRead(OperationContext
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(OperationContext* opCtx,
-                                                                     size_t bytesRead) {
+void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(size_t bytesRead) {
     _doIfCollecting([&]() {
         size_t units = std::ceil(bytesRead / static_cast<float>(gIndexEntryUnitSizeBytes));
         _metrics.readMetrics.idxEntryBytesRead += bytesRead;
@@ -201,13 +202,15 @@ void ResourceConsumption::MetricsCollector::incrementOneIdxEntryRead(OperationCo
     });
 }
 
-void ResourceConsumption::MetricsCollector::incrementKeysSorted(OperationContext* opCtx,
-                                                                size_t keysSorted) {
+void ResourceConsumption::MetricsCollector::incrementKeysSorted(size_t keysSorted) {
     _doIfCollecting([&]() { _metrics.readMetrics.keysSorted += keysSorted; });
 }
 
-void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(OperationContext* opCtx,
-                                                                      size_t returned) {
+void ResourceConsumption::MetricsCollector::incrementSorterSpills(size_t spills) {
+    _doIfCollecting([&]() { _metrics.readMetrics.sorterSpills += spills; });
+}
+
+void ResourceConsumption::MetricsCollector::incrementDocUnitsReturned(size_t returned) {
     _doIfCollecting([&]() { _metrics.readMetrics.docUnitsReturned += returned; });
 }
 

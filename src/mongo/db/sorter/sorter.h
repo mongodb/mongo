@@ -258,8 +258,12 @@ public:
 
     virtual ~Sorter() {}
 
-    bool usedDisk() const {
-        return _usedDisk;
+    size_t numSpills() const {
+        return _numSpills;
+    }
+
+    size_t numSorted() const {
+        return _numSorted;
     }
 
     PersistedState persistDataForShutdown();
@@ -269,7 +273,8 @@ protected:
 
     virtual void spill() = 0;
 
-    bool _usedDisk{false};  // Keeps track of whether the sorter used disk or not
+    size_t _numSpills = 0;  // Keeps track of the number of times data was spilled to disk.
+    size_t _numSorted = 0;  // Keeps track of the number of keys sorted.
 
     // Whether the files written by this Sorter should be kept on destruction.
     bool _shouldKeepFilesOnDestruction = false;
