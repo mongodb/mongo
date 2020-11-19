@@ -165,14 +165,20 @@ functions:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        script: ./src/dsi/run-dsi bootstrap
+        continue_on_err: true
+        script: ./src/dsi/run-dsi run_workload
     - command: shell.exec
+      type: system
       params:
-        script: ./src/dsi/run-dsi deploy_cluster
+        script: ./src/dsi/run-dsi determine_failure -m SYSTEM
+    - command: shell.exec
+      type: setup
+      params:
+        script: ./src/dsi/run-dsi determine_failure -m SETUP
     - command: shell.exec
       type: test
       params:
-        script: ./src/dsi/run-dsi test_control
+        script: ./src/dsi/run-dsi determine_failure -m TEST
     - command: json.send
       params:
         name: "perf"
