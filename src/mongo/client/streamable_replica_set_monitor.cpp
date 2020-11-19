@@ -184,8 +184,10 @@ bool hasMembershipChange(sdam::TopologyDescriptionPtr oldDescription,
 StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,
-    std::shared_ptr<executor::EgressTagCloser> connectionManager)
-    : _errorHandler(std::make_unique<SdamErrorHandler>(uri.getSetName())),
+    std::shared_ptr<executor::EgressTagCloser> connectionManager,
+    std::function<void()> cleanupCallback)
+    : ReplicaSetMonitor(cleanupCallback),
+      _errorHandler(std::make_unique<SdamErrorHandler>(uri.getSetName())),
       _queryProcessor(std::make_shared<StreamableReplicaSetMonitorQueryProcessor>()),
       _uri(uri),
       _connectionManager(connectionManager),
@@ -216,8 +218,10 @@ StreamableReplicaSetMonitor::~StreamableReplicaSetMonitor() {
 ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,
-    std::shared_ptr<executor::EgressTagCloser> connectionManager) {
-    auto result = std::make_shared<StreamableReplicaSetMonitor>(uri, executor, connectionManager);
+    std::shared_ptr<executor::EgressTagCloser> connectionManager,
+    std::function<void()> cleanupCallback) {
+    auto result = std::make_shared<StreamableReplicaSetMonitor>(
+        uri, executor, connectionManager, cleanupCallback);
     result->init();
     return result;
 }

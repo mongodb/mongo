@@ -170,14 +170,17 @@ const Seconds kDefaultRefreshPeriod(30);
 // Defaults to random selection as required by the spec
 bool ScanningReplicaSetMonitor::useDeterministicHostSelection = false;
 
-ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const SetStatePtr& initialState)
-    : _state(initialState) {}
+ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const SetStatePtr& initialState,
+                                                     std::function<void()> cleanupCallback)
+    : ReplicaSetMonitor(cleanupCallback), _state(initialState) {}
 
-ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const MongoURI& uri)
+ScanningReplicaSetMonitor::ScanningReplicaSetMonitor(const MongoURI& uri,
+                                                     std::function<void()> cleanupCallback)
     : ScanningReplicaSetMonitor(
           std::make_shared<SetState>(uri,
                                      &ReplicaSetMonitorManager::get()->getNotifier(),
-                                     ReplicaSetMonitorManager::get()->getExecutor().get())) {}
+                                     ReplicaSetMonitorManager::get()->getExecutor().get()),
+          cleanupCallback) {}
 
 void ScanningReplicaSetMonitor::init() {
     if (areRefreshRetriesDisabledForTest()) {

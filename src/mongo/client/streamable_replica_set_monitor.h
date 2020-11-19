@@ -79,7 +79,8 @@ public:
 
     StreamableReplicaSetMonitor(const MongoURI& uri,
                                 std::shared_ptr<executor::TaskExecutor> executor,
-                                std::shared_ptr<executor::EgressTagCloser> connectionManager);
+                                std::shared_ptr<executor::EgressTagCloser> connectionManager,
+                                std::function<void()> cleanupCallback);
 
     ~StreamableReplicaSetMonitor() override;
 
@@ -89,7 +90,8 @@ public:
 
     static ReplicaSetMonitorPtr make(const MongoURI& uri,
                                      std::shared_ptr<executor::TaskExecutor> executor,
-                                     std::shared_ptr<executor::EgressTagCloser> connectionCloser);
+                                     std::shared_ptr<executor::EgressTagCloser> connectionCloser,
+                                     std::function<void()> cleanupCallback);
 
     SemiFuture<HostAndPort> getHostOrRefresh(const ReadPreferenceSetting& readPref,
                                              const CancelationToken& cancelToken) override;

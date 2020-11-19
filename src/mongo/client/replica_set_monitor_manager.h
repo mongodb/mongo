@@ -104,10 +104,13 @@ public:
     /**
      * Create or retrieve a monitor for a particular replica set. The getter method returns
      * nullptr if there is no monitor registered for the particular replica set.
+     * @param cleanupCallback will be executed when the instance of ReplicaSetMonitor is deleted.
      */
     std::shared_ptr<ReplicaSetMonitor> getMonitor(StringData setName);
-    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr);
-    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MongoURI& uri);
+    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const ConnectionString& connStr,
+                                                          std::function<void()> cleanupCallback);
+    std::shared_ptr<ReplicaSetMonitor> getOrCreateMonitor(const MongoURI& uri,
+                                                          std::function<void()> cleanupCallback);
 
     /**
      * Retrieves the names of all sets tracked by this manager.
@@ -120,6 +123,11 @@ public:
      * will be destroyed and will no longer be tracked.
      */
     void removeMonitor(StringData setName);
+
+    /**
+     * Removes the already deleted monitor for 'setName' from the internal map.
+     */
+    void garbageCollect(StringData setName);
 
     std::shared_ptr<ReplicaSetMonitor> getMonitorForHost(const HostAndPort& host);
 

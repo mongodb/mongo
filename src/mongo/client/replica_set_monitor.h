@@ -52,7 +52,7 @@ namespace mongo {
  */
 class ReplicaSetMonitor : public ReplicaSetMonitorInterface {
 public:
-    ~ReplicaSetMonitor() override = default;
+    ~ReplicaSetMonitor() override;
 
     /**
      * Creates a new ReplicaSetMonitor, if it doesn't already exist.
@@ -70,9 +70,14 @@ public:
     static std::shared_ptr<ReplicaSetMonitor> get(const std::string& name);
 
     /**
-     * Removes the ReplicaSetMonitor for the given set name from _sets, which will delete it.
-     * If clearSeedCache is true, then the cached seed std::string for this Replica Set will be
-     * removed from _seedServers.
+     * Removes the ReplicaSetMonitor for the given set name from ReplicaSetMonitorManager.
+     * Drop and remove the ReplicaSetMonitor for the given set name if it exists.
+     * Then all connections for this host are deleted from the connection pool DBConnectionPool.
+     * Those two steps are not performed atomically together, but the possible (unlikely) race:
+     *  1. RSM is dropped and removed
+     *  2. Another RSM is created for the same name
+     *  3. Pooled connections are cleared
+     * is not creating any incorrectness, it is only inefficient.
      */
     static void remove(const std::string& name);
 
@@ -92,6 +97,18 @@ public:
      * Permanently stops all monitoring on replica sets.
      */
     static void shutdown();
+
+protected:
+    explicit ReplicaSetMonitor(const std::function<void()> cleanupCallback);
+
+private:
+    /**
+     * @return callback helper to safely cleanup 'ReplicaSetMonitor' and 'globalConnPool' when the
+     * instance of ReplicaSetMonitor for the 'name' is being destroyed.
+     */
+    static std::function<void()> _getCleanupCallback(StringData name);
+
+    const std::function<void()> _cleanupCallback;
 };
 
 }  // namespace mongo

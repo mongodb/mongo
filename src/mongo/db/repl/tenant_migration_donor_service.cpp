@@ -486,13 +486,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
     const CancelationToken& token) noexcept {
     auto recipientUri =
         uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()));
-    auto recipientTargeterRS = std::shared_ptr<RemoteCommandTargeterRS>(
-        new RemoteCommandTargeterRS(recipientUri.getSetName(), recipientUri.getServers()),
-        [this, self = shared_from_this(), setName = recipientUri.getSetName()](
-            RemoteCommandTargeterRS* p) {
-            ReplicaSetMonitor::remove(setName);
-            delete p;
-        });
+    auto recipientTargeterRS = std::make_shared<RemoteCommandTargeterRS>(recipientUri.getSetName(),
+                                                                         recipientUri.getServers());
 
     return ExecutorFuture<void>(**executor)
         .then([this, self = shared_from_this(), executor] {
@@ -537,7 +532,14 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                     auto opCtxHolder = cc().makeOperationContext();
                     auto opCtx = opCtxHolder.get();
 
-                    pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
+                    pauseTenantMigrationAfterBlockingStarts.executeIf(
+                        [&](const BSONObj&) {
+                            pauseTenantMigrationAfterBlockingStarts.pauseWhileSet(opCtx);
+                        },
+                        [&](const BSONObj& data) {
+                            return !data.hasField("tenantId") ||
+                                _stateDoc.getTenantId() == data["tenantId"].str();
+                        });
 
                     abortTenantMigrationAfterBlockingStarts.execute([&](const BSONObj& data) {
                         if (data.hasField("blockTimeMS")) {

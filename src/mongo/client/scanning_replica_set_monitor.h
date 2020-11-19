@@ -65,7 +65,7 @@ public:
     static constexpr auto kExpeditedRefreshPeriod = Milliseconds(500);
     static constexpr auto kCheckTimeout = Seconds(5);
 
-    ScanningReplicaSetMonitor(const MongoURI& uri);
+    ScanningReplicaSetMonitor(const MongoURI& uri, std::function<void()> cleanupCallback);
 
     void init() override;
 
@@ -138,7 +138,8 @@ public:
     /**
      * Allows tests to set initial conditions and introspect the current state.
      */
-    explicit ScanningReplicaSetMonitor(const SetStatePtr& initialState);
+    ScanningReplicaSetMonitor(const SetStatePtr& initialState,
+                              std::function<void()> cleanupCallback);
     ~ScanningReplicaSetMonitor() override;
 
     /**
