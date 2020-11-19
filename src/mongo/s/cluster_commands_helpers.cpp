@@ -697,9 +697,6 @@ bool appendEmptyResultSet(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().nShards = 0;
 
     if (status == ErrorCodes::NamespaceNotFound) {
-        // Old style reply
-        result << "result" << BSONArray();
-
         // New (command) style reply
         appendCursorResponseObject(0LL, ns, BSONArray(), &result);
 
