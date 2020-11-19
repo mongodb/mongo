@@ -76,6 +76,7 @@ assertMetricsExist(metricsBefore[db2Name]);
 
 const newNode = replSet.add({setParameter: setParams});
 replSet.reInitiate();
+replSet.waitForState(newNode, ReplSetTest.State.SECONDARY);
 replSet.awaitReplication();
 
 // Ensure that the initial syncing node has not collected any metrics.
