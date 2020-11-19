@@ -50,6 +50,7 @@
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"
@@ -732,6 +733,11 @@ namespace {
  */
 bool trySetSockOpt(int level, int opt, int val) {
     auto sock = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (sock == -1) {
+        int ec = errno;
+        LOGV2_WARNING(5128700, "socket() failed", "error"_attr = errnoWithDescription(ec));
+        return false;
+    }
 
 #ifdef _WIN32
     char* pval = reinterpret_cast<char*>(&val);
