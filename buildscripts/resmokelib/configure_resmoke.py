@@ -189,6 +189,8 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     if _config.FUZZ_MONGOD_CONFIGS:
         if not _config.CONFIG_FUZZ_SEED:
             _config.CONFIG_FUZZ_SEED = random.randrange(sys.maxsize)
+        else:
+            _config.CONFIG_FUZZ_SEED = int(_config.CONFIG_FUZZ_SEED)
         _config.MONGOD_SET_PARAMETERS, _config.WT_ENGINE_CONFIG = mongod_fuzzer_configs \
             .fuzz_set_parameters(_config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
 

@@ -1163,10 +1163,11 @@ def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-man
 
 
 def strip_fuzz_config_params(input_args):
-    """Delete fuzz related command line args because we have to add the --fuzzSeed manually."""
+    """Delete fuzz related command line args because we have to add the seed manually."""
+
     ret = []
     for arg in input_args:
-        if "--fuzzMongodConfigs" not in arg and "-fuzzSeed" not in arg:
+        if "--fuzzMongodConfigs" not in arg and "--fuzzConfigSeed" not in arg:
             ret.append(arg)
 
     return ret
