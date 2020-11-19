@@ -652,11 +652,11 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
 
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                                                        stdx::function<void()> startCompleted) {
-    if (_startedSteadyStateReplication.load()) {
+    if (_startedSteadyStateReplication.swap(true)) {
+        // This is not the first call.
         return;
     }
 
-    _startedSteadyStateReplication.store(true);
     // Check to see if we need to do an initial sync.
     const auto lastOpTime = getMyLastAppliedOpTime();
     const auto needsInitialSync =
@@ -2782,6 +2782,17 @@ ReplicationCoordinatorImpl::_updateMemberStateFromTopologyCoordinator_inlock(
     if (_memberState.secondary()) {
         _cancelCatchupTakeover_inlock();
         _cancelPriorityTakeover_inlock();
+    }
+
+    // Ensure replication is running if we are no longer REMOVED.
+    if (_memberState.removed() && !newState.arbiter()) {
+        log() << "Scheduling a task to begin or continue replication";
+        _scheduleWorkAt(_replExecutor->now(),
+                        [=](const mongo::executor::TaskExecutor::CallbackArgs& cbData) {
+                            _externalState->startThreads(_settings);
+                            auto opCtx = cc().makeOperationContext();
+                            _startDataReplication(opCtx.get());
+                        });
     }
 
     log() << "transition to " << newState << " from " << _memberState << rsLog;
