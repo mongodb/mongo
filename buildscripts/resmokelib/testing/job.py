@@ -37,6 +37,11 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         self._check_if_fixture_running = not any(
             isinstance(hook, stepdown.ContinuousStepdown) for hook in self.hooks)
 
+    @property
+    def job_num(self):
+        """Forward the job_num option from FixtureTestCaseManager."""
+        return self.manager.job_num
+
     @staticmethod
     def _interrupt_all_jobs(queue, interrupt_flag):
         # Set the interrupt flag so that other jobs do not start running more tests.
