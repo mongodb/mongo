@@ -236,11 +236,9 @@ public:
         bool canShutdown = false;
     };
 
-    explicit ConnectionPool(
-        std::shared_ptr<DependentTypeFactoryInterface> impl,
-        std::string name,
-        Options options = Options{},
-        std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = {});
+    explicit ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> impl,
+                            std::string name,
+                            Options options = Options{});
 
     ~ConnectionPool();
 
@@ -270,9 +268,6 @@ private:
 
     const std::shared_ptr<DependentTypeFactoryInterface> _factory;
     const Options _options;
-
-    // SSL context for the connections that require non-default SSL paramaeters.
-    std::shared_ptr<const transport::SSLConnectionContext> _transientSSLContext;
 
     std::shared_ptr<ControllerInterface> _controller;
 

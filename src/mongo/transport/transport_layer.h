@@ -42,6 +42,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
+
 #ifdef MONGO_CONFIG_SSL
 #include "mongo/util/net/ssl_manager.h"
 #endif
@@ -133,6 +134,16 @@ public:
     /** Rotate the in-use certificates for new connections. */
     virtual Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                       bool asyncOCSPStaple) = 0;
+
+    /**
+     * Creates a transient SSL context using targeted (non default) SSL params.
+     * @param transientSSLParams overrides any value in stored SSLConnectionContext.
+     * @param optionalManager provides an optional SSL manager, otherwise the default one will be
+     * used.
+     */
+    virtual StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
+    createTransientSSLContext(const TransientSSLParams& transientSSLParams,
+                              const SSLManagerInterface* optionalManager) = 0;
 #endif
 
 private:

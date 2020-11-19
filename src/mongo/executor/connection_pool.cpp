@@ -450,15 +450,12 @@ auto ConnectionPool::SpecificPool::make(std::shared_ptr<ConnectionPool> parent,
 const Status ConnectionPool::kConnectionStateUnknown =
     Status(ErrorCodes::InternalError, "Connection is in an unknown state");
 
-ConnectionPool::ConnectionPool(
-    std::shared_ptr<DependentTypeFactoryInterface> impl,
-    std::string name,
-    Options options,
-    std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext)
+ConnectionPool::ConnectionPool(std::shared_ptr<DependentTypeFactoryInterface> impl,
+                               std::string name,
+                               Options options)
     : _name(std::move(name)),
       _factory(std::move(impl)),
       _options(std::move(options)),
-      _transientSSLContext(std::move(transientSSLContext)),
       _controller(_options.controllerFactory()),
       _manager(options.egressTagCloserManager) {
     if (_manager) {
@@ -1037,6 +1034,7 @@ void ConnectionPool::SpecificPool::spawnConnections() {
                 "Spawning connections",
                 "connAllowance"_attr = allowance,
                 "hostAndPort"_attr = _hostAndPort);
+
     for (decltype(allowance) i = 0; i < allowance; ++i) {
         OwnedConnection handle;
         try {

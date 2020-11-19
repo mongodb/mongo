@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,43 +27,49 @@
  *    it in the license file.
  */
 
-#pragma once
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-#include <memory>
+#include <fstream>
 
-#include "mongo/config.h"
-#include "mongo/util/net/ssl_options.h"
-#include "mongo/util/net/ssl_types.h"
+#include "mongo/platform/basic.h"
 
-namespace asio {
-
-namespace ssl {
-class context;
-}  // namespace ssl
-}  // namespace asio
+#include "mongo/executor/network_interface_integration_fixture.h"
+#include "mongo/logv2/log.h"
+#include "mongo/unittest/integration_test.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
+namespace executor {
+namespace {
 
-class SSLManagerInterface;
+std::string LoadFile(const std::string& name) {
+    std::ifstream input(name);
+    std::string str((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    return str;
+}
 
-namespace transport {
-
-#ifdef MONGO_CONFIG_SSL
-struct SSLConnectionContext {
-    std::unique_ptr<asio::ssl::context> ingress;
-    std::unique_ptr<asio::ssl::context> egress;
-    std::shared_ptr<SSLManagerInterface> manager;
-    // If this Context was created from transient SSL params this contains the URI of the target
-    // cluster. It can also be used to determine if the context is indeed transient.
-    std::optional<std::string> targetClusterURI;
-
-    ~SSLConnectionContext();
+class NetworkInterfaceSSLFixture : public NetworkInterfaceIntegrationFixture {
+public:
+    void setUp() final {
+        ConnectionPool::Options options;
+        options.transientSSLParams.emplace([] {
+            TransientSSLParams params;
+            params.sslClusterPEMPayload = LoadFile("jstests/libs/client.pem");
+            params.targetedClusterConnectionString = ConnectionString::forLocal();
+            return params;
+        }());
+        LOGV2(5181101, "Initializing the test connection with transient SSL params");
+        createNet(nullptr, std::move(options));
+        net().startup();
+    }
 };
-#endif
 
-#ifndef MONGO_CONFIG_SSL
-struct SSLConnectionContext {};
-#endif
+TEST_F(NetworkInterfaceSSLFixture, Ping) {
+    assertCommandOK("admin", BSON("ping" << 1));
+}
 
-}  // namespace transport
+
+}  // namespace
+}  // namespace executor
 }  // namespace mongo

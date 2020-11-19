@@ -114,6 +114,16 @@ public:
         _remote = HostAndPort(_remoteAddr.toString(true));
 #ifdef MONGO_CONFIG_SSL
         _sslContext = transientSSLContext ? transientSSLContext : *tl->_sslContext;
+        if (transientSSLContext) {
+            logv2::DynamicAttributes attrs;
+            if (transientSSLContext->targetClusterURI) {
+                attrs.add("targetClusterURI", *transientSSLContext->targetClusterURI);
+            }
+            attrs.add("isIngress", isIngressSession);
+            attrs.add("connectionId", id());
+            attrs.add("remote", remote());
+            LOGV2(5271001, "Initializing the ASIOSession with transient SSL context", attrs);
+        }
 #endif
     } catch (const DBException&) {
         throw;

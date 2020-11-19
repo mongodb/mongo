@@ -36,6 +36,7 @@
 
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer_asio.h"
+#include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/net/ssl/context_base.hpp"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -51,7 +52,6 @@
 
 namespace mongo {
 namespace {
-
 
 // Test implementation needed by ASIO transport.
 class ServiceEntryPointUtil : public ServiceEntryPoint {
@@ -600,6 +600,42 @@ TEST(SSLManager, InitServerSideContextFromMemory) {
                                             params,
                                             transientParams,
                                             SSLManagerInterface::ConnectionDirection::kOutgoing));
+}
+
+TEST(SSLManager, TransientSSLParams) {
+    SSLParams params;
+    params.sslMode.store(::mongo::sslGlobalParams.SSLMode_requireSSL);
+    params.sslCAFile = "jstests/libs/ca.pem";
+    params.sslClusterFile = "jstests/libs/client.pem";
+
+    std::shared_ptr<SSLManagerInterface> manager =
+        SSLManagerInterface::create(params, false /* isSSLServer */);
+
+    ServiceEntryPointUtil sepu;
+
+    auto options = [] {
+        ServerGlobalParams params;
+        params.noUnixSocket = true;
+        transport::TransportLayerASIO::Options opts(&params);
+        return opts;
+    }();
+    transport::TransportLayerASIO tla(options, &sepu);
+
+    TransientSSLParams transientSSLParams;
+    transientSSLParams.sslClusterPEMPayload = LoadFile("jstests/libs/client.pem");
+    transientSSLParams.targetedClusterConnectionString = ConnectionString::forLocal();
+
+    auto result = tla.createTransientSSLContext(transientSSLParams, manager.get());
+
+    // This will fail because we need to rotate certificates first to
+    // initialize the default SSL context inside TransportLayerASIO.
+    ASSERT_NOT_OK(result.getStatus());
+
+    // Init the transport properly.
+    uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
+
+    result = tla.createTransientSSLContext(transientSSLParams, manager.get());
+    uassertStatusOK(result.getStatus());
 }
 
 #endif

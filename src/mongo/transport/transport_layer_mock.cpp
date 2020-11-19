@@ -102,5 +102,11 @@ TransportLayerMock::~TransportLayerMock() {
     shutdown();
 }
 
+StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
+TransportLayerMock::createTransientSSLContext(const TransientSSLParams& transientSSLParams,
+                                              const SSLManagerInterface* optionalManager) {
+    return Status(ErrorCodes::InvalidSSLConfiguration, "Failure creating transient SSL context");
+}
+
 }  // namespace transport
 }  // namespace mongo

@@ -45,6 +45,7 @@
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/testing_proctor.h"
 
+
 namespace mongo {
 namespace executor {
 
@@ -126,25 +127,20 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
     }
 
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
-
 #ifdef MONGO_CONFIG_SSL
     if (_connPoolOpts.transientSSLParams) {
-        // TODO: uncomment when changes for SERVER-51599 are submitted.
-        // auto statusOrContext = _tl->createTransientSSLContext(
-        //     _connPoolOpts.transientSSLParams.get(), nullptr, true /* asyncOCSPStaple */);
-        // uassertStatusOK(statusOrContext.getStatus());
-        // transientSSLContext = std::make_shared<const transport::SSLConnectionContext>(
-        //     std::move(statusOrContext.getValue()));
+        auto statusOrContext =
+            _tl->createTransientSSLContext(_connPoolOpts.transientSSLParams.get(), nullptr);
+        uassertStatusOK(statusOrContext.getStatus());
+        transientSSLContext = std::move(statusOrContext.getValue());
     }
 #endif
 
     _reactor = _tl->getReactor(transport::TransportLayer::kNewReactor);
     auto typeFactory = std::make_unique<connection_pool_tl::TLTypeFactory>(
-        _reactor, _tl, std::move(_onConnectHook), _connPoolOpts);
-    _pool = std::make_shared<ConnectionPool>(std::move(typeFactory),
-                                             std::string("NetworkInterfaceTL-") + _instanceName,
-                                             _connPoolOpts,
-                                             transientSSLContext);
+        _reactor, _tl, std::move(_onConnectHook), _connPoolOpts, transientSSLContext);
+    _pool = std::make_shared<ConnectionPool>(
+        std::move(typeFactory), std::string("NetworkInterfaceTL-") + _instanceName, _connPoolOpts);
 
     if (TestingProctor::instance().isEnabled()) {
         _counters = std::make_unique<SynchronizedCounters>();

@@ -99,6 +99,9 @@ boost::optional<Status> maybeTcpFastOpenStatus;
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
 
+
+SSLConnectionContext::~SSLConnectionContext() = default;
+
 class ASIOReactorTimer final : public ReactorTimer {
 public:
     explicit ASIOReactorTimer(asio::io_context& ctx)
@@ -1189,17 +1192,33 @@ SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
 
 Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                               bool asyncOCSPStaple) {
-    auto newSSLContext = std::make_shared<SSLConnectionContext>();
+
+    auto contextOrStatus =
+        _createSSLContext(manager, _sslMode(), TransientSSLParams(), asyncOCSPStaple);
+    if (!contextOrStatus.isOK()) {
+        return contextOrStatus.getStatus();
+    }
+    _sslContext = std::move(contextOrStatus.getValue());
+    return Status::OK();
+}
+
+StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
+TransportLayerASIO::_createSSLContext(std::shared_ptr<SSLManagerInterface>& manager,
+                                      SSLParams::SSLModes sslMode,
+                                      TransientSSLParams transientEgressSSLParams,
+                                      bool asyncOCSPStaple) const {
+
+    std::shared_ptr<SSLConnectionContext> newSSLContext = std::make_shared<SSLConnectionContext>();
     newSSLContext->manager = manager;
     const auto& sslParams = getSSLGlobalParams();
 
-    if (_sslMode() != SSLParams::SSLMode_disabled && _listenerOptions.isIngress()) {
+    if (sslMode != SSLParams::SSLMode_disabled && _listenerOptions.isIngress()) {
         newSSLContext->ingress = std::make_unique<asio::ssl::context>(asio::ssl::context::sslv23);
 
         Status status = newSSLContext->manager->initSSLContext(
             newSSLContext->ingress->native_handle(),
             sslParams,
-            TransientSSLParams(),
+            TransientSSLParams(),  // Ingress is not using transient params, they are egress.
             SSLManagerInterface::ConnectionDirection::kIncoming);
         if (!status.isOK()) {
             return status;
@@ -1220,15 +1239,33 @@ Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterfac
         Status status = newSSLContext->manager->initSSLContext(
             newSSLContext->egress->native_handle(),
             sslParams,
-            TransientSSLParams(),
+            transientEgressSSLParams,
             SSLManagerInterface::ConnectionDirection::kOutgoing);
         if (!status.isOK()) {
             return status;
         }
+        if (!transientEgressSSLParams.sslClusterPEMPayload.empty()) {
+            if (transientEgressSSLParams.targetedClusterConnectionString) {
+                newSSLContext->targetClusterURI =
+                    transientEgressSSLParams.targetedClusterConnectionString.toString();
+            }
+        }
     }
-    _sslContext = std::move(newSSLContext);
-    return Status::OK();
+    return newSSLContext;
 }
+
+StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
+TransportLayerASIO::createTransientSSLContext(const TransientSSLParams& transientSSLParams,
+                                              const SSLManagerInterface* optionalManager) {
+
+    auto manager = getSSLManager();
+    if (!manager) {
+        return Status(ErrorCodes::InvalidSSLConfiguration, "TransportLayerASIO has no SSL manager");
+    }
+
+    return _createSSLContext(manager, _sslMode(), transientSSLParams, true /* asyncOCSPStaple */);
+}
+
 #endif
 
 #ifdef __linux__

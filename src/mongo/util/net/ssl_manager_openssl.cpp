@@ -1331,7 +1331,7 @@ private:
     StatusWith<boost::optional<std::vector<DERInteger>>> _parseTLSFeature(X509* peerCert) const;
 
     /** @return true if was successful, otherwise false */
-    bool _setupPEM(SSL_CTX* context, const std::string& keyFile, PasswordFetcher* password);
+    bool _setupPEM(SSL_CTX* context, const std::string& keyFile, PasswordFetcher* password) const;
 
     /**
      * @param payload in-memory payload of a PEM file
@@ -1340,7 +1340,7 @@ private:
     bool _setupPEMFromMemoryPayload(SSL_CTX* context,
                                     const std::string& payload,
                                     PasswordFetcher* password,
-                                    StringData targetClusterURI);
+                                    StringData targetClusterURI) const;
 
     /**
      * Setup PEM from BIO, which could be file or memory input abstraction.
@@ -1356,7 +1356,7 @@ private:
                           UniqueBIO inBio,
                           PasswordFetcher* password,
                           std::optional<StringData> keyFile,
-                          std::optional<StringData> targetClusterURI);
+                          std::optional<StringData> targetClusterURI) const;
 
     /**
      * Loads a certificate chain from memory into context.
@@ -2437,7 +2437,7 @@ bool SSLManagerOpenSSL::_readCertificateChainFromMemory(
 
 bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
                                   const std::string& keyFile,
-                                  PasswordFetcher* password) {
+                                  PasswordFetcher* password) const {
     logv2::DynamicAttributes errorAttrs;
     errorAttrs.add("keyFile", keyFile);
 
@@ -2466,7 +2466,7 @@ bool SSLManagerOpenSSL::_setupPEM(SSL_CTX* context,
 bool SSLManagerOpenSSL::_setupPEMFromMemoryPayload(SSL_CTX* context,
                                                    const std::string& payload,
                                                    PasswordFetcher* password,
-                                                   StringData targetClusterURI) {
+                                                   StringData targetClusterURI) const {
     logv2::DynamicAttributes errorAttrs;
     errorAttrs.add("targetClusterURI", targetClusterURI);
 
@@ -2492,7 +2492,7 @@ bool SSLManagerOpenSSL::_setupPEMFromBIO(SSL_CTX* context,
                                          UniqueBIO inBio,
                                          PasswordFetcher* password,
                                          std::optional<StringData> keyFile,
-                                         std::optional<StringData> targetClusterURI) {
+                                         std::optional<StringData> targetClusterURI) const {
     logv2::DynamicAttributes errorAttrs;
     if (keyFile) {
         errorAttrs.add("keyFile", *keyFile);
