@@ -70,8 +70,7 @@ void WireSpec::reset(Specification spec) {
     BSONObj oldSpec, newSpec;
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        internalAssert(
-            ErrorCodes::NotYetInitialized, "WireSpec is not yet initialized", isInitialized());
+        iassert(ErrorCodes::NotYetInitialized, "WireSpec is not yet initialized", isInitialized());
 
         oldSpec = specToBSON(*_spec.get());
         _spec = std::make_shared<Specification>(std::move(spec));

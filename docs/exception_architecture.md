@@ -1,7 +1,7 @@
 # Exception Architecture
 
 MongoDB code uses the following types of assertions that are available for use:
--   `uassert` and `internalAssert`
+-   `uassert` and `iassert`
     -   Checks for per-operation user errors. Operation-fatal.
 -   `tassert`
     -   Like uassert, but inhibits clean shutdown.
@@ -24,21 +24,21 @@ The following types of assertions are deprecated:
 -   `dassert`
     -   Calls `invariant` but only in debug mode. Do not use!
 
-MongoDB uses a series of `ErrorCodes` (defined in [mongo/base/error_codes.yml][error_codes_yml]) to 
-identify and categorize error conditions. `ErrorCodes` are defined in a YAML file and converted to 
-C++ files using [MongoDB's IDL parser][idlc_py] at compile time. We also use error codes to create 
-`Status` objects, which convey the success or failure of function invocations across the code base. 
-`Status` objects are also used internally by `DBException`, MongoDB's primary exception class, and 
-its children (e.g., `AssertionException`) as a means of maintaining metadata for exceptions. The 
+MongoDB uses a series of `ErrorCodes` (defined in [mongo/base/error_codes.yml][error_codes_yml]) to
+identify and categorize error conditions. `ErrorCodes` are defined in a YAML file and converted to
+C++ files using [MongoDB's IDL parser][idlc_py] at compile time. We also use error codes to create
+`Status` objects, which convey the success or failure of function invocations across the code base.
+`Status` objects are also used internally by `DBException`, MongoDB's primary exception class, and
+its children (e.g., `AssertionException`) as a means of maintaining metadata for exceptions. The
 proper usage of these constructs is described below.
 
 ## Considerations
 
 When per-operation invariant checks fail, the current operation fails, but the process and
-connection persist. This means that `massert`, `uassert`, `internalAssert` and `verify` only 
-terminate the current operation, not the whole process. Be careful not to corrupt process state by 
-mistakenly using these assertions midway through mutating process state. Examples of this include 
-`uassert`, `internalAssert` and `massert` inside of constructors and destructors.
+connection persist. This means that `massert`, `uassert`, `iassert` and `verify` only
+terminate the current operation, not the whole process. Be careful not to corrupt process state by
+mistakenly using these assertions midway through mutating process state. Examples of this include
+`uassert`, `iassert` and `massert` inside of constructors and destructors.
 
 `fassert` failures will terminate the entire process; this is used for low-level checks where
 continuing might lead to corrupt data or loss of data on disk.
@@ -49,13 +49,13 @@ invoke the tripwire fatal assertion. This is useful for ensuring that operation 
 a test suite to fail, without resorting to different behavior during testing, and without allowing
 user operations to potentially disrupt production deployments by terminating the server.
 
-Both `massert` and `uassert` take error codes, so that all assertions have codes associated with 
-them. Currently, programmers are free to provide the error code by either using a unique location 
-number or choose from existing `ErrorCodes`. Unique location numbers are assigned incrementally and 
+Both `massert` and `uassert` take error codes, so that all assertions have codes associated with
+them. Currently, programmers are free to provide the error code by either using a unique location
+number or choose from existing `ErrorCodes`. Unique location numbers are assigned incrementally and
 have no meaning other than a way to associate a log message with a line of code.
 
-`internalAssert` provides similar functionality to `uassert`, but it logs at a higher level and 
-does not increment user assertion counters. We should always choose `internalAssert` over `uassert` 
+`iassert` provides similar functionality to `uassert`, but it logs at a higher level and
+does not increment user assertion counters. We should always choose `iassert` over `uassert`
 when we expect a failure, a failure might be recoverable, or failure accounting is not interesting.
 
 
@@ -72,46 +72,46 @@ The inheritance hierarchy resembles:
 
 See util/assert_util.h.
 
-Generally, code in the server should be able to tolerate (e.g., catch) a `DBException`. Server 
-functions must be structured with exception safety in mind, such that `DBException` can propagate 
-upwards harmlessly. The code should also expect, and properly handle, `UserException`. We use 
+Generally, code in the server should be able to tolerate (e.g., catch) a `DBException`. Server
+functions must be structured with exception safety in mind, such that `DBException` can propagate
+upwards harmlessly. The code should also expect, and properly handle, `UserException`. We use
 [Resource Acquisition Is Initialization][raii] heavily.
 
 ## ErrorCodes and Status
 
-MongoDB uses `ErrorCodes` both internally and externally: a subset of error codes (e.g., 
-`BadValue`) are used externally to pass errors over the wire and to clients. These error codes are 
-the means for MongoDB processes (e.g., *mongod* and *mongo*) to communicate errors, and are visible 
-to client applications. Other error codes are used internally to indicate the underlying reason for 
-a failed operation. For instance, `PeriodicJobIsStopped` is an internal error code that is passed 
-to callback functions running inside a [`PeriodicRunner`][periodic_runner_h] once the runner is 
-stopped. The internal error codes are for internal use only and must never be returned to clients 
+MongoDB uses `ErrorCodes` both internally and externally: a subset of error codes (e.g.,
+`BadValue`) are used externally to pass errors over the wire and to clients. These error codes are
+the means for MongoDB processes (e.g., *mongod* and *mongo*) to communicate errors, and are visible
+to client applications. Other error codes are used internally to indicate the underlying reason for
+a failed operation. For instance, `PeriodicJobIsStopped` is an internal error code that is passed
+to callback functions running inside a [`PeriodicRunner`][periodic_runner_h] once the runner is
+stopped. The internal error codes are for internal use only and must never be returned to clients
 (i.e., in a network response).
- 
-Zero or more error categories can be assigned to `ErrorCodes`, which allows a single handler to 
-serve a group of `ErrorCodes`. `RetriableError`, for instance, is an `ErrorCategory` that includes 
-all retriable `ErrorCodes` (e.g., `HostUnreachable` and `HostNotFound`). This implies that an 
-operation that fails with any error code in this category can be safely retried. We can use 
-`ErrorCodes::isA<${category}>(${error})` to check if `error` belongs to `category`. Alternatively, 
-we can use `ErrorCodes::is${category}(${error})` to check error categories. Both methods provide 
+
+Zero or more error categories can be assigned to `ErrorCodes`, which allows a single handler to
+serve a group of `ErrorCodes`. `RetriableError`, for instance, is an `ErrorCategory` that includes
+all retriable `ErrorCodes` (e.g., `HostUnreachable` and `HostNotFound`). This implies that an
+operation that fails with any error code in this category can be safely retried. We can use
+`ErrorCodes::isA<${category}>(${error})` to check if `error` belongs to `category`. Alternatively,
+we can use `ErrorCodes::is${category}(${error})` to check error categories. Both methods provide
 similar functionality.
 
-To represent the status of an executed operation (e.g., a command or a function invocation), we 
-use `Status` objects, which represent an error state or the absence thereof. A `Status` uses the 
-standardized `ErrorCodes` to determine the underlying cause of an error. It also allows assigning 
-a textual description, as well as code-specific extra info, to the error code for further 
-clarification. The extra info is a subclass of `ErrorExtraInfo` and specific to `ErrorCodes`. Look 
+To represent the status of an executed operation (e.g., a command or a function invocation), we
+use `Status` objects, which represent an error state or the absence thereof. A `Status` uses the
+standardized `ErrorCodes` to determine the underlying cause of an error. It also allows assigning
+a textual description, as well as code-specific extra info, to the error code for further
+clarification. The extra info is a subclass of `ErrorExtraInfo` and specific to `ErrorCodes`. Look
 for `extra` in [here][error_codes_yml] for reference.
 
-MongoDB provides `StatusWith` to enable functions to return an error code or a value without 
-requiring them to have multiple outputs. This makes exception-free code cleaner by avoiding 
-functions with multiple out parameters. We can either pass an error code or an actual value to a 
-`StatusWith` object, indicating failure or success of the operation. For examples of the proper 
-usage of `StatusWith`, see [mongo/base/status_with.h][status_with_h] and 
-[mongo/base/status_with_test.cpp][status_with_test_cpp]. It is highly recommended to use `uassert` 
-or `internalAssert` over `StatusWith`, and catch exceptions instead of checking `Status` objects 
-returned from functions. Using `StatusWith` to indicate exceptions, instead of throwing via 
-`uassert` and `internalAssert`, makes it very difficult to identify that an error has occurred, and 
+MongoDB provides `StatusWith` to enable functions to return an error code or a value without
+requiring them to have multiple outputs. This makes exception-free code cleaner by avoiding
+functions with multiple out parameters. We can either pass an error code or an actual value to a
+`StatusWith` object, indicating failure or success of the operation. For examples of the proper
+usage of `StatusWith`, see [mongo/base/status_with.h][status_with_h] and
+[mongo/base/status_with_test.cpp][status_with_test_cpp]. It is highly recommended to use `uassert`
+or `iassert` over `StatusWith`, and catch exceptions instead of checking `Status` objects
+returned from functions. Using `StatusWith` to indicate exceptions, instead of throwing via
+`uassert` and `iassert`, makes it very difficult to identify that an error has occurred, and
 could lead to the wrong error being propagated.
 
 ## Gotchas

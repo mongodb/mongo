@@ -92,8 +92,8 @@ public:
      * for execution on the service executor. May throw if "scheduleTask" returns a non-okay status.
      */
     void schedule(OutOfLineExecutor::Task func) override {
-        internalAssert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); },
-                                    ScheduleFlags::kEmptyFlags));
+        iassert(scheduleTask([task = std::move(func)]() mutable { task(Status::OK()); },
+                             ScheduleFlags::kEmptyFlags));
     }
 
     /*

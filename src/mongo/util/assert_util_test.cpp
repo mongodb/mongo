@@ -233,13 +233,13 @@ TEST(AssertUtils, InternalAssertWithStatus) {
     auto userAssertions = assertionCount.user.load();
     try {
         Status status = {ErrorCodes::BadValue, "Test"};
-        internalAssert(status);
+        iassert(status);
     } catch (const DBException& ex) {
         ASSERT_EQ(ex.code(), ErrorCodes::BadValue);
         ASSERT_EQ(ex.reason(), "Test");
     }
 
-    internalAssert(Status::OK());
+    iassert(Status::OK());
 
     ASSERT_EQ(userAssertions, assertionCount.user.load());
 }
@@ -247,13 +247,13 @@ TEST(AssertUtils, InternalAssertWithStatus) {
 TEST(AssertUtils, InternalAssertWithExpression) {
     auto userAssertions = assertionCount.user.load();
     try {
-        internalAssert(48922, "Test", false);
+        iassert(48922, "Test", false);
     } catch (const DBException& ex) {
         ASSERT_EQ(ex.code(), 48922);
         ASSERT_EQ(ex.reason(), "Test");
     }
 
-    internalAssert(48922, "Another test", true);
+    iassert(48922, "Another test", true);
 
     ASSERT_EQ(userAssertions, assertionCount.user.load());
 }

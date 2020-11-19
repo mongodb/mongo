@@ -60,8 +60,8 @@ Nanoseconds getThreadCPUTime() {
     struct timespec t;
     if (auto ret = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t); ret != 0) {
         int ec = errno;
-        internalAssert(Status(ErrorCodes::InternalError,
-                              "Unable to get time: {}"_format(errnoWithDescription(ec))));
+        iassert(Status(ErrorCodes::InternalError,
+                       "Unable to get time: {}"_format(errnoWithDescription(ec))));
     }
     return Seconds(t.tv_sec) + Nanoseconds(t.tv_nsec);
 }

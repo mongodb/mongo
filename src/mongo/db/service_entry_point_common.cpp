@@ -1702,7 +1702,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
 
     if (ErrorCodes::isA<ErrorCategory::CloseConnectionError>(status.code())) {
         // Rethrow the exception to the top to signal that the client connection should be closed.
-        internalAssert(status);
+        iassert(status);
     }
 }
 
@@ -1852,7 +1852,7 @@ Future<DbResponse> receivedCommands(std::shared_ptr<HandleRequest::ExecutionCont
         .onError([execContext](Status status) {
             if (ErrorCodes::isConnectionFatalMessageParseError(status.code())) {
                 // If this error needs to fail the connection, propagate it out.
-                internalAssert(status);
+                iassert(status);
             }
 
             auto opCtx = execContext->getOpCtx();
@@ -1870,7 +1870,7 @@ Future<DbResponse> receivedCommands(std::shared_ptr<HandleRequest::ExecutionCont
             if (ErrorCodes::isA<ErrorCategory::CloseConnectionError>(status.code())) {
                 // Return the exception to the top to signal that the client connection should be
                 // closed.
-                internalAssert(status);
+                iassert(status);
             }
         })
         .then([execContext] { return makeCommandResponse(std::move(execContext)); });
