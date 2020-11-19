@@ -227,7 +227,7 @@ private:
     int _recv(char* buf, int max);
 
     SOCKET _fd;
-    uint64_t _fdCreationMicroSec;
+    uint64_t _fdCreationMicroSec = 0;
     SockAddr _local;
     SockAddr _remote;
     double _timeout;
