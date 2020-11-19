@@ -1199,6 +1199,23 @@ buildvariants:
     - name: genny_patch_tasks
     - name: genny_auto_tasks
 
+- name: linux-shard-lite-audit
+  display_name: Linux Shard Lite Cluster Audit
+  batchtime: 5760  # 4 days
+  modules: *modules
+  expansions:
+    mongodb_setup: shard-lite-audit
+    infrastructure_provisioning: shard-lite
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-shard-lite"
+  depends_on: *_compile_amazon2
+  tasks:
+    - name: industry_benchmarks
+
 - name: linux-shard-lite
   display_name: Linux Shard Lite Cluster
   batchtime: 5760  # 4 days
@@ -1503,6 +1520,23 @@ buildvariants:
 #  tasks:
 #    - name: initialsync-logkeeper-snapshot-update
 #    - name: initialsync-logkeeper-short-s3-update
+
+- name: linux-replSet-audit
+  display_name: Linux 3-Node ReplSet Audit
+  batchtime: 10080 # 7 days
+  modules: *modules
+  expansions:
+    mongodb_setup: replica-audit
+    infrastructure_provisioning: replica
+    platform: linux
+    project_dir: *project_dir
+    authentication: enabled
+    storageEngine: wiredTiger
+  run_on:
+      - "rhel70-perf-replset"
+  depends_on: *_compile_amazon2
+  tasks:
+    - name: industry_benchmarks
 
 - name: linux-replSet-auth-delay
   display_name: Linux 3-Node ReplSet (Auth Delay)
