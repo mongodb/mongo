@@ -67,19 +67,15 @@ try {
     // Resume initial sync. The createIndexes oplog entry will be applied.
     failPoint.off();
 
-    assert.soon(function() {
-        return rawMongoProgramOutput().search(
-                   /Invariant failure.*indexSpecs.size\(\) > 1.*test.coll.*a_1.*multi_index_block\.cpp/) >=
-            0;
-    });
+    // Wait for initial sync to finish.
+    rst.awaitSecondaryNodes();
 } finally {
+    IndexBuildTest.resumeIndexBuilds(secondary);
     IndexBuildTest.resumeIndexBuilds(primary);
     createIdx();
 }
 
 IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_', 'a_1']);
 
-rst.stop(secondary, undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
-TestData.skipCheckDBHashes = true;
 rst.stopSet();
 })();
