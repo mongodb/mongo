@@ -3,7 +3,6 @@
 //   # update/delete on a sharded collection must contain an exact match on _id or contain the shard
 //   # key.
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 
 /**

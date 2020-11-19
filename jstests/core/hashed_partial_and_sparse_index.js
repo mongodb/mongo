@@ -3,7 +3,6 @@
  * index and sparse index. The test verifies compound hashed index with hashed prefix and non-hashed
  * prefix.
  * @tags: [
- *   sbe_incompatible,
  *   requires_fcv_49,
  * ]
  */

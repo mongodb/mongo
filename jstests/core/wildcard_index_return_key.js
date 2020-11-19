@@ -1,8 +1,5 @@
 /**
  * Tests that $** indexes works with returnKey option.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 'use strict';

@@ -4,7 +4,6 @@
 // be the case on all shards.
 // @tags: [
 //   assumes_unsharded_collection,
-//   sbe_incompatible,
 // ]
 (function() {
 "use strict";

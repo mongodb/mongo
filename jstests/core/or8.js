@@ -1,6 +1,5 @@
 // @tags: [
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 // missing collection

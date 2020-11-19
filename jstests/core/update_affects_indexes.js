@@ -1,8 +1,5 @@
 // This is a regression test for SERVER-32048. It checks that index keys are correctly updated when
 // an update modifier implicitly creates a new array element.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

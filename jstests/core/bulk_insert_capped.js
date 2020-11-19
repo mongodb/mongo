@@ -3,7 +3,6 @@
 //   # expected.
 //   assumes_no_implicit_collection_creation_after_drop,
 //   requires_capped,
-//   sbe_incompatible,
 // ]
 
 // SERVER-21488 Test that multi inserts into capped collections don't cause corruption.

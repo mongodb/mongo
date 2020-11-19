@@ -2,7 +2,6 @@
  * Test explaining various operations against a non-existent collection.
  * @tags: [
  *   assumes_no_implicit_collection_creation_after_drop,
- *   sbe_incompatible,
  * ]
  */
 (function() {

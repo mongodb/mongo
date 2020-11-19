@@ -1,7 +1,4 @@
 // Test explain of various operations against a non-existent database
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 var explainMissingDb = db.getSiblingDB("explainMissingDb");
 

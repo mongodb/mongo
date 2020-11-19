@@ -1,9 +1,6 @@
 /**
  * Tests that an index properly reports multikeyness and multikey paths metadata in the presence of
  * successful and unsuccessful inserts.
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 (function() {
 "use strict";

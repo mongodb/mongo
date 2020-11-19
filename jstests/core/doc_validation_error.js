@@ -4,7 +4,6 @@
  * @tags: [
  *   # Does not work with legacy shellWriteMode.
  *   requires_find_command,
- *   sbe_incompatible,
  *   requires_fcv_49,
  * ]
  */

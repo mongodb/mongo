@@ -1,8 +1,5 @@
 // SERVER-13039. Confirm that we return the right results when $text is
 // inside an $or.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 var t = db.jstests_fts6;
 t.drop();

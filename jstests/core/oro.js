@@ -1,7 +1,6 @@
 // @tags: [
 //   requires_collstats,
 //   requires_getmore,
-//   sbe_incompatible,
 // ]
 
 // Test $or query with several clauses on separate indexes.

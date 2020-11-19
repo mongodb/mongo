@@ -6,7 +6,6 @@
 // covered, which will not happen if the $sort is within a $facet stage.
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
-//   sbe_incompatible,
 // ]
 load('jstests/aggregation/extras/utils.js');  // For resultsEq.
 

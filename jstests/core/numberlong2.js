@@ -1,6 +1,5 @@
 // @tags: [
 //   requires_non_retryable_writes,
-//   sbe_incompatible,
 // ]
 
 // Test precision of NumberLong values with v1 index code SERVER-3717

@@ -1,7 +1,4 @@
 // This test was designed to reproduce a memory leak that was fixed by SERVER-35455.
-// @tags: [
-//   sbe_incompatible,
-// ]
 (function() {
 "use strict";
 

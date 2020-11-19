@@ -1,7 +1,4 @@
 // Test $elemMatch object with complex embedded expressions.
-// @tags: [
-//   sbe_incompatible,
-// ]
 
 var t = db.jstests_arrayfindb;
 t.drop();

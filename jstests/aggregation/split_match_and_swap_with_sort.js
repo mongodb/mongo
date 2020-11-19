@@ -10,7 +10,6 @@
 //   assumes_unsharded_collection,
 //   # Don't disable the thing we are specifically testing for!
 //   requires_pipeline_optimization,
-//   sbe_incompatible,
 // ]
 load('jstests/libs/analyze_plan.js');
 

@@ -5,7 +5,6 @@
  * that may return different values after a failover; in this case, 'planCacheClearFilters'.
  * @tags: [
  *   does_not_support_stepdowns,
- *   sbe_incompatible,
  * ]
  */
 (function() {

@@ -4,7 +4,6 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   requires_fastcount,
-//   sbe_incompatible,
 // ]
 
 t = db["jstests_coveredIndex2"];

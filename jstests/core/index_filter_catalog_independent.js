@@ -7,7 +7,6 @@
  *   # mongod, and do not replicate, this test must issue all of its commands against the same node.
  *   assumes_read_preference_unchanged,
  *   does_not_support_stepdowns,
- *   sbe_incompatible,
  * ]
  */
 (function() {

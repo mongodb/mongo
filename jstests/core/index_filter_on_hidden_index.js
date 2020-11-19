@@ -12,7 +12,6 @@
  * @tags: [
  *   # Command 'planCacheSetFilter' may return different values after a failover.
  *   does_not_support_stepdowns,
- *   sbe_incompatible,
  * ]
  */
 

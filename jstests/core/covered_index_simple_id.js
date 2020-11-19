@@ -1,6 +1,5 @@
 // @tags: [
 //   assumes_balancer_off,
-//   sbe_incompatible,
 // ]
 // Simple covered index query test
 
