@@ -1104,6 +1104,23 @@ public:
         repl::StorageInterface::set(operationContext()->getServiceContext(),
                                     std::make_unique<repl::StorageInterfaceImpl>());
         MongoDSessionCatalog::onStepUp(operationContext());
+
+        // Normally, committing a transaction is supposed to uassert if the corresponding prepare
+        // has not been majority committed. We exempt our unit tests from this expectation.
+        setGlobalFailPoint("skipCommitTxnCheckPrepareMajorityCommitted",
+                           BSON("mode"
+                                << "alwaysOn"));
+    }
+
+    void tearDown() override {
+        // Clear all sessions to free up any stashed resources.
+        SessionCatalog::get(operationContext()->getServiceContext())->reset_forTest();
+
+        setGlobalFailPoint("skipCommitTxnCheckPrepareMajorityCommitted",
+                           BSON("mode"
+                                << "off"));
+
+        ReshardingOplogApplierTest::tearDown();
     }
 
     static repl::OpTime insertRetryableOplog(OperationContext* opCtx,
@@ -1177,6 +1194,122 @@ public:
         txnParticipant.beginOrContinue(opCtx, *session.getTxnNumber(), boost::none, boost::none);
 
         return txnParticipant.checkStatementExecuted(opCtx, stmtId).is_initialized();
+    }
+
+    /**
+     * Start a transaction with lsid, txnNum and stash the resources.
+     */
+    void makeUnpreparedTransaction(OperationContext* opCtx,
+                                   LogicalSessionId lsid,
+                                   TxnNumber txnNum) {
+        // Note: marking opCtx in txn mode is permanent.
+        auto newClient = opCtx->getServiceContext()->makeClient("testWriteTxnRecord");
+        AlternativeClientRegion acr(newClient);
+        auto scopedOpCtx = cc().makeOperationContext();
+        auto innerOpCtx = scopedOpCtx.get();
+        innerOpCtx->setLogicalSessionId(lsid);
+        innerOpCtx->setTxnNumber(txnNum);
+        innerOpCtx->setInMultiDocumentTransaction();
+
+        OperationContextSession scopedSession(innerOpCtx);
+
+        auto txnParticipant = TransactionParticipant::get(innerOpCtx);
+        txnParticipant.refreshFromStorageIfNeeded(innerOpCtx);
+        txnParticipant.beginOrContinue(innerOpCtx, txnNum, false, true);
+        txnParticipant.unstashTransactionResources(innerOpCtx, "insert");
+
+        WriteUnitOfWork wuow(innerOpCtx);
+
+        // The transaction machinery cannot store an empty locker.
+        {
+            Lock::GlobalLock lk(
+                innerOpCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        }
+
+        auto operation =
+            repl::OplogEntry::makeInsertOperation(crudNs(), crudUUID(), BSON("x" << 20));
+        txnParticipant.addTransactionOperation(innerOpCtx, operation);
+        wuow.commit();
+
+        txnParticipant.stashTransactionResources(innerOpCtx);
+    }
+
+    /**
+     * Make transaction participant with lsid, txnNum go into prepared state with no ops. Returns
+     * the prepare timestamp.
+     */
+    Timestamp prepareWithEmptyTransaction(OperationContext* opCtx,
+                                          LogicalSessionId lsid,
+                                          TxnNumber txnNum) {
+        // Note: marking opCtx in txn mode is permanent.
+        auto newClient = opCtx->getServiceContext()->makeClient("testWriteTxnRecord");
+        AlternativeClientRegion acr(newClient);
+        auto scopedOpCtx = cc().makeOperationContext();
+        auto innerOpCtx = scopedOpCtx.get();
+
+        innerOpCtx->setLogicalSessionId(lsid);
+        innerOpCtx->setTxnNumber(txnNum);
+        innerOpCtx->setInMultiDocumentTransaction();
+
+        OperationContextSession scopedSession(innerOpCtx);
+
+        auto txnParticipant = TransactionParticipant::get(innerOpCtx);
+        txnParticipant.refreshFromStorageIfNeeded(innerOpCtx);
+        txnParticipant.beginOrContinue(innerOpCtx, txnNum, false, true);
+        txnParticipant.unstashTransactionResources(innerOpCtx, "prepareTransaction");
+
+        // The transaction machinery cannot store an empty locker.
+        {
+            Lock::GlobalLock lk(
+                innerOpCtx, MODE_IX, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        }
+
+        auto prepareTimestamp = txnParticipant.prepareTransaction(innerOpCtx, {});
+        txnParticipant.stashTransactionResources(innerOpCtx);
+        return Timestamp(prepareTimestamp.getSecs(), prepareTimestamp.getInc() + 1);
+    }
+
+    void commitPreparedTxn(OperationContext* opCtx,
+                           LogicalSessionId lsid,
+                           TxnNumber txnNum,
+                           Timestamp commitTs) {
+        // Note: marking opCtx in txn mode is permanent.
+        auto newClient = operationContext()->getServiceContext()->makeClient("commitTxn");
+        AlternativeClientRegion acr(newClient);
+        auto scopedOpCtx = cc().makeOperationContext();
+        auto innerOpCtx = scopedOpCtx.get();
+
+        innerOpCtx->setLogicalSessionId(lsid);
+        innerOpCtx->setTxnNumber(txnNum);
+        innerOpCtx->setInMultiDocumentTransaction();
+
+        OperationContextSession scopedSession(innerOpCtx);
+
+        auto txnParticipant = TransactionParticipant::get(innerOpCtx);
+        txnParticipant.beginOrContinue(innerOpCtx, txnNum, false, boost::none);
+
+        txnParticipant.unstashTransactionResources(innerOpCtx, "commitTransaction");
+        txnParticipant.commitPreparedTransaction(innerOpCtx, commitTs, boost::none);
+    }
+
+    void abortTxn(OperationContext* opCtx, LogicalSessionId lsid, TxnNumber txnNum) {
+        // Note: marking opCtx in txn mode is permanent.
+        auto newClient = operationContext()->getServiceContext()->makeClient("abortTxn");
+        AlternativeClientRegion acr(newClient);
+        auto scopedOpCtx = cc().makeOperationContext();
+        auto innerOpCtx = scopedOpCtx.get();
+
+        innerOpCtx->setLogicalSessionId(lsid);
+        innerOpCtx->setTxnNumber(txnNum);
+        innerOpCtx->setInMultiDocumentTransaction();
+
+        OperationContextSession scopedSession(innerOpCtx);
+
+        auto txnParticipant = TransactionParticipant::get(innerOpCtx);
+        txnParticipant.beginOrContinue(innerOpCtx, txnNum, false, boost::none);
+
+        txnParticipant.unstashTransactionResources(innerOpCtx, "abortTransaction");
+        txnParticipant.abortTransaction(innerOpCtx);
     }
 };
 
@@ -1580,6 +1713,223 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
     ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
 
     ASSERT_TRUE(isWriteAlreadyExecuted(session, incomingStmtId));
+}
+
+TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSameTxn) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 1;
+
+    makeUnpreparedTransaction(operationContext(), lsid, txnNum);
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    OperationSessionInfo session;
+    session.setSessionId(lsid);
+    session.setTxnNumber(txnNum);
+
+    std::queue<repl::OplogEntry> crudOps;
+
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1),
+                           boost::none,
+                           session,
+                           1));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   Timestamp(6, 3),
+                                   std::move(iterator),
+                                   2 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // Op should always be applied, even if session info was not compatible.
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    ASSERT_THROWS_CODE(
+        isWriteAlreadyExecuted(session, 1), DBException, ErrorCodes::IncompleteTransactionHistory);
+}
+
+TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWithLowerTxnNum) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 10;
+
+    makeUnpreparedTransaction(operationContext(), lsid, txnNum - 1);
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    OperationSessionInfo session;
+    session.setSessionId(lsid);
+    session.setTxnNumber(txnNum);
+
+    std::queue<repl::OplogEntry> crudOps;
+
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1),
+                           boost::none,
+                           session,
+                           1));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   Timestamp(6, 3),
+                                   std::move(iterator),
+                                   2 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // Op should always be applied, even if session info was not compatible.
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
+}
+
+TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillCommit) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 10;
+
+    auto commitTs = prepareWithEmptyTransaction(operationContext(), lsid, txnNum - 1);
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    OperationSessionInfo session;
+    session.setSessionId(lsid);
+    session.setTxnNumber(txnNum);
+
+    std::queue<repl::OplogEntry> crudOps;
+
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1),
+                           boost::none,
+                           session,
+                           1));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   Timestamp(6, 3),
+                                   std::move(iterator),
+                                   2 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    auto future = applier.applyUntilCloneFinishedTs();
+
+    // Sleep a little bit to make the applier block on the prepared transaction.
+    sleepmillis(200);
+
+    ASSERT_FALSE(future.isReady());
+
+    commitPreparedTxn(operationContext(), lsid, txnNum - 1, commitTs);
+
+    future.get();
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // Op should always be applied, even if session info was not compatible.
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
+}
+
+TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbort) {
+    const auto lsid = makeLogicalSessionIdForTest();
+    const TxnNumber txnNum = 10;
+
+    static_cast<void>(prepareWithEmptyTransaction(operationContext(), lsid, txnNum - 1));
+
+    auto opCtx = operationContext();
+    opCtx->setLogicalSessionId(lsid);
+    opCtx->setTxnNumber(txnNum);
+
+    OperationSessionInfo session;
+    session.setSessionId(lsid);
+    session.setTxnNumber(txnNum);
+
+    std::queue<repl::OplogEntry> crudOps;
+
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1),
+                           boost::none,
+                           session,
+                           1));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   Timestamp(6, 3),
+                                   std::move(iterator),
+                                   2 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    auto future = applier.applyUntilCloneFinishedTs();
+
+    // Sleep a little bit to make the applier block on the prepared transaction.
+    sleepmillis(200);
+
+    ASSERT_FALSE(future.isReady());
+
+    abortTxn(operationContext(), lsid, txnNum - 1);
+
+    future.get();
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // Op should always be applied, even if session info was not compatible.
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1), doc);
+
+    ASSERT_TRUE(isWriteAlreadyExecuted(session, 1));
 }
 
 }  // unnamed namespace

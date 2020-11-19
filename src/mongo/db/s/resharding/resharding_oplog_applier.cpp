@@ -77,7 +77,9 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
     opCtx->setLogicalSessionId(*oplog.getSessionId());
     opCtx->setTxnNumber(txnNumber);
 
-    MongoDOperationContextSession ocs(opCtx);
+    boost::optional<MongoDOperationContextSession> scopedSession;
+    scopedSession.emplace(opCtx);
+
     auto txnParticipant = TransactionParticipant::get(opCtx);
     uassert(4990400, "Failed to get transaction Participant", txnParticipant);
     const auto stmtId = *oplog.getStatementId();
@@ -95,7 +97,16 @@ Status insertOplogAndUpdateConfigForRetryable(OperationContext* opCtx,
         } else if (ex.code() == ErrorCodes::IncompleteTransactionHistory) {
             // If the transaction chain is incomplete because oplog was truncated, just ignore the
             // incoming oplog and don't attempt to 'patch up' the missing pieces.
+            // This can also occur when txnNum == activeTxnNum. This can only happen when (lsid,
+            // txnNum) pair is reused. We are not going to update config.transactions and let the
+            // retry error out on this shard for this case.
             return Status::OK();
+        } else if (ex.code() == ErrorCodes::PreparedTransactionInProgress) {
+            // TODO SERVER-53139 Change to not block here.
+            auto txnFinishes = txnParticipant.onExitPrepare();
+            scopedSession.reset();
+            txnFinishes.wait();
+            return insertOplogAndUpdateConfigForRetryable(opCtx, oplog);
         }
 
         throw;
