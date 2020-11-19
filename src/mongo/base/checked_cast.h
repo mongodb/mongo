@@ -30,9 +30,13 @@
 #pragma once
 
 #include <memory>
+#include <type_traits>
 
-#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+
+#define MONGO_INCLUDE_INVARIANT_H_WHITELISTED
+#include "mongo/util/invariant.h"
+#undef MONGO_INCLUDE_INVARIANT_H_WHITELISTED
 
 namespace mongo {
 
@@ -40,88 +44,50 @@ namespace mongo {
  * Similar to static_cast, but in debug builds uses RTTI to confirm that the cast
  * is legal at runtime.
  */
-template <bool>
-struct checked_cast_impl;
-
-template <>
-struct checked_cast_impl<false> {
-    template <typename T, typename U>
-    static T cast(const U& u) {
-        return static_cast<T>(u);
-    }
-
-    template <typename T, typename U>
-    static T cast(U& u) {
-        return static_cast<T>(u);
-    }
-};
-
-template <>
-struct checked_cast_impl<true> {
-    template <typename T, typename U>
-    static T cast(U* u) {
-        if (!u) {
-            return nullptr;
+template <typename T, typename U>
+T checked_cast(U&& u) {
+    if constexpr (kDebugBuild) {
+        if constexpr (std::is_pointer_v<std::remove_reference_t<U>>) {
+            if (!u)
+                return nullptr;
+            T t = dynamic_cast<T>(u);
+            invariant(t);
+            return t;
+        } else {
+            return dynamic_cast<T>(std::forward<U>(u));
         }
-        T t = dynamic_cast<T>(u);
+    } else {
+        return static_cast<T>(std::forward<U>(u));
+    }
+}
+
+namespace checked_cast_detail {
+template <typename T, typename U>
+std::shared_ptr<T> checked_pointer_cast(U&& u) {
+    if constexpr (kDebugBuild) {
+        if (!u)
+            return nullptr;
+        std::shared_ptr<T> t = std::dynamic_pointer_cast<T>(std::forward<U>(u));
         invariant(t);
         return t;
+    } else {
+        return std::static_pointer_cast<T>(std::forward<U>(u));
     }
-
-    template <typename T, typename U>
-    static T cast(const U& u) {
-        return dynamic_cast<T>(u);
-    }
-
-    template <typename T, typename U>
-    static T cast(U& u) {
-        return dynamic_cast<T>(u);
-    }
-};
-
-template <typename T, typename U>
-T checked_cast(const U& u) {
-    return checked_cast_impl<kDebugBuild>::cast<T>(u);
-};
-
-template <typename T, typename U>
-T checked_cast(U& u) {
-    return checked_cast_impl<kDebugBuild>::cast<T>(u);
-};
+}
+}  // namespace checked_cast_detail
 
 /**
  * Similar to static_pointer_cast, but in debug builds uses RTTI to confirm that the cast
  * is legal at runtime.
  */
-template <bool>
-struct checked_pointer_cast_impl;
-
-template <>
-struct checked_pointer_cast_impl<false> {
-    template <typename T, typename U>
-    static std::shared_ptr<T> cast(const std::shared_ptr<U>& u) {
-        return std::static_pointer_cast<T>(u);
-    }
-};
-
-template <>
-struct checked_pointer_cast_impl<true> {
-    template <typename T, typename U>
-    static std::shared_ptr<T> cast(const std::shared_ptr<U>& u) {
-        if (!u) {
-            return nullptr;
-        }
-
-        std::shared_ptr<T> t = std::dynamic_pointer_cast<T>(u);
-        invariant(t);
-
-        return t;
-    }
-};
-
 template <typename T, typename U>
 std::shared_ptr<T> checked_pointer_cast(const std::shared_ptr<U>& u) {
-    return checked_pointer_cast_impl<kDebugBuild>::cast<T>(u);
-};
+    return checked_cast_detail::checked_pointer_cast<T>(u);
+}
+
+template <typename T, typename U>
+std::shared_ptr<T> checked_pointer_cast(std::shared_ptr<U>&& u) {
+    return checked_cast_detail::checked_pointer_cast<T>(std::move(u));
+}
 
 }  // namespace mongo

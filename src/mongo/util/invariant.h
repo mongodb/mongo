@@ -38,9 +38,11 @@
 namespace mongo {
 
 /**
- * This include exists so that mongo/base/status_with.h can use the invariant macro without causing
- * a circular include chain. It should never be included directly in any other file other than that
- * one (and assert_util.h).
+ * This header is separated from assert_util.h so that the low-level
+ * dependencies of assert_util.h (e.g. mongo/base/status_with.h,
+ * mongo/base/status.h, mongo/base/string_data.h) can use the invariant macro
+ * without causing a circular include chain. It should never be included
+ * directly in any other files.
  */
 
 #if !defined(MONGO_INCLUDE_INVARIANT_H_WHITELISTED)
