@@ -87,7 +87,7 @@ struct RemoteCommandRequestBase {
 
     boost::optional<UUID> operationKey;
 
-    FireAndForgetMode fireAndForgetMode;
+    FireAndForgetMode fireAndForgetMode = FireAndForgetMode::kOff;
 
     // When false, the network interface will refrain from enforcing the 'timeout' for this request,
     // but will still pass the timeout on as maxTimeMSOpOnly.
