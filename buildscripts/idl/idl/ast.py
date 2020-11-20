@@ -215,6 +215,7 @@ class Command(Struct):
         # type: (str, int, int) -> None
         """Construct a command."""
         self.namespace = None  # type: str
+        self.command_name = None  # type: str
         self.command_field = None  # type: Field
         self.reply_type = None  # type: Field
         self.api_version = ""  # type: str
@@ -268,8 +269,6 @@ class FieldListEntry(common.SourceLocation):
         self.name = None  # type: str
         self.forward_to_shards = False  # type: bool
         self.forward_from_shards = False  # type: bool
-
-        self.command_name = None  # type: str
         super(FieldListEntry, self).__init__(file_name, line, column)
 
     def get_should_forward(self):

@@ -482,6 +482,8 @@ def _bind_command_reply_type(ctxt, parsed_spec, command):
 
     if not isinstance(syntax_symbol, syntax.Struct):
         ctxt.add_reply_type_invalid_type(ast_field, command.name, command.reply_type)
+    else:
+        ast_field.struct_type = syntax_symbol.name
 
     return ast_field
 
@@ -497,6 +499,8 @@ def _bind_command(ctxt, parsed_spec, command):
 
     ast_command = ast.Command(command.file_name, command.line, command.column)
     ast_command.api_version = command.api_version
+    ast_command.is_deprecated = command.is_deprecated
+    ast_command.command_name = command.command_name
 
     # Inject special fields used for command parsing
     _inject_hidden_command_fields(command)

@@ -475,7 +475,6 @@ class FieldListEntry(common.SourceLocation):
         self.name = None  # type: str
         self.forward_to_shards = False  # type: bool
         self.forward_from_shards = False  # type: bool
-        self.command_name = None  # type: str
         super(FieldListEntry, self).__init__(file_name, line, column)
 
 

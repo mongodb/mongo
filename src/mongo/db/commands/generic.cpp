@@ -52,27 +52,6 @@ using std::string;
 using std::stringstream;
 using std::vector;
 
-// TODO (SERVER-51862): generate PingCmdVersion1Gen from IDL.
-template <typename Derived>
-class PingCmdVersion1Gen : public TypedCommand<Derived> {
-    using _TypedCommandInvocationBase = typename TypedCommand<Derived>::InvocationBase;
-
-public:
-    using Request = Ping;
-    using Reply = OkReply;
-    virtual const std::set<std::string>& apiVersions() const override {
-        return kApiVersions1;
-    }
-    virtual const std::set<std::string>& deprecatedApiVersions() const override {
-        return kNoApiVersions;
-    }
-    class InvocationBaseGen : public _TypedCommandInvocationBase {
-    public:
-        using _TypedCommandInvocationBase::_TypedCommandInvocationBase;
-        virtual Reply typedRun(OperationContext* opCtx) = 0;
-    };
-};
-
 class PingCommand : public PingCmdVersion1Gen<PingCommand> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {

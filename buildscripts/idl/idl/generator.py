@@ -514,6 +514,8 @@ class _CppFileWriterBase(object):
 class _CppHeaderFileWriter(_CppFileWriterBase):
     """C++ .h File writer."""
 
+    # pylint: disable=too-many-public-methods
+
     def gen_class_declaration_block(self, class_name):
         # type: (str) -> writer.IndentedScopedBlock
         """Generate a class declaration block."""
@@ -715,8 +717,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         if isinstance(struct, ast.Command):
             self._writer.write_line(
-                common.template_args('static constexpr auto kCommandName = "${struct_name}"_sd;',
-                                     struct_name=struct.name))
+                common.template_args('static constexpr auto kCommandName = "${command_name}"_sd;',
+                                     command_name=struct.command_name))
 
     def gen_enum_functions(self, idl_enum):
         # type: (ast.Enum) -> None
@@ -910,6 +912,76 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
+    def gen_template_declaration(self):
+        # type: () -> None
+        """Generate a template declaration for a command's base class."""
+        self._writer.write_line('template <typename Derived>')
+
+    def gen_derived_class_declaration_block(self, command_name, api_version):
+        # type: (str, str) -> writer.IndentedScopedBlock
+        """Generate a command's base class declaration block."""
+        class_name = common.title_case(command_name) + "CmdVersion" + api_version + "Gen"
+        return writer.IndentedScopedBlock(
+            self._writer, 'class %s : public TypedCommand<Derived> {' % class_name, '};')
+
+    def gen_type_alias_declaration(self, new_type_name, old_type_name):
+        # type: (str, str) -> None
+        """Generate a type alias declaration."""
+        self._writer.write_line(
+            'using %s = %s;' % (new_type_name, common.title_case(old_type_name)))
+
+    def gen_api_version_fn(self, is_api_versions, api_version):
+        # type: (bool, Union[str, bool]) -> None
+        """Generate an apiVersions or deprecatedApiVersions function for a command's base class."""
+        fn_name = "apiVersions" if is_api_versions else "deprecatedApiVersions"
+        fn_def = 'virtual const std::set<std::string>& %s() const override' % fn_name
+        value = "kApiVersions1" if api_version else "kNoApiVersions"
+        with self._block('%s {' % (fn_def), '}'):
+            self._writer.write_line('return %s;' % value)
+
+    def gen_invocation_base_class_declaration(self):
+        # type: () -> None
+        """Generate the InvocationBaseGen class for a command's base class."""
+        class_declaration = 'class InvocationBaseGen : public _TypedCommandInvocationBase {'
+        with writer.IndentedScopedBlock(self._writer, class_declaration, '};'):
+            # public requires special indentation that aligns with the class definition.
+            self._writer.unindent()
+            self._writer.write_line('public:')
+            self._writer.indent()
+
+            # Inherit base constructor.
+            self._writer.write_line(
+                'using _TypedCommandInvocationBase::_TypedCommandInvocationBase;')
+
+            self._writer.write_line('virtual Reply typedRun(OperationContext* opCtx) = 0;')
+
+    def generate_versioned_command_base_class(self, command):
+        # type: (ast.Command) -> None
+        """Generate a command's C++ base class to a stream."""
+        self.write_empty_line()
+
+        self.gen_template_declaration()
+
+        with self.gen_derived_class_declaration_block(command.command_name, command.api_version):
+            # Write type alias for InvocationBase.
+            self.gen_type_alias_declaration('_TypedCommandInvocationBase',
+                                            'typename TypedCommand<Derived>::InvocationBase')
+
+            self.write_empty_line()
+
+            self.write_unindented_line('public:')
+
+            # Write type aliases for Request and Reply.
+            self.gen_type_alias_declaration("Request", command.command_name)
+            self.gen_type_alias_declaration("Reply", command.reply_type.struct_type)
+
+            # Write apiVersions() and deprecatedApiVersions() functions.
+            self.gen_api_version_fn(True, command.api_version)
+            self.gen_api_version_fn(False, command.is_deprecated)
+
+            # Write InvocationBaseGen class.
+            self.gen_invocation_base_class_declaration()
+
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
@@ -961,6 +1033,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             header_list.append('mongo/idl/server_parameter.h')
             header_list.append('mongo/idl/server_parameter_with_storage.h')
 
+        # Include this for TypedCommand only if a base class will be generated for a command in this
+        # file.
+        if any(command.api_version for command in spec.commands):
+            header_list.append('mongo/db/commands.h')
+
         header_list.sort()
 
         for include in header_list:
@@ -968,7 +1045,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self.write_empty_line()
 
-        # Generate namesapce
+        # Generate namespace
         with self.gen_namespace_block(spec.globals.cpp_namespace):
             self.write_empty_line()
 
@@ -1076,6 +1153,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     self._gen_exported_constexpr(opt.name, 'Default', opt.default, opt.condition)
                     self._gen_extern_declaration(opt.cpp_vartype, opt.cpp_varname, opt.condition)
                 self._gen_config_function_declaration(spec)
+
+            # Write a base class for each command in API Version 1.
+            for command in spec.commands:
+                if command.api_version:
+                    self.generate_versioned_command_base_class(command)
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
@@ -2314,7 +2396,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def generate(self, spec, header_file_name):
         # type: (ast.IDLAST, str) -> None
-        """Generate the C++ header to a stream."""
+        """Generate the C++ source to a stream."""
 
         # pylint: disable=too-many-statements
 
