@@ -178,6 +178,7 @@ static_assert(sizeof(Instruction) == sizeof(uint8_t));
 enum class Builtin : uint8_t {
     split,
     regexMatch,
+    replaceOne,
     dateParts,
     dateToParts,
     isoDateToParts,
@@ -539,6 +540,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinDayOfMonth(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDayOfWeek(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRegexMatch(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinReplaceOne(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDropFields(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinNewObj(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinKeyStringToString(ArityType arity);

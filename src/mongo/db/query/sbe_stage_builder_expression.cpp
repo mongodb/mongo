@@ -2067,7 +2067,83 @@ public:
         unsupportedExpression("$reduce");
     }
     void visit(ExpressionReplaceOne* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto frameId = _context->frameIdGenerator->generate();
+
+        auto replacement = _context->popExpr();
+        auto find = _context->popExpr();
+        auto input = _context->popExpr();
+
+        sbe::EVariable inputRef(frameId, 0);
+        sbe::EVariable findRef(frameId, 1);
+        sbe::EVariable replacementRef(frameId, 2);
+        sbe::EVariable inputNullOrMissingRef(frameId, 3);
+        sbe::EVariable findNullOrMissingRef(frameId, 4);
+        sbe::EVariable replacementNullOrMissingRef(frameId, 5);
+
+        auto binds = sbe::makeEs(std::move(input),
+                                 std::move(find),
+                                 std::move(replacement),
+                                 generateNullOrMissing(inputRef),
+                                 generateNullOrMissing(findRef),
+                                 generateNullOrMissing(replacementRef));
+
+        auto generateValidateParameter = [](const sbe::EVariable& paramRef,
+                                            const sbe::EVariable& paramMissingRef,
+                                            const std::string& paramName) {
+            return sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::logicOr,
+                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                             paramMissingRef.clone(),
+                                             makeFunction("isString", paramRef.clone())),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5154400},
+                                       str::stream() << "$replaceOne requires that '" << paramName
+                                                     << "' be a string"));
+        };
+
+        auto inputIsStringOrFail =
+            generateValidateParameter(inputRef, inputNullOrMissingRef, "input");
+        auto findIsStringOrFail = generateValidateParameter(findRef, findNullOrMissingRef, "find");
+        auto replacementIsStringOrFail =
+            generateValidateParameter(replacementRef, replacementNullOrMissingRef, "replacement");
+
+        auto checkNullExpr =
+            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                         sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicOr,
+                                                                      inputNullOrMissingRef.clone(),
+                                                                      findNullOrMissingRef.clone()),
+                                         replacementNullOrMissingRef.clone());
+
+        // Order here is important because we want to preserve the precedence of failures in MQL.
+        auto isNullExpr = sbe::makeE<sbe::EPrimBinary>(
+            sbe::EPrimBinary::logicAnd,
+            sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::logicAnd,
+                sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::logicAnd,
+                                             std::move(inputIsStringOrFail),
+                                             std::move(findIsStringOrFail)),
+                std::move(replacementIsStringOrFail)),
+            std::move(checkNullExpr));
+
+        // Check if find string is empty, and if so return the the concatenation of the replacement
+        // string and the input string, otherwise replace the first occurrence of the find string.
+        auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
+        auto isEmptyFindStr =
+            sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq,
+                                         findRef.clone(),
+                                         sbe::makeE<sbe::EConstant>(emptyStrTag, emptyStrVal));
+
+        auto replaceOrReturnInputExpr = sbe::makeE<sbe::EIf>(
+            std::move(isEmptyFindStr),
+            makeFunction("concat", replacementRef.clone(), inputRef.clone()),
+            makeFunction("replaceOne", inputRef.clone(), findRef.clone(), replacementRef.clone()));
+
+        auto replaceOneExpr =
+            sbe::makeE<sbe::EIf>(std::move(isNullExpr),
+                                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
+                                 std::move(replaceOrReturnInputExpr));
+
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(replaceOneExpr)));
     }
     void visit(ExpressionReplaceAll* expr) final {
         unsupportedExpression(expr->getOpName());

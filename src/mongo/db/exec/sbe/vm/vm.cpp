@@ -1004,6 +1004,51 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRunJsPredicate(
     return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(predicateResult)};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReplaceOne(ArityType arity) {
+    invariant(arity == 3);
+
+    auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(0);
+    auto [ownedFindStr, typeTagFindStr, valueFindStr] = getFromStack(1);
+    auto [ownedReplacementStr, typeTagReplacementStr, valueReplacementStr] = getFromStack(2);
+
+    if (!value::isString(typeTagInputStr) || !value::isString(typeTagFindStr) ||
+        !value::isString(typeTagReplacementStr)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto inputStrView = value::getStringView(typeTagInputStr, valueInputStr);
+    auto findStrView = value::getStringView(typeTagFindStr, valueFindStr);
+    auto replacementStrView = value::getStringView(typeTagReplacementStr, valueReplacementStr);
+
+    // If find string is empty, return nothing, since an empty find will match every position in a
+    // string.
+    if (findStrView.empty()) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto input = StringData(inputStrView.data(), inputStrView.length());
+    auto find = StringData(findStrView.data(), findStrView.length());
+    auto replacement = StringData(replacementStrView.data(), replacementStrView.length());
+
+    // If find string is not found, return the original string.
+    size_t startIndex = input.find(find);
+    if (startIndex == std::string::npos) {
+        topStack(false, value::TypeTags::Nothing, 0);
+        return {ownedInputStr, typeTagInputStr, valueInputStr};
+    }
+
+    StringBuilder output;
+    size_t endIndex = startIndex + find.size();
+    output << input.substr(0, startIndex);
+    output << replacement;
+    output << input.substr(endIndex);
+
+    auto strData = output.stringData();
+    auto [outputStrTypeTag, outputStrValue] =
+        sbe::value::makeNewString({strData.rawData(), strData.size()});
+    return {true, outputStrTypeTag, outputStrValue};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(ArityType arity) {
     invariant(arity > 0);
 
@@ -2223,6 +2268,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinSplit(arity);
         case Builtin::regexMatch:
             return builtinRegexMatch(arity);
+        case Builtin::replaceOne:
+            return builtinReplaceOne(arity);
         case Builtin::dropFields:
             return builtinDropFields(arity);
         case Builtin::newObj:

@@ -125,6 +125,7 @@ env.CppUnitTest(
         'expressions/sbe_iso_date_to_parts_test.cpp',
         'expressions/sbe_mod_expression_test.cpp',
         'expressions/sbe_regex_test.cpp',
+        'expressions/sbe_replace_one_expression_test.cpp',
         'expressions/sbe_set_expressions_test.cpp',
         'expressions/sbe_to_upper_to_lower_test.cpp',
         'expressions/sbe_trigonometric_expressions_test.cpp',
