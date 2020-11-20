@@ -115,6 +115,10 @@ assert.eq(1, numAwaitingTopologyChangeOnPrimary);
 let config = replTest.getReplSetConfig();
 config.members.splice(1, 1);
 config.version = replTest.getReplSetConfigFromNode().version + 1;
+// Set a failpoint to indicate that the secondary has finished closing connections after being
+// removed from the replica set.
+let connectionsClosedAfterRemoved =
+    configureFailPoint(secondary, "waitForPostActionCompleteInHbReconfig");
 assert.commandWorked(primaryDB.runCommand({replSetReconfig: config}));
 awaitPrimaryIsMasterBeforeNodeRemoval();
 
@@ -122,6 +126,8 @@ awaitPrimaryIsMasterBeforeNodeRemoval();
 assert.soonNoExcept(
     () => assert.commandFailedWithCode(secondaryDB.adminCommand({replSetGetStatus: 1}),
                                        ErrorCodes.InvalidReplicaSetConfig));
+
+connectionsClosedAfterRemoved.wait();
 
 const primaryRespAfterRemoval = assert.commandWorked(primaryDB.runCommand({isMaster: 1}));
 const secondaryRespAfterRemoval = assert.commandWorked(secondaryDB.runCommand({isMaster: 1}));
