@@ -1,6 +1,9 @@
 //
 // Basic tests for reshardCollection.
-// @tags: [requires_fcv_47]
+// @tags: [
+//   requires_fcv_47,
+//   uses_atclustertime,
+// ]
 //
 
 load("jstests/libs/uuid_util.js");

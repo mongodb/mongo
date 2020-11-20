@@ -45,7 +45,8 @@ let MongosAPIParametersUtil = (function() {
         for (const [propertyName, defaultValue] of [["runsAgainstAdminDb", false],
                                                     ["permittedInTxn", true],
                                                     ["permittedOnShardedCollection", true],
-                                                    ["requiresShardedCollection", false]]) {
+                                                    ["requiresShardedCollection", false],
+                                                    ["requiresCommittedReads", false]]) {
             if (testCase.hasOwnProperty(propertyName)) {
                 assert(typeof testCase[propertyName] === "boolean",
                        `${propertyName} must be a boolean: ${tojson(testCase)}`);
@@ -952,6 +953,8 @@ let MongosAPIParametersUtil = (function() {
                 permittedInTxn: false,
                 configServerCommandName: "_configsvrReshardCollection",
                 requiresShardedCollection: true,
+                // reshardCollection internally does atClusterTime reads.
+                requiresCommittedReads: true,
                 runsAgainstAdminDb: true,
                 command: () => ({reshardCollection: "db.collection", key: {_id: 1}})
             }
@@ -1283,6 +1286,10 @@ let MongosAPIParametersUtil = (function() {
     const listCommandsRes = st.s0.adminCommand({listCommands: 1});
     assert.commandWorked(listCommandsRes);
 
+    const supportsCommittedReads =
+        assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1}))
+            .storageEngine.supportsCommittedReads;
+
     (() => {
         // Validate test cases for all commands. Ensure there is at least one test case for every
         // mongos command, and that the test cases are well formed.
@@ -1392,6 +1399,9 @@ let MongosAPIParametersUtil = (function() {
                         continue;
 
                     if (!shardedCollection && runOrExplain.requiresShardedCollection)
+                        continue;
+
+                    if (!supportsCommittedReads && runOrExplain.requiresCommittedReads)
                         continue;
 
                     if (apiStrict && !runOrExplain.inAPIVersion1)
