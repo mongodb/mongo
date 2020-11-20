@@ -99,8 +99,9 @@ boost::optional<Status> maybeTcpFastOpenStatus;
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
 
-
+#ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
+#endif
 
 class ASIOReactorTimer final : public ReactorTimer {
 public:
