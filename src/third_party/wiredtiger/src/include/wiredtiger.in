@@ -699,30 +699,31 @@ struct __wt_cursor {
 	const char *internal_uri;
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
-#define	WT_CURSTD_APPEND		0x000001u
-#define	WT_CURSTD_BULK			0x000002u
-#define	WT_CURSTD_CACHEABLE		0x000004u
-#define	WT_CURSTD_CACHED		0x000008u
-#define	WT_CURSTD_DEAD			0x000010u
-#define	WT_CURSTD_DEBUG_COPY_KEY	0x000020u
-#define	WT_CURSTD_DEBUG_COPY_VALUE	0x000040u
-#define	WT_CURSTD_DEBUG_RESET_EVICT	0x000080u
-#define	WT_CURSTD_DUMP_HEX		0x000100u
-#define	WT_CURSTD_DUMP_JSON		0x000200u
-#define	WT_CURSTD_DUMP_PRETTY		0x000400u
-#define	WT_CURSTD_DUMP_PRINT		0x000800u
-#define	WT_CURSTD_IGNORE_TOMBSTONE	0x001000u
-#define	WT_CURSTD_JOINED		0x002000u
-#define	WT_CURSTD_KEY_EXT		0x004000u	/* Key points out of tree. */
-#define	WT_CURSTD_KEY_INT		0x008000u	/* Key points into tree. */
-#define	WT_CURSTD_META_INUSE		0x010000u
-#define	WT_CURSTD_OPEN			0x020000u
-#define	WT_CURSTD_OVERWRITE		0x040000u
-#define	WT_CURSTD_RAW			0x080000u
-#define	WT_CURSTD_RAW_SEARCH		0x100000u
-#define	WT_CURSTD_UPDATE_LOCAL		0x200000u
-#define	WT_CURSTD_VALUE_EXT		0x400000u	/* Value points out of tree. */
-#define	WT_CURSTD_VALUE_INT		0x800000u	/* Value points into tree. */
+#define	WT_CURSTD_APPEND		0x0000001u
+#define	WT_CURSTD_BULK			0x0000002u
+#define	WT_CURSTD_CACHEABLE		0x0000004u
+#define	WT_CURSTD_CACHED		0x0000008u
+#define	WT_CURSTD_DEAD			0x0000010u
+#define	WT_CURSTD_DEBUG_COPY_KEY	0x0000020u
+#define	WT_CURSTD_DEBUG_COPY_VALUE	0x0000040u
+#define	WT_CURSTD_DEBUG_RESET_EVICT	0x0000080u
+#define	WT_CURSTD_DUMP_HEX		0x0000100u
+#define	WT_CURSTD_DUMP_JSON		0x0000200u
+#define	WT_CURSTD_DUMP_PRETTY		0x0000400u
+#define	WT_CURSTD_DUMP_PRINT		0x0000800u
+#define	WT_CURSTD_HS_READ_COMMITTED	0x0001000u
+#define	WT_CURSTD_IGNORE_TOMBSTONE	0x0002000u
+#define	WT_CURSTD_JOINED		0x0004000u
+#define	WT_CURSTD_KEY_EXT		0x0008000u	/* Key points out of tree. */
+#define	WT_CURSTD_KEY_INT		0x0010000u	/* Key points into tree. */
+#define	WT_CURSTD_META_INUSE		0x0020000u
+#define	WT_CURSTD_OPEN			0x0040000u
+#define	WT_CURSTD_OVERWRITE		0x0080000u
+#define	WT_CURSTD_RAW			0x0100000u
+#define	WT_CURSTD_RAW_SEARCH		0x0200000u
+#define	WT_CURSTD_UPDATE_LOCAL		0x0400000u
+#define	WT_CURSTD_VALUE_EXT		0x0800000u	/* Value points out of tree. */
+#define	WT_CURSTD_VALUE_INT		0x1000000u	/* Value points into tree. */
 /* AUTOMATIC FLAG VALUE GENERATION STOP */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
@@ -867,6 +868,12 @@ struct __wt_session {
 	 * @config{checkpoint, the name of a checkpoint to open (the reserved name
 	 * "WiredTigerCheckpoint" opens the most recent internal checkpoint taken for the object).
 	 * The cursor does not support data modification., a string; default empty.}
+	 * @config{debug = (, configure debug specific behavior on a cursor.  Generally only used
+	 * for internal testing purposes., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;release_evict, Configure the cursor to evict the page
+	 * positioned on when the reset API is used., a boolean flag; default \c false.}
+	 * @config{
+	 * ),,}
 	 * @config{dump, configure the cursor for dump format inputs and outputs: "hex" selects a
 	 * simple hexadecimal format\, "json" selects a JSON format with each record formatted as
 	 * fields named by column names if available\, "pretty" selects a human-readable format

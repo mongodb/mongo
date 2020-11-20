@@ -548,8 +548,7 @@ err:
 
 /*
  * __recovery_setup_file --
- *     Set up the recovery slot for a file, track the largest file ID, and update the base write gen
- *     based on the file's configuration.
+ *     Set up the recovery slot for a file and track the largest file ID.
  */
 static int
 __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
@@ -595,8 +594,7 @@ __recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
       (WT_IS_MAX_LSN(&r->max_ckpt_lsn) || __wt_log_cmp(&lsn, &r->max_ckpt_lsn) > 0))
         WT_ASSIGN_LSN(&r->max_ckpt_lsn, &lsn);
 
-    /* Update the base write gen based on this file's configuration. */
-    return (__wt_metadata_update_base_write_gen(r->session, config));
+    return (0);
 }
 
 /*
@@ -978,6 +976,16 @@ done:
          * the checkpoint LSN and archiving.
          */
         WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
+
+    /* Initialize the connection's base write generation after rollback to stable. */
+    WT_ERR(__wt_metadata_init_base_write_gen(session));
+
+    /*
+     * Update the open dhandles write generations and base write generation with the connection's
+     * base write generation. The write generations of the pages which are in disk will be
+     * initialized when loaded to cache.
+     */
+    __wt_dhandle_update_write_gens(session);
 
     /*
      * If we're downgrading and have newer log files, force an archive, no matter what the archive
