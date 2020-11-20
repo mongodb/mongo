@@ -31,6 +31,7 @@
 
 #include "mongo/util/future.h"
 
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/future_test_utils.h"
 
@@ -279,94 +280,109 @@ TEST(SharedFuture, InterruptedGet_AddChild_Get) {
                         });
 }
 
-TEST(SharedFuture, ConcurrentTest_OneSharedFuture) {
-    auto nTries = 16;
-    while (nTries--) {
-        const auto nThreads = 16;
-        auto threads = std::vector<stdx::thread>(nThreads);
+/** Punt until we have `std::jthread`. Joins itself in destructor. Move-only. */
+class JoinThread : public stdx::thread {
+public:
+    explicit JoinThread(stdx::thread thread) : stdx::thread(std::move(thread)) {}
+    JoinThread(const JoinThread&) = delete;
+    JoinThread& operator=(const JoinThread&) = delete;
+    JoinThread(JoinThread&&) noexcept = default;
+    JoinThread& operator=(JoinThread&&) noexcept = default;
+    ~JoinThread() {
+        if (joinable())
+            join();
+    }
+};
 
-        SharedPromise<void> promise;
-
-        auto shared = promise.getFuture();
-
-        for (int i = 0; i < nThreads; i++) {
-            threads[i] = stdx::thread([i, &shared] {
-                auto exec = InlineRecursiveCountingExecutor::make();
-                if (i % 5 == 0) {
-                    // just wait directly on shared.
-                    shared.get();
-                } else if (i % 7 == 0) {
-                    // interrupted wait, then blocking wait.
-                    DummyInterruptable dummyInterruptable;
-                    auto res = shared.waitNoThrow(&dummyInterruptable);
-                    if (!shared.isReady()) {
-                        ASSERT_EQ(res, ErrorCodes::Interrupted);
-                    }
-                    shared.get();
-                } else if (i % 2 == 0) {
-                    // add a child.
-                    shared.thenRunOn(exec).then([] {}).get();
-                } else {
-                    // add a grand child.
-                    shared.thenRunOn(exec).share().thenRunOn(exec).then([] {}).get();
-                }
-            });
+void sharedFutureTestWorker(size_t i, SharedSemiFuture<void>& shared) {
+    auto exec = InlineRecursiveCountingExecutor::make();
+    if (i % 5 == 0) {
+        // just wait directly on shared.
+        shared.get();
+    } else if (i % 7 == 0) {
+        // interrupted wait, then blocking wait.
+        DummyInterruptable dummyInterruptable;
+        auto res = shared.waitNoThrow(&dummyInterruptable);
+        if (!shared.isReady()) {
+            ASSERT_EQ(res, ErrorCodes::Interrupted);
         }
-
-        if (nTries % 2 == 0)
-            stdx::this_thread::yield();  // Slightly increase the chance of racing.
-
-        promise.emplaceValue();
-
-        for (auto&& thread : threads) {
-            thread.join();
-        }
+        shared.get();
+    } else if (i % 2 == 0) {
+        // add a child.
+        shared.thenRunOn(exec).then([] {}).get();
+    } else {
+        // add a grand child.
+        shared.thenRunOn(exec).share().thenRunOn(exec).then([] {}).get();
     }
 }
 
-TEST(SharedFuture, ConcurrentTest_ManySharedFutures) {
-    auto nTries = 16;
-    while (nTries--) {
-        const auto nThreads = 16;
-        auto threads = std::vector<stdx::thread>(nThreads);
+/**
+ * Define a common structure between `ConcurrentTest_OneSharedFuture` and
+ * `ConcurrentTest_ManySharedFutures`. They can vary only in the ways specified
+ * by the `policy` hooks. The `policy` object defines per-try state (returned by
+ * `onTryBegin`), and then per-thread state within each worker thread of each
+ * try (returned by `onThreadBegin`). We want to ensure that the SharedPromise
+ * API works the same whether you make multiple calls to getFuture() or just
+ * one and copy it around.
+ */
+template <typename Policy>
+void sharedFutureConcurrentTest(unittest::ThreadAssertionMonitor& monitor, Policy& policy) {
+    const size_t nTries = 16;
+    for (size_t tryCount = 0; tryCount < nTries; ++tryCount) {
+        const size_t nThreads = 16;
 
         SharedPromise<void> promise;
+        std::vector<JoinThread> threads;
 
-        for (int i = 0; i < nThreads; i++) {
-            threads[i] = stdx::thread([i, &promise] {
-                auto shared = promise.getFuture();
-                auto exec = InlineRecursiveCountingExecutor::make();
-
-                if (i % 5 == 0) {
-                    // just wait directly on shared.
-                    shared.get();
-                } else if (i % 7 == 0) {
-                    // interrupted wait, then blocking wait.
-                    DummyInterruptable dummyInterruptable;
-                    auto res = shared.waitNoThrow(&dummyInterruptable);
-                    if (!shared.isReady()) {
-                        ASSERT_EQ(res, ErrorCodes::Interrupted);
-                    }
-                    shared.get();
-                } else if (i % 2 == 0) {
-                    // add a child.
-                    shared.thenRunOn(exec).then([] {}).get();
-                } else {
-                    // add a grand child.
-                    shared.thenRunOn(exec).share().thenRunOn(exec).then([] {}).get();
-                }
-            });
+        auto&& tryState = policy.onTryBegin(promise);
+        for (size_t i = 0; i < nThreads; i++) {
+            threads.push_back(JoinThread{monitor.spawn([&, i] {
+                auto&& shared = policy.onThreadBegin(tryState);
+                sharedFutureTestWorker(i, shared);
+            })});
         }
 
-        if (nTries % 2 == 0)
+        if (tryCount % 2 == 0)
             stdx::this_thread::yield();  // Slightly increase the chance of racing.
 
         promise.emplaceValue();
-
-        for (auto&& thread : threads) {
-            thread.join();
-        }
     }
+}
+
+/**
+ * Make a SharedSemiFuture from the SharedPromise at the beginning of each try.
+ * Use that same object in all of the worker threads.
+ */
+TEST(SharedFuture, ConcurrentTest_OneSharedFuture) {
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        struct {
+            decltype(auto) onTryBegin(SharedPromise<void>& promise) {
+                return promise.getFuture();
+            }
+            decltype(auto) onThreadBegin(SharedSemiFuture<void>& shared) {
+                return shared;
+            }
+        } policy;
+        sharedFutureConcurrentTest(monitor, policy);
+    });
+}
+
+/**
+ * Retain a SharedPromise through all the tries.
+ * Peel multiple SharedSemiFuture from it, one per worker thread.
+ */
+TEST(SharedFuture, ConcurrentTest_ManySharedFutures) {
+    unittest::threadAssertionMonitoredTest([&](auto& monitor) {
+        struct {
+            decltype(auto) onTryBegin(SharedPromise<void>& promise) {
+                return promise;
+            }
+            decltype(auto) onThreadBegin(SharedPromise<void>& promise) {
+                return promise.getFuture();
+            }
+        } policy;
+        sharedFutureConcurrentTest(monitor, policy);
+    });
 }
 
 }  // namespace
