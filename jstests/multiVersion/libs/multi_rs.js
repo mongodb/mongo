@@ -80,6 +80,8 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
         this.nodeOptions[nodeName] = Object.merge(this.nodeOptions[nodeName], options);
     }
 
+    jsTest.authenticate(primary);
+
     let oldPrimary = this.stepdown(primary);
     this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY);
 

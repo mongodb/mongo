@@ -20,6 +20,9 @@ selector:
   # it attempts to connect to an upgraded mongoD. Un-blacklist when SERVER-42919 fixes this issue.
   - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
 
+  # Skip any tests that run with auth explicitly.
+  - jstests/multiVersion/load_keys_on_upgrade.js
+
 # Multiversion tests start their own mongod's.
 executor:
   config:
