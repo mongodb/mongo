@@ -8,6 +8,8 @@ try:
 except ImportError:
     pass
 
+import time
+
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.core import process as _process
@@ -21,7 +23,8 @@ class Process(_process.Process):
     pb = None
     rpc = None
 
-    def __init__(self, logger, args, env=None, env_vars=None, job_num=None, test_id=None):  # pylint: disable=too-many-arguments
+    def __init__(  # pylint: disable=too-many-arguments
+            self, logger, args, env=None, env_vars=None, job_num=None, test_id=None):
         """Initialize the process with the specified logger, arguments, and environment."""
         _process.Process.__init__(self, logger, args, env=env, env_vars=env_vars)
         self._id = None
@@ -33,8 +36,11 @@ class Process(_process.Process):
 
     def start(self):
         """Start the process and the logger pipes for its stdout and stderr."""
+        # Add current timestamp to process name since processes may restart
+        # within a job.
+        process_name = "{}-{}".format(self.args[0], time.monotonic())
         logger = get_logger_config(group_id=self.job_num, test_id=self.test_id,
-                                   process_name=self.args[0])
+                                   process_name=process_name, prefix=self.logger.name)
         output_opts = self.pb.OutputOptions(loggers=[logger])
         create_options = self.pb.CreateOptions(
             args=self.args,

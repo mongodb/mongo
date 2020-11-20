@@ -12,6 +12,7 @@ from buildscripts.resmokelib import config
 from buildscripts.resmokelib import utils
 from buildscripts.resmokelib.core import jasper_process
 from buildscripts.resmokelib.core import process
+from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOD_BINARY
 from buildscripts.resmokelib.multiversionconstants import LAST_LTS_MONGOS_BINARY
 
@@ -118,7 +119,7 @@ def _add_testing_set_parameters(suite_set_parameters):
 
 
 def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
-        logger, executable=None, process_kwargs=None, **kwargs):
+        logger, job_num, executable=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts mongod arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOD_EXECUTABLE)
@@ -271,10 +272,11 @@ def mongod_program(  # pylint: disable=too-many-branches,too-many-statements
     _set_keyfile_permissions(kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
+    process_kwargs["job_num"] = job_num
     return make_process(logger, args, **process_kwargs)
 
 
-def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
+def mongos_program(logger, job_num, test_id=None, executable=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_MONGOS_EXECUTABLE)
@@ -301,11 +303,13 @@ def mongos_program(logger, executable=None, process_kwargs=None, **kwargs):
     _set_keyfile_permissions(kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
+    process_kwargs["job_num"] = job_num
+    process_kwargs["test_id"] = test_id
     return make_process(logger, args, **process_kwargs)
 
 
 def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals,too-many-statements
-        logger, job_num=None, test_id=None, executable=None, connection_string=None, filename=None,
+        logger, job_num, test_id=None, executable=None, connection_string=None, filename=None,
         process_kwargs=None, **kwargs):
     """Return a Process instance that starts a mongo shell.
 
@@ -503,7 +507,8 @@ def _format_shell_vars(sb, paths, value):
         _format_shell_vars(sb, paths + [subkey], value[subkey])
 
 
-def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **kwargs):
+def dbtest_program(logger, job_num, test_id=None, executable=None, suites=None, process_kwargs=None,
+                   **kwargs):  # pylint: disable=too-many-arguments
     """Return a Process instance that starts a dbtest with arguments constructed from 'kwargs'."""
 
     executable = utils.default_if_none(executable, config.DEFAULT_DBTEST_EXECUTABLE)
@@ -519,17 +524,19 @@ def dbtest_program(logger, executable=None, suites=None, process_kwargs=None, **
     if config.FLOW_CONTROL is not None:
         kwargs["flowControl"] = (config.FLOW_CONTROL == "on")
 
-    return generic_program(logger, args, process_kwargs=process_kwargs, **kwargs)
+    return generic_program(logger, args, job_num, test_id=test_id, process_kwargs=process_kwargs,
+                           **kwargs)
 
 
-def genny_program(logger, executable=None, process_kwargs=None, **kwargs):
+def genny_program(logger, job_num, test_id=None, executable=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts a genny executable with arguments constructed from 'kwargs'."""
     executable = utils.default_if_none(executable, config.DEFAULT_GENNY_EXECUTABLE)
     args = [executable]
-    return generic_program(logger, args, process_kwargs, **kwargs)
+    return generic_program(logger, args, job_num, test_id=test_id, process_kwargs=process_kwargs,
+                           **kwargs)
 
 
-def generic_program(logger, args, process_kwargs=None, **kwargs):
+def generic_program(logger, args, job_num, test_id=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts an arbitrary executable.
 
     The executable arguments are constructed from 'kwargs'.
@@ -543,6 +550,8 @@ def generic_program(logger, args, process_kwargs=None, **kwargs):
     _apply_kwargs(args, kwargs)
 
     process_kwargs = utils.default_if_none(process_kwargs, {})
+    process_kwargs["job_num"] = job_num
+    process_kwargs["test_id"] = test_id
     return make_process(logger, args, **process_kwargs)
 
 

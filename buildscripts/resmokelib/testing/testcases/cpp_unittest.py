@@ -19,5 +19,7 @@ class CPPUnitTestCase(interface.ProcessTestCase):
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
     def _make_process(self):
+        self.program_options["job_num"] = self.fixture.job_num
+        self.program_options["test_id"] = self._id
         return core.programs.make_process(self.logger, [self.program_executable],
                                           **self.program_options)

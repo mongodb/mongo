@@ -153,8 +153,8 @@ class SetUpEC2Instance(PowercycleCommand):
 
         # Sixth operation -
         # Set up curator to collect system & process stats on remote.
-        variant = "windows-64" if self.is_windows() else "ubuntu1604"
-        curator_hash = "117d1a65256ff78b6d15ab79a1c7088443b936d0"
+        variant = "windows" if self.is_windows() else "ubuntu1604"
+        curator_hash = "b0c3c0fc68bce26d9572796d6bed3af4a298e30e"
         curator_url = f"https://s3.amazonaws.com/boxes.10gen.com/build/curator/curator-dist-{variant}-{curator_hash}.tar.gz"
         cmds = f"curl -s {curator_url} | tar -xzv"
         monitor_system_file = powercycle_constants.MONITOR_SYSTEM_FILE

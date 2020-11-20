@@ -17,7 +17,8 @@ class PyTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.generic_program(
-            self.logger, [sys.executable, "-m", "unittest", self.test_module_name])
+            self.logger, [sys.executable, "-m", "unittest", self.test_module_name], 0,
+            test_id=self._id)
 
     @property
     def test_module_name(self):

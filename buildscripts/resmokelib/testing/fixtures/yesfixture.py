@@ -35,7 +35,7 @@ class YesFixture(interface.Fixture):  # pylint: disable=abstract-method
     def _make_process(self, index):
         logger = logging.loggers.new_fixture_node_logger(self.__class__.__name__, self.job_num,
                                                          "yes{:d}".format(index))
-        return programs.generic_program(logger, ["yes", self.__message])
+        return programs.generic_program(logger, self.job_num, ["yes", self.__message])
 
     def _do_teardown(self, mode=None):
         running_at_start = self.is_running()

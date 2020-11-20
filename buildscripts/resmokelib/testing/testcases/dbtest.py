@@ -50,7 +50,8 @@ class DBTestCase(interface.ProcessTestCase):
         utils.rmtree(self.dbtest_options["dbpath"], ignore_errors=True)
 
     def _make_process(self):
-        return core.programs.dbtest_program(self.logger, executable=self.dbtest_executable,
+        return core.programs.dbtest_program(self.logger, self.fixture.job_num, test_id=self._id,
+                                            executable=self.dbtest_executable,
                                             suites=[self.dbtest_suite], **self.dbtest_options)
 
     @staticmethod

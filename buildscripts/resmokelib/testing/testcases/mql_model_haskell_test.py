@@ -36,7 +36,8 @@ class MqlModelHaskellTestCase(interface.ProcessTestCase):
         self.program_executable = execs[0]
 
     def _make_process(self):
+        program_opts = {"job_num": self.fixture.job_num, "test_id": self._id}
         return core.programs.make_process(self.logger, [
             self.program_executable, "--test", self.json_test_file, "--prefix",
             self.top_level_dirname
-        ])
+        ], **program_opts)

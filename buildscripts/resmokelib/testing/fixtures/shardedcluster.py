@@ -406,8 +406,8 @@ class _MongoSFixture(interface.Fixture):
                 port=self.port)
             self.mongos_options["logappend"] = ""
 
-        mongos = core.programs.mongos_program(self.logger, executable=self.mongos_executable,
-                                              **self.mongos_options)
+        mongos = core.programs.mongos_program(
+            self.logger, self.job_num, executable=self.mongos_executable, **self.mongos_options)
         try:
             self.logger.info("Starting mongos on port %d...\n%s", self.port, mongos.as_command())
             mongos.start()

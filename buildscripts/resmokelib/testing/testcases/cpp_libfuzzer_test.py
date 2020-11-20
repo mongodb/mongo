@@ -31,6 +31,8 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
         default_args = [
             self.program_executable, self.corpus_directory, "-max_len=100000", "-rss_limit_mb=5000"
         ]
+        self.program_options["job_num"] = self.fixture.job_num
+        self.program_options["test_id"] = self._id
         return core.programs.make_process(self.logger, default_args, **self.program_options)
 
     def _execute(self, process):

@@ -123,6 +123,8 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             # self._exit_logging() may never return when the log output is incomplete.
             # Our workaround is to call os._exit().
             self._exit_logging()
+            if config.SPAWN_USING == "jasper":
+                self._exit_jasper()
 
     def list_suites(self):
         """List the suites that are available to execute."""
@@ -205,8 +207,6 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
             exit_code = max(suite.return_code for suite in suites)
             self.exit(exit_code)
         finally:
-            if config.SPAWN_USING == "jasper":
-                self._exit_jasper()
             self._exit_archival()
             if suites:
                 reportfile.write(suites)
@@ -357,7 +357,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         curator_path = "build/curator"
         if sys.platform == "win32":
             curator_path += ".exe"
-        git_hash = "d11f83290729dc42138af106fe01bc0714c24a8b"
+        git_hash = "b0c3c0fc68bce26d9572796d6bed3af4a298e30e"
         curator_exists = os.path.isfile(curator_path)
         curator_same_version = False
         if curator_exists:
@@ -398,6 +398,8 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
 
         jasper_process.Process.pb = jasper_pb2
         jasper_process.Process.rpc = jasper_pb2_grpc
+        logging.jasper_logger.JasperHandler.pb = jasper_pb2
+        logging.jasper_logger.JasperHandler.rpc = jasper_pb2_grpc
 
         jasper_port = config.BASE_PORT - 1
         jasper_conn_str = "localhost:%d" % jasper_port

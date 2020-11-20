@@ -42,4 +42,5 @@ class TLAPlusTestCase(interface.ProcessTestCase):
             process_kwargs["env_vars"] = {"JAVA_BINARY": self.java_binary}
 
         return core.programs.generic_program(self.logger, ["sh", "model-check.sh", self.test_name],
+                                             self.fixture.job_num, test_id=self._id,
                                              process_kwargs=process_kwargs)

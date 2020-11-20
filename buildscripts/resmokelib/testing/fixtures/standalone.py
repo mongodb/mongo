@@ -66,8 +66,8 @@ class MongoDFixture(interface.Fixture):
             self.mongod_options["port"] = core.network.PortAllocator.next_fixture_port(self.job_num)
         self.port = self.mongod_options["port"]
 
-        mongod = core.programs.mongod_program(self.logger, executable=self.mongod_executable,
-                                              **self.mongod_options)
+        mongod = core.programs.mongod_program(
+            self.logger, self.job_num, executable=self.mongod_executable, **self.mongod_options)
         try:
             self.logger.info("Starting mongod on port %d...\n%s", self.port, mongod.as_command())
             mongod.start()

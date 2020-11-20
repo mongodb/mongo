@@ -81,4 +81,6 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         return self.bm_executable + ".json"
 
     def _make_process(self):
-        return core.programs.generic_program(self.logger, [self.bm_executable], **self.bm_options)
+        return core.programs.generic_program(self.logger, [self.bm_executable],
+                                             self.fixture.job_num, test_id=self._id,
+                                             **self.bm_options)

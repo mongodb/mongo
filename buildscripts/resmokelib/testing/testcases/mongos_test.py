@@ -29,5 +29,5 @@ class MongosTestCase(interface.ProcessTestCase):
             self.options["test"] = ""
 
     def _make_process(self):
-        return core.programs.mongos_program(self.logger, executable=self.mongos_executable,
-                                            **self.options)
+        return core.programs.mongos_program(self.logger, self.fixture.job_num, test_id=self._id,
+                                            executable=self.mongos_executable, **self.options)

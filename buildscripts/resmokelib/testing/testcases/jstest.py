@@ -20,15 +20,15 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger, js_filename, shell_executable=None, shell_options=None):
+    def __init__(self, logger, js_filename, test_id, shell_executable=None, shell_options=None):  # pylint: disable=too-many-arguments
         """Initialize the _SingleJSTestCase with the JS file to run."""
-
         interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
 
         # Command line options override the YAML configuration.
         self.shell_executable = utils.default_if_none(config.MONGO_EXECUTABLE, shell_executable)
 
         self.js_filename = js_filename
+        self.test_id = test_id
         self.shell_options = utils.default_if_none(shell_options, {}).copy()
 
     def configure(self, fixture, *args, **kwargs):
@@ -102,7 +102,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     def _make_process(self):
         return core.programs.mongo_shell_program(
-            self.logger, job_num=self.fixture.job_num, test_id=self._id,
+            self.logger, self.fixture.job_num, test_id=self.test_id,
             executable=self.shell_executable, filename=self.js_filename,
             connection_string=self.fixture.get_driver_connection_url(), **self.shell_options)
 
@@ -134,7 +134,7 @@ class JSTestCase(interface.ProcessTestCase):
 
         interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
         self.num_clients = JSTestCase.DEFAULT_CLIENT_NUM
-        self.test_case_template = _SingleJSTestCase(logger, js_filename, shell_executable,
+        self.test_case_template = _SingleJSTestCase(logger, js_filename, self._id, shell_executable,
                                                     shell_options)
 
     def configure(  # pylint: disable=arguments-differ,keyword-arg-before-vararg
@@ -174,7 +174,7 @@ class JSTestCase(interface.ProcessTestCase):
         """Create and configure a _SingleJSTestCase to be run in a separate thread."""
 
         shell_options = self._get_shell_options_for_thread(thread_id)
-        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename,
+        test_case = _SingleJSTestCase(logger, self.test_case_template.js_filename, self._id,
                                       self.test_case_template.shell_executable, shell_options)
 
         test_case.configure(self.fixture)
