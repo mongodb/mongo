@@ -74,6 +74,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(blockHeartbeatStepdown);
 MONGO_FAIL_POINT_DEFINE(blockHeartbeatReconfigFinish);
+MONGO_FAIL_POINT_DEFINE(waitForPostActionCompleteInHbReconfig);
 
 }  // namespace
 
@@ -855,6 +856,11 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     lk.unlock();
     _performPostMemberStateUpdateAction(action);
+    if (MONGO_unlikely(waitForPostActionCompleteInHbReconfig.shouldFail())) {
+        // Used in tests that wait for the post member state update action to complete.
+        // eg. Closing connections upon being removed.
+        LOGV2(5286701, "waitForPostActionCompleteInHbReconfig failpoint enabled");
+    }
 }
 
 void ReplicationCoordinatorImpl::_trackHeartbeatHandle_inlock(
