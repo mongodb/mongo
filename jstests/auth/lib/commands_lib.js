@@ -5902,6 +5902,30 @@ var authCommandsLib = {
               },
           ]
         },
+        {
+          testname: "aggregate_operation_metrics",
+          command: {
+              aggregate: 1,
+              pipeline: [{$operationMetrics: {}}],
+              cursor: {}
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: roles_monitoring,
+                privileges: [
+                    {resource: {cluster: true}, actions: ["operationMetrics"]},
+                ],
+              },
+              {
+                runOnDb: firstDbName,
+                roles: roles_monitoring,
+                privileges: [
+                    {resource: {cluster: true}, actions: ["operationMetrics"]},
+                ],
+              },
+            ]
+        },
     ],
 
     /************* SHARED TEST LOGIC ****************/

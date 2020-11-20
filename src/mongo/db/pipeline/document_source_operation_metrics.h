@@ -52,7 +52,7 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::serverStatus)};
+            return {Privilege(ResourcePattern::forClusterResource(), ActionType::operationMetrics)};
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {

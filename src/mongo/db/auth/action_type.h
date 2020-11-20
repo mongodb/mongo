@@ -134,6 +134,7 @@ namespace mongo {
     X(logRotate)                                                                      \
     X(moveChunk)                                                                      \
     X(netstat)                                                                        \
+    X(operationMetrics)                                                               \
     X(planCacheIndexFilter) /* view/update index filters */                           \
     X(planCacheRead)        /* view contents of plan cache */                         \
     X(planCacheWrite)       /* clear cache, drop cache entry, pin/unpin/shun plans */ \

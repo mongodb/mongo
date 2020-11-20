@@ -188,6 +188,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::listSessions // clusterManager gets this also
         << ActionType::listShards  // clusterManager gets this also
         << ActionType::netstat
+        << ActionType::operationMetrics
         << ActionType::replSetGetConfig  // clusterManager gets this also
         << ActionType::replSetGetStatus  // clusterManager gets this also
         << ActionType::serverStatus
