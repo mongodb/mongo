@@ -6,7 +6,7 @@
 
 load("jstests/aggregation/extras/utils.js");  // arrayEq
 
-const coll = db.jstests_elemmatch_object;
+const coll = db.jstests_elemmatch_value;
 coll.drop();
 
 assert.commandWorked(coll.insert([
