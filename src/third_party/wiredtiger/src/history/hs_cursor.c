@@ -266,6 +266,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
          */
         if (__wt_txn_tw_stop_visible_all(session, &hs_cbt->upd_value->tw)) {
             WT_STAT_CONN_INCR(session, cursor_prev_hs_tombstone);
+            WT_STAT_DATA_INCR(session, cursor_prev_hs_tombstone);
             continue;
         }
         /*
@@ -382,6 +383,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
             mod_upd = NULL;
         }
         WT_STAT_CONN_INCR(session, cache_hs_read_squash);
+        WT_STAT_DATA_INCR(session, cache_hs_read_squash);
     }
 
     /*
@@ -417,6 +419,7 @@ err:
         if (upd == NULL) {
             ret = WT_NOTFOUND;
             WT_STAT_CONN_INCR(session, cache_hs_read_miss);
+            WT_STAT_DATA_INCR(session, cache_hs_read_miss);
         } else {
             WT_STAT_CONN_INCR(session, cache_hs_read);
             WT_STAT_DATA_INCR(session, cache_hs_read);

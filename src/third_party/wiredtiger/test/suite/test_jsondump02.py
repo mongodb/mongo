@@ -92,9 +92,6 @@ class test_jsondump02(wttest.WiredTigerTestCase, suite_subprocess):
         Create JSON cursors and test them directly, also test
         dump/load commands.
         """
-        import platform
-        if platform.system() == 'Darwin':
-            self.skipTest('JSON cursor test for OSX not yet working on Python3')
         extra_params = ',allocation_size=512,' +\
             'internal_page_max=16384,leaf_page_max=131072'
         self.session.create(self.table_uri1,

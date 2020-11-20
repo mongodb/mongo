@@ -62,14 +62,16 @@ struct __wt_cursor_backup {
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
 #define WT_CURBACKUP_CKPT_FAKE 0x001u   /* Object has fake checkpoint */
-#define WT_CURBACKUP_DUP 0x002u         /* Duplicated backup cursor */
-#define WT_CURBACKUP_FORCE_FULL 0x004u  /* Force full file copy for this cursor */
-#define WT_CURBACKUP_FORCE_STOP 0x008u  /* Force stop incremental backup */
-#define WT_CURBACKUP_HAS_CB_INFO 0x010u /* Object has checkpoint backup info */
-#define WT_CURBACKUP_INCR 0x020u        /* Incremental backup cursor */
-#define WT_CURBACKUP_INCR_INIT 0x040u   /* Cursor traversal initialized */
-#define WT_CURBACKUP_LOCKER 0x080u      /* Hot-backup started */
-#define WT_CURBACKUP_RENAME 0x100u      /* Object had a rename */
+#define WT_CURBACKUP_CONSOLIDATE 0x002u /* Consolidate returned info on this object */
+#define WT_CURBACKUP_DUP 0x004u         /* Duplicated backup cursor */
+#define WT_CURBACKUP_FORCE_FULL 0x008u  /* Force full file copy for this cursor */
+#define WT_CURBACKUP_FORCE_STOP 0x010u  /* Force stop incremental backup */
+#define WT_CURBACKUP_HAS_CB_INFO 0x020u /* Object has checkpoint backup info */
+#define WT_CURBACKUP_INCR 0x040u        /* Incremental backup cursor */
+#define WT_CURBACKUP_INCR_INIT 0x080u   /* Cursor traversal initialized */
+#define WT_CURBACKUP_LOCKER 0x100u      /* Hot-backup started */
+#define WT_CURBACKUP_QUERYID 0x200u     /* Backup cursor for incremental ids */
+#define WT_CURBACKUP_RENAME 0x400u      /* Object had a rename */
                                         /* AUTOMATIC FLAG VALUE GENERATION STOP */
     uint32_t flags;
 };
@@ -157,14 +159,14 @@ struct __wt_cursor_btree {
     WT_COL *cip_saved; /* Last iteration reference */
 
     /*
-     * We don't instantiate prefix-compressed keys on pages where there's no Huffman encoding
-     * because we don't want to waste memory if only moving a cursor through the page, and it's
-     * faster to build keys while moving through the page than to roll-forward from a previously
-     * instantiated key (we don't instantiate all of the keys, just the ones at binary search
-     * points). We can't use the application's WT_CURSOR key field as a copy of the last-returned
-     * key because it may have been altered by the API layer, for example, dump cursors. Instead we
-     * store the last-returned key in a temporary buffer. The rip_saved field is used to determine
-     * if the key in the temporary buffer has the prefix needed for building the current key.
+     * We don't instantiate prefix-compressed keys on pages because we don't want to waste memory if
+     * only moving a cursor through the page, and it's faster to build keys while moving through the
+     * page than to roll-forward from a previously instantiated key (we don't instantiate all of the
+     * keys, just the ones at binary search points). We can't use the application's WT_CURSOR key
+     * field as a copy of the last-returned key because it may have been altered by the API layer,
+     * for example, dump cursors. Instead we store the last-returned key in a temporary buffer. The
+     * rip_saved field is used to determine if the key in the temporary buffer has the prefix needed
+     * for building the current key.
      */
     WT_ROW *rip_saved; /* Last-returned key reference */
 
@@ -278,6 +280,13 @@ struct __wt_cursor_dump {
     WT_CURSOR iface;
 
     WT_CURSOR *child;
+};
+
+struct __wt_cursor_hs {
+    WT_CURSOR iface;
+
+    WT_CURSOR *file_cursor; /* Queries of regular history store data */
+    WT_TIME_WINDOW time_window;
 };
 
 struct __wt_cursor_index {

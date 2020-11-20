@@ -1081,6 +1081,7 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
     void *huffman;
 
     btree = S2BT(session);
+    huffman = NULL;
 
     /* Reference the cell's data, optionally decode it. */
     switch (unpack->type) {
@@ -1089,8 +1090,6 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
         store->size = unpack->size;
         if (page_type == WT_PAGE_ROW_INT)
             return (0);
-
-        huffman = btree->huffman_key;
         break;
     case WT_CELL_VALUE:
         store->data = unpack->data;
@@ -1101,8 +1100,6 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
         WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
         if (page_type == WT_PAGE_ROW_INT || decoded)
             return (0);
-
-        huffman = btree->huffman_key;
         break;
     case WT_CELL_VALUE_OVFL:
         WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));

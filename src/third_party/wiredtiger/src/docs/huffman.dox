@@ -1,17 +1,12 @@
 /*! @page huffman Huffman Encoding
 
-Keys in row-stores and variable-length values in either row- or
-column-stores can be compressed with Huffman encoding.
+Variable-length values in either row- or column-stores can be
+compressed with Huffman encoding.
 
 Huffman compression is maintained in memory as well as on disk, and can
 increase the amount of usable data the cache can hold as well as
 decrease the size of the data on disk.  The additional CPU cost of
 Huffman coding can be high, and should be considered.
-
-To configure Huffman encoding for the key in a row-store, specify \c
-huffman_key=english, \c huffman_key=utf8<file> or \c
-huffman_key=utf16<file> in the configuration passed to \c
-WT_SESSION::create.
 
 To configure Huffman encoding for a variable-length value in either a
 row-store or a column-store, specify \c huffman_value=english, \c

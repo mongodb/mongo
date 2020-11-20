@@ -156,11 +156,6 @@ __rec_cell_build_leaf_key(
         WT_RET(__wt_buf_set(session, &key->buf, (uint8_t *)data + pfx, size - pfx));
     }
 
-    /* Optionally compress the key using the Huffman engine. */
-    if (btree->huffman_key != NULL)
-        WT_RET(__wt_huffman_encode(
-          session, btree->huffman_key, key->buf.data, (uint32_t)key->buf.size, &key->buf));
-
     /* Create an overflow object if the data won't fit. */
     if (key->buf.size > btree->maxleafkey) {
         /*
@@ -923,6 +918,7 @@ __wt_rec_row_leaf(
                           session, btree->id, tmpkey, WT_TS_NONE, false));
                         WT_ERR(__wt_hs_cursor_close(session));
                         WT_STAT_CONN_INCR(session, cache_hs_key_truncate_onpage_removal);
+                        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_onpage_removal);
                     }
                 }
 
@@ -971,8 +967,7 @@ __wt_rec_row_leaf(
 
             kpack = &_kpack;
             __wt_cell_unpack_kv(session, page->dsk, cell, kpack);
-            if (btree->huffman_key == NULL && kpack->type == WT_CELL_KEY &&
-              tmpkey->size >= kpack->prefix && tmpkey->size != 0) {
+            if (kpack->type == WT_CELL_KEY && tmpkey->size >= kpack->prefix && tmpkey->size != 0) {
                 /*
                  * Grow the buffer as necessary, ensuring data data has been copied into local
                  * buffer space, then append the suffix to the prefix already in the buffer.

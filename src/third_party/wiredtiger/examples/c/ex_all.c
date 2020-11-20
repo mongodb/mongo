@@ -686,12 +686,6 @@ session_ops(WT_SESSION *session)
         error_check(session->compact(session, "table:mytable", NULL));
         /*! [Compact a table] */
 
-#ifdef MIGHT_NOT_RUN
-        /*! [Import a file] */
-        error_check(session->import(session, "file:import", NULL));
-/*! [Import a file] */
-#endif
-
         error_check(
           session->create(session, "table:old", "key_format=r,value_format=S,cache_resident=true"));
         /*! [Rename a table] */

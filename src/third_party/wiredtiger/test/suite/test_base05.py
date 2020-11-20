@@ -42,9 +42,7 @@ class test_base05(wttest.WiredTigerTestCase):
     nentries = 1000
     scenarios = make_scenarios([
         ('no_huffman', dict(extraconfig='')),
-        ('huffman_key', dict(extraconfig='huffman_key="english"')),
         ('huffman_val', dict(extraconfig='huffman_value="english"')),
-        ('huffman_keyval', dict(extraconfig='huffman_key="english",huffman_value="english"'))
         ])
 
     def config_string(self):

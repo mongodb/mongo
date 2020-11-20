@@ -423,7 +423,6 @@ static inline int
 __cursor_row_slot_key_return(
   WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_CELL_UNPACK_KV *kpack, bool *kpack_used)
 {
-    WT_BTREE *btree;
     WT_CELL *cell;
     WT_ITEM *kb;
     WT_PAGE *page;
@@ -433,7 +432,6 @@ __cursor_row_slot_key_return(
     *kpack_used = false;
 
     session = CUR2S(cbt);
-    btree = S2BT(session);
     page = cbt->ref->page;
 
     kb = &cbt->iface.key;
@@ -452,10 +450,6 @@ __cursor_row_slot_key_return(
      */
     if (__wt_row_leaf_key_info(page, copy, NULL, &cell, &kb->data, &kb->size))
         return (0);
-
-    /* Huffman encoded keys are a slow path in all cases. */
-    if (btree->huffman_key != NULL)
-        goto slow;
 
     /*
      * Unpack the cell and deal with overflow and prefix-compressed keys. Inline building simple
@@ -487,7 +481,6 @@ __cursor_row_slot_key_return(
          * Call __wt_row_leaf_key_work instead of __wt_row_leaf_key: we already did
          * __wt_row_leaf_key's fast-path checks inline.
          */
-slow:
         WT_RET(__wt_row_leaf_key_work(session, page, rip, cbt->row_key, false));
     }
     kb->data = cbt->row_key->data;

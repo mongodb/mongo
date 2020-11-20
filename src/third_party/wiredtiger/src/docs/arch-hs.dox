@@ -1,0 +1,8 @@
+/*! @arch_page arch-hs History Store
+
+The History Store in WiredTiger tracks old (all but the latest committed)
+versions of records.  By having these records in storage separate from
+the current version, they can be used to service long running transactions,
+and be evicted as necessary, without interfering with activity that uses
+the most recent committed versions.
+*/

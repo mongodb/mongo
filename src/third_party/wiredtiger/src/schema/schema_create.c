@@ -62,7 +62,7 @@ __check_imported_ts(WT_SESSION_IMPL *session, const char *uri, const char *confi
     ckptbase = NULL;
     txn_global = &S2C(session)->txn_global;
 
-    WT_ERR_NOTFOUND_OK(__wt_meta_ckptlist_get_with_config(session, false, &ckptbase, config), true);
+    WT_ERR_NOTFOUND_OK(__wt_meta_ckptlist_get_from_config(session, false, &ckptbase, config), true);
     if (ret == WT_NOTFOUND)
         WT_ERR_MSG(session, EINVAL,
           "%s: import could not find any checkpoint information in supplied metadata", uri);
@@ -218,18 +218,18 @@ __create_file(
                 ;
             *p = val->data;
             WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
-            WT_ERR(__wt_metadata_insert(session, uri, fileconf));
         } else {
-            /* Read the data file's descriptor block and try to recreate the associated metadata. */
+            /* Try to recreate the associated metadata from the imported data source. */
             WT_ERR(__wt_import_repair(session, uri, &fileconf));
         }
+        WT_ERR(__wt_metadata_insert(session, uri, fileconf));
 
         /*
          * Ensure that the timestamps in the imported data file are not in the future relative to
          * our oldest timestamp.
          */
         if (import)
-            WT_ERR(__check_imported_ts(session, filename, fileconf));
+            WT_ERR(__check_imported_ts(session, uri, fileconf));
     }
 
     /*
@@ -663,16 +663,18 @@ __create_table(
     WT_CONFIG_ITEM cgkey, cgval, ckey, cval;
     WT_DECL_RET;
     WT_TABLE *table;
-    size_t cgsize;
+    size_t len;
     int ncolgroups, nkeys;
-    char *tableconf, *cgname;
+    char *cgcfg, *cgname, *filecfg, *filename, *importcfg, *tablecfg;
     const char *cfg[4] = {WT_CONFIG_BASE(session, table_meta), config, NULL, NULL};
     const char *tablename;
     bool import_repair;
 
-    cgname = NULL;
+    import_repair = false;
+
+    cgcfg = filecfg = importcfg = tablecfg = NULL;
+    cgname = filename = NULL;
     table = NULL;
-    tableconf = NULL;
 
     WT_ASSERT(session, F_ISSET(session, WT_SESSION_LOCKED_TABLE_WRITE));
 
@@ -680,7 +682,7 @@ __create_table(
     WT_PREFIX_SKIP_REQUIRED(session, tablename, "table:");
 
     /* Check if the table already exists. */
-    if ((ret = __wt_metadata_search(session, uri, &tableconf)) != WT_NOTFOUND) {
+    if ((ret = __wt_metadata_search(session, uri, &tablecfg)) != WT_NOTFOUND) {
         /*
          * Regardless of the 'exclusive' flag, we should raise an error if we try to import an
          * existing URI rather than just silently returning.
@@ -707,6 +709,13 @@ __create_table(
                   "'repair' option is provided",
                   uri);
             WT_ERR_NOTFOUND_OK(ret, false);
+        } else {
+            /* Try to recreate the associated metadata from the imported data source. */
+            len = strlen("file:") + strlen(tablename) + strlen(".wt") + 1;
+            WT_ERR(__wt_calloc_def(session, len, &filename));
+            WT_ERR(__wt_snprintf(filename, len, "file:%s.wt", tablename));
+            WT_ERR(__wt_import_repair(session, filename, &filecfg));
+            cfg[2] = filecfg;
         }
     }
 
@@ -716,14 +725,24 @@ __create_table(
         ;
     WT_ERR_NOTFOUND_OK(ret, false);
 
-    WT_ERR(__wt_config_collapse(session, cfg, &tableconf));
-    WT_ERR(__wt_metadata_insert(session, uri, tableconf));
+    WT_ERR(__wt_config_collapse(session, cfg, &tablecfg));
+    WT_ERR(__wt_metadata_insert(session, uri, tablecfg));
 
     if (ncolgroups == 0) {
-        cgsize = strlen("colgroup:") + strlen(tablename) + 1;
-        WT_ERR(__wt_calloc_def(session, cgsize, &cgname));
-        WT_ERR(__wt_snprintf(cgname, cgsize, "colgroup:%s", tablename));
-        WT_ERR(__create_colgroup(session, cgname, exclusive, config));
+        len = strlen("colgroup:") + strlen(tablename) + 1;
+        WT_ERR(__wt_calloc_def(session, len, &cgname));
+        WT_ERR(__wt_snprintf(cgname, len, "colgroup:%s", tablename));
+        if (import_repair) {
+            len =
+              strlen(tablecfg) + strlen(",import=(enabled,file_metadata=())") + strlen(filecfg) + 1;
+            WT_ERR(__wt_calloc_def(session, len, &importcfg));
+            WT_ERR(__wt_snprintf(
+              importcfg, len, "%s,import=(enabled,file_metadata=(%s))", tablecfg, filecfg));
+            cfg[2] = importcfg;
+            WT_ERR(__wt_config_collapse(session, &cfg[1], &cgcfg));
+            WT_ERR(__create_colgroup(session, cgname, exclusive, cgcfg));
+        } else
+            WT_ERR(__create_colgroup(session, cgname, exclusive, config));
     }
 
     /*
@@ -739,8 +758,12 @@ __create_table(
 
 err:
     WT_TRET(__wt_schema_release_table(session, &table));
+    __wt_free(session, cgcfg);
     __wt_free(session, cgname);
-    __wt_free(session, tableconf);
+    __wt_free(session, filecfg);
+    __wt_free(session, filename);
+    __wt_free(session, importcfg);
+    __wt_free(session, tablecfg);
     return (ret);
 }
 
@@ -798,6 +821,8 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
      * back it all out.
      */
     WT_RET(__wt_meta_track_on(session));
+    if (import)
+        F_SET(session, WT_SESSION_IMPORT);
 
     if (WT_PREFIX_MATCH(uri, "colgroup:"))
         ret = __create_colgroup(session, uri, exclusive, config);
@@ -816,6 +841,7 @@ __schema_create(WT_SESSION_IMPL *session, const char *uri, const char *config)
         ret = __wt_bad_object_type(session, uri);
 
     session->dhandle = NULL;
+    F_CLR(session, WT_SESSION_IMPORT);
     WT_TRET(__wt_meta_track_off(session, true, ret != 0));
 
     return (ret);

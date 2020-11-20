@@ -139,6 +139,49 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_active --
+ *     Check if a transaction is still active. If not, it is either committed, prepared, or rolled
+ *     back. It is possible that we race with commit, prepare or rollback and a transaction is still
+ *     active before the start of the call is eventually reported as resolved.
+ */
+bool
+__wt_txn_active(WT_SESSION_IMPL *session, uint64_t txnid)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_TXN_GLOBAL *txn_global;
+    WT_TXN_SHARED *s;
+    uint64_t oldest_id;
+    uint32_t i, session_cnt;
+    bool active;
+
+    conn = S2C(session);
+    txn_global = &conn->txn_global;
+    active = true;
+
+    /* We're going to scan the table: wait for the lock. */
+    __wt_readlock(session, &txn_global->rwlock);
+    oldest_id = txn_global->oldest_id;
+
+    if (WT_TXNID_LT(txnid, oldest_id)) {
+        active = false;
+        goto done;
+    }
+
+    /* Walk the array of concurrent transactions. */
+    WT_ORDERED_READ(session_cnt, conn->session_cnt);
+    for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
+        /* If the transaction is in the list, it is uncommitted. */
+        if (s->id == txnid)
+            goto done;
+    }
+
+    active = false;
+done:
+    __wt_readunlock(session, &txn_global->rwlock);
+    return (active);
+}
+
+/*
  * __txn_get_snapshot_int --
  *     Allocate a snapshot, optionally update our shared txn ids.
  */

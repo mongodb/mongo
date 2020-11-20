@@ -9,13 +9,13 @@
 #include "wt_internal.h"
 
 /*
- * __verify_history_store_id --
+ * __hs_verify_id --
  *     Verify the history store for a single btree. Given a cursor to the tree, walk all history
  *     store keys. This function assumes any caller has already opened a cursor to the history
  *     store.
  */
 static int
-__verify_history_store_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *ds_cbt, uint32_t this_btree_id)
+__hs_verify_id(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *ds_cbt, uint32_t this_btree_id)
 {
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE *hs_cbt;
@@ -104,12 +104,12 @@ err:
 }
 
 /*
- * __wt_history_store_verify_one --
+ * __wt_hs_verify_one --
  *     Verify the history store for the btree that is set up in this session. This must be called
  *     when we are known to have exclusive access to the btree.
  */
 int
-__wt_history_store_verify_one(WT_SESSION_IMPL *session)
+__wt_hs_verify_one(WT_SESSION_IMPL *session)
 {
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE ds_cbt;
@@ -141,19 +141,19 @@ __wt_history_store_verify_one(WT_SESSION_IMPL *session)
     if (ret == 0) {
         __wt_btcur_init(session, &ds_cbt);
         __wt_btcur_open(&ds_cbt);
-        ret = __verify_history_store_id(session, &ds_cbt, btree_id);
+        ret = __hs_verify_id(session, &ds_cbt, btree_id);
         WT_TRET(__wt_btcur_close(&ds_cbt, false));
     }
     return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*
- * __wt_history_store_verify --
+ * __wt_hs_verify --
  *     Verify the history store. There can't be an entry in the history store without having the
  *     latest value for the respective key in the data store.
  */
 int
-__wt_history_store_verify(WT_SESSION_IMPL *session)
+__wt_hs_verify(WT_SESSION_IMPL *session)
 {
     WT_CURSOR *ds_cursor, *hs_cursor;
     WT_DECL_ITEM(buf);
@@ -198,7 +198,7 @@ __wt_history_store_verify(WT_SESSION_IMPL *session)
         }
         WT_ERR(__wt_open_cursor(session, uri_data, NULL, NULL, &ds_cursor));
         F_SET(ds_cursor, WT_CURSOR_RAW_OK);
-        ret = __verify_history_store_id(session, (WT_CURSOR_BTREE *)ds_cursor, btree_id);
+        ret = __hs_verify_id(session, (WT_CURSOR_BTREE *)ds_cursor, btree_id);
         if (ret == WT_NOTFOUND)
             stop = true;
         WT_TRET(ds_cursor->close(ds_cursor));

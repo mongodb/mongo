@@ -73,7 +73,7 @@ class test_base02(wttest.WiredTigerTestCase):
             ]
         conf_encoding = [
             None,
-            'huffman_key=,huffman_value=english',
+            'huffman_value=english',
             ]
         for size in conf_confsize:
             for col in conf_col:

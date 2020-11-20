@@ -826,7 +826,8 @@ main(int argc, char *argv[])
             cur_shadow->set_key(cur_shadow, kname);
             /*
              * The collection table should always only have the data as of the checkpoint. The
-             * shadow table should always have the exact same data (or not) as the collection table.
+             * shadow table should always have the exact same data (or not) as the collection table,
+             * except for the last key that may be committed after the stable timestamp.
              */
             if ((ret = cur_coll->search(cur_coll)) != 0) {
                 if (ret != WT_NOTFOUND)
@@ -850,7 +851,12 @@ main(int argc, char *argv[])
             } else if ((ret = cur_shadow->search(cur_shadow)) != 0) {
                 if (ret != WT_NOTFOUND)
                     testutil_die(ret, "shadow search");
-                else {
+                /*
+                 * We respectively insert the record to the collection table at timestamp t and to
+                 * the shadow table at t + 1. If the checkpoint finishes at timestamp t, the last
+                 * shadow table record will be removed by rollback to stable after restart.
+                 */
+                if (durable_fp <= stable_val) {
                     printf("%s: SHADOW no record with key %" PRIu64 "\n", fname, key);
                     absent_shadow++;
                 }

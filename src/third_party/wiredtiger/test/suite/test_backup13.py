@@ -48,8 +48,25 @@ class test_backup13(wttest.WiredTigerTestCase, suite_subprocess):
     bigkey = 'Key' * 100
     bigval = 'Value' * 100
 
-    def add_data(self, uri):
+    def simulate_crash_restart(self, olddir, newdir):
+        ''' Simulate a crash from olddir and restart in newdir. '''
+        # with the connection still open, copy files to new directory
+        shutil.rmtree(newdir, ignore_errors=True)
+        os.mkdir(newdir)
+        for fname in os.listdir(olddir):
+            fullname = os.path.join(olddir, fname)
+            # Skip lock file on Windows since it is locked
+            if os.path.isfile(fullname) and \
+                "WiredTiger.lock" not in fullname and \
+                "Tmplog" not in fullname and \
+                "Preplog" not in fullname:
+                shutil.copy(fullname, newdir)
+        # close the original connection and open to new directory
+        self.close_conn()
+        self.conn = self.setUpConnectionOpen(newdir)
+        self.session = self.setUpSessionOpen(self.conn)
 
+    def add_data(self, uri):
         c = self.session.open_cursor(uri)
         for i in range(0, self.nops):
             num = i + (self.mult * self.nops)
@@ -157,8 +174,15 @@ class test_backup13(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Make sure after a force stop we cannot access old backup info.
         config = 'incremental=(src_id="ID1",this_id="ID3")'
+
         self.assertRaises(wiredtiger.WiredTigerError,
             lambda: self.session.open_cursor('backup:', None, config))
+
+        # Make sure after a crash we cannot access old backup info.
+        self.simulate_crash_restart(".", "RESTART")
+        self.assertRaises(wiredtiger.WiredTigerError,
+            lambda: self.session.open_cursor('backup:', None, config))
+
         self.reopen_conn()
         # Make sure after a restart we cannot access old backup info.
         self.assertRaises(wiredtiger.WiredTigerError,

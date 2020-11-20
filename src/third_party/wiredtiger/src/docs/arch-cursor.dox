@@ -1,0 +1,15 @@
+/*! @arch_page arch-cursor Cursor
+
+Cursors are used in WiredTiger to get and modify data.
+A caller of WiredTiger uses WT_SESSION::open_cursor to create
+a WT_CURSOR.  Methods on the WT_CURSOR can then be used to
+position, iterate, get, and set data.
+
+Depending on the <code>uri</code> used when creating a cursor, the cursor will
+be internally implemented as one of the many cursor structures that include
+WT_CURSOR_BTREE, WT_CURSOR_BACKUP, WT_CURSOR_INDEX, WT_CURSOR_LOG,
+WT_CURSOR_METADATA, WT_CURSOR_STAT. Each of these structures starts
+with the common \c %WT_CURSOR structure, which contain all
+of the data and method pointers that make up the public part of the API.
+
+*/

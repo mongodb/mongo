@@ -175,6 +175,15 @@ An example of opening the backup data source for block-based incremental backup:
 
 @snippet ex_all.c incremental block backup
 
+The URI \c backup:query_id can be used to return existing block incremental identifier
+strings. It operates like a backup cursor but will return the identifier strings
+as the keys of the cursor. There are no values. As with all backup cursors, there
+can only be one backup cursor of any type open at a time.
+
+An example of opening the backup data source to query incremental identifiers:
+
+@snippet ex_backup_block.c Query existing IDs
+
 @section backup_incremental Log-based Incremental backup
 
 Once a backup has been done, it can be rolled forward incrementally by

@@ -267,8 +267,10 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
           hs_stop_durable_ts <= newer_hs_durable_ts || hs_start_ts == hs_stop_durable_ts ||
             first_record);
 
-        if (hs_stop_durable_ts < newer_hs_durable_ts)
+        if (hs_stop_durable_ts < newer_hs_durable_ts) {
             WT_STAT_CONN_INCR(session, txn_rts_hs_stop_older_than_newer_start);
+            WT_STAT_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
+        }
 
         /*
          * Stop processing when we find the newer version value of this key is stable according to
@@ -319,6 +321,8 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         WT_ERR(__wt_hs_modify(cbt, hs_upd));
         WT_STAT_CONN_INCR(session, txn_rts_hs_removed);
         WT_STAT_CONN_INCR(session, cache_hs_key_truncate_rts_unstable);
+        WT_STAT_DATA_INCR(session, txn_rts_hs_removed);
+        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_rts_unstable);
     }
 
     if (replace) {
@@ -369,10 +373,12 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
                 tombstone->next = upd;
                 upd = tombstone;
                 WT_STAT_CONN_INCR(session, txn_rts_hs_restore_tombstones);
+                WT_STAT_DATA_INCR(session, txn_rts_hs_restore_tombstones);
             }
         } else {
             WT_ERR(__wt_upd_alloc_tombstone(session, &upd, NULL));
             WT_STAT_CONN_INCR(session, txn_rts_keys_removed);
+            WT_STAT_DATA_INCR(session, txn_rts_keys_removed);
             __wt_verbose(session, WT_VERB_RTS, "%p: key removed", (void *)key);
         }
 
@@ -385,6 +391,8 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         WT_ERR(__wt_hs_modify(cbt, hs_upd));
         WT_STAT_CONN_INCR(session, txn_rts_hs_removed);
         WT_STAT_CONN_INCR(session, cache_hs_key_truncate_rts);
+        WT_STAT_DATA_INCR(session, txn_rts_hs_removed);
+        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_rts);
     }
 
     if (0) {
@@ -439,6 +447,7 @@ __rollback_abort_row_ondisk_kv(
               __wt_timestamp_to_string(rollback_timestamp, ts_string[4]));
             WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
             WT_STAT_CONN_INCR(session, txn_rts_sweep_hs_keys);
+            WT_STAT_DATA_INCR(session, txn_rts_sweep_hs_keys);
         } else
             return (0);
     } else if (vpack->tw.durable_start_ts > rollback_timestamp ||
@@ -458,6 +467,7 @@ __rollback_abort_row_ondisk_kv(
              */
             WT_RET(__wt_upd_alloc_tombstone(session, &upd, NULL));
             WT_STAT_CONN_INCR(session, txn_rts_keys_removed);
+            WT_STAT_DATA_INCR(session, txn_rts_keys_removed);
         }
     } else if (WT_TIME_WINDOW_HAS_STOP(&vpack->tw) &&
       (vpack->tw.durable_stop_ts > rollback_timestamp || prepared)) {
@@ -473,6 +483,7 @@ __rollback_abort_row_ondisk_kv(
         upd->start_ts = vpack->tw.start_ts;
         F_SET(upd, WT_UPDATE_RESTORED_FROM_DS);
         WT_STAT_CONN_INCR(session, txn_rts_keys_restored);
+        WT_STAT_DATA_INCR(session, txn_rts_keys_restored);
         __wt_verbose(session, WT_VERB_RTS,
           "key restored with commit timestamp: %s, durable timestamp: %s txnid: %" PRIu64
           "and removed commit timestamp: %s, durable timestamp: %s, txnid: %" PRIu64
@@ -1055,6 +1066,8 @@ __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_
         WT_ERR(__wt_hs_modify(cbt, hs_upd));
         WT_STAT_CONN_INCR(session, txn_rts_hs_removed);
         WT_STAT_CONN_INCR(session, cache_hs_key_truncate_rts);
+        WT_STAT_DATA_INCR(session, txn_rts_hs_removed);
+        WT_STAT_DATA_INCR(session, cache_hs_key_truncate_rts);
         hs_upd = NULL;
     }
     WT_ERR_NOTFOUND_OK(ret, false);

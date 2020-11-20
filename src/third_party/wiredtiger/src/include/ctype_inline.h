@@ -29,6 +29,16 @@ __wt_isalpha(u_char c)
 }
 
 /*
+ * __wt_isascii --
+ *     Wrap the ctype function without sign extension.
+ */
+static inline bool
+__wt_isascii(u_char c)
+{
+    return (isascii(c) != 0);
+}
+
+/*
  * __wt_isdigit --
  *     Wrap the ctype function without sign extension.
  */

@@ -141,6 +141,8 @@ struct __wt_cursor_data_source;
 typedef struct __wt_cursor_data_source WT_CURSOR_DATA_SOURCE;
 struct __wt_cursor_dump;
 typedef struct __wt_cursor_dump WT_CURSOR_DUMP;
+struct __wt_cursor_hs;
+typedef struct __wt_cursor_hs WT_CURSOR_HS;
 struct __wt_cursor_index;
 typedef struct __wt_cursor_index WT_CURSOR_INDEX;
 struct __wt_cursor_join;

@@ -563,10 +563,10 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
             continue;
         case WT_CELL_KEY:
             /*
-             * Simple keys without compression (not Huffman encoded or prefix compressed), can be
-             * directly referenced on the page to avoid repeatedly unpacking their cells.
+             * Simple keys without prefix compression can be directly referenced on the page to
+             * avoid repeatedly unpacking their cells.
              */
-            if (!btree->huffman_key && unpack.prefix == 0)
+            if (unpack.prefix == 0)
                 __wt_row_leaf_key_set(page, rip, &unpack);
             else
                 __wt_row_leaf_key_set_cell(page, rip, unpack.cell);

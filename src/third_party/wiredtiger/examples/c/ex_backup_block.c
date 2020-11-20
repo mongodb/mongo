@@ -327,13 +327,23 @@ take_incr_backup(WT_SESSION *session, int i)
     size_t alloc, count, rdsize, tmp_sz;
     int j, ret, rfd, wfd;
     char buf[1024], h[256], *tmp;
-    const char *filename;
+    const char *filename, *idstr;
     bool first;
 
     tmp = NULL;
     tmp_sz = 0;
+    /*! [Query existing IDs] */
+    error_check(session->open_cursor(session, "backup:query_id", NULL, NULL, &backup_cur));
+    while ((ret = backup_cur->next(backup_cur)) == 0) {
+        error_check(backup_cur->get_key(backup_cur, &idstr));
+        printf("Existing incremental ID string: %s\n", idstr);
+    }
+    error_check(backup_cur->close(backup_cur));
+    /*! [Query existing IDs] */
+
     /* Open the backup data source for incremental backup. */
-    (void)snprintf(buf, sizeof(buf), "incremental=(src_id=\"ID%d\",this_id=\"ID%d\")", i - 1, i);
+    (void)snprintf(buf, sizeof(buf), "incremental=(src_id=\"ID%d\",this_id=\"ID%d\"%s)", i - 1, i,
+      i % 2 == 0 ? "" : ",consolidate=true");
     error_check(session->open_cursor(session, "backup:", NULL, buf, &backup_cur));
     rfd = wfd = -1;
     count = 0;
@@ -454,7 +464,7 @@ main(int argc, char *argv[])
     WT_CURSOR *backup_cur;
     WT_SESSION *session;
     int i, j, ret;
-    char cmd_buf[256];
+    char cmd_buf[256], *idstr;
 
     (void)argc; /* Unused variable */
     (void)testutil_set_progname(argv);
@@ -507,6 +517,15 @@ main(int argc, char *argv[])
     error_check(wt_conn->close(wt_conn, NULL));
     error_check(wiredtiger_open(home, NULL, CONN_CONFIG, &wt_conn));
     error_check(wt_conn->open_session(wt_conn, NULL, NULL, &session));
+
+    printf("Verify query after reopen\n");
+    error_check(session->open_cursor(session, "backup:query_id", NULL, NULL, &backup_cur));
+    while ((ret = backup_cur->next(backup_cur)) == 0) {
+        error_check(backup_cur->get_key(backup_cur, &idstr));
+        printf("Existing incremental ID string: %s\n", idstr);
+    }
+    error_check(backup_cur->close(backup_cur));
+
     /*
      * We should have an entry for i-1 and i-2. Use the older one.
      */

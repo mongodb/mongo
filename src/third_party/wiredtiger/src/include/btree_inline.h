@@ -887,10 +887,9 @@ __wt_row_leaf_key_info(
  * A row-store leaf page key is in one of two places: if instantiated,
  * the WT_ROW pointer references a WT_IKEY structure, otherwise, it
  * references an on-page offset.  Further, on-page keys are in one of
- * two states: if the key is a simple key (not an overflow key, prefix
- * compressed or Huffman encoded, all of which are likely), the key's
- * offset/size is encoded in the pointer.  Otherwise, the offset is to
- * the key's on-page cell.
+ * two states: if the key is a simple key (not an overflow key or prefix
+ * compressed, all of which are likely), the key's offset/size is encoded
+ * in the pointer.  Otherwise, the offset is to the key's on-page cell.
  *
  * Now the magic: allocated memory must be aligned to store any standard
  * type, and we expect some standard type to require at least quad-byte

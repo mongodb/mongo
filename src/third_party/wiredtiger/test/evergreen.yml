@@ -284,6 +284,38 @@ functions:
         rm -rf "wiredtiger"
         rm -rf "wiredtiger.tgz"
 
+  "run wt hang analyzer":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/build_posix"
+      script: |
+        set -o verbose
+
+        # Dump core (-c) and debugger outputs (-o)
+        wt_hang_analyzer_option="-c -o file -o stdout"
+
+        echo "Calling the wt hang analyzer ..."
+        PATH="/opt/mongodbtoolchain/gdb/bin:$PATH" ${python_binary|python3} ../test/wt_hang_analyzer/wt_hang_analyzer.py $wt_hang_analyzer_option
+
+  "save wt hang analyzer core/debugger files":
+    - command: archive.targz_pack
+      params:
+        target: "wt-hang-analyzer.tgz"
+        source_dir: "wiredtiger/build_posix"
+        include:
+          - "./*core*"
+          - "./debugger*.*"
+    - command: s3.put
+      params:
+        aws_secret: ${aws_secret}
+        aws_key: ${aws_key}
+        local_file: wt-hang-analyzer.tgz
+        bucket: build_external
+        permissions: public-read
+        content_type: application/tar
+        display_name: WT Hang Analyzer Output - Execution ${execution}
+        remote_file: wiredtiger/${build_variant}/${revision}/wt_hang_analyzer/wt-hang-analyzer_${task_name}_${build_id}${postfix|}.tgz
+
   "dump stderr/stdout":
     command: shell.exec
     params:
@@ -423,8 +455,11 @@ post:
   - func: "upload artifact"
     vars:
       postfix: -${execution}
+  - func: "save wt hang analyzer core/debugger files"
   - func: "dump stderr/stdout"
   - func: "cleanup"
+timeout:
+  - func: "run wt hang analyzer"
 
 tasks:
   # Base compile task on posix flavours
@@ -1658,6 +1693,17 @@ tasks:
             set -o verbose
             test/evergreen/compatibility_test_for_releases.sh -w
 
+  - name: import-compatibility-test
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger"
+          script: |
+            set -o errexit
+            set -o verbose
+            test/evergreen/import_compatibility_test.sh
+
   - name: generate-datafile-little-endian
     depends_on:
       - name: compile
@@ -1921,7 +1967,7 @@ tasks:
           extra_args: leak_memory=0 mmap=1 file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
       - func: "format test"
         vars:
-          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_key=1 huffman_value=1
+          extra_args: checkpoints=1 leak_memory=0 mmap=1 file_type=row compression=zlib huffman_value=1
       # FIXME-WT-6668: temporarily disable lower isolation level test
       # - func: "format test"
       #   vars:
@@ -2541,6 +2587,7 @@ buildvariants:
   - ubuntu1804-test
   tasks:
     - name: compatibility-test-for-newer-releases
+    - name: import-compatibility-test
 
 - name: windows-64
   display_name: "! Windows 64-bit"

@@ -267,10 +267,6 @@ file_config = format_meta + file_runtime_config + [
     Config('format', 'btree', r'''
         the file format''',
         choices=['btree']),
-    Config('huffman_key', 'none', r'''
-        configure Huffman encoding for keys.  Permitted values are
-        \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
-        See @ref huffman for more information'''),
     Config('huffman_value', 'none', r'''
         configure Huffman encoding for values.  Permitted values are
         \c "none", \c "english", \c "utf8<file>" or \c "utf16<file>".
@@ -1281,6 +1277,12 @@ methods = {
         configure the cursor for block incremental backup usage. These formats
         are only compatible with the backup data source; see @ref backup''',
         type='category', subconfig=[
+        Config('consolidate', 'false', r'''
+            causes block incremental backup information to be consolidated if adjacent
+            granularity blocks are modified. If false, information will be returned in
+            granularity sized blocks only. This must be set on the primary backup cursor and it
+            applies to all files for this backup''',
+            type='boolean'),
         Config('enabled', 'false', r'''
             whether to configure this backup as the starting point for a subsequent
             incremental backup''',

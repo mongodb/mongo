@@ -1,0 +1,17 @@
+/*! @arch_page arch-data-file Data File Format
+
+The format of the WiredTiger data file is given by structures
+in \c block.h , defining the overall structure of the file and
+its blocks.  The \c WT_BLOCK_DESC starts the file.  Following that,
+individual pages appear, each with a \c WT_PAGE_HEADER defined in \c btmem.h
+and a \c WT_BLOCK_HEADER defined in \c block.h .  Individual cells then
+sequentially appear as defined in \c cell.h .  Each cell encodes
+a key or value.  Ordering is important, values are all associated with
+the key that precedes them.  Multiple values may be present, which
+can represent multiple versions.  Extremely large values may be represented
+as a reference to another page.
+
+The exact encoding is rather complex, and beyond what can be described here.
+The encoding strikes a balance between data that can be compacted efficiently
+in time and space, extensibility, and compatibility with previous versions.
+*/

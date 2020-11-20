@@ -26,6 +26,50 @@ img {
 	height: auto;
 }
 
+div.arch_diagram {
+    display: block;
+    background: #FFFFFF;
+    background: radial-gradient(#FFDDAA,#FFFFFF);
+}
+
+/* match just one image */
+img[src="wt_diagram.png"] {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.arch_head table {
+    background-color: #FFDDAA;
+    border-color: #624D32;
+    /*border: solid 1px;*/
+    border-spacing: 5px;
+}
+
+.arch_head td {
+    border-color: #FFFFFF;
+    /*border: solid 1px;*/
+    vertical-align: top;
+    text-align: left;
+}
+
+.arch_head th {
+    border-color: #624D32;
+    vertical-align: top;
+    text-align: left;
+}
+
+.arch_thumbnail {
+    padding: 0px 0px 0px 0px;
+    border: 3px solid #fff;
+    outline: 1px solid #000;
+    margin: 3px;
+    width: 70px;
+    height: 70px;
+    display: block;
+    text-align: center;
+}
+
 .tablist {
 	width: 800px;
 }

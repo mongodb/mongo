@@ -617,11 +617,7 @@ __wt_txn_set_commit_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t commit_ts
               __wt_timestamp_to_string(commit_ts, ts_string[0]),
               __wt_timestamp_to_string(txn->first_commit_timestamp, ts_string[1]));
 
-        /*
-         * FIXME-WT-4780: Disabled to buy time to understand a test failure.
-         * WT_RET(__txn_assert_after_reads(
-         *   session, "commit", commit_ts, NULL));
-         */
+        WT_RET(__txn_assert_after_reads(session, "commit", commit_ts, NULL));
     } else {
         /*
          * For a prepared transaction, the commit timestamp should not be less than the prepare

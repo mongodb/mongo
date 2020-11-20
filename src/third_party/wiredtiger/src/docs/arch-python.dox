@@ -1,0 +1,18 @@
+/*! @arch_page arch-python Python API
+
+WiredTiger includes a Python API, which is useful for scripting and
+experimentation.
+
+The following simple example show some highlights of the API:
+
+@snippet ex_access.py python simple example
+
+The API is implemented using SWIG.  SWIG imports the \c \<wiredtiger.h\> file,
+and from it creates the classes and C support files needed to allow
+Python to import the WiredTiger library.
+
+Not every facility that is present in the C API is available in Python.
+In particular, setting up custom collators, extractors, compressors,
+encryptors and file system implementations must all be done within
+the C framework.
+*/

@@ -88,9 +88,6 @@ static CONFIG c[] = {
     NULL},
 
   /* 20% */
-  {"btree.huffman_key", "configure huffman encoded keys", C_BOOL, 20, 0, 0, &g.c_huffman_key, NULL},
-
-  /* 20% */
   {"btree.huffman_value", "configure huffman encoded values", C_BOOL, 20, 0, 0, &g.c_huffman_value,
     NULL},
 

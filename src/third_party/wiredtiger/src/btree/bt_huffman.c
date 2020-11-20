@@ -197,7 +197,7 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
 {
     struct __wt_huffman_table *table;
     WT_BTREE *btree;
-    WT_CONFIG_ITEM key_conf, value_conf;
+    WT_CONFIG_ITEM value_conf;
     WT_DECL_RET;
     u_int entries, numbytes;
     const char **cfg;
@@ -205,11 +205,9 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
     btree = S2BT(session);
     cfg = btree->dhandle->cfg;
 
-    WT_RET(__wt_config_gets_none(session, cfg, "huffman_key", &key_conf));
-    WT_RET(__huffman_confchk(session, &key_conf));
     WT_RET(__wt_config_gets_none(session, cfg, "huffman_value", &value_conf));
     WT_RET(__huffman_confchk(session, &value_conf));
-    if (key_conf.len == 0 && value_conf.len == 0)
+    if (value_conf.len == 0)
         return (0);
 
     switch (btree->type) { /* Check file type compatibility. */
@@ -217,41 +215,8 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session)
         WT_RET_MSG(session, EINVAL, "fixed-size column-store files may not be Huffman encoded");
     /* NOTREACHED */
     case BTREE_COL_VAR:
-        if (key_conf.len != 0)
-            WT_RET_MSG(session, EINVAL,
-              "the keys of variable-length column-store files may not be Huffman encoded");
-        break;
     case BTREE_ROW:
         break;
-    }
-
-    if (key_conf.len == 0) {
-        ;
-    } else if (strncmp(key_conf.str, "english", key_conf.len) == 0) {
-        struct __wt_huffman_table copy[WT_ELEMENTS(__wt_huffman_nytenglish)];
-
-        memcpy(copy, __wt_huffman_nytenglish, sizeof(__wt_huffman_nytenglish));
-        WT_RET(__wt_huffman_open(
-          session, copy, WT_ELEMENTS(__wt_huffman_nytenglish), 1, &btree->huffman_key));
-
-        /* Check for a shared key/value table. */
-        if (value_conf.len != 0 && strncmp(value_conf.str, "english", value_conf.len) == 0) {
-            btree->huffman_value = btree->huffman_key;
-            return (0);
-        }
-    } else {
-        WT_RET(__wt_huffman_read(session, &key_conf, &table, &entries, &numbytes));
-        ret = __wt_huffman_open(session, table, entries, numbytes, &btree->huffman_key);
-        __wt_free(session, table);
-        if (ret != 0)
-            return (ret);
-
-        /* Check for a shared key/value table. */
-        if (value_conf.len != 0 && key_conf.len == value_conf.len &&
-          memcmp(key_conf.str, value_conf.str, key_conf.len) == 0) {
-            btree->huffman_value = btree->huffman_key;
-            return (0);
-        }
     }
 
     if (value_conf.len == 0) {
@@ -375,14 +340,6 @@ __wt_btree_huffman_close(WT_SESSION_IMPL *session)
 
     btree = S2BT(session);
 
-    if (btree->huffman_key != NULL) {
-        /* Key and data may use the same table, only close it once. */
-        if (btree->huffman_value == btree->huffman_key)
-            btree->huffman_value = NULL;
-
-        __wt_huffman_close(session, btree->huffman_key);
-        btree->huffman_key = NULL;
-    }
     if (btree->huffman_value != NULL) {
         __wt_huffman_close(session, btree->huffman_value);
         btree->huffman_value = NULL;

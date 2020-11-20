@@ -242,7 +242,7 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
     WT_DECL_RET;
     size_t len, tmp_sz;
     ssize_t rdsize;
-    uint64_t offset, size, type;
+    uint64_t offset, size, this_size, total, type;
     int rfd, wfd1, wfd2;
     char config[512], *tmp;
     bool first_pass;
@@ -286,25 +286,35 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
 
                 first_pass = false;
             }
-            if (tmp_sz < size) {
-                tmp = drealloc(tmp, size);
-                tmp_sz = size;
+            this_size = WT_MIN(size, BACKUP_MAX_COPY);
+            if (tmp_sz < this_size) {
+                tmp = drealloc(tmp, this_size);
+                tmp_sz = this_size;
             }
-            /*
-             * Don't use the system checker for lseek. The system check macro uses an int which is
-             * often 4 bytes and checks for any negative value. The offset returned from lseek is
-             * 8 bytes and we can have a false positive error check.
-             */
             if (lseek(rfd, (wt_off_t)offset, SEEK_SET) == -1)
                 testutil_die(errno, "backup-read: lseek");
-            error_sys_check(rdsize = read(rfd, tmp, size));
             if (lseek(wfd1, (wt_off_t)offset, SEEK_SET) == -1)
                 testutil_die(errno, "backup-write1: lseek");
             if (lseek(wfd2, (wt_off_t)offset, SEEK_SET) == -1)
                 testutil_die(errno, "backup-write2: lseek");
-            /* Use the read size since we may have read less than the granularity. */
-            error_sys_check(write(wfd1, tmp, (size_t)rdsize));
-            error_sys_check(write(wfd2, tmp, (size_t)rdsize));
+            total = 0;
+            while (total < size) {
+                /*
+                 * Don't use the system checker for lseek. The system check macro uses an int which
+                 * is often 4 bytes and checks for any negative value. The offset returned from
+                 * lseek is 8 bytes and we can have a false positive error check.
+                 */
+                /* Use the read size since we may have read less than the granularity. */
+                error_sys_check(rdsize = read(rfd, tmp, this_size));
+                /* If we get EOF, we're done. */
+                if (rdsize == 0)
+                    break;
+                error_sys_check(write(wfd1, tmp, (size_t)rdsize));
+                error_sys_check(write(wfd2, tmp, (size_t)rdsize));
+                total += (uint64_t)rdsize;
+                offset += (uint64_t)rdsize;
+                this_size = WT_MIN(this_size, size - total);
+            }
         } else {
             testutil_assert(type == WT_BACKUP_FILE);
             testutil_assert(first_pass == true);
@@ -574,9 +584,10 @@ backup(void *arg)
                 else
                     active_now = &active[0];
                 src_id = g.backup_id - 1;
+                /* Use consolidation too. */
                 testutil_check(__wt_snprintf(cfg, sizeof(cfg),
-                  "incremental=(enabled,src_id=%" PRIu64 ",this_id=%" PRIu64 ")", src_id,
-                  g.backup_id));
+                  "incremental=(enabled,consolidate=true,src_id=%" PRIu64 ",this_id=%" PRIu64 ")",
+                  src_id, g.backup_id));
                 /* Restart a full incremental every once in a while. */
                 full = false;
                 incr_full = mmrand(NULL, 1, 8) == 1;

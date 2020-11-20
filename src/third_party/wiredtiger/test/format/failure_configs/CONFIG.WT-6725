@@ -9,7 +9,6 @@
     btree.bitcnt=6
     btree.compression=none
     btree.dictionary=0
-    btree.huffman_key=0
     btree.huffman_value=0
     btree.internal_key_truncation=1
     btree.internal_page_max=15

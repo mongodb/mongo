@@ -32,7 +32,19 @@
 # (i.e., from "/*!" to "/**"), because the latter are configured to not
 # search for brief descriptions at the beginning of pages.
 
-import re, sys
+import os, re, sys
+
+# We want to import the docs_data.py page from the dist directory.
+# First get our (src/doc/tools) directory.
+doc_tools_dir = os.path.dirname(os.path.realpath(__file__))
+top_dir = os.path.dirname(os.path.dirname(os.path.dirname(doc_tools_dir)))
+dist_dir = os.path.join(top_dir, 'dist')
+sys.path.insert(1, dist_dir)
+import docs_data
+
+arch_doc_lookup = {}
+for page in docs_data.arch_doc_pages:
+    arch_doc_lookup[page.doxygen_name] = page
 
 progname = 'doxfilter.py'
 linenum = 0
@@ -42,8 +54,40 @@ def err(arg):
     sys.stderr.write(filename + ':' + str(linenum) + ': ERROR: ' + arg + '\n')
     sys.exit(1)
 
+# Convert @arch_page to @arch_page_expanded, adding in information
+# from docs_data.py.
+def process_arch(source):
+    result = ''
+    mpage_content = []
+    arch_page_pat = re.compile(r'^(.*)@arch_page  *([^ ]*)  *(.*)')
+    for line in source.split('\n'):
+        m = re.search(arch_page_pat, line)
+        if line.count('@arch_page') > 0 and not m:
+            err('@arch_page incorrect syntax, need identifier and title')
+        if m:
+            groups = m.groups()
+            prefix = groups[0]
+            doxy_name = groups[1]
+            title = groups[2]
+
+            page_info = arch_doc_lookup[doxy_name]
+            data_structures_str = '<code>' + '<br>'.join(page_info.data_structures) + '</code>'
+            files_str = '<code>' + '<br>'.join(page_info.files) + '</code>'
+            result += prefix + '@arch_page_top{' + \
+                doxy_name + ',' + \
+                title + '}\n'
+            result += '@arch_page_table{' + \
+                data_structures_str + ',' + \
+                files_str + '}\n'
+        else:
+            result += line + '\n'
+    return result
+
 def process(source):
-    return source.replace(r'/*!', r'/**')
+    source = source.replace(r'/*!', r'/**')
+    if '@arch_page' in source:
+        source = process_arch(source)
+    return source
 
 if __name__ == '__main__':
     for f in sys.argv[1:]:

@@ -34,11 +34,6 @@ import wiredtiger, wttest
 # test_huffman02.py
 #    Huffman key and value configurations test.
 class test_huffman02(wttest.WiredTigerTestCase, suite_subprocess):
-    huffkey = [
-        ('bad', dict(keybad=1,huffkey=',huffman_key=bad')),
-        ('english', dict(keybad=0,huffkey=',huffman_key=english')),
-        ('none', dict(keybad=0,huffkey=',huffman_key=none')),
-    ]
     huffval = [
         ('bad', dict(valbad=1,huffval=',huffman_value=bad')),
         ('english', dict(valbad=0,huffval=',huffman_value=english')),
@@ -48,15 +43,15 @@ class test_huffman02(wttest.WiredTigerTestCase, suite_subprocess):
         ('file', dict(uri='file:huff')),
         ('table', dict(uri='table:huff')),
     ]
-    scenarios = make_scenarios(type, huffkey, huffval)
+    scenarios = make_scenarios(type, huffval)
 
     def test_huffman(self):
-        if self.keybad or self.valbad:
+        if self.valbad:
             msg = '/Invalid argument/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError, lambda:
-                self.session.create(self.uri, self.huffkey + self.huffval), msg)
+                self.session.create(self.uri, self.huffval), msg)
         else:
-            self.session.create(self.uri, self.huffkey + self.huffval)
+            self.session.create(self.uri, self.huffval)
 
 if __name__ == '__main__':
     wttest.run()
