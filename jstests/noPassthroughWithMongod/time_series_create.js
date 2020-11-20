@@ -120,4 +120,29 @@ testTimeseriesNamespaceExists((testDB, collName) => {
 testTimeseriesNamespaceExists((testDB, collName) => {
     assert.commandWorked(testDB.createView(collName, collName + '_source', []));
 });
+
+// Tests that schema validation is enabled on the bucket collection.
+{
+    const testDB = db.getSiblingDB(jsTestName());
+    const coll = testDB.getCollection('timeseries_' + collCount++);
+    assert.commandWorked(
+        testDB.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
+    const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
+    assert.commandWorked(bucketsColl.insert(
+        {control: {version: 1, min: {time: ISODate()}, max: {time: ISODate()}}, data: {}}));
+    assert.commandWorked(bucketsColl.insert({
+        control: {version: 'not a number', min: {time: ISODate()}, max: {time: ISODate()}},
+        data: {}
+    }));
+    assert.commandWorked(bucketsColl.insert(
+        {control: {version: 1, min: {time: 'not a date'}, max: {time: ISODate()}}, data: {}}));
+    assert.commandWorked(bucketsColl.insert(
+        {control: {version: 1, min: {time: ISODate()}, max: {time: 'not a date'}}, data: {}}));
+    assert.commandWorked(bucketsColl.insert({
+        control: {version: 1, min: {time: ISODate()}, max: {time: ISODate()}},
+        data: 'not an object'
+    }));
+    assert.commandWorked(bucketsColl.insert({invalid_bucket_field: 1}));
+    assert.commandWorked(testDB.runCommand({drop: coll.getName(), writeConcern: {w: "majority"}}));
+}
 })();
