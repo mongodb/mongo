@@ -78,6 +78,8 @@ ReplSetTest.prototype.upgradePrimary = function(primary, options, user, pwd) {
     // Merge new options into node settings.
     this.nodeOptions = mergeNodeOptions(this.nodeOptions, options);
 
+    jsTest.authenticate(primary);
+
     let oldPrimary = this.stepdown(primary);
     this.waitForState(oldPrimary, ReplSetTest.State.SECONDARY);
 
