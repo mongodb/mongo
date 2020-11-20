@@ -87,6 +87,12 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
                                                const CollatorInterface* defaultCollator);
 
 /**
+ * Validates the key pattern and the 'expireAfterSeconds' duration in the index specification
+ * 'indexSpec' for a TTL index. Returns success if 'indexSpec' does not refer to a TTL index.
+ */
+Status validateIndexSpecTTL(const BSONObj& indexSpec);
+
+/**
  * Optional filtering function to adjust allowed index field names at startup.
  * Set it in a MONGO_INITIALIZER with 'FilterAllowedIndexFieldNames' as a dependant.
  */

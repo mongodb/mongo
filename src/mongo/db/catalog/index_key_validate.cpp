@@ -610,6 +610,57 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
     return indexSpec;
 }
 
+Status validateIndexSpecTTL(const BSONObj& indexSpec) {
+    if (!indexSpec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
+        return Status::OK();
+    }
+
+    const BSONElement expireAfterSecondsElt =
+        indexSpec[IndexDescriptor::kExpireAfterSecondsFieldName];
+    if (!expireAfterSecondsElt.isNumber()) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                              << "' option must be numeric, but received a type of '"
+                              << typeName(expireAfterSecondsElt.type())
+                              << "'. Index spec: " << indexSpec};
+    }
+
+    if (expireAfterSecondsElt.safeNumberLong() < 0) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+                              << "' option cannot be less than 0. Index spec: " << indexSpec};
+    }
+
+    const std::string tooLargeErr = str::stream()
+        << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
+        << "' option must be within an acceptable range, try a lower number. Index spec: "
+        << indexSpec;
+
+    // There are two cases where we can encounter an issue here.
+    // The first case is when we try to cast to millseconds from seconds, which could cause an
+    // overflow. The second case is where 'expireAfterSeconds' is larger than the current epoch
+    // time.
+    try {
+        auto expireAfterMillis =
+            duration_cast<Milliseconds>(Seconds(expireAfterSecondsElt.safeNumberLong()));
+        if (expireAfterMillis > Date_t::now().toDurationSinceEpoch()) {
+            return {ErrorCodes::CannotCreateIndex, tooLargeErr};
+        }
+    } catch (const AssertionException&) {
+        return {ErrorCodes::CannotCreateIndex, tooLargeErr};
+    }
+
+    const BSONObj key = indexSpec["key"].Obj();
+    if (key.nFields() != 1) {
+        return {ErrorCodes::CannotCreateIndex,
+                str::stream() << "TTL indexes are single-field indexes, compound indexes do "
+                                 "not support TTL. Index spec: "
+                              << indexSpec};
+    }
+
+    return Status::OK();
+}
+
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
     "FilterAllowedIndexFieldNames", [](InitializerContext* service) {
         if (filterAllowedIndexFieldNames)
