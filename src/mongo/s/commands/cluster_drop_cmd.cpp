@@ -33,6 +33,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/drop_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
@@ -74,8 +75,8 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+        auto parsed = Drop::parse(IDLParserErrorContext("drop"), cmdObj);
+        const auto& nss = parsed.getNamespace();
 
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot drop collection in config database",

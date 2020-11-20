@@ -571,6 +571,7 @@ env.Library(
     target="commands",
     source=[
         'commands.cpp',
+        'drop.idl',
         'drop_database.idl',
         'list_collections.idl',
     ],

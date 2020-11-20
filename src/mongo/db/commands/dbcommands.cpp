@@ -63,6 +63,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/drop_database_gen.h"
+#include "mongo/db/drop_gen.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -251,9 +252,8 @@ public:
                            const BSONObj& cmdObj,
                            string& errmsg,
                            BSONObjBuilder& result) {
-        const NamespaceString nsToDrop(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
-
-        if (nsToDrop.isOplog()) {
+        auto parsed = Drop::parse(IDLParserErrorContext("drop"), cmdObj);
+        if (parsed.getNamespace().isOplog()) {
             if (repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
                 errmsg = "can't drop live oplog while replicating";
                 return false;
@@ -273,7 +273,7 @@ public:
 
         uassertStatusOK(
             dropCollection(opCtx,
-                           nsToDrop,
+                           parsed.getNamespace(),
                            result,
                            DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
         return true;
