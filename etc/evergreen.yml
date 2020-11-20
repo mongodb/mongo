@@ -12134,14 +12134,6 @@ buildvariants:
   - name: concurrency
     distros:
     - rhel62-large  # Some workloads require a lot of memory, use a bigger machine for this suite.
-  - name: concurrency_replication
-  - name: concurrency_replication_causal_consistency
-    distros:
-    - rhel62-large
-  - name: concurrency_simultaneous
-  - name: concurrency_simultaneous_replication
-    distros:
-    - rhel62-large
   - name: .integration !.audit
     distros:
     - rhel62-large
