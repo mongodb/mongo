@@ -40,6 +40,7 @@
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer.h"
@@ -207,9 +208,33 @@ Status _createTimeseries(OperationContext* opCtx,
             });
 
         // Create the buckets collection that will back the view.
-        invariant(db->createCollection(opCtx, bucketsNs),
+        auto bucketsCollection = db->createCollection(opCtx, bucketsNs);
+        invariant(bucketsCollection,
                   str::stream() << "Failed to create buckets collection " << bucketsNs
                                 << " for time-series collection " << ns);
+
+        // Create a TTL index on 'control.min.[timeField]' if 'expireAfterSeconds' is provided.
+        if (auto expireAfterSeconds = options.timeseries->getExpireAfterSeconds()) {
+            CollectionWriter collectionWriter(opCtx, bucketsCollection->uuid());
+            auto indexBuildCoord = IndexBuildsCoordinator::get(opCtx);
+            const std::string controlMinTimeField = str::stream()
+                << "control.min." << options.timeseries->getTimeField();
+            auto indexSpec =
+                BSON(IndexDescriptor::kIndexVersionFieldName
+                     << IndexDescriptor::kLatestIndexVersion
+                     << IndexDescriptor::kKeyPatternFieldName << BSON(controlMinTimeField << 1)
+                     << IndexDescriptor::kIndexNameFieldName << (controlMinTimeField + "_1")
+                     << IndexDescriptor::kExpireAfterSecondsFieldName << *expireAfterSeconds);
+            auto fromMigrate = false;
+            try {
+                indexBuildCoord->createIndexesOnEmptyCollection(
+                    opCtx, collectionWriter, {indexSpec}, fromMigrate);
+            } catch (DBException& ex) {
+                ex.addContext(str::stream() << "failed to create TTL index on bucket collection: "
+                                            << bucketsNs << "; index spec: " << indexSpec);
+                return ex.toStatus();
+            }
+        }
 
         // Create the time-series view. Even though 'options' is passed by rvalue reference, it is
         // not safe to move because 'userCreateNS' may throw a WriteConflictException.
