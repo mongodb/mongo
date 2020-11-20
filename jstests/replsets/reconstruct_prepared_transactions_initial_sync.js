@@ -126,6 +126,8 @@ assert.commandWorked(secondary.adminCommand(
 
 // Wait for the secondary to complete initial sync.
 replTest.awaitSecondaryNodes();
+// Wait for the commit point to advance past the "prepare" oplog entry for transaction four.
+replTest.awaitLastOpCommitted();
 
 jsTestLog("Initial sync completed");
 
