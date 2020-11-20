@@ -60,9 +60,6 @@ const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOn
 // This is needed since the dispatcher only returns hosts with responses.
 //
 
-// TODO: Unordered map?
-typedef OwnedPointerMap<ShardId, TargetedWriteBatch> OwnedShardBatchMap;
-
 WriteErrorDetail errorFromStatus(const Status& status) {
     WriteErrorDetail error;
     error.setStatus(status);
@@ -200,8 +197,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
         while (numSent != numToSend) {
             // Collect batches out on the network, mapped by endpoint
-            OwnedShardBatchMap ownedPendingBatches;
-            OwnedShardBatchMap::MapType& pendingBatches = ownedPendingBatches.mutableMap();
+            OwnedPointerMap<ShardId, TargetedWriteBatch> ownedPendingBatches;
+            OwnedPointerMap<ShardId, TargetedWriteBatch>::MapType& pendingBatches =
+                ownedPendingBatches.mutableMap();
 
             //
             // Construct the requests.
@@ -276,32 +274,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 dassert(pendingBatches.find(response.shardId) != pendingBatches.end());
                 TargetedWriteBatch* batch = pendingBatches.find(response.shardId)->second;
 
-                // First check if we were able to target a shard host.
-                if (!response.shardHostAndPort) {
-                    invariant(!response.swResponse.isOK());
-
-                    // Record a resolve failure
-                    batchOp.noteBatchError(*batch,
-                                           errorFromStatus(response.swResponse.getStatus()));
-
-                    // TODO: It may be necessary to refresh the cache if stale, or maybe just cancel
-                    // and retarget the batch
-                    LOGV2_DEBUG(22906,
-                                4,
-                                "Unable to send write batch to {shardId}: {error}",
-                                "Unable to send write batch",
-                                "shardId"_attr = batch->getEndpoint().shardName,
-                                "error"_attr = redact(response.swResponse.getStatus()));
-
-                    // We're done with this batch. Clean up when we can't resolve a host.
-                    auto it = childBatches.find(batch->getEndpoint().shardName);
-                    invariant(it != childBatches.end());
-                    delete it->second;
-                    it->second = nullptr;
-                    continue;
-                }
-
-                const auto shardHost(std::move(*response.shardHostAndPort));
+                const auto shardInfo = response.shardHostAndPort
+                    ? response.shardHostAndPort->toString()
+                    : batch->getEndpoint().shardName;
 
                 // Then check if we successfully got a response.
                 Status responseStatus = response.swResponse.getStatus();
@@ -322,9 +297,9 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                     LOGV2_DEBUG(22907,
                                 4,
-                                "Write results received from {shardHost}: {response}",
+                                "Write results received from {shardInfo}: {response}",
                                 "Write results received",
-                                "shardHost"_attr = shardHost.toString(),
+                                "shardInfo"_attr = shardInfo,
                                 "status"_attr = redact(batchedCommandResponse.toStatus()));
 
                     // Dispatch was ok, note response
@@ -337,7 +312,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                         if (!batchStatus.isOK() &&
                             batchStatus != ErrorCodes::WouldChangeOwningShard) {
                             auto newStatus = batchStatus.withContext(
-                                str::stream() << "Encountered error from " << shardHost.toString()
+                                str::stream() << "Encountered error from " << shardInfo
                                               << " during a transaction");
 
                             batchOp.forgetTargetedBatchesOnTransactionAbortingError();
@@ -370,34 +345,39 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                         ++stats->numStaleDbBatches;
                     }
 
-                    // Remember that we successfully wrote to this shard
-                    // NOTE: This will record lastOps for shards where we actually didn't update
-                    // or delete any documents, which preserves old behavior but is conservative
-                    stats->noteWriteAt(shardHost,
-                                       batchedCommandResponse.isLastOpSet()
-                                           ? batchedCommandResponse.getLastOp()
-                                           : repl::OpTime(),
-                                       batchedCommandResponse.isElectionIdSet()
-                                           ? batchedCommandResponse.getElectionId()
-                                           : OID());
+                    if (response.shardHostAndPort) {
+                        // Remember that we successfully wrote to this shard
+                        // NOTE: This will record lastOps for shards where we actually didn't update
+                        // or delete any documents, which preserves old behavior but is conservative
+                        stats->noteWriteAt(*response.shardHostAndPort,
+                                           batchedCommandResponse.isLastOpSet()
+                                               ? batchedCommandResponse.getLastOp()
+                                               : repl::OpTime(),
+                                           batchedCommandResponse.isElectionIdSet()
+                                               ? batchedCommandResponse.getElectionId()
+                                               : OID());
+                    }
                 } else {
                     // Error occurred dispatching, note it
                     const Status status = responseStatus.withContext(
-                        str::stream() << "Write results unavailable from " << shardHost);
+                        str::stream() << "Write results unavailable "
+                                      << (response.shardHostAndPort
+                                              ? "from "
+                                              : "from failing to target a host in the shard ")
+                                      << shardInfo);
 
                     batchOp.noteBatchError(*batch, errorFromStatus(status));
 
                     LOGV2_DEBUG(22908,
                                 4,
-                                "Unable to receive write results from {shardHost}: {error}",
+                                "Unable to receive write results from {shardInfo}: {error}",
                                 "Unable to receive write results",
-                                "shardHost"_attr = shardHost,
+                                "shardInfo"_attr = shardInfo,
                                 "error"_attr = redact(status));
 
                     // If we are in a transaction, we must stop immediately (even for unordered).
                     if (TransactionRouter::get(opCtx)) {
                         batchOp.forgetTargetedBatchesOnTransactionAbortingError();
-                        abortBatch = true;
 
                         // Throw when there is a transient transaction error since this should be a
                         // top
@@ -406,6 +386,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                             uassertStatusOK(status);
                         }
 
+                        abortBatch = true;
                         break;
                     }
                 }
