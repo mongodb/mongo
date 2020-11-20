@@ -4200,7 +4200,7 @@ tasks:
           set -o verbose
           ${activate_virtualenv}
 
-          $python buildscripts/idl/check_versioned_api_commands_have_idl_definitions.py -v --include src --installDir dist-test/bin 1
+          $python buildscripts/idl/check_versioned_api_commands_have_idl_definitions.py -v --include src --include src/mongo/db/modules/enterprise/src --installDir dist-test/bin 1
           $python buildscripts/idl/checkout_idl_files_from_past_releases.py -v idls
 
 - name: burn_in_tests_gen
