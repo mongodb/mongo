@@ -7,9 +7,10 @@
  */
 (function() {
 "use strict";
-load("jstests/multiVersion/libs/multi_rs.js");       // For 'upgradeSet()'
-load("jstests/multiVersion/libs/multi_cluster.js");  // For 'upgradeCluster()'
-load('jstests/noPassthrough/libs/index_build.js');   // For 'assertIndexes()'
+load("jstests/multiVersion/libs/multi_rs.js");         // For 'upgradeSet()'
+load("jstests/multiVersion/libs/multi_cluster.js");    // For 'upgradeCluster()'
+load('jstests/multiVersion/libs/verify_versions.js');  // For 'assert.binVersion()'
+load('jstests/noPassthrough/libs/index_build.js');     // For 'assertIndexes()'
 
 const dbName = "test";
 const collName = jsTestName();
@@ -80,9 +81,14 @@ function runStandaloneTest() {
 /**
  * Verifies that every node in 'replSetTest' has the indexes in 'expectedIndexes'.
  */
-function verifyIndexesPresentOnAllNodes(replSetTest, expectedIndexes) {
+function verifyIndexesPresentOnAllNodes(replSetTest, expectedIndexes, expectedPrimary) {
     // Make sure that the replica set is stable.
-    replSetTest.awaitNodesAgreeOnPrimary();
+    if (expectedPrimary) {
+        replSetTest.awaitNodesAgreeOnPrimary(
+            replSetTest.kDefaultTimeoutMS, replSetTest.nodes, expectedPrimary);
+    } else {
+        replSetTest.awaitNodesAgreeOnPrimary();
+    }
     for (const node of [replSetTest.getPrimary(), replSetTest.getSecondary()]) {
         const db = node.getDB(dbName);
         const coll = db[collName];
@@ -97,7 +103,8 @@ function runReplicaSetTest() {
     rst.startSet();
     rst.initiate();
 
-    const primaryDB = rst.getPrimary().getDB(dbName);
+    const initialPrimary = rst.getPrimary();
+    const primaryDB = initialPrimary.getDB(dbName);
     const primaryColl = primaryDB[collName];
     insertDocuments(primaryColl);
     createIndexes(primaryColl);
@@ -105,19 +112,31 @@ function runReplicaSetTest() {
     // Wait until both nodes finish inserting the documents and building the index.
     rst.awaitReplication();
 
-    verifyIndexesPresentOnAllNodes(rst, indexList);
+    verifyIndexesPresentOnAllNodes(rst, indexList, initialPrimary);
 
     // Upgrade the secondary.
     rst.upgradeSecondaries({binVersion: "latest"});
-    verifyIndexesPresentOnAllNodes(rst, indexList);
+
+    // Verify that the primary has not changed and is in the last-lts version, while the
+    // secondary is in the latest version.
+    assert.eq(initialPrimary, rst.getPrimary());
+    assert.binVersion(initialPrimary, "last-lts");
+    assert.binVersion(rst.getSecondary(), "latest");
+
+    verifyIndexesPresentOnAllNodes(rst, indexList, initialPrimary);
 
     // Upgrade the primary.
-    rst.upgradePrimary(rst.getPrimary(), {binVersion: "latest"});
-    verifyIndexesPresentOnAllNodes(rst, indexList);
+    const upgradedPrimary = rst.upgradePrimary(initialPrimary, {binVersion: "latest"});
+
+    // Verify that all nodes are in the latest version.
+    for (const node of rst.nodes) {
+        assert.binVersion(node, "latest");
+    }
+
+    verifyIndexesPresentOnAllNodes(rst, indexList, upgradedPrimary);
 
     // Set the FCV.
-    const primary = rst.getPrimary();
-    const adminDB = primary.getDB("admin");
+    const adminDB = upgradedPrimary.getDB("admin");
     checkFCV(adminDB, lastLTSFCV);
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(adminDB, latestFCV);
