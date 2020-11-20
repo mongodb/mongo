@@ -19,6 +19,8 @@ selector:
   # TODO: SERVER-30161
   - jstests/multiVersion/dumprestore.js
   - jstests/multiVersion/dumprestore_sharded.js
+  # Skip any tests that run with auth explicitly.
+  - jstests/multiVersion/load_keys_on_upgrade.js
 
 # Multiversion tests start their own mongod's.
 executor:
