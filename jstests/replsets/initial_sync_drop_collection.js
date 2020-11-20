@@ -138,11 +138,11 @@ let expectedLogFor3and4 =
 
 // We don't support 4.2 style two-phase drops with EMRC=false - in that configuration, the
 // collection will instead be renamed to a <db>.system.drop.* namespace before being dropped. Since
-// the cloner queries collection by UUID, it will observe the first drop phase as a rename.
+// the cloner queries collection by UUID, it may observe the first drop phase as a rename.
 // We still want to check that initial sync succeeds in such a case.
 if (TwoPhaseDropCollectionTest.supportsDropPendingNamespaces(replTest)) {
     expectedLogFor3and4 =
-        '{code: 21075, attr: { cloner: "CollectionCloner", stage: "query","error": (x)=>(x.code===175 && x.codeName==="QueryPlanKilled" && x.errmsg=="collection renamed from \'" + nss + "\' to \'" + rnss + "\'. UUID " + uuid)}}';
+        '{code: 21075, attr: { cloner: "CollectionCloner", stage: "query","error": (x)=>(x.code===175 && x.codeName==="QueryPlanKilled" && (x.errmsg=="collection renamed from \'" + nss + "\' to \'" + rnss + "\'. UUID " + uuid || x.errmsg=="collection dropped. UUID " + uuid))}}';
 }
 
 jsTestLog("[3] Testing drop-pending between getMore calls.");
