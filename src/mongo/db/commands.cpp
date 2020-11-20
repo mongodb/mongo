@@ -626,7 +626,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
     for (auto&& failCommand : data.getObjectField("failCommands")) {
         if (failCommand.type() == String && cmd->hasAlias(failCommand.valueStringData())) {
             LOGV2(4898500,
-                  "Should activate 'failCommand' failpoint",
+                  "Activating 'failCommand' failpoint",
                   "data"_attr = data,
                   "threadName"_attr = threadName,
                   "appName"_attr = appName,
