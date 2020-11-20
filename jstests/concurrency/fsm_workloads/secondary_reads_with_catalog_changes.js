@@ -25,7 +25,6 @@ load('jstests/concurrency/fsm_workloads/secondary_reads.js');  // for $config
  *   creates_background_indexes,
  *   requires_replication,
  *   uses_write_concern,
- *   incompatible_with_lockfreereads,
  * ]
  */
 var $config = extendWorkload($config, function($config, $super) {

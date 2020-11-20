@@ -66,8 +66,13 @@ void RecoveryUnit::runPreCommitHooks(OperationContext* opCtx) {
 }
 
 void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
-    invariant(_inUnitOfWork(), toString(_getState()));
+    validateInUnitOfWork();
     _changes.push_back(std::move(change));
+}
+
+void RecoveryUnit::registerChangeForCatalogVisibility(std::unique_ptr<Change> change) {
+    validateInUnitOfWork();
+    _changesForCatalogVisibility.push_back(std::move(change));
 }
 
 void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp) {
@@ -77,6 +82,10 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
     if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
         sleepmillis(1000);
     }
+    _executeCommitHandlers(commitTimestamp);
+}
+
+void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
     for (auto& change : _changes) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
@@ -89,7 +98,20 @@ void RecoveryUnit::commitRegisteredChanges(boost::optional<Timestamp> commitTime
             std::terminate();
         }
     }
+    for (auto& change : _changesForCatalogVisibility) {
+        try {
+            // Log at higher level because commits occur far more frequently than rollbacks.
+            LOGV2_DEBUG(5255701,
+                        2,
+                        "CUSTOM COMMIT {demangleName_typeid_change}",
+                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
+            change->commit(commitTimestamp);
+        } catch (...) {
+            std::terminate();
+        }
+    }
     _changes.clear();
+    _changesForCatalogVisibility.clear();
 }
 
 void RecoveryUnit::abortRegisteredChanges() {
@@ -97,7 +119,21 @@ void RecoveryUnit::abortRegisteredChanges() {
     if (MONGO_unlikely(widenWUOWChangesWindow.shouldFail())) {
         sleepmillis(1000);
     }
+    _executeRollbackHandlers();
+}
+void RecoveryUnit::_executeRollbackHandlers() {
     try {
+        for (Changes::const_reverse_iterator it = _changesForCatalogVisibility.rbegin(),
+                                             end = _changesForCatalogVisibility.rend();
+             it != end;
+             ++it) {
+            Change* change = it->get();
+            LOGV2_DEBUG(5255702,
+                        2,
+                        "CUSTOM ROLLBACK {demangleName_typeid_change}",
+                        "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
+            change->rollback();
+        }
         for (Changes::const_reverse_iterator it = _changes.rbegin(), end = _changes.rend();
              it != end;
              ++it) {
@@ -108,9 +144,15 @@ void RecoveryUnit::abortRegisteredChanges() {
                         "demangleName_typeid_change"_attr = redact(demangleName(typeid(*change))));
             change->rollback();
         }
+        _changesForCatalogVisibility.clear();
         _changes.clear();
     } catch (...) {
         std::terminate();
     }
 }
+
+void RecoveryUnit::validateInUnitOfWork() const {
+    invariant(_inUnitOfWork(), toString(_getState()));
+}
+
 }  // namespace mongo

@@ -187,6 +187,43 @@ private:
 
 }  // namespace
 
+/**
+ * Publishes a pending writable Collection to the catalog. It needs to be registered with
+ * registerChangeForCatalogVisibility so other commit handlers can still write to this Collection.
+ * It also cleans up the collection from the UncommittedWritableCollections decoration.
+ */
+class CollectionCatalog::PublishWritableCollection final : public RecoveryUnit::Change {
+public:
+    PublishWritableCollection(OperationContext* opCtx,
+                              UncommittedWritableCollections& uncommittedWritableCollections,
+                              Collection* collection)
+        : _opCtx(opCtx),
+          _uncommittedWritableCollections(uncommittedWritableCollections),
+          _collection(collection) {}
+
+    void commit(boost::optional<Timestamp> commitTime) override {
+        auto [collection, commitHandlers] = _uncommittedWritableCollections.remove(_collection);
+        if (collection) {
+            CollectionCatalog::write(
+                _opCtx,
+                [collection = std::move(collection), &commitTime, commitHandlers = &commitHandlers](
+                    CollectionCatalog& catalog) {
+                    catalog._commitWritableClone(
+                        std::move(collection), commitTime, *commitHandlers);
+                });
+        }
+    }
+
+    void rollback() override {
+        _uncommittedWritableCollections.remove(_collection);
+    }
+
+private:
+    OperationContext* _opCtx;
+    UncommittedWritableCollections& _uncommittedWritableCollections;
+    Collection* _collection;
+};
+
 CollectionCatalog::iterator::iterator(OperationContext* opCtx,
                                       StringData dbName,
                                       const CollectionCatalog& catalog)
@@ -529,25 +566,9 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     auto cloned = coll->clone();
     uncommittedWritableCollections.insert(cloned);
 
-    opCtx->recoveryUnit()->onCommit(
-        [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
-            boost::optional<Timestamp> commitTime) {
-            auto [collection, commitHandlers] = uncommittedWritableCollections.remove(clonedPtr);
-            if (collection) {
-                CollectionCatalog::write(
-                    opCtx,
-                    [collection = std::move(collection),
-                     &commitTime,
-                     commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
-                        catalog._commitWritableClone(
-                            std::move(collection), commitTime, *commitHandlers);
-                    });
-            }
-        });
-
-    opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
-        uncommittedWritableCollections.remove(cloned.get());
-    });
+    opCtx->recoveryUnit()->registerChangeForCatalogVisibility(
+        std::make_unique<PublishWritableCollection>(
+            opCtx, uncommittedWritableCollections, cloned.get()));
 
     return cloned.get();
 }
@@ -617,25 +638,9 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     auto cloned = coll->clone();
     uncommittedWritableCollections.insert(cloned);
 
-    opCtx->recoveryUnit()->onCommit(
-        [opCtx, &uncommittedWritableCollections, clonedPtr = cloned.get()](
-            boost::optional<Timestamp> commitTime) {
-            auto [collection, commitHandlers] = uncommittedWritableCollections.remove(clonedPtr);
-            if (collection) {
-                CollectionCatalog::write(
-                    opCtx,
-                    [collection = std::move(collection),
-                     &commitTime,
-                     commitHandlers = &commitHandlers](CollectionCatalog& catalog) {
-                        catalog._commitWritableClone(
-                            std::move(collection), commitTime, *commitHandlers);
-                    });
-            }
-        });
-
-    opCtx->recoveryUnit()->onRollback([&uncommittedWritableCollections, cloned]() {
-        uncommittedWritableCollections.remove(cloned.get());
-    });
+    opCtx->recoveryUnit()->registerChangeForCatalogVisibility(
+        std::make_unique<PublishWritableCollection>(
+            opCtx, uncommittedWritableCollections, cloned.get()));
 
     return cloned.get();
 }

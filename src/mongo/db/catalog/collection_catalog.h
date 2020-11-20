@@ -355,6 +355,7 @@ public:
 
 private:
     friend class CollectionCatalog::iterator;
+    class PublishWritableCollection;
 
     std::shared_ptr<Collection> _lookupCollectionByUUID(CollectionUUID uuid) const;
 

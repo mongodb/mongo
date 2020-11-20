@@ -42,15 +42,13 @@ class RecoveryUnitNoop : public RecoveryUnit {
 public:
     void beginUnitOfWork(OperationContext* opCtx) final {}
 
-    virtual bool waitUntilDurable(OperationContext* opCtx) {
+    bool waitUntilDurable(OperationContext* opCtx) override {
         return true;
     }
 
-    virtual void registerChange(std::unique_ptr<Change> change) {
-        _changes.push_back(std::move(change));
-    }
+    void setOrderedCommit(bool orderedCommit) override {}
 
-    virtual void setOrderedCommit(bool orderedCommit) {}
+    void validateInUnitOfWork() const override {}
 
     bool inActiveTxn() const {
         return false;
@@ -62,25 +60,11 @@ public:
 
 private:
     void doCommitUnitOfWork() final {
-        for (auto& change : _changes) {
-            try {
-                change->commit(boost::none);
-            } catch (...) {
-                std::terminate();
-            }
-        }
-        _changes.clear();
+        _executeCommitHandlers(boost::none);
     }
 
     void doAbortUnitOfWork() final {
-        for (auto it = _changes.rbegin(); it != _changes.rend(); ++it) {
-            try {
-                (*it)->rollback();
-            } catch (...) {
-                std::terminate();
-            }
-        }
-        _changes.clear();
+        _executeRollbackHandlers();
     }
 
     virtual void doAbandonSnapshot() {}
