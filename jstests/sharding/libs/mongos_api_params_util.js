@@ -764,7 +764,7 @@ let MongosAPIParametersUtil = (function() {
                     reduce: function reduceFunc(key, values) {
                         return Array.sum(values);
                     },
-                    out: "inline"
+                    out: {inline: 1}
                 }),
             },
             explain: {
@@ -780,7 +780,7 @@ let MongosAPIParametersUtil = (function() {
                         reduce: function reduceFunc(key, values) {
                             return Array.sum(values);
                         },
-                        out: "inline"
+                        out: {inline: 1}
                     }
                 }),
             }
