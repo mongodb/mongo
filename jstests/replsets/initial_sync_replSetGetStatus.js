@@ -76,10 +76,13 @@ assert.eq(pretestDbRes.initialSyncStatus.databases.pretest.clonedCollections, 0)
 
 let barCollRes = pretestDbRes.initialSyncStatus.databases.pretest["pretest.bar"];
 assert.eq(barCollRes.documentsToCopy, 3);
-assert.gte(barCollRes.documentsCopied, 2);
+// Even though we set the collectionClonerBatchSize to 2, it is possible for a batch to actually
+// return only 1 document. This can lead to us hitting the failpoint in the next batch instead,
+// causing us to copy up to 3 documents.
+assert.lte(barCollRes.documentsCopied, 3);
 assert.gt(barCollRes.bytesToCopy, 0);
 assert.gt(barCollRes.approxBytesCopied, 0);
-assert.lt(barCollRes.approxBytesCopied, barCollRes.bytesToCopy);
+assert.lte(barCollRes.approxBytesCopied, barCollRes.bytesToCopy);
 assert.lt(barCollRes.approxBytesCopied, pretestDbRes.initialSyncStatus.approxTotalDataSize);
 
 const bytesCopiedAdminDb =
