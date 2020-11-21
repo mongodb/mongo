@@ -1108,9 +1108,10 @@ public:
                                                          _context->planNodeId,
                                                          _context->slotIdGenerator);
 
-                    inputStage = makeLoopJoin(std::move(inputStage),
-                                              std::move(shortCircuitingStage),
-                                              _context->planNodeId);
+                    inputStage =
+                        makeLoopJoin(std::move(inputStage),  // NOLINT(bugprone-use-after-move)
+                                     std::move(shortCircuitingStage),
+                                     _context->planNodeId);
 
                     return {std::move(shortCircuitingExpr), std::move(inputStage)};
                 }
