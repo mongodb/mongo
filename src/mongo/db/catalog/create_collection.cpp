@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/curop.h"
@@ -227,6 +228,7 @@ Status _createTimeseries(OperationContext* opCtx,
                      << IndexDescriptor::kExpireAfterSecondsFieldName << *expireAfterSeconds);
             auto fromMigrate = false;
             try {
+                uassertStatusOK(index_key_validate::validateIndexSpecTTL(indexSpec));
                 indexBuildCoord->createIndexesOnEmptyCollection(
                     opCtx, collectionWriter, {indexSpec}, fromMigrate);
             } catch (DBException& ex) {

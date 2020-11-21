@@ -95,7 +95,7 @@ testInvalidTimeseriesOptions({timeField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", metaField: 100}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: ""}, ErrorCodes.TypeMismatch);
 testInvalidTimeseriesOptions({timeField: "time", expireAfterSeconds: NumberLong(-10)},
-                             ErrorCodes.TypeMismatch);
+                             ErrorCodes.CannotCreateIndex);
 testInvalidTimeseriesOptions({timeField: "time", invalidOption: {}}, 40415);
 
 testCompatibleCreateOptions({storageEngine: {}});
