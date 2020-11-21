@@ -33,7 +33,10 @@
 
 #include "mongo/db/catalog/create_collection.h"
 
+#include <fmt/printf.h>
+
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -208,8 +211,50 @@ Status _createTimeseries(OperationContext* opCtx,
                 Top::get(serviceContext).collectionDropped(bucketsNs);
             });
 
+        CollectionOptions bucketsOptions;
+
+        // Set the validator option to a JSON schema enforcing constraints on bucket documents.
+        // This validation is only structural to prevent accidental corruption by users and cannot
+        // cover all constraints.
+        // Leave the validationLevel and validationAction to their strict/error defaults.
+        auto timeField = options.timeseries->getTimeField();
+        bucketsOptions.validator = fromjson(fmt::sprintf(R"(
+{
+    '$jsonSchema' : {
+        bsonType: 'object',
+        required: ['_id', 'control', 'data'],
+        properties: {
+            _id: {bsonType: 'objectId'},
+            control: {
+                bsonType: 'object',
+                required: ['version', 'min', 'max'],
+                properties: {
+                    version: {bsonType: 'number'},
+                    min: {
+                        bsonType: 'object',
+                        required: ['%s'],
+                        properties: {'%s': {bsonType: 'date'}}
+                    },
+                    max: {
+                        bsonType: 'object',
+                        required: ['%s'],
+                        properties: {'%s': {bsonType: 'date'}}
+                    }
+                }
+            },
+            data: {bsonType: 'object'},
+            meta: {}
+        },
+        additionalProperties: false
+    }
+})",
+                                                         timeField,
+                                                         timeField,
+                                                         timeField,
+                                                         timeField));
+
         // Create the buckets collection that will back the view.
-        auto bucketsCollection = db->createCollection(opCtx, bucketsNs);
+        auto bucketsCollection = db->createCollection(opCtx, bucketsNs, bucketsOptions);
         invariant(bucketsCollection,
                   str::stream() << "Failed to create buckets collection " << bucketsNs
                                 << " for time-series collection " << ns);

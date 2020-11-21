@@ -130,19 +130,26 @@ testTimeseriesNamespaceExists((testDB, collName) => {
     const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
     assert.commandWorked(bucketsColl.insert(
         {control: {version: 1, min: {time: ISODate()}, max: {time: ISODate()}}, data: {}}));
-    assert.commandWorked(bucketsColl.insert({
+    assert.commandFailedWithCode(bucketsColl.insert({
         control: {version: 'not a number', min: {time: ISODate()}, max: {time: ISODate()}},
         data: {}
-    }));
-    assert.commandWorked(bucketsColl.insert(
-        {control: {version: 1, min: {time: 'not a date'}, max: {time: ISODate()}}, data: {}}));
-    assert.commandWorked(bucketsColl.insert(
-        {control: {version: 1, min: {time: ISODate()}, max: {time: 'not a date'}}, data: {}}));
-    assert.commandWorked(bucketsColl.insert({
+    }),
+                                 ErrorCodes.DocumentValidationFailure);
+    assert.commandFailedWithCode(
+        bucketsColl.insert(
+            {control: {version: 1, min: {time: 'not a date'}, max: {time: ISODate()}}, data: {}}),
+        ErrorCodes.DocumentValidationFailure);
+    assert.commandFailedWithCode(
+        bucketsColl.insert(
+            {control: {version: 1, min: {time: ISODate()}, max: {time: 'not a date'}}, data: {}}),
+        ErrorCodes.DocumentValidationFailure);
+    assert.commandFailedWithCode(bucketsColl.insert({
         control: {version: 1, min: {time: ISODate()}, max: {time: ISODate()}},
         data: 'not an object'
-    }));
-    assert.commandWorked(bucketsColl.insert({invalid_bucket_field: 1}));
+    }),
+                                 ErrorCodes.DocumentValidationFailure);
+    assert.commandFailedWithCode(bucketsColl.insert({invalid_bucket_field: 1}),
+                                 ErrorCodes.DocumentValidationFailure);
     assert.commandWorked(testDB.runCommand({drop: coll.getName(), writeConcern: {w: "majority"}}));
 }
 })();

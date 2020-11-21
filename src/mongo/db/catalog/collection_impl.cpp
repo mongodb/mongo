@@ -213,6 +213,10 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
         return Status::OK();
     }
 
+    if (nss.isTimeseriesBucketsCollection()) {
+        return Status::OK();
+    }
+
     if (nss.isSystem() && !nss.isDropPendingNamespace()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators not allowed on system collection " << nss
