@@ -474,8 +474,9 @@ private:
 
             BSONObjBuilder builder;
             builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
-            builder.append(write_ops::Update::kBypassDocumentValidationFieldName,
-                           _batch.getBypassDocumentValidation());
+            // The schema validation configured in the bucket collection is intended for direct
+            // operations by end users and is not applicable here.
+            builder.append(write_ops::Update::kBypassDocumentValidationFieldName, true);
             builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
             if (auto stmtId = _batch.getStmtId()) {
                 builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
