@@ -106,8 +106,4 @@ commands:
                 type: safeBool
                 unstable: true
                 default: false
-            comment:
-                type: IDLAnyType
-                description: "A user-provided comment to attach to this command."
-                optional: true
         reply_type: ListCollectionsReply
