@@ -273,9 +273,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                 Snapshotted<RecordData> snap(oldObj.snapshotId(), oldRec);
 
                 if (_isUserInitiatedWrite &&
-                    (checkUpdateChangesShardKeyFields(oldObj) ||
-                     wasReshardingKeyUpdated(_doc.getObject(), oldObj)) &&
-                    !args.preImageDoc) {
+                    checkUpdateChangesShardKeyFields(boost::none, oldObj) && !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
 
@@ -299,9 +297,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj, Reco
                     newObj.objsize() <= BSONObjMaxUserSize);
 
             if (!request->explain()) {
-                if (_isUserInitiatedWrite &&
-                    (checkUpdateChangesShardKeyFields(oldObj) ||
-                     wasReshardingKeyUpdated(_doc.getObject(), oldObj)) &&
+                if (_isUserInitiatedWrite && checkUpdateChangesShardKeyFields(newObj, oldObj) &&
                     !args.preImageDoc) {
                     args.preImageDoc = oldObj.value().getOwned();
                 }
@@ -573,12 +569,10 @@ PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, Wor
     return NEED_YIELD;
 }
 
-bool UpdateStage::wasReshardingKeyUpdated(const BSONObj& newObj,
+bool UpdateStage::wasReshardingKeyUpdated(const ScopedCollectionDescription& collDesc,
+                                          const BSONObj& newObj,
                                           const Snapshotted<BSONObj>& oldObj) {
-    auto css = CollectionShardingState::get(opCtx(), collection()->ns());
-
-    auto reshardingKeyPattern =
-        css->getCollectionDescription(opCtx()).getReshardingKeyIfShouldForwardOps();
+    auto reshardingKeyPattern = collDesc.getReshardingKeyIfShouldForwardOps();
     if (!reshardingKeyPattern)
         return false;
 
@@ -606,14 +600,27 @@ bool UpdateStage::wasReshardingKeyUpdated(const BSONObj& newObj,
     return true;
 }
 
-bool UpdateStage::checkUpdateChangesShardKeyFields(const Snapshotted<BSONObj>& oldObj) {
+bool UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
+                                                   const Snapshotted<BSONObj>& oldObj) {
     auto* const css = CollectionShardingState::get(opCtx(), collection()->ns());
     const auto collDesc = css->getCollectionDescription(opCtx());
+
+    // Calling mutablebson::Document::getObject() renders a full copy of the updated document. This
+    // can be expensive for larger documents, so we skip calling it when the collection isn't even
+    // sharded.
     if (!collDesc.isSharded()) {
         return false;
     }
 
-    auto newObj = _doc.getObject();
+    const auto& newObj = newObjCopy ? *newObjCopy : _doc.getObject();
+    return wasExistingShardKeyUpdated(css, collDesc, newObj, oldObj) ||
+        wasReshardingKeyUpdated(collDesc, newObj, oldObj);
+}
+
+bool UpdateStage::wasExistingShardKeyUpdated(CollectionShardingState* css,
+                                             const ScopedCollectionDescription& collDesc,
+                                             const BSONObj& newObj,
+                                             const Snapshotted<BSONObj>& oldObj) {
     const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldObj.value());
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newObj);
