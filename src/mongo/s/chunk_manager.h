@@ -450,6 +450,20 @@ using RoutingTableHistoryCache =
 using RoutingTableHistoryValueHandle = RoutingTableHistoryCache::ValueHandle;
 
 /**
+ * Combines a shard, the shard version, and database version that the shard should be using
+ */
+struct ShardEndpoint {
+    ShardEndpoint(const ShardId& shardName,
+                  boost::optional<ChunkVersion> shardVersion,
+                  boost::optional<DatabaseVersion> dbVersion);
+
+    ShardId shardName;
+
+    boost::optional<ChunkVersion> shardVersion;
+    boost::optional<DatabaseVersion> databaseVersion;
+};
+
+/**
  * Wrapper around a RoutingTableHistory, which pins it to a particular point in time.
  */
 class ChunkManager {

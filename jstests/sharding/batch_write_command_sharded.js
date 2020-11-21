@@ -245,8 +245,7 @@ printjson(request = {
     documents: [{a: 1}]
 });
 printjson(result = configColl.runCommand(request));
-assert(!result.ok);
-assert(result.errmsg != null);
+assert.commandFailedWithCode(result, ErrorCodes.FailedToSatisfyReadPreference);
 
 // Config server insert with no config PRIMARY
 configColl.remove({});
@@ -256,8 +255,7 @@ printjson(request = {
     updates: [{q: {a: 1}, u: {$set: {b: 2}}}]
 });
 printjson(result = configColl.runCommand(request));
-assert(!result.ok);
-assert(result.errmsg != null);
+assert.commandFailedWithCode(result, ErrorCodes.FailedToSatisfyReadPreference);
 
 // Config server insert with no config PRIMARY
 configColl.remove({});
@@ -267,8 +265,7 @@ printjson(request = {
     deletes: [{q: {a: 1}, limit: 0}]
 });
 printjson(result = configColl.runCommand(request));
-assert(!result.ok);
-assert(result.errmsg != null);
+assert.commandFailedWithCode(result, ErrorCodes.FailedToSatisfyReadPreference);
 
 jsTest.log("DONE!");
 

@@ -852,4 +852,18 @@ bool ComparableChunkVersion::operator<(const ComparableChunkVersion& other) cons
     return _epochDisambiguatingSequenceNum < other._epochDisambiguatingSequenceNum;
 }
 
+ShardEndpoint::ShardEndpoint(const ShardId& shardName,
+                             boost::optional<ChunkVersion> shardVersion,
+                             boost::optional<DatabaseVersion> dbVersion)
+    : shardName(shardName),
+      shardVersion(std::move(shardVersion)),
+      databaseVersion(std::move(dbVersion)) {
+    if (databaseVersion)
+        invariant(shardVersion && *shardVersion == ChunkVersion::UNSHARDED());
+    else if (shardVersion)
+        invariant(*shardVersion != ChunkVersion::UNSHARDED());
+    else
+        invariant(shardName == ShardId::kConfigServerId);
+}
+
 }  // namespace mongo

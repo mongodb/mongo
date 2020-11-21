@@ -288,20 +288,6 @@ public:
         repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
-     * Directly sends the specified command to the config server and returns the response.
-     *
-     * NOTE: Usage of this function is disallowed in new code, which should instead go through
-     *       the regular catalog management calls. It is currently only used privately by this
-     *       class and externally for writes to the admin/config namespaces.
-     *
-     * @param request Request to be sent to the config server.
-     * @param response Out parameter to receive the response. Can be nullptr.
-     */
-    virtual void writeConfigServerDirect(OperationContext* opCtx,
-                                         const BatchedCommandRequest& request,
-                                         BatchedCommandResponse* response) = 0;
-
-    /**
      * Directly inserts a document in the specified namespace on the config server. The document
      * must have an _id index. Must only be used for insertions in the 'config' database.
      *

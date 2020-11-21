@@ -50,11 +50,6 @@ void ClusterWriter::write(OperationContext* opCtx,
 
     ChunkManagerTargeter targeter(opCtx, request.getNS(), targetEpoch);
 
-    if (targeter.endpointIsConfigServer()) {
-        Grid::get(opCtx)->catalogClient()->writeConfigServerDirect(opCtx, request, response);
-        return;
-    }
-
     LOGV2_DEBUG_OPTIONS(
         4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");
 

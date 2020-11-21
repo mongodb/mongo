@@ -141,10 +141,6 @@ StatusWith<VersionType> ShardingCatalogClientMock::getConfigVersion(
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-void ShardingCatalogClientMock::writeConfigServerDirect(OperationContext* opCtx,
-                                                        const BatchedCommandRequest& request,
-                                                        BatchedCommandResponse* response) {}
-
 Status ShardingCatalogClientMock::insertConfigDocument(OperationContext* opCtx,
                                                        const NamespaceString& nss,
                                                        const BSONObj& doc,

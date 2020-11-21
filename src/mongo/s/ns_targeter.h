@@ -31,31 +31,11 @@
 
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {
-
-class OperationContext;
-
-/**
- * Combines a shard, the shard version, and database version that the shard should be using
- */
-struct ShardEndpoint {
-    ShardEndpoint(const ShardId& shardName,
-                  const ChunkVersion& shardVersion,
-                  boost::optional<DatabaseVersion> dbVersion = boost::none)
-        : shardName(shardName), shardVersion(shardVersion), databaseVersion(std::move(dbVersion)) {}
-
-    ShardId shardName;
-    ChunkVersion shardVersion;
-    boost::optional<DatabaseVersion> databaseVersion;
-};
 
 /**
  * The NSTargeter interface is used by a WriteOp to generate and target child write operations

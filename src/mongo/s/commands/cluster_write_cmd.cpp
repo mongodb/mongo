@@ -387,7 +387,9 @@ private:
                 cmdObjWithVersions =
                     appendDbVersionIfPresent(cmdObjWithVersions, *endpoint.databaseVersion);
             }
-            cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, endpoint.shardVersion);
+            if (endpoint.shardVersion) {
+                cmdObjWithVersions = appendShardVersion(cmdObjWithVersions, *endpoint.shardVersion);
+            }
             requests.emplace_back(endpoint.shardName, cmdObjWithVersions);
         }
 

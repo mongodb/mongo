@@ -180,8 +180,12 @@ public:
      */
     std::string toString() const;
 
+    inline int compare(const UUID& rhs) const {
+        return memcmp(&_uuid, &rhs._uuid, sizeof(_uuid));
+    }
+
     inline bool operator==(const UUID& rhs) const {
-        return !memcmp(&_uuid, &rhs._uuid, sizeof(_uuid));
+        return !compare(rhs);
     }
 
     inline bool operator!=(const UUID& rhs) const {

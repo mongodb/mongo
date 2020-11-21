@@ -130,10 +130,6 @@ public:
     StatusWith<VersionType> getConfigVersion(OperationContext* opCtx,
                                              repl::ReadConcernLevel readConcern) override;
 
-    void writeConfigServerDirect(OperationContext* opCtx,
-                                 const BatchedCommandRequest& request,
-                                 BatchedCommandResponse* response) override;
-
     Status insertConfigDocument(OperationContext* opCtx,
                                 const NamespaceString& nss,
                                 const BSONObj& doc,

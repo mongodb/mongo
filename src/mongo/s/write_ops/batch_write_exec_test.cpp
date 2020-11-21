@@ -278,7 +278,7 @@ public:
 
     MockNSTargeter singleShardNSTargeter{
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, OID::gen())),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, OID::gen()), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << MAXKEY))}};
 };
@@ -347,17 +347,17 @@ TEST_F(BatchWriteExecTest, SingleUpdateTargetsShardWithLet) {
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("x" << 0),
                    BSON("x" << MAXKEY))});
 
@@ -431,17 +431,17 @@ TEST_F(BatchWriteExecTest, SingleDeleteTargetsShardWithLet) {
     protected:
         std::vector<ShardEndpoint> targetDelete(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("x" << 0),
                    BSON("x" << MAXKEY))});
 
@@ -620,18 +620,18 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("x" << 0),
                    BSON("x" << MAXKEY))});
 
@@ -725,18 +725,18 @@ TEST_F(BatchWriteExecTest,
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("sk" << MINKEY),
                    BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("sk" << 10),
                    BSON("sk" << MAXKEY))});
 
@@ -845,18 +845,18 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("sk" << MINKEY),
                    BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("sk" << 10),
                    BSON("sk" << MAXKEY))});
 
@@ -976,18 +976,18 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("sk" << MINKEY),
                    BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("sk" << 10),
                    BSON("sk" << MAXKEY))});
 
@@ -1103,12 +1103,12 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
             if (targetAll) {
-                return std::vector<ShardEndpoint>{
-                    ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                    ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+                return std::vector{
+                    ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                    ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
             } else {
-                return std::vector<ShardEndpoint>{
-                    ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+                return std::vector{
+                    ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
             }
         }
 
@@ -1117,10 +1117,10 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("sk" << MINKEY),
                    BSON("sk" << 10)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("sk" << 10),
                    BSON("sk" << MAXKEY))});
 
@@ -1672,18 +1672,18 @@ TEST_F(BatchWriteExecTargeterErrorTest, TargetedFailedAndErrorResponse) {
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("x" << 0),
                    BSON("x" << MAXKEY))});
 
@@ -1810,18 +1810,18 @@ TEST_F(BatchWriteExecTransactionTargeterErrorTest, TargetedFailedAndErrorRespons
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("x" << 0),
                    BSON("x" << MAXKEY))});
 
@@ -1951,18 +1951,18 @@ TEST_F(BatchWriteExecTransactionMultiShardTest, TargetedSucceededAndErrorRespons
 
         std::vector<ShardEndpoint> targetUpdate(OperationContext* opCtx,
                                                 const BatchItemRef& itemRef) const override {
-            return std::vector<ShardEndpoint>{
-                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
-                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch))};
+            return std::vector{
+                ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
+                ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none)};
         }
     };
 
     MultiShardTargeter multiShardNSTargeter(
         nss,
-        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch)),
+        {MockRange(ShardEndpoint(kShardName1, ChunkVersion(100, 200, epoch), boost::none),
                    BSON("x" << MINKEY),
                    BSON("x" << 0)),
-         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch)),
+         MockRange(ShardEndpoint(kShardName2, ChunkVersion(101, 200, epoch), boost::none),
                    BSON("x" << 0),
                    BSON("x" << MAXKEY))});
 

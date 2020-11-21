@@ -242,14 +242,6 @@ CompareResult compareShardVersions(const ChunkVersion& shardVersionA,
         return CompareResult_GTE;
 }
 
-ChunkVersion getShardVersion(const ChunkManager& cm, const ShardId& shardId) {
-    if (cm.isSharded()) {
-        return cm.getVersion(shardId);
-    }
-
-    return ChunkVersion::UNSHARDED();
-}
-
 /**
  * Returns the relationship between two maps of shard versions. As above, these maps are often
  * comparable when the collection has not been dropped and there is at least one chunk on the
@@ -270,10 +262,9 @@ CompareResult compareAllShardVersions(const ChunkManager& cm,
         const ChunkVersion& remoteShardVersion = shardVersionEntry.second;
 
         ChunkVersion cachedShardVersion;
-
         try {
-            // Throws b/c shard constructor throws
-            cachedShardVersion = getShardVersion(cm, shardId);
+            cachedShardVersion =
+                cm.isSharded() ? cm.getVersion(shardId) : ChunkVersion::UNSHARDED();
         } catch (const DBException& ex) {
             LOGV2_WARNING(22915,
                           "could not lookup shard {shardId} in local cache, shard metadata may "
@@ -380,7 +371,12 @@ ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
             _targetShardKey(shardKey, CollationSpec::kSimpleSpec, doc.objsize()));
     }
 
-    return ShardEndpoint(_cm->dbPrimary(), ChunkVersion::UNSHARDED(), _cm->dbVersion());
+    // TODO (SERVER-51070): Remove the boost::none when the config server can support shardVersion
+    // in commands
+    return ShardEndpoint(
+        _cm->dbPrimary(),
+        _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
+        _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm->dbVersion());
 }
 
 std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* opCtx,
@@ -403,8 +399,12 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
 
     // If the collection is not sharded, forward the update to the primary shard.
     if (!_cm->isSharded()) {
-        return std::vector<ShardEndpoint>{
-            {_cm->dbPrimary(), ChunkVersion::UNSHARDED(), _cm->dbVersion()}};
+        // TODO (SERVER-51070): Remove the boost::none when the config server can support
+        // shardVersion in commands
+        return std::vector{ShardEndpoint(
+            _cm->dbPrimary(),
+            _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
+            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm->dbVersion())};
     }
 
     const auto& shardKeyPattern = _cm->getShardKeyPattern();
@@ -536,8 +536,12 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
     const BSONObj& query,
     const BSONObj& collation) const {
     if (!_cm->isSharded()) {
-        return std::vector<ShardEndpoint>{
-            {_cm->dbPrimary(), ChunkVersion::UNSHARDED(), _cm->dbVersion()}};
+        // TODO (SERVER-51070): Remove the boost::none when the config server can support
+        // shardVersion in commands
+        return std::vector{ShardEndpoint(
+            _cm->dbPrimary(),
+            _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
+            _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm->dbVersion())};
     }
 
     std::set<ShardId> shardIds;
@@ -549,7 +553,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _cm->getVersion(shardId));
+        endpoints.emplace_back(std::move(shardId), _cm->getVersion(shardId), boost::none);
     }
 
     return endpoints;
@@ -560,7 +564,7 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(const BSONObj& s
                                                                 long long estDataSize) const {
     try {
         auto chunk = _cm->findIntersectingChunk(shardKey, collation);
-        return {{chunk.getShardId(), _cm->getVersion(chunk.getShardId())}};
+        return ShardEndpoint(chunk.getShardId(), _cm->getVersion(chunk.getShardId()), boost::none);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -577,7 +581,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetAllShards(OperationContex
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _cm->getVersion(shardId));
+        endpoints.emplace_back(std::move(shardId), _cm->getVersion(shardId), boost::none);
     }
 
     return endpoints;
@@ -597,7 +601,8 @@ void ChunkManagerTargeter::noteStaleShardResponse(const ShardEndpoint& endpoint,
     ChunkVersion remoteShardVersion;
     if (!staleInfo.getVersionWanted()) {
         // If we don't have a vWanted sent, assume the version is higher than our current version.
-        remoteShardVersion = getShardVersion(*_cm, endpoint.shardName);
+        remoteShardVersion =
+            _cm->isSharded() ? _cm->getVersion(endpoint.shardName) : ChunkVersion::UNSHARDED();
         remoteShardVersion.incMajor();
     } else {
         remoteShardVersion = *staleInfo.getVersionWanted();

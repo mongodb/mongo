@@ -712,16 +712,6 @@ DistLockManager* ShardingCatalogClientImpl::getDistLockManager() {
     return _distLockManager.get();
 }
 
-void ShardingCatalogClientImpl::writeConfigServerDirect(OperationContext* opCtx,
-                                                        const BatchedCommandRequest& batchRequest,
-                                                        BatchedCommandResponse* batchResponse) {
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    *batchResponse = configShard->runBatchWriteCommand(opCtx,
-                                                       Shard::kDefaultConfigCommandTimeout,
-                                                       batchRequest,
-                                                       Shard::RetryPolicy::kNotIdempotent);
-}
-
 Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
                                                        const NamespaceString& nss,
                                                        const BSONObj& doc,
