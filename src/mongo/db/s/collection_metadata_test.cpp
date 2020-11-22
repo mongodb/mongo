@@ -45,7 +45,8 @@ using unittest::assertGet;
 CollectionMetadata makeCollectionMetadataImpl(
     const KeyPattern& shardKeyPattern,
     const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks,
-    bool staleChunkManager) {
+    bool staleChunkManager,
+    CoordinatorStateEnum state = CoordinatorStateEnum::kInitializing) {
 
     const OID epoch = OID::gen();
     const NamespaceString kNss("test.foo");
@@ -79,6 +80,9 @@ CollectionMetadata makeCollectionMetadataImpl(
         allChunks.back().setHistory({ChunkHistory(kRouting, kOtherShard)});
     }
 
+    TypeCollectionReshardingFields reshardingFields;
+    reshardingFields.setState(state);
+
     return CollectionMetadata(
         ChunkManager(kThisShard,
                      DatabaseVersion(UUID::gen(), 1),
@@ -89,7 +93,7 @@ CollectionMetadata makeCollectionMetadataImpl(
                                                       nullptr,
                                                       false,
                                                       epoch,
-                                                      boost::none,
+                                                      reshardingFields,
                                                       true,
                                                       allChunks)),
                      kChunkManager),
@@ -103,8 +107,9 @@ struct ConstructedRangeMap : public RangeMap {
 
 class NoChunkFixture : public unittest::Test {
 protected:
-    CollectionMetadata makeCollectionMetadata() const {
-        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)), {}, false);
+    CollectionMetadata makeCollectionMetadata(
+        CoordinatorStateEnum state = CoordinatorStateEnum::kInitializing) const {
+        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)), {}, false, state);
     }
 };
 
@@ -173,6 +178,30 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
 
     ConstructedRangeMap pending;
     ASSERT(!metadata.getNextOrphanRange(pending, metadata.getMaxKey()));
+}
+
+TEST_F(NoChunkFixture, WritesShouldRunInDistributedTxnRenamingCheck) {
+    auto metadata(makeCollectionMetadata(CoordinatorStateEnum::kRenaming));
+    // We are in kRenaming by default.
+    OID originalEpoch = OID::gen();
+    OID reshardingEpoch = OID::gen();
+
+    // Writes should run in a distributed txn if the collection metadata's epoch matches
+    // the original collection's epoch.
+    ASSERT(metadata.writesShouldRunInDistributedTransaction(metadata.getCollVersion().epoch(),
+                                                            reshardingEpoch));
+
+    // Writes should NOT run in a distributed txn when the epoch matches the temp collection's
+    // epoch.
+    ASSERT(!metadata.writesShouldRunInDistributedTransaction(originalEpoch,
+                                                             metadata.getCollVersion().epoch()));
+
+    // If the collection's epoch matches neither the original epoch nor the resharding epoch,
+    // expect a throw.
+    ASSERT_THROWS_CODE(
+        metadata.writesShouldRunInDistributedTransaction(originalEpoch, reshardingEpoch),
+        AssertionException,
+        5169400);
 }
 
 /**

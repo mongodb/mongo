@@ -91,6 +91,52 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
     return ShardKeyPattern(donorFields->getReshardingKey());
 }
 
+bool CollectionMetadata::writesShouldRunInDistributedTransaction(const OID& originalEpoch,
+                                                                 const OID& reshardingEpoch) const {
+    auto reshardingFields = getReshardingFields();
+    if (!reshardingFields)
+        return false;
+
+    switch (reshardingFields->getState()) {
+        case CoordinatorStateEnum::kUnused:
+        case CoordinatorStateEnum::kInitializing:
+        case CoordinatorStateEnum::kPreparingToDonate:
+        case CoordinatorStateEnum::kCloning:
+        case CoordinatorStateEnum::kApplying:
+            return false;
+        case CoordinatorStateEnum::kMirroring:
+        case CoordinatorStateEnum::kCommitted:
+            return true;
+        case CoordinatorStateEnum::kRenaming:
+            break;
+        case CoordinatorStateEnum::kDropping:
+        case CoordinatorStateEnum::kDone:
+        case CoordinatorStateEnum::kError:
+            return false;
+    }
+
+    // Handle kRenaming:
+    auto chunkVersion = getCollVersion();
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Collection is not sharded, original epoch: " << originalEpoch,
+            chunkVersion != ChunkVersion::UNSHARDED());
+
+    const auto& collectionCurrentEpoch = chunkVersion.epoch();
+
+    // Renaming has not completed:
+    if (collectionCurrentEpoch == originalEpoch)
+        return true;
+
+    // Else, renaming must have completed, and myEpoch must be equal to reshardingEpoch.
+    uassert(5169400,
+            str::stream() << "Invalid epoch; current epoch " << collectionCurrentEpoch
+                          << " does not match original epoch " << originalEpoch
+                          << " or resharding epoch " << reshardingEpoch,
+            collectionCurrentEpoch == reshardingEpoch);
+
+    return false;
+}
+
 BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
     BSONObj key;
 

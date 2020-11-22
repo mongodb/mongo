@@ -78,6 +78,14 @@ public:
     boost::optional<ShardKeyPattern> getReshardingKeyIfShouldForwardOps() const;
 
     /**
+     * Writes should run in distributed transactions when
+     *      1. The coordinator is between the mirroring and committed states, OR
+     *      2. The coordinator is in the renaming state, but the epoch is still the original epoch.
+     */
+    bool writesShouldRunInDistributedTransaction(const OID& originalEpoch,
+                                                 const OID& reshardingEpoch) const;
+
+    /**
      * Returns the current shard version for the collection or UNSHARDED if it is not sharded.
      *
      * Will throw ShardInvalidatedForTargeting if _thisShardId is marked as stale by
