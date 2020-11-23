@@ -58,7 +58,8 @@ public:
     ReshardingOplogApplicationRules(const NamespaceString& outputNss,
                                     const NamespaceString& stashNss,
                                     const ShardId& donorShardId,
-                                    ChunkManager sourceChunkMgr);
+                                    ChunkManager sourceChunkMgr,
+                                    std::vector<NamespaceString> stashColls);
 
     /**
      * Wraps the op application in a writeConflictRetry loop and is responsible for creating and
@@ -69,29 +70,31 @@ public:
 
 private:
     // Applies an insert operation
-    Status _applyInsert(OperationContext* opCtx,
-                        const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
+    void _applyInsert_inlock(OperationContext* opCtx,
+                             Database* db,
+                             const CollectionPtr& outputColl,
+                             const CollectionPtr& stashColl,
+                             const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
 
     // Applies an update operation
-    Status _applyUpdate(OperationContext* opCtx,
-                        const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
+    void _applyUpdate_inlock(OperationContext* opCtx,
+                             Database* db,
+                             const CollectionPtr& outputColl,
+                             const CollectionPtr& stashColl,
+                             const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
 
     // Applies a delete operation
-    Status _applyDelete(OperationContext* opCtx,
-                        const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
+    void _applyDelete_inlock(OperationContext* opCtx,
+                             Database* db,
+                             const CollectionPtr& outputColl,
+                             const CollectionPtr& stashColl,
+                             const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts);
 
-    // Takes db and collection locks in MODE_IX for 'nss' and then applies an op by calling
-    // 'applyOpFn'. 'nss' must either be '_outputNss' or '_stashNss'.
-    Status _getCollectionAndApplyOp(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        unique_function<Status(OperationContext*, Database*, const AutoGetCollection&)> applyOpFn);
-
-    // Takes db and collection locks in MODE_IS for 'nss' and queries the collection using
-    // 'idQuery'.
-    BSONObj _queryCollForId(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            const BSONObj& idQuery);
+    // Queries '_stashNss' using 'idQuery'.
+    BSONObj _queryStashCollById(OperationContext* opCtx,
+                                Database* db,
+                                const CollectionPtr& coll,
+                                const BSONObj& idQuery);
 
     // Namespace where operations should be applied, unless there is an _id conflict.
     const NamespaceString _outputNss;
@@ -104,6 +107,9 @@ private:
 
     // The chunk manager for the source namespace and original shard key.
     const ChunkManager _sourceChunkMgr;
+
+    // The namespaces of all stash collections, including the stash collection for this donor.
+    std::vector<NamespaceString> _stashColls;
 };
 
 }  // namespace mongo

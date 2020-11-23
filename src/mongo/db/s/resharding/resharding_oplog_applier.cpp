@@ -198,6 +198,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
     NamespaceString oplogNs,
     NamespaceString nsBeingResharded,
     UUID collUUIDBeingResharded,
+    std::vector<NamespaceString> stashCollections,
     Timestamp reshardingCloneFinishedTs,
     std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
     size_t batchSize,
@@ -216,7 +217,7 @@ ReshardingOplogApplier::ReshardingOplogApplier(
       _reshardingCloneFinishedTs(std::move(reshardingCloneFinishedTs)),
       _batchSize(batchSize),
       _applicationRules(ReshardingOplogApplicationRules(
-          _outputNs, _stashNs, _sourceId.getShardId(), sourceChunkMgr)),
+          _outputNs, _stashNs, _sourceId.getShardId(), sourceChunkMgr, stashCollections)),
       _service(service),
       _executor(executor),
       _writerPool(writerPool),
@@ -536,10 +537,9 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
     if (opType == repl::OpTypeEnum::kNoop) {
         return Status::OK();
     } else if (resharding::gUseReshardingOplogApplicationRules) {
-        if (opType == repl::OpTypeEnum::kInsert) {
+        if (opType == repl::OpTypeEnum::kInsert || opType == repl::OpTypeEnum::kDelete) {
             return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
         } else {
-            // TODO SERVER-49902 call ReshardingOplogApplicationRules::applyOperation for deletes
             // TODO SERVER-49903 call ReshardingOplogApplicationRules::applyOperation for updates
             return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                 opCtx,

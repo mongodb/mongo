@@ -100,3 +100,12 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gReshardingTempInterruptBeforeOplogApplication
         default: true
+
+    reshardingOplogApplierMaxLockRequestTimeoutMillis:
+        description: >-
+            The max number of milliseconds that the resharding oplog applier will wait for lock
+            acquisition.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gReshardingOplogApplierMaxLockRequestTimeoutMillis
+        default: 5

@@ -124,9 +124,18 @@ public:
 
         _writerPool = repl::makeReplWriterPool(kWriterPoolSize);
 
+        LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+
+        uassertStatusOK(createCollection(
+            operationContext(),
+            NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
+            BSON("create" << NamespaceString::kSessionTransactionsTableNamespace.coll())));
         uassertStatusOK(createCollection(operationContext(),
                                          kAppliedToNs.db().toString(),
                                          BSON("create" << kAppliedToNs.coll())));
+        uassertStatusOK(createCollection(operationContext(),
+                                         kOtherDonorStashNs.db().toString(),
+                                         BSON("create" << kOtherDonorStashNs.coll())));
 
         _cm = createChunkManagerForOriginalColl();
     }
@@ -249,6 +258,10 @@ public:
         return _cm.get();
     }
 
+    const std::vector<NamespaceString>& stashCollections() {
+        return kStashCollections;
+    }
+
 protected:
     static constexpr int kWriterPoolSize = 4;
     const NamespaceString kOplogNs{"config.localReshardingOplogBuffer.xxx.yyy"};
@@ -256,6 +269,8 @@ protected:
     const UUID kCrudUUID = UUID::gen();
     const NamespaceString kAppliedToNs{"foo", "system.resharding.{}"_format(kCrudUUID.toString())};
     const NamespaceString kStashNs{"foo", "{}.{}"_format(kCrudNs.coll(), kOplogNs.coll())};
+    const NamespaceString kOtherDonorStashNs{"foo", "{}.{}"_format("otherstash", "otheroplog")};
+    const std::vector<NamespaceString> kStashCollections{kStashNs, kOtherDonorStashNs};
     const ShardId kMyShardId{"shard1"};
     const ShardId kOtherShardId{"shard2"};
     UUID _crudNsUuid = UUID::gen();
@@ -276,6 +291,7 @@ TEST_F(ReshardingOplogApplierTest, NothingToIterate) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -315,6 +331,7 @@ TEST_F(ReshardingOplogApplierTest, ApplyBasicCrud) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -363,6 +380,7 @@ TEST_F(ReshardingOplogApplierTest, InsertTypeOplogAppliedInMultipleBatches) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(8, 3),
                                    std::move(iterator),
                                    3 /* batchSize */,
@@ -419,6 +437,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCloningPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(7, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
@@ -463,6 +482,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorDuringBatchApplyCatchUpPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -508,6 +528,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCloningPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -550,6 +571,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstOplogCatchUpPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -592,6 +614,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCloningPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(8, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
@@ -638,6 +661,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingFirstBatchCatchUpPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -685,6 +709,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCloningPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(7, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -743,6 +768,7 @@ TEST_F(ReshardingOplogApplierTest, ErrorWhileIteratingSecondBatchCatchUpPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -792,6 +818,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCloningPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
@@ -833,6 +860,7 @@ TEST_F(ReshardingOplogApplierTest, ExecutorIsShutDownCatchUpPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -871,6 +899,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCloningPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    4 /* batchSize */,
@@ -912,6 +941,7 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -938,7 +968,8 @@ TEST_F(ReshardingOplogApplierTest, WriterPoolIsShutDownCatchUpPhase) {
 }
 
 TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingApplicationRules) {
-    // This case tests applying rule #2 described in ReshardingOplogApplicationRules::_applyInsert.
+    // This case tests applying rule #2 described in
+    // ReshardingOplogApplicationRules::_applyInsert_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
     std::queue<repl::OplogEntry> crudOps;
@@ -965,6 +996,7 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -999,7 +1031,8 @@ TEST_F(ReshardingOplogApplierTest, InsertOpIntoOuputCollectionUseReshardingAppli
 
 TEST_F(ReshardingOplogApplierTest,
        InsertOpShouldTurnIntoReplacementUpdateOnOutputCollectionUseReshardingApplicationRules) {
-    // This case tests applying rule #3 described in ReshardingOplogApplicationRules::_applyInsert.
+    // This case tests applying rule #3 described in
+    // ReshardingOplogApplicationRules::_applyInsert_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
     std::queue<repl::OplogEntry> crudOps;
@@ -1014,6 +1047,7 @@ TEST_F(ReshardingOplogApplierTest,
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    1 /* batchSize */,
@@ -1046,7 +1080,7 @@ TEST_F(ReshardingOplogApplierTest,
 TEST_F(ReshardingOplogApplierTest,
        InsertOpShouldWriteToStashCollectionUseReshardingApplicationRules) {
     // This case tests applying rules #1 and #4 described in
-    // ReshardingOplogApplicationRules::_applyInsert.
+    // ReshardingOplogApplicationRules::_applyInsert_inlock.
     setReshardingOplogApplicationServerParameterTrue();
 
     std::queue<repl::OplogEntry> crudOps;
@@ -1065,6 +1099,7 @@ TEST_F(ReshardingOplogApplierTest,
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(5, 3),
                                    std::move(iterator),
                                    1 /* batchSize */,
@@ -1105,6 +1140,294 @@ TEST_F(ReshardingOplogApplierTest,
     ASSERT_TRUE(progressDoc);
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
     ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollNonEmptyStashCollForThisDonorUseReshardingApplicationRules) {
+    // This case tests applying rule #1 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> crudOps;
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1 << "sk" << 2),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                           repl::OpTypeEnum::kDelete,
+                           BSON("_id" << 1),
+                           boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   stashCollections(),
+                                   Timestamp(5, 3),
+                                   std::move(iterator),
+                                   1 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    // Insert a doc {_id: 1} in the output collection before applying the insert of doc with
+    // {_id: 1}. This will force the doc {_id: 1, sk: 1} to be inserted to the stash collection for
+    // this donor shard.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().toString(), BSON("_id" << 1 << "sk" << -1));
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    // The output collection should still hold the doc {_id: 1, sk: -1}, and the doc with {_id: 1,
+    // sk: 2} should have been inserted into the stash collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 2), doc);
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // We should have applied rule #1 and deleted the doc with {_id : 1} from the stash collection
+    // for this donor.
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The output collection should remain unchanged.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollShouldDoNothingUseReshardingApplicationRules) {
+    // This case tests applying rules #2 and #3 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> crudOps;
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kDelete,
+                           BSON("_id" << 1 << "sk" << -1),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                           repl::OpTypeEnum::kDelete,
+                           BSON("_id" << 2),
+                           boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   stashCollections(),
+                                   Timestamp(5, 3),
+                                   std::move(iterator),
+                                   1 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    // Make sure a doc with {_id: 1} exists in the output collection that does not belong to this
+    // donor shard before applying the deletes.
+    DBDirectClient client(operationContext());
+    client.insert(appliedToNs().ns(), BSON("_id" << 1 << "sk" << -1));
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    // The doc {_id: 1, sk: -1} that exists in the output collection does not belong to this donor
+    // shard, so we should have applied rule #3 and done nothing and the doc should still be in the
+    // output collection.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // There does not exist a doc with {_id : 2} in the output collection, so we should have applied
+    // rule #2 and done nothing.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The doc with {_id: 1, sk: -1} should still exist.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -1), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollAllStashCollsEmptyUseReshardingApplicationRules) {
+    // This case tests applying rule #4 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> crudOps;
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1 << "sk" << 1),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 2 << "sk" << 2),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
+                           repl::OpTypeEnum::kDelete,
+                           BSON("_id" << 1),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(8, 3), 1),
+                           repl::OpTypeEnum::kDelete,
+                           BSON("_id" << 2),
+                           boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   stashCollections(),
+                                   Timestamp(6, 3),
+                                   std::move(iterator),
+                                   2 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    // Apply the inserts first so there exists docs in the output collection
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    DBDirectClient client(operationContext());
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 1), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 2 << "sk" << 2), doc);
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // None of the stash collections have docs with _id == [op _id], so we should not have found any
+    // docs to insert into the output collection with either {_id : 1} or {_id : 2}.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 2));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(8, 3), progressDoc->getProgress().getTs());
+
+    // Assert that the delete on the output collection was run in a transaction by looking in the
+    // oplog for an applyOps entry with a "d" op on 'appliedToNs'.
+    doc = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                         BSON("o.applyOps.0.op"
+                              << "d"
+                              << "o.applyOps.0.ns" << appliedToNs().ns()));
+    ASSERT(!doc.isEmpty());
+}
+
+TEST_F(ReshardingOplogApplierTest,
+       DeleteFromOutputCollNonEmptyStashCollForOtherDonorUseReshardingApplicationRules) {
+    // This case tests applying rule #4 described in
+    // ReshardingOplogApplicationRules::_applyDelete_inlock.
+    setReshardingOplogApplicationServerParameterTrue();
+
+    std::queue<repl::OplogEntry> crudOps;
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
+                           repl::OpTypeEnum::kInsert,
+                           BSON("_id" << 1 << "sk" << 1),
+                           boost::none));
+    crudOps.push(makeOplog(repl::OpTime(Timestamp(6, 3), 1),
+                           repl::OpTypeEnum::kDelete,
+                           BSON("_id" << 1),
+                           boost::none));
+
+    auto iterator = std::make_unique<OplogIteratorMock>(std::move(crudOps));
+    ReshardingOplogApplier applier(getServiceContext(),
+                                   sourceId(),
+                                   oplogNs(),
+                                   crudNs(),
+                                   crudUUID(),
+                                   stashCollections(),
+                                   Timestamp(5, 3),
+                                   std::move(iterator),
+                                   1 /* batchSize */,
+                                   chunkManager(),
+                                   getExecutor(),
+                                   writerPool());
+
+    // Make sure a doc with {_id: 1} exists in the stash collection for the other donor shard. The
+    // stash collection for this donor shard is empty.
+    DBDirectClient client(operationContext());
+    client.insert(stashCollections()[1].toString(), BSON("_id" << 1 << "sk" << -3));
+
+    auto future = applier.applyUntilCloneFinishedTs();
+    future.get();
+
+    // The output collection should now hold the doc {_id: 1, sk: 1}.
+    auto doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << 1), doc);
+
+    // The stash collection for this donor shard still should be empty.
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The stash collection for the other donor shard should still hold the doc {_id: 1, sk: -3}.
+    doc = client.findOne(stashCollections()[1].toString(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -3), doc);
+
+    future = applier.applyUntilDone();
+    future.get();
+
+    // We should have applied rule #4 and deleted the doc that was in the output collection {_id: 1,
+    // sk: 1}, deleted the doc with the same _id {_id: 1, sk: -3} in the other donor shard's stash
+    // collection and inserted this doc into the output collection.
+    doc = client.findOne(appliedToNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSON("_id" << 1 << "sk" << -3), doc);
+
+    // This donor shard's stash collection should remain empty.
+    doc = client.findOne(stashNs().ns(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    // The other donor shard's stash collection should now be empty.
+    doc = client.findOne(stashCollections()[1].toString(), BSON("_id" << 1));
+    ASSERT_BSONOBJ_EQ(BSONObj(), doc);
+
+    auto progressDoc = ReshardingOplogApplier::checkStoredProgress(operationContext(), sourceId());
+    ASSERT_TRUE(progressDoc);
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getClusterTime());
+    ASSERT_EQ(Timestamp(6, 3), progressDoc->getProgress().getTs());
+
+    // Assert that the delete on the output collection was run in a transaction by looking in the
+    // oplog for an applyOps entry with the following ops: ["d" op on 'appliedToNs', "d" on
+    // 'otherStashNs'. "i" on 'appliedToNs'].
+    doc = client.findOne(NamespaceString::kRsOplogNamespace.ns(),
+                         BSON("o.applyOps.0.op"
+                              << "d"
+                              << "o.applyOps.0.ns" << appliedToNs().ns() << "o.applyOps.1.op"
+                              << "d"
+                              << "o.applyOps.1.ns" << stashCollections()[1].toString()
+                              << "o.applyOps.2.op"
+                              << "i"
+                              << "o.applyOps.2.ns" << appliedToNs().ns()));
+    ASSERT(!doc.isEmpty());
 }
 
 class ReshardingOplogApplierRetryableTest : public ReshardingOplogApplierTest {
@@ -1372,6 +1695,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, CrudWithEmptyConfigTransactions) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1452,6 +1776,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, MultipleTxnSameLsidInOneBatch) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1506,6 +1831,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxn) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1553,6 +1879,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithHigherExistingTxnNum) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1610,6 +1937,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithLowerExistingTxnNum) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1658,6 +1986,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithEqualExistingTxnNum) {
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1706,6 +2035,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithStmtIdAlreadyExecuted) 
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1755,6 +2085,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnSame
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1806,6 +2137,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithActiveUnpreparedTxnWith
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1856,6 +2188,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillComm
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,
@@ -1914,6 +2247,7 @@ TEST_F(ReshardingOplogApplierRetryableTest, RetryableWithPreparedTxnThatWillAbor
                                    oplogNs(),
                                    crudNs(),
                                    crudUUID(),
+                                   stashCollections(),
                                    Timestamp(6, 3),
                                    std::move(iterator),
                                    2 /* batchSize */,

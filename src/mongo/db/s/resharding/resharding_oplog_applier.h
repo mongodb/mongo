@@ -57,6 +57,7 @@ public:
                            NamespaceString oplogNs,
                            NamespaceString nsBeingResharded,
                            UUID collUUIDBeingResharded,
+                           std::vector<NamespaceString> stashCollections,
                            Timestamp reshardingCloneFinishedTs,
                            std::unique_ptr<ReshardingDonorOplogIteratorInterface> oplogIterator,
                            size_t batchSize,

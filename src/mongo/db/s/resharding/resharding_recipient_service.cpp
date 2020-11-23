@@ -402,6 +402,18 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         return getShardedCollectionRoutingInfo(opCtx.get(), _recipientDoc.getNss());
     }();
 
+    std::vector<NamespaceString> stashCollections;
+    std::vector<NamespaceString> oplogBuffers;
+    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
+        auto oplogBufferNss = getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId());
+        oplogBuffers.push_back(oplogBufferNss);
+        // TODO: Also make the stash collection a system collection to guarantee it won't conflict
+        // with any user collections.
+        stashCollections.emplace_back(
+            _recipientDoc.getNss().db(),
+            "{}.{}"_format(_recipientDoc.getNss().coll(), oplogBufferNss.coll()));
+    }
+
     size_t i = 0;
     auto futuresToWaitOn = std::move(_oplogFetcherFutures);
     for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
@@ -413,13 +425,14 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
                                          true /* isKillableByStepdown */));
         }
 
-        auto oplogBufferNss = getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId());
+        const auto& oplogBufferNss = oplogBuffers[i];
         _oplogAppliers.emplace_back(std::make_unique<ReshardingOplogApplier>(
             serviceContext,
             ReshardingSourceId{_recipientDoc.get_id(), donor.getId()},
             oplogBufferNss,
             _recipientDoc.getNss(),
             _recipientDoc.getExistingUUID(),
+            stashCollections,
             *_recipientDoc.getFetchTimestamp(),
             // The recipient applies oplog entries from the donor starting from the fetchTimestamp,
             // which corresponds to {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume
