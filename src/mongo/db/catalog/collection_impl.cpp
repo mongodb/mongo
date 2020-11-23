@@ -953,6 +953,9 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
     auto oldValidationLevel = _validationLevel;
     _validationLevel = levelSW.getValue();
 
+    opCtx->recoveryUnit()->onRollback(
+        [this, oldValidationLevel]() { this->_validationLevel = oldValidationLevel; });
+
     // Reparse the validator as there are some features which are only supported with certain
     // validation levels.
     auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
@@ -966,8 +969,6 @@ Status CollectionImpl::setValidationLevel(OperationContext* opCtx, StringData ne
 
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());
-    opCtx->recoveryUnit()->onRollback(
-        [this, oldValidationLevel]() { this->_validationLevel = oldValidationLevel; });
 
     return Status::OK();
 }
@@ -983,6 +984,9 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
     auto oldValidationAction = _validationAction;
     _validationAction = actionSW.getValue();
 
+    opCtx->recoveryUnit()->onRollback(
+        [this, oldValidationAction]() { this->_validationAction = oldValidationAction; });
+
     // Reparse the validator as there are some features which are only supported with certain
     // validation actions.
     auto allowedFeatures = MatchExpressionParser::kAllowAllSpecialFeatures;
@@ -996,8 +1000,6 @@ Status CollectionImpl::setValidationAction(OperationContext* opCtx, StringData n
 
     DurableCatalog::get(opCtx)->updateValidator(
         opCtx, ns(), _validatorDoc, getValidationLevel(), getValidationAction());
-    opCtx->recoveryUnit()->onRollback(
-        [this, oldValidationAction]() { this->_validationAction = oldValidationAction; });
 
     return Status::OK();
 }
