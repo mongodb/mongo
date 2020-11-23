@@ -1,6 +1,7 @@
 """Test hook that runs tenant migrations continuously."""
 
 import random
+import re
 import threading
 import time
 import uuid
@@ -144,6 +145,20 @@ class TenantMigrationLifeCycle(object):
         """
         with self.__lock:
             return self.__test_state == self._TEST_FINISHED_STATE
+
+
+def get_certificate_and_private_key(pem_file_path):  # noqa: D205,D400
+    """Return a dictionary containing the certificate and private key extracted from the given pem
+    file.
+    """
+    lines = open(pem_file_path, 'rt').read()
+    certificate = re.findall(
+        re.compile("(-*BEGIN CERTIFICATE-*\n(.*\n)*-*END CERTIFICATE-*\n)", re.MULTILINE),
+        lines)[0][0]
+    private_key = re.findall(
+        re.compile("(-*BEGIN PRIVATE KEY-*\n(.*\n)*-*END PRIVATE KEY-*\n)", re.MULTILINE),
+        lines)[0][0]
+    return {"certificate": certificate, "privateKey": private_key}
 
 
 class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
@@ -316,9 +331,19 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
 
         migration_id = bson.Binary(uuid.uuid4().bytes, 4)
         cmd_obj = {
-            "donorStartMigration": 1, "migrationId": migration_id,
-            "recipientConnectionString": recipient_rs.get_driver_connection_url(),
-            "tenantId": self._tenant_id, "readPreference": {"mode": "primary"}
+            "donorStartMigration":
+                1,
+            "migrationId":
+                migration_id,
+            "recipientConnectionString":
+                recipient_rs.get_driver_connection_url(),
+            "tenantId":
+                self._tenant_id,
+            "readPreference": {"mode": "primary"},
+            "donorCertificateForRecipient":
+                get_certificate_and_private_key("jstests/libs/client.pem"),
+            "recipientCertificateForDonor":
+                get_certificate_and_private_key("jstests/libs/client.pem"),
         }
 
         try:

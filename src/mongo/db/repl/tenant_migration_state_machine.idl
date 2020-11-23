@@ -34,6 +34,7 @@ global:
 imports:
     - "mongo/client/read_preference_setting.idl"
     - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/repl/tenant_migration_pem_payload.idl"
     - "mongo/idl/basic_types.idl"
 
 enums:
@@ -106,6 +107,16 @@ structs:
                     The wall-clock time at which the state machine document should be
                     removed by the TTL monitor.
                 optional: true
+            donorCertificateForRecipient:
+                description: >-
+                    The SSL certificate and private key that the donor should use to authenticate
+                    to the recipient.
+                type: TenantMigrationPEMPayload
+            recipientCertificateForDonor:
+                description: >-
+                    The SSL certificate and private key that the recipient should use to
+                    authenticate to the donor.
+                type: TenantMigrationPEMPayload
 
     tenantMigrationRecipientDocument:
         description: "Represents an in-progress tenant migration on the migration recipient."

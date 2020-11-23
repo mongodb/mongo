@@ -968,8 +968,8 @@ class CmdCreateUser : public CmdUMCTyped<CreateUserCommand, void> {
 public:
     static constexpr StringData kPwdField = "pwd"_sd;
 
-    StringData sensitiveFieldName() const final {
-        return kPwdField;
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {kPwdField};
     }
 } cmdCreateUser;
 
@@ -1077,8 +1077,8 @@ class CmdUpdateUser : public CmdUMCTyped<UpdateUserCommand, void> {
 public:
     static constexpr StringData kPwdField = "pwd"_sd;
 
-    StringData sensitiveFieldName() const final {
-        return kPwdField;
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {kPwdField};
     }
 } cmdUpdateUser;
 

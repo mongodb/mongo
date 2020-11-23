@@ -1269,6 +1269,7 @@ env.Library(
 env.Library(
     target='tenant_migration_state_machine_idl',
     source=[
+        'tenant_migration_pem_payload.idl',
         'tenant_migration_state_machine.idl',
     ],
     LIBDEPS=[
@@ -1276,6 +1277,7 @@ env.Library(
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/client/read_preference',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
         'optime',
         'repl_coordinator_interface',
     ],

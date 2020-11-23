@@ -221,24 +221,21 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
     return AsyncTry([this, self = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
-               DBDirectClient client(opCtx);
 
-               auto commandResponse = client.runCommand([&] {
-                   write_ops::Update updateOp(_stateDocumentsNS);
-                   auto updateModification =
-                       write_ops::UpdateModification::parseFromClassicUpdate(_stateDoc.toBSON());
-                   write_ops::UpdateOpEntry updateEntry(
-                       BSON(TenantMigrationDonorDocument::kIdFieldName << _stateDoc.getId()),
-                       updateModification);
-                   updateEntry.setMulti(false);
-                   updateEntry.setUpsert(true);
-                   updateOp.setUpdates({updateEntry});
+               AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
 
-                   return updateOp.serialize({});
-               }());
+               writeConflictRetry(
+                   opCtx, "tenantMigrationInsertStateDoc", _stateDocumentsNS.ns(), [&] {
+                       const auto filter =
+                           BSON(TenantMigrationDonorDocument::kIdFieldName << _stateDoc.getId());
+                       const auto updateMod = BSON("$setOnInsert" << _stateDoc.toBSON());
+                       auto updateResult = Helpers::upsert(
+                           opCtx, _stateDocumentsNS.ns(), filter, updateMod, /*fromMigrate=*/false);
 
-               const auto commandReply = commandResponse->getCommandReply();
-               uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+                       // '$setOnInsert' update operator can never modify an existing on-disk state
+                       // doc.
+                       invariant(!updateResult.numDocsModified);
+                   });
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
@@ -348,31 +345,28 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 ExecutorFuture<repl::OpTime>
 TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancelationToken& token) {
+    _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
+                          Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
+
     return AsyncTry([this, self = shared_from_this()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto opCtx = opCtxHolder.get();
-               DBDirectClient client(opCtx);
 
-               _stateDoc.setExpireAt(
-                   _serviceContext->getFastClockSource()->now() +
-                   Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
+               AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
 
-               auto commandResponse = client.runCommand([&] {
-                   write_ops::Update updateOp(_stateDocumentsNS);
-                   auto updateModification =
-                       write_ops::UpdateModification::parseFromClassicUpdate(_stateDoc.toBSON());
-                   write_ops::UpdateOpEntry updateEntry(
-                       BSON(TenantMigrationDonorDocument::kIdFieldName << _stateDoc.getId()),
-                       updateModification);
-                   updateEntry.setMulti(false);
-                   updateEntry.setUpsert(false);
-                   updateOp.setUpdates({updateEntry});
+               writeConflictRetry(
+                   opCtx,
+                   "tenantMigrationDonorMarkStateDocAsGarbageCollectable",
+                   _stateDocumentsNS.ns(),
+                   [&] {
+                       const auto filter =
+                           BSON(TenantMigrationDonorDocument::kIdFieldName << _stateDoc.getId());
+                       const auto updateMod = _stateDoc.toBSON();
+                       auto updateResult = Helpers::upsert(
+                           opCtx, _stateDocumentsNS.ns(), filter, updateMod, /*fromMigrate=*/false);
 
-                   return updateOp.serialize({});
-               }());
-
-               const auto commandReply = commandResponse->getCommandReply();
-               uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
+                       invariant(updateResult.numDocsModified == 1);
+                   });
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })

@@ -34,6 +34,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -96,6 +97,18 @@ inline Status validateConnectionString(const StringData& donorOrRecipientConnect
         }
     }
     return Status::OK();
+}
+
+inline Status validateCertificatePEMPayload(const StringData& payload) {
+    auto swBlob =
+        ssl_util::findPEMBlob(payload, "CERTIFICATE"_sd, 0 /* position */, false /* allowEmpty */);
+    return swBlob.getStatus().withContext("Invalid certificate field");
+}
+
+inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
+    auto swBlob =
+        ssl_util::findPEMBlob(payload, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
+    return swBlob.getStatus().withContext("Invalid private key field");
 }
 
 }  // namespace mongo

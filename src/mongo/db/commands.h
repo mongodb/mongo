@@ -484,8 +484,8 @@ public:
      * The default snipForLogging shall remove these field names. Auditing shall not
      * include these fields in audit outputs.
      */
-    virtual StringData sensitiveFieldName() const {
-        return StringData{};
+    virtual std::set<StringData> sensitiveFieldNames() const {
+        return {};
     }
 
     /**

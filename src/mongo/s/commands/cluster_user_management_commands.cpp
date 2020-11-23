@@ -176,16 +176,16 @@ public:
 class CmdCreateUser : public CmdUMCPassthrough<CreateUserCommand, void, UserCacheInvalidatorNOOP> {
 public:
     static constexpr StringData kPwdField = "pwd"_sd;
-    StringData sensitiveFieldName() const final {
-        return kPwdField;
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {kPwdField};
     }
 } cmdCreateUser;
 
 class CmdUpdateUser : public CmdUMCPassthrough<UpdateUserCommand, void, UserCacheInvalidatorUser> {
 public:
     static constexpr StringData kPwdField = "pwd"_sd;
-    StringData sensitiveFieldName() const final {
-        return kPwdField;
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {kPwdField};
     }
 } cmdUpdateUser;
 

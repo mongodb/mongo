@@ -214,11 +214,11 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
             }
         }
 
-        StringData sensitiveFieldName() const override {
+        std::set<StringData> sensitiveFieldNames() const override {
             if (_invocation) {
-                return _invocation->definition()->sensitiveFieldName();
+                return _invocation->definition()->sensitiveFieldNames();
             }
-            return StringData{};
+            return {};
         }
 
         StringData getName() const override {
@@ -898,15 +898,15 @@ private:
 Command::~Command() = default;
 
 void Command::snipForLogging(mutablebson::Document* cmdObj) const {
-    StringData sensitiveField = sensitiveFieldName();
-    if (!sensitiveField.empty()) {
-
-        for (mutablebson::Element pwdElement =
-                 mutablebson::findFirstChildNamed(cmdObj->root(), sensitiveField);
-             pwdElement.ok();
-             pwdElement =
-                 mutablebson::findElementNamed(pwdElement.rightSibling(), sensitiveField)) {
-            uassertStatusOK(pwdElement.setValueString("xxx"));
+    auto sensitiveFields = sensitiveFieldNames();
+    if (!sensitiveFields.empty()) {
+        for (auto& sensitiveField : sensitiveFields) {
+            for (mutablebson::Element element =
+                     mutablebson::findFirstChildNamed(cmdObj->root(), sensitiveField);
+                 element.ok();
+                 element = mutablebson::findElementNamed(element.rightSibling(), sensitiveField)) {
+                uassertStatusOK(element.setValueString("xxx"));
+            }
         }
     }
 }

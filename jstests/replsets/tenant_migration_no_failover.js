@@ -40,7 +40,7 @@ assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
 for (const db of [...tenantDBs, ...nonTenantDBs]) {
     for (const coll of collNames) {
-        tenantMigrationTest.verifyReceipientDB(tenantId, db, coll);
+        tenantMigrationTest.verifyRecipientDB(tenantId, db, coll);
     }
 }
 

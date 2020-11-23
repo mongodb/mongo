@@ -67,6 +67,8 @@ const bool autoAuthorizeDefault = true;
 
 class CmdSaslStart : public BasicCommand {
 public:
+    static constexpr StringData kPayloadField = "payload"_sd;
+
     CmdSaslStart();
     virtual ~CmdSaslStart();
 
@@ -78,8 +80,8 @@ public:
                                        const BSONObj&,
                                        std::vector<Privilege>*) const {}
 
-    StringData sensitiveFieldName() const final {
-        return "payload"_sd;
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {kPayloadField};
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -101,6 +103,8 @@ public:
 
 class CmdSaslContinue : public BasicCommand {
 public:
+    static constexpr StringData kPayloadField = "payload"_sd;
+
     CmdSaslContinue();
     virtual ~CmdSaslContinue();
 
@@ -111,8 +115,8 @@ public:
                                        const BSONObj&,
                                        std::vector<Privilege>*) const {}
 
-    StringData sensitiveFieldName() const final {
-        return "payload"_sd;
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {kPayloadField};
     }
 
     virtual bool run(OperationContext* opCtx,

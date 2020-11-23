@@ -10,6 +10,7 @@
 (function() {
 "use strict";
 
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest =
@@ -27,6 +28,7 @@ const tenantId = "testTenantId";
 const readPreference = {
     mode: 'primary'
 };
+const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 
 jsTestLog("Testing 'donorStartMigration' command provided with invalid options.");
 
@@ -38,7 +40,9 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
         tenantId: invalidTenantId,
-        readPreference: readPreference
+        readPreference: readPreference,
+        donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.BadValue);
 });
@@ -49,7 +53,9 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     migrationId: UUID(),
     recipientConnectionString: tenantMigrationTest.getDonorRst().getURL(),
     tenantId: tenantId,
-    readPreference: readPreference
+    readPreference: readPreference,
+    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 
@@ -70,7 +76,9 @@ assert.commandFailedWithCode(donorPrimary.adminCommand({
     migrationId: UUID(),
     recipientConnectionString: recipientPrimary.host,
     tenantId: tenantId,
-    readPreference: readPreference
+    readPreference: readPreference,
+    donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 

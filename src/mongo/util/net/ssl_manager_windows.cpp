@@ -62,6 +62,7 @@
 #include "mongo/util/net/ssl_parameters_gen.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
+#include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 #include "mongo/util/uuid.h"
@@ -602,35 +603,6 @@ StatusWith<std::string> readFile(StringData fileName) {
     return buf;
 }
 
-// Find a specific kind of PEM blob marked by BEGIN and END in a string
-StatusWith<StringData> findPEMBlob(StringData blob,
-                                   StringData type,
-                                   size_t position = 0,
-                                   bool allowEmpty = false) {
-    std::string header = str::stream() << "-----BEGIN " << type << "-----";
-    std::string trailer = str::stream() << "-----END " << type << "-----";
-
-    size_t headerPosition = blob.find(header, position);
-    if (headerPosition == std::string::npos) {
-        if (allowEmpty) {
-            return StringData();
-        } else {
-            return Status(ErrorCodes::InvalidSSLConfiguration,
-                          str::stream() << "Failed to find PEM blob header: " << header);
-        }
-    }
-
-    size_t trailerPosition = blob.find(trailer, headerPosition);
-    if (trailerPosition == std::string::npos) {
-        return Status(ErrorCodes::InvalidSSLConfiguration,
-                      str::stream() << "Failed to find PEM blob trailer: " << trailer);
-    }
-
-    trailerPosition += trailer.size();
-
-    return StringData(blob.rawData() + headerPosition, trailerPosition - headerPosition);
-}
-
 // Decode a base-64 PEM blob with headers into a binary blob
 StatusWith<std::vector<BYTE>> decodePEMBlob(StringData blob) {
     DWORD decodeLen{0};
@@ -705,7 +677,7 @@ StatusWith<std::vector<UniqueCertificate>> readCAPEMBuffer(StringData buffer) {
     bool found_one = false;
 
     while (pos < buffer.size()) {
-        auto swBlob = findPEMBlob(buffer, "CERTIFICATE"_sd, pos, pos != 0);
+        auto swBlob = ssl_util::findPEMBlob(buffer, "CERTIFICATE"_sd, pos, pos != 0);
 
         // We expect to find at least one certificate
         if (!swBlob.isOK()) {
@@ -783,7 +755,7 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
     }
 
     // Search the buffer for the various strings that make up a PEM file
-    auto swPublicKeyBlob = findPEMBlob(buf, "CERTIFICATE"_sd);
+    auto swPublicKeyBlob = ssl_util::findPEMBlob(buf, "CERTIFICATE"_sd);
     if (!swPublicKeyBlob.isOK()) {
         return swPublicKeyBlob.getStatus();
     }
@@ -857,11 +829,11 @@ StatusWith<UniqueCertificateWithPrivateKey> readCertPEMFile(StringData fileName,
 
     // PEM files can have either private key format
     // Also the private key can either come before or after the certificate
-    auto swPrivateKeyBlob = findPEMBlob(buf, "RSA PRIVATE KEY"_sd);
+    auto swPrivateKeyBlob = ssl_util::findPEMBlob(buf, "RSA PRIVATE KEY"_sd);
     // We expect to find at least one certificate
     if (!swPrivateKeyBlob.isOK()) {
         // A "PRIVATE KEY" is actually a PKCS #8 PrivateKeyInfo ASN.1 type.
-        swPrivateKeyBlob = findPEMBlob(buf, "PRIVATE KEY"_sd);
+        swPrivateKeyBlob = ssl_util::findPEMBlob(buf, "PRIVATE KEY"_sd);
         if (!swPrivateKeyBlob.isOK()) {
             return swPrivateKeyBlob.getStatus();
         }
@@ -1054,7 +1026,7 @@ Status readCRLPEMFile(HCERTSTORE certStore, StringData fileName) {
     bool found_one = false;
 
     while (pos < buf.size()) {
-        auto swBlob = findPEMBlob(buf, "X509 CRL"_sd, pos, pos != 0);
+        auto swBlob = ssl_util::findPEMBlob(buf, "X509 CRL"_sd, pos, pos != 0);
 
         // We expect to find at least one CRL
         if (!swBlob.isOK()) {

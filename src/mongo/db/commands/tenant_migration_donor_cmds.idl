@@ -74,6 +74,16 @@ commands:
       readPreference:
         description: "The read preference settings that the donor will pass on to the recipient."
         type: readPreference
+      donorCertificateForRecipient:
+        description: >-
+          The SSL certificate and private key that the donor should use to authenticate to the
+          recipient.
+        type: TenantMigrationPEMPayload
+      recipientCertificateForDonor:
+        description: >-
+          The SSL certificate and private key that the recipient should use to authenticate to the
+          donor.
+        type: TenantMigrationPEMPayload
 
   donorForgetMigration:
     description: "Parser for the 'donorForgetMigration' command."

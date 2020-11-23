@@ -62,7 +62,7 @@ namespace audit {
 class CommandInterface {
 public:
     virtual ~CommandInterface() = default;
-    virtual StringData sensitiveFieldName() const = 0;
+    virtual std::set<StringData> sensitiveFieldNames() const = 0;
     virtual void snipForLogging(mutablebson::Document* cmdObj) const = 0;
     virtual StringData getName() const = 0;
     virtual NamespaceString ns() const = 0;

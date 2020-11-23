@@ -40,7 +40,7 @@ const runTest = (baseTenantId, dbName, shouldMatch) => {
 
     // verifyRecipientDB calls isNamespaceForTenant() to determine if the data should have been
     // migrated, so we can directly call it here.
-    tenantMigrationTest.verifyReceipientDB(baseTenantId, dbName, collName);
+    tenantMigrationTest.verifyRecipientDB(baseTenantId, dbName, collName);
     tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 };
 

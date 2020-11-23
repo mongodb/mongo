@@ -44,6 +44,11 @@ public:
     using Request = DonorStartMigration;
     using Response = DonorStartMigrationResponse;
 
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {Request::kDonorCertificateForRecipientFieldName,
+                Request::kRecipientCertificateForDonorFieldName};
+    }
+
     class Invocation : public InvocationBase {
 
     public:
@@ -61,7 +66,9 @@ public:
                 TenantMigrationDonorDocument(requestBody.getMigrationId(),
                                              requestBody.getRecipientConnectionString().toString(),
                                              requestBody.getReadPreference(),
-                                             requestBody.getTenantId().toString())
+                                             requestBody.getTenantId().toString(),
+                                             requestBody.getDonorCertificateForRecipient(),
+                                             requestBody.getRecipientCertificateForDonor())
                     .toBSON();
 
             auto donorService =

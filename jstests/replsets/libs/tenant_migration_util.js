@@ -2,8 +2,6 @@
  * Utilities for testing tenant migrations.
  */
 var TenantMigrationUtil = (function() {
-    load("jstests/replsets/libs/tenant_migration_test.js");
-
     /**
      * Returns whether tenant migration commands are supported.
      */
@@ -11,6 +9,30 @@ var TenantMigrationUtil = (function() {
         return assert
             .commandWorked(conn.adminCommand({getParameter: 1, featureFlagTenantMigrations: 1}))
             .featureFlagTenantMigrations.value;
+    }
+
+    /**
+     * Returns an object containing the certificate and private key extracted from the given
+     * pem file.
+     */
+    function getCertificateAndPrivateKey(pemFile) {
+        const lines = cat(pemFile);
+        const certificate =
+            lines.match(new RegExp("-*BEGIN CERTIFICATE-*\\n(.*\\n)*-*END CERTIFICATE-*\\n"))[0];
+        const privateKey =
+            lines.match(new RegExp("-*BEGIN PRIVATE KEY-*\\n(.*\\n)*-*END PRIVATE KEY-*\\n"))[0];
+        return {certificate, privateKey};
+    }
+
+    /**
+     * Returns an object containing the donor and recipient's certificate and private key for
+     * tenant migration testing.
+     */
+    function makeMigrationCertificatesForTest() {
+        return {
+            donorCertificateForRecipient: getCertificateAndPrivateKey("jstests/libs/client.pem"),
+            recipientCertificateForDonor: getCertificateAndPrivateKey("jstests/libs/client.pem")
+        };
     }
 
     /**
@@ -26,12 +48,19 @@ var TenantMigrationUtil = (function() {
      * fixture.
      */
     function runMigrationAsync(migrationOpts, donorRstArgs, retryOnRetryableErrors = false) {
+        load("jstests/replsets/libs/tenant_migration_util.js");
+
+        const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
         const cmdObj = {
             donorStartMigration: 1,
             migrationId: UUID(migrationOpts.migrationIdString),
             recipientConnectionString: migrationOpts.recipientConnString,
             tenantId: migrationOpts.tenantId,
             readPreference: migrationOpts.readPreference || {mode: "primary"},
+            donorCertificateForRecipient: migrationOpts.donorCertificateForRecipient ||
+                migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationOpts.recipientCertificateForDonor ||
+                migrationCertificates.recipientCertificateForDonor
         };
 
         const donorRst = new ReplSetTest({rstArgs: donorRstArgs});
@@ -118,5 +147,12 @@ var TenantMigrationUtil = (function() {
         return donorRstArgs;
     }
 
-    return {runMigrationAsync, forgetMigrationAsync, createRstArgs, isFeatureFlagEnabled};
+    return {
+        runMigrationAsync,
+        forgetMigrationAsync,
+        createRstArgs,
+        isFeatureFlagEnabled,
+        getCertificateAndPrivateKey,
+        makeMigrationCertificatesForTest,
+    };
 })();

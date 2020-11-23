@@ -5,8 +5,7 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");
-load("jstests/replsets/rslib.js");
-load('jstests/libs/fail_point_util.js');
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 /**
  * This fixture allows the user to optionally pass in a custom ReplSetTest for the donor and
@@ -23,6 +22,8 @@ function TenantMigrationTest(
     {name = "TenantMigrationTest", enableRecipientTesting = true, donorRst, recipientRst}) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
+
+    const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 
     donorRst = donorPassedIn ? donorRst : performSetUp(true /* isDonor */);
     recipientRst = recipientPassedIn ? recipientRst : performSetUp(false /* isDonor */);
@@ -153,6 +154,8 @@ function TenantMigrationTest(
         tenantId,
         recipientConnectionString = recipientRst.getURL(),
         readPreference = {mode: "primary"},
+        donorCertificateForRecipient = migrationCertificates.donorCertificateForRecipient,
+        recipientCertificateForDonor = migrationCertificates.recipientCertificateForDonor,
     },
                                            waitForMigrationToComplete,
                                            retryOnRetryableErrors) {
@@ -162,6 +165,8 @@ function TenantMigrationTest(
             migrationId: UUID(migrationIdString),
             recipientConnectionString,
             readPreference,
+            donorCertificateForRecipient,
+            recipientCertificateForDonor
         };
 
         let donorPrimary = this.getDonorPrimary();
@@ -345,8 +350,9 @@ function TenantMigrationTest(
     /**
      * Verifies that the documents on the recipient primary are correct.
      */
-    this.verifyReceipientDB = function(tenantId, dbName, collName, data = loadDummyData()) {
-        const shouldMigrate = this.isNamespaceForTenant(tenantId, dbName);
+    this.verifyRecipientDB = function(
+        tenantId, dbName, collName, migrationCommitted = true, data = loadDummyData()) {
+        const shouldMigrate = migrationCommitted && this.isNamespaceForTenant(tenantId, dbName);
 
         jsTestLog(`Verifying that data in collection ${collName} of DB ${dbName} was ${
             (shouldMigrate ? "" : "not")} migrated to the recipient`);
