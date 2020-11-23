@@ -66,7 +66,7 @@ bool fetchNextDocument(plan_ranker::CandidatePlan* candidate,
         }
 
         invariant(state == sbe::PlanState::ADVANCED);
-        candidate->results.push({std::move(obj), {recordIdSlot != nullptr, recordId}});
+        candidate->results.push({obj.getOwned(), {recordIdSlot != nullptr, recordId}});
     } catch (const ExceptionFor<ErrorCodes::QueryTrialRunCompleted>&) {
         candidate->exitedEarly = true;
         return true;
