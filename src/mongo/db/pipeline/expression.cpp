@@ -2956,13 +2956,20 @@ const char* ExpressionMultiply::getOpName() const {
 
 /* ----------------------- ExpressionIfNull ---------------------------- */
 
-Value ExpressionIfNull::evaluate(const Document& root, Variables* variables) const {
-    Value pLeft(_children[0]->evaluate(root, variables));
-    if (!pLeft.nullish())
-        return pLeft;
+void ExpressionIfNull::validateArguments(const ExpressionVector& args) const {
+    uassert(1257300,
+            str::stream() << "$ifNull needs at least two arguments, had: " << args.size(),
+            args.size() >= 2);
+}
 
-    Value pRight(_children[1]->evaluate(root, variables));
-    return pRight;
+Value ExpressionIfNull::evaluate(const Document& root, Variables* variables) const {
+    const size_t n = _children.size();
+    for (size_t i = 0; i < n; ++i) {
+        Value pValue(_children[i]->evaluate(root, variables));
+        if (!pValue.nullish() || i == n - 1)
+            return pValue;
+    }
+    return Value();
 }
 
 REGISTER_EXPRESSION(ifNull, ExpressionIfNull::parse);

@@ -1601,13 +1601,14 @@ public:
 };
 
 
-class ExpressionIfNull final : public ExpressionFixedArity<ExpressionIfNull, 2> {
+class ExpressionIfNull final : public ExpressionVariadic<ExpressionIfNull> {
 public:
     explicit ExpressionIfNull(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionIfNull, 2>(expCtx) {}
+        : ExpressionVariadic<ExpressionIfNull>(expCtx) {}
 
     Value evaluate(const Document& root, Variables* variables) const final;
     const char* getOpName() const final;
+    void validateArguments(const ExpressionVector& args) const final;
 
     void acceptVisitor(ExpressionVisitor* visitor) final {
         return visitor->visit(this);
