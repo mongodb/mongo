@@ -215,17 +215,16 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(
     OpCounters* opCounters = &globalOpCounters;
     opCounters->gotInsert();
 
-    BSONObj o = op.getObject();
+    BSONObj oField = op.getObject();
 
     // If the 'o' field does not have an _id, the oplog entry is corrupted.
-    auto idField = o["_id"];
+    auto idField = oField["_id"];
     uassert(ErrorCodes::NoSuchKey,
             str::stream() << "Failed to apply insert due to missing _id: " << redact(op.toBSON()),
             !idField.eoo());
 
     BSONObj idQuery = idField.wrap();
-    const NamespaceString outputNss = op.getNss();
-    auto updateMod = write_ops::UpdateModification::parseFromClassicUpdate(o);
+    auto updateMod = write_ops::UpdateModification::parseFromClassicUpdate(oField);
 
     // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
     // apply rule #1 and run a replacement update on the stash collection.
@@ -251,7 +250,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(
 
     if (!foundDoc) {
         uassertStatusOK(outputColl->insertDocument(
-            opCtx, InsertStatement(o), nullptr /* nullOpDebug*/, false /* fromMigrate */));
+            opCtx, InsertStatement(oField), nullptr /* nullOpDebug*/, false /* fromMigrate */));
 
         return;
     }
@@ -280,7 +279,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(
     // The doc does not belong to '_donorShardId' under the original shard key, so apply rule #4
     // and insert the contents of 'op' to the stash collection.
     uassertStatusOK(stashColl->insertDocument(
-        opCtx, InsertStatement(o), nullptr /* nullOpDebug */, false /* fromMigrate */));
+        opCtx, InsertStatement(oField), nullptr /* nullOpDebug */, false /* fromMigrate */));
 }
 
 void ReshardingOplogApplicationRules::_applyUpdate_inlock(
@@ -289,8 +288,84 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(
     const CollectionPtr& outputColl,
     const CollectionPtr& stashColl,
     const repl::OplogEntryOrGroupedInserts& opOrGroupedInserts) {
-    // TODO SERVER-49903
-    return;
+    /**
+     * The rules to apply ordinary update operations are as follows:
+     *
+     * Note that [op _id] refers to the value of op["o"]["_id"].
+     *
+     * 1. If there exists a document with _id == [op _id] in the conflict stash collection, update
+     * the document from this collection.
+     * 2. If there does NOT exist a document with _id == [op _id] in the output collection, do
+     * nothing.
+     * 3. If there exists a document with _id == [op _id] in the output collection but it is NOT
+     * owned by this donor shard, do nothing.
+     * 4. If there exists a document with _id == [op _id] in the output collection and it is owned
+     * by this donor shard, update the document from this collection.
+     */
+    auto op = opOrGroupedInserts.getOp();
+
+    // Writes are replicated, so use global op counters.
+    OpCounters* opCounters = &globalOpCounters;
+    opCounters->gotUpdate();
+
+    BSONObj oField = op.getObject();
+    BSONObj o2Field;
+    if (op.getObject2())
+        o2Field = op.getObject2().get();
+
+    // If the 'o2' field does not have an _id, the oplog entry is corrupted.
+    auto idField = o2Field["_id"];
+    uassert(ErrorCodes::NoSuchKey,
+            str::stream() << "Failed to apply update due to missing _id: " << redact(op.toBSON()),
+            !idField.eoo());
+
+    BSONObj idQuery = idField.wrap();
+    auto updateMod = write_ops::UpdateModification::parseFromOplogEntry(oField);
+
+    // First, query the conflict stash collection using [op _id] as the query. If a doc exists,
+    // apply rule #1 and update the doc from the stash collection.
+    auto stashCollDoc = _queryStashCollById(opCtx, db, stashColl, idQuery);
+    if (!stashCollDoc.isEmpty()) {
+        auto request = UpdateRequest();
+        request.setNamespaceString(_stashNss);
+        request.setQuery(idQuery);
+        request.setUpdateModification(std::move(updateMod));
+        request.setUpsert(false);
+        request.setFromOplogApplication(true);
+        UpdateResult ur = update(opCtx, db, request);
+
+        invariant(ur.numMatched != 0);
+
+        return;
+    }
+
+    // Query the output collection for a doc with _id == [op _id].
+    BSONObj outputCollDoc;
+    auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx, outputColl, idQuery, outputCollDoc);
+
+    if (!foundDoc ||
+        !_sourceChunkMgr.keyBelongsToShard(
+            _sourceChunkMgr.getShardKeyPattern().extractShardKeyFromDoc(outputCollDoc),
+            _donorShardId)) {
+        // Either a doc with _id == [op _id] does not exist in the output collection (rule
+        // #2) or a doc does exist, but it does not belong to '_donorShardId' under the
+        // original shard key (rule #3). In either case, do nothing.
+        return;
+    }
+
+    invariant(!outputCollDoc.isEmpty());
+
+    // A doc with _id == [op _id] exists and is owned by '_donorShardId'. Apply rule #4 and update
+    // the doc in the ouput collection.
+    auto request = UpdateRequest();
+    request.setNamespaceString(_outputNss);
+    request.setQuery(idQuery);
+    request.setUpdateModification(std::move(updateMod));
+    request.setUpsert(false);
+    request.setFromOplogApplication(true);
+    UpdateResult ur = update(opCtx, db, request);
+
+    invariant(ur.numMatched != 0);
 }
 
 void ReshardingOplogApplicationRules::_applyDelete_inlock(
@@ -321,10 +396,10 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
     OpCounters* opCounters = &globalOpCounters;
     opCounters->gotDelete();
 
-    BSONObj o = op.getObject();
+    BSONObj oField = op.getObject();
 
     // If the 'o' field does not have an _id, the oplog entry is corrupted.
-    auto idField = o["_id"];
+    auto idField = oField["_id"];
     uassert(ErrorCodes::NoSuchKey,
             str::stream() << "Failed to apply delete due to missing _id: " << redact(op.toBSON()),
             !idField.eoo());

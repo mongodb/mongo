@@ -536,18 +536,9 @@ Status ReshardingOplogApplier::_applyOplogEntryOrGroupedInserts(
     auto opType = op.getOpType();
     if (opType == repl::OpTypeEnum::kNoop) {
         return Status::OK();
-    } else if (resharding::gUseReshardingOplogApplicationRules) {
-        if (opType == repl::OpTypeEnum::kInsert || opType == repl::OpTypeEnum::kDelete) {
-            return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
-        } else {
-            // TODO SERVER-49903 call ReshardingOplogApplicationRules::applyOperation for updates
-            return repl::OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
-                opCtx,
-                entryOrGroupedInserts,
-                oplogApplicationMode,
-                incrementOpsAppliedStats,
-                nullptr);
-        }
+    } else if (resharding::gUseReshardingOplogApplicationRules &&
+               repl::OplogEntry::isCrudOpType(opType)) {
+        return _applicationRules.applyOperation(opCtx, entryOrGroupedInserts);
     } else {
         // We always use oplog application mode 'kInitialSync', because we're applying oplog entries
         // to a cloned database the way initial sync does.
