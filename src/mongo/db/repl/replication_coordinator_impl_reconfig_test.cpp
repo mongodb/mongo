@@ -70,7 +70,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotYetInitializedWhenReconfigReceivedPriorToIni
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
+TEST_F(ReplCoordTest, NodeReturnsNotWritablePrimaryWhenReconfigReceivedWhileSecondary) {
     // start up, become secondary, receive reconfig
     init();
     assertStartSuccess(BSON("_id"
@@ -95,7 +95,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigReceivedWhileSecondary) {
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenRunningSafeReconfigWhileInDrainMode) {
+TEST_F(ReplCoordTest, NodeReturnsNotWritablePrimaryWhenRunningSafeReconfigWhileInDrainMode) {
     init();
 
     assertStartSuccess(BSON("_id"
@@ -128,7 +128,7 @@ TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenRunningSafeReconfigWhileInDrainMod
     ASSERT_TRUE(result.obj().isEmpty());
 }
 
-TEST_F(ReplCoordTest, NodeReturnsNotMasterWhenReconfigCmdReceivedWhileInDrainMode) {
+TEST_F(ReplCoordTest, NodeReturnsNotPrimaryErrorWhenReconfigCmdReceivedWhileInDrainMode) {
     init();
 
     assertStartSuccess(BSON("_id"

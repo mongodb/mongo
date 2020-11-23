@@ -742,7 +742,7 @@ TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
     ASSERT(getReplCoord()->getMemberState().primary());
 }
 
-TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
+TEST_F(ReplCoordHBV1Test, AwaitHelloReturnsResponseOnReconfigViaHeartbeat) {
     init();
     assertStartSuccess(BSON("_id"
                             << "mySet"
@@ -772,7 +772,7 @@ TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
     auto opCtx = makeOperationContext();
     // awaitHelloResponse blocks and waits on a future when the request TopologyVersion equals
     // the current TopologyVersion of the server.
-    stdx::thread getIsMasterThread([&] {
+    stdx::thread getHelloThread([&] {
         auto response =
             getReplCoord()->awaitHelloResponse(opCtx.get(), {}, currentTopologyVersion, deadline);
         auto topologyVersion = response->getTopologyVersion();
@@ -832,7 +832,7 @@ TEST_F(ReplCoordHBV1Test, AwaitIsMasterReturnsResponseOnReconfigViaHeartbeat) {
     noi = net->getNextReadyRequest();
 
     exitNetwork();
-    getIsMasterThread.join();
+    getHelloThread.join();
 }
 
 TEST_F(ReplCoordHBV1Test,

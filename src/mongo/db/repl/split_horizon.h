@@ -48,7 +48,7 @@ namespace repl {
  * Every Replica Set member has several views under which it can respond.  The Split Horizon class
  * represents the unification of all of those views.  For example, a member might be reachable under
  * "internal.example.com:27017" and "external.example.com:25000".  The replica set needs to be able
- * to respond, as a group, with the correct view, when `isMaster` requests come in.  Each member of
+ * to respond, as a group, with the correct view, when hello requests come in.  Each member of
  * the replica set has its own `SplitHorizon` class to manage the mapping between server names and
  * horizon names.  `SplitHorizon` models a single member's view across all horizons, not views for
  * all of the members.
@@ -72,7 +72,7 @@ public:
     };
 
     /**
-     * Set the split horizon connection parameters, for use by future `isMaster` commands.
+     * Set the split horizon connection parameters, for use by future `hello/isMaster` commands.
      */
     static void setParameters(Client* client, boost::optional<std::string> sniName);
 
