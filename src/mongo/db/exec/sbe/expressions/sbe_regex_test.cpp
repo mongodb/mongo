@@ -62,12 +62,12 @@ protected:
         auto obj = value::getObjectView(val);
 
         auto [matchTag, matchVal] = obj->getField("match");
-        value::ValueGuard(matchTag, matchVal);
+        value::ValueGuard matchGuard(matchTag, matchVal);
         ASSERT(value::isString(matchTag));
         ASSERT_EQUALS(value::getStringView(matchTag, matchVal), expectedMatch);
 
         auto [idxTag, idxVal] = obj->getField("idx");
-        value::ValueGuard(idxTag, idxVal);
+        value::ValueGuard idxGuard(idxTag, idxVal);
         ASSERT_EQUALS(idxTag, value::TypeTags::NumberInt32);
         ASSERT_EQUALS(value::numericCast<int32_t>(idxTag, idxVal), idx);
     }
