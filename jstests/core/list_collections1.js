@@ -1,7 +1,7 @@
 // Cannot implicitly shard accessed collections because of collection existing when none
 // expected.
 // @tags: [assumes_no_implicit_collection_creation_after_drop, requires_getmore,
-// requires_replication]
+// requires_replication, requires_fcv_49]
 
 // Basic functional tests for the listCollections command.
 //
@@ -334,4 +334,10 @@ assert.commandFailedWithCode(mydb.runCommand("listCollections", {includePendingD
 assert.commandWorked(mydb.runCommand("listCollections", {includePendingDrops: 1}));
 assert.commandWorked(mydb.runCommand("listCollections", {includePendingDrops: true}));
 assert.commandWorked(mydb.runCommand("listCollections", {includePendingDrops: false}));
+
+// Verify that 'includePendingDrops' field is unstable in API version 1.
+assert.commandFailedWithCode(
+    mydb.runCommand("listCollections",
+                    {includePendingDrops: false, apiVersion: "1", apiStrict: true}),
+    ErrorCodes.APIStrictError);
 }());

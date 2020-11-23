@@ -576,6 +576,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'api_parameters',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',

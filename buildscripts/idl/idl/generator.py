@@ -311,6 +311,11 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
         self._writer.write_line('usedFields.set(%s);' % (_gen_field_usage_constant(field)))
         self._writer.write_empty_line()
 
+        if field.unstable:
+            self._writer.write_line(
+                'ctxt.throwAPIStrictErrorIfApplicable(%s);' % (bson_element_variable))
+            self._writer.write_empty_line()
+
     def add_final_checks(self):
         # type: () -> None
         """Output the code to check for missing fields."""

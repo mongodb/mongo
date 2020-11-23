@@ -67,7 +67,8 @@ public:
     static constexpr auto kOpMsgDollarDB = "$db"_sd;
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
 
-    IDLParserErrorContext(StringData fieldName) : _currentField(fieldName), _predecessor(nullptr) {}
+    IDLParserErrorContext(StringData fieldName, bool apiStrict = false)
+        : _currentField(fieldName), _apiStrict(apiStrict), _predecessor(nullptr) {}
 
     IDLParserErrorContext(StringData fieldName, const IDLParserErrorContext* predecessor)
         : _currentField(fieldName), _predecessor(predecessor) {}
@@ -153,6 +154,12 @@ public:
     MONGO_COMPILER_NORETURN void throwBadEnumValue(int enumValue) const;
 
     /**
+     * Throw an 'APIStrictError' if the user command has 'apiStrict' field as true.
+     */
+    void throwAPIStrictErrorIfApplicable(StringData fieldName) const;
+    void throwAPIStrictErrorIfApplicable(BSONElement fieldName) const;
+
+    /**
      * Equivalent to CommandHelpers::parseNsCollectionRequired
      */
     static NamespaceString parseNSCollectionRequired(StringData dbName, const BSONElement& element);
@@ -195,6 +202,9 @@ private:
 private:
     // Name of the current field that is being parsed.
     const StringData _currentField;
+
+    // Whether the 'apiStrict' parameter is set in the user request.
+    const bool _apiStrict = false;
 
     // Pointer to a parent parser context.
     // This provides a singly linked list of parent pointers, and use to produce a full path to a

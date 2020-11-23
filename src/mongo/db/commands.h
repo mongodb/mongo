@@ -39,6 +39,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
@@ -971,10 +972,12 @@ class TypedCommand<Derived>::InvocationBaseInternal : public CommandInvocation {
 public:
     using RequestType = typename Derived::Request;
 
-    InvocationBaseInternal(OperationContext*,
+    InvocationBaseInternal(OperationContext* opCtx,
                            const Command* command,
                            const OpMsgRequest& opMsgRequest)
-        : CommandInvocation(command), _request{_parseRequest(command->getName(), opMsgRequest)} {}
+        : CommandInvocation(command),
+
+          _request{_parseRequest(opCtx, command->getName(), opMsgRequest)} {}
 
 protected:
     const RequestType& request() const {
@@ -982,8 +985,12 @@ protected:
     }
 
 private:
-    static RequestType _parseRequest(StringData name, const OpMsgRequest& opMsgRequest) {
-        return RequestType::parse(IDLParserErrorContext(name), opMsgRequest);
+    static RequestType _parseRequest(OperationContext* opCtx,
+                                     StringData name,
+                                     const OpMsgRequest& opMsgRequest) {
+        return RequestType::parse(
+            IDLParserErrorContext(name, APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            opMsgRequest);
     }
 
     RequestType _request;

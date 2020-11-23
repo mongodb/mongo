@@ -273,7 +273,10 @@ public:
         unique_ptr<MatchExpression> matcher;
         const auto as = AuthorizationSession::get(opCtx->getClient());
 
-        auto parsed = ListCollections::parse(IDLParserErrorContext("listCollections"), jsobj);
+        auto parsed = ListCollections::parse(
+            IDLParserErrorContext("listCollections",
+                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            jsobj);
         const bool nameOnly = parsed.getNameOnly();
         const bool authorizedCollections = parsed.getAuthorizedCollections();
 

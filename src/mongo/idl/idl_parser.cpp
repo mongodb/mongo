@@ -224,6 +224,17 @@ void IDLParserErrorContext::throwBadEnumValue(StringData enumValue) const {
                             << "' is not a valid value.");
 }
 
+void IDLParserErrorContext::throwAPIStrictErrorIfApplicable(BSONElement field) const {
+    throwAPIStrictErrorIfApplicable(field.fieldNameStringData());
+}
+
+void IDLParserErrorContext::throwAPIStrictErrorIfApplicable(StringData fieldName) const {
+    uassert(ErrorCodes::APIStrictError,
+            str::stream() << "BSON field '" << getElementPath(fieldName)
+                          << "' is not allowed with apiStrict:true.",
+            !_apiStrict);
+}
+
 NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbName,
                                                                  const BSONElement& element) {
     const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
