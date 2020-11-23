@@ -44,7 +44,7 @@ enum ResultFlagType {
     ResultFlag_ShardConfigStaleDeprecated = 4,
 
     /* for backward compatibility: this let's us know the server supports
-       the QueryOption_AwaitData option. if it doesn't, a repl slave client should sleep
+       the QueryOption_AwaitData option. if it doesn't, a repl secondary client should sleep
     a little between getMore's.
     */
     ResultFlag_AwaitCapable = 8

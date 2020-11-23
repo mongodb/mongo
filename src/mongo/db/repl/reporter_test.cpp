@@ -94,9 +94,9 @@ private:
         ProgressInfo(const OpTime& lastDurableOpTime, const OpTime& lastAppliedOpTime)
             : lastDurableOpTime(lastDurableOpTime), lastAppliedOpTime(lastAppliedOpTime) {}
 
-        // Our last known OpTime that this slave has applied and journaled to.
+        // Our last known OpTime that this secondary has applied and journaled to.
         OpTime lastDurableOpTime;
-        // Our last known OpTime that this slave has applied, whether journaled or unjournaled.
+        // Our last known OpTime that this secondary has applied, whether journaled or unjournaled.
         OpTime lastAppliedOpTime;
     };
 

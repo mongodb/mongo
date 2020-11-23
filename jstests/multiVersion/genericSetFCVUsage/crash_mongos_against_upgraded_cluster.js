@@ -29,7 +29,7 @@ function runTest(downgradeVersion) {
     assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: downgradeFCV}));
 
     // wait until all config server nodes are downgraded
-    // awaitReplication waits for all slaves to replicate primary's latest opTime which will
+    // awaitReplication waits for all secondaries to replicate primary's latest opTime which will
     // guarantee propagation of the write to the admin.system.version collection which triggers the
     // change FCV.
     st.configRS.awaitReplication();

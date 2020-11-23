@@ -297,7 +297,8 @@ enum QueryOptions {
     */
     QueryOption_CursorTailable = 1 << 1,
 
-    /** allow query of replica slave.  normally these return an error except for namespace "local".
+    /** allow query of replica secondary.  normally these return an error except for namespace
+     * "local".
      */
     QueryOption_SecondaryOk = 1 << 2,
 

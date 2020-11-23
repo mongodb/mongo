@@ -96,7 +96,7 @@ function testReadLoadBalancing(numReplicas) {
                 return true;
         */
         return false;
-    }, "one slave not ok", 180000, 5000);
+    }, "one secondary not ok", 180000, 5000);
 
     // Secondaries may change here
     secondaries = s.rs0.getSecondaries();

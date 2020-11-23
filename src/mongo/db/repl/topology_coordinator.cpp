@@ -324,7 +324,7 @@ HostAndPort TopologyCoordinator::_chooseNearbySyncSource(Date_t now,
 
     // Make two attempts, with less restrictive rules the second time.
     //
-    // During the first attempt, we ignore those nodes that have a larger slave
+    // During the first attempt, we ignore those nodes that have a larger secondary
     // delay, hidden nodes or non-voting, and nodes that are excessively behind.
     //
     // For the second attempt include those nodes, in case those are the only ones we can reach.

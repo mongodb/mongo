@@ -60,11 +60,11 @@ secondaries[1].setSecondaryOk();
 
 var secondary0Count = secondaries[0].getDB(testDB).foo.find().itcount();
 assert(secondary0Count == docNum,
-       "Slave 0 has " + secondary0Count + " of " + docNum + " documents!");
+       "Secondary 0 has " + secondary0Count + " of " + docNum + " documents!");
 
 var secondary1Count = secondaries[1].getDB(testDB).foo.find().itcount();
 assert(secondary1Count == docNum,
-       "Slave 1 has " + secondary1Count + " of " + docNum + " documents!");
+       "Secondary 1 has " + secondary1Count + " of " + docNum + " documents!");
 
 var primary1Count = primary.getDB(testDB).foo.find().itcount();
 assert(primary1Count == docNum, "Master has " + primary1Count + " of " + docNum + " documents!");

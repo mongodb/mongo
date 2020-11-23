@@ -452,8 +452,8 @@ Status applyOps(OperationContext* opCtx,
             }
             // Generate oplog entry for all atomic ops collectively.
             if (opCtx->writesAreReplicated()) {
-                // We want this applied atomically on slaves so we rewrite the oplog entry without
-                // the pre-condition for speed.
+                // We want this applied atomically on secondaries so we rewrite the oplog entry
+                // without the pre-condition for speed.
 
                 BSONObjBuilder cmdBuilder;
 

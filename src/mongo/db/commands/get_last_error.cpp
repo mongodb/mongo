@@ -304,7 +304,7 @@ public:
         if (wcResult.wTimedOut) {
             dassert(!wcResult.err.empty());  // so we always report err
             dassert(!status.isOK());
-            result.append("errmsg", "timed out waiting for slaves");
+            result.append("errmsg", "timed out waiting for secondaries");
             result.append("code", status.code());
             result.append("codeName", ErrorCodes::errorString(status.code()));
             return true;

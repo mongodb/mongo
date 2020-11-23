@@ -43,9 +43,9 @@ for (i = 0; i < 20; i++) {
 var collPrimary = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
 assert.eq(2100, collPrimary.find().itcount());
 
-var collSlaveOk = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
-collSlaveOk.setSecondaryOk();
-assert.eq(2100, collSlaveOk.find().itcount());
+var collSecondaryOk = (new Mongo(s.s0.host)).getDB('TestDB').TestColl;
+collSecondaryOk.setSecondaryOk();
+assert.eq(2100, collSecondaryOk.find().itcount());
 
 assert.commandWorked(s.s0.adminCommand({
     moveChunk: 'TestDB.TestColl',
@@ -57,7 +57,7 @@ assert.commandWorked(s.s0.adminCommand({
 }));
 
 assert.eq(2100,
-          collSlaveOk.find().itcount(),
+          collSecondaryOk.find().itcount(),
           'Incorrect count when reading from secondary. Count from primary is ' +
               collPrimary.find().itcount());
 

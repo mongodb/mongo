@@ -323,7 +323,7 @@ public:
     /**
      * Initializes the authorization manager.  Depending on what version the authorization
      * system is at, this may involve building up the user cache and/or the roles graph.
-     * Call this function at startup and after resynchronizing a slave/secondary.
+     * Call this function at startup and after resynchronizing a secondary.
      */
     virtual Status initialize(OperationContext* opCtx) = 0;
 

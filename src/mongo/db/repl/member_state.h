@@ -47,7 +47,7 @@ namespace repl {
 /*
     RS_STARTUP    serving still starting up, or still trying to initiate the set
     RS_PRIMARY    this server thinks it is primary
-    RS_SECONDARY  this server thinks it is a secondary (slave mode)
+    RS_SECONDARY  this server thinks it is a secondary
     RS_RECOVERING recovering/resyncing; after recovery usually auto-transitions to secondary
     RS_STARTUP2   loaded config, still determining who is primary
 
