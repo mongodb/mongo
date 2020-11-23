@@ -60,7 +60,6 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/database_version_helpers.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"

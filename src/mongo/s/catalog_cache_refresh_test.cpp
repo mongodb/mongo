@@ -38,7 +38,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
@@ -59,7 +59,7 @@ protected:
 
     void expectGetDatabase() {
         expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-            DatabaseType db(kNss.db().toString(), {"0"}, true, databaseVersion::makeNew());
+            DatabaseType db(kNss.db().toString(), {"0"}, true, DatabaseVersion(UUID::gen()));
             return std::vector<BSONObj>{db.toBSON()};
         }());
     }

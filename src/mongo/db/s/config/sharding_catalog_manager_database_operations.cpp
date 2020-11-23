@@ -43,7 +43,7 @@
 #include "mongo/s/catalog/type_database.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_util.h"
@@ -160,7 +160,7 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 
             // Pick a primary shard for the new database.
             DatabaseType db(
-                dbName.toString(), shardPtr->getId(), false, databaseVersion::makeNew());
+                dbName.toString(), shardPtr->getId(), false, DatabaseVersion(UUID::gen()));
 
             LOGV2(21938,
                   "Registering new database {db} in sharding catalog",
@@ -306,7 +306,7 @@ Status ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
     auto const currentDatabaseVersion = dbType.getVersion();
 
-    newDbType.setVersion(databaseVersion::makeIncremented(currentDatabaseVersion));
+    newDbType.setVersion(currentDatabaseVersion.makeUpdated());
 
     auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << dbname));
     updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion.toBSON());

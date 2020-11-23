@@ -60,7 +60,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_shard_version_request.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -188,14 +188,14 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
         return DatabaseType(dbName.toString(),
                             ShardRegistry::kConfigServerShardId,
                             false,
-                            databaseVersion::makeFixed());
+                            DatabaseVersion::makeFixed());
 
     // The config database's primary shard is always config, and it is always sharded.
     if (dbName == NamespaceString::kConfigDb)
         return DatabaseType(dbName.toString(),
                             ShardRegistry::kConfigServerShardId,
                             true,
-                            databaseVersion::makeFixed());
+                            DatabaseVersion::makeFixed());
 
     auto result =
         _fetchDatabaseMetadata(opCtx, dbName.toString(), kConfigReadSelector, readConcernLevel);

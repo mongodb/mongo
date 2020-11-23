@@ -27,22 +27,22 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include "mongo/s/database_version_gen.h"
+#include "mongo/s/database_version.h"
 
 namespace mongo {
-namespace databaseVersion {
 
-DatabaseVersion makeNew();
-DatabaseVersion makeIncremented(const DatabaseVersion& v);
-/**
- * makeFixed is only for databases that do not have entries in the sharding catalog, such as
- * "config" and "admin".
- */
-DatabaseVersion makeFixed();
-bool equal(const DatabaseVersion& dbv1, const DatabaseVersion& dbv2);
-bool isFixed(const DatabaseVersion& dbv);
+DatabaseVersion DatabaseVersion::makeFixed() {
+    DatabaseVersion dbVersion;
+    dbVersion.setLastMod(0);
+    dbVersion.setUuid(UUID::gen());
+    return dbVersion;
+}
+DatabaseVersion DatabaseVersion::makeUpdated() const {
+    DatabaseVersion newVersion = *this;
+    newVersion.setLastMod(newVersion.getLastMod() + 1);
+    return newVersion;
+}
 
-}  // namespace databaseVersion
 }  // namespace mongo

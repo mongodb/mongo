@@ -531,7 +531,7 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
 
     ChunkManager chunkManager(
         ShardId("0"),
-        DatabaseVersion(UUID::gen(), 1),
+        DatabaseVersion(UUID::gen()),
         makeStandaloneRoutingTableHistory(oldRoutingTable.makeUpdated(boost::none, true, {chunk1})),
         Timestamp(5, 0));
 

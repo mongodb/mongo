@@ -51,7 +51,7 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/create_database_gen.h"
@@ -259,7 +259,7 @@ BSONObj appendDbVersionIfPresent(BSONObj cmdObj, const CachedDatabaseInfo& dbInf
 }
 
 BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion) {
-    if (databaseVersion::isFixed(dbVersion)) {
+    if (dbVersion.isFixed()) {
         return cmdObj;
     }
     BSONObjBuilder cmdWithDbVersion(std::move(cmdObj));

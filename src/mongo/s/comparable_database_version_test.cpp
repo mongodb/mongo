@@ -30,21 +30,21 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/s/catalog_cache.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
 TEST(ComparableDatabaseVersionTest, VersionsEqual) {
-    DatabaseVersion dbVersion{UUID::gen(), 1};
+    DatabaseVersion dbVersion{UUID::gen()};
     const auto version = ComparableDatabaseVersion::makeComparableDatabaseVersion(dbVersion);
-    ASSERT(databaseVersion::equal(version.getVersion(), dbVersion));
+    ASSERT(version.getVersion() == dbVersion);
     ASSERT(version == version);
 }
 
 TEST(ComparableDatabaseVersionTest, VersionsEqualAfterCopy) {
-    DatabaseVersion dbVersion{UUID::gen(), 1};
+    DatabaseVersion dbVersion{UUID::gen()};
     const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(dbVersion);
     const auto version2 = version1;
     ASSERT(version1 == version2);
@@ -52,31 +52,31 @@ TEST(ComparableDatabaseVersionTest, VersionsEqualAfterCopy) {
 
 TEST(ComparableDatabaseVersionTest, CompareVersionDifferentUuids) {
     const auto version1 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen(), 2));
+        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen()));
     const auto version2 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen(), 1));
+        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen()));
     ASSERT(version2 != version1);
     ASSERT(version2 > version1);
     ASSERT_FALSE(version2 < version1);
 }
 
 TEST(ComparableDatabaseVersionTest, VersionGreaterSameUuid) {
-    const auto uuid = UUID::gen();
-    const auto version1 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(uuid, 1));
-    const auto version2 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(uuid, 2));
+    DatabaseVersion dbVersion1{UUID::gen()};
+    DatabaseVersion dbVersion2 = dbVersion1.makeUpdated();
+
+    const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(dbVersion1);
+    const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(dbVersion2);
     ASSERT(version2 != version1);
     ASSERT(version2 > version1);
     ASSERT_FALSE(version2 < version1);
 }
 
 TEST(ComparableDatabaseVersionTest, VersionLessSameUuid) {
-    const auto uuid = UUID::gen();
-    const auto version1 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(uuid, 1));
-    const auto version2 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(uuid, 2));
+    DatabaseVersion dbVersion1{UUID::gen()};
+    DatabaseVersion dbVersion2 = dbVersion1.makeUpdated();
+    const auto version1 = ComparableDatabaseVersion::makeComparableDatabaseVersion(dbVersion1);
+    const auto version2 = ComparableDatabaseVersion::makeComparableDatabaseVersion(dbVersion2);
+
     ASSERT(version1 != version2);
     ASSERT(version1 < version2);
     ASSERT_FALSE(version1 > version2);
@@ -92,7 +92,7 @@ TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionsAreEqual) {
 TEST(ComparableDatabaseVersionTest, DefaultConstructedVersionIsAlwaysLess) {
     const ComparableDatabaseVersion defaultVersion{};
     const auto version1 =
-        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen(), 0));
+        ComparableDatabaseVersion::makeComparableDatabaseVersion(DatabaseVersion(UUID::gen()));
     ASSERT(defaultVersion != version1);
     ASSERT(defaultVersion < version1);
     ASSERT_FALSE(defaultVersion > version1);

@@ -43,7 +43,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
@@ -172,9 +172,10 @@ public:
     void expectStaleDbVersionError(const NamespaceString& nss, StringData expectedCmdName) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.cmdObj.firstElementFieldNameStringData(), expectedCmdName);
-            return createErrorCursorResponse(Status(
-                StaleDbRoutingVersion(nss.db().toString(), databaseVersion::makeNew(), boost::none),
-                "dummy stale db version error"));
+            return createErrorCursorResponse(
+                Status(StaleDbRoutingVersion(
+                           nss.db().toString(), DatabaseVersion(UUID::gen()), boost::none),
+                       "dummy stale db version error"));
         });
     }
 

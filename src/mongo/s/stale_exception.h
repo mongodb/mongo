@@ -31,7 +31,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/database_version_gen.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/util/concurrency/notification.h"
 

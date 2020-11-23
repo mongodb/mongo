@@ -156,7 +156,7 @@ public:
                                                chunks);
 
         return ChunkManager(_sourceId.getShardId(),
-                            DatabaseVersion(UUID::gen(), 1),
+                            DatabaseVersion(UUID::gen()),
                             makeStandaloneRoutingTableHistory(std::move(rt)),
                             boost::none);
     }

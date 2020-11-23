@@ -85,7 +85,7 @@ CollectionMetadata makeCollectionMetadataImpl(
 
     return CollectionMetadata(
         ChunkManager(kThisShard,
-                     DatabaseVersion(UUID::gen(), 1),
+                     DatabaseVersion(UUID::gen()),
                      ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
                          RoutingTableHistory::makeNew(kNss,
                                                       UUID::gen(),

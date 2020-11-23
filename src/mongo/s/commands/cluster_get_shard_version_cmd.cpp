@@ -38,7 +38,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
-#include "mongo/s/database_version_gen.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 
 namespace mongo {

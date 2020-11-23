@@ -70,7 +70,7 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -736,7 +736,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Add all databases which were discovered on the new shard
     for (const auto& dbName : dbNamesStatus.getValue()) {
-        DatabaseType dbt(dbName, shardType.getName(), false, databaseVersion::makeNew());
+        DatabaseType dbt(dbName, shardType.getName(), false, DatabaseVersion(UUID::gen()));
 
         {
             const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(

@@ -82,7 +82,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
     auto rt = RoutingTableHistory::makeNew(
         kNss, UUID::gen(), shardKeyPattern, nullptr, true, collEpoch, boost::none, true, chunks);
     return CollectionMetadata(ChunkManager(ShardId("Shard0"),
-                                           DatabaseVersion(UUID::gen(), 1),
+                                           DatabaseVersion(UUID::gen()),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
                                            boost::none),
                               ShardId("shard0"));
@@ -113,7 +113,7 @@ MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
     auto rt = cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(
         boost::none, true, newChunks);
     return CollectionMetadata(ChunkManager(ShardId("shard0"),
-                                           DatabaseVersion(UUID::gen(), 1),
+                                           DatabaseVersion(UUID::gen()),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
                                            boost::none),
                               ShardId("shard0"));
@@ -171,7 +171,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                chunks);
         benchmark::DoNotOptimize(
             CollectionMetadata(ChunkManager(ShardId("shard0"),
-                                            DatabaseVersion(UUID::gen(), 1),
+                                            DatabaseVersion(UUID::gen()),
                                             makeStandaloneRoutingTableHistory(std::move(rt)),
                                             boost::none),
                                ShardId("shard0")));

@@ -35,7 +35,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -78,18 +78,14 @@ StatusWith<DatabaseType> DatabaseType::fromBSON(const BSONObj& source) {
             return status;
     }
 
-    DatabaseVersion dbtVersion;
-    {
-        BSONObj versionField = source.getObjectField("version");
-        if (versionField.isEmpty()) {
-            return Status{ErrorCodes::InternalError,
-                          str::stream()
-                              << "DatabaseVersion doesn't exist in database entry " << source
-                              << " despite the config server being in binary version 4.2 "
-                                 "or later."};
-        }
-        dbtVersion = DatabaseVersion::parse(IDLParserErrorContext("DatabaseType"), versionField);
+    BSONObj versionField = source.getObjectField("version");
+    if (versionField.isEmpty()) {
+        return Status{ErrorCodes::InternalError,
+                      str::stream() << "DatabaseVersion doesn't exist in database entry " << source
+                                    << " despite the config server being in binary version 4.2 "
+                                       "or later."};
     }
+    DatabaseVersion dbtVersion(versionField);
 
     return DatabaseType{
         std::move(dbtName), std::move(dbtPrimary), dbtSharded, std::move(dbtVersion)};

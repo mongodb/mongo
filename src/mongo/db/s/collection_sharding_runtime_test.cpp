@@ -55,7 +55,7 @@ protected:
             ChunkType(kTestNss, std::move(range), ChunkVersion(1, 0, epoch), ShardId("other"));
         ChunkManager cm(
             ShardId("0"),
-            DatabaseVersion(UUID::gen(), 1),
+            DatabaseVersion(UUID::gen()),
             makeStandaloneRoutingTableHistory(RoutingTableHistory::makeNew(kTestNss,
                                                                            uuid,
                                                                            kShardKeyPattern,

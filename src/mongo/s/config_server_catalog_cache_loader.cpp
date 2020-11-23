@@ -38,7 +38,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/database_version_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/fail_point.h"
 

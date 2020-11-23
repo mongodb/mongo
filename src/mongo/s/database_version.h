@@ -27,41 +27,49 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version_gen.h"
 
 namespace mongo {
-namespace databaseVersion {
 
-DatabaseVersion makeNew() {
-    DatabaseVersion dbv;
-    dbv.setLastMod(1);
-    dbv.setUuid(UUID::gen());
-    return dbv;
-}
+class DatabaseVersion : private DatabaseVersionBase {
+public:
+    using DatabaseVersionBase::getLastMod;
+    using DatabaseVersionBase::toBSON;
 
-DatabaseVersion makeIncremented(const DatabaseVersion& v) {
-    DatabaseVersion dbv;
-    dbv.setLastMod(v.getLastMod() + 1);
-    dbv.setUuid(v.getUuid());
-    return dbv;
-}
+    // It returns a new DatabaseVersion marked as fixed. A fixed database version is used to
+    // distinguish databases that do not have entries in the sharding catalog, such as 'config' and
+    // 'admin'
+    static DatabaseVersion makeFixed();
 
-DatabaseVersion makeFixed() {
-    DatabaseVersion dbv;
-    dbv.setLastMod(0);
-    dbv.setUuid(UUID::gen());
-    return dbv;
-}
+    DatabaseVersion() = default;
 
-bool equal(const DatabaseVersion& dbv1, const DatabaseVersion& dbv2) {
-    return dbv1.getUuid() == dbv2.getUuid() && dbv1.getLastMod() == dbv2.getLastMod();
-}
+    explicit DatabaseVersion(const BSONObj& obj) {
+        DatabaseVersionBase::parseProtected(IDLParserErrorContext("DatabaseVersion"), obj);
+    }
 
-bool isFixed(const DatabaseVersion& dbv) {
-    return dbv.getLastMod() == 0;
-}
+    explicit DatabaseVersion(mongo::UUID uuid) : DatabaseVersionBase(/* lastMod */ 1) {
+        setUuid(uuid);
+    }
 
-}  // namespace databaseVersion
+    DatabaseVersion makeUpdated() const;
+
+    bool operator==(const DatabaseVersion& other) const {
+        return getUuid() == other.getUuid() && getLastMod() == other.getLastMod();
+    }
+
+    bool operator!=(const DatabaseVersion& other) const {
+        return !(*this == other);
+    }
+
+    bool isFixed() const {
+        return getLastMod() == 0;
+    }
+
+    mongo::UUID getUuid() const {
+        return *DatabaseVersionBase::getUuid();
+    }
+};
+
 }  // namespace mongo

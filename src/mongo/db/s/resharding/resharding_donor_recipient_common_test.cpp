@@ -97,7 +97,7 @@ protected:
         auto chunk = ChunkType(nss, std::move(range), ChunkVersion(1, 0, epoch), kShardTwo);
         ChunkManager cm(
             kShardOne,
-            DatabaseVersion(uuid, 1),
+            DatabaseVersion(uuid),
             makeStandaloneRoutingTableHistory(RoutingTableHistory::makeNew(nss,
                                                                            uuid,
                                                                            shardKeyPattern,

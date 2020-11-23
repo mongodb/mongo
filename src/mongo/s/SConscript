@@ -146,7 +146,7 @@ env.Library(
         'catalog/type_tags.cpp',
         'chunk_version.cpp',
         'chunk_version.idl',
-        'database_version_helpers.cpp',
+        'database_version.cpp',
         'database_version.idl',
         'mongod_and_mongos_server_parameters.idl',
         'request_types/add_shard_request_type.cpp',

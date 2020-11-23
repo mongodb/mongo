@@ -32,7 +32,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/db/s/sharding_state_lock.h"
-#include "mongo/s/database_version_gen.h"
+#include "mongo/s/database_version.h"
 
 namespace mongo {
 

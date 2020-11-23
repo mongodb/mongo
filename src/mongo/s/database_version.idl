@@ -26,8 +26,6 @@
 # it in the license file.
 #
 
-# DatabaseVersion type
-
 global:
     cpp_namespace: "mongo"
 
@@ -35,7 +33,7 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 structs:
-    DatabaseVersion:
+    DatabaseVersionBase:
         description: "A (UUID, int) pair that uniquely identifies an incarnation of a database in a cluster and reflects changes to the database's primary shard"
         # The generated comparison operators will do a field-wise lexicographic comparison, which
         # doesn't work because it's nonsensical to lexicographically compare UUIDs.
@@ -45,6 +43,7 @@ structs:
             uuid:
                 type: uuid
                 description: "a unique identifier to distinguish different incarnations of this database"
+                optional: true
             lastMod:
                 type: int
                 description: "an integer which is bumped whenever the database's primary shard changes"

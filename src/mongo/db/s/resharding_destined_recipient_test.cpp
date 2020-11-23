@@ -48,7 +48,7 @@
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
-#include "mongo/s/database_version_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/unittest/unittest.h"
 
@@ -183,7 +183,7 @@ protected:
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
         env.version = ChunkVersion(1, 0, OID::gen());
-        env.dbVersion = databaseVersion::makeNew();
+        env.dbVersion = DatabaseVersion(UUID::gen());
 
         env.tempNss =
             NamespaceString(kNss.db(),

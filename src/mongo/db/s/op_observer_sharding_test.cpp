@@ -77,7 +77,7 @@ protected:
                                                {std::move(chunk)});
 
         return CollectionMetadata(ChunkManager(ShardId("this"),
-                                               DatabaseVersion(UUID::gen(), 1),
+                                               DatabaseVersion(UUID::gen()),
                                                makeStandaloneRoutingTableHistory(std::move(rt)),
                                                Timestamp(100, 0)),
                                   ShardId("this"));

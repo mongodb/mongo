@@ -43,7 +43,6 @@
 #include "mongo/s/catalog/type_locks.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/database_version_helpers.h"
 
 namespace mongo {
 

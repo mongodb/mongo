@@ -138,10 +138,10 @@ BSONObj expectInsertsReturnStaleDbVersionErrorsBase(const NamespaceString& nss,
         errorBuilder.append("index", i);
         errorBuilder.append("code", int(ErrorCodes::StaleDbVersion));
 
-        auto dbVersion = databaseVersion::makeNew();
+        auto dbVersion = DatabaseVersion(UUID::gen());
         errorBuilder.append("db", nss.db());
         errorBuilder.append("vReceived", dbVersion.toBSON());
-        errorBuilder.append("vWanted", databaseVersion::makeIncremented(dbVersion).toBSON());
+        errorBuilder.append("vWanted", dbVersion.makeUpdated().toBSON());
 
         errorBuilder.append("errmsg", "mock stale db version");
 

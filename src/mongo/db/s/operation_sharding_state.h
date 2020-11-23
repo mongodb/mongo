@@ -33,7 +33,7 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/database_version_gen.h"
+#include "mongo/s/database_version.h"
 #include "mongo/util/future.h"
 #include "mongo/util/string_map.h"
 

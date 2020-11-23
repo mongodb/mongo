@@ -33,7 +33,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/s/database_version_gen.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/shard_id.h"
 
 namespace mongo {

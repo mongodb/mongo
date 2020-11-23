@@ -109,7 +109,7 @@ public:
             ->setFilteringMetadata(
                 operationContext(),
                 CollectionMetadata(ChunkManager(ShardId("dummyShardId"),
-                                                DatabaseVersion(UUID::gen(), 1),
+                                                DatabaseVersion(UUID::gen()),
                                                 makeStandaloneRoutingTableHistory(std::move(rt)),
                                                 boost::none),
                                    ShardId("dummyShardId")));

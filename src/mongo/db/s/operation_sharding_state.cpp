@@ -92,8 +92,7 @@ void OperationShardingState::initializeClientRoutingVersionsFromCommand(Namespac
                               << dbVersionElem,
                 dbVersionElem.type() == BSONType::Object);
 
-        dbVersion = DatabaseVersion::parse(IDLParserErrorContext("initializeClientRoutingVersions"),
-                                           dbVersionElem.Obj());
+        dbVersion = DatabaseVersion(dbVersionElem.Obj());
     }
 
     initializeClientRoutingVersions(nss, shardVersion, dbVersion);

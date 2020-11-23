@@ -90,7 +90,7 @@ protected:
             {ChunkType{kNss, range, ChunkVersion(1, 0, epoch), kOtherShard}});
 
         return CollectionMetadata(ChunkManager(kThisShard,
-                                               DatabaseVersion(UUID::gen(), 1),
+                                               DatabaseVersion(UUID::gen()),
                                                makeStandaloneRoutingTableHistory(std::move(rt)),
                                                boost::none),
                                   kThisShard);
