@@ -929,9 +929,13 @@ done:
      * Perform rollback to stable only when the following conditions met.
      * 1. The connection is not read-only. A read-only connection expects that there shouldn't be
      *    any changes that need to be done on the database other than reading.
-     * 2. The history store file was found in the metadata.
+     * 2. A valid recovery timestamp. The recovery timestamp is the stable timestamp retrieved
+     *    from the metadata checkpoint information to indicate the stable timestamp when the
+     *    checkpoint happened. Anything updates newer than this timestamp must rollback.
+     * 3. The history store file was found in the metadata.
      */
-    if (hs_exists && !F_ISSET(conn, WT_CONN_READONLY)) {
+    if (hs_exists && !F_ISSET(conn, WT_CONN_READONLY) &&
+      conn->txn_global.recovery_timestamp != WT_TS_NONE) {
         /* Start the eviction threads for rollback to stable if not already started. */
         if (!eviction_started) {
             WT_ERR(__wt_evict_create(session));
@@ -958,10 +962,7 @@ done:
          * stable.
          */
         conn->txn_global.stable_timestamp = conn->txn_global.recovery_timestamp;
-        conn->txn_global.has_stable_timestamp = false;
-
-        if (conn->txn_global.recovery_timestamp != WT_TS_NONE)
-            conn->txn_global.has_stable_timestamp = true;
+        conn->txn_global.has_stable_timestamp = true;
 
         __wt_verbose(session, WT_VERB_RTS,
           "Performing recovery rollback_to_stable with stable timestamp: %s and oldest timestamp: "
