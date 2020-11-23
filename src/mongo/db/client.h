@@ -160,22 +160,6 @@ public:
     ServiceContext::UniqueOperationContext makeOperationContext();
 
     /**
-     * Sets the active operation context on this client to "opCtx", which must be non-NULL.
-     *
-     * It is an error to call this method if there is already an operation context on Client.
-     * It is an error to call this on an unlocked client.
-     */
-    void setOperationContext(OperationContext* opCtx);
-
-    /**
-     * Clears the active operation context on this client.
-     *
-     * There must already be such a context set on this client.
-     * It is an error to call this on an unlocked client.
-     */
-    void resetOperationContext();
-
-    /**
      * Gets the operation context active on this client, or nullptr if there is no such context.
      *
      * It is an error to call this method on an unlocked client, or to use the value returned
@@ -277,6 +261,13 @@ private:
     explicit Client(std::string desc,
                     ServiceContext* serviceContext,
                     transport::SessionHandle session);
+
+    /**
+     * Sets the active operation context on this client to "opCtx".
+     */
+    void _setOperationContext(OperationContext* opCtx) {
+        _opCtx = opCtx;
+    }
 
     ServiceContext* const _serviceContext;
     const transport::SessionHandle _session;

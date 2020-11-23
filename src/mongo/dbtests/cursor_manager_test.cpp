@@ -56,12 +56,17 @@ const NamespaceString kTestNss{"test.collection"};
 
 class CursorManagerTest : public unittest::Test {
 public:
-    CursorManagerTest()
-        : _queryServiceContext(std::make_unique<QueryTestServiceContext>()),
-          _opCtx(_queryServiceContext->makeOperationContext()) {
-        _opCtx->getServiceContext()->setPreciseClockSource(std::make_unique<ClockSourceMock>());
-        _clock =
-            static_cast<ClockSourceMock*>(_opCtx->getServiceContext()->getPreciseClockSource());
+    CursorManagerTest() : _queryServiceContext(std::make_unique<QueryTestServiceContext>()) {
+        _queryServiceContext->getServiceContext()->setPreciseClockSource(
+            std::make_unique<ClockSourceMock>());
+    }
+
+    void setUp() override {
+        _opCtx = _queryServiceContext->makeOperationContext();
+    }
+
+    void tearDown() override {
+        // Do nothing.
     }
 
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeFakePlanExecutor() {
@@ -102,7 +107,8 @@ public:
     }
 
     ClockSourceMock* useClock() {
-        return _clock;
+        auto svcCtx = _queryServiceContext->getServiceContext();
+        return static_cast<ClockSourceMock*>(svcCtx->getPreciseClockSource());
     }
 
     CursorManager* useCursorManager() {
@@ -114,17 +120,16 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
 
 private:
-    ClockSourceMock* _clock;
     CursorManager _cursorManager;
 };
 
 class CursorManagerTestCustomOpCtx : public CursorManagerTest {
     void setUp() override {
-        _queryServiceContext->getClient()->resetOperationContext();
+        // Do nothing.
     }
 
     void tearDown() override {
-        _queryServiceContext->getClient()->setOperationContext(_opCtx.get());
+        // Do nothing.
     }
 };
 
