@@ -814,14 +814,6 @@ def _get_node_with_ixes(env, node, node_builder_type):
 
 _get_node_with_ixes.node_type_ixes = dict()
 
-def add_libdeps_node(env, target, libdeps):
-    if str(target).endswith(env["SHLIBSUFFIX"]):
-        t_str = _get_node_with_ixes(env, str(target.abspath), target.get_builder().get_name(env)).abspath
-        env.GetLibdepsGraph().add_node(t_str)
-        for libdep in libdeps:
-            if str(libdep.target_node).endswith(env["SHLIBSUFFIX"]):
-                env.GetLibdepsGraph().add_edge(str(libdep.target_node.abspath), t_str, visibility=libdep.dependency_type)
-
 def make_libdeps_emitter(
     dependency_builder,
     dependency_map=dependency_visibility_ignored,
@@ -867,10 +859,6 @@ def make_libdeps_emitter(
         # and LIBDEPS_TAGS used.
         if not any("conftest" in str(t) for t in target):
             LibdepLinter(env, target).lint_libdeps(libdeps)
-
-        if env.get('SYMBOLDEPSSUFFIX', None):
-            for t in target:
-                add_libdeps_node(env, t, libdeps)
 
         # We ignored the dependency_map until now because we needed to use
         # original dependency value for linting. Now go back through and
@@ -980,6 +968,67 @@ def expand_libdeps_with_flags(source, target, env, for_signature):
 
     return libdeps_with_flags
 
+def generate_libdeps_graph(env):
+    if env.get('SYMBOLDEPSSUFFIX', None):
+        import glob
+        from buildscripts.libdeps.graph_analyzer import EdgeProps
+        find_symbols = env.Dir("$BUILD_DIR").path + "/libdeps/find_symbols"
+        symbol_deps = []
+        for target, source in env.get('LIBDEPS_SYMBOL_DEP_FILES', []):
+            direct_libdeps = []
+            for direct_libdep in __get_sorted_direct_libdeps(source):
+                env.GetLibdepsGraph().add_edges_from([(
+                    str(direct_libdep.target_node.abspath),
+                    str(source.abspath),
+                    {
+                        EdgeProps.direct.name: 1,
+                        EdgeProps.visibility.name: int(direct_libdep.dependency_type)
+                    })])
+                direct_libdeps.append(direct_libdep.target_node.abspath)
+            for libdep in __get_libdeps(source):
+                if libdep.abspath not in direct_libdeps:
+                    env.GetLibdepsGraph().add_edges_from([(
+                        str(libdep.abspath),
+                        str(source.abspath),
+                        {
+                            EdgeProps.direct.name: 0,
+                            EdgeProps.visibility.name: 0
+                        })])
+
+            ld_path = ":".join([os.path.dirname(str(libdep)) for libdep in __get_libdeps(source)])
+            symbol_deps.append(env.Command(
+                target=target,
+                source=source,
+                action=SCons.Action.Action(
+                    f'{find_symbols} $SOURCE "{ld_path}" $TARGET',
+                    "Generating $SOURCE symbol dependencies")))
+
+        def write_graph_hash(env, target, source):
+            import networkx
+            import hashlib
+            import json
+            with open(target[0].path, 'w') as f:
+                json_str = json.dumps(networkx.readwrite.json_graph.node_link_data(env.GetLibdepsGraph()), sort_keys=True).encode('utf-8')
+                f.write(hashlib.sha256(json_str).hexdigest())
+
+        graph_hash = env.Command(target="$BUILD_DIR/libdeps/graph_hash.sha256",
+                    source=symbol_deps + [
+                        env.File("#SConstruct")] +
+                        glob.glob("**/SConscript", recursive=True) +
+                        [os.path.abspath(__file__)],
+                    action=SCons.Action.FunctionAction(
+                        write_graph_hash,
+                        {"cmdstr": None}))
+
+        graph_node = env.Command(
+            target=env.get('LIBDEPS_GRAPH_FILE', None),
+            source=symbol_deps,
+            action=SCons.Action.FunctionAction(
+                generate_graph,
+                {"cmdstr": "Generating libdeps graph"}))
+
+        env.Depends(graph_node, graph_hash)
+
 def get_typeinfo_link_command():
     if LibdepLinter.skip_linting:
         return "{ninjalink}"
@@ -1040,14 +1089,21 @@ def generate_graph(env, target, source):
 
     for symbol_deps_file in source:
         with open(str(symbol_deps_file)) as f:
+            symbols = {}
             for symbol, lib in json.load(f).items():
                 # ignore symbols from external libraries,
                 # they will just clutter the graph
                 if lib.startswith(env.Dir("$BUILD_DIR").path):
-                    env.GetLibdepsGraph().add_edges_from([(
-                        os.path.abspath(lib).strip(),
-                        os.path.abspath(str(symbol_deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])]),
-                        {symbol.strip(): "1"})])
+                    if lib not in symbols:
+                        symbols[lib] = []
+                    symbols[lib].append(symbol)
+
+            for lib in symbols:
+                env.GetLibdepsGraph().add_edges_from([(
+                    os.path.abspath(lib).strip(),
+                    os.path.abspath(str(symbol_deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])]),
+                    {"symbols": " ".join(symbols[lib]) })])
+
 
     libdeps_graph_file = f"{env.Dir('$BUILD_DIR').path}/libdeps/libdeps.graphml"
     networkx.write_graphml(env.GetLibdepsGraph(), libdeps_graph_file, named_key_ids=True)
@@ -1129,14 +1185,15 @@ def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinf
         find_symbols_env.VariantDir('${BUILD_DIR}/libdeps', 'buildscripts/libdeps', duplicate = 0)
         find_symbols_node = find_symbols_env.Program(
             target='${BUILD_DIR}/libdeps/find_symbols',
-            source=['${BUILD_DIR}/libdeps/find_symbols.c'])
+            source=['${BUILD_DIR}/libdeps/find_symbols.c'],
+            CFLAGS=['-O3'])
 
         # Here we are setting up some functions which will return single instance of the
         # network graph and symbol deps list. We also setup some environment variables
         # which are used along side the functions.
         symbol_deps = []
         def append_symbol_deps(env, symbol_deps_file):
-            env.Depends("${BUILD_DIR}/libdeps/libdeps.graphml", symbol_deps_file)
+            env.Depends(env['LIBDEPS_GRAPH_FILE'], symbol_deps_file[0])
             symbol_deps.append(symbol_deps_file)
         env.AddMethod(append_symbol_deps, "AppendSymbolDeps")
 
@@ -1146,16 +1203,16 @@ def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinf
         env.AddMethod(get_libdeps_graph, "GetLibdepsGraph")
 
         env['LIBDEPS_SYMBOL_DEP_FILES'] = symbol_deps
+        env['LIBDEPS_GRAPH_FILE'] = env.File("${BUILD_DIR}/libdeps/libdeps.graphml")
         env["SYMBOLDEPSSUFFIX"] = '.symbol_deps'
 
         # Now we will setup an emitter, and an additional action for several
         # of the builder involved with dynamic builds.
         def libdeps_graph_emitter(target, source, env):
             if "conftest" not in str(target[0]):
-                symbol_deps_file = target[0].path + env['SYMBOLDEPSSUFFIX']
-                env.Depends(target, '${BUILD_DIR}/libdeps/find_symbols')
-                env.SideEffect(symbol_deps_file, target)
-                env.AppendSymbolDeps(symbol_deps_file)
+                symbol_deps_file = env.File(str(target[0]) + env['SYMBOLDEPSSUFFIX'])
+                env.Depends(symbol_deps_file, '${BUILD_DIR}/libdeps/find_symbols')
+                env.AppendSymbolDeps((symbol_deps_file,target[0]))
 
             return target, source
 
@@ -1164,15 +1221,6 @@ def setup_environment(env, emitting_shared=False, linting='on', sanitize_typeinf
             base_emitter = builder.emitter
             new_emitter = SCons.Builder.ListEmitter([base_emitter, libdeps_graph_emitter])
             builder.emitter = new_emitter
-
-            base_action = builder.action
-            if not isinstance(base_action, SCons.Action.ListAction):
-                base_action = SCons.Action.ListAction([base_action])
-            find_symbols = env.Dir("$BUILD_DIR").path + "/libdeps/find_symbols"
-            base_action.list.extend([
-                SCons.Action.Action(f'if [ -e {find_symbols} ]; then {find_symbols} $TARGET "$_LIBDEPS_LD_PATH" ${{TARGET}}.symbol_deps; fi', None)
-            ])
-            builder.action = base_action
 
     # We need a way for environments to alter just which libdeps
     # emitter they want, without altering the overall program or
