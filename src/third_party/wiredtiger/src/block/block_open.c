@@ -391,12 +391,7 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
          */
         if (F_ISSET(session, WT_SESSION_IMPORT_REPAIR))
             goto err;
-
-        if (F_ISSET(session, WT_SESSION_ROLLBACK_TO_STABLE))
-            ret = ENOENT;
-        else
-            WT_ERR_MSG(
-              session, WT_ERROR, "%s does not appear to be a WiredTiger file", block->name);
+        WT_ERR_MSG(session, WT_ERROR, "%s does not appear to be a WiredTiger file", block->name);
     }
 
     if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||

@@ -182,9 +182,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             f.truncate(0)
         self.runWt(["verify", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
-        # The test may output the following error message while opening a file that
-        # does not exist. Ignore that.
-        self.ignoreStderrPatternIfExists('No such file or directory')
+        self.check_non_empty_file("verifyerr.out")
 
     def test_verify_process_zero_length(self):
         """
@@ -197,9 +195,7 @@ class test_verify(wttest.WiredTigerTestCase, suite_subprocess):
             f.truncate(0)
         self.runWt(["verify", "table:" + self.tablename],
             errfilename="verifyerr.out", failure=True)
-        # The test may output the following error message while opening a file that
-        # does not exist. Ignore that.
-        self.ignoreStderrPatternIfExists('No such file or directory')
+        self.check_non_empty_file("verifyerr.out")
 
 if __name__ == '__main__':
     wttest.run()

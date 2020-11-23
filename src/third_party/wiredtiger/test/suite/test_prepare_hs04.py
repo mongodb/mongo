@@ -165,12 +165,8 @@ class test_prepare_hs04(wttest.WiredTigerTestCase):
         # After simulating a crash, search for the keys inserted.
 
         txn_config = 'read_timestamp=' + timestamp_str(5) + ',ignore_prepare=false'
-        if self.commit == True:
-            # Search keys with timestamp 5, ignore_prepare=false and expect the cursor search to return WT_NOTFOUND.
-            self.search_keys_timestamp_and_ignore(ds, txn_config, None)
-        else:
-            # Search keys with timestamp 5, ignore_prepare=false and expect the cursor value to be commit_value.
-            self.search_keys_timestamp_and_ignore(ds, txn_config, commit_value)
+        # Search keys with timestamp 5, ignore_prepare=false and expect the cursor value to be commit_value.
+        self.search_keys_timestamp_and_ignore(ds, txn_config, commit_value)
 
         txn_config = 'read_timestamp=' + timestamp_str(20) + ',ignore_prepare=true'
         # Search keys with timestamp 20, ignore_prepare=true and expect the cursor search to return WT_NOTFOUND.

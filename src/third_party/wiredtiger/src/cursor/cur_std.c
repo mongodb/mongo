@@ -979,6 +979,33 @@ err:
 }
 
 /*
+ * __cursor_config_debug --
+ *     Set configuration options for debug category.
+ */
+static int
+__cursor_config_debug(WT_CURSOR *cursor, const char *cfg[])
+{
+    WT_CONFIG_ITEM cval;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    session = (WT_SESSION_IMPL *)cursor->session;
+
+    /*
+     * Debug options. Special handling for options that aren't found - since reconfigure passes in
+     * just the single configuration string, not the stack.
+     */
+    if ((ret = __wt_config_gets_def(session, cfg, "debug.release_evict", 0, &cval)) == 0) {
+        if (cval.val)
+            F_SET(cursor, WT_CURSTD_DEBUG_RESET_EVICT);
+        else
+            F_CLR(cursor, WT_CURSTD_DEBUG_RESET_EVICT);
+    } else
+        WT_RET_NOTFOUND_OK(ret);
+    return (0);
+}
+
+/*
  * __wt_cursor_reconfigure --
  *     Set runtime-configurable settings.
  */
@@ -988,6 +1015,7 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
     WT_CONFIG_ITEM cval;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    const char *cfg[] = {config, NULL};
 
     CURSOR_API_CALL(cursor, session, reconfigure, NULL);
 
@@ -1017,6 +1045,8 @@ __wt_cursor_reconfigure(WT_CURSOR *cursor, const char *config)
             F_CLR(cursor, WT_CURSTD_OVERWRITE);
     } else
         WT_ERR_NOTFOUND_OK(ret, false);
+
+    WT_ERR(__cursor_config_debug(cursor, cfg));
 
 err:
     API_END_RET(session, ret);
@@ -1110,6 +1140,7 @@ __wt_cursor_init(
         cursor->update = __wt_cursor_notsup;
         F_CLR(cursor, WT_CURSTD_CACHEABLE);
     }
+    WT_RET(__cursor_config_debug(cursor, cfg));
 
     /*
      * dump If an index cursor is opened with dump, then this function is called on the index files,
