@@ -46,6 +46,10 @@ public:
     using Request = RecipientSyncData;
     using Response = RecipientSyncDataResponse;
 
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {Request::kRecipientCertificateForDonorFieldName};
+    }
+
     class Invocation : public InvocationBase {
 
     public:
@@ -62,7 +66,8 @@ public:
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId().toString(),
-                                                      cmd.getReadPreference());
+                                                      cmd.getReadPreference(),
+                                                      cmd.getRecipientCertificateForDonor());
 
 
             if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
@@ -136,6 +141,10 @@ class RecipientForgetMigrationCmd : public TypedCommand<RecipientForgetMigration
 public:
     using Request = RecipientForgetMigration;
 
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {Request::kRecipientCertificateForDonorFieldName};
+    }
+
     class Invocation : public InvocationBase {
 
     public:
@@ -160,7 +169,8 @@ public:
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
                                                       cmd.getTenantId().toString(),
-                                                      cmd.getReadPreference());
+                                                      cmd.getReadPreference(),
+                                                      cmd.getRecipientCertificateForDonor());
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDoc.toBSON());
 

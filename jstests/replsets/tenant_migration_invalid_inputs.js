@@ -91,7 +91,8 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: invalidTenantId,
-        readPreference: readPreference
+        readPreference: readPreference,
+        recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
     }),
                                  ErrorCodes.BadValue);
 });
@@ -112,7 +113,8 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     migrationId: UUID(),
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL() + "," + recipientPrimary.host,
     tenantId: tenantId,
-    readPreference: readPreference
+    readPreference: readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.BadValue);
 

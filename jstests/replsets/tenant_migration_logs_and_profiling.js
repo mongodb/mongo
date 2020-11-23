@@ -46,11 +46,14 @@ if (!tenantMigrationTest.isFeatureFlagEnabled()) {
 }
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
+const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
 // Verify that migration certificates are not logged as part of slow query logging.
 (() => {
     const donorDefaultSlowMs =
         assert.commandWorked(donorPrimary.adminCommand({profile: 0, slowms: 0})).slowms;
+    const recipientDefaultSlowMs =
+        assert.commandWorked(recipientPrimary.adminCommand({profile: 0, slowms: 0})).slowms;
 
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -61,19 +64,25 @@ const donorPrimary = tenantMigrationTest.getDonorPrimary();
     assert.eq(stateRes.state, TenantMigrationTest.State.kCommitted);
 
     assertNoCertificateOrPrivateKeyLogsForCmd(donorPrimary, "donorStartMigration");
+    assertNoCertificateOrPrivateKeyLogsForCmd(recipientPrimary, "recipientSyncData");
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     assertNoCertificateOrPrivateKeyLogsForCmd(donorPrimary, "donorForgetMigration");
+    assertNoCertificateOrPrivateKeyLogsForCmd(recipientPrimary, "recipientForgetMigration");
 
     assert.commandWorked(donorPrimary.adminCommand({profile: 0, slowms: donorDefaultSlowMs}));
+    assert.commandWorked(
+        recipientPrimary.adminCommand({profile: 0, slowms: recipientDefaultSlowMs}));
 })();
 
 // Verify that migration certificates do not show up in system.profile collections.
 (() => {
     const donorAdminDB = donorPrimary.getDB("config");
+    const recipientAdminDB = recipientPrimary.getDB("config");
 
     donorAdminDB.setProfilingLevel(2);
+    recipientAdminDB.setProfilingLevel(2);
 
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -86,12 +95,20 @@ const donorPrimary = tenantMigrationTest.getDonorPrimary();
     donorAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigDonorsNS}).forEach(doc => {
         assertNoCertificateOrPrivateKeyFields(doc);
     });
+    recipientAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigRecipientsNS})
+        .forEach(doc => {
+            assertNoCertificateOrPrivateKeyFields(doc);
+        });
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
     donorAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigDonorsNS}).forEach(doc => {
         assertNoCertificateOrPrivateKeyFields(doc);
     });
+    recipientAdminDB.system.profile.find({ns: TenantMigrationTest.kConfigRecipientsNS})
+        .forEach(doc => {
+            assertNoCertificateOrPrivateKeyFields(doc);
+        });
 })();
 
 tenantMigrationTest.stop();

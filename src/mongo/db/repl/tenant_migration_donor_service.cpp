@@ -455,7 +455,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
         request.setMigrationRecipientCommonData({_stateDoc.getId(),
                                                  donorConnString.toString(),
                                                  _stateDoc.getTenantId().toString(),
-                                                 _stateDoc.getReadPreference()});
+                                                 _stateDoc.getReadPreference(),
+                                                 _stateDoc.getRecipientCertificateForDonor()});
         request.setReturnAfterReachingDonorTimestamp(_stateDoc.getBlockTimestamp());
         return request.toBSON(BSONObj());
     }());
@@ -478,7 +479,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     request.setMigrationRecipientCommonData({_stateDoc.getId(),
                                              donorConnString.toString(),
                                              _stateDoc.getTenantId().toString(),
-                                             _stateDoc.getReadPreference()});
+                                             _stateDoc.getReadPreference(),
+                                             _stateDoc.getRecipientCertificateForDonor()});
     return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()), token);
 }
 

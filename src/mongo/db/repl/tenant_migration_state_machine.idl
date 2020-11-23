@@ -177,3 +177,8 @@ structs:
                     cloning finishes.
                 type: optime
                 optional: true
+            recipientCertificateForDonor:
+                description: >-
+                    The SSL certificate and private key that the recipient should use to
+                    authenticate to the donor.
+                type: TenantMigrationPEMPayload

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <fstream>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/namespace_string.h"
@@ -70,6 +72,22 @@ public:
     }
 
 protected:
+    const TenantMigrationPEMPayload kRecipientPEMPayload = [&] {
+        std::ifstream infile("jstests/libs/client.pem");
+        std::string buf((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
+
+        auto swCertificateBlob =
+            ssl_util::findPEMBlob(buf, "CERTIFICATE"_sd, 0 /* position */, false /* allowEmpty */);
+        ASSERT_TRUE(swCertificateBlob.isOK());
+
+        auto swPrivateKeyBlob =
+            ssl_util::findPEMBlob(buf, "PRIVATE KEY"_sd, 0 /* position */, false /* allowEmpty */);
+        ASSERT_TRUE(swPrivateKeyBlob.isOK());
+
+        return TenantMigrationPEMPayload{swCertificateBlob.getValue().toString(),
+                                         swPrivateKeyBlob.getValue().toString()};
+    }();
+
     bool checkStateDocPersisted(OperationContext* opCtx,
                                 const TenantMigrationRecipientDocument& stateDoc) {
         auto persistedStateDocWithStatus = getStateDoc(opCtx, stateDoc.getId());
@@ -93,7 +111,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
         migrationUUID,
         "donor-rs0/localhost:12345",
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), activeTenantAStateDoc));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), activeTenantAStateDoc));
 
@@ -101,7 +120,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc1(migrationUUID,
                                                "donor-rs1/localhost:12345",
                                                "tenantA",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     auto status = insertStateDoc(opCtx.get(), stateDoc1);
     ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status.code());
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), activeTenantAStateDoc));
@@ -110,7 +130,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc2(migrationUUID,
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
         insertStateDoc(opCtx.get(), stateDoc2), DBException, ErrorCodes::DuplicateKey);
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), activeTenantAStateDoc));
@@ -119,7 +140,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc3(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantA",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     status = insertStateDoc(opCtx.get(), stateDoc3);
     ASSERT_EQUALS(ErrorCodes::ConflictingOperationInProgress, status.code());
     ASSERT_FALSE(checkStateDocPersisted(opCtx.get(), stateDoc3));
@@ -128,7 +150,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest, AddTenantMigrationRecipientStat
     TenantMigrationRecipientDocument stateDoc4(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), stateDoc4));
 }
@@ -142,7 +165,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
         migrationUUID,
         "donor-rs0/localhost:12345",
         "tenantA",
-        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        kRecipientPEMPayload);
     inactiveTenantAStateDoc.setExpireAt(Date_t::now());
     ASSERT_OK(insertStateDoc(opCtx.get(), inactiveTenantAStateDoc));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), inactiveTenantAStateDoc));
@@ -151,7 +175,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc1(migrationUUID,
                                                "donor-rs1/localhost:12345",
                                                "tenantA",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
         insertStateDoc(opCtx.get(), stateDoc1), DBException, ErrorCodes::DuplicateKey);
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), inactiveTenantAStateDoc));
@@ -160,7 +185,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc2(migrationUUID,
                                                "donor-rs0/localhost:12345",
                                                "tenantB",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     ASSERT_THROWS_CODE(
         insertStateDoc(opCtx.get(), stateDoc2), DBException, ErrorCodes::DuplicateKey);
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), inactiveTenantAStateDoc));
@@ -169,7 +195,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc3(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantA",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc3));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), stateDoc3));
 
@@ -177,7 +204,8 @@ TEST_F(TenantMigrationRecipientEntryHelpersTest,
     TenantMigrationRecipientDocument stateDoc4(UUID::gen(),
                                                "donor-rs0/localhost:12345",
                                                "tenantC",
-                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+                                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                               kRecipientPEMPayload);
     ASSERT_OK(insertStateDoc(opCtx.get(), stateDoc4));
     ASSERT_TRUE(checkStateDocPersisted(opCtx.get(), stateDoc4));
 }

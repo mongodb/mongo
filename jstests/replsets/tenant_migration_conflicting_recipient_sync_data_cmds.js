@@ -48,6 +48,8 @@ function getTenantMigrationRecipientCurrentOpEntries(recipientPrimary, query) {
 }
 
 function startRecipientSyncDataCmd(migrationUuid, tenantId, connectionString, readPreference) {
+    load("jstests/replsets/libs/tenant_migration_util.js");
+
     jsTestLog("Starting a recipientSyncDataCmd for migrationUuid: " + migrationUuid +
               " tenantId: '" + tenantId + "'");
     assert.commandFailedWithCode(
@@ -56,7 +58,9 @@ function startRecipientSyncDataCmd(migrationUuid, tenantId, connectionString, re
             migrationId: migrationUuid,
             donorConnectionString: connectionString,
             tenantId: tenantId,
-            readPreference: readPreference
+            readPreference: readPreference,
+            recipientCertificateForDonor:
+                TenantMigrationUtil.makeMigrationCertificatesForTest().recipientCertificateForDonor
         }),
         [TestData.stopFailPointErrorCode, ErrorCodes.ConflictingOperationInProgress]);
 }

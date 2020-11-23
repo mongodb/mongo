@@ -35,6 +35,7 @@ global:
 
 imports:
   - "mongo/client/read_preference_setting.idl"
+  - "mongo/db/repl/tenant_migration_pem_payload.idl"
   - "mongo/idl/basic_types.idl"
   - "mongo/s/sharding_types.idl"
   - "mongo/db/repl/replication_types.idl"
@@ -73,6 +74,11 @@ structs:
           description: >-
             The read preference settings that the donor will pass on to the recipient.
           type: readPreference
+        recipientCertificateForDonor:
+          description: >-
+            The SSL certificate and private key that the recipient should use to authenticate to the
+            donor.
+          type: TenantMigrationPEMPayload
 
 commands:
   recipientSyncData:
