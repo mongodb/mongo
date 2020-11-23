@@ -37,6 +37,7 @@
 #include "mongo/db/op_observer.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -44,6 +45,20 @@
 
 namespace mongo {
 namespace {
+void refreshTemporaryReshardingCollection(const ReshardingDonorDocument& donorDoc) {
+    auto opCtx = cc().makeOperationContext();
+
+    auto tempNss =
+        constructTemporaryReshardingNss(donorDoc.getNss().db(), donorDoc.getExistingUUID());
+
+    auto tempNssRoutingInfo =
+        Grid::get(opCtx.get())
+            ->catalogCache()
+            ->getShardedCollectionRoutingInfoWithRefresh(opCtx.get(), tempNss);
+    uassertStatusOK(tempNssRoutingInfo);
+    CatalogCacheLoader::get(opCtx.get()).waitForCollectionFlush(opCtx.get(), tempNss);
+}
+
 Timestamp generateMinFetchTimestamp(const ReshardingDonorDocument& donorDoc) {
     auto opCtx = cc().makeOperationContext();
 
@@ -178,6 +193,14 @@ void ReshardingDonorService::DonorStateMachine::
     }
 
     _insertDonorDocument(_donorDoc);
+
+    // Recipient shards expect to read from the donor shard's existing sharded collection
+    // and the config.cache.chunks collection of the temporary resharding collection using
+    // {atClusterTime: <fetchTimestamp>}. Refreshing the temporary resharding collection on
+    // the donor shards causes them to create the config.cache.chunks collection. Without
+    // this refresh, the {atClusterTime: <fetchTimestamp>} read on the config.cache.chunks
+    // namespace would fail with a SnapshotUnavailable error response.
+    refreshTemporaryReshardingCollection(_donorDoc);
 
     auto minFetchTimestamp = generateMinFetchTimestamp(_donorDoc);
     _transitionStateAndUpdateCoordinator(DonorStateEnum::kDonatingInitialData, minFetchTimestamp);
