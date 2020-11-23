@@ -40,7 +40,9 @@ case "$1" in
         fi
 
         # Check for changes to the service file
-        systemctl daemon-reload
+        if $(command systemctl --help >/dev/null); then
+            systemctl daemon-reload
+        fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
