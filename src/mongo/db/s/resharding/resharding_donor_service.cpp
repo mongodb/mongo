@@ -193,7 +193,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::
     }
 
     return _allRecipientsDoneCloning.getFuture().thenRunOn(**executor).then([this]() {
-        _transitionStateAndUpdateCoordinator(DonorStateEnum::kDonatingOplogEntries);
+        _transitionState(DonorStateEnum::kDonatingOplogEntries);
     });
 }
 
