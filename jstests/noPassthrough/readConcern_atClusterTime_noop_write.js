@@ -35,10 +35,13 @@ const failpointParams = {
 };
 
 // The ShardingUptimeReporter only exists on mongos.
+const shardingUptimeFailpointName = jsTestOptions().mongosBinVersion == 'last-lts'
+    ? "failpoint.disableShardingUptimeReporterPeriodicThread"
+    : "failpoint.disableShardingUptimeReporting";
 const mongosFailpointParams = {
     setParameter: {
         "failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}",
-        "failpoint.disableShardingUptimeReporterPeriodicThread": "{mode: 'alwaysOn'}"
+        [shardingUptimeFailpointName]: "{mode: 'alwaysOn'}"
     }
 };
 

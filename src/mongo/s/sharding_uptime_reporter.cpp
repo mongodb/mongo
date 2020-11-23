@@ -50,7 +50,7 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(disableShardingUptimeReporterPeriodicThread);
+MONGO_FAIL_POINT_DEFINE(disableShardingUptimeReporting);
 
 const Seconds kUptimeReportInterval(10);
 
@@ -112,14 +112,15 @@ void ShardingUptimeReporter::startPeriodicThread() {
         const Timer upTimeTimer;
 
         while (!globalInShutdownDeprecated()) {
-            if (MONGO_unlikely(disableShardingUptimeReporterPeriodicThread.shouldFail())) {
-                LOGV2(426322,
-                      "The sharding uptime reporter periodic thread is disabled for testing");
-                return;
-            }
             {
                 auto opCtx = cc().makeOperationContext();
-                reportStatus(opCtx.get(), instanceId, hostName, upTimeTimer);
+
+                if (MONGO_unlikely(disableShardingUptimeReporting.shouldFail())) {
+                    LOGV2(426322,
+                          "Disabling the reporting of the uptime status for the current instance.");
+                } else {
+                    reportStatus(opCtx.get(), instanceId, hostName, upTimeTimer);
+                }
 
                 auto status = Grid::get(opCtx.get())
                                   ->getBalancerConfiguration()
