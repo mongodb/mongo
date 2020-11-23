@@ -536,7 +536,7 @@ Status runAggregate(OperationContext* opCtx,
             // AutoGetCollectionForReadCommand will raise an error if 'origNss' is a view. We do not
             // need to check this if we are opening a stream on an entire db or across the cluster.
             if (!origNss.isCollectionlessAggregateNS()) {
-                AutoGetCollectionForReadCommand origNssCtx(opCtx, origNss);
+                AutoGetCollectionForReadCommandMaybeLockFree origNssCtx(opCtx, origNss);
             }
 
             // If the user specified an explicit collation, adopt it; otherwise, use the simple
