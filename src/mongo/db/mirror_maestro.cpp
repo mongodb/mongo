@@ -413,8 +413,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
         gMirroredReadsSection.sent.fetchAndAdd(1);
     }
 } catch (const DBException& e) {
-    // TODO SERVER-44570 Invariant this only in testing
-    LOGV2_DEBUG(31456, 2, "Mirroring failed", "reason"_attr = e);
+    tassert(e.toStatus());
 }
 
 void MirrorMaestroImpl::init(ServiceContext* serviceContext) noexcept {
