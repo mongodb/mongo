@@ -1,18 +1,24 @@
 /**
- * This test checks several upgrade/downgrade routines related to sharding, namely:
- *  - The entries in the config server's config.collections that were marked as 'dropped: true' are
- *    deleted. (SERVER-52630: Remove once 5.0 becomes the LastLTS)
- *  - The entries in the config server's config.collections contain a 'distributionMode' field.
- *    (SERVER-51900: Remove once 5.0 becomes the LastLTS)
+ * The goal of this test is to verify that some metadata is properly updated when
+ *upgrading/downgrading a sharded cluster. More specifically:
+ *
+ *	1. We create a sharded cluster running and old binary version (lastLTSFCV or lastContinuousFCV)
+ *	2. We run some operations that involve the creation of some metadata
+ *	3. We upgrade the binaries of the sharded cluster to the latest version + set FCV to latestFCV
+ *	4. We verify that the metadata has been properly upgraded
+ *	5. We set FCV to old bin version + downgrade the binaries of the sharded cluster to that version
+ *	6. We verify that the metadata has been properly downgraded
  */
 (function() {
 "use strict";
 
 load('./jstests/multiVersion/libs/multi_cluster.js');  // for upgradeCluster()
 
-// Test 1: it checks two things after upgrading from 4.4:
+// Test 1: it checks two things after upgrading from versions prior 4.9:
 // - dropped collections are not present in csrs config.collections
 // - Entries on config.collections doesn't have the 'distributionMode' and the 'dropped' fields
+//
+// This test must be removed once 5.0 is defined as the lastLTS (SERVER-52630)
 function test1Setup() {
     let csrs_config_db = st.configRS.getPrimary().getDB('config');
     // Setup sharded collections
@@ -48,7 +54,9 @@ function test1ChecksAfterUpgrade() {
 }
 
 // Test 2: it checks that the 'allowMigrations' field in the
-// config.cache.collections entries is removed when downgrading to 4.4
+// config.cache.collections entries is removed when downgrading to prior 4.9
+//
+// This test must be removed once 5.0 is defined as the lastLTS (SERVER-52632)
 function test2Setup() {
     assert.commandWorked(st.s.getDB("sharded").getCollection("test2").insert({_id: 0}));
     assert.commandWorked(st.s.getDB("sharded").getCollection("test2").insert({_id: 1}));
@@ -97,40 +105,41 @@ function runChecksAfterDowngrade() {
     test2ChecksAfterDowngrade();
 }
 
-// Start a sharded cluster on version 4.4
-let old_version = '4.4';
-var st = new ShardingTest({
-    shards: 2,
-    mongos: 1,
-    other: {
-        mongosOptions: {binVersion: old_version},
-        configOptions: {binVersion: old_version},
-        shardOptions: {binVersion: old_version},
+for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
+    var st = new ShardingTest({
+        shards: 2,
+        mongos: 1,
+        other: {
+            mongosOptions: {binVersion: oldVersion},
+            configOptions: {binVersion: oldVersion},
+            shardOptions: {binVersion: oldVersion},
 
-        rsOptions: {binVersion: old_version},
-        rs: true,
-    }
-});
-st.configRS.awaitReplication();
+            rsOptions: {binVersion: oldVersion},
+            rs: true,
+        }
+    });
 
-// Setup initial conditions on 4.4
-setupInitialStateOnOldVersion();
+    st.configRS.awaitReplication();
 
-// Upgrade the entire cluster to the latest version.
-jsTest.log('upgrading cluster');
-st.upgradeCluster('latest');
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    // Setup initial conditions
+    setupInitialStateOnOldVersion();
 
-// Tests after upgrade
-runChecksAfterUpgrade();
+    // Upgrade the entire cluster to the latest version.
+    jsTest.log('upgrading cluster');
+    st.upgradeCluster(latestFCV);
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-// Downgrade back to 4.4
-jsTest.log('downgrading cluster');
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: old_version}));
-st.upgradeCluster(old_version);
+    // Tests after upgrade
+    runChecksAfterUpgrade();
 
-// Tests after downgrade to 4.4
-runChecksAfterDowngrade();
+    // Downgrade back to oldVersion
+    jsTest.log('downgrading cluster');
+    assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion}));
+    st.upgradeCluster(oldVersion);
 
-st.stop();
+    // Tests after downgrade to oldVersion
+    runChecksAfterDowngrade();
+
+    st.stop();
+}
 })();

@@ -438,7 +438,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     return Status::OK();
 }
 
-void ShardingCatalogManager::removePre44LegacyMetadata(OperationContext* opCtx) {
+void ShardingCatalogManager::removePre49LegacyMetadata(OperationContext* opCtx) {
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     DBDirectClient client(opCtx);
 

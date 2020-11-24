@@ -451,9 +451,9 @@ public:
      * as 'dropped: true'. As those are no longer needed, this method cleans up the leftover
      * metadata.
      *
-     * It shall be called on FCV 4.4 to 5.0 upgrade.
+     * It shall be called when upgrading to 4.9 or newer versions.
      */
-    void removePre44LegacyMetadata(OperationContext* opCtx);
+    void removePre49LegacyMetadata(OperationContext* opCtx);
 
     //
     // For Diagnostics

@@ -243,16 +243,9 @@ public:
             }
 
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                if (actualVersion ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kFullyDowngradedTo44 ||
-                    actualVersion ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To47 ||
-                    actualVersion ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To48 ||
-                    actualVersion ==
-                        ServerGlobalParams::FeatureCompatibility::Version::kUpgradingFrom44To49) {
+                if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49) {
                     // SERVER-52630: Remove once 5.0 becomes the LastLTS
-                    ShardingCatalogManager::get(opCtx)->removePre44LegacyMetadata(opCtx);
+                    ShardingCatalogManager::get(opCtx)->removePre49LegacyMetadata(opCtx);
                 }
 
                 // Upgrade shards before config finishes its upgrade.
@@ -334,9 +327,9 @@ public:
                 LOGV2(20502, "Downgrade: dropping config.rangeDeletions collection");
                 migrationutil::dropRangeDeletionsCollection(opCtx);
 
-                if (requestedVersion == FeatureCompatibilityParams::Version::kFullyDowngradedTo44) {
+                if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
                     // SERVER-52632: Remove once 5.0 becomes the LastLTS
-                    shardmetadatautil::downgradeShardConfigCollectionEntriesTo44(opCtx);
+                    shardmetadatautil::downgradeShardConfigCollectionEntriesToPre49(opCtx);
                 }
 
 

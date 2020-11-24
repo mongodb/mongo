@@ -484,7 +484,7 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
     }
 }
 
-void downgradeShardConfigCollectionEntriesTo44(OperationContext* opCtx) {
+void downgradeShardConfigCollectionEntriesToPre49(OperationContext* opCtx) {
     // Clear the 'allowMigrations' field from config.cache.collections
     LOGV2(5189100, "Starting downgrade of config.cache.collections");
     write_ops::Update clearAllowMigrations(NamespaceString::kShardConfigCollectionsNamespace, [] {

@@ -346,10 +346,10 @@ TEST_F(ShardMetadataUtilTest, DowngradeShardConfigCollectionEntriesTo44) {
     // allowMigrations was explicitly defined to false by the previous statement
     checkShardCollectionAllowMigrationsFlag(/* expectedValue */ false);
 
-    downgradeShardConfigCollectionEntriesTo44(operationContext());
+    downgradeShardConfigCollectionEntriesToPre49(operationContext());
 
-    // The downgrade process to 4.4 removes the allowMigration flag from all collections. Thus, this
-    // flag will not be present which implies that its value is true
+    // The downgrade process to prior 4.9 removes the allowMigration flag from all collections.
+    // Thus, this flag will not be present which implies that its value is true
     checkShardCollectionAllowMigrationsFlag(/* expectedValue */ true);
 }
 
