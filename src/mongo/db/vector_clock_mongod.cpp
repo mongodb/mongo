@@ -34,7 +34,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock_document_gen.h"
 #include "mongo/db/vector_clock_mutable.h"
@@ -128,9 +127,6 @@ private:
     // Protects the shared state below
     Mutex _mutex = MONGO_MAKE_LATCH("VectorClockMongoD::_mutex");
 
-    // This value is incremented every time the node changes its role between primary and secondary
-    uint64_t _generation{0};
-
     // If set to true, means that another operation already scheduled the `_queue` draining loop, if
     // false it means that this operation must do it
     bool _loopScheduled{false};
@@ -173,13 +169,11 @@ VectorClockMongoD::~VectorClockMongoD() = default;
 
 void VectorClockMongoD::onStepUpBegin(OperationContext* opCtx, long long term) {
     stdx::lock_guard lg(_mutex);
-    ++_generation;
     _durableTime.reset();
 }
 
 void VectorClockMongoD::onStepDown() {
     stdx::lock_guard lg(_mutex);
-    ++_generation;
     _durableTime.reset();
 }
 
@@ -251,15 +245,11 @@ SharedSemiFuture<void> VectorClockMongoD::_enqueueWaiterAndScheduleLoopIfNeeded(
 }
 
 Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* service) {
-    auto [p, f] = makePromiseFuture<std::pair<uint64_t, VectorTime>>();
+    auto [p, f] = makePromiseFuture<VectorTime>();
     auto future = std::move(f)
-                      .then([this](std::pair<uint64_t, VectorTime> newDurableTime) {
+                      .then([this](VectorTime newDurableTime) {
                           stdx::unique_lock ul(_mutex);
-                          uassert(ErrorCodes::InterruptedDueToReplStateChange,
-                                  "VectorClock failed to persist due to stepdown",
-                                  newDurableTime.first == _generation);
-
-                          _durableTime.emplace(newDurableTime.second);
+                          _durableTime.emplace(newDurableTime);
 
                           ComparableVectorTime time{*_durableTime};
 
@@ -274,9 +264,9 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
 
                           // Make sure the VectorClock advances at least up to the just recovered
                           // durable time
-                          _advanceTime({newDurableTime.second.clusterTime(),
-                                        newDurableTime.second.configTime(),
-                                        newDurableTime.second.topologyTime()});
+                          _advanceTime({newDurableTime.clusterTime(),
+                                        newDurableTime.configTime(),
+                                        newDurableTime.topologyTime()});
 
                           for (auto& p : promises)
                               p->emplaceValue();
@@ -307,9 +297,9 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
     // Blocking work to recover and/or persist the current vector time
     ExecutorFuture<void>(Grid::get(service)->getExecutorPool()->getFixedExecutor())
         .then([this, service] {
-            auto [generation, mustRecoverDurableTime] = [&] {
+            auto mustRecoverDurableTime = [&] {
                 stdx::lock_guard lg(_mutex);
-                return std::make_pair(_generation, !_durableTime);
+                return !_durableTime;
             }();
 
             ThreadClient tc("VectorClockStateOperation", service);
@@ -336,50 +326,23 @@ Future<void> VectorClockMongoD::_doWhileQueueNotEmptyOrError(ServiceContext* ser
                         return true;
                     });
 
-                return std::make_pair(
-                    generation,
-                    VectorTime({LogicalTime(Timestamp(0)),
-                                LogicalTime(durableVectorClock.getConfigTime()),
-                                LogicalTime(durableVectorClock.getTopologyTime())}));
-            } else {
-                auto vectorTime = getTime();
-
-                auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
-                if (replCoord->getMemberState().primary()) {
-                    // Persist as primary
-                    const VectorClockDocument vcd(vectorTime.configTime().asTimestamp(),
-                                                  vectorTime.topologyTime().asTimestamp());
-
-                    PersistentTaskStore<VectorClockDocument> store(
-                        NamespaceString::kVectorClockNamespace);
-                    store.upsert(opCtx,
-                                 QUERY(VectorClockDocument::k_idFieldName << vcd.get_id()),
-                                 vcd.toBSON(),
-                                 WriteConcerns::kMajorityWriteConcern);
-                } else {
-                    // Persist as secondary, by asking the primary
-                    auto const shardingState = ShardingState::get(opCtx);
-                    invariant(shardingState->enabled());
-
-                    auto selfShard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-                        opCtx, shardingState->shardId()));
-
-                    auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
-                        opCtx,
-                        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                        NamespaceString::kVectorClockNamespace.db().toString(),
-                        BSON("_vectorClockPersist" << 1),
-                        Seconds{30},
-                        Shard::RetryPolicy::kIdempotent));
-
-                    uassertStatusOK(cmdResponse.commandStatus);
-                }
-
-                return std::make_pair(generation, vectorTime);
+                return VectorTime({LogicalTime(Timestamp(0)),
+                                   LogicalTime(durableVectorClock.getConfigTime()),
+                                   LogicalTime(durableVectorClock.getTopologyTime())});
             }
+
+            auto vectorTime = getTime();
+            const VectorClockDocument vcd(vectorTime.configTime().asTimestamp(),
+                                          vectorTime.topologyTime().asTimestamp());
+
+            PersistentTaskStore<VectorClockDocument> store(NamespaceString::kVectorClockNamespace);
+            store.upsert(opCtx,
+                         QUERY(VectorClockDocument::k_idFieldName << vcd.get_id()),
+                         vcd.toBSON(),
+                         WriteConcerns::kMajorityWriteConcern);
+            return vectorTime;
         })
-        .getAsync([this, promise = std::move(p)](
-                      StatusWith<std::pair<uint64_t, VectorTime>> swResult) mutable {
+        .getAsync([this, promise = std::move(p)](StatusWith<VectorTime> swResult) mutable {
             promise.setFrom(std::move(swResult));
         });
 

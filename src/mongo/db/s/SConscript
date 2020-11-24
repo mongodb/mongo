@@ -341,7 +341,6 @@ env.Library(
         'split_vector_command.cpp',
         'txn_two_phase_commit_cmds.cpp',
         'unset_sharding_command.cpp',
-        'vector_clock_persist_command.cpp',
         'wait_for_ongoing_chunk_splits_command.cpp',
     ],
     LIBDEPS_PRIVATE=[
