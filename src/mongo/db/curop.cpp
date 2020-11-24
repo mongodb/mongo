@@ -1085,6 +1085,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("operationMetrics", builder.obj());
     }
 
+    if (client && client->session()) {
+        pAttrs->add("remote", client->session()->remote());
+    }
+
     if (iscommand) {
         pAttrs->add("protocol", getProtoString(networkOp));
     }

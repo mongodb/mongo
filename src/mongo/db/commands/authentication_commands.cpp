@@ -310,7 +310,7 @@ bool CmdAuthenticate::run(OperationContext* opCtx,
                   "Successfully authenticated",
                   "user"_attr = user.getUser(),
                   "db"_attr = user.getDB(),
-                  "client"_attr = opCtx->getClient()->session()->remote());
+                  "remote"_attr = opCtx->getClient()->session()->remote());
         }
 
         uassertStatusOK(authCounter.incAuthenticateSuccessful(mechanism));

@@ -237,9 +237,7 @@ public:
     TimeoutSyncSEP(Mode mode) : _mode(mode) {}
 
     void startSession(transport::SessionHandle session) override {
-        LOGV2(23040,
-              "Accepted connection from {session_remote}",
-              "session_remote"_attr = session->remote());
+        LOGV2(23040, "Accepted connection", "remote"_attr = session->remote());
         startWorkerThread([this, session = std::move(session)]() mutable {
             LOGV2(23041, "waiting for message");
             session->setTimeout(Milliseconds{500});
@@ -335,9 +333,7 @@ TEST(TransportLayerASIO, SourceSyncTimeoutSucceeds) {
 class TimeoutSwitchModesSEP : public TimeoutSEP {
 public:
     void startSession(transport::SessionHandle session) override {
-        LOGV2(23044,
-              "Accepted connection from {session_remote}",
-              "session_remote"_attr = session->remote());
+        LOGV2(23044, "Accepted connection", "remote"_attr = session->remote());
         startWorkerThread([this, session = std::move(session)]() mutable {
             LOGV2(23045, "waiting for message");
             auto sourceMessage = [&] { return session->sourceMessage().getStatus(); };

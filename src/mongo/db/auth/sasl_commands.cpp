@@ -202,7 +202,7 @@ Status doSaslStep(OperationContext* opCtx,
               "mechanism"_attr = mechanism.mechanismName(),
               "principalName"_attr = mechanism.getPrincipalName(),
               "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-              "client"_attr = opCtx->getClient()->getRemote().toString(),
+              "remote"_attr = opCtx->getClient()->getRemote(),
               "result"_attr = redact(swResponse.getStatus()));
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
@@ -231,7 +231,7 @@ Status doSaslStep(OperationContext* opCtx,
                   "mechanism"_attr = mechanism.mechanismName(),
                   "principalName"_attr = mechanism.getPrincipalName(),
                   "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-                  "client"_attr = opCtx->getClient()->session()->remote());
+                  "remote"_attr = opCtx->getClient()->session()->remote());
         }
         if (session->isSpeculative()) {
             status = authCounter.incSpeculativeAuthenticateSuccessful(
