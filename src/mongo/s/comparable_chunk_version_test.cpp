@@ -128,29 +128,6 @@ TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanUnshar
     ASSERT_FALSE(defaultVersion > version1);
 }
 
-TEST(ComparableChunkVersionTest, DefaultConstructedVersionIsAlwaysLessThanDropped) {
-    const ComparableChunkVersion defaultVersion{};
-    const auto version1 =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::DROPPED());
-    ASSERT(defaultVersion != version1);
-    ASSERT(defaultVersion < version1);
-    ASSERT_FALSE(defaultVersion > version1);
-}
-
-TEST(ComparableChunkVersionTest, UnshardedAndDroppedAreEqual) {
-    const auto version1 =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
-    const auto version2 =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::DROPPED());
-    const auto version3 =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::UNSHARDED());
-    const auto version4 =
-        ComparableChunkVersion::makeComparableChunkVersion(ChunkVersion::DROPPED());
-    ASSERT(version1 == version2);
-    ASSERT(version1 == version3);
-    ASSERT(version2 == version4);
-}
-
 TEST(ComparableChunkVersionTest, TwoNoChunksVersionsAreTheSame) {
     const auto oid = OID::gen();
     const auto version1 =

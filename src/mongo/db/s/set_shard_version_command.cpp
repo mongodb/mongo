@@ -249,7 +249,7 @@ public:
         const auto status = [&] {
             try {
                 // TODO (SERVER-50812) remove this if-else: just call onShardVersionMismatch
-                if (requestedVersion == requestedVersion.DROPPED()) {
+                if (requestedVersion == ChunkVersion::UNSHARDED()) {
                     forceShardFilteringMetadataRefresh(opCtx, nss);
                 } else {
                     onShardVersionMismatch(opCtx, nss, requestedVersion);

@@ -270,9 +270,7 @@ void sendDropCollectionToAllShards(OperationContext* opCtx, const NamespaceStrin
                            opCtx->getWriteConcern().toBSON());
         }
 
-        auto ignoredShardVersion = ChunkVersion::IGNORED();
-        ignoredShardVersion.setToThrowSSVOnIgnored();
-        ignoredShardVersion.appendToCommand(&builder);
+        ChunkVersion::IGNORED().appendToCommand(&builder);
         return builder.obj();
     }();
 
@@ -340,7 +338,7 @@ void sendSSVToAllShards(OperationContext* opCtx, const NamespaceString& nss) {
         const auto& shard = uassertStatusOK(shardRegistry->getShard(opCtx, shardEntry.getName()));
 
         SetShardVersionRequest ssv(
-            nss, ChunkVersion::DROPPED(), true /* isAuthoritative */, true /* forceRefresh */);
+            nss, ChunkVersion::UNSHARDED(), true /* isAuthoritative */, true /* forceRefresh */);
 
         auto ssvResult = shard->runCommandWithFixedRetryAttempts(
             opCtx,
