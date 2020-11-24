@@ -626,7 +626,7 @@ Future<void> TenantMigrationRecipientService::Instance::_startTenantAllDatabaseC
                                                   _writerPool.get(),
                                                   _tenantId);
     LOGV2_DEBUG(4881100,
-                2,
+                1,
                 "Starting TenantAllDatabaseCloner",
                 "migrationId"_attr = getMigrationUUID(),
                 "tenantId"_attr = getTenantId());
@@ -730,6 +730,13 @@ void setPromiseErrorifNotReady(WithLock lk, Promise& promise, Status status) {
 }  // namespace
 
 void TenantMigrationRecipientService::Instance::_cancelRemainingWork(WithLock lk) {
+    if (_sharedData) {
+        stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
+        // Prevents the tenant cloner from getting retried on retriable errors.
+        _sharedData->setStatusIfOK(
+            sharedDatalk, Status{ErrorCodes::CallbackCanceled, "Tenant migration cloner canceled"});
+    }
+
     if (_client) {
         // interrupts running tenant cloner.
         _client->shutdownAndDisallowReconnect();
@@ -897,6 +904,16 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             _stopOrHangOnFailPoint(&fpAfterStartingOplogFetcherMigrationRecipientInstance);
 
             stdx::lock_guard lk(_mutex);
+            {
+                // Throwing error when cloner is canceled externally via interrupt(), makes the
+                // instance to skip the remaining task (i.e., starting oplog applier) in the
+                // sync process. This step is necessary to prevent race between interrupt()
+                // and starting oplog applier for the failover scenarios where we don't start
+                // the cloner if the tenant data is already in consistent state.
+                stdx::lock_guard<TenantMigrationSharedData> sharedDatalk(*_sharedData);
+                uassertStatusOK(_sharedData->getStatus(sharedDatalk));
+            }
+
             // Create the oplog applier but do not start it yet.
             invariant(_stateDoc.getStartApplyingDonorOpTime());
             LOGV2_DEBUG(4881202,
