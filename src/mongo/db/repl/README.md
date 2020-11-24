@@ -7,8 +7,10 @@ requested replica. Replication in MongoDB is facilitated through [**replica
 sets**](https://docs.mongodb.com/manual/replication/).
 
 Replica sets are a group of nodes with one primary and multiple secondaries. The primary is
-responsible for all writes. Users may specify that reads from secondaries are acceptable with a
-`slaveOK` flag, but they are not by default.
+responsible for all writes. Users may specify that reads from secondaries are acceptable via
+[`setSecondaryOk`](https://docs.mongodb.com/manual/reference/method/Mongo.setSecondaryOk/) or through
+[**read preference**](https://docs.mongodb.com/manual/core/read-preference/#secondaryPreferred), but
+they are not by default.
 
 # Steady State Replication
 
@@ -259,17 +261,36 @@ The `ReplicationCoordinator` communicates with the storage layer and other nodes
 The external state also manages and owns all of the replication threads.
 
 The `TopologyCoordinator` is in charge of maintaining state about the topology of the cluster. On
-significant changes (anything that affects the response to isMaster), the TopologyCoordinator updates
-its TopologyVersion. The [`isMaster`](https://github.com/mongodb/mongo/blob/r4.3.3/src/mongo/db/repl/replication_info.cpp#L258) command awaits changes in the TopologyVersion before returning. On
-shutdown, if the server is a secondary, it enters quiesce mode: we increment the TopologyVersion and
-start responding to `isMaster` commands with a `ShutdownInProgress` error, so that clients cease
+significant changes (anything that affects the response to hello/isMaster), the TopologyCoordinator
+updates its TopologyVersion. The [`hello`](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L241) command awaits changes in the TopologyVersion before returning. On
+shutdown, if the server is a secondary, it enters quiesce mode: we increment the TopologyVersion
+and start responding to `hello` commands with a `ShutdownInProgress` error, so that clients cease
 routing new operations to the node.
+
+Since we wish to track usage of the `isMaster` command separately from the `hello` command in
+`serverStatus`, it is implemented as a [derived class](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L513) of hello. The main difference between the two commands is that
+clients will start seeing an `isWritablePrimary` response field instead of `ismaster` when switching
+to the `hello` command.
 
 The `TopologyCoordinator` is non-blocking and does a large amount of a node's decision making
 surrounding replication. Most replication command requests and responses are filled in here.
 
 Both coordinators maintain views of the entire cluster and the state of each node, though there are
 plans to merge these together.
+
+## helloOk Protocol Negotiation
+
+In order to preserve backwards compatibility with old drivers, we currently support both the
+[`isMaster`](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L513)
+command and the [`hello`](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/db/repl/replication_info.cpp#L241) command. New drivers and 5.0+ versions of the server will support `hello`.
+A new driver will send "helloOk: true" as a part of the initial handshake when opening a new
+connection to mongod. If the server supports hello, it will respond with "helloOk: true" as well.
+This way, new drivers know that they're communicating with a version of the server that supports
+`hello` and will start sending `hello` instead of `isMaster` on this connection.
+
+If the server does not support `hello`, the `helloOk` flag is ignored. A new driver will subsequently
+not see "helloOk: true" in the response and continue to send `isMaster` on this connection. Old drivers
+will not specify this flag at all, so the behavior remains the same.
 
 ## Communication
 
