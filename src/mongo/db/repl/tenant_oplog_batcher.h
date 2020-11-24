@@ -62,7 +62,8 @@ struct TenantOplogBatch {
  * tenant oplog applier.  It expands transactions into their individual ops and keeps them together
  * in a single batch.  The original transaction information is included in the batch.
  */
-class TenantOplogBatcher : public AbstractAsyncComponent {
+class TenantOplogBatcher : public AbstractAsyncComponent,
+                           public std::enable_shared_from_this<TenantOplogBatcher> {
 public:
     class BatchLimits {
     public:
@@ -111,7 +112,6 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
 
     RandomAccessOplogBuffer* _oplogBuffer;              // (S)
-    std::optional<Promise<TenantOplogBatch>> _promise;  // (M)
     bool _batchRequested = false;                       // (M)
     std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
 };

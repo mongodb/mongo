@@ -772,7 +772,7 @@ void TenantMigrationRecipientService::Instance::_cleanupOnTaskCompletion(Status 
     auto opCtx = cc().makeOperationContext();
 
     std::unique_ptr<OplogFetcher> savedDonorOplogFetcher;
-    std::unique_ptr<TenantOplogApplier> savedTenantOplogApplier;
+    std::shared_ptr<TenantOplogApplier> savedTenantOplogApplier;
     std::unique_ptr<ThreadPool> savedWriterPool;
     {
         stdx::lock_guard lk(_mutex);
@@ -907,7 +907,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                         "startApplyingDonorOpTime"_attr = *_stateDoc.getStartApplyingDonorOpTime());
 
             _tenantOplogApplier =
-                std::make_unique<TenantOplogApplier>(_migrationUuid,
+                std::make_shared<TenantOplogApplier>(_migrationUuid,
                                                      _tenantId,
                                                      *_stateDoc.getStartApplyingDonorOpTime(),
                                                      _donorOplogBuffer.get(),

@@ -165,20 +165,26 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, Ba
             Status(ErrorCodes::CallbackCanceled, "Tenant oplog batcher has been shut down."));
     }
     auto pf = makePromiseFuture<TenantOplogBatch>();
-    _promise = std::move(pf.promise);
+    auto taskCompletionPromise = std::make_shared<Promise<TenantOplogBatch>>(std::move(pf.promise));
     _batchRequested = true;
     auto statusWithCbh =
-        _executor->scheduleWork([this, limits](const executor::TaskExecutor::CallbackArgs& args) {
+        _executor->scheduleWork([this, limits, taskCompletionPromise, self = shared_from_this()](
+                                    const executor::TaskExecutor::CallbackArgs& args) {
             if (!args.status.isOK()) {
-                stdx::lock_guard lk(_mutex);
-                _promise->setError(args.status);
+                taskCompletionPromise->setError(args.status);
                 return;
             }
+
             // Using makeReadyFutureWith here allows capturing exceptions.
-            auto result = makeReadyFutureWith([this, &limits] { return _readNextBatch(limits); });
+            auto result = makeReadyFutureWith(
+                [this, &limits, self = shared_from_this()] { return _readNextBatch(limits); });
+
             stdx::lock_guard lk(_mutex);
+            // Fulfilling 'taskCompletionPromise' and resetting '_batchRequested' have to be done in
+            // a single critical section to avoid failure due to "Cannot ask for already-requested
+            // oplog fetcher batch".
             _batchRequested = false;
-            _promise->setFrom(std::move(result));
+            taskCompletionPromise->setFrom(std::move(result));
             if (_isShuttingDown_inlock()) {
                 _transitionToComplete_inlock();
             }
@@ -186,7 +192,7 @@ SemiFuture<TenantOplogBatch> TenantOplogBatcher::_scheduleNextBatch(WithLock, Ba
 
     // If the batch fails to schedule, ensure we get a valid error code instead of a broken promise.
     if (!statusWithCbh.isOK()) {
-        _promise->setError(statusWithCbh.getStatus());
+        taskCompletionPromise->setError(statusWithCbh.getStatus());
     }
     return std::move(pf.future).semi();
 }

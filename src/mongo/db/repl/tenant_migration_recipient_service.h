@@ -378,7 +378,7 @@ public:
         std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (M)
         std::unique_ptr<OplogFetcher> _donorOplogFetcher;                           // (M)
         std::unique_ptr<TenantAllDatabaseCloner> _tenantAllDatabaseCloner;          // (M)
-        std::unique_ptr<TenantOplogApplier> _tenantOplogApplier;                    // (M)
+        std::shared_ptr<TenantOplogApplier> _tenantOplogApplier;                    // (M)
 
         // Writer pool to do storage write operation. Used by tenant collection cloner and by
         // tenant oplog applier.

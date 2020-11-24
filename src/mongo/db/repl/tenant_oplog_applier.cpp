@@ -104,65 +104,118 @@ Status TenantOplogApplier::_doStartup_inlock() noexcept {
                                         std::size_t(tenantApplierBatchSizeOps.load())));
     std::move(fut)
         .thenRunOn(_executor)
-        .then([&](TenantOplogBatch batch) { _applyLoop(std::move(batch)); })
-        .onError([&](Status status) { _handleError(status); })
+        .then([this, self = shared_from_this()](TenantOplogBatch batch) {
+            _applyLoop(std::move(batch));
+        })
+        .onError([this, self = shared_from_this()](Status status) {
+            invariant(_shouldStopApplying(status));
+        })
         .getAsync([](auto status) {});
     return Status::OK();
+}
+
+void TenantOplogApplier::_setFinalStatusIfOk(WithLock, Status newStatus) {
+    if (_finalStatus.isOK()) {
+        _finalStatus = newStatus;
+    }
 }
 
 void TenantOplogApplier::_doShutdown_inlock() noexcept {
     // Shutting down the oplog batcher will make the _applyLoop stop with an error future, thus
     // shutting down the applier.
     _oplogBatcher->shutdown();
+    // Oplog applier executor can shutdown before executing _applyLoop() and shouldStopApplying().
+    // This can cause the applier to miss notifying the waiters in _opTimeNotificationList. So,
+    // shutdown() is responsible to notify those waiters when _applyLoop() is not running.
+    if (!_applyLoopApplyingBatch) {
+        // We actually hold the required lock, but the lock object itself is not passed through.
+        _finishShutdown(WithLock::withoutLock(),
+                        {ErrorCodes::CallbackCanceled, "Tenant oplog applier shut down"});
+    }
 }
 
 void TenantOplogApplier::_applyLoop(TenantOplogBatch batch) {
+    {
+        stdx::lock_guard lk(_mutex);
+        // Applier is not active as someone might have called shutdown().
+        if (!_isActive_inlock())
+            return;
+        _applyLoopApplyingBatch = true;
+    }
+
     // Getting the future for the next batch here means the batcher can retrieve the next batch
     // while the applier is processing the current one.
-
     auto nextBatchFuture = _oplogBatcher->getNextBatch(
         TenantOplogBatcher::BatchLimits(std::size_t(tenantApplierBatchSizeBytes.load()),
                                         std::size_t(tenantApplierBatchSizeOps.load())));
+
+    Status applyStatus{Status::OK()};
     try {
         _applyOplogBatch(&batch);
     } catch (const DBException& e) {
-        _handleError(e.toStatus());
+        applyStatus = e.toStatus();
+    }
+
+    if (_shouldStopApplying(applyStatus)) {
         return;
     }
-    {
-        stdx::lock_guard lk(_mutex);
-        if (_isShuttingDown_inlock()) {
-            _finishShutdown(lk, {ErrorCodes::CallbackCanceled, "Tenant Oplog Applier shut down"});
-            return;
-        }
-    }
+
     std::move(nextBatchFuture)
         .thenRunOn(_executor)
-        .then([&](TenantOplogBatch batch) { _applyLoop(std::move(batch)); })
-        .onError([&](Status status) { _handleError(status); })
+        .then([this, self = shared_from_this()](TenantOplogBatch batch) {
+            _applyLoop(std::move(batch));
+        })
+        .onError([this, self = shared_from_this()](Status status) {
+            invariant(_shouldStopApplying(status));
+        })
         .getAsync([](auto status) {});
 }
 
-void TenantOplogApplier::_handleError(Status status) {
-    LOGV2_DEBUG(4886005,
-                1,
-                "TenantOplogApplier::_handleError",
-                "tenant"_attr = _tenantId,
-                "migrationUuid"_attr = _migrationUuid,
-                "error"_attr = redact(status));
+bool TenantOplogApplier::_shouldStopApplying(Status status) {
+    {
+        stdx::lock_guard lk(_mutex);
+        _applyLoopApplyingBatch = false;
+
+        if (!_isActive_inlock()) {
+            return true;
+        }
+
+        if (_isShuttingDown_inlock()) {
+            _finishShutdown(lk,
+                            {ErrorCodes::CallbackCanceled, "Tenant oplog applier shutting down"});
+            return true;
+        }
+
+        dassert(_finalStatus.isOK());
+        // Set the _finalStatus. This guarantees that the shutdown() called after releasing
+        // the mutex will signal donor opTime waiters with the 'status' error code and not with
+        // ErrorCodes::CallbackCanceled.
+        _setFinalStatusIfOk(lk, status);
+        if (_finalStatus.isOK()) {
+            return false;
+        }
+    }
     shutdown();
-    stdx::lock_guard lk(_mutex);
-    // If we reach _handleError, it means the applyLoop is not running.
-    _finishShutdown(lk, status);
+    return true;
 }
 
-void TenantOplogApplier::_finishShutdown(WithLock, Status status) {
+void TenantOplogApplier::_finishShutdown(WithLock lk, Status status) {
+    // shouldStopApplying() might have already set the final status. So, don't mask the original
+    // error.
+    _setFinalStatusIfOk(lk, status);
+    LOGV2_DEBUG(4886005,
+                1,
+                "TenantOplogApplier::_finishShutdown",
+                "tenant"_attr = _tenantId,
+                "migrationUuid"_attr = _migrationUuid,
+                "error"_attr = redact(_finalStatus));
+
+    invariant(!_finalStatus.isOK());
     // Any unfulfilled notifications are errored out.
     for (auto& listEntry : _opTimeNotificationList) {
-        listEntry.second.setError(status);
+        listEntry.second.setError(_finalStatus);
     }
     _opTimeNotificationList.clear();
-    _finalStatus = status;
     _transitionToComplete_inlock();
 }
 
