@@ -23,7 +23,7 @@ const recipientRst = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         setParameter: {
-            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+            // TODO SERVER-52719: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
             'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
         }
     }

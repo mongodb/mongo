@@ -48,7 +48,8 @@ function insertDocument(primaryHost, dbName, collName) {
     donorRst.startSet();
     donorRst.initiate();
 
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, enableRecipientTesting: false});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         donorRst.stopSet();
@@ -110,7 +111,9 @@ function insertDocument(primaryHost, dbName, collName) {
     donorRst.startSet();
     donorRst.initiate();
 
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+    // TODO SERVER-XXXX: Remove 'enableRecipientTesting: false'.
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, enableRecipientTesting: false});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         donorRst.stopSet();
