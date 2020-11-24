@@ -170,6 +170,12 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
     _serverSelector = std::make_unique<SdamServerSelector>(_sdamConfig);
 }
 
+StreamableReplicaSetMonitor::~StreamableReplicaSetMonitor() {
+    // `drop` is idempotent and a duplicate call from ReplicaSetMonitorManager::removeMonitor() is
+    // safe.
+    drop();
+}
+
 ReplicaSetMonitorPtr StreamableReplicaSetMonitor::make(
     const MongoURI& uri,
     std::shared_ptr<TaskExecutor> executor,

@@ -81,9 +81,11 @@ public:
                                 std::shared_ptr<executor::TaskExecutor> executor,
                                 std::shared_ptr<executor::EgressTagCloser> connectionManager);
 
-    void init();
+    ~StreamableReplicaSetMonitor() override;
 
-    void drop();
+    void init() override;
+
+    void drop() override;
 
     static ReplicaSetMonitorPtr make(const MongoURI& uri,
                                      std::shared_ptr<executor::TaskExecutor> executor,

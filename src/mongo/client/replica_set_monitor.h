@@ -52,7 +52,7 @@ namespace mongo {
  */
 class ReplicaSetMonitor : public ReplicaSetMonitorInterface {
 public:
-    virtual ~ReplicaSetMonitor() = default;
+    ~ReplicaSetMonitor() override = default;
 
     /**
      * Creates a new ReplicaSetMonitor, if it doesn't already exist.

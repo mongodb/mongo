@@ -71,7 +71,9 @@ void SingleServerPingMonitor::init() {
 
 void SingleServerPingMonitor::drop() {
     stdx::lock_guard lk(_mutex);
-    _isDropped = true;
+    if (std::exchange(_isDropped, true)) {
+        return;
+    }
     if (auto handle = std::exchange(_pingHandle, {})) {
         _executor->cancel(handle);
     }

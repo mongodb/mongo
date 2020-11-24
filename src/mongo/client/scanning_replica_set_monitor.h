@@ -133,7 +133,7 @@ public:
      * Allows tests to set initial conditions and introspect the current state.
      */
     explicit ScanningReplicaSetMonitor(const SetStatePtr& initialState);
-    ~ScanningReplicaSetMonitor();
+    ~ScanningReplicaSetMonitor() override;
 
     /**
      * This is for use in tests using MockReplicaSet to ensure that a full scan completes before

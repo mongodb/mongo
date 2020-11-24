@@ -201,6 +201,8 @@ void ScanningReplicaSetMonitor::drop() {
 }
 
 ScanningReplicaSetMonitor::~ScanningReplicaSetMonitor() {
+    // `drop` is idempotent and a duplicate call from ReplicaSetMonitorManager::removeMonitor() is
+    // safe.
     drop();
 }
 
@@ -1434,6 +1436,7 @@ void SetState::init() {
 }
 
 void SetState::drop() {
+    // This is invoked from ScanningReplicaSetMonitor::drop() under lock.
     if (std::exchange(isDropped, true)) {
         // If a SetState calls drop() from destruction after the RSMM calls shutdown(), then the
         // RSMM's executor may no longer exist. Thus, only drop once.
