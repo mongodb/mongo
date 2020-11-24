@@ -96,7 +96,10 @@ void sanitizerDieCallback() {
 #endif
 
 void DeathTestBase::_doTest() {
-#if defined(_WIN32)
+#if defined(__has_feature) && (__has_feature(address_sanitizer) || __has_feature(memory_sanitizer))
+    LOGV2(5306900, "Skipping death test in sanitizer build");
+    return;
+#elif defined(_WIN32)
     LOGV2(24133, "Skipping death test on Windows");
     return;
 #elif defined(__APPLE__) && (TARGET_OS_TV || TARGET_OS_WATCH)
