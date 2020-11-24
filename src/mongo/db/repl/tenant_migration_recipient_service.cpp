@@ -298,11 +298,20 @@ TenantMigrationRecipientService::Instance::_createAndConnectClients() {
     stdx::lock_guard lk(_mutex);
     _donorReplicaSetMonitor = ReplicaSetMonitor::createIfNeeded(
         connectionString.getSetName(), std::set<HostAndPort>(servers.begin(), servers.end()));
-    Milliseconds findHostTimeout = ReplicaSetMonitorInterface::kDefaultFindHostTimeout;
+
+    // Only ever used to cancel when the setTenantMigrationRecipientInstanceHostTimeout failpoint is
+    // set.
+    CancelationSource getHostCancelSource;
     setTenantMigrationRecipientInstanceHostTimeout.execute([&](const BSONObj& data) {
-        findHostTimeout = Milliseconds(data["findHostTimeoutMillis"].safeNumberLong());
+        auto exec = **_scopedExecutor;
+        const auto deadline =
+            exec->now() + Milliseconds(data["findHostTimeoutMillis"].safeNumberLong());
+        // Cancel the find host request after a timeout. Ignore callback handle.
+        exec->sleepUntil(deadline, CancelationToken::uncancelable())
+            .getAsync([getHostCancelSource](auto) mutable { getHostCancelSource.cancel(); });
     });
-    return _donorReplicaSetMonitor->getHostOrRefresh(_readPreference, findHostTimeout)
+
+    return _donorReplicaSetMonitor->getHostOrRefresh(_readPreference, getHostCancelSource.token())
         .thenRunOn(**_scopedExecutor)
         .then([this](const HostAndPort& serverAddress) {
             // Application name is constructed such that it doesn't exceeds

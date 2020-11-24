@@ -304,8 +304,8 @@ void ScanningReplicaSetMonitor::SetState::rescheduleRefresh(SchedulingStrategy s
 }
 
 SemiFuture<HostAndPort> ScanningReplicaSetMonitor::getHostOrRefresh(
-    const ReadPreferenceSetting& criteria, Milliseconds maxWait) {
-    return _getHostsOrRefresh(criteria, maxWait)
+    const ReadPreferenceSetting& criteria, const CancelationToken&) {
+    return _getHostsOrRefresh(criteria, ReplicaSetMonitorInterface::kDefaultFindHostTimeout)
         .then([](const auto& hosts) {
             invariant(hosts.size());
             return hosts[0];
@@ -314,8 +314,8 @@ SemiFuture<HostAndPort> ScanningReplicaSetMonitor::getHostOrRefresh(
 }
 
 SemiFuture<std::vector<HostAndPort>> ScanningReplicaSetMonitor::getHostsOrRefresh(
-    const ReadPreferenceSetting& criteria, Milliseconds maxWait) {
-    return _getHostsOrRefresh(criteria, maxWait).semi();
+    const ReadPreferenceSetting& criteria, const CancelationToken&) {
+    return _getHostsOrRefresh(criteria, ReplicaSetMonitorInterface::kDefaultFindHostTimeout).semi();
 }
 
 Future<std::vector<HostAndPort>> ScanningReplicaSetMonitor::_getHostsOrRefresh(
@@ -352,8 +352,9 @@ Future<std::vector<HostAndPort>> ScanningReplicaSetMonitor::_getHostsOrRefresh(
 
     return std::move(pf.future);
 }
+
 HostAndPort ScanningReplicaSetMonitor::getPrimaryOrUassert() {
-    return getHostOrRefresh(kPrimaryOnlyReadPreference).get();
+    return getHostOrRefresh(kPrimaryOnlyReadPreference, CancelationToken::uncancelable()).get();
 }
 
 void ScanningReplicaSetMonitor::failedHost(const HostAndPort& host, const Status& status) {
