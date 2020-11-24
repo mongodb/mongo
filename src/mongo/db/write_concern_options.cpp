@@ -223,8 +223,8 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
     // Ensure that the write concern document complies with the strict IDL definition, found in
     // idl/basic_types.idl.
     try {
-        auto writeConcernIdl = WriteConcernIdl::parse(
-            IDLParserErrorContext("WriteConcernOptions::extractWCFromCommand"), writeConcernObj);
+        auto writeConcernIdl =
+            WriteConcernIdl::parse(IDLParserErrorContext("writeConcern"), writeConcernObj);
         // Convert the IDL parsed WriteConcern into a WriteConcernOptions object.
         auto sw = convertFromIdl(writeConcernIdl);
         if (!sw.isOK()) {

@@ -50,13 +50,9 @@ var executeTests = function() {
     var bulk = coll.initializeOrderedBulkOp();
     bulk.insert({a: 1});
     bulk.insert({a: 2});
-    var result = assert.throws(function() {
+    assert.throws(function() {
         bulk.execute({x: 1});
     });
-    assert.eq(ErrorCodes.FailedToParse, result.code, 'unexpected error code: ' + tojson(result));
-    assert.eq('unrecognized write concern field: x',
-              result.errmsg,
-              'unexpected error message: ' + tojson(result));
 
     //
     // Fail with write error, no write concern error even though it would fail on apply for
