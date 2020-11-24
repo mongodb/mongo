@@ -774,3 +774,8 @@ env.Benchmark(
     target='string_bm',
     source='string_bm.cpp',
 )
+
+env.Benchmark(
+    target='cancelation_bm',
+    source='cancelation_bm.cpp',
+)
