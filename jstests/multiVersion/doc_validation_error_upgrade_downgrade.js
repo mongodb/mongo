@@ -61,6 +61,10 @@ function assertFCV44DocumentValidationFailure(res, coll) {
     }
 }
 
+const validatorExpression = {
+    a: 1
+};
+
 // Test document validation behavior of mongod in FCV 4.4 mode.
 (function() {
 const mongod = MongoRunner.runMongod();
@@ -71,7 +75,7 @@ const testDB = mongod.getDB("test");
 assert.commandWorked(mongod.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 // Create a collection with a validator.
-assert.commandWorked(testDB.createCollection(collName, {validator: {a: 1}}));
+assert.commandWorked(testDB.createCollection(collName, {validator: validatorExpression}));
 
 // Verify that a document insertion fails due to document validation error that conforms to FCV4.4.
 assertFCV44DocumentValidationFailure(testDB[collName].insert({a: 2}), testDB[collName]);
@@ -104,7 +108,7 @@ st.ensurePrimaryShard("sourceDB", st.shard0.shardName);
 let targetDB = mongos.getDB("targetDB");
 
 // Create a collection with a validator.
-assert.commandWorked(targetDB.createCollection(collName, {validator: {a: 1}}));
+assert.commandWorked(targetDB.createCollection(collName, {validator: validatorExpression}));
 
 // Assign database "targetDB" to the second shard.
 st.ensurePrimaryShard("targetDB", st.shard1.shardName);
@@ -118,6 +122,25 @@ st.rs1.upgradeSet({binVersion: "latest"});
 
 // Perform document insertion and verify output conformance to FCV4.4.
 testDocumentValidation(sourceDB, targetDB, assertFCV44DocumentValidationFailure);
+
+// Verify that collection validator expressions which throw an exception return said exception
+// when the FCV is 4.4.
+const exprValidator = {
+    $expr: {$divide: [10, 0]}
+};
+assert.commandWorked(targetDB.runCommand({collMod: collName, validator: exprValidator}));
+let exprResponse = targetDB[collName].insert({});
+assert.commandFailedWithCode(exprResponse, 16608, tojson(exprResponse));
+
+// Verify that the insert succeeds when the validator expression throws if the validationAction is
+// set to 'warn' and the FCV is 4.4.
+assert.commandWorked(targetDB.runCommand({collMod: collName, validationAction: "warn"}));
+exprResponse = targetDB[collName].insert({});
+assert.commandWorked(exprResponse, tojson(exprResponse));
+
+// Reset the collection validator to the original.
+assert.commandWorked(targetDB.runCommand(
+    {collMod: collName, validator: validatorExpression, validationAction: "error"}));
 
 // Upgrade the remaining shard.
 st.upgradeCluster("latest", {upgradeShards: true, upgradeConfigs: false, upgradeMongos: false});
@@ -139,6 +162,23 @@ assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFC
 // Perform document insertion and verify that the server now provides the "errInfo" field, which
 // contains the document validation failure details.
 testDocumentValidation(sourceDB, targetDB, assertDocumentValidationFailure);
+
+// Verify that collection validator expressions which throw an exception fail with a
+// DocumentValidationFailure error when the FCV is 4.7.
+assert.commandWorked(targetDB.runCommand({collMod: collName, validator: exprValidator}));
+exprResponse = targetDB[collName].insert({});
+assert.commandFailedWithCode(
+    exprResponse, ErrorCodes.DocumentValidationFailure, tojson(exprResponse));
+
+// Verify that the insert succeeds when the validator expression throws if the validationAction is
+// set to 'warn' and the FCV is 4.7.
+assert.commandWorked(targetDB.runCommand({collMod: collName, validationAction: "warn"}));
+exprResponse = targetDB[collName].insert({});
+assert.commandWorked(exprResponse, tojson(exprResponse));
+
+// Reset the collection validator to the original.
+assert.commandWorked(targetDB.runCommand(
+    {collMod: collName, validator: validatorExpression, validationAction: "error"}));
 
 // Start a downgrade. Set FCV to 4.4.
 assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));

@@ -189,13 +189,19 @@ struct ValidationErrorContext {
             return;
         }
 
-        // If our parent needs more information, call 'matches()' to determine whether the 'expr'
+        // If our parent needs more information, call 'matchesBSON()' to determine whether 'expr'
         // will contribute to error output.
         if (parentRuntimeState == RuntimeState::kErrorNeedChildrenInfo) {
             auto inversion = frameParams.inversion;
-            bool generateErrorValue = expr.matchesBSON(frameParams.currentDoc)
-                ? inversion == InvertError::kInverted
-                : inversion == InvertError::kNormal;
+            bool generateErrorValue;
+            // If 'matchesBSON()' throws, generate an error which explains the exception.
+            try {
+                generateErrorValue = expr.matchesBSON(frameParams.currentDoc)
+                    ? inversion == InvertError::kInverted
+                    : inversion == InvertError::kNormal;
+            } catch (const DBException&) {
+                generateErrorValue = true;
+            }
             frames.emplace(generateErrorValue ? RuntimeState::kError : RuntimeState::kNoError,
                            frameParams);
             return;
@@ -737,13 +743,20 @@ public:
         _context->pushNewFrame(*expr);
         if (_context->shouldGenerateError(*expr)) {
             appendErrorDetails(*expr);
-            appendErrorReason(kNormalReason, kInvertedReason);
             BSONObjBuilder& bob = _context->getCurrentObjBuilder();
 
             // Append the result of $expr's aggregation expression evaluation.
             BSONMatchableDocument document{_context->getCurrentDocument()};
-            auto expressionResult = expr->evaluateExpression(&document);
-            expressionResult.addToBsonObj(&bob, "expressionResult"_sd);
+            try {
+                auto expressionResult = expr->evaluateExpression(&document);
+                appendErrorReason(kNormalReason, kInvertedReason);
+                expressionResult.addToBsonObj(&bob, "expressionResult"_sd);
+            } catch (const DBException& e) {
+                bob.append("reason"_sd, "failed to evaluate aggregation expression");
+                BSONObjBuilder exceptionDetailsBuilder = bob.subobjStart("details");
+                e.serialize(&exceptionDetailsBuilder);
+                exceptionDetailsBuilder.done();
+            }
         }
     }
     void visit(const GTEMatchExpression* expr) final {

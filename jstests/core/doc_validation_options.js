@@ -12,15 +12,17 @@ load("jstests/aggregation/extras/utils.js");  // for documentEq
 load("jstests/libs/fixture_helpers.js");      // for getPrimaryForNodeHostingDatabase
 
 function assertFailsValidation(res) {
-    var DocumentValidationFailure = 121;
     assert.writeError(res);
-    assert.eq(res.getWriteError().code, DocumentValidationFailure);
+    assert.eq(res.getWriteError().code, ErrorCodes.DocumentValidationFailure);
 }
 
-var t = db.doc_validation_options;
+const t = db[jsTestName()];
 t.drop();
 
-assert.commandWorked(db.createCollection(t.getName(), {validator: {a: 1}}));
+const validatorExpression = {
+    a: 1
+};
+assert.commandWorked(db.createCollection(t.getName(), {validator: validatorExpression}));
 
 assertFailsValidation(t.insert({a: 2}));
 t.insert({_id: 1, a: 1});
@@ -53,8 +55,17 @@ checkLog.containsJson(conn, logId, {
 });
 
 // make sure persisted
-var info = db.getCollectionInfos({name: t.getName()})[0];
+const info = db.getCollectionInfos({name: t.getName()})[0];
 assert.eq("warn", info.options.validationAction, tojson(info));
+
+// Verify that validator expressions which throw accept writes when in 'warn' mode.
+assert.commandWorked(t.runCommand("collMod", {validator: {$expr: {$divide: [10, 0]}}}));
+const insertResult = t.insert({foo: '1'});
+assert.commandWorked(insertResult, tojson(insertResult));
+assert.commandWorked(t.remove({foo: '1'}));
+
+// Reset the collection validator to the original.
+assert.commandWorked(t.runCommand("collMod", {validator: validatorExpression}));
 
 // check we can go back to enforce strict
 assert.commandWorked(

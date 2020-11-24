@@ -41,5 +41,6 @@ namespace mongo::doc_validation_error {
  */
 void verifyGeneratedError(const BSONObj& query,
                           const BSONObj& document,
-                          const BSONObj& expectedError);
+                          const BSONObj& expectedError,
+                          bool shouldThrow = false);
 }  // namespace mongo::doc_validation_error

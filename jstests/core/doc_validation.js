@@ -184,6 +184,14 @@ assert.commandWorked(db.runCommand({"collMod": collName, "validator": {$expr: {$
 assert.commandWorked(coll.insert({a: 4}));
 assertDocumentValidationFailure(coll.insert({a: 5}), coll);
 
+// The validator will generate detailed errors when $expr throws.
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "validator": {$expr: {$divide: [10, 0]}}}));
+assertDocumentValidationFailure(coll.insert({a: 4}), coll);
+assert.commandWorked(
+    db.runCommand({"collMod": collName, "validator": {$nor: [{$expr: {$divide: [10, 0]}}]}}));
+assertDocumentValidationFailure(coll.insert({a: 4}), coll);
+
 // The validator supports $expr with the date extraction expressions (with a timezone
 // specified).
 coll.drop();
@@ -276,7 +284,7 @@ assert.commandWorked(
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 let res = coll.insert({a: 1, b: 0});
 assert.writeError(res);
-assert.eq(res.getWriteError().code, 16608);
+assert.eq(res.getWriteError().code, ErrorCodes.DocumentValidationFailure);
 assert.commandWorked(coll.insert({a: -1, b: -1}));
 
 // The validator can contain an $expr that respects the collation.

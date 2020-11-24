@@ -41,6 +41,7 @@ namespace {
 BSONObj generateValidationError(
     const BSONObj& query,
     const BSONObj& document,
+    const bool shouldThrow,
     const int maxDocValidationErrorSize = kDefaultMaxDocValidationErrorSize,
     const int maxConsideredValues = internalQueryMaxDocValidationErrorConsideredValues.load()) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -49,8 +50,13 @@ BSONObj generateValidationError(
     ASSERT_OK(result.getStatus());
     MatchExpression* expr = result.getValue().get();
 
-    // Verify that the document fails to match against the query.
-    ASSERT_FALSE(expr->matchesBSON(document));
+    // Verify that the document fails to match against the query or whether it should throw based
+    // on the value of 'shouldThrow'.
+    if (shouldThrow) {
+        ASSERT_THROWS(expr->matchesBSON(document), DBException);
+    } else {
+        ASSERT_FALSE(expr->matchesBSON(document));
+    }
 
     return doc_validation_error::generateError(
         *expr,
@@ -62,8 +68,9 @@ BSONObj generateValidationError(
 
 void verifyGeneratedError(const BSONObj& query,
                           const BSONObj& document,
-                          const BSONObj& expectedError) {
-    auto generatedError = generateValidationError(query, document);
+                          const BSONObj& expectedError,
+                          bool shouldThrow) {
+    auto generatedError = generateValidationError(query, document, shouldThrow);
 
     // Verify that the generated error details match the expected error.
     ASSERT_TRUE(generatedError.hasField("details"));
@@ -83,8 +90,9 @@ TEST(GenerateValidationError, FailingDocumentId) {
                                                              << "specifiedAs" << query << "reason"
                                                              << "comparison failed"
                                                              << "consideredValue" << 1));
-    ASSERT_BSONOBJ_EQ(doc_validation_error::generateValidationError(query, document),
-                      expectedError);
+    ASSERT_BSONOBJ_EQ(
+        doc_validation_error::generateValidationError(query, document, false /* shouldThrow */),
+        expectedError);
 }
 
 /**
@@ -120,8 +128,11 @@ void verifyTruncatedError(const BSONObj& query,
                           const BSONObj& document,
                           const int maxDocValidationErrorSize,
                           const int maxConsideredValuesSize) {
-    auto generatedError = generateValidationError(
-        query, document, maxDocValidationErrorSize, maxConsideredValuesSize);
+    auto generatedError = generateValidationError(query,
+                                                  document,
+                                                  false /* shouldThrow */,
+                                                  maxDocValidationErrorSize,
+                                                  maxConsideredValuesSize);
     ASSERT_TRUE(generatedError.hasField("truncated"));
     auto elem = generatedError["truncated"];
     ASSERT_TRUE(elem.isBoolean());
@@ -933,6 +944,88 @@ TEST(MiscellaneousMatchExpression, ExprImplicitArrayTraversal) {
                                  << "expressionResult" << false);
     doc_validation_error::verifyGeneratedError(query, document, expectedError);
 }
+
+TEST(MiscellaneousMatchExpression, ExprWhichThrowsGeneratesError) {
+    BSONObj query = fromjson("{$expr: {$divide: [10, 0]}}");
+    BSONObj doc = fromjson("{}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$expr', "
+        "specifiedAs: {$expr: {$divide: [10, 0]}},"
+        "reason: 'failed to evaluate aggregation expression',"
+        "details: "
+        "   {code: 16608, "
+        "   codeName: 'Location16608', "
+        "   errmsg: \"can't $divide by zero\"}}");
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+}
+
+TEST(MiscellaneousMatchExpression, MultipleExprsWhichThrow) {
+    BSONObj query =
+        fromjson("{$and: [{$expr: {$concat: ['$a', '$b']}}, {$expr: {$divide: [10, 0]}}]}");
+    BSONObj doc = fromjson("{a: 'field b is not a string', b: 1}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$and', clausesNotSatisfied: ["
+        "{index: 0, details: "
+        "   {operatorName: '$expr', "
+        "   specifiedAs: {$expr: {$concat: [\"$a\", \"$b\"]}},"
+        "   reason: 'failed to evaluate aggregation expression',"
+        "   details: "
+        "       {code: 16702, "
+        "      codeName: 'Location16702', "
+        "       errmsg: \"$concat only supports strings, not int\"}}},"
+        "{index: 1, details: "
+        "   {operatorName: '$expr', "
+        "   specifiedAs: {$expr: {$divide: [10, 0]}},"
+        "   reason: 'failed to evaluate aggregation expression',"
+        "   details: "
+        "       {code: 16608, "
+        "      codeName: 'Location16608', "
+        "       errmsg: \"can't $divide by zero\"}}}]}");
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+}
+
+TEST(MiscellaneousMatchExpression, OneExprThrowsAmongMultiple) {
+    BSONObj query =
+        fromjson("{$and: [{$expr: {$concat: ['$a', '$b']}}, {$expr: {$divide: [10, 0]}}]}");
+    BSONObj doc = fromjson("{a: 'field b IS a string', b: 'This will concat and not throw'}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$and', clausesNotSatisfied: ["
+        "{index: 1, details: "
+        "   {operatorName: '$expr', "
+        "   specifiedAs: {$expr: {$divide: [10, 0]}},"
+        "   reason: 'failed to evaluate aggregation expression',"
+        "   details: "
+        "       {code: 16608, "
+        "      codeName: 'Location16608', "
+        "       errmsg: \"can't $divide by zero\"}}}]}");
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+}
+
+TEST(MiscellaneousMatchExpression, ExprsWhichThrowUnderInversion) {
+    BSONObj query =
+        fromjson("{$nor: [{$expr: {$concat: ['$a', '$b']}}, {$expr: {$divide: [10, 0]}}]}");
+    BSONObj doc = fromjson("{a: 'field b is not a string', b: 1}");
+    BSONObj expectedError = fromjson(
+        "{operatorName: '$nor', clausesSatisfied: ["
+        "{index: 0, details: "
+        "   {operatorName: '$expr', "
+        "   specifiedAs: {$expr: {$concat: [\"$a\", \"$b\"]}},"
+        "   reason: 'failed to evaluate aggregation expression',"
+        "   details: "
+        "       {code: 16702, "
+        "      codeName: 'Location16702', "
+        "       errmsg: \"$concat only supports strings, not int\"}}},"
+        "{index: 1, details: "
+        "   {operatorName: '$expr', "
+        "   specifiedAs: {$expr: {$divide: [10, 0]}},"
+        "   reason: 'failed to evaluate aggregation expression',"
+        "   details: "
+        "       {code: 16608, "
+        "      codeName: 'Location16608', "
+        "       errmsg: \"can't $divide by zero\"}}}]}");
+    doc_validation_error::verifyGeneratedError(query, doc, expectedError, true /* shouldThrow */);
+}
+
 // $sampleRate
 TEST(MiscellaneousMatchExpression, SampleRateAlwaysFalse) {
     BSONObj query = fromjson("{$sampleRate: 0}");
@@ -1810,7 +1903,7 @@ TEST(ValidationErrorTruncation, BasicDeeplyNestedError) {
     // Verify that a query that is too deep will not return any error detail.
     auto verifyFailingQuery = [](const BSONObj& query, BSONObj& failingDoc) -> void {
         // 'failingQuery' will generate a truncated error with no detail.
-        BSONObj error = generateValidationError(query, failingDoc);
+        BSONObj error = generateValidationError(query, failingDoc, false /* shouldThrow */);
         auto reason = error.getField("reason");
         auto truncated = error.getField("truncated");
         ASSERT(reason);
@@ -1830,7 +1923,8 @@ TEST(ValidationErrorTruncation, BasicDeeplyNestedError) {
     verifyFailingQuery(generateDeeplyNestedOr(depth), doc);
     // Should no longer fail when below the maximum allowed depth.
     --depth;
-    BSONObj error = generateValidationError(generateDeeplyNestedOr(depth), doc);
+    BSONObj error =
+        generateValidationError(generateDeeplyNestedOr(depth), doc, false /* shouldThrow */);
     ASSERT_FALSE(error.hasField("reason"));
     ASSERT_FALSE(error.hasField("truncated"));
     ASSERT_EQ(error.getField("details").type(), BSONType::Object);
@@ -1867,7 +1961,7 @@ TEST(DocValidationTruncationTest, ConsideredValuesArrayNotTruncatedWhenConfigure
         valuesArray.append(i);
     }
     BSONObj document = BSON("a" << valuesArray.arr());
-    BSONObj generatedError = generateValidationError(query, document);
+    BSONObj generatedError = generateValidationError(query, document, false /* shouldThrow */);
     // Should not report 'consideredValuesTruncated: true'
     ASSERT_FALSE(generatedError.hasField("consideredValuesTruncated"));
 }
@@ -1934,8 +2028,12 @@ TEST(DocValidationTruncationTest, BasicSizeTruncation) {
             andArgument.append(BSON("a" << i));
         }
         BSONObj query = BSON("$and" << andArgument.arr());
-        auto error = generateValidationError(
-            query, doc, maxSize, internalQueryMaxDocValidationErrorConsideredValues.load());
+        auto error =
+            generateValidationError(query,
+                                    doc,
+                                    false /* shouldThrow */,
+                                    maxSize,
+                                    internalQueryMaxDocValidationErrorConsideredValues.load());
         // Generated error should have a note field and a failingDocumentId field, but no details
         // field.
         auto note = error["note"];
@@ -1954,6 +2052,7 @@ TEST(DocValidationTruncationTest, DocValidationReportsProgrammingError) {
     BSONObj doc = BSON("b" << 4);
     auto error = generateValidationError(query,
                                          doc,
+                                         false /* shouldThrow */,
                                          kDefaultMaxDocValidationErrorSize,
                                          internalQueryMaxDocValidationErrorConsideredValues.load());
     // There should be an error with 'note' and 'details' fields.
