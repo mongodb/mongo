@@ -1026,7 +1026,7 @@ buildvariants:
       --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     compile-variant: -rhel70
   run_on:
-  - rhel70-small
+  - rhel70-large
   tasks:
   - name: compile
 
