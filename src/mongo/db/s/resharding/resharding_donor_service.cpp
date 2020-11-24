@@ -31,6 +31,9 @@
 
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 
+#include <fmt/format.h>
+
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/dbdirectclient.h"
@@ -45,19 +48,27 @@
 #include "mongo/s/grid.h"
 
 namespace mongo {
+
+using namespace fmt::literals;
+
 namespace {
-void refreshTemporaryReshardingCollection(const ReshardingDonorDocument& donorDoc) {
+ChunkManager getShardedCollectionRoutingInfoWithRefreshAndFlush(const NamespaceString& nss) {
     auto opCtx = cc().makeOperationContext();
 
+    auto swRoutingInfo = Grid::get(opCtx.get())
+                             ->catalogCache()
+                             ->getShardedCollectionRoutingInfoWithRefresh(opCtx.get(), nss);
+    auto routingInfo = uassertStatusOK(swRoutingInfo);
+
+    CatalogCacheLoader::get(opCtx.get()).waitForCollectionFlush(opCtx.get(), nss);
+
+    return routingInfo;
+}
+
+void refreshTemporaryReshardingCollection(const ReshardingDonorDocument& donorDoc) {
     auto tempNss =
         constructTemporaryReshardingNss(donorDoc.getNss().db(), donorDoc.getExistingUUID());
-
-    auto tempNssRoutingInfo =
-        Grid::get(opCtx.get())
-            ->catalogCache()
-            ->getShardedCollectionRoutingInfoWithRefresh(opCtx.get(), tempNss);
-    uassertStatusOK(tempNssRoutingInfo);
-    CatalogCacheLoader::get(opCtx.get()).waitForCollectionFlush(opCtx.get(), tempNss);
+    std::ignore = getShardedCollectionRoutingInfoWithRefreshAndFlush(tempNss);
 }
 
 Timestamp generateMinFetchTimestamp(const ReshardingDonorDocument& donorDoc) {
@@ -269,7 +280,37 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenDelet
         return;
     }
 
+    auto origNssRoutingInfo =
+        getShardedCollectionRoutingInfoWithRefreshAndFlush(_donorDoc.getNss());
+    auto currentCollectionUUID =
+        getCollectionUUIDFromChunkManger(_donorDoc.getNss(), origNssRoutingInfo);
+
+    if (currentCollectionUUID == _donorDoc.getExistingUUID()) {
+        _dropOriginalCollection();
+    } else {
+        uassert(ErrorCodes::InvalidUUID,
+                "Expected collection {} to have either the original UUID {} or the resharding UUID"
+                " {}, but the collection instead has UUID {}"_format(
+                    _donorDoc.getNss().toString(),
+                    _donorDoc.getExistingUUID().toString(),
+                    _donorDoc.get_id().toString(),
+                    currentCollectionUUID.toString()),
+                currentCollectionUUID == _donorDoc.get_id());
+    }
+
     _transitionStateAndUpdateCoordinator(DonorStateEnum::kDone);
+}
+
+void ReshardingDonorService::DonorStateMachine::_dropOriginalCollection() {
+    DBDirectClient client(cc().makeOperationContext().get());
+    BSONObj dropResult;
+    if (!client.dropCollection(
+            _donorDoc.getNss().toString(), WriteConcerns::kMajorityWriteConcern, &dropResult)) {
+        auto dropStatus = getStatusFromCommandResult(dropResult);
+        if (dropStatus != ErrorCodes::NamespaceNotFound) {
+            uassertStatusOK(dropStatus);
+        }
+    }
 }
 
 void ReshardingDonorService::DonorStateMachine::_transitionState(

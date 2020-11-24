@@ -57,9 +57,9 @@ public:
         return _impl->get().isSharded();
     }
 
-    bool writesShouldRunInDistributedTransaction(const OID& originalEpoch,
-                                                 const OID& reshardingEpoch) const {
-        return _impl->get().writesShouldRunInDistributedTransaction(originalEpoch, reshardingEpoch);
+    bool writesShouldRunInDistributedTransaction(const UUID& originalUUID,
+                                                 const UUID& reshardingUUID) const {
+        return _impl->get().writesShouldRunInDistributedTransaction(originalUUID, reshardingUUID);
     }
 
     bool isValidKey(const BSONObj& key) const {

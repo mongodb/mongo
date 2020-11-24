@@ -46,6 +46,7 @@ CollectionMetadata makeCollectionMetadataImpl(
     const KeyPattern& shardKeyPattern,
     const std::vector<std::pair<BSONObj, BSONObj>>& thisShardsChunks,
     bool staleChunkManager,
+    UUID uuid = UUID::gen(),
     CoordinatorStateEnum state = CoordinatorStateEnum::kInitializing) {
 
     const OID epoch = OID::gen();
@@ -85,10 +86,10 @@ CollectionMetadata makeCollectionMetadataImpl(
 
     return CollectionMetadata(
         ChunkManager(kThisShard,
-                     DatabaseVersion(UUID::gen()),
+                     DatabaseVersion(uuid),
                      ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
                          RoutingTableHistory::makeNew(kNss,
-                                                      UUID::gen(),
+                                                      uuid,
                                                       shardKeyPattern,
                                                       nullptr,
                                                       false,
@@ -108,8 +109,9 @@ struct ConstructedRangeMap : public RangeMap {
 class NoChunkFixture : public unittest::Test {
 protected:
     CollectionMetadata makeCollectionMetadata(
+        UUID uuid = UUID::gen(),
         CoordinatorStateEnum state = CoordinatorStateEnum::kInitializing) const {
-        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)), {}, false, state);
+        return makeCollectionMetadataImpl(KeyPattern(BSON("a" << 1)), {}, false, uuid, state);
     }
 };
 
@@ -180,28 +182,44 @@ TEST_F(NoChunkFixture, OrphanedDataRangeEnd) {
     ASSERT(!metadata.getNextOrphanRange(pending, metadata.getMaxKey()));
 }
 
+TEST_F(NoChunkFixture, WritesShouldRunInDistributedTxnRenamingOrigUUID) {
+    UUID originalUUID = UUID::gen();
+    UUID reshardingUUID = UUID::gen();
+
+    // kRenaming is the only state where UUIDs will be compared.
+    auto metadata(makeCollectionMetadata(originalUUID, CoordinatorStateEnum::kRenaming));
+
+    // Writes should run in a distributed txn if the collection metadata's UUID matches
+    // the original collection's UUID.
+    ASSERT(metadata.writesShouldRunInDistributedTransaction(originalUUID, reshardingUUID));
+}
+
+TEST_F(NoChunkFixture, WritesShouldRunInDistributedTxnRenamingCheckReshardingUUID) {
+    UUID originalUUID = UUID::gen();
+    UUID reshardingUUID = UUID::gen();
+
+    // kRenaming is the only state where UUIDs will be compared.
+    auto metadata(makeCollectionMetadata(reshardingUUID, CoordinatorStateEnum::kRenaming));
+
+    // Writes should NOT run in a distributed txn when the UUID matches the temp collection's
+    // UUID.
+    ASSERT(!metadata.writesShouldRunInDistributedTransaction(originalUUID, reshardingUUID));
+}
+
 TEST_F(NoChunkFixture, WritesShouldRunInDistributedTxnRenamingCheck) {
-    auto metadata(makeCollectionMetadata(CoordinatorStateEnum::kRenaming));
-    // We are in kRenaming by default.
-    OID originalEpoch = OID::gen();
-    OID reshardingEpoch = OID::gen();
+    UUID originalUUID = UUID::gen();
+    UUID reshardingUUID = UUID::gen();
+    UUID rogueUUID = UUID::gen();
 
-    // Writes should run in a distributed txn if the collection metadata's epoch matches
-    // the original collection's epoch.
-    ASSERT(metadata.writesShouldRunInDistributedTransaction(metadata.getCollVersion().epoch(),
-                                                            reshardingEpoch));
+    // kRenaming is the only state where UUIDs will be compared.
+    auto metadata(makeCollectionMetadata(rogueUUID, CoordinatorStateEnum::kRenaming));
 
-    // Writes should NOT run in a distributed txn when the epoch matches the temp collection's
-    // epoch.
-    ASSERT(!metadata.writesShouldRunInDistributedTransaction(originalEpoch,
-                                                             metadata.getCollVersion().epoch()));
-
-    // If the collection's epoch matches neither the original epoch nor the resharding epoch,
+    // If the collection's UUID matches neither the original UUID nor the resharding UUID,
     // expect a throw.
     ASSERT_THROWS_CODE(
-        metadata.writesShouldRunInDistributedTransaction(originalEpoch, reshardingEpoch),
+        metadata.writesShouldRunInDistributedTransaction(originalUUID, reshardingUUID),
         AssertionException,
-        5169400);
+        ErrorCodes::InvalidUUID);
 }
 
 /**

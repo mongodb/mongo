@@ -80,10 +80,10 @@ public:
     /**
      * Writes should run in distributed transactions when
      *      1. The coordinator is between the mirroring and committed states, OR
-     *      2. The coordinator is in the renaming state, but the epoch is still the original epoch.
+     *      2. The coordinator is in the renaming state, but the UUID is still the original UUID.
      */
-    bool writesShouldRunInDistributedTransaction(const OID& originalEpoch,
-                                                 const OID& reshardingEpoch) const;
+    bool writesShouldRunInDistributedTransaction(const UUID& originalUUID,
+                                                 const UUID& reshardingUUID) const;
 
     /**
      * Returns the current shard version for the collection or UNSHARDED if it is not sharded.

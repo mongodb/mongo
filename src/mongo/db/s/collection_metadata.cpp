@@ -33,6 +33,8 @@
 
 #include "mongo/db/s/collection_metadata.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
@@ -40,6 +42,8 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
+
+using namespace fmt::literals;
 
 CollectionMetadata::CollectionMetadata(ChunkManager cm, const ShardId& thisShardId)
     : _cm(std::move(cm)), _thisShardId(thisShardId) {}
@@ -90,8 +94,8 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
     return ShardKeyPattern(donorFields->getReshardingKey());
 }
 
-bool CollectionMetadata::writesShouldRunInDistributedTransaction(const OID& originalEpoch,
-                                                                 const OID& reshardingEpoch) const {
+bool CollectionMetadata::writesShouldRunInDistributedTransaction(const UUID& originalUUID,
+                                                                 const UUID& reshardingUUID) const {
     auto reshardingFields = getReshardingFields();
     if (!reshardingFields)
         return false;
@@ -114,23 +118,20 @@ bool CollectionMetadata::writesShouldRunInDistributedTransaction(const OID& orig
     }
 
     // Handle kRenaming:
-    auto chunkVersion = getCollVersion();
-    uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection is not sharded, original epoch: " << originalEpoch,
-            chunkVersion != ChunkVersion::UNSHARDED());
+    auto currentCollectionUUID = *_cm->getUUID();
 
-    const auto& collectionCurrentEpoch = chunkVersion.epoch();
-
-    // Renaming has not completed:
-    if (collectionCurrentEpoch == originalEpoch)
+    // Renaming has not completed
+    if (currentCollectionUUID == originalUUID) {
         return true;
+    }
 
-    // Else, renaming must have completed, and myEpoch must be equal to reshardingEpoch.
-    uassert(5169400,
-            str::stream() << "Invalid epoch; current epoch " << collectionCurrentEpoch
-                          << " does not match original epoch " << originalEpoch
-                          << " or resharding epoch " << reshardingEpoch,
-            collectionCurrentEpoch == reshardingEpoch);
+    // Else, renaming must have completed, and the new UUID must be equal to the resharding UUID.
+    uassert(ErrorCodes::InvalidUUID,
+            "Expected collection to have either the original UUID {} or the resharding UUID {}, "
+            "but the collection instead has UUID {}"_format(originalUUID.toString(),
+                                                            reshardingUUID.toString(),
+                                                            currentCollectionUUID.toString()),
+            currentCollectionUUID == reshardingUUID);
 
     return false;
 }

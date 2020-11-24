@@ -117,6 +117,10 @@ private:
 
     void _dropOriginalCollectionThenDeleteLocalState();
 
+    // Drops the original collection and throws if the returned status is not either Status::OK()
+    // or NamespaceNotFound.
+    void _dropOriginalCollection();
+
     // Transitions the state on-disk and in-memory to 'endState'.
     void _transitionState(DonorStateEnum endState,
                           boost::optional<Timestamp> minFetchTimestamp = boost::none);
