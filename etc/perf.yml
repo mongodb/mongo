@@ -81,7 +81,7 @@ modules:
   prefix: ../../src
   branch: master
 - name: linkbench2
-  repo: git@github.com:mdcallag/linkbench.git
+  repo: git@github.com:10gen/linkbench2.git
   prefix: ../../src
   branch: master
   ref: 63207190657737b32eb0e81c5b81ad1b8bad0e5a
