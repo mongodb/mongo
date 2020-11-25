@@ -819,6 +819,25 @@ commands:
         fields:
             anyTypeField: IDLAnyType
 
+    # Test that we correctly generate C++ base classes for versioned API commands with different
+    # key names, command names, and C++ names.
+    APIVersion1CommandIDLName:
+        description: A versioned API command
+        command_name: APIVersion1CommandRuntimeName
+        namespace: ignored
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    APIVersion1CommandIDLName2:
+        description: A versioned API command
+        command_name: APIVersion1CommandRuntimeName2
+        cpp_name: APIVersion1CommandCPPName2
+        namespace: ignored
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
 ##################################################################################################
 #
 # Test field lists

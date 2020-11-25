@@ -972,7 +972,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             self.write_unindented_line('public:')
 
             # Write type aliases for Request and Reply.
-            self.gen_type_alias_declaration("Request", command.command_name)
+            self.gen_type_alias_declaration("Request", command.cpp_name)
             self.gen_type_alias_declaration("Reply", command.reply_type.struct_type)
 
             # Write apiVersions() and deprecatedApiVersions() functions.
