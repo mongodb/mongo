@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <functional>
+#include <iosfwd>
+#include <vector>
+
+#include "mongo/util/dynamic_catch.h"
+
 namespace mongo {
 
 /**
@@ -68,5 +74,61 @@ void clearSignalMask();
 int stackTraceSignal();
 #endif
 
+
+/**
+ * Analyzes the active exception, describing it to an ostream.
+ * Consults a dynamic registry of exception handlers.
+ * See `util/dynamic_catch.h`.
+ */
+class ActiveExceptionWitness {
+public:
+    /** Default constructor creates handlers for some basic exception types. */
+    ActiveExceptionWitness();
+
+    /**
+     * Called at startup to teach our std::terminate handler how to print a
+     * diagnostic for decoupled types of exceptions (e.g. in third_party, in
+     * layers above base, or outside of the server codebase).
+     *
+     * This is not thread-safe, call at startup before multithreading. The
+     * probes are evaluated in order so that later entries here will supersede
+     * earlier entries and match more tightly in the catch hierarchy.
+     */
+    template <typename Ex>
+    void addHandler(std::function<void(const Ex&, std::ostream&)> handler) {
+        _configurators.push_back([=](CatchAndDescribe& dc) {
+            dc.addCatch<Ex>([=](const Ex& ex, std::ostream& os) {
+                handler(ex, os);
+                _exceptionTypeBlurb(typeid(ex), os);
+            });
+        });
+    }
+
+    /**
+     * Writes a description of the active exception to `os`, using built-in
+     * exception probes, augmented by any configured exception probes given by calls to
+     * `addHandler`.
+     *
+     * Called by our std::terminate handler when it detects an active
+     * exception. The active exception is probably related to why the process
+     * is terminating, but not necessarily. Consult a dynamic registry of
+     * exception types to diagnose the active exception.
+     */
+    void describe(std::ostream& os);
+
+private:
+    /**
+     * A DynamicCatch that provides handlers with an std::ostream& into which
+     * to describe the exception they've caught.
+     */
+    using CatchAndDescribe = DynamicCatch<std::ostream&>;
+
+    static void _exceptionTypeBlurb(const std::type_info& ex, std::ostream& os);
+
+    std::vector<std::function<void(CatchAndDescribe&)>> _configurators;
+};
+
+/** The singleton ActiveExceptionWitness. */
+ActiveExceptionWitness& globalActiveExceptionWitness();
 
 }  // namespace mongo

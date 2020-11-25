@@ -52,11 +52,13 @@
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
+#include "mongo/util/dynamic_catch.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -211,45 +213,13 @@ void printSignalAndBacktrace(int signalNum) {
 // exceptions
 void myTerminate() {
     MallocFreeOStreamGuard lk{};
-
-    // In c++11 we can recover the current exception to print it.
+    mallocFreeOStream << "terminate() called.";
     if (std::current_exception()) {
-        mallocFreeOStream << "terminate() called. An exception is active;"
-                          << " attempting to gather more information";
+        mallocFreeOStream << " An exception is active; attempting to gather more information";
         writeMallocFreeStreamToLog();
-
-        const std::type_info* typeInfo = nullptr;
-        try {
-            try {
-                throw;
-            } catch (const DBException& ex) {
-                typeInfo = &typeid(ex);
-                mallocFreeOStream << "DBException::toString(): " << redact(ex) << '\n';
-            } catch (const std::exception& ex) {
-                typeInfo = &typeid(ex);
-                mallocFreeOStream << "std::exception::what(): " << redact(ex.what()) << '\n';
-            } catch (const boost::exception& ex) {
-                typeInfo = &typeid(ex);
-                mallocFreeOStream << "boost::diagnostic_information(): "
-                                  << boost::diagnostic_information(ex) << '\n';
-            } catch (...) {
-                mallocFreeOStream << "A non-standard exception type was thrown\n";
-            }
-
-            if (typeInfo) {
-                const std::string name = demangleName(*typeInfo);
-                mallocFreeOStream << "Actual exception type: " << name << '\n';
-            }
-        } catch (...) {
-            mallocFreeOStream << "Exception while trying to print current exception.\n";
-            if (typeInfo) {
-                // It is possible that we failed during demangling. At least try to print the
-                // mangled name.
-                mallocFreeOStream << "Actual exception type: " << typeInfo->name() << '\n';
-            }
-        }
+        globalActiveExceptionWitness().describe(mallocFreeOStream);
     } else {
-        mallocFreeOStream << "terminate() called. No exception is active";
+        mallocFreeOStream << " No exception is active";
     }
     writeMallocFreeStreamToLog();
     printStackTrace();
@@ -395,5 +365,41 @@ int stackTraceSignal() {
     return SIGUSR2;
 }
 #endif
+
+ActiveExceptionWitness::ActiveExceptionWitness() {
+    // Later entries in the catch chain will become the innermost catch blocks, so
+    // these are in order of increasing specificity. User-provided probes
+    // will be appended, so they will be considered more specific than any of
+    // these, which are essentially "fallback" handlers.
+    addHandler<boost::exception>([](auto&& ex, std::ostream& os) {
+        os << "boost::diagnostic_information(): " << boost::diagnostic_information(ex) << "\n";
+    });
+    addHandler<std::exception>([](auto&& ex, std::ostream& os) {
+        os << "std::exception::what(): " << redact(ex.what()) << "\n";
+    });
+    addHandler<DBException>([](auto&& ex, std::ostream& os) {
+        os << "DBException::toString(): " << redact(ex) << "\n";
+    });
+}
+
+void ActiveExceptionWitness::describe(std::ostream& os) {
+    CatchAndDescribe dc;
+    for (const auto& config : _configurators)
+        config(dc);
+    try {
+        dc.doCatch(os);
+    } catch (...) {
+        os << "A non-standard exception type was thrown\n";
+    }
+}
+
+void ActiveExceptionWitness::_exceptionTypeBlurb(const std::type_info& ex, std::ostream& os) {
+    os << "Actual exception type: " << demangleName(ex) << "\n";
+}
+
+ActiveExceptionWitness& globalActiveExceptionWitness() {
+    static StaticImmortal<ActiveExceptionWitness> v;
+    return *v;
+}
 
 }  // namespace mongo

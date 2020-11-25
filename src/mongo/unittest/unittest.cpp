@@ -56,6 +56,7 @@
 #include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/timer.h"
 
@@ -634,6 +635,15 @@ ComparisonAssertion<op> ComparisonAssertion<op>::make(const char* theFile,
 
 // Provide definitions for common instantiations of ComparisonAssertion.
 INSTANTIATE_COMPARISON_ASSERTION_CTORS();
+
+namespace {
+// At startup, teach the terminate handler how to print TestAssertionFailureException.
+[[maybe_unused]] const auto earlyCall = [] {
+    globalActiveExceptionWitness().addHandler<TestAssertionFailureException>(
+        [](const auto& ex, std::ostream& os) { os << ex.toString() << "\n"; });
+    return 0;
+}();
+}  // namespace
 
 }  // namespace unittest
 }  // namespace mongo
