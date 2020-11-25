@@ -103,8 +103,9 @@ Status GeoParser::parseLegacyPoint(const BSONElement& elem,
 }
 
 static Status coordToPoint(double lng, double lat, S2Point* out) {
-    // We don't rely on drem to clean up non-sane points.  We just don't let them become
+    // We don't rely on S2LatLng::Normalized's call to drem(...) to clean up non-sane points.  We just don't let them become
     // spherical.
+    // drem() was removed in https://github.com/mongodb/mongo/commit/38c0eb538d0fd390c6cb9ce9ae9894153f6e8ef5
     if (!isValidLngLat(lng, lat))
         return BAD_VALUE("longitude/latitude is out of bounds, lng: " << lng << " lat: " << lat);
     // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
