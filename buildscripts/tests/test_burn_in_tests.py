@@ -365,9 +365,8 @@ class TestGetTaskRuntimeHistory(unittest.TestCase):
                                                       "variant1")
         self.assertEqual(result, [("dir/test2.js", 10.1)])
         evergreen_api.test_stats_by_project.assert_called_with(
-            "project1", after_date=start_date.strftime("%Y-%m-%d"),
-            before_date=end_date.strftime("%Y-%m-%d"), group_by="test", group_num_days=14,
-            tasks=["task1"], variants=["variant1"])
+            "project1", after_date=start_date, before_date=end_date, group_by="test",
+            group_num_days=14, tasks=["task1"], variants=["variant1"])
 
     def test__get_task_runtime_history_evg_degraded_mode_error(self):  # pylint: disable=invalid-name
         response = Mock()
