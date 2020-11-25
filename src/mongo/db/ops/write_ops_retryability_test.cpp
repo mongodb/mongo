@@ -267,6 +267,71 @@ TEST_F(WriteOpsRetryability, PerformOrderedInsertsStopsAtError) {
     ASSERT_EQ(ErrorCodes::DuplicateKey, result.results[1].getStatus());
 }
 
+TEST_F(WriteOpsRetryability, PerformOrderedInsertsStopsAtBadDoc) {
+    auto opCtxRaii = makeOperationContext();
+    opCtxRaii->setLogicalSessionId({UUID::gen(), {}});
+    OperationContextSession session(opCtxRaii.get());
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    write_ops::Insert insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandBase().setOrdered(true);
+
+    // Setup documents such that the second cannot be successfully inserted.
+    auto largeBuffer = [](std::int32_t size) {
+        std::vector<char> buffer(size);
+        DataRange bufferRange(&buffer.front(), &buffer.back());
+        ASSERT_OK(bufferRange.writeNoThrow(LittleEndian<int32_t>(size)));
+
+        return buffer;
+    }(17 * 1024 * 1024);
+
+    insertOp.setDocuments({BSON("_id" << 0),
+                           BSONObj(largeBuffer.data(), BSONObj::LargeSizeTrait{}),
+                           BSON("_id" << 2)});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    // Assert that the third write is not attempted because this is an ordered insert.
+    ASSERT_EQ(2, result.results.size());
+    ASSERT_TRUE(result.results[0].isOK());
+    ASSERT_FALSE(result.results[1].isOK());
+    ASSERT_EQ(ErrorCodes::BadValue, result.results[1].getStatus());
+}
+
+TEST_F(WriteOpsRetryability, PerformUnorderedInsertsContinuesAtBadDoc) {
+    auto opCtxRaii = makeOperationContext();
+    opCtxRaii->setLogicalSessionId({UUID::gen(), {}});
+    OperationContextSession session(opCtxRaii.get());
+    // Use an unreplicated write block to avoid setting up more structures.
+    repl::UnreplicatedWritesBlock unreplicated(opCtxRaii.get());
+    setUpReplication(getServiceContext());
+
+    write_ops::Insert insertOp(NamespaceString("foo.bar"));
+    insertOp.getWriteCommandBase().setOrdered(false);
+
+    // Setup documents such that the second cannot be successfully inserted.
+    auto largeBuffer = [](std::int32_t size) {
+        std::vector<char> buffer(size);
+        DataRange bufferRange(&buffer.front(), &buffer.back());
+        ASSERT_OK(bufferRange.writeNoThrow(LittleEndian<int32_t>(size)));
+
+        return buffer;
+    }(17 * 1024 * 1024);
+
+    insertOp.setDocuments({BSON("_id" << 0),
+                           BSONObj(largeBuffer.data(), BSONObj::LargeSizeTrait{}),
+                           BSON("_id" << 2)});
+    write_ops_exec::WriteResult result = write_ops_exec::performInserts(opCtxRaii.get(), insertOp);
+
+    // Assert that the third write is attempted because this is an unordered insert.
+    ASSERT_EQ(3, result.results.size());
+    ASSERT_TRUE(result.results[0].isOK());
+    ASSERT_FALSE(result.results[1].isOK());
+    ASSERT_TRUE(result.results[2].isOK());
+    ASSERT_EQ(ErrorCodes::BadValue, result.results[1].getStatus());
+}
+
 
 class FindAndModifyRetryability : public MockReplCoordServerFixture {
 public:

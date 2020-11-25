@@ -233,7 +233,7 @@ void serializeReply(OperationContext* opCtx,
         }
     }
 
-    long long n = 0;
+    long long nVal = 0;
     long long nModified = 0;
     std::vector<BSONObj> upsertInfo;
     std::vector<BSONObj> errors;
@@ -255,7 +255,7 @@ void serializeReply(OperationContext* opCtx,
     for (size_t i = 0; i < result.results.size(); i++) {
         if (result.results[i].isOK()) {
             const auto& opResult = result.results[i].getValue();
-            n += opResult.getN();  // Always there.
+            nVal += opResult.getN();  // Always there.
             if (replyStyle == ReplyStyle::kUpdate) {
                 nModified += opResult.getNModified();
                 if (auto idElement = opResult.getUpsertedId().firstElement()) {
@@ -325,7 +325,7 @@ void serializeReply(OperationContext* opCtx,
         errors.push_back(error.obj());
     }
 
-    out->appendNumber("n", n);
+    out->appendNumber("n", nVal);
 
     if (replyStyle == ReplyStyle::kUpdate) {
         out->appendNumber("nModified", nModified);

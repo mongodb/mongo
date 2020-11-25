@@ -594,6 +594,8 @@ WriteResult performInserts(OperationContext* opCtx,
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 
+        // If the batch had an error and decides to not continue, do not process a current doc that
+        // was unsuccessfully "fixed" or an already executed retryable write.
         if (!canContinue)
             break;
 
@@ -609,6 +611,10 @@ WriteResult performInserts(OperationContext* opCtx,
             } catch (const DBException& ex) {
                 canContinue = handleError(
                     opCtx, ex, wholeOp.getNamespace(), wholeOp.getWriteCommandBase(), &out);
+            }
+
+            if (!canContinue) {
+                break;
             }
         } else if (wasAlreadyExecuted) {
             containsRetry = true;
