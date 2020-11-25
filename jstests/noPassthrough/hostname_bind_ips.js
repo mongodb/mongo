@@ -14,6 +14,7 @@ assert.soon(function() {
         assert.commandWorked(conn.adminCommand({ping: 1}));
         return true;
     } catch (e) {
+        jsTestLog('Ping failed: ' + tojson(e));
         return false;
     }
 }, "Cannot connect to 127.0.0.1 when bound to localhost", 30 * 1000);
