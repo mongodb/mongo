@@ -95,7 +95,7 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
 
         IDLParserErrorContext ctx("listDatabases");
-        auto cmd = ListDatabasesCommand::parse(ctx, cmdObj);
+        auto cmd = ListDatabases::parse(ctx, cmdObj);
         auto* as = AuthorizationSession::get(opCtx->getClient());
 
         // { nameOnly: bool } - Default false.
@@ -178,52 +178,50 @@ public:
                     bb.reset(new BSONObjBuilder());
                 }
 
-                bb->appendNumber(s->getId().toString(), size);
+                bb->append(s->getId().toString(), size);
             }
         }
 
         // Now that we have aggregated results for all the shards, convert to a response,
         // and compute total sizes.
         long long totalSize = 0;
+        std::vector<ListDatabasesReplyItem> items;
+        for (const auto& sizeEntry : sizes) {
+            const auto& name = sizeEntry.first;
+            const long long size = sizeEntry.second;
 
-        {
-            BSONArrayBuilder dbListBuilder(result.subarrayStart("databases"));
-            for (const auto& sizeEntry : sizes) {
-                const auto& name = sizeEntry.first;
-                const long long size = sizeEntry.second;
+            // Skip the local database, since all shards have their own independent local
+            if (name == NamespaceString::kLocalDb)
+                continue;
 
-                // Skip the local database, since all shards have their own independent local
-                if (name == NamespaceString::kLocalDb)
-                    continue;
-
-                if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(name)) {
-                    // We don't have listDatabases on the cluser or find on this database.
-                    continue;
-                }
-
-                BSONObjBuilder temp;
-                temp.append("name", name);
-                if (!nameOnly) {
-                    temp.appendNumber("sizeOnDisk", size);
-                    temp.appendBool("empty", size == 1);
-                    temp.append("shards", dbShardInfo[name]->obj());
-
-                    uassert(ErrorCodes::BadValue,
-                            str::stream() << "Found negative 'sizeOnDisk' in: " << name,
-                            size >= 0);
-
-                    totalSize += size;
-                }
-
-                dbListBuilder.append(temp.obj());
+            if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(name)) {
+                // We don't have listDatabases on the cluser or find on this database.
+                continue;
             }
+
+            ListDatabasesReplyItem item(name);
+            if (!nameOnly) {
+                item.setSizeOnDisk(size);
+                item.setEmpty(size == 1);
+                item.setShards(dbShardInfo[name]->obj());
+
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "Found negative 'sizeOnDisk' in: " << name,
+                        size >= 0);
+
+                totalSize += size;
+            }
+
+            items.push_back(std::move(item));
         }
 
+        ListDatabasesReply reply(items);
         if (!nameOnly) {
-            result.appendNumber("totalSize", totalSize);
-            result.appendNumber("totalSizeMb", totalSize / (1024 * 1024));
+            reply.setTotalSize(totalSize);
+            reply.setTotalSizeMb(totalSize / (1024 * 1024));
         }
 
+        reply.serialize(&result);
         return true;
     }
 

@@ -102,7 +102,7 @@ public:
              BSONObjBuilder& result) final {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         IDLParserErrorContext ctx("listDatabases");
-        auto cmd = ListDatabasesCommand::parse(ctx, cmdObj);
+        auto cmd = ListDatabases::parse(ctx, cmdObj);
         auto* as = AuthorizationSession::get(opCtx->getClient());
 
         // {nameOnly: bool} - default false.
@@ -146,53 +146,51 @@ public:
             dbNames = storageEngine->listDatabases();
         }
 
-        vector<BSONObj> dbInfos;
+        vector<ListDatabasesReplyItem> items;
 
         const bool filterNameOnly = filter &&
             filter->getCategory() == MatchExpression::MatchCategory::kLeaf &&
             filter->path() == kNameField;
-        intmax_t totalSize = 0;
-        for (const auto& dbname : dbNames) {
-            if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
+        long long totalSize = 0;
+        for (const auto& itemName : dbNames) {
+            if (authorizedDatabases && !as->isAuthorizedForAnyActionOnAnyResourceInDB(itemName)) {
                 // We don't have listDatabases on the cluser or find on this database.
                 continue;
             }
 
-            BSONObjBuilder b;
-            b.append("name", dbname);
+            ListDatabasesReplyItem item(itemName);
 
-            int64_t size = 0;
+            long long size = 0;
             if (!nameOnly) {
                 // Filtering on name only should not require taking locks on filtered-out names.
-                if (filterNameOnly && !filter->matchesBSON(b.asTempObj()))
+                if (filterNameOnly && !filter->matchesBSON(item.toBSON()))
                     continue;
 
-                AutoGetDb autoDb(opCtx, dbname, MODE_IS);
+                AutoGetDb autoDb(opCtx, itemName, MODE_IS);
                 Database* const db = autoDb.getDb();
                 if (!db)
                     continue;
 
-                writeConflictRetry(opCtx, "sizeOnDisk", dbname, [&] {
-                    size = storageEngine->sizeOnDiskForDb(opCtx, dbname);
+                writeConflictRetry(opCtx, "sizeOnDisk", itemName, [&] {
+                    size = storageEngine->sizeOnDiskForDb(opCtx, itemName);
                 });
-                b.append("sizeOnDisk", static_cast<double>(size));
-
-                b.appendBool(
-                    "empty",
-                    CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbname).empty());
+                item.setSizeOnDisk(size);
+                item.setEmpty(
+                    CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(itemName).empty());
             }
-            BSONObj curDbObj = b.obj();
-
-            if (!filter || filter->matchesBSON(curDbObj)) {
+            if (!filter || filter->matchesBSON(item.toBSON())) {
                 totalSize += size;
-                dbInfos.push_back(curDbObj);
+                items.push_back(std::move(item));
             }
         }
 
-        result.append("databases", dbInfos);
+        ListDatabasesReply reply(items);
         if (!nameOnly) {
-            result.append("totalSize", double(totalSize));
+            reply.setTotalSize(totalSize);
+            reply.setTotalSizeMb(totalSize / (1024 * 1024));
         }
+
+        reply.serialize(&result);
         return true;
     }
 } cmdListDatabases;
