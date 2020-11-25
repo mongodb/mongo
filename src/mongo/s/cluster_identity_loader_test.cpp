@@ -65,7 +65,8 @@ BSONObj getReplSecondaryOkMetadata() {
 
 class ClusterIdentityTest : public ShardingTestFixture {
 public:
-    ClusterIdentityTest() {
+    void setUp() {
+        ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);
     }
 

@@ -81,7 +81,9 @@ HostAndPort makeHostAndPort(const ShardId& shardId) {
 
 class AppendRawResponsesTest : public ShardingTestFixture {
 protected:
-    AppendRawResponsesTest() {
+    void setUp() {
+        ShardingTestFixture::setUp();
+
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         std::vector<std::tuple<ShardId, HostAndPort>> remoteShards;

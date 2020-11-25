@@ -172,7 +172,8 @@ ShardingTestFixture::ShardingTestFixture()
     auto catalogCache = std::make_unique<CatalogCache>(service, CatalogCacheLoader::get(service));
     // For now initialize the global grid object. All sharding objects will be accessible from there
     // until we get rid of it.
-    auto const grid = Grid::get(operationContext());
+    auto uniqueOpCtx = makeOperationContext();
+    auto const grid = Grid::get(uniqueOpCtx.get());
     grid->init(makeShardingCatalogClient(std::move(uniqueDistLockManager)),
                std::move(catalogCache),
                std::move(shardRegistry),
@@ -194,7 +195,7 @@ ShardingTestFixture::~ShardingTestFixture() {
             grid->getExecutorPool()->shutdownAndJoin();
         }
         if (grid->catalogClient()) {
-            grid->catalogClient()->shutDown(operationContext());
+            grid->catalogClient()->shutDown(makeOperationContext().get());
         }
         if (grid->shardRegistry()) {
             grid->shardRegistry()->shutdown();

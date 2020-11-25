@@ -58,7 +58,9 @@ LogicalSessionId constructFullLsid() {
 
 class ShardingTaskExecutorTest : public ShardingTestFixture {
 protected:
-    ShardingTaskExecutorTest() {
+    void setUp() {
+        ShardingTestFixture::setUp();
+
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 
         auto netForFixedTaskExecutor = std::make_unique<executor::NetworkInterfaceMock>();

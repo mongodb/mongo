@@ -49,6 +49,8 @@ const std::vector<HostAndPort> ResultsMergerTestFixture::kTestShardHosts = {
 const NamespaceString ResultsMergerTestFixture::kTestNss = NamespaceString{"testdb.testcoll"};
 
 void ResultsMergerTestFixture::setUp() {
+    ShardingTestFixture::setUp();
+
     setRemote(HostAndPort("ClientHost", 12345));
 
     configTargeter()->setFindHostReturnValue(kTestConfigShardHost);

@@ -61,7 +61,13 @@ protected:
     ShardingTestFixtureCommon();
     ~ShardingTestFixtureCommon();
 
+    void setUp() override;
+
+    void tearDown() override;
+
     OperationContext* operationContext() const {
+        invariant(_opCtxHolder,
+                  "ShardingTestFixtureCommon::setUp() must have been called before this method");
         return _opCtxHolder.get();
     }
 

@@ -41,11 +41,20 @@ using executor::NetworkTestEnv;
 using executor::RemoteCommandRequest;
 using unittest::assertGet;
 
-ShardingTestFixtureCommon::ShardingTestFixtureCommon() {
+ShardingTestFixtureCommon::ShardingTestFixtureCommon() = default;
+
+ShardingTestFixtureCommon::~ShardingTestFixtureCommon() {
+    invariant(!_opCtxHolder,
+              "ShardingTestFixtureCommon::tearDown() must have been called before destruction");
+}
+
+void ShardingTestFixtureCommon::setUp() {
     _opCtxHolder = makeOperationContext();
 }
 
-ShardingTestFixtureCommon::~ShardingTestFixtureCommon() = default;
+void ShardingTestFixtureCommon::tearDown() {
+    _opCtxHolder.reset();
+}
 
 RoutingTableHistoryValueHandle ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
     RoutingTableHistory rt) {

@@ -56,6 +56,8 @@ protected:
     ShardingMongodTestFixture();
     ~ShardingMongodTestFixture();
 
+    void setUp() override;
+
     void tearDown() override;
 
     /**

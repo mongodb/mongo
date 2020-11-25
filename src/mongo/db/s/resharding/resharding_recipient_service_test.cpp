@@ -49,8 +49,8 @@
 namespace mongo {
 namespace {
 
-class ReshardingRecipientServiceTest : public ServiceContextMongoDTest,
-                                       public CatalogCacheTestFixture {
+class ReshardingRecipientServiceTest : public CatalogCacheTestFixture,
+                                       public ServiceContextMongoDTest {
 public:
     const UUID kOrigUUID = UUID::gen();
     const NamespaceString kOrigNss = NamespaceString("db.foo");

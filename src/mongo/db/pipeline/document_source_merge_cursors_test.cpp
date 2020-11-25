@@ -80,13 +80,14 @@ class DocumentSourceMergeCursorsTest : public ShardingTestFixture {
 public:
     DocumentSourceMergeCursorsTest() {
         TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
-        _expCtx = new ExpressionContext(operationContext(), nullptr, kTestNss);
-        _expCtx->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>(executor());
     }
 
     void setUp() override {
         ShardingTestFixture::setUp();
         setRemote(HostAndPort("ClientHost", 12345));
+
+        _expCtx = new ExpressionContext(operationContext(), nullptr, kTestNss);
+        _expCtx->mongoProcessInterface = std::make_shared<StubMongoProcessInterface>(executor());
 
         configTargeter()->setFindHostReturnValue(kTestConfigShardHost);
 

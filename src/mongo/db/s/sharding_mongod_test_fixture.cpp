@@ -122,8 +122,9 @@ ShardingMongodTestFixture::ShardingMongodTestFixture() {
                                       std::make_unique<repl::ReplicationConsistencyMarkersMock>(),
                                       std::make_unique<repl::ReplicationRecoveryMock>()));
 
-    ASSERT_OK(repl::ReplicationProcess::get(operationContext())
-                  ->initializeRollbackID(operationContext()));
+    auto uniqueOpCtx = makeOperationContext();
+    ASSERT_OK(
+        repl::ReplicationProcess::get(uniqueOpCtx.get())->initializeRollbackID(uniqueOpCtx.get()));
 
     repl::StorageInterface::set(service, std::move(storagePtr));
 
@@ -132,7 +133,7 @@ ShardingMongodTestFixture::ShardingMongodTestFixture() {
     opObserver->addObserver(std::make_unique<ConfigServerOpObserver>());
     opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
 
-    repl::createOplog(operationContext());
+    repl::createOplog(uniqueOpCtx.get());
 
     // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to
     // testing this release's code, not backwards compatibility code.
@@ -273,6 +274,10 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
     return Status::OK();
 }
 
+void ShardingMongodTestFixture::setUp() {
+    ShardingTestFixtureCommon::setUp();
+}
+
 void ShardingMongodTestFixture::tearDown() {
     ReplicaSetMonitor::cleanup();
 
@@ -291,6 +296,7 @@ void ShardingMongodTestFixture::tearDown() {
     CollectionShardingStateFactory::clear(getServiceContext());
     Grid::get(operationContext())->clearForUnitTests();
 
+    ShardingTestFixtureCommon::tearDown();
     ServiceContextMongoDTest::tearDown();
 }
 
