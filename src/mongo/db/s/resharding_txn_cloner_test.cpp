@@ -149,7 +149,7 @@ protected:
             txns.emplace_back(makeTxn());
         }
         std::sort(txns.begin(), txns.end(), [this](BSONObj a, BSONObj b) {
-            return getTxnRecordLsid(a).toBSON().woCompare(getTxnRecordLsid(b).toBSON());
+            return getTxnRecordLsid(a).toBSON().woCompare(getTxnRecordLsid(b).toBSON()) < 0;
         });
         return txns;
     }
