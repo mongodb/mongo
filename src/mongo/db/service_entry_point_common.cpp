@@ -1296,6 +1296,10 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
     auto command = _execContext->getCommand();
     auto replyBuilder = _execContext->getReplyBuilder();
 
+    // Record the time here to ensure that maxTimeMS, if set by the command, considers the time
+    // spent before the deadline is set on `opCtx`.
+    const auto startedCommandExecAt = opCtx->getServiceContext()->getFastClockSource()->now();
+
     const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
     Client* client = opCtx->getClient();
 
@@ -1473,24 +1477,29 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
     // TODO SERVER-34277 Remove the special handling for maxTimeMS for getMores. This will require
     // introducing a new 'max await time' parameter for getMore, and eventually banning maxTimeMS
     // altogether on a getMore command.
-    int maxTimeMS = uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField));
-    int maxTimeMSOpOnly = uassertStatusOK(QueryRequest::parseMaxTimeMS(maxTimeMSOpOnlyField));
+    const auto maxTimeMS =
+        Milliseconds{uassertStatusOK(QueryRequest::parseMaxTimeMS(cmdOptionMaxTimeMSField))};
+    const auto maxTimeMSOpOnly =
+        Milliseconds{uassertStatusOK(QueryRequest::parseMaxTimeMS(maxTimeMSOpOnlyField))};
 
-    // The "hello" command should not inherit the deadline from the user op it is operating as a
-    // part of as that can interfere with replica set monitoring and host selection.
-    bool ignoreMaxTimeMSOpOnly = isHello();
-
-    if ((maxTimeMS > 0 || maxTimeMSOpOnly > 0) && command->getLogicalOp() != LogicalOp::opGetMore) {
+    if ((maxTimeMS > Milliseconds::zero() || maxTimeMSOpOnly > Milliseconds::zero()) &&
+        command->getLogicalOp() != LogicalOp::opGetMore) {
         uassert(40119,
                 "Illegal attempt to set operation deadline within DBDirectClient",
                 !opCtx->getClient()->isInDirectClient());
-        if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > 0 &&
-            (maxTimeMS == 0 || maxTimeMSOpOnly < maxTimeMS)) {
-            opCtx->storeMaxTimeMS(Milliseconds{maxTimeMS});
-            opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMSOpOnly},
-                                         ErrorCodes::MaxTimeMSExpired);
-        } else if (maxTimeMS > 0) {
-            opCtx->setDeadlineAfterNowBy(Milliseconds{maxTimeMS}, ErrorCodes::MaxTimeMSExpired);
+
+        // The "hello" command should not inherit the deadline from the user op it is operating as a
+        // part of as that can interfere with replica set monitoring and host selection.
+        const bool ignoreMaxTimeMSOpOnly = isHello();
+
+        if (!ignoreMaxTimeMSOpOnly && maxTimeMSOpOnly > Milliseconds::zero() &&
+            (maxTimeMS == Milliseconds::zero() || maxTimeMSOpOnly < maxTimeMS)) {
+            opCtx->storeMaxTimeMS(maxTimeMS);
+            opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMSOpOnly,
+                                     ErrorCodes::MaxTimeMSExpired);
+        } else if (maxTimeMS > Milliseconds::zero()) {
+            opCtx->setDeadlineByDate(startedCommandExecAt + maxTimeMS,
+                                     ErrorCodes::MaxTimeMSExpired);
         }
     }
 
