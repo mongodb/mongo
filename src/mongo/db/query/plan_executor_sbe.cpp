@@ -86,10 +86,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
     _shouldTrackLatestOplogTimestamp = winner.data.shouldTrackLatestOplogTimestamp;
     _shouldTrackResumeToken = winner.data.shouldTrackResumeToken;
 
-    if (!isOpen) {
-        _root->attachFromOperationContext(_opCtx);
-    }
-
     if (!winner.results.empty()) {
         _stash = std::move(winner.results);
     }

@@ -74,6 +74,8 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
     auto root = builder->build(solution.root());
     auto data = builder->getPlanStageData();
 
+    root->attachFromOperationContext(opCtx);
+
     // Register this plan to yield according to the configured policy.
     sbeYieldPolicy->registerPlan(root.get());
 

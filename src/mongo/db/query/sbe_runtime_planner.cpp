@@ -99,8 +99,6 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
         uassert(4822872, "Query does not have record ID slot.", recordIdSlot);
     }
 
-    root->attachFromOperationContext(_opCtx);
-
     auto exitedEarly{false};
     try {
         root->open(false);
