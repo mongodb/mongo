@@ -123,7 +123,6 @@ if not has_option('noshell') and usemozjs:
             'querytests.cpp',
             'replica_set_tests.cpp',
             'repltests.cpp',
-            'resharding_tests.cpp',
             'rollbacktests.cpp',
             'socktests.cpp',
             'storage_timestamp_tests.cpp',

@@ -85,6 +85,10 @@ public:
                                  const std::string& dbName,
                                  const BSONObj& cmdObj) final;
 
+    Status runAggregation(OperationContext* opCtx,
+                          const AggregationRequest& aggRequest,
+                          std::function<bool(const std::vector<BSONObj>& batch)> callback);
+
 private:
     struct AsyncCmdHandle {
         HostAndPort hostTargetted;

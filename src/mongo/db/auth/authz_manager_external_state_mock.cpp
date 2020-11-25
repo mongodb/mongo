@@ -112,7 +112,11 @@ void AuthzManagerExternalStateMock::setAuthzVersion(int version) {
 
 std::unique_ptr<AuthzSessionExternalState>
 AuthzManagerExternalStateMock::makeAuthzSessionExternalState(AuthorizationManager* authzManager) {
-    return std::make_unique<AuthzSessionExternalStateMock>(authzManager);
+    auto ret = std::make_unique<AuthzSessionExternalStateMock>(authzManager);
+    // Construct a `AuthzSessionExternalStateMock` structure that represents the default no-auth
+    // state of a running mongod.
+    ret->setReturnValueForShouldIgnoreAuthChecks(true);
+    return ret;
 }
 
 Status AuthzManagerExternalStateMock::findOne(OperationContext* opCtx,
