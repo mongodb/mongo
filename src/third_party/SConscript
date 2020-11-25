@@ -1,12 +1,8 @@
 # -*- mode: python -*-
 
-import SCons
-
-from site_scons.mongo import insort_wrapper
 import json
 
 Import("env use_system_version_of_library usemozjs get_option")
-Import("get_option")
 Import("use_libunwind")
 Import("use_system_libunwind")
 Import("use_vendored_libunwind")
@@ -83,59 +79,6 @@ def injectMozJS(thisEnv):
         ])
 
 env.AddMethod(injectMozJS, 'InjectMozJS');
-
-
-def add_shim_allocator_hack(target, source, env):
-
-    # If we allowed conftests to become dependent, any TryLink
-    # that happened after we made the below modifications would
-    # cause the configure steps to try to compile tcmalloc and any
-    # of its dependencies. Oops!
-    if any('conftest' in str(t) for t in target):
-        return target, source
-
-    # It is possible that 'env' isn't a unique
-    # OverrideEnvironment, since if you didn't pass any kw args
-    # into your builder call, you just reuse the env you were
-    # called with. That could mean that we see the same
-    # environment here multiple times. But that is really OK,
-    # since the operation we are performing would be performed on
-    # all of them anyway. The flag serves as a way to disable the
-    # auto-injection for the handful of libraries where we must do
-    # so to avoid forming a cycle.
-    if not env.get('DISABLE_ALLOCATOR_SHIM_INJECTION', False):
-        lds = env.get('LIBDEPS', [])
-        shim_allocator = '$BUILD_DIR/third_party/shim_allocator'
-        if shim_allocator not in lds:
-            insort_wrapper(lds, shim_allocator)
-            env['LIBDEPS'] = lds
-
-    return target, source
-
-
-if get_option("build-tools") == "stable":
-    for builder_name in ('Program', 'SharedLibrary', 'LoadableModule', 'StaticLibrary'):
-        builder = env['BUILDERS'][builder_name]
-        base_emitter = builder.emitter
-        builder.emitter = SCons.Builder.ListEmitter([add_shim_allocator_hack, base_emitter])
-
-
-def shim_library(env, name, needs_link=False, *args, **kwargs):
-    nodes = env.Library(
-        target=f"shim_{name}" if name else name,
-        source=[
-            f"shim_{name}.cpp" if name else name,
-        ],
-        *args,
-        **kwargs
-    )
-
-    for n in nodes:
-        setattr(n.attributes, "needs_link", needs_link)
-
-    return nodes
-
-env.AddMethod(shim_library, 'ShimLibrary')
 
 
 if not use_system_version_of_library('tcmalloc'):
@@ -290,8 +233,8 @@ if use_libunwind:
         LIBDEPS_GLOBAL=[
             dep
             for dep in env.get('LIBDEPS_GLOBAL', [])
-            if not dep.endswith('shim_allocator')
-        ]
+            if dep and not dep.endswith('shim_allocator')
+        ],
     )
     if use_system_libunwind:
         unwindEnv = unwindEnv.Clone(
@@ -447,7 +390,9 @@ else:
             'zlib' + zlibSuffix + '/zlib',
         ])
 
-zlibEnv.ShimLibrary(name="zlib")
+zlibEnv.ShimLibrary(
+    name="zlib",
+)
 
 zstdEnv = env.Clone()
 if use_system_version_of_library("zstd"):
@@ -464,7 +409,9 @@ else:
             'zstandard' + zstdSuffix + '/zstd',
         ])
 
-zstdEnv.ShimLibrary(name="zstd")
+zstdEnv.ShimLibrary(
+    name="zstd",
+)
 
 benchmarkEnv = env.Clone()
 if use_system_version_of_library("google-benchmark"):
@@ -504,14 +451,16 @@ if "tom" in env["MONGO_CRYPTO"]:
             'tomcrypt' + tomcryptSuffix + '/tomcrypt',
         ])
 
-    tomcryptEnv.ShimLibrary(name="tomcrypt")
+    tomcryptEnv.ShimLibrary(
+        name="tomcrypt",
+    )
 
 
 gperftoolsEnv = env.Clone(
     LIBDEPS_GLOBAL=[
         dep
         for dep in env.get('LIBDEPS_GLOBAL', [])
-        if not dep.endswith('shim_allocator')
+        if dep and not dep.endswith('shim_allocator')
     ],
 )
 if gperftoolsEnv['MONGO_ALLOCATOR'] in ["tcmalloc", "tcmalloc-experimental"]:
@@ -598,7 +547,9 @@ timelibEnv = timelibEnv.Clone(
         'timelib' + timelibSuffix + '/timelib',
     ])
 
-timelibEnv.ShimLibrary(name='timelib')
+timelibEnv.ShimLibrary(
+    name='timelib',
+)
 
 wiredtigerEnv = env.Clone()
 if wiredtiger:
@@ -650,7 +601,9 @@ else:
 	    'IntelRDFPMathLib20U1/intel_decimal128',
 	])
 
-intelDecimal128Env.ShimLibrary(name="intel_decimal128")
+intelDecimal128Env.ShimLibrary(
+    name="intel_decimal128",
+)
 
 icuEnv = env.Clone()
 if use_system_version_of_library("icu"):
@@ -669,7 +622,9 @@ else:
             'icu4c' + icuSuffix + '/source/icu_i18n',
         ])
 
-icuEnv.ShimLibrary(name="icu")
+icuEnv.ShimLibrary(
+    name="icu",
+)
 
 kmsEnv = env.Clone()
 if get_option('ssl') == 'on':
@@ -687,5 +642,7 @@ if get_option('ssl') == 'on':
                 'kms-message/kms-message',
             ])
 
-    kmsEnv.ShimLibrary(name="kms_message")
+    kmsEnv.ShimLibrary(
+        name="kms_message",
+    )
 
