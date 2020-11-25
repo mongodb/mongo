@@ -52,6 +52,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
@@ -1418,11 +1419,18 @@ Status OptionsParser::addDefaultValues(const OptionSection& options, Environment
 Status OptionsParser::readConfigFile(const std::string& filename,
                                      std::string* contents,
                                      ConfigExpand configExpand) {
-    // check if it's a regular file
-    fs::path configPath(filename);
-    if (!fs::is_regular_file(filename)) {
-        return {ErrorCodes::InternalError,
-                str::stream() << "Error opening config file: " << strerror(EISDIR)};
+    // check if it's a valid file
+    const auto badFile = [&](StringData errMsg) -> Status {
+        return {ErrorCodes::BadValue,
+                str::stream() << "Error opening config file '" << filename << "': " << errMsg};
+    };
+
+    if (!fs::exists(filename)) {
+        return badFile(strerror(ENOENT));
+    } else if (fs::is_directory(filename)) {
+        return badFile(strerror(EISDIR));
+    } else if (!fs::is_regular_file(filename)) {
+        return badFile("Invalid file type");
     }
 
 #ifdef _WIN32

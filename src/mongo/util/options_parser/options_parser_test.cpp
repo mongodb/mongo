@@ -480,7 +480,6 @@ TEST(Parsing, StringMapDuplicateKey) {
     argv.push_back("--multival");
     argv.push_back("key1=value2");
 
-    moe::Value value;
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -521,7 +520,6 @@ TEST(Parsing, PositionalTooMany) {
     argv.push_back("positional");
     argv.push_back("extrapositional");
 
-    moe::Value value;
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -2104,7 +2102,6 @@ TEST(ConfigFromFilesystem, Empty) {
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("empty.json"));
 
-    moe::Value value;
     ASSERT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -2121,7 +2118,22 @@ TEST(ConfigFromFilesystem, Directory) {
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH(""));
 
-    moe::Value value;
+    ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
+}
+
+TEST(ConfigFromFilesystem, Nonexistent) {
+    moe::OptionsParser parser;
+    moe::Environment environment;
+
+    moe::OptionSection testOpts;
+    testOpts.addOptionChaining(
+        "config", "config", moe::String, "Config file to parse", {}, {}, OptionParserTest);
+
+    std::vector<std::string> argv;
+    argv.push_back("binaryname");
+    argv.push_back("--config");
+    argv.push_back(TEST_CONFIG_PATH("nonexistent_file.conf"));
+
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -2140,7 +2152,6 @@ TEST(ConfigFromFilesystem, NullByte) {
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("nullByte.conf"));
 
-    moe::Value value;
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -2160,7 +2171,6 @@ TEST(ConfigFromFilesystem, NullSubDir) {
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("dirNullByte.conf"));
 
-    moe::Value value;
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -2181,7 +2191,6 @@ TEST(ConfigFromFilesystem, NullTerminated) {
     argv.push_back("--config");
     argv.push_back(TEST_CONFIG_PATH("endStringNull.conf"));
 
-    moe::Value value;
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -2781,7 +2790,6 @@ TEST(ChainingInterface, PositionalTooMany) {
     argv.push_back("positional");
     argv.push_back("extrapositional");
 
-    moe::Value value;
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
@@ -4321,7 +4329,6 @@ TEST(YAMLConfigFile, StringMapDuplicateKey) {
                      // significant
                      "multival : \n key1 : \"value1\"\n key1 : \"value2\"");
 
-    moe::Value value;
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
 }
 
