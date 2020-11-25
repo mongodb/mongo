@@ -460,7 +460,7 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
             !initializationStatus);
 
     try {
-        _initFunc(opCtx, shardIdentity, generateDistLockProcessId(opCtx));
+        _initFunc(opCtx, shardIdentity, shardIdentity.getShardName().toString());
         shardingState->setInitialized(shardIdentity.getShardName().toString(),
                                       shardIdentity.getClusterId());
     } catch (const DBException& ex) {
