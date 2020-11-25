@@ -34,6 +34,7 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/config.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/time_support.h"
@@ -102,11 +103,15 @@ TransportLayerMock::~TransportLayerMock() {
     shutdown();
 }
 
+#ifdef MONGO_CONFIG_SSL
+
 StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
 TransportLayerMock::createTransientSSLContext(const TransientSSLParams& transientSSLParams,
                                               const SSLManagerInterface* optionalManager) {
     return Status(ErrorCodes::InvalidSSLConfiguration, "Failure creating transient SSL context");
 }
+
+#endif
 
 }  // namespace transport
 }  // namespace mongo
