@@ -11,10 +11,11 @@ selector:
   - jstests/core/profile1.js
   - jstests/core/profile3.js
   - jstests/core/views/views_stats.js
-  # These tests expect hardcoded count of write operations and this suite retries writes on
-  # migration conflict errors.
+  # These tests contain assertions on the number of executed operations and this suite retries
+  # operations on TenantMigrationAborted errors.
   - jstests/core/operation_latency_histogram.js
   - jstests/core/top.js
+  - jstests/core/profile_sampling.js
   # The override cannot deep copy very large or small dates.
   - jstests/core/index_large_and_small_dates.js
   # These tests are not expected to pass with replica-sets.
