@@ -1,0 +1,38 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='timeseries_idl',
+    source=[
+        'timeseries.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
+    target='bucket_catalog',
+    source=[
+        'bucket_catalog.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/views/views',
+        'timeseries_idl',
+    ],
+)
+
+env.CppUnitTest(
+    target='bucket_catalog_test',
+    source=[
+        'bucket_catalog_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        'bucket_catalog',
+    ],
+)

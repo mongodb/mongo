@@ -619,7 +619,7 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
                   str::stream() << "invalid namespace name for a view: " + viewName.toString()};
     } else {
         status = ViewCatalog::get(this)->createView(
-            opCtx, viewName, viewOnNss, pipeline, options.collation);
+            opCtx, viewName, viewOnNss, pipeline, options.collation, options.timeseries);
     }
 
     audit::logCreateView(&cc(), viewName.toString(), viewOnNss.toString(), pipeline, status.code());

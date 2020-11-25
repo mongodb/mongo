@@ -102,7 +102,8 @@ public:
                       const NamespaceString& viewName,
                       const NamespaceString& viewOn,
                       const BSONArray& pipeline,
-                      const BSONObj& collation);
+                      const BSONObj& collation,
+                      const boost::optional<TimeseriesOptions>& timeseries);
 
     /**
      * Drop the view named 'viewName'.
@@ -168,7 +169,8 @@ private:
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline,
-                               std::unique_ptr<CollatorInterface> collator);
+                               std::unique_ptr<CollatorInterface> collator,
+                               const boost::optional<TimeseriesOptions>& timeseries = boost::none);
     /**
      * Parses the view definition pipeline, attempts to upsert into the view graph, and refreshes
      * the graph if necessary. Returns an error status if the resulting graph would be invalid.

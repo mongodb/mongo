@@ -59,6 +59,7 @@
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/stale_exception.h"
@@ -106,81 +107,80 @@ bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
         return false;
     }
 
-    return view->isTimeseries();
+    return view->timeseries().has_value();
 }
 
 // Default for control.version in time-series bucket collection.
 const int kTimeseriesControlVersion = 1;
-const int kTimeseriesBucketMaxCount = 1000;
-const int kTimeseriesBucketMaxSizeKB = 125;
-const Hours kTimeseriesBucketMaxTimeRange(1);
 
 /**
  * Returns min/max $set expressions for the bucket's control field.
  */
-BSONObj makeTimeseriesControlMinMaxStages(const BSONObj& doc) {
-    BSONObjBuilder builder;
-    for (const auto& elem : doc) {
-        auto key = elem.fieldNameStringData();
-        builder.append("control.min." + key,
-                       BSON("$min" << BSON_ARRAY(("$control.min." + key) << elem)));
-        builder.append("control.max." + key,
-                       BSON("$max" << BSON_ARRAY(("$control.max." + key) << elem)));
+BSONObj makeTimeseriesControlMinMaxStages(const std::vector<BSONObj>& docs) {
+    struct MinMaxBuilders {
+        BSONArrayBuilder min;
+        BSONArrayBuilder max;
+    };
+    StringDataMap<MinMaxBuilders> minMaxBuilders;
+
+    for (const auto& doc : docs) {
+        for (const auto& elem : doc) {
+            auto key = elem.fieldNameStringData();
+            auto [it, created] = minMaxBuilders.insert({key, MinMaxBuilders{}});
+            if (created) {
+                it->second.min.append("$control.min." + key);
+                it->second.max.append("$control.max." + key);
+            }
+            it->second.min.append(elem);
+            it->second.max.append(elem);
+        }
     }
+
+    BSONObjBuilder builder;
+    for (auto& builders : minMaxBuilders) {
+        builder.append("control.min." + builders.first, BSON("$min" << builders.second.min.arr()));
+        builder.append("control.max." + builders.first, BSON("$max" << builders.second.max.arr()));
+    }
+
     return builder.obj();
 }
 
 /**
  * Returns $set expressions for the bucket's data field.
  */
-BSONObj makeTimeseriesDataStages(const BSONObj& doc) {
+BSONObj makeTimeseriesDataStages(const std::vector<BSONObj>& docs, uint16_t count) {
+    StringDataMap<BSONArrayBuilder> measurements;
+    for (const auto& doc : docs) {
+        for (const auto& elem : doc) {
+            auto key = elem.fieldNameStringData();
+            measurements[key].append(
+                BSON("k" << std::to_string(count) << elem.wrap("v").firstElement()));
+        }
+        count++;
+    }
+
     BSONObjBuilder builder;
-    for (const auto& elem : doc) {
-        auto key = elem.fieldNameStringData();
+    for (auto& field : measurements) {
         builder.append(
-            "data." + key,
+            "data." + field.first,
             BSON("$arrayToObject" << BSON(
                      "$setUnion" << BSON_ARRAY(
-                         BSON("$objectToArray"
-                              << BSON("$ifNull" << BSON_ARRAY(("$data." + key) << BSONObj())))
-                         << BSON_ARRAY(BSON(
-                                "k" << BSON("$toString"
-                                            << BSON("$ifNull" << BSON_ARRAY("$control.count" << 0)))
-                                    << elem.wrap("v").firstElement()))))));
+                         BSON("$objectToArray" << BSON(
+                                  "$ifNull" << BSON_ARRAY(("$data." + field.first) << BSONObj())))
+                         << field.second.arr()))));
     }
+
     return builder.obj();
 }
 
 /**
  * Transforms a single time-series insert to an upsert request.
  */
-BSONObj makeTimeseriesUpsertRequest(const BSONObj& doc) {
+BSONObj makeTimeseriesUpsertRequest(const OID& oid,
+                                    const std::vector<BSONObj>& docs,
+                                    uint16_t count) {
     BSONObjBuilder builder;
-    // TODO(SERVER-52523): Obtain _id of bucket to update  and name of time field from in-memory
-    // catalog.
-    const auto timeField = "time"_sd;
-    {
-        BSONObjBuilder queryBuilder(builder.subobjStart(write_ops::UpdateOpEntry::kQFieldName));
-        BSONArrayBuilder andBuilder(queryBuilder.subarrayStart("$and"));
-        // Each bucket can hold up to 'kTimeseriesBucketMaxCount' measurements.
-        andBuilder.append(BSON(std::string(str::stream() << "data." << timeField << "."
-                                                         << (kTimeseriesBucketMaxCount - 1))
-                               << BSON("$exists" << false)));
-        // The total size of measurements in a bucket cannot exceed 'kTimeseriesBucketMaxSizeKB'.
-        // Ideally, we would use the following expression to avoid relying on 'control.size':
-        //     {$expr: {$lte: [{$bsonSize: '$data'}, (bucketMaxSizeKB * 1024 - doc.objsize())]}}
-        // but $expr is not allowed in an upsert. See SERVER-30731.
-        andBuilder.append(BSON(
-            "control.size" << BSON("$lte" << (kTimeseriesBucketMaxSizeKB * 1024 - doc.objsize()))));
-        // The maximum time-range of a bucket is limited, so index scans looking for buckets
-        // containing a time T only need to consider buckets that are newer than
-        // T - 'kTimeseriesBucketMaxTimeRange'.
-        auto docTime = doc[timeField].Date();
-        const std::string minTimeFieldName = str::stream() << "control.min." << timeField;
-        andBuilder.append(BSON(minTimeFieldName << BSON("$lte" << docTime)));
-        andBuilder.append(
-            BSON(minTimeFieldName << BSON("$gte" << (docTime - kTimeseriesBucketMaxTimeRange))));
-    }
+    builder.append(write_ops::UpdateOpEntry::kQFieldName, BSON("_id" << oid));
     builder.append(write_ops::UpdateOpEntry::kMultiFieldName, false);
     builder.append(write_ops::UpdateOpEntry::kUpsertFieldName, true);
     {
@@ -190,21 +190,94 @@ BSONObj makeTimeseriesUpsertRequest(const BSONObj& doc) {
             BSON("$set" << BSON("control.version"
                                 << BSON("$ifNull" << BSON_ARRAY("$control.version"
                                                                 << kTimeseriesControlVersion)))));
-        stagesBuilder.append(BSON(
-            "$set" << BSON("control.size"
-                           << BSON("$sum"
-                                   << BSON_ARRAY(BSON("$ifNull" << BSON_ARRAY("$control.size" << 0))
-                                                 << doc.objsize())))));
-        stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(doc)));
-        stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(doc)));
-        // Update 'control.count' last because it is referenced in preceding $set stages in this
-        // aggregation pipeline.
-        stagesBuilder.append(BSON(
-            "$set" << BSON("control.count" << BSON(
-                               "$sum" << BSON_ARRAY(
-                                   BSON("$ifNull" << BSON_ARRAY("$control.count" << 0)) << 1)))));
+        stagesBuilder.append(BSON("$set" << makeTimeseriesControlMinMaxStages(docs)));
+        stagesBuilder.append(BSON("$set" << makeTimeseriesDataStages(docs, count)));
     }
     return builder.obj();
+}
+
+void appendOpTime(const repl::OpTime& opTime, BSONObjBuilder* out) {
+    if (opTime.getTerm() == repl::OpTime::kUninitializedTerm) {
+        out->append("opTime", opTime.getTimestamp());
+    } else {
+        opTime.append(out, "opTime");
+    }
+}
+
+boost::optional<BSONObj> generateError(OperationContext* opCtx,
+                                       const StatusWith<SingleWriteResult>& result,
+                                       int index,
+                                       size_t numErrors) {
+    auto status = result.getStatus();
+    if (status.isOK()) {
+        return boost::none;
+    }
+
+    auto errorMessage = [numErrors, errorSize = size_t(0)](StringData rawMessage) mutable {
+        // Start truncating error messages once both of these limits are exceeded.
+        constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
+        constexpr size_t kErrorCountTruncationMin = 2;
+        if (errorSize >= kErrorSizeTruncationMin && numErrors >= kErrorCountTruncationMin) {
+            return ""_sd;
+        }
+
+        errorSize += rawMessage.size();
+        return rawMessage;
+    };
+
+    BSONSizeTracker errorsSizeTracker;
+    BSONObjBuilder error(errorsSizeTracker);
+    error.append("index", index);
+    if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
+        error.append("code", int(ErrorCodes::StaleShardVersion));  // Different from exception!
+        {
+            BSONObjBuilder errInfo(error.subobjStart("errInfo"));
+            staleInfo->serialize(&errInfo);
+        }
+    } else if (ErrorCodes::DocumentValidationFailure == status.code() && status.extraInfo()) {
+        auto docValidationError =
+            status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>();
+        error.append("code", static_cast<int>(ErrorCodes::DocumentValidationFailure));
+        error.append("errInfo", docValidationError->getDetails());
+    } else if (ErrorCodes::isTenantMigrationError(status.code())) {
+        if (ErrorCodes::TenantMigrationConflict == status.code()) {
+            auto migrationConflictInfo = status.extraInfo<TenantMigrationConflictInfo>();
+
+            hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
+
+            auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
+
+            auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
+            error.append("code", static_cast<int>(migrationStatus.code()));
+
+            // We want to append an empty errmsg for the errors after the first one, so let the
+            // code below that appends errmsg do that.
+            if (status.reason() != "") {
+                error.append("errmsg", errorMessage(migrationStatus.reason()));
+            }
+            if (migrationStatus.extraInfo()) {
+                error.append("errInfo",
+                             migrationStatus.extraInfo<TenantMigrationCommittedInfo>()->toBSON());
+            }
+        } else {
+            error.append("code", int(status.code()));
+            if (status.extraInfo()) {
+                error.append("errInfo", status.extraInfo<TenantMigrationCommittedInfo>()->toBSON());
+            }
+        }
+    } else {
+        error.append("code", int(status.code()));
+        if (auto const extraInfo = status.extraInfo()) {
+            extraInfo->serialize(&error);
+        }
+    }
+
+    // Skip appending errmsg if it has already been appended like in the case of
+    // TenantMigrationConflict.
+    if (!error.hasField("errmsg")) {
+        error.append("errmsg", errorMessage(status.reason()));
+    }
+    return error.obj();
 }
 
 enum class ReplyStyle { kUpdate, kNotUpdate };  // update has extra fields.
@@ -238,91 +311,24 @@ void serializeReply(OperationContext* opCtx,
     std::vector<BSONObj> upsertInfo;
     std::vector<BSONObj> errors;
     BSONSizeTracker upsertInfoSizeTracker;
-    BSONSizeTracker errorsSizeTracker;
-
-    auto errorMessage = [&, errorSize = size_t(0)](StringData rawMessage) mutable {
-        // Start truncating error messages once both of these limits are exceeded.
-        constexpr size_t kErrorSizeTruncationMin = 1024 * 1024;
-        constexpr size_t kErrorCountTruncationMin = 2;
-        if (errorSize >= kErrorSizeTruncationMin && errors.size() >= kErrorCountTruncationMin) {
-            return ""_sd;
-        }
-
-        errorSize += rawMessage.size();
-        return rawMessage;
-    };
 
     for (size_t i = 0; i < result.results.size(); i++) {
-        if (result.results[i].isOK()) {
-            const auto& opResult = result.results[i].getValue();
-            nVal += opResult.getN();  // Always there.
-            if (replyStyle == ReplyStyle::kUpdate) {
-                nModified += opResult.getNModified();
-                if (auto idElement = opResult.getUpsertedId().firstElement()) {
-                    BSONObjBuilder upsertedId(upsertInfoSizeTracker);
-                    upsertedId.append("index", int(i));
-                    upsertedId.appendAs(idElement, "_id");
-                    upsertInfo.push_back(upsertedId.obj());
-                }
-            }
+        if (auto error = generateError(opCtx, result.results[i], i, errors.size())) {
+            errors.push_back(*error);
             continue;
         }
 
-        const auto& status = result.results[i].getStatus();
-        BSONObjBuilder error(errorsSizeTracker);
-        error.append("index", int(i));
-        if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
-            error.append("code", int(ErrorCodes::StaleShardVersion));  // Different from exception!
-            {
-                BSONObjBuilder errInfo(error.subobjStart("errInfo"));
-                staleInfo->serialize(&errInfo);
-            }
-        } else if (ErrorCodes::DocumentValidationFailure == status.code() && status.extraInfo()) {
-            auto docValidationError =
-                status.extraInfo<doc_validation_error::DocumentValidationFailureInfo>();
-            error.append("code", static_cast<int>(ErrorCodes::DocumentValidationFailure));
-            error.append("errInfo", docValidationError->getDetails());
-        } else if (ErrorCodes::isTenantMigrationError(status.code())) {
-            if (ErrorCodes::TenantMigrationConflict == status.code()) {
-                auto migrationConflictInfo = status.extraInfo<TenantMigrationConflictInfo>();
-
-                hangWriteBeforeWaitingForMigrationDecision.pauseWhileSet(opCtx);
-
-                auto mtab = migrationConflictInfo->getTenantMigrationAccessBlocker();
-
-                auto migrationStatus = mtab->waitUntilCommittedOrAborted(opCtx);
-                error.append("code", static_cast<int>(migrationStatus.code()));
-
-                // We want to append an empty errmsg for the errors after the first one, so let the
-                // code below that appends errmsg do that.
-                if (status.reason() != "") {
-                    error.append("errmsg", errorMessage(migrationStatus.reason()));
-                }
-                if (migrationStatus.extraInfo()) {
-                    error.append(
-                        "errInfo",
-                        migrationStatus.extraInfo<TenantMigrationCommittedInfo>()->toBSON());
-                }
-            } else {
-                error.append("code", int(status.code()));
-                if (status.extraInfo()) {
-                    error.append("errInfo",
-                                 status.extraInfo<TenantMigrationCommittedInfo>()->toBSON());
-                }
-            }
-        } else {
-            error.append("code", int(status.code()));
-            if (auto const extraInfo = status.extraInfo()) {
-                extraInfo->serialize(&error);
+        const auto& opResult = result.results[i].getValue();
+        nVal += opResult.getN();  // Always there.
+        if (replyStyle == ReplyStyle::kUpdate) {
+            nModified += opResult.getNModified();
+            if (auto idElement = opResult.getUpsertedId().firstElement()) {
+                BSONObjBuilder upsertedId(upsertInfoSizeTracker);
+                upsertedId.append("index", int(i));
+                upsertedId.appendAs(idElement, "_id");
+                upsertInfo.push_back(upsertedId.obj());
             }
         }
-
-        // Skip appending errmsg if it has already been appended like in the case of
-        // TenantMigrationConflict.
-        if (!error.hasField("errmsg")) {
-            error.append("errmsg", errorMessage(status.reason()));
-        }
-        errors.push_back(error.obj());
     }
 
     out->appendNumber("n", nVal);
@@ -345,12 +351,7 @@ void serializeReply(OperationContext* opCtx,
         auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
         const auto replMode = replCoord->getReplicationMode();
         if (replMode != repl::ReplicationCoordinator::modeNone) {
-            const auto lastOp = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            if (lastOp.getTerm() == repl::OpTime::kUninitializedTerm) {
-                out->append("opTime", lastOp.getTimestamp());
-            } else {
-                lastOp.append(out, "opTime");
-            }
+            appendOpTime(repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(), out);
 
             if (replMode == repl::ReplicationCoordinator::modeReplSet) {
                 out->append("electionId", replCoord->getElectionId());
@@ -468,39 +469,102 @@ private:
         /**
          * Writes to the underlying system.buckets collection.
          */
-        void _performTimeseriesWrites(OperationContext* opCtx, BSONObjBuilder& result) const {
+        void _performTimeseriesWrites(OperationContext* opCtx, BSONObjBuilder* result) const {
             auto ns = _batch.getNamespace();
             auto bucketsNs = ns.makeTimeseriesBucketsNamespace();
 
-            BSONObjBuilder builder;
-            builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
-            // The schema validation configured in the bucket collection is intended for direct
-            // operations by end users and is not applicable here.
-            builder.append(write_ops::Update::kBypassDocumentValidationFieldName, true);
-            builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
-            if (auto stmtId = _batch.getStmtId()) {
-                builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
-            } else if (auto stmtIds = _batch.getStmtIds()) {
-                builder.append(write_ops::Update::kStmtIdsFieldName, *stmtIds);
-            }
-            {
-                BSONArrayBuilder updatesBuilder(
-                    builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
-                for (const auto& doc : _batch.getDocuments()) {
-                    updatesBuilder.append(makeTimeseriesUpsertRequest(doc));
+            auto& bucketCatalog = BucketCatalog::get(opCtx);
+            std::vector<std::pair<OID, size_t>> bucketsToCommit;
+            std::vector<std::pair<Future<BucketCatalog::CommitInfo>, size_t>> bucketsToWaitOn;
+            for (size_t i = 0; i < _batch.getDocuments().size(); i++) {
+                auto [bucketId, commitInfo] =
+                    bucketCatalog.insert(opCtx, ns, _batch.getDocuments()[i]);
+                if (commitInfo) {
+                    bucketsToWaitOn.push_back({std::move(*commitInfo), i});
+                } else {
+                    bucketsToCommit.push_back({std::move(bucketId), i});
                 }
             }
-            auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
 
-            auto timeseriesUpsertBatch = UpdateOp::parse(request);
+            std::vector<BSONObj> errors;
+            boost::optional<repl::OpTime> opTime;
+            boost::optional<OID> electionId;
 
-            auto reply = write_ops_exec::performUpdates(opCtx, timeseriesUpsertBatch);
-            serializeReply(opCtx,
-                           ReplyStyle::kUpdate,
-                           !timeseriesUpsertBatch.getWriteCommandBase().getOrdered(),
-                           timeseriesUpsertBatch.getUpdates().size(),
-                           std::move(reply),
-                           &result);
+            for (const auto& [bucketId, index] : bucketsToCommit) {
+                auto data = bucketCatalog.commit(bucketId);
+                while (!data.docs.empty()) {
+                    BSONObjBuilder builder;
+                    builder.append(write_ops::Update::kCommandName, bucketsNs.coll());
+                    // The schema validation configured in the bucket collection is intended for
+                    // direct operations by end users and is not applicable here.
+                    builder.append(write_ops::Update::kBypassDocumentValidationFieldName, true);
+                    builder.append(write_ops::Update::kOrderedFieldName, _batch.getOrdered());
+                    if (auto stmtId = _batch.getStmtId()) {
+                        builder.append(write_ops::Update::kStmtIdFieldName, *stmtId);
+                    } else if (auto stmtIds = _batch.getStmtIds()) {
+                        builder.append(write_ops::Update::kStmtIdsFieldName, *stmtIds);
+                    }
+
+                    {
+                        BSONArrayBuilder updatesBuilder(
+                            builder.subarrayStart(write_ops::Update::kUpdatesFieldName));
+                        updatesBuilder.append(makeTimeseriesUpsertRequest(
+                            bucketId, data.docs, data.numCommittedMeasurements));
+                    }
+
+                    auto request = OpMsgRequest::fromDBAndBody(bucketsNs.db(), builder.obj());
+                    auto timeseriesUpsertBatch = UpdateOp::parse(request);
+                    auto reply = write_ops_exec::performUpdates(opCtx, timeseriesUpsertBatch);
+
+                    invariant(reply.results.size() == 1,
+                              str::stream()
+                                  << "Unexpected number of results (" << reply.results.size()
+                                  << ") for insert on time-series collection " << ns);
+
+                    if (auto error = generateError(opCtx, reply.results[0], index, errors.size())) {
+                        errors.push_back(*error);
+                    }
+
+                    auto* replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
+                    const auto replMode = replCoord->getReplicationMode();
+
+                    opTime = replMode != repl::ReplicationCoordinator::modeNone
+                        ? boost::make_optional(
+                              repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp())
+                        : boost::none;
+                    electionId = replMode == repl::ReplicationCoordinator::modeReplSet
+                        ? boost::make_optional(replCoord->getElectionId())
+                        : boost::none;
+
+                    data = bucketCatalog.commit(
+                        bucketId,
+                        BucketCatalog::CommitInfo{std::move(reply.results[0]), opTime, electionId});
+                }
+            }
+
+            for (const auto& [future, index] : bucketsToWaitOn) {
+                auto commitInfo = future.get(opCtx);
+                if (auto error = generateError(opCtx, commitInfo.result, index, errors.size())) {
+                    errors.push_back(*error);
+                }
+                if (commitInfo.opTime) {
+                    opTime = std::max(opTime.value_or(repl::OpTime()), *commitInfo.opTime);
+                }
+                if (commitInfo.electionId) {
+                    electionId = std::max(electionId.value_or(OID()), *commitInfo.electionId);
+                }
+            }
+
+            result->appendNumber("n", _batch.getDocuments().size() - errors.size());
+            if (!errors.empty()) {
+                result->append("writeErrors", errors);
+            }
+            if (opTime) {
+                appendOpTime(*opTime, result);
+            }
+            if (electionId) {
+                result->append("electionId", *electionId);
+            }
         }
 
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
@@ -508,7 +572,7 @@ private:
                 // Re-throw parsing exceptions to be consistent with CmdInsert::Invocation's
                 // constructor.
                 try {
-                    _performTimeseriesWrites(opCtx, result);
+                    _performTimeseriesWrites(opCtx, &result);
                 } catch (DBException& ex) {
                     ex.addContext(str::stream() << "time-series insert failed: " << ns().ns());
                     throw;

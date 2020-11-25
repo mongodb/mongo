@@ -264,7 +264,6 @@ public:
         } else {
             // Time-series collections are only supported in 5.0. If the user tries to downgrade the
             // cluster to an earlier version, they must first remove all time-series collections.
-            // TODO(SERVER-52523): Use the bucket catalog to detect time-series collections.
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, dbName);
                 if (!viewCatalog) {
@@ -277,7 +276,7 @@ public:
                                    "collections present; drop all time-series collections before "
                                    "downgrading. First detected time-series collection: "
                                 << view.name(),
-                            !view.isTimeseries());
+                            !view.timeseries());
                 });
             }
 

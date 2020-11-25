@@ -40,6 +40,7 @@ env.SConscript(
         'sorter',
         'stats',
         'storage',
+        'timeseries',
         'update',
         'views',
     ],

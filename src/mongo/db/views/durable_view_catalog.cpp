@@ -142,7 +142,8 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
 
     for (const BSONElement& e : viewDefinition) {
         std::string name(e.fieldName());
-        valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation";
+        valid &= name == "_id" || name == "viewOn" || name == "pipeline" || name == "collation" ||
+            name == "timeseries";
     }
 
     const auto viewName = viewDefinition["_id"].str();
@@ -167,6 +168,9 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
 
     valid &= (!viewDefinition.hasField("collation") ||
               viewDefinition["collation"].type() == BSONType::Object);
+
+    valid &= !viewDefinition.hasField("timeseries") ||
+        viewDefinition["timeseries"].type() == BSONType::Object;
 
     uassert(ErrorCodes::InvalidViewDefinition,
             str::stream() << "found invalid view definition " << viewDefinition["_id"]

@@ -206,7 +206,7 @@ Status _createTimeseries(OperationContext* opCtx,
         // If the buckets collection and time-series view creation roll back, ensure that their Top
         // entries are deleted.
         opCtx->recoveryUnit()->onRollback(
-            [serviceContext = opCtx->getServiceContext(), &ns, &bucketsNs]() {
+            [serviceContext = opCtx->getServiceContext(), ns, bucketsNs]() {
                 Top::get(serviceContext).collectionDropped(ns);
                 Top::get(serviceContext).collectionDropped(bucketsNs);
             });

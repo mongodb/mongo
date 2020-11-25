@@ -83,7 +83,7 @@ public:
             collator = std::move(factoryCollator.getValue());
         }
 
-        return {db, view, viewOn, pipeline, std::move(collator)};
+        return {db, view, viewOn, pipeline, std::move(collator), boost::none};
     }
 
 private:

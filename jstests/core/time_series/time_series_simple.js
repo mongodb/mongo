@@ -2,6 +2,7 @@
  * Tests inserting sample data into the time-series buckets collection.
  * This test is for the simple case of only one measurement per bucket.
  * @tags: [
+ *     does_not_support_stepdowns,
  *     requires_fcv_49,
  * ]
  */
@@ -102,7 +103,6 @@ const bucketDocs = bucketsColl.find().toArray();
 assert.eq(1, bucketDocs.length, bucketDocs);
 const bucketDoc = bucketDocs[0];
 jsTestLog('Bucket collection document: ' + tojson(bucketDoc));
-assert.eq(numDocs, bucketDoc.control.count, 'invalid count in bucket: ' + tojson(bucketDoc));
 assert.docEq(expectedBucketDoc.control.min,
              bucketDoc.control.min,
              'invalid min in bucket: ' + tojson(bucketDoc));

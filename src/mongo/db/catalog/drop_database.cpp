@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/duration.h"
@@ -113,6 +114,8 @@ void _finishDropDatabase(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
     databaseHolder->dropDb(opCtx, db);
     dropPendingGuard.dismiss();
+
+    BucketCatalog::get(opCtx).clear(dbName);
 
     LOGV2(20336,
           "dropDatabase {dbName} - finished, dropped {numCollections} collection(s)",
