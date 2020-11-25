@@ -119,6 +119,7 @@ let viewsCommandTests = {
     _shardsvrMovePrimary: {skip: isAnInternalCommand},
     _shardsvrRenameCollection: {skip: isAnInternalCommand},
     _shardsvrShardCollection: {skip: isAnInternalCommand},
+    _shardsvrDropDatabase: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortTransaction: {skip: isUnrelated},

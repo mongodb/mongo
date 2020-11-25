@@ -117,6 +117,7 @@ let testCases = {
     _shardsvrMovePrimary: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrShardCollection: {skip: "internal command"},
+    _shardsvrDropDatabase: {skip: "internal command"},
     _transferMods: {skip: "internal command"},
     _vectorClockPersist: {skip: "internal command"},
     abortTransaction: {

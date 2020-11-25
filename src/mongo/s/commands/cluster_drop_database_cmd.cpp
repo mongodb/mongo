@@ -35,9 +35,12 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/drop_database_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -78,7 +81,6 @@ public:
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot drop the config database",
                 dbname != NamespaceString::kConfigDb);
-
         uassert(ErrorCodes::IllegalOperation,
                 "Cannot drop the admin database",
                 dbname != NamespaceString::kAdminDb);
@@ -88,28 +90,43 @@ public:
                 "have to pass 1 as db parameter",
                 request.getCommandParameter() == 1);
 
-        // Invalidate the database metadata so the next access kicks off a full reload, even if
-        // sending the command to the config server fails due to e.g. a NetworkError.
-        ON_BLOCK_EXIT([opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
+        try {
 
-        // Send _configsvrDropDatabase to the config server.
-        auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-        auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-            "admin",
-            CommandHelpers::appendMajorityWriteConcern(
-                CommandHelpers::appendGenericCommandArgs(cmdObj,
-                                                         BSON("_configsvrDropDatabase" << dbname)),
-                opCtx->getWriteConcern()),
-            Shard::RetryPolicy::kIdempotent));
+            const CachedDatabaseInfo dbInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbname));
 
-        // The cmdResponse status can be OK even if the config server replied ok: 0.
-        uassertStatusOK(cmdResponse.commandStatus);
-        auto reply = DropDatabaseReply::parse(IDLParserErrorContext("dropDatabase-reply"),
-                                              cmdResponse.response);
-        CommandHelpers::appendGenericReplyFields(cmdResponse.response, reply.toBSON(), &result);
-        return true;
+            // Invalidate the database metadata so the next access kicks off a full reload, even if
+            // sending the command to the config server fails due to e.g. a NetworkError.
+            ON_BLOCK_EXIT(
+                [opCtx, dbname] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbname); });
+
+            // Send it to the primary shard
+            ShardsvrDropDatabase dropDatabaseCommand(1);
+            dropDatabaseCommand.setDbName(dbname);
+
+            auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                opCtx,
+                dbname,
+                dbInfo,
+                CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON({}),
+                                                           opCtx->getWriteConcern()),
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                Shard::RetryPolicy::kIdempotent);
+
+            const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+
+            auto reply = DropDatabaseReply::parse(IDLParserErrorContext("dropDatabase-reply"),
+                                                  remoteResponse.data);
+            CommandHelpers::appendGenericReplyFields(remoteResponse.data, reply.toBSON(), &result);
+
+            return true;
+        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+            // If the namespace isn't found, treat the drop as a success but inform about the
+            // failure.
+            result.append("info", "database does not exist");
+            return true;
+        }
     }
 
 } clusterDropDatabaseCmd;
