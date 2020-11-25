@@ -36,7 +36,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregation_request.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/remote_command_response.h"
@@ -206,18 +205,6 @@ public:
                                                          const std::string& dbName,
                                                          const BSONObj& cmdObj,
                                                          Milliseconds maxTimeMSOverride);
-
-    /**
-     * Synchronously run the aggregation request, with a best effort honoring of request
-     * options. `callback` will be called with the batch contained in each response. `callback`
-     * should return `true` to execute another getmore. Returning `false` will send a
-     * `killCursors`. If the aggregation results are exhausted, there will be no additional calls to
-     * `callback`.
-     */
-    virtual Status runAggregation(
-        OperationContext* opCtx,
-        const AggregationRequest& aggRequest,
-        std::function<bool(const std::vector<BSONObj>& batch)> callback) = 0;
 
     /**
      * Runs a write command against a shard. This is separate from runCommand, because write

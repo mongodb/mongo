@@ -201,10 +201,4 @@ void ShardLocal::runFireAndForgetCommand(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-Status ShardLocal::runAggregation(OperationContext* opCtx,
-                                  const AggregationRequest& aggRequest,
-                                  std::function<bool(const std::vector<BSONObj>& batch)> callback) {
-    MONGO_UNREACHABLE;
-}
-
 }  // namespace mongo

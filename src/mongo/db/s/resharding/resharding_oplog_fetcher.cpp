@@ -87,71 +87,88 @@ ReshardingOplogFetcher::ReshardingOplogFetcher(UUID reshardingUUID,
       _donorShard(donorShard),
       _recipientShard(recipientShard),
       _doesDonorOwnMinKeyChunk(doesDonorOwnMinKeyChunk),
-      _toWriteInto(toWriteInto) {}
+      _toWriteInto(toWriteInto),
+      _client(getGlobalServiceContext()->makeClient(
+          fmt::format("OplogFetcher-{}-{}", reshardingUUID.toString(), donorShard.toString()))) {}
 
-Future<void> ReshardingOplogFetcher::schedule(executor::TaskExecutor* executor) {
-    auto pf = makePromiseFuture<void>();
-    _fetchedFinishPromise = std::move(pf.promise);
-
-    _reschedule(executor);
-
-    return std::move(pf.future);
+void ReshardingOplogFetcher::consume(DBClientBase* conn) {
+    while (true) {
+        auto opCtxRaii = _client->makeOperationContext();
+        opCtxRaii->checkForInterrupt();
+        auto expCtx = _makeExpressionContext(opCtxRaii.get());
+        boost::optional<ReshardingDonorOplogId> restartAt = iterate(opCtxRaii.get(),
+                                                                    conn,
+                                                                    expCtx,
+                                                                    _startAt,
+                                                                    _collUUID,
+                                                                    _recipientShard,
+                                                                    _doesDonorOwnMinKeyChunk,
+                                                                    _toWriteInto);
+        if (!restartAt) {
+            return;
+        }
+        _startAt = restartAt.get();
+    }
 }
 
-void ReshardingOplogFetcher::_reschedule(executor::TaskExecutor* executor) {
+void ReshardingOplogFetcher::setKilled() {
+    _isAlive.store(false);
+    _client->setKilled();
+}
+
+void ReshardingOplogFetcher::schedule(executor::TaskExecutor* executor) {
     executor->schedule([this, executor](Status status) {
-        ThreadClient client(
-            fmt::format("OplogFetcher-{}-{}", _reshardingUUID.toString(), _donorShard.toString()),
-            getGlobalServiceContext());
         if (!status.isOK()) {
-            LOGV2_INFO(5192101, "Resharding oplog fetcher aborting.", "reason"_attr = status);
-            _fetchedFinishPromise.setError(status);
             return;
         }
 
-        try {
-            if (iterate(client.get())) {
-                _reschedule(executor);
-            } else {
-                _fetchedFinishPromise.emplaceValue();
-            }
-        } catch (...) {
-            LOGV2_INFO(5192102, "Error.", "reason"_attr = exceptionToStatus());
-            _fetchedFinishPromise.setError(exceptionToStatus());
+        if (_runTask()) {
+            schedule(executor);
         }
     });
 }
 
-bool ReshardingOplogFetcher::iterate(Client* client) {
-    std::shared_ptr<Shard> targetShard;
-    {
-        auto opCtxRaii = client->makeOperationContext();
-        opCtxRaii->checkForInterrupt();
+bool ReshardingOplogFetcher::_runTask() {
+    auto opCtxRaii = _client->makeOperationContext();
+    opCtxRaii->checkForInterrupt();
 
-        const Seconds maxStaleness(10);
-        ReadPreferenceSetting readPref(ReadPreference::Nearest, maxStaleness);
-        StatusWith<std::shared_ptr<Shard>> swDonor =
-            Grid::get(opCtxRaii.get())->shardRegistry()->getShard(opCtxRaii.get(), _donorShard);
-        if (!swDonor.isOK()) {
-            LOGV2_WARNING(5127203,
-                          "Error finding shard in registry, retrying.",
-                          "error"_attr = swDonor.getStatus());
-            return true;
-        }
-        targetShard = swDonor.getValue();
+    const Seconds maxStaleness(10);
+    ReadPreferenceSetting readPref(ReadPreference::Nearest, maxStaleness);
+    StatusWith<std::shared_ptr<Shard>> swDonor =
+        Grid::get(opCtxRaii.get())->shardRegistry()->getShard(opCtxRaii.get(), _donorShard);
+    if (!swDonor.isOK()) {
+        LOGV2_WARNING(5127203,
+                      "Error finding shard in registry, retrying.",
+                      "error"_attr = swDonor.getStatus());
+        return true;
     }
+
+    StatusWith<HostAndPort> swTargettedDonor =
+        swDonor.getValue()->getTargeter()->findHost(opCtxRaii.get(), readPref);
+    if (!swTargettedDonor.isOK()) {
+        LOGV2_WARNING(5127202,
+                      "Error targetting donor, retrying.",
+                      "error"_attr = swTargettedDonor.getStatus());
+        return true;
+    }
+
+    DBClientConnection donorConn;
+    if (auto status = donorConn.connect(swTargettedDonor.getValue(), "ReshardingOplogFetching"_sd);
+        !status.isOK()) {
+        LOGV2_WARNING(5127201, "Failed connecting to donor, retrying.", "error"_attr = status);
+        return true;
+    }
+    // Reset the OpCtx so consuming can manage short-lived OpCtx lifetimes with the current client.
+    opCtxRaii.reset();
 
     try {
         // Consume will throw if there's oplog entries to be copied. It only returns cleanly when
         // the final oplog has been seen and copied.
-        consume(client, targetShard.get());
+        consume(&donorConn);
         return false;
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+        _isAlive.store(false);
         return false;
-    } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>&) {
-        LOGV2_ERROR(
-            5192103, "Fatal resharding error while fetching.", "error"_attr = exceptionToStatus());
-        throw;
     } catch (const DBException&) {
         LOGV2_WARNING(
             5127200, "Error while fetching, retrying.", "error"_attr = exceptionToStatus());
@@ -159,99 +176,73 @@ bool ReshardingOplogFetcher::iterate(Client* client) {
     }
 }
 
-void ReshardingOplogFetcher::_ensureCollection(Client* client, const NamespaceString nss) {
-    auto opCtxRaii = client->makeOperationContext();
-    auto opCtx = opCtxRaii.get();
+boost::optional<ReshardingDonorOplogId> ReshardingOplogFetcher::iterate(
+    OperationContext* opCtx,
+    DBClientBase* conn,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    const ReshardingDonorOplogId startAfter,
+    const UUID collUUID,
+    const ShardId& recipientShard,
+    const bool doesDonorOwnMinKeyChunk,
+    const NamespaceString toWriteToNss) {
+    // This method will use the input opCtx to perform writes into `toWriteToNss`.
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
     // Create the destination collection if necessary.
-    writeConflictRetry(opCtx, "createReshardingLocalOplogBuffer", nss.toString(), [&] {
-        const CollectionPtr coll =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-        if (coll) {
+    writeConflictRetry(opCtx, "createReshardingLocalOplogBuffer", toWriteToNss.toString(), [&] {
+        const CollectionPtr toWriteTo =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toWriteToNss);
+        if (toWriteTo) {
             return;
         }
 
         WriteUnitOfWork wuow(opCtx);
-        AutoGetOrCreateDb db(opCtx, nss.db(), LockMode::MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        db.getDb()->createCollection(opCtx, nss);
+        AutoGetOrCreateDb db(opCtx, toWriteToNss.db(), LockMode::MODE_IX);
+        Lock::CollectionLock collLock(opCtx, toWriteToNss, MODE_IX);
+        db.getDb()->createCollection(opCtx, toWriteToNss);
         wuow.commit();
     });
-}
 
-std::vector<BSONObj> ReshardingOplogFetcher::_makePipeline(Client* client) {
-    auto opCtxRaii = client->makeOperationContext();
-    auto opCtx = opCtxRaii.get();
-    auto expCtx = _makeExpressionContext(opCtx);
-
-    return createOplogFetchingPipelineForResharding(
-               expCtx, _startAt, _collUUID, _recipientShard, _doesDonorOwnMinKeyChunk)
-        ->serializeToBson();
-}
-
-void ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
-    _ensureCollection(client, _toWriteInto);
-    std::vector<BSONObj> serializedPipeline = _makePipeline(client);
+    std::vector<BSONObj> serializedPipeline =
+        createOplogFetchingPipelineForResharding(
+            expCtx, startAfter, collUUID, recipientShard, doesDonorOwnMinKeyChunk)
+            ->serializeToBson();
 
     AggregationRequest aggRequest(NamespaceString::kRsOplogNamespace, serializedPipeline);
-    if (_useReadConcern) {
-        auto readConcernArgs = repl::ReadConcernArgs(
-            boost::optional<LogicalTime>(_startAt.getTs()),
-            boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
-        aggRequest.setReadConcern(readConcernArgs.toBSONInner());
-    }
-
+    auto readConcernArgs = repl::ReadConcernArgs(
+        boost::optional<LogicalTime>(startAfter.getTs()),
+        boost::optional<repl::ReadConcernLevel>(repl::ReadConcernLevel::kMajorityReadConcern));
+    aggRequest.setReadConcern(readConcernArgs.toBSONInner());
     aggRequest.setHint(BSON("$natural" << 1));
-    aggRequest.setRequestReshardingResumeToken(true);
 
-    if (_initialBatchSize) {
-        aggRequest.setBatchSize(_initialBatchSize);
+    const bool secondaryOk = true;
+    const bool useExhaust = true;
+    std::unique_ptr<DBClientCursor> cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        conn, std::move(aggRequest), secondaryOk, useExhaust));
+
+    // Noting some possible optimizations:
+    //
+    // * Batch more inserts into larger storage transactions.
+    // * Parallize writing documents across multiple threads.
+    // * Doing either of the above while still using the underlying message buffer of bson objects.
+    AutoGetCollection toWriteTo(opCtx, toWriteToNss, LockMode::MODE_IX);
+    ReshardingDonorOplogId lastSeen = startAfter;
+    while (cursor->more() && _isAlive.load()) {
+        WriteUnitOfWork wuow(opCtx);
+        BSONObj obj = cursor->next();
+        auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(obj));
+
+        lastSeen = ReshardingDonorOplogId::parse({"OplogFetcherParsing"},
+                                                 nextOplog.get_id()->getDocument().toBson());
+        uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{obj}, nullptr));
+        wuow.commit();
+        ++_numOplogEntriesCopied;
+
+        if (isFinalOplog(nextOplog, _reshardingUUID)) {
+            return boost::none;
+        }
     }
 
-    auto opCtxRaii = client->makeOperationContext();
-    int batchesProcessed = 0;
-    auto svcCtx = client->getServiceContext();
-    uassertStatusOK(shard->runAggregation(
-        opCtxRaii.get(),
-        aggRequest,
-        [this, svcCtx, &batchesProcessed](const std::vector<BSONObj>& batch) {
-            ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
-                                            _reshardingUUID.toString(),
-                                            _donorShard.toString()),
-                                svcCtx,
-                                nullptr);
-            auto opCtxRaii = cc().makeOperationContext();
-            auto opCtx = opCtxRaii.get();
-
-            // Noting some possible optimizations:
-            //
-            // * Batch more inserts into larger storage transactions.
-            // * Parallize writing documents across multiple threads.
-            // * Doing either of the above while still using the underlying message buffer of bson
-            //   objects.
-            AutoGetCollection toWriteTo(opCtx, _toWriteInto, LockMode::MODE_IX);
-            for (const BSONObj& doc : batch) {
-                WriteUnitOfWork wuow(opCtx);
-                auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(doc));
-
-                _startAt = ReshardingDonorOplogId::parse(
-                    {"OplogFetcherParsing"}, nextOplog.get_id()->getDocument().toBson());
-                uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{doc}, nullptr));
-                wuow.commit();
-                ++_numOplogEntriesCopied;
-
-                if (isFinalOplog(nextOplog, _reshardingUUID)) {
-                    return false;
-                }
-            }
-
-            if (_maxBatches > -1 && ++batchesProcessed >= _maxBatches) {
-                return false;
-            }
-
-            return true;
-        }));
+    return lastSeen;
 }
-
 }  // namespace mongo

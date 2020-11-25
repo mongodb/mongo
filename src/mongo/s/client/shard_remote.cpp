@@ -281,7 +281,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
         const auto& data = dataStatus.getValue();
 
         if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
-            // Sharding users of ReplSetMetadata do not require the wall clock time field to be set.
+            // Sharding users of ReplSetMetadata do not require the wall clock time field to be set
             auto replParseStatus =
                 rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
             if (!replParseStatus.isOK()) {
@@ -410,91 +410,6 @@ void ShardRemote::runFireAndForgetCommand(OperationContext* opCtx,
         .getStatus()
         .ignore();
 }
-
-Status ShardRemote::runAggregation(
-    OperationContext* opCtx,
-    const AggregationRequest& aggRequest,
-    std::function<bool(const std::vector<BSONObj>& batch)> callback) {
-
-    BSONObj readPrefMetadata;
-
-    ReadPreferenceSetting readPreference =
-        uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(
-            aggRequest.getUnwrappedReadPref(), ReadPreference::SecondaryPreferred));
-
-    auto swHost = _targeter->findHost(opCtx, readPreference);
-    if (!swHost.isOK()) {
-        return swHost.getStatus();
-    }
-    HostAndPort host = swHost.getValue();
-
-    BSONObjBuilder builder;
-    readPreference.toContainingBSON(&builder);
-    readPrefMetadata = builder.obj();
-
-    Status status =
-        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
-    auto fetcherCallback = [&status, callback](const Fetcher::QueryResponseStatus& dataStatus,
-                                               Fetcher::NextAction* nextAction,
-                                               BSONObjBuilder* getMoreBob) {
-        // Throw out any accumulated results on error
-        if (!dataStatus.isOK()) {
-            status = dataStatus.getStatus();
-            return;
-        }
-
-        const auto& data = dataStatus.getValue();
-
-        if (data.otherFields.metadata.hasField(rpc::kReplSetMetadataFieldName)) {
-            // Sharding users of ReplSetMetadata do not require the wall clock time field to be set.
-            auto replParseStatus =
-                rpc::ReplSetMetadata::readFromMetadata(data.otherFields.metadata);
-            if (!replParseStatus.isOK()) {
-                status = replParseStatus.getStatus();
-                return;
-            }
-        }
-
-        if (!callback(data.documents)) {
-            *nextAction = Fetcher::NextAction::kNoAction;
-        }
-
-        status = Status::OK();
-
-        if (!getMoreBob) {
-            return;
-        }
-        getMoreBob->append("getMore", data.cursorId);
-        getMoreBob->append("collection", data.nss.coll());
-    };
-
-    Milliseconds requestTimeout(-1);
-    if (aggRequest.getMaxTimeMS()) {
-        requestTimeout = Milliseconds(aggRequest.getMaxTimeMS());
-    }
-
-    auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    Fetcher fetcher(executor.get(),
-                    host,
-                    aggRequest.getNamespaceString().db().toString(),
-                    aggRequest.serializeToCommandObj().toBson(),
-                    fetcherCallback,
-                    readPrefMetadata,
-                    requestTimeout, /* command network timeout */
-                    requestTimeout /* getMore network timeout */);
-
-    Status scheduleStatus = fetcher.schedule();
-    if (!scheduleStatus.isOK()) {
-        return scheduleStatus;
-    }
-
-    fetcher.join();
-
-    updateReplSetMonitor(host, status);
-
-    return status;
-}
-
 
 StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     OperationContext* opCtx,

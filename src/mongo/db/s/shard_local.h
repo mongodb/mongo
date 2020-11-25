@@ -70,10 +70,6 @@ public:
                                  const std::string& dbName,
                                  const BSONObj& cmdObj) override;
 
-    Status runAggregation(OperationContext* opCtx,
-                          const AggregationRequest& aggRequest,
-                          std::function<bool(const std::vector<BSONObj>& batch)> callback);
-
 private:
     StatusWith<Shard::CommandResponse> _runCommand(OperationContext* opCtx,
                                                    const ReadPreferenceSetting& unused,
