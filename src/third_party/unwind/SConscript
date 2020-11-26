@@ -131,7 +131,7 @@ env.Library(
     LIBDEPS_GLOBAL=[
         dep
         for dep in env.get('LIBDEPS_GLOBAL', [])
-        if dep and not (dep.endswith('shim_allocator') or dep.endswith('shim_cxx'))
+        if not dep.endswith('shim_allocator')
     ],
     # TODO: Remove when SERVER-48291 is merged into stable build tools
     DISABLE_ALLOCATOR_SHIM_INJECTION=True,

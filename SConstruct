@@ -429,15 +429,6 @@ add_option("cxx-std",
     help="Select the C++ langauge standard to build with",
 )
 
-add_option("dynamic-runtime",
-    choices=["force", "off", "auto"],
-    const="on",
-    default="auto",
-    help="Force the static compiler and C++ runtimes to be linked dynamically",
-    nargs="?",
-    type="choice",
-)
-
 def find_mongo_custom_variables():
     files = []
     paths = [path for path in sys.path if 'site_scons' in path]
@@ -1155,25 +1146,6 @@ for var in ['CC', 'CXX']:
 env.AddMethod(mongo_platform.env_os_is_wrapper, 'TargetOSIs')
 env.AddMethod(mongo_platform.env_get_os_name_wrapper, 'GetTargetOSName')
 
-
-def shim_library(env, name, needs_link=False, *args, **kwargs):
-    nodes = env.Library(
-        target=f"shim_{name}" if name else name,
-        source=[
-            f"shim_{name}.cpp" if name else name,
-        ],
-        *args,
-        **kwargs
-    )
-
-    for n in nodes:
-        setattr(n.attributes, "needs_link", needs_link)
-
-    return nodes
-
-env.AddMethod(shim_library, 'ShimLibrary')
-
-
 def conf_error(env, msg, *args):
     print(msg.format(*args))
     print("See {0} for details".format(env.File('$CONFIGURELOG').abspath))
@@ -1662,106 +1634,6 @@ if link_model.startswith("dynamic"):
                     return []
                 env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
 
-
-# If requested, wrap the static runtime libraries in shims and use those to link
-# them dynamically. This allows us to "convert" runtimes in toolchains that have
-# linker scripts in place of shared libraries which actually link the static
-# library instead. The benefit of making this conversion is that shared
-# libraries produced by these toolchains are smaller because we don't end up
-# spreading runtime symbols all over the place, and in turn they should also
-# get loaded by the dynamic linker more quickly as well.
-dynamicRT = get_option("dynamic-runtime")
-
-if get_option("link-model") != "dynamic" and dynamicRT == "auto":
-    dynamicRT = "off"
-
-if dynamicRT == "force" and not (env.TargetOSIs('linux') or env.TargetOSIs('windows')):
-    env.FatalError("A dynamic runtime can be forced only on Windows and Linux at this time.")
-
-if env.ToolchainIs('msvc'):
-    # /MD:  use the multithreaded, DLL version of the run-time library
-    # /MT:  use the multithreaded, static version of the run-time library
-    # /MDd: As /MD but also defines _DEBUG
-    # /MTd: As /MT but also defines _DEBUG
-
-    winRuntimeLibMap = {
-          #dyn   #dbg
-        ( False, False ) : "/MT",
-        ( False, True  ) : "/MTd",
-        ( True,  False ) : "/MD",
-        ( True,  True  ) : "/MDd",
-    }
-
-    # On Windows, the dynamic CRT is the default.
-    env.Append(CCFLAGS=[winRuntimeLibMap[(dynamicRT != "off", debugBuild)]])
-
-if dynamicRT == "auto":
-    if env.TargetOSIs('linux') and env.ToolchainIs('gcc', 'clang'):
-        def CheckRuntimeLibraries(context):
-            context.Message("Checking whether any runtime libraries are linker scripts... ")
-
-            result = {}
-            libs = [ 'libgcc', 'libgcc_s', 'libgcc_eh' ]
-
-            if get_option('libc++'):
-                libs.append('libc++')
-            else:
-                libs.append('libstdc++')
-
-            compiler = subprocess.Popen(
-                [context.env['CXX'], "-print-search-dirs"],
-                stdout=subprocess.PIPE
-            )
-
-            # This just pulls out the library paths and *only* the library
-            # paths, deleting all other lines. It also removes the leading
-            # "libraries" tag from the line so only the paths are left in
-            # the output.
-            sed = subprocess.Popen(
-                [
-                    "sed",
-                    "/^lib/b 1;d;:1;s,.*:[^=]*=,,",
-                ],
-                stdin=compiler.stdout,
-                stdout=subprocess.PIPE
-            )
-            compiler.stdout.close()
-
-            search_paths = sed.communicate()[0].decode('utf-8').split(':')
-
-            for lib in libs:
-                for search_path in search_paths:
-                    lib_file = os.path.join(search_path, lib + ".so")
-                    if os.path.exists(lib_file):
-                        file_type = subprocess.check_output(["file", lib_file]).decode('utf-8')
-                        match = re.search('ASCII text', file_type)
-                        result[lib] = bool(match)
-                        break
-            if any(result.values()):
-                ret = "yes"
-            else:
-                ret = "no"
-            context.Result(ret)
-            return ret
-
-        detectStaticRuntime = Configure(detectEnv, help=False, custom_tests = {
-            'CheckRuntimeLibraries' : CheckRuntimeLibraries,
-        })
-        if detectStaticRuntime.CheckRuntimeLibraries() == "yes":
-            dynamicRT = "force"
-        else:
-            dynamicRT = "off"
-
-        detectStaticRuntime.Finish()
-
-elif dynamicRT == "force":
-    if get_option("link-model") != "dynamic":
-        env.FatalError("A dynamic runtime can only be forced with dynamic linking.")
-
-    if not env.ToolchainIs('gcc', 'clang'):
-        env.FatalError("Don't know how to bundle a dynamic runtime on this toolchain.")
-
-
 if optBuild:
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
@@ -2218,6 +2090,11 @@ elif env.TargetOSIs('windows'):
     if not any(flag.startswith('/DEBUG') for flag in env['LINKFLAGS']):
         env.Append(LINKFLAGS=["/DEBUG"])
 
+    # /MD:  use the multithreaded, DLL version of the run-time library (MSVCRT.lib/MSVCR###.DLL)
+    # /MDd: Defines _DEBUG, _MT, _DLL, and uses MSVCRTD.lib/MSVCRD###.DLL
+
+    env.Append(CCFLAGS=["/MDd" if debugBuild else "/MD"])
+
     if optBuild:
         # /O1:  optimize for size
         # /O2:  optimize for speed (as opposed to size)
@@ -2366,14 +2243,8 @@ if env.TargetOSIs('posix'):
     # On OS X, clang doesn't want the pthread flag at link time, or it
     # issues warnings which make it impossible for us to declare link
     # warnings as errors. See http://stackoverflow.com/a/19382663.
-    #
-    # We don't need it anyway since we explicitly link to -lpthread,
-    # so all we need beyond that is the preprocessor variable.
-    if not env.ToolchainIs('clang'):
-        env.Append(
-            CPPDEFINES=[("_REENTRANT", "1")],
-            LINKFLAGS=["-pthread"]
-        )
+    if not (env.TargetOSIs('darwin') and env.ToolchainIs('clang')):
+        env.Append( LINKFLAGS=["-pthread"] )
 
     # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
     # startup.
@@ -3939,10 +3810,8 @@ def doConfigure(myenv):
                     language='C++')
     if posix_system:
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_HEADER_UNISTD_H")
-        conf.CheckLib('c')
         conf.CheckLib('rt')
         conf.CheckLib('dl')
-        conf.CheckLib('pthread')
 
     if posix_monotonic_clock:
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_POSIX_MONOTONIC_CLOCK")
@@ -4908,7 +4777,6 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 # and they are exported here, as well.
 Export([
     'debugBuild',
-    'dynamicRT',
     'endian',
     'free_monitoring',
     'get_option',
