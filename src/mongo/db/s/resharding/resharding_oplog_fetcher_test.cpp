@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/optional.hpp>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
@@ -397,12 +398,14 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
                                        outputCollectionNss);
         fetcher.useReadConcernForTest(false);
 
+        // Status has a private default constructor so we wrap it in a boost::optional to placate
+        // the Windows compiler.
         try {
             fetcher.iterate(&cc());
             // Test failure case.
-            return Status::OK();
+            return boost::optional<Status>(Status::OK());
         } catch (...) {
-            return exceptionToStatus();
+            return boost::optional<Status>(exceptionToStatus());
         }
     });
 
@@ -410,7 +413,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
 
     // Two oplog entries due to the batch size.
     ASSERT_EQ(0, itcount(outputCollectionNss));
-    ASSERT_EQ(ErrorCodes::OplogQueryMinTsMissing, fetcherStatus.code());
+    ASSERT_EQ(ErrorCodes::OplogQueryMinTsMissing, fetcherStatus->code());
 }
 
 }  // namespace
