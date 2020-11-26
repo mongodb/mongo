@@ -34,7 +34,8 @@ imports:
 
 structs:
     DatabaseVersionBase:
-        description: "A (UUID, int) pair that uniquely identifies an incarnation of a database in a cluster and reflects changes to the database's primary shard"
+        description: "A (UUID, Timestamp, int) object that uniquely identifies an incarnation of a database
+                      in a cluster and reflects changes to the database's primary shard"
         # The generated comparison operators will do a field-wise lexicographic comparison, which
         # doesn't work because it's nonsensical to lexicographically compare UUIDs.
         generate_comparison_operators: false
@@ -42,7 +43,14 @@ structs:
         fields:
             uuid:
                 type: uuid
-                description: "a unique identifier to distinguish different incarnations of this database"
+                description: "a unique identifier to distinguish different incarnations of this database.
+                              It is optional for parsing purposes and it will be removed in 5.2."
+                optional: true
+            timestamp:
+                type: timestamp
+                description: "Uniquely identifies to distinguish different incarnations of this database
+                              It is optional for parsing purposes, because in versions of MongoDB
+                              prior to 5.0, this value wasn't being written."
                 optional: true
             lastMod:
                 type: int

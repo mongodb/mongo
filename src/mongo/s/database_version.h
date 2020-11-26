@@ -49,8 +49,19 @@ public:
         DatabaseVersionBase::parseProtected(IDLParserErrorContext("DatabaseVersion"), obj);
     }
 
-    explicit DatabaseVersion(mongo::UUID uuid) : DatabaseVersionBase(/* lastMod */ 1) {
+    /**
+     * Constructor of a DatabaseVersion based on epochs
+     */
+    explicit DatabaseVersion(mongo::UUID uuid)
+        : DatabaseVersion(uuid, boost::none /* timestamp */) {}
+
+    /**
+     * Constructor of a DatabaseVersion based on epochs and timestamps
+     */
+    DatabaseVersion(mongo::UUID uuid, boost::optional<mongo::Timestamp> timestamp)
+        : DatabaseVersionBase(1 /* lastMod */) {
         setUuid(uuid);
+        setTimestamp(timestamp);
     }
 
     DatabaseVersion makeUpdated() const;

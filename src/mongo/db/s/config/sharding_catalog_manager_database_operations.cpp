@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_database.h"
@@ -47,6 +48,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/s/shard_util.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
@@ -158,9 +160,18 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                 primaryShard.isValid() ? primaryShard
                                        : selectShardForNewDatabase(opCtx, shardRegistry)));
 
+            boost::optional<Timestamp> clusterTime;
+            if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                const auto now = VectorClock::get(opCtx)->getTime();
+                clusterTime = now.clusterTime().asTimestamp();
+            }
+
             // Pick a primary shard for the new database.
-            DatabaseType db(
-                dbName.toString(), shardPtr->getId(), false, DatabaseVersion(UUID::gen()));
+            DatabaseType db(dbName.toString(),
+                            shardPtr->getId(),
+                            false,
+                            DatabaseVersion(UUID::gen(), clusterTime));
 
             LOGV2(21938,
                   "Registering new database {db} in sharding catalog",

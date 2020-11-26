@@ -58,6 +58,7 @@
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"
@@ -72,6 +73,7 @@
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
@@ -736,7 +738,15 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Add all databases which were discovered on the new shard
     for (const auto& dbName : dbNamesStatus.getValue()) {
-        DatabaseType dbt(dbName, shardType.getName(), false, DatabaseVersion(UUID::gen()));
+        boost::optional<Timestamp> clusterTime;
+        if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            const auto now = VectorClock::get(opCtx)->getTime();
+            clusterTime = now.clusterTime().asTimestamp();
+        }
+
+        DatabaseType dbt(
+            dbName, shardType.getName(), false, DatabaseVersion(UUID::gen(), clusterTime));
 
         {
             const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
