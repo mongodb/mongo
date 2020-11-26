@@ -89,6 +89,9 @@ __hs_cursor_position_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t b
     WT_DECL_RET;
     int cmp, exact;
 
+    /* The session should be pointing at the history store btree. */
+    WT_ASSERT(session, WT_IS_HS(S2BT(session)));
+
     if (user_srch_key == NULL)
         WT_RET(__wt_scr_alloc(session, 0, &srch_key));
     else
@@ -151,21 +154,24 @@ __wt_hs_cursor_position(WT_SESSION_IMPL *session, WT_CURSOR *cursor, uint32_t bt
   const WT_ITEM *key, wt_timestamp_t timestamp, WT_ITEM *user_srch_key)
 {
     WT_DECL_RET;
-    WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
-      ret = __hs_cursor_position_int(session, cursor, btree_id, key, timestamp, user_srch_key));
+
+    WT_WITH_BTREE(session, CUR2BT(cursor),
+      WT_WITH_TXN_ISOLATION(session, WT_ISO_READ_UNCOMMITTED,
+        ret = __hs_cursor_position_int(session, cursor, btree_id, key, timestamp, user_srch_key)));
     return (ret);
 }
 
 /*
- * __wt_hs_find_upd --
- *     Scan the history store for a record the btree cursor wants to position on. Create an update
- *     for the record and return to the caller. The caller may choose to optionally allow prepared
- *     updates to be returned regardless of whether prepare is being ignored globally. Otherwise, a
- *     prepare conflict will be returned upon reading a prepared update.
+ * __hs_find_upd_int --
+ *     Internal helper to scan the history store for a record the btree cursor wants to position on.
+ *     Create an update for the record and return to the caller. The caller may choose to optionally
+ *     allow prepared updates to be returned regardless of whether prepare is being ignored
+ *     globally. Otherwise, a prepare conflict will be returned upon reading a prepared update.
  */
-int
-__wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_format, uint64_t recno,
-  WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *on_disk_buf, WT_TIME_WINDOW *on_disk_tw)
+static int
+__hs_find_upd_int(WT_SESSION_IMPL *session, uint32_t btree_id, WT_ITEM *key,
+  const char *value_format, uint64_t recno, WT_UPDATE_VALUE *upd_value, bool allow_prepare,
+  WT_ITEM *on_disk_buf, WT_TIME_WINDOW *on_disk_tw)
 {
     WT_CURSOR *hs_cursor;
     WT_CURSOR_BTREE *hs_cbt;
@@ -192,11 +198,13 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
     __wt_modify_vector_init(session, &modifies);
     txn = session->txn;
     txn_shared = WT_SESSION_TXN_SHARED(session);
-    hs_btree_id = S2BT(session)->id;
     upd_found = false;
 
     WT_STAT_CONN_INCR(session, cursor_search_hs);
     WT_STAT_DATA_INCR(session, cursor_search_hs);
+
+    hs_cursor = session->hs_cursor;
+    hs_cbt = (WT_CURSOR_BTREE *)hs_cursor;
 
     /* Row-store key is as passed to us, create the column-store key as needed. */
     WT_ASSERT(
@@ -212,11 +220,6 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
 
     /* Allocate buffer for the history store value. */
     WT_ERR(__wt_scr_alloc(session, 0, &hs_value));
-
-    /* Open a history store table cursor. */
-    WT_ERR(__wt_hs_cursor_open(session));
-    hs_cursor = session->hs_cursor;
-    hs_cbt = (WT_CURSOR_BTREE *)hs_cursor;
 
     /*
      * After positioning our cursor, we're stepping backwards to find the correct update. Since the
@@ -234,7 +237,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
         read_timestamp = WT_TS_MAX;
 
     WT_ERR_NOTFOUND_OK(
-      __wt_hs_cursor_position(session, hs_cursor, hs_btree_id, key, read_timestamp, NULL), true);
+      __wt_hs_cursor_position(session, hs_cursor, btree_id, key, read_timestamp, NULL), true);
     if (ret == WT_NOTFOUND) {
         ret = 0;
         goto done;
@@ -249,7 +252,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
         WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, &hs_key, &hs_start_ts, &hs_counter));
 
         /* Stop before crossing over to the next btree */
-        if (hs_btree_id != S2BT(session)->id)
+        if (hs_btree_id != btree_id)
             goto done;
 
         /*
@@ -345,7 +348,7 @@ __wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_forma
             WT_ERR(hs_cursor->get_key(
               hs_cursor, &hs_btree_id, &hs_key, &hs_start_ts_tmp, &hs_counter_tmp));
 
-            if (hs_btree_id != S2BT(session)->id) {
+            if (hs_btree_id != btree_id) {
                 /* Fallback to the onpage value as the base value. */
                 orig_hs_value_buf = hs_value;
                 hs_value = on_disk_buf;
@@ -429,13 +432,32 @@ err:
         }
     }
 
-    WT_TRET(__wt_hs_cursor_close(session));
-
     /* Mark the buffer as invalid if there is an error. */
     if (ret != 0)
         upd_value->type = WT_UPDATE_INVALID;
 
     WT_ASSERT(session, ret != WT_NOTFOUND);
 
+    return (ret);
+}
+
+/*
+ * __wt_hs_find_upd --
+ *     Scan the history store for a record.
+ */
+int
+__wt_hs_find_upd(WT_SESSION_IMPL *session, WT_ITEM *key, const char *value_format, uint64_t recno,
+  WT_UPDATE_VALUE *upd_value, bool allow_prepare, WT_ITEM *on_disk_buf, WT_TIME_WINDOW *on_disk_tw)
+{
+    WT_BTREE *btree;
+    WT_DECL_RET;
+
+    btree = S2BT(session);
+
+    WT_RET(__wt_hs_cursor_open(session));
+    WT_WITH_BTREE(session, CUR2BT(session->hs_cursor),
+      (ret = __hs_find_upd_int(session, btree->id, key, value_format, recno, upd_value,
+         allow_prepare, on_disk_buf, on_disk_tw)));
+    WT_TRET(__wt_hs_cursor_close(session));
     return (ret);
 }

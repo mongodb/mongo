@@ -87,6 +87,9 @@ __hs_insert_record_with_btree_int(WT_SESSION_IMPL *session, WT_CURSOR *cursor, u
     cbt = (WT_CURSOR_BTREE *)cursor;
     hs_upd = upd_local = NULL;
 
+    /* The session should be pointing at the history store btree. */
+    WT_ASSERT(session, WT_IS_HS(S2BT(session)));
+
     /*
      * Use WT_CURSOR.set_key and WT_CURSOR.set_value to create key and value items, then use them to
      * create an update chain for a direct insertion onto the history store page.
@@ -322,6 +325,7 @@ __hs_next_upd_full_value(WT_SESSION_IMPL *session, WT_MODIFY_VECTOR *modifies,
 {
     WT_UPDATE *upd;
     *updp = NULL;
+
     __wt_modify_vector_pop(modifies, &upd);
     if (upd->type == WT_UPDATE_TOMBSTONE) {
         if (modifies->size == 0) {
@@ -378,6 +382,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_PAGE *page, WT_MULTI *multi)
     int nentries;
     char ts_string[3][WT_TS_INT_STRING_SIZE];
     bool enable_reverse_modify, hs_inserted, squashed, ts_updates_in_hs;
+
     btree = S2BT(session);
     cursor = session->hs_cursor;
     prev_upd = NULL;
@@ -772,6 +777,9 @@ __hs_delete_key_from_ts_int(
     uint32_t hs_btree_id;
     int cmp, exact;
 
+    /* The session should be pointing at the history store btree. */
+    WT_ASSERT(session, WT_IS_HS(S2BT(session)));
+
     hs_cursor = session->hs_cursor;
     WT_RET(__wt_scr_alloc(session, 0, &srch_key));
 
@@ -831,11 +839,14 @@ __wt_hs_delete_key_from_ts(
     WT_ASSERT(session, !F_ISSET(session, WT_SESSION_NO_DATA_HANDLES));
 
     /* The tree structure can change while we try to insert the mod list, retry if that happens. */
-    while (
-      (ret = __hs_delete_key_from_ts_int(session, btree_id, key, ts, reinsert)) == WT_RESTART) {
-        WT_STAT_CONN_INCR(session, cache_hs_insert_restart);
-        WT_STAT_DATA_INCR(session, cache_hs_insert_restart);
-    }
+    do {
+        WT_WITH_BTREE(session, CUR2BT(session->hs_cursor),
+          (ret = __hs_delete_key_from_ts_int(session, btree_id, key, ts, reinsert)));
+        if (ret == WT_RESTART) {
+            WT_STAT_CONN_INCR(session, cache_hs_insert_restart);
+            WT_STAT_DATA_INCR(session, cache_hs_insert_restart);
+        }
+    } while (ret == WT_RESTART);
 
     return (ret);
 }
@@ -869,6 +880,9 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
     WT_CLEAR(hs_key);
     WT_CLEAR(hs_value);
     tombstone = NULL;
+
+    /* The session should be pointing at the history store btree. */
+    WT_ASSERT(session, WT_IS_HS(S2BT(session)));
 
     /*
      * Position ourselves at the beginning of the key range that we may have to fixup. Prior to
@@ -1002,8 +1016,10 @@ __hs_fixup_out_of_order_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
         WT_ERR(__wt_upd_alloc_tombstone(session, &tombstone, NULL));
         tombstone->txnid = WT_TXN_NONE;
         tombstone->start_ts = tombstone->durable_ts = WT_TS_NONE;
-        while ((ret = __wt_hs_modify(hs_cbt, tombstone)) == WT_RESTART)
-            ;
+        while ((ret = __wt_hs_modify(hs_cbt, tombstone)) == WT_RESTART) {
+            WT_WITH_PAGE_INDEX(session, ret = __wt_hs_row_search(hs_cbt, &hs_cursor->key, false));
+            WT_ERR(ret);
+        }
         WT_ERR(ret);
         tombstone = NULL;
         WT_STAT_CONN_INCR(session, cache_hs_order_fixup_move);

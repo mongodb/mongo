@@ -333,16 +333,7 @@ __rollback_row_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW 
         if (valid_update_found) {
             WT_ERR(__wt_upd_alloc(session, &full_value, WT_UPDATE_STANDARD, &upd, NULL));
 
-            /*
-             * Set the transaction id of updates to WT_TXN_NONE when called from recovery, because
-             * the connections write generation will be initialized after rollback to stable and the
-             * updates in the cache will be problematic. The transaction id of pages which are in
-             * disk will be automatically reset as part of unpacking cell when loaded to cache.
-             */
-            if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
-                upd->txnid = WT_TXN_NONE;
-            else
-                upd->txnid = cbt->upd_value->tw.start_txn;
+            upd->txnid = cbt->upd_value->tw.start_txn;
             upd->durable_ts = cbt->upd_value->tw.durable_start_ts;
             upd->start_ts = cbt->upd_value->tw.start_ts;
             __wt_verbose(session, WT_VERB_RTS,

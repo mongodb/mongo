@@ -91,7 +91,7 @@ transactional readers, an operation may fail and return ::WT_ROLLBACK.
 
 WiredTiger supports <code>read-uncommitted</code>,
 <code>read-committed</code> and  <code>snapshot</code> isolation levels;
-the default isolation level is <code>read-committed</code>.
+the default isolation level is <code>snapshot</code>.
 
 - <code>read-uncommitted</code>:
 Transactions can see changes made by other transactions before those
