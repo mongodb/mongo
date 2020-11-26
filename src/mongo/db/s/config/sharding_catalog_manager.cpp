@@ -39,6 +39,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/query_request.h"
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/config_server_version.h"
@@ -52,6 +53,7 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/transport/service_entry_point.h"
@@ -482,6 +484,81 @@ void ShardingCatalogManager::removePre49LegacyMetadata(OperationContext* opCtx) 
         return response.toStatus();
     }());
     uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
+}
+
+void ShardingCatalogManager::createCollectionTimestampsFor49(OperationContext* opCtx) {
+    LOGV2(5258800, "Starting upgrade of config.collections");
+
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto const catalogCache = Grid::get(opCtx)->catalogCache();
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto collectionDocs =
+        uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                            opCtx,
+                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                            repl::ReadConcernLevel::kLocalReadConcern,
+                            CollectionType::ConfigNS,
+                            BSON(CollectionType::kTimestampFieldName << BSON("$exists" << false)),
+                            BSONObj(),
+                            boost::none))
+            .docs;
+
+
+    for (const auto& doc : collectionDocs) {
+        const CollectionType coll(doc);
+        const auto nss = coll.getNss();
+
+        auto now = VectorClock::get(opCtx)->getTime();
+        auto clusterTime = now.clusterTime().asTimestamp();
+
+        uassertStatusOK(catalogClient->updateConfigDocument(
+            opCtx,
+            CollectionType::ConfigNS,
+            BSON(CollectionType::kNssFieldName << nss.ns()),
+            BSON("$set" << BSON(CollectionType::kTimestampFieldName << clusterTime)),
+            false /* upsert */,
+            ShardingCatalogClient::kMajorityWriteConcern));
+
+        catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+    }
+
+    LOGV2(5258801, "Successfully upgraded config.collections");
+}
+
+void ShardingCatalogManager::downgradeConfigCollectionEntriesToPre49(OperationContext* opCtx) {
+    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        DBDirectClient client(opCtx);
+
+        // Clear the 'timestamp' fields from config.collections
+        write_ops::Update unsetTimestamp(CollectionType::ConfigNS, [] {
+            write_ops::UpdateOpEntry u;
+            u.setQ({});
+            u.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                BSON("$unset" << BSON(CollectionType::kTimestampFieldName << ""))));
+            u.setMulti(true);
+            return std::vector{u};
+        }());
+        unsetTimestamp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase base;
+            base.setOrdered(false);
+            return base;
+        }());
+
+        auto commandResult = client.runCommand(OpMsgRequest::fromDBAndBody(
+            CollectionType::ConfigNS.db(),
+            unsetTimestamp.toBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+
+        uassertStatusOK([&] {
+            BatchedCommandResponse response;
+            std::string unusedErrmsg;
+            response.parseBSON(
+                commandResult->getCommandReply(),
+                &unusedErrmsg);  // Return value intentionally ignored, because response.toStatus()
+                                 // will contain any errors in more detail
+            return response.toStatus();
+        }());
+        uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
+    }
 }
 
 Lock::ExclusiveLock ShardingCatalogManager::lockZoneMutex(OperationContext* opCtx) {

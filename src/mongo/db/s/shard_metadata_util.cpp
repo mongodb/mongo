@@ -44,7 +44,9 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
@@ -485,30 +487,35 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {
 }
 
 void downgradeShardConfigCollectionEntriesToPre49(OperationContext* opCtx) {
-    // Clear the 'allowMigrations' field from config.cache.collections
+    // Clear the 'allowMigrations' and 'timestamp' fields from config.cache.collections
     LOGV2(5189100, "Starting downgrade of config.cache.collections");
-    write_ops::Update clearAllowMigrations(NamespaceString::kShardConfigCollectionsNamespace, [] {
+    write_ops::Update clearFields(NamespaceString::kShardConfigCollectionsNamespace, [] {
+        BSONObj unsetFields =
+            BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName << "");
+        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+            unsetFields = unsetFields.addFields(BSON(CollectionType::kTimestampFieldName << ""));
+        }
+
         write_ops::UpdateOpEntry u;
         u.setQ({});
-        u.setU(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$unset" << BSON(ShardCollectionType::kPre50CompatibleAllowMigrationsFieldName
-                                  << ""))));
+        u.setU(
+            write_ops::UpdateModification::parseFromClassicUpdate(BSON("$unset" << unsetFields)));
         u.setMulti(true);
         return std::vector{u};
     }());
 
-    clearAllowMigrations.setWriteCommandBase([] {
+    clearFields.setWriteCommandBase([] {
         write_ops::WriteCommandBase base;
         base.setOrdered(false);
         return base;
     }());
 
     DBDirectClient client(opCtx);
-    const auto commandResult = client.runCommand(clearAllowMigrations.serialize({}));
+    const auto commandResult = client.runCommand(clearFields.serialize({}));
 
     uassertStatusOK(getStatusFromWriteCommandResponse(commandResult->getCommandReply()));
 
-    LOGV2(5189101, "Succesfully downgraded config.cache.collections");
+    LOGV2(5189101, "Successfully downgraded config.cache.collections");
 }
 
 }  // namespace shardmetadatautil

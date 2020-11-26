@@ -88,6 +88,7 @@ public:
     using CollectionTypeBase::kAllowMigrationsFieldName;
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;
+    using CollectionTypeBase::kTimestampFieldName;
     using CollectionTypeBase::kUniqueFieldName;
     using CollectionTypeBase::kUpdatedAtFieldName;
 

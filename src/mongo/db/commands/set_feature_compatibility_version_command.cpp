@@ -60,6 +60,7 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/fail_point.h"
@@ -252,6 +253,15 @@ public:
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
+
+                // Create a 'timestamp' for the collections that don't have one. This must be done
+                // after all shards have been upgraded in order to guarantee that when
+                // createCollectionTimestampsFor49 starts, no new collections without a timestamp
+                // will be added.
+                if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49 &&
+                    feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+                    ShardingCatalogManager::get(opCtx)->createCollectionTimestampsFor49(opCtx);
+                }
             }
 
             hangWhileUpgrading.pauseWhileSet(opCtx);
@@ -338,11 +348,20 @@ public:
                 deletePersistedDefaultRWConcernDocument(opCtx);
             }
 
-            // Downgrade shards before config finishes its downgrade.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                // Downgrade shards before config finishes its downgrade.
                 uassertStatusOK(
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
+
+                // Delete the 'timestamp' field in config.collections entries. This must be done
+                // after all shards have been downgraded in order to guarantee that when
+                // downgradeConfigCollectionEntriesToPre49 starts, no new collections with a
+                // timestamp will be added.
+                if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
+                    ShardingCatalogManager::get(opCtx)->downgradeConfigCollectionEntriesToPre49(
+                        opCtx);
+                }
             }
 
             hangWhileDowngrading.pauseWhileSet(opCtx);

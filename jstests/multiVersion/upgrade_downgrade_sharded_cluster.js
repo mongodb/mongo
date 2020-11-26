@@ -14,12 +14,13 @@
 
 load('./jstests/multiVersion/libs/multi_cluster.js');  // for upgradeCluster()
 
-// Test 1: it checks two things after upgrading from versions prior 4.9:
+// testDroppedAndDistributionModeFields: it checks two things after upgrading from versions
+// prior 4.9:
 // - dropped collections are not present in csrs config.collections
 // - Entries on config.collections doesn't have the 'distributionMode' and the 'dropped' fields
 //
 // This test must be removed once 5.0 is defined as the lastLTS (SERVER-52630)
-function test1Setup() {
+function testDroppedAndDistributionModeFieldsSetup() {
     let csrs_config_db = st.configRS.getPrimary().getDB('config');
     // Setup sharded collections
     assert.commandWorked(st.s.adminCommand({shardCollection: 'sharded.foo', key: {x: 1}}));
@@ -42,7 +43,7 @@ function test1Setup() {
     assert.neq(null, csrs_config_db.collections.findOne({_id: 'sharded.bar'}));
 }
 
-function test1ChecksAfterUpgrade() {
+function testDroppedAndDistributionModeFieldsChecksAfterUpgrade() {
     let csrs_config_db = st.configRS.getPrimary().getDB('config');
 
     // Check that the left over metadata at csrs config.collections has been cleaned up.
@@ -53,11 +54,11 @@ function test1ChecksAfterUpgrade() {
     assert.eq(undefined, collBar.dropped);
 }
 
-// Test 2: it checks that the 'allowMigrations' field in the
+// testAllowedMigrationsField: it checks that the 'allowMigrations' field in the
 // config.cache.collections entries is removed when downgrading to prior 4.9
 //
 // This test must be removed once 5.0 is defined as the lastLTS (SERVER-52632)
-function test2Setup() {
+function testAllowedMigrationsFieldSetup() {
     assert.commandWorked(st.s.getDB("sharded").getCollection("test2").insert({_id: 0}));
     assert.commandWorked(st.s.getDB("sharded").getCollection("test2").insert({_id: 1}));
 
@@ -77,7 +78,7 @@ function test2Setup() {
     assert.eq(1, updateResult.modifiedCount);
 }
 
-function test2ChecksAfterDowngrade() {
+function testAllowedMigrationsFieldChecksAfterFCVDowngrade() {
     assert.eq(undefined,
               st.rs0.getPrimary()
                   .getDB("config")
@@ -90,19 +91,102 @@ function test2ChecksAfterDowngrade() {
                   .allowMigrations);
 }
 
+// testTimestampField: Check that on FCV upgrade to 5.0, a 'timestamp' is created for the existing
+// collections in config.collections and config.cache.collections On downgrade, check that the
+// 'timestamp' field is removed from config.collections and config.cache.collections.
+
+// This test must be removed once 5.0 is defined as the lastLTS.
+function testTimestampFieldSetup() {
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: 'sharded.test3_created_before_upgrade', key: {x: 1}}));
+}
+
+function testTimestampFieldChecksAfterUpgrade() {
+    // Check that 'timestamp' has been created in configsvr config.collections
+    let csrs_config_db = st.configRS.getPrimary().getDB('config');
+    let timestampInConfigSvr =
+        csrs_config_db.collections.findOne({_id: 'sharded.test3_created_before_upgrade'}).timestamp;
+    assert.neq(null, timestampInConfigSvr);
+
+    // TODO: After SERVER-52587, check that the timestamp in the shardsvr config.cache.collection
+    // exists and matches timestampInConfigSvr
+}
+
+function testTimestampFieldSetupBeforeDowngrade() {
+    assert.commandWorked(
+        st.s.adminCommand({shardCollection: 'sharded.test3_created_after_upgrade', key: {x: 1}}));
+}
+
+function testTimestampFieldChecksAfterFCVDowngrade() {
+    // Check that the 'timestamp' has been removed from config.collections.
+    let csrs_config_db = st.configRS.getPrimary().getDB('config');
+    let collAfterUpgrade =
+        csrs_config_db.collections.findOne({_id: 'sharded.test3_created_before_upgrade'});
+    assert.eq(null, collAfterUpgrade.timestamp);
+
+    // Check that the 'timestamp' has been removed from config.cache.collections.
+    let primaryShard = st.getPrimaryShard('sharded');
+    let timestampInShard =
+        primaryShard.getDB('config')
+            .cache.collections.findOne({_id: 'sharded.test3_created_before_upgrade'})
+            .timestamp;
+    assert.eq(null, timestampInShard);
+
+    // TODO: After SERVER-52587, this is no longer needed as we can just check with
+    // test3_created_before_upgrade.
+    timestampInShard = primaryShard.getDB('config')
+                           .cache.collections.findOne({_id: 'sharded.test3_created_after_upgrade'})
+                           .timestamp;
+    assert.eq(null, timestampInShard);
+}
+
 function setupInitialStateOnOldVersion() {
     assert.commandWorked(st.s.adminCommand({enableSharding: 'sharded'}));
 
-    test1Setup();
-    test2Setup();
+    testDroppedAndDistributionModeFieldsSetup();
+    testAllowedMigrationsFieldSetup();
+    testTimestampFieldSetup();
 }
 
 function runChecksAfterUpgrade() {
-    test1ChecksAfterUpgrade();
+    const shardingFullDDLSupport = assert
+                                       .commandWorked(st.configRS.getPrimary().adminCommand(
+                                           {getParameter: 1, shardingFullDDLSupport: 1}))
+                                       .shardingFullDDLSupport.value;
+
+    testDroppedAndDistributionModeFieldsChecksAfterUpgrade();
+
+    if (shardingFullDDLSupport) {
+        testTimestampFieldChecksAfterUpgrade();
+    } else {
+        jsTest.log(
+            'Skipping testTimestampFieldChecksAfterUpgrade because shardingFullDDLSupport is not ' +
+            'enabled');
+    }
 }
 
-function runChecksAfterDowngrade() {
-    test2ChecksAfterDowngrade();
+function setupStateBeforeDowngrade() {
+    testTimestampFieldSetupBeforeDowngrade();
+}
+
+function runChecksAfterFCVDowngrade() {
+    const shardingFullDDLSupport = assert
+                                       .commandWorked(st.configRS.getPrimary().adminCommand(
+                                           {getParameter: 1, shardingFullDDLSupport: 1}))
+                                       .shardingFullDDLSupport.value;
+
+    testAllowedMigrationsFieldChecksAfterFCVDowngrade();
+
+    if (shardingFullDDLSupport) {
+        testTimestampFieldChecksAfterFCVDowngrade();
+    } else {
+        jsTest.log(
+            'Skipping testTimestampFieldChecksAfterFCVDowngrade because shardingFullDDLSupport ' +
+            'is not enabled');
+    }
+}
+
+function runChecksAfterBinDowngrade() {
 }
 
 for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
@@ -132,13 +216,22 @@ for (let oldVersion of [lastLTSFCV, lastContinuousFCV]) {
     // Tests after upgrade
     runChecksAfterUpgrade();
 
-    // Downgrade back to oldVersion
-    jsTest.log('downgrading cluster');
+    // Setup state before downgrade
+    setupStateBeforeDowngrade();
+
+    // Downgrade FCV back to oldVersion
+    jsTest.log('downgrading cluster FCV');
     assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: oldVersion}));
+
+    // Tests after FCV downgrade to oldVersion
+    runChecksAfterFCVDowngrade();
+
+    // Downgrade binaries back to oldVersion
+    jsTest.log('downgrading cluster binaries');
     st.upgradeCluster(oldVersion);
 
-    // Tests after downgrade to oldVersion
-    runChecksAfterDowngrade();
+    // Tests after binaries downgrade to oldVersion
+    runChecksAfterBinDowngrade();
 
     st.stop();
 }

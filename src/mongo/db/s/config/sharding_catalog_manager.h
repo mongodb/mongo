@@ -455,6 +455,22 @@ public:
      */
     void removePre49LegacyMetadata(OperationContext* opCtx);
 
+    /**
+     * Creates a 'timestamp' for each one of the entries in the config server's config.collections,
+     * where 'timestamp' does not already exist.
+     *
+     * It shall be called when upgrading to 4.9.
+     */
+    void createCollectionTimestampsFor49(OperationContext* opCtx);
+
+    /**
+     * Downgrades the config.collections entries to prior 4.9 version. More specifically, it removes
+     * the 'timestamp' field from all the documents in config.collections.
+     *
+     * It shall be called when downgrading from 4.9 to an earlier version.
+     */
+    void downgradeConfigCollectionEntriesToPre49(OperationContext* opCtx);
+
     //
     // For Diagnostics
     //

@@ -224,7 +224,8 @@ Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName);
 
 /**
  * Downgrades the config.cache.collections entries to prior 4.9 version. More specifically, it
- * removes the allowMigrations field from all the documents of config.cache.collections
+ * removes the allowMigrations and timestamp fields from all the documents of
+ * config.cache.collections
  */
 void downgradeShardConfigCollectionEntriesToPre49(OperationContext* opCtx);
 
