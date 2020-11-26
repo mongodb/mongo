@@ -40,5 +40,10 @@ commands:
         namespace: type
         type: safeInt64
         cpp_name: ShardsvrDropDatabase
-        strict: true
         reply_type: DropDatabaseReply
+
+    _shardsvrDropCollection:
+        description: "Parser for the _shardsvrDropCollection command"
+        command_name: _shardsvrDropCollection
+        namespace: concatenate_with_db
+        cpp_name: ShardsvrDropCollection

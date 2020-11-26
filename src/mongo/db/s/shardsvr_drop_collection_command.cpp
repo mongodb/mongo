@@ -39,12 +39,11 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
 
-class ShardsvrDropDatabaseCommand final : public TypedCommand<ShardsvrDropDatabaseCommand> {
+class ShardsvrDropCollectionCommand final : public TypedCommand<ShardsvrDropCollectionCommand> {
 public:
     bool acceptsAnyApiVersionParameters() const override {
         return true;
@@ -56,36 +55,30 @@ public:
 
     std::string help() const override {
         return "Internal command, which is exported by the primary sharding server. Do not call "
-               "directly. Drops a database.";
+               "directly. Drops a collection.";
     }
 
-    using Request = ShardsvrDropDatabase;
-    using Response = DropDatabaseReply;
+    using Request = ShardsvrDropCollection;
 
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
-        Response typedRun(OperationContext* opCtx) {
+        void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    "_shardsvrDropDatabase can only be run on primary shard servers",
+                    "_shardsvrDropCollection can only be run on primary shard servers",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-            const StringData dbName = request().getDbName();
-
-            const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+            auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
             auto cmdResponse = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 "admin",
-                CommandHelpers::appendMajorityWriteConcern(BSON("_configsvrDropDatabase" << dbName),
-                                                           opCtx->getWriteConcern()),
+                CommandHelpers::appendMajorityWriteConcern(
+                    BSON("_configsvrDropCollection" << ns().toString()), opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
 
             uassertStatusOK(cmdResponse.commandStatus);
-
-            return Response::parse(IDLParserErrorContext("dropDatabase-reply"),
-                                   cmdResponse.response);
         }
 
         bool supportsWriteConcern() const override {
@@ -95,10 +88,10 @@ public:
         void doCheckAuthorization(OperationContext*) const override {}
 
         NamespaceString ns() const override {
-            return {"", ""};
+            return request().getNamespace();
         }
     };
-} shardsvrDropDatabaseCommand;
+} sharsvrdDropCollectionCommand;
 
 }  // namespace
 }  // namespace mongo

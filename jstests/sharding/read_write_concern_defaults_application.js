@@ -114,6 +114,7 @@ let testCases = {
     _recvChunkStart: {skip: "internal command"},
     _recvChunkStatus: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "internal command"},
+    _shardsvrDropCollection: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
     _shardsvrRenameCollection: {skip: "internal command"},
     _shardsvrShardCollection: {skip: "internal command"},
