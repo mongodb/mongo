@@ -311,9 +311,10 @@ public:
      */
     static void validateToStringFormat(StringData format);
     static void validateFromStringFormat(StringData format);
-    std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
 
 private:
+    std::unique_ptr<_timelib_time, TimelibTimeDeleter> getTimelibTime(Date_t) const;
+
     /**
      * Only works with 1 <= spaces <= 4 and 0 <= number <= 9999. If spaces is less than the digit
      * count of number we simply insert the number without padding.
@@ -471,53 +472,4 @@ private:
     std::unique_ptr<_timelib_tzdb, TimeZoneDBDeleter> _timeZoneDatabase;
 };
 
-/**
- * A set of standard measures of time used to express a length of time interval.
- */
-enum class TimeUnit {
-    year,
-    quarter,  // A quarter of a year.
-    month,
-    week,
-    day,
-    hour,
-    minute,
-    second,
-    millisecond
-};
-
-/**
- * Parses a string representation of an enumerator of TimeUnit type 'unitName' into a value of type
- * TimeUnit. Throws an exception with error code ErrorCodes::FailedToParse when passed an invalid
- * name.
- */
-TimeUnit parseTimeUnit(const std::string& unitName);
-
-/**
- * Determines the number of upper boundaries of time intervals crossed when moving from time instant
- * 'startDate' to time instant 'endDate' in time zone 'timezone'. The time intervals are of length
- * equal to one 'unit' and aligned so that the lower/upper bound is located in time axis at instant
- * n*'unit', where n is an integer.
- *
- * If 'endDate' < 'startDate', then the returned number of crossed boundaries is negative.
- *
- * For 'unit' values 'hour' and smaller, when there is a transition from Daylight Saving Time to
- * standard time the function behaves as if standard time intervals overlap Daylight Saving Time
- * intervals. When there is a transition from standard time to Daylight Saving Time the function
- * behaves as if the last interval in standard time is longer by one hour.
- *
- * An example: if startDate=2011-01-31T00:00:00 (in 'timezone'), endDate=2011-02-01T00:00:00 (in
- * 'timezone'), unit='month', then the function returns 1, since a month boundary at
- * 2011-02-01T00:00:00 was crossed.
- *
- * The function operates in the Gregorian calendar. The function does not account for leap seconds.
- * For time instants before year 1583 the proleptic Gregorian calendar is used.
- *
- * startDate - starting time instant in UTC time zone.
- * endDate - ending time instant in UTC time zone.
- * unit - length of time intervals.
- * timezone - determines the timezone used for counting the boundaries as well as Daylight Saving
- * Time rules.
- */
-long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZone& timezone);
 }  // namespace mongo

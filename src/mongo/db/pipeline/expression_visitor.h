@@ -152,7 +152,6 @@ class ExpressionInternalJsEmit;
 class ExpressionFunction;
 class ExpressionDegreesToRadians;
 class ExpressionRadiansToDegrees;
-class ExpressionDateDiff;
 
 class AccumulatorAvg;
 class AccumulatorMax;
@@ -200,7 +199,6 @@ public:
     virtual void visit(ExpressionCond*) = 0;
     virtual void visit(ExpressionDateFromString*) = 0;
     virtual void visit(ExpressionDateFromParts*) = 0;
-    virtual void visit(ExpressionDateDiff*) = 0;
     virtual void visit(ExpressionDateToParts*) = 0;
     virtual void visit(ExpressionDateToString*) = 0;
     virtual void visit(ExpressionDivide*) = 0;
