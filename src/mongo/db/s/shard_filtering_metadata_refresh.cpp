@@ -47,6 +47,7 @@
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/fail_point.h"
 
@@ -66,10 +67,19 @@ void onDbVersionMismatch(OperationContext* opCtx,
 
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-    if (serverDbVersion && serverDbVersion->getUuid() == clientDbVersion.getUuid() &&
-        serverDbVersion->getLastMod() >= clientDbVersion.getLastMod()) {
-        // The client was stale; do not trigger server-side refresh.
-        return;
+    if (serverDbVersion) {
+        // Do not reorder these two statements! if the comparison is done through epochs, the
+        // construction order matters: we are pessimistically assuming that the client version
+        // is newer when they have different uuids
+        const ComparableDatabaseVersion comparableServerDbVersion =
+            ComparableDatabaseVersion::makeComparableDatabaseVersion(*serverDbVersion);
+        const ComparableDatabaseVersion comparableClientDbVersion =
+            ComparableDatabaseVersion::makeComparableDatabaseVersion(clientDbVersion);
+
+        if (comparableClientDbVersion <= comparableServerDbVersion) {
+            // The client was stale; do not trigger server-side refresh.
+            return;
+        }
     }
 
     // Ensure any ongoing movePrimary's have completed before trying to do the refresh. This wait is
@@ -501,19 +511,29 @@ void forceDatabaseRefresh(OperationContext* opCtx, const StringData dbName) {
         auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
 
         const auto cachedDbVersion = dss->getDbVersion(opCtx, dssLock);
-        if (cachedDbVersion && cachedDbVersion->getUuid() == refreshedDbVersion.getUuid() &&
-            cachedDbVersion->getLastMod() >= refreshedDbVersion.getLastMod()) {
-            LOGV2_DEBUG(22066,
-                        2,
-                        "Skipping setting cached databaseVersion for {db} to refreshed version "
-                        "{refreshedDbVersion} because current cached databaseVersion is already "
-                        "{cachedDbVersion}",
-                        "Skipping setting cached databaseVersion to refreshed version "
-                        "because current cached databaseVersion is more recent",
-                        "db"_attr = dbName,
-                        "refreshedDbVersion"_attr = refreshedDbVersion.toBSON(),
-                        "cachedDbVersion"_attr = cachedDbVersion->toBSON());
-            return;
+        if (cachedDbVersion) {
+            // Do not reorder these two statements! if the comparison is done through epochs, the
+            // construction order matters: we are pessimistically assuming that the client version
+            // is newer when they have different uuids
+            const ComparableDatabaseVersion comparableCachedDbVersion =
+                ComparableDatabaseVersion::makeComparableDatabaseVersion(*cachedDbVersion);
+            const ComparableDatabaseVersion comparableRefreshedDbVersion =
+                ComparableDatabaseVersion::makeComparableDatabaseVersion(refreshedDbVersion);
+
+            if (comparableRefreshedDbVersion <= comparableCachedDbVersion) {
+                LOGV2_DEBUG(
+                    22066,
+                    2,
+                    "Skipping setting cached databaseVersion for {db} to refreshed version "
+                    "{refreshedDbVersion} because current cached databaseVersion is already "
+                    "{cachedDbVersion}",
+                    "Skipping setting cached databaseVersion to refreshed version "
+                    "because current cached databaseVersion is more recent",
+                    "db"_attr = dbName,
+                    "refreshedDbVersion"_attr = refreshedDbVersion.toBSON(),
+                    "cachedDbVersion"_attr = cachedDbVersion->toBSON());
+                return;
+            }
         }
     }
 

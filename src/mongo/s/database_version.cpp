@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+AtomicWord<uint64_t> ComparableDatabaseVersion::_uuidDisambiguatingSequenceNumSource{1ULL};
+
 DatabaseVersion DatabaseVersion::makeFixed() {
     DatabaseVersion dbVersion;
     dbVersion.setLastMod(0);
@@ -43,6 +45,44 @@ DatabaseVersion DatabaseVersion::makeUpdated() const {
     DatabaseVersion newVersion = *this;
     newVersion.setLastMod(newVersion.getLastMod() + 1);
     return newVersion;
+}
+
+ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
+    const DatabaseVersion& version) {
+    return ComparableDatabaseVersion(version, _uuidDisambiguatingSequenceNumSource.fetchAndAdd(1));
+}
+
+BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
+    BSONObjBuilder builder;
+    if (_dbVersion)
+        builder.append("dbVersion"_sd, _dbVersion->toBSON());
+    else
+        builder.append("dbVersion"_sd, "None");
+
+    builder.append("uuidDisambiguatingSequenceNum"_sd,
+                   static_cast<int64_t>(_uuidDisambiguatingSequenceNum));
+
+    return builder.obj();
+}
+
+bool ComparableDatabaseVersion::operator==(const ComparableDatabaseVersion& other) const {
+    if (!_dbVersion && !other._dbVersion)
+        return true;  // Default constructed value
+    if (_dbVersion.is_initialized() != other._dbVersion.is_initialized())
+        return false;  // One side is default constructed value
+
+    return *_dbVersion == *other._dbVersion;
+}
+
+bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other) const {
+    if (!_dbVersion && !other._dbVersion)
+        return false;  // Default constructed value
+
+    if (_dbVersion && other._dbVersion && _dbVersion->getUuid() == other._dbVersion->getUuid()) {
+        return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
+    } else {
+        return _uuidDisambiguatingSequenceNum < other._uuidDisambiguatingSequenceNum;
+    }
 }
 
 }  // namespace mongo

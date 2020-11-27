@@ -639,47 +639,6 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
     }
 }
 
-AtomicWord<uint64_t> ComparableDatabaseVersion::_uuidDisambiguatingSequenceNumSource{1ULL};
-
-ComparableDatabaseVersion ComparableDatabaseVersion::makeComparableDatabaseVersion(
-    const DatabaseVersion& version) {
-    return ComparableDatabaseVersion(version, _uuidDisambiguatingSequenceNumSource.fetchAndAdd(1));
-}
-
-BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
-    BSONObjBuilder builder;
-    if (_dbVersion)
-        builder.append("dbVersion"_sd, _dbVersion->toBSON());
-    else
-        builder.append("dbVersion"_sd, "None");
-
-    builder.append("uuidDisambiguatingSequenceNum"_sd,
-                   static_cast<int64_t>(_uuidDisambiguatingSequenceNum));
-
-    return builder.obj();
-}
-
-
-bool ComparableDatabaseVersion::operator==(const ComparableDatabaseVersion& other) const {
-    if (!_dbVersion && !other._dbVersion)
-        return true;  // Default constructed value
-    if (_dbVersion.is_initialized() != other._dbVersion.is_initialized())
-        return false;  // One side is default constructed value
-
-    return sameUuid(other) && (_dbVersion->getLastMod() == other._dbVersion->getLastMod());
-}
-
-bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other) const {
-    if (!_dbVersion && !other._dbVersion)
-        return false;  // Default constructed value
-
-    if (_dbVersion && other._dbVersion && sameUuid(other)) {
-        return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
-    } else {
-        return _uuidDisambiguatingSequenceNum < other._uuidDisambiguatingSequenceNum;
-    }
-}
-
 CachedDatabaseInfo::CachedDatabaseInfo(DatabaseType dbt) : _dbt(std::move(dbt)) {}
 
 const ShardId& CachedDatabaseInfo::primaryId() const {
