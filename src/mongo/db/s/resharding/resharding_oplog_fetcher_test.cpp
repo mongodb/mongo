@@ -322,7 +322,7 @@ TEST_F(ReshardingOplogFetcherTest, TestBasic) {
 
     AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
     auto fetcherJob = launchAsync([&, this] {
-        Client::initThread("RefetchRunner", _svcCtx, nullptr);
+        ThreadClient tc("RefetchRunner", _svcCtx, nullptr);
         ReshardingOplogFetcher fetcher(_reshardingUUID,
                                        dataColl->uuid(),
                                        {_fetchTimestamp, _fetchTimestamp},
@@ -352,7 +352,7 @@ TEST_F(ReshardingOplogFetcherTest, TestTrackLastSeen) {
 
     const int maxBatches = 1;
     auto fetcherJob = launchAsync([&, this] {
-        Client::initThread("RefetcherRunner", _svcCtx, nullptr);
+        ThreadClient tc("RefetcherRunner", _svcCtx, nullptr);
 
         ReshardingOplogFetcher fetcher(_reshardingUUID,
                                        dataColl->uuid(),
@@ -386,7 +386,7 @@ TEST_F(ReshardingOplogFetcherTest, TestFallingOffOplog) {
     AutoGetCollection dataColl(_opCtx, dataCollectionNss, LockMode::MODE_IX);
 
     auto fetcherJob = launchAsync([&, this] {
-        Client::initThread("RefetcherRunner", _svcCtx, nullptr);
+        ThreadClient tc("RefetcherRunner", _svcCtx, nullptr);
 
         const Timestamp doesNotExist(1, 1);
         ReshardingOplogFetcher fetcher(_reshardingUUID,
