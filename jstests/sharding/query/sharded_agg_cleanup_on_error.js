@@ -35,9 +35,27 @@ for (let i = 0; i < 10; i++) {
 st.shardColl(coll, {_id: 1}, {_id: 5}, {_id: 6}, kDBName, false);
 st.ensurePrimaryShard(kDBName, st.shard0.name);
 
+function findMatchingCursors(db) {
+    return db.getSiblingDB("admin")
+        .aggregate([
+            {$currentOp: {idleCursors: true, localOps: true}},
+            {
+                $match: {
+                    "cursor.originatingCommand.pipeline.$mergeCursors": {$exists: false},
+                    "cursor.originatingCommand.comment": jsTestName()
+                }
+            }
+        ])
+        .toArray();
+}
+
 function assertFailsAndCleansUpCursors({pipeline, errCode}) {
-    let cmdRes = mongosDB.runCommand(
-        {aggregate: coll.getName(), pipeline: pipeline, cursor: {batchSize: 0}});
+    let cmdRes = mongosDB.runCommand({
+        aggregate: coll.getName(),
+        pipeline: pipeline,
+        cursor: {batchSize: 0},
+        comment: jsTestName()
+    });
     assert.commandWorked(cmdRes);
     assert.neq(0, cmdRes.cursor.id);
     assert.eq(coll.getFullName(), cmdRes.cursor.ns);
@@ -49,9 +67,13 @@ function assertFailsAndCleansUpCursors({pipeline, errCode}) {
     // Neither mongos or the shards should leave cursors open. By the time we get here, the
     // cursor which was hanging on shard 1 will have been marked interrupted, but isn't
     // guaranteed to be deleted yet. Thus, we use an assert.soon().
-    assert.eq(mongosDB.serverStatus().metrics.cursor.open.total, 0);
-    assert.eq(shard0DB.serverStatus().metrics.cursor.open.total, 0);
-    assert.soon(() => shard1DB.serverStatus().metrics.cursor.open.pinned == 0);
+    assert(findMatchingCursors(mongosDB).length === 0);
+    assert.soon(() => findMatchingCursors(shard0DB).length === 0,
+                () => findMatchingCursors(shard0DB),
+                2 * 60 * 1000);
+    assert.soon(() => findMatchingCursors(shard1DB).length === 0,
+                () => findMatchingCursors(shard1DB),
+                2 * 60 * 1000);
 }
 
 try {
