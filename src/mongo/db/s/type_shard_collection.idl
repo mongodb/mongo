@@ -147,8 +147,7 @@ structs:
                               collection is the temporary resharding collection."
                 type: TypeCollectionReshardingFields
                 optional: true
-            allowMigrations:    # TODO (SERVER-51880): This field must never be 'false' on downgrade
-                                # to FCV 4.4 and must be cleared
+            allowMigrations:
                 cpp_name: pre50CompatibleAllowMigrations
                 type: bool
                 description: "Whether this collection allows chunks to move. It is required by
