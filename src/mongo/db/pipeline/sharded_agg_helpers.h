@@ -33,6 +33,7 @@
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/query/owned_remote_cursor.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo {
@@ -205,74 +206,5 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(Pipeline* owne
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregationRequest> targetRequest);
-
-/**
- * Adds a log message with the given message. Simple helper to avoid defining the log component in a
- * header file.
- */
-void logFailedRetryAttempt(StringData taskDescription, const DBException&);
-
-/**
- * A retry loop which handles errors in ErrorCategory::StaleShardVersionError. When such an error is
- * encountered, the CatalogCache is marked for refresh and 'callback' is retried. When retried,
- * 'callback' will trigger a refresh of the CatalogCache and block until it's done when it next
- * consults the CatalogCache.
- */
-template <typename F>
-auto shardVersionRetry(OperationContext* opCtx,
-                       CatalogCache* catalogCache,
-                       NamespaceString nss,
-                       StringData taskDescription,
-                       F&& callbackFn) {
-    size_t numAttempts = 0;
-    auto logAndTestMaxRetries = [&numAttempts, taskDescription](auto& exception) {
-        if (++numAttempts <= kMaxNumStaleVersionRetries) {
-            logFailedRetryAttempt(taskDescription, exception);
-            return true;
-        }
-        exception.addContext(str::stream()
-                             << "Exceeded maximum number of " << kMaxNumStaleVersionRetries
-                             << " retries attempting " << taskDescription);
-        return false;
-    };
-    while (true) {
-        catalogCache->setOperationShouldBlockBehindCatalogCacheRefresh(opCtx, numAttempts);
-        try {
-            return callbackFn();
-        } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-            invariant(ex->getDb() == nss.db(),
-                      str::stream() << "StaleDbVersion error on unexpected database. Expected "
-                                    << nss.db() << ", received " << ex->getDb());
-
-            // If the database version is stale, refresh its entry in the catalog cache.
-            Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(ex->getDb(),
-                                                                     ex->getVersionWanted());
-
-            if (!logAndTestMaxRetries(ex)) {
-                throw;
-            }
-        } catch (ExceptionForCat<ErrorCategory::StaleShardVersionError>& e) {
-            // If the exception provides a shardId, add it to the set of shards requiring a refresh.
-            // If the cache currently considers the collection to be unsharded, this will trigger an
-            // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
-            if (auto staleInfo = e.extraInfo<StaleConfigInfo>()) {
-                invariant(staleInfo->getNss() == nss,
-                          str::stream() << "StaleConfig error on unexpected namespace. Expected "
-                                        << nss << ", received " << staleInfo->getNss());
-                catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                    nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
-            } else {
-                catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-            }
-            if (!logAndTestMaxRetries(e)) {
-                throw;
-            }
-        } catch (ExceptionFor<ErrorCodes::ShardInvalidatedForTargeting>& e) {
-            if (!logAndTestMaxRetries(e)) {
-                throw;
-            }
-        }
-    }
-}
 }  // namespace sharded_agg_helpers
 }  // namespace mongo

@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
 namespace {
@@ -194,15 +195,15 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     const bool hasChangeStream = false;
     auto future = launchAsync([&] {
         // Shouldn't throw.
-        auto results = sharded_agg_helpers::shardVersionRetry(
-            operationContext(),
-            Grid::get(getServiceContext())->catalogCache(),
-            kTestAggregateNss,
-            "dispatch shard pipeline"_sd,
-            [&]() {
-                return sharded_agg_helpers::dispatchShardPipeline(
-                    serializedCommand, hasChangeStream, pipeline->clone());
-            });
+        auto results =
+            shardVersionRetry(operationContext(),
+                              Grid::get(getServiceContext())->catalogCache(),
+                              kTestAggregateNss,
+                              "dispatch shard pipeline"_sd,
+                              [&]() {
+                                  return sharded_agg_helpers::dispatchShardPipeline(
+                                      serializedCommand, hasChangeStream, pipeline->clone());
+                              });
         ASSERT_EQ(results.remoteCursors.size(), 1UL);
         ASSERT(!bool(results.splitPipeline));
     });

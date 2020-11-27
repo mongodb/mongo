@@ -52,6 +52,7 @@
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/router_exec_stage.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 
@@ -145,7 +146,7 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
     try {
         auto findCmd = cmdBuilder.obj();
         auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
-        auto shardResults = sharded_agg_helpers::shardVersionRetry(
+        auto shardResults = shardVersionRetry(
             expCtx->opCtx,
             catalogCache,
             foreignExpCtx->ns,

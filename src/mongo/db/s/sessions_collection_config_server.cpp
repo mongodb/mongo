@@ -38,13 +38,13 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/shard_collection_gen.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
 
@@ -81,7 +81,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* opCtx) {
     const auto nss = NamespaceString::kLogicalSessionsNamespace;
 
-    sharded_agg_helpers::shardVersionRetry(
+    shardVersionRetry(
         opCtx,
         Grid::get(opCtx)->catalogCache(),
         nss,

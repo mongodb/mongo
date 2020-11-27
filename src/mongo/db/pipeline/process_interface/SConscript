@@ -64,7 +64,7 @@ env.Library(
         'mongod_process_interfaces',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/sharding_api',
     ],
 )

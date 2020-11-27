@@ -54,6 +54,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
@@ -169,15 +170,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
     // TODO SERVER-52692: Set read preference to nearest.
     // request.setUnwrappedReadPref();
 
-    return sharded_agg_helpers::shardVersionRetry(
-        opCtx,
-        Grid::get(opCtx)->catalogCache(),
-        _sourceNss,
-        "targeting donor shards for resharding collection cloning"_sd,
-        [&] {
-            return sharded_agg_helpers::targetShardsAndAddMergeCursors(pipeline.getContext(),
-                                                                       request);
-        });
+    return shardVersionRetry(opCtx,
+                             Grid::get(opCtx)->catalogCache(),
+                             _sourceNss,
+                             "targeting donor shards for resharding collection cloning"_sd,
+                             [&] {
+                                 return sharded_agg_helpers::targetShardsAndAddMergeCursors(
+                                     pipeline.getContext(), request);
+                             });
 }
 
 std::vector<InsertStatement> ReshardingCollectionCloner::_fillBatch(Pipeline& pipeline) {

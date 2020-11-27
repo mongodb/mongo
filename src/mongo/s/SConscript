@@ -44,8 +44,9 @@ env.Library(
         'multi_statement_transaction_requests_sender.cpp',
         'transaction_router.cpp',
         'router_transactions_metrics.cpp',
-        'session_catalog_router.cpp',
         'router_transactions_stats.idl',
+        'session_catalog_router.cpp',
+        'stale_shard_version_helpers.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',

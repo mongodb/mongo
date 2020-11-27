@@ -35,7 +35,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
@@ -45,6 +44,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
 
@@ -62,24 +62,24 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
     auto reshardingNss = constructTemporaryReshardingNss(originalNss.db(), existingUUID);
 
     // Load the original collection's options from the database's primary shard.
-    auto [collOptions, uuid] = sharded_agg_helpers::shardVersionRetry(
-        opCtx,
-        catalogCache,
-        reshardingNss,
-        "loading collection options to create temporary resharding collection"_sd,
-        [&]() -> MigrationDestinationManager::CollectionOptionsAndUUID {
-            auto originalCm =
-                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, originalNss));
-            return MigrationDestinationManager::getCollectionOptions(
-                opCtx,
-                NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
-                originalCm.dbPrimary(),
-                originalCm,
-                fetchTimestamp);
-        });
+    auto [collOptions, uuid] =
+        shardVersionRetry(opCtx,
+                          catalogCache,
+                          reshardingNss,
+                          "loading collection options to create temporary resharding collection"_sd,
+                          [&]() -> MigrationDestinationManager::CollectionOptionsAndUUID {
+                              auto originalCm = uassertStatusOK(
+                                  catalogCache->getCollectionRoutingInfo(opCtx, originalNss));
+                              return MigrationDestinationManager::getCollectionOptions(
+                                  opCtx,
+                                  NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
+                                  originalCm.dbPrimary(),
+                                  originalCm,
+                                  fetchTimestamp);
+                          });
 
     // Load the original collection's indexes from the shard that owns the global minimum chunk.
-    auto [indexes, idIndex] = sharded_agg_helpers::shardVersionRetry(
+    auto [indexes, idIndex] = shardVersionRetry(
         opCtx,
         catalogCache,
         reshardingNss,

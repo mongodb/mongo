@@ -167,6 +167,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/async_requests_sender',
         '$BUILD_DIR/mongo/s/commands/shared_cluster_commands',
+        '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/s/query/cluster_query',
         'aggregation',
     ],

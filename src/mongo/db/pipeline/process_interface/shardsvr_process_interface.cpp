@@ -50,6 +50,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/s/write_ops/cluster_write.h"
 
 namespace mongo {
@@ -308,7 +309,7 @@ void ShardServerProcessInterface::createIndexesOnEmptyCollection(
                          opCtx->getWriteConcern().toBSON());
     auto cmdObj = newCmdBuilder.done();
 
-    sharded_agg_helpers::shardVersionRetry(
+    shardVersionRetry(
         opCtx,
         Grid::get(opCtx)->catalogCache(),
         ns,
