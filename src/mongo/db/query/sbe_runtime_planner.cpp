@@ -33,13 +33,14 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/plan_executor_sbe.h"
 
 namespace mongo::sbe {
 namespace {
 /**
  * Fetches a next document form the given plan stage tree and returns 'true' if the plan stage
- * returns EOF, or throws 'TrialRunProgressTracker::EarlyExitException' exception. Otherwise, the
+ * returns EOF, or throws 'TrialRunTracker::EarlyExitException' exception. Otherwise, the
  * loaded document is placed into the candidate's plan result queue.
  *
  * If the plan stage throws a 'QueryExceededMemoryLimitNoDiskUseAllowed', it will be caught and the
@@ -116,9 +117,19 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
     std::vector<plan_ranker::CandidatePlan> candidates;
     std::vector<std::pair<sbe::value::SlotAccessor*, sbe::value::SlotAccessor*>> slots;
+    std::vector<std::unique_ptr<TrialRunTracker>> trialRunTrackers;
+
+    const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
+    const auto maxNumReads{trial_period::getTrialPeriodMaxWorks(_opCtx, _collection)};
 
     for (size_t ix = 0; ix < roots.size(); ++ix) {
         auto&& [root, data] = roots[ix];
+
+        // Attach a unique TrialRunTracker to each SBE plan.
+        auto tracker = std::make_unique<TrialRunTracker>(maxNumResults, maxNumReads);
+        root->attachToTrialRunTracker(tracker.get());
+        trialRunTrackers.emplace_back(std::move(tracker));
+
         auto [resultSlot, recordIdSlot, exitedEarly] = prepareExecutionPlan(root.get(), &data);
 
         candidates.push_back(
@@ -128,7 +139,6 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
 
     auto done{false};
     size_t numFailures{0};
-    const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
     for (size_t it = 0; it < maxNumResults && !done; ++it) {
         for (size_t ix = 0; ix < candidates.size(); ++ix) {
             // Even if we had a candidate plan that exited early, we still want continue the trial
@@ -144,6 +154,11 @@ std::vector<plan_ranker::CandidatePlan> BaseRuntimePlanner::collectExecutionStat
             done |= fetchNextDocument(&candidates[ix], slots[ix], &numFailures) ||
                 (numFailures == candidates.size());
         }
+    }
+
+    // Detach each SBE plan's TrialRunTracker.
+    for (size_t ix = 0; ix < candidates.size(); ++ix) {
+        candidates[ix].root->detachFromTrialRunTracker();
     }
 
     // Make sure we have at least one plan which hasn't failed.

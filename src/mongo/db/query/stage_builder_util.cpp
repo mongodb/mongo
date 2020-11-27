@@ -58,8 +58,7 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
                              const CollectionPtr& collection,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
-                             PlanYieldPolicy* yieldPolicy,
-                             bool needsTrialRunProgressTracker) {
+                             PlanYieldPolicy* yieldPolicy) {
     // Only QuerySolutions derived from queries parsed with context, or QuerySolutions derived from
     // queries that disallow extensions, can be properly executed. If the query does not have
     // $text/$where context (and $text/$where are allowed), then no attempt should be made to
@@ -72,17 +71,12 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
 
     auto shardFilterer = std::make_unique<ShardFiltererFactoryImpl>(collection);
 
-    auto builder = std::make_unique<SlotBasedStageBuilder>(opCtx,
-                                                           collection,
-                                                           cq,
-                                                           solution,
-                                                           sbeYieldPolicy,
-                                                           needsTrialRunProgressTracker,
-                                                           shardFilterer.get());
+    auto builder = std::make_unique<SlotBasedStageBuilder>(
+        opCtx, collection, cq, solution, sbeYieldPolicy, shardFilterer.get());
     auto root = builder->build(solution.root());
     auto data = builder->getPlanStageData();
 
-    root->attachFromOperationContext(opCtx);
+    root->attachToOperationContext(opCtx);
 
     // Register this plan to yield according to the configured policy.
     sbeYieldPolicy->registerPlan(root.get());

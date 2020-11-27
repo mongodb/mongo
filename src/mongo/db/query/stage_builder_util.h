@@ -55,7 +55,6 @@ buildSlotBasedExecutableTree(OperationContext* opCtx,
                              const CollectionPtr& collection,
                              const CanonicalQuery& cq,
                              const QuerySolution& solution,
-                             PlanYieldPolicy* yieldPolicy,
-                             bool needsTrialRunProgressTracker);
+                             PlanYieldPolicy* yieldPolicy);
 
 }  // namespace mongo::stage_builder

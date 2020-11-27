@@ -120,7 +120,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
     if (solutions.size() == 1) {
         // Only one possible plan. Build the stages from the solution.
         auto&& [root, data] = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solutions[0], _yieldPolicy, true);
+            _opCtx, _collection, _cq, *solutions[0], _yieldPolicy);
         prepareExecutionPlan(root.get(), &data);
 
         auto explainer = plan_explainer_factory::make(root.get(), solutions[0].get());
@@ -145,7 +145,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache) const {
         }
 
         roots.push_back(stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, _cq, *solution, _yieldPolicy, true));
+            _opCtx, _collection, _cq, *solution, _yieldPolicy));
     }
 
     const auto cachingMode =

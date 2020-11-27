@@ -32,7 +32,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/trial_run_progress_tracker.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -49,7 +48,6 @@ public:
               boost::optional<value::SlotId> seekKeySlot,
               bool forward,
               PlanYieldPolicy* yieldPolicy,
-              TrialRunProgressTracker* tracker,
               PlanNodeId nodeId,
               ScanOpenCallback openCallback = {});
 
@@ -69,7 +67,9 @@ protected:
     void doSaveState() override;
     void doRestoreState() override;
     void doDetachFromOperationContext() override;
-    void doAttachFromOperationContext(OperationContext* opCtx) override;
+    void doAttachToOperationContext(OperationContext* opCtx) override;
+    void doDetachFromTrialRunTracker() override;
+    void doAttachToTrialRunTracker(TrialRunTracker* tracker) override;
 
 private:
     const NamespaceStringOrUUID _name;
@@ -82,7 +82,7 @@ private:
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
-    TrialRunProgressTracker* _tracker{nullptr};
+    TrialRunTracker* _tracker{nullptr};
 
     ScanOpenCallback _openCallback;
 
@@ -148,7 +148,7 @@ protected:
     void doSaveState() final;
     void doRestoreState() final;
     void doDetachFromOperationContext() final;
-    void doAttachFromOperationContext(OperationContext* opCtx) final;
+    void doAttachToOperationContext(OperationContext* opCtx) final;
 
 private:
     boost::optional<Record> nextRange();

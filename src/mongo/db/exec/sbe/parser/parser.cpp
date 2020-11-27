@@ -574,7 +574,6 @@ void Parser::walkScan(AstQuery& ast) {
                                  boost::none,
                                  forward,
                                  nullptr,
-                                 nullptr,
                                  getCurrentPlanNodeId());
 }
 
@@ -643,7 +642,6 @@ void Parser::walkSeek(AstQuery& ast) {
                                  lookupSlot(ast.nodes[0]->identifier),
                                  true /* forward */,
                                  nullptr,
-                                 nullptr,
                                  getCurrentPlanNodeId());
 }
 
@@ -693,7 +691,6 @@ void Parser::walkIndexScan(AstQuery& ast) {
                                       vars,
                                       boost::none,
                                       boost::none,
-                                      nullptr,
                                       nullptr,
                                       getCurrentPlanNodeId());
 }
@@ -745,7 +742,6 @@ void Parser::walkIndexSeek(AstQuery& ast) {
                                       lookupSlot(ast.nodes[0]->identifier),
                                       lookupSlot(ast.nodes[1]->identifier),
                                       nullptr,
-                                      nullptr,
                                       getCurrentPlanNodeId());
 }
 
@@ -785,7 +781,6 @@ void Parser::walkSort(AstQuery& ast) {
                                  std::numeric_limits<std::size_t>::max(),
                                  std::numeric_limits<std::size_t>::max(),
                                  true /* allowDiskUse */,
-                                 nullptr,
                                  getCurrentPlanNodeId());
 }
 

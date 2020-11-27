@@ -59,7 +59,6 @@ TEST_F(SortStageTest, SortNumbersTest) {
                              std::numeric_limits<std::size_t>::max(),
                              204857600,
                              false,
-                             nullptr,
                              kEmptyPlanNodeId);
 
         return std::make_pair(scanSlots, std::move(sortStage));

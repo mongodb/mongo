@@ -40,7 +40,7 @@ namespace mongo {
  * processed, or the number of physical reads performed, and the tracker will use it to check if
  * the execution plan has progressed enough.
  */
-class TrialRunProgressTracker final {
+class TrialRunTracker final {
 public:
     /**
      * The type of metric which can be collected and tracked during a trial run.
@@ -57,7 +57,7 @@ public:
 
     template <typename... MaxMetrics,
               std::enable_if_t<sizeof...(MaxMetrics) == TrialRunMetric::kLastElem, int> = 0>
-    TrialRunProgressTracker(MaxMetrics... maxMetrics) : _maxMetrics{maxMetrics...} {}
+    TrialRunTracker(MaxMetrics... maxMetrics) : _maxMetrics{maxMetrics...} {}
 
     /**
      * Increments the trial run metric specified as a template parameter 'metric' by the

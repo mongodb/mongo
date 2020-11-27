@@ -53,7 +53,7 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots, const BSONArray
 
 void PlanStageTestFixture::prepareTree(CompileCtx* ctx, PlanStage* root) {
     root->prepare(*ctx);
-    root->attachFromOperationContext(opCtx());
+    root->attachToOperationContext(opCtx());
     root->open(false);
 }
 

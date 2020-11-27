@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/trial_run_progress_tracker.h"
 
 namespace mongo {
 template <typename Key, typename Value>
@@ -49,7 +48,6 @@ public:
               size_t limit,
               size_t memoryLimit,
               bool allowDiskUse,
-              TrialRunProgressTracker* tracker,
               PlanNodeId planNodeId);
 
     ~SortStage();
@@ -65,6 +63,10 @@ public:
     std::unique_ptr<PlanStageStats> getStats(bool includeDebugInfo) const final;
     const SpecificStats* getSpecificStats() const final;
     std::vector<DebugPrinter::Block> debugPrint() const final;
+
+protected:
+    void doDetachFromTrialRunTracker() override;
+    void doAttachToTrialRunTracker(TrialRunTracker* tracker) override;
 
 private:
     void makeSorter();
@@ -90,6 +92,6 @@ private:
 
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
-    TrialRunProgressTracker* _tracker{nullptr};
+    TrialRunTracker* _tracker{nullptr};
 };
 }  // namespace mongo::sbe

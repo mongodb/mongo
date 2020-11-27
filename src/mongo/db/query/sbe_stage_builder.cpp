@@ -121,20 +121,11 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
                                              const CanonicalQuery& cq,
                                              const QuerySolution& solution,
                                              PlanYieldPolicySBE* yieldPolicy,
-                                             bool needsTrialRunProgressTracker,
                                              ShardFiltererFactoryInterface* shardFiltererFactory)
     : StageBuilder(opCtx, collection, cq, solution),
       _yieldPolicy(yieldPolicy),
       _data(makeRuntimeEnvironment(_opCtx, &_slotIdGenerator)),
       _shardFiltererFactory(shardFiltererFactory) {
-
-    if (needsTrialRunProgressTracker) {
-        const auto maxNumResults{trial_period::getTrialPeriodNumToReturn(_cq)};
-        const auto maxNumReads{trial_period::getTrialPeriodMaxWorks(_opCtx, _collection)};
-        _data.trialRunProgressTracker =
-            std::make_unique<TrialRunProgressTracker>(maxNumResults, maxNumReads);
-    }
-
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.
@@ -193,8 +184,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                              &_frameIdGenerator,
                                              _yieldPolicy,
                                              _data.env,
-                                             reqs.getIsTailableCollScanResumeBranch(),
-                                             _data.trialRunProgressTracker.get());
+                                             reqs.getIsTailableCollScanResumeBranch());
 
     if (reqs.has(kReturnKey)) {
         // Assign the 'returnKeySlot' to be the empty object.
@@ -255,14 +245,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Index scans cannot produce an oplogTsSlot, so assert that the caller doesn't need it.
     invariant(!reqs.has(kOplogTs));
 
-    return generateIndexScan(_opCtx,
-                             _collection,
-                             ixn,
-                             reqs,
-                             &_slotIdGenerator,
-                             &_spoolIdGenerator,
-                             _yieldPolicy,
-                             _data.trialRunProgressTracker.get());
+    return generateIndexScan(
+        _opCtx, _collection, ixn, reqs, &_slotIdGenerator, &_spoolIdGenerator, _yieldPolicy);
 }
 
 std::tuple<sbe::value::SlotId, sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>>
@@ -283,7 +267,6 @@ SlotBasedStageBuilder::makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inpu
         seekKeySlot,
         true,
         nullptr,
-        _data.trialRunProgressTracker.get(),
         planNodeId);
 
     // Get the recordIdSlot from the outer side (e.g., IXSCAN) and feed it to the inner side,
@@ -493,7 +476,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                    sn->limit ? sn->limit : std::numeric_limits<std::size_t>::max(),
                                    sn->maxMemoryUsageBytes,
                                    _cq.getExpCtx()->allowDiskUse,
-                                   _data.trialRunProgressTracker.get(),
                                    root->nodeId());
 
     return {std::move(inputStage), std::move(outputs)};
@@ -844,7 +826,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                             boost::none,  // recordSlot
                                             &_slotIdGenerator,
                                             _yieldPolicy,
-                                            _data.trialRunProgressTracker.get(),
                                             root->nodeId());
         indexScanList.push_back(std::move(ixscan));
         ixscanOutputSlots.push_back(sbe::makeSV(recordIdSlot));

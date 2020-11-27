@@ -32,7 +32,6 @@
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/trial_run_progress_tracker.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo::stage_builder {
@@ -59,7 +58,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateCollScan(
     sbe::value::FrameIdGenerator* frameIdGenerator,
     PlanYieldPolicy* yieldPolicy,
     sbe::RuntimeEnvironment* env,
-    bool isTailableResumeBranch,
-    TrialRunProgressTracker* tracker);
+    bool isTailableResumeBranch);
 
 }  // namespace mongo::stage_builder

@@ -456,7 +456,7 @@ void ExchangeProducer::start(OperationContext* opCtx,
                              std::unique_ptr<PlanStage> producer) {
     ExchangeProducer* p = static_cast<ExchangeProducer*>(producer.get());
 
-    p->attachFromOperationContext(opCtx);
+    p->attachToOperationContext(opCtx);
 
     try {
         p->prepare(ctx);

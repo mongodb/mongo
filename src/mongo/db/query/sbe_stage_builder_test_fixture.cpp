@@ -59,7 +59,6 @@ SbeStageBuilderTestFixture::buildPlanStage(
                                                  *statusWithCQ.getValue(),
                                                  *querySolution,
                                                  nullptr /* YieldPolicy */,
-                                                 false,
                                                  shardFiltererInterface.get()};
 
     auto stage = builder.build(querySolution->root());

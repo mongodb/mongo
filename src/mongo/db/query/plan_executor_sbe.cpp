@@ -131,7 +131,7 @@ void PlanExecutorSBE::detachFromOperationContext() {
 void PlanExecutorSBE::reattachToOperationContext(OperationContext* opCtx) {
     invariant(!_opCtx);
     invariant(_root);
-    _root->attachFromOperationContext(opCtx);
+    _root->attachToOperationContext(opCtx);
     _opCtx = opCtx;
 }
 

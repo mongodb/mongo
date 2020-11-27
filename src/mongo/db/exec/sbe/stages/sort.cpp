@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/sort.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/util/str.h"
 
 namespace {
@@ -52,15 +53,13 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
                      size_t limit,
                      size_t memoryLimit,
                      bool allowDiskUse,
-                     TrialRunProgressTracker* tracker,
                      PlanNodeId planNodeId)
     : PlanStage("sort"_sd, planNodeId),
       _obs(std::move(obs)),
       _dirs(std::move(dirs)),
       _vals(std::move(vals)),
       _allowDiskUse(allowDiskUse),
-      _mergeData({0, 0}),
-      _tracker(tracker) {
+      _mergeData({0, 0}) {
     _children.emplace_back(std::move(input));
 
     invariant(_obs.size() == _dirs.size());
@@ -69,7 +68,7 @@ SortStage::SortStage(std::unique_ptr<PlanStage> input,
     _specificStats.maxMemoryUsageBytes = memoryLimit;
 }
 
-SortStage ::~SortStage() {}
+SortStage::~SortStage() {}
 
 std::unique_ptr<PlanStage> SortStage::clone() const {
     return std::make_unique<SortStage>(_children[0]->clone(),
@@ -79,7 +78,6 @@ std::unique_ptr<PlanStage> SortStage::clone() const {
                                        _specificStats.limit,
                                        _specificStats.maxMemoryUsageBytes,
                                        _allowDiskUse,
-                                       _tracker,
                                        _commonStats.nodeId);
 }
 
@@ -149,6 +147,14 @@ void SortStage::makeSorter() {
     _mergeIt.reset();
 }
 
+void SortStage::doDetachFromTrialRunTracker() {
+    _tracker = nullptr;
+}
+
+void SortStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
+    _tracker = tracker;
+}
+
 void SortStage::open(bool reOpen) {
     _commonStats.opens++;
     _children[0]->open(reOpen);
@@ -174,7 +180,7 @@ void SortStage::open(bool reOpen) {
         // TODO SERVER-51815: count total mem usage for specificStats.
         _sorter->emplace(std::move(keys), std::move(vals));
 
-        if (_tracker && _tracker->trackProgress<TrialRunProgressTracker::kNumResults>(1)) {
+        if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
             // If we either hit the maximum number of document to return during the trial run, or
             // if we've performed enough physical reads, stop populating the sort heap and bail out
             // from the trial run by raising a special exception to signal a runtime planner that

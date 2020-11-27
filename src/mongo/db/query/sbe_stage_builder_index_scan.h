@@ -31,7 +31,6 @@
 
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/exec/trial_run_progress_tracker.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo::stage_builder {
@@ -56,8 +55,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     PlanStageReqs reqs,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::SpoolIdGenerator* spoolIdGenerator,
-    PlanYieldPolicy* yieldPolicy,
-    TrialRunProgressTracker* tracker);
+    PlanYieldPolicy* yieldPolicy);
 
 /**
  * Constructs the most simple version of an index scan from the single interval index bounds. The
@@ -88,7 +86,6 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateSingleInt
     boost::optional<sbe::value::SlotId> recordSlot,
     sbe::value::SlotIdGenerator* slotIdGenerator,
     PlanYieldPolicy* yieldPolicy,
-    TrialRunProgressTracker* tracker,
     PlanNodeId nodeId);
 
 }  // namespace mongo::stage_builder

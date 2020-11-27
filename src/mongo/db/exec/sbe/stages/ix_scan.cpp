@@ -34,6 +34,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
@@ -48,7 +49,6 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
                                boost::optional<value::SlotId> seekKeySlotLow,
                                boost::optional<value::SlotId> seekKeySlotHigh,
                                PlanYieldPolicy* yieldPolicy,
-                               TrialRunProgressTracker* tracker,
                                PlanNodeId nodeId)
     : PlanStage(seekKeySlotLow ? "ixseek"_sd : "ixscan"_sd, yieldPolicy, nodeId),
       _name(name),
@@ -59,8 +59,7 @@ IndexScanStage::IndexScanStage(const NamespaceStringOrUUID& name,
       _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)),
       _seekKeySlotLow(seekKeySlotLow),
-      _seekKeySlotHigh(seekKeySlotHigh),
-      _tracker(tracker) {
+      _seekKeySlotHigh(seekKeySlotHigh) {
     // The valid state is when both boundaries, or none is set, or only low key is set.
     invariant((_seekKeySlotLow && _seekKeySlotHigh) || (!_seekKeySlotLow && !_seekKeySlotHigh) ||
               (_seekKeySlotLow && !_seekKeySlotHigh));
@@ -79,7 +78,6 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _seekKeySlotLow,
                                             _seekKeySlotHigh,
                                             _yieldPolicy,
-                                            _tracker,
                                             _commonStats.nodeId);
 }
 
@@ -129,6 +127,7 @@ void IndexScanStage::doSaveState() {
 
     _coll.reset();
 }
+
 void IndexScanStage::doRestoreState() {
     invariant(_opCtx);
     invariant(!_coll);
@@ -153,10 +152,19 @@ void IndexScanStage::doDetachFromOperationContext() {
         _cursor->detachFromOperationContext();
     }
 }
-void IndexScanStage::doAttachFromOperationContext(OperationContext* opCtx) {
+
+void IndexScanStage::doAttachToOperationContext(OperationContext* opCtx) {
     if (_cursor) {
         _cursor->reattachToOperationContext(opCtx);
     }
+}
+
+void IndexScanStage::doDetachFromTrialRunTracker() {
+    _tracker = nullptr;
+}
+
+void IndexScanStage::doAttachToTrialRunTracker(TrialRunTracker* tracker) {
+    _tracker = tracker;
 }
 
 void IndexScanStage::open(bool reOpen) {
@@ -284,7 +292,7 @@ PlanState IndexScanStage::getNext() {
             _nextRecord->keyString, *_ordering, &_valuesBuffer, &_accessors, _indexKeysToInclude);
     }
 
-    if (_tracker && _tracker->trackProgress<TrialRunProgressTracker::kNumReads>(1)) {
+    if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumReads>(1)) {
         // If we're collecting execution stats during multi-planning and reached the end of the
         // trial period (trackProgress() will return 'true' in this case), then we can reset the
         // tracker. Note that a trial period is executed only once per a PlanStge tree, and once

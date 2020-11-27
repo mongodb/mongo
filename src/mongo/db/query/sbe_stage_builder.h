@@ -33,7 +33,6 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/trial_period_utils.h"
-#include "mongo/db/exec/trial_run_progress_tracker.h"
 #include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder.h"
@@ -231,11 +230,6 @@ struct PlanStageData {
     sbe::RuntimeEnvironment* env{nullptr};
     sbe::CompileCtx ctx;
 
-    // Used during the trial run of the runtime planner to track progress of the work done so far.
-    // Some PlanStages hold pointers to the TrialRunProgressTracker object and call methods on it
-    // when the SBE plan is executed.
-    std::unique_ptr<TrialRunProgressTracker> trialRunProgressTracker;
-
     bool shouldTrackLatestOplogTimestamp{false};
     bool shouldTrackResumeToken{false};
     bool shouldUseTailableScan{false};
@@ -256,7 +250,6 @@ public:
                           const CanonicalQuery& cq,
                           const QuerySolution& solution,
                           PlanYieldPolicySBE* yieldPolicy,
-                          bool needsTrialRunProgressTracker,
                           ShardFiltererFactoryInterface* shardFilterer);
 
     std::unique_ptr<sbe::PlanStage> build(const QuerySolutionNode* root) final;

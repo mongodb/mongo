@@ -901,7 +901,8 @@ public:
 protected:
     std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> buildExecutableTree(
         const QuerySolution& solution) const final {
-        return buildExecutableTree(solution, false);
+        return stage_builder::buildSlotBasedExecutableTree(
+            _opCtx, _collection, *_cq, solution, _yieldPolicy);
     }
 
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildIdHackPlan(
@@ -920,7 +921,7 @@ protected:
         const QueryPlannerParams& plannerParams,
         size_t decisionWorks) final {
         auto result = makeResult();
-        auto execTree = buildExecutableTree(*solution, true);
+        auto execTree = buildExecutableTree(*solution);
         result->emplace(std::move(execTree), std::move(solution));
         result->setDecisionWorks(decisionWorks);
         return result;
@@ -943,17 +944,10 @@ protected:
                 solutions[ix]->cacheData->indexFilterApplied = plannerParams.indexFiltersApplied;
             }
 
-            auto execTree = buildExecutableTree(*solutions[ix], true);
+            auto execTree = buildExecutableTree(*solutions[ix]);
             result->emplace(std::move(execTree), std::move(solutions[ix]));
         }
         return result;
-    }
-
-private:
-    std::pair<std::unique_ptr<sbe::PlanStage>, stage_builder::PlanStageData> buildExecutableTree(
-        const QuerySolution& solution, bool needsTrialRunProgressTracker) const {
-        return stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collection, *_cq, solution, _yieldPolicy, needsTrialRunProgressTracker);
     }
 };
 
