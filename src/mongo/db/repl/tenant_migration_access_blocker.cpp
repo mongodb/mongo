@@ -37,6 +37,7 @@
 #include "mongo/db/repl/tenant_migration_committed_info.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
 
@@ -292,7 +293,7 @@ ExecutorFuture<void> TenantMigrationAccessBlocker::_waitForOpTimeToMajorityCommi
             return shouldStop;
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(_executor);
+        .on(_executor, CancelationToken::uncancelable());
 }
 
 void TenantMigrationAccessBlocker::appendInfoForServerStatus(BSONObjBuilder* builder) const {

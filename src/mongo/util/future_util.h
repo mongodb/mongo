@@ -30,6 +30,7 @@
 
 #include "mongo/executor/task_executor.h"
 #include "mongo/util/future.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 
@@ -45,6 +46,14 @@ ExecutorFuture<void> sleepFor(std::shared_ptr<executor::TaskExecutor> executor,
                               Milliseconds duration);
 
 namespace future_util_details {
+
+/**
+ * Error status to use if any AsyncTry loop has been canceled.
+ */
+inline Status asyncTryCanceledStatus() {
+    static StaticImmortal s = Status{ErrorCodes::CallbackCanceled, "AsyncTry loop canceled"};
+    return *s;
+}
 
 /**
  * Widget to get a default-constructible object that allows access to the type passed in at
@@ -84,15 +93,20 @@ public:
 
     /**
      * Launches the loop and returns an ExecutorFuture that will be resolved when the loop is
-     * complete.
+     * complete. If the executor is already shut down or the cancelToken has already been canceled
+     * before the loop is launched, the loop body will never run and the resulting ExecutorFuture
+     * will be set with either a ShutdownInProgress or CallbackCanceled error.
      *
      * The returned ExecutorFuture contains the last result returned by the loop body. If the last
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    auto on(std::shared_ptr<executor::TaskExecutor> executor)&& {
-        auto loop = std::make_shared<TryUntilLoopWithDelay>(
-            std::move(executor), std::move(_body), std::move(_condition), std::move(_delay));
+    auto on(std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken)&& {
+        auto loop = std::make_shared<TryUntilLoopWithDelay>(std::move(executor),
+                                                            std::move(_body),
+                                                            std::move(_condition),
+                                                            std::move(_delay),
+                                                            std::move(cancelToken));
         // Launch the recursive chain using the helper class.
         return loop->run();
     }
@@ -106,11 +120,13 @@ private:
         TryUntilLoopWithDelay(std::shared_ptr<executor::TaskExecutor> executor,
                               BodyCallable executeLoopBody,
                               ConditionCallable shouldStopIteration,
-                              Delay delay)
+                              Delay delay,
+                              CancelationToken cancelToken)
             : executor(std::move(executor)),
               executeLoopBody(std::move(executeLoopBody)),
               shouldStopIteration(std::move(shouldStopIteration)),
-              delay(std::move(delay)) {}
+              delay(std::move(delay)),
+              cancelToken(std::move(cancelToken)) {}
 
         /**
          * Performs actual looping through recursion.
@@ -118,15 +134,19 @@ private:
         ExecutorFuture<FutureContinuationResult<BodyCallable>> run() {
             using ReturnType =
                 typename decltype(getReturnType<decltype(executeLoopBody())>())::type;
+            // If the request to executeLoopBody has already been canceled, don't attempt to run it.
+            if (cancelToken.isCanceled()) {
+                return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
+            }
             auto future = ExecutorFuture<void>(executor).then(executeLoopBody);
 
             return std::move(future).onCompletion(
-                [this, self = this->shared_from_this()](StatusOrStatusWith<ReturnType> s) mutable {
+                [this, self = this->shared_from_this()](StatusOrStatusWith<ReturnType> s) {
                     if (shouldStopIteration(s))
                         return ExecutorFuture<ReturnType>(executor, std::move(s));
 
                     // Retry after a delay.
-                    return sleepFor(executor, delay.getNext()).then([this, self]() mutable {
+                    return executor->sleepFor(delay.getNext(), cancelToken).then([this, self] {
                         return run();
                     });
                 });
@@ -136,6 +156,7 @@ private:
         BodyCallable executeLoopBody;
         ConditionCallable shouldStopIteration;
         Delay delay;
+        CancelationToken cancelToken;
     };
 
     BodyCallable _body;
@@ -177,15 +198,17 @@ public:
 
     /**
      * Launches the loop and returns an ExecutorFuture that will be resolved when the loop is
-     * complete.
+     * complete. If the executor is already shut down or the cancelToken has already been canceled
+     * before the loop is launched, the loop body will never run and the resulting ExecutorFuture
+     * will be set with either a ShutdownInProgress or CallbackCanceled error.
      *
      * The returned ExecutorFuture contains the last result returned by the loop body. If the last
      * iteration of the loop body threw an exception or otherwise returned an error status, the
      * returned ExecutorFuture will contain that error.
      */
-    auto on(std::shared_ptr<executor::TaskExecutor> executor)&& {
+    auto on(std::shared_ptr<executor::TaskExecutor> executor, CancelationToken cancelToken)&& {
         auto loop = std::make_shared<TryUntilLoop>(
-            std::move(executor), std::move(_body), std::move(_condition));
+            std::move(executor), std::move(_body), std::move(_condition), std::move(cancelToken));
         // Launch the recursive chain using the helper class.
         return loop->run();
     }
@@ -224,10 +247,12 @@ private:
     struct TryUntilLoop : public std::enable_shared_from_this<TryUntilLoop> {
         TryUntilLoop(std::shared_ptr<executor::TaskExecutor> executor,
                      BodyCallable executeLoopBody,
-                     ConditionCallable shouldStopIteration)
+                     ConditionCallable shouldStopIteration,
+                     CancelationToken cancelToken)
             : executor(std::move(executor)),
               executeLoopBody(std::move(executeLoopBody)),
-              shouldStopIteration(std::move(shouldStopIteration)) {}
+              shouldStopIteration(std::move(shouldStopIteration)),
+              cancelToken(std::move(cancelToken)) {}
 
         /**
          * Performs actual looping through recursion.
@@ -235,10 +260,13 @@ private:
         ExecutorFuture<FutureContinuationResult<BodyCallable>> run() {
             using ReturnType =
                 typename decltype(getReturnType<decltype(executeLoopBody())>())::type;
+            // If the request is already canceled, don't run anything.
+            if (cancelToken.isCanceled())
+                return ExecutorFuture<ReturnType>(executor, asyncTryCanceledStatus());
             auto future = ExecutorFuture<void>(executor).then(executeLoopBody);
 
             return std::move(future).onCompletion(
-                [this, self = this->shared_from_this()](StatusOrStatusWith<ReturnType> s) mutable {
+                [this, self = this->shared_from_this()](StatusOrStatusWith<ReturnType> s) {
                     if (shouldStopIteration(s))
                         return ExecutorFuture<ReturnType>(executor, std::move(s));
 
@@ -249,6 +277,7 @@ private:
         std::shared_ptr<executor::TaskExecutor> executor;
         BodyCallable executeLoopBody;
         ConditionCallable shouldStopIteration;
+        CancelationToken cancelToken;
     };
 
     BodyCallable _body;
@@ -332,32 +361,31 @@ SemiFuture<ResultVector> whenAllSucceed(std::vector<FutureLike>&& futures) {
     auto sharedBlock = std::make_shared<SharedBlock>(futures.size(), std::move(promise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
-        std::move(futures[i])
-            .getAsync([sharedBlock, myIndex = i](StatusWith<Value> swValue) mutable {
-                if (swValue.isOK()) {
-                    // Best effort check that no error has returned, not required for correctness.
-                    if (!sharedBlock->completedWithError.loadRelaxed()) {
-                        // Put this result in its proper slot in the output vector.
-                        sharedBlock->intermediateResult[myIndex] = std::move(swValue.getValue());
-                        auto numResultsReturnedWithSuccess =
-                            sharedBlock->numResultsReturnedWithSuccess.addAndFetch(1);
-                        // If this is the last result to return, set the promise. Note that this
-                        // will never be true if one of the input futures resolves with an error,
-                        // since the future with an error will not cause the
-                        // numResultsReturnedWithSuccess count to be incremented.
-                        if (numResultsReturnedWithSuccess == sharedBlock->numFuturesToWaitFor) {
-                            // All results are ready.
-                            sharedBlock->resultPromise.emplaceValue(
-                                std::move(sharedBlock->intermediateResult));
-                        }
-                    }
-                } else {
-                    // Make sure no other error has already been set before setting the promise.
-                    if (!sharedBlock->completedWithError.swap(true)) {
-                        sharedBlock->resultPromise.setError(std::move(swValue.getStatus()));
+        std::move(futures[i]).getAsync([sharedBlock, myIndex = i](StatusWith<Value> swValue) {
+            if (swValue.isOK()) {
+                // Best effort check that no error has returned, not required for correctness.
+                if (!sharedBlock->completedWithError.loadRelaxed()) {
+                    // Put this result in its proper slot in the output vector.
+                    sharedBlock->intermediateResult[myIndex] = std::move(swValue.getValue());
+                    auto numResultsReturnedWithSuccess =
+                        sharedBlock->numResultsReturnedWithSuccess.addAndFetch(1);
+                    // If this is the last result to return, set the promise. Note that this
+                    // will never be true if one of the input futures resolves with an error,
+                    // since the future with an error will not cause the
+                    // numResultsReturnedWithSuccess count to be incremented.
+                    if (numResultsReturnedWithSuccess == sharedBlock->numFuturesToWaitFor) {
+                        // All results are ready.
+                        sharedBlock->resultPromise.emplaceValue(
+                            std::move(sharedBlock->intermediateResult));
                     }
                 }
-            });
+            } else {
+                // Make sure no other error has already been set before setting the promise.
+                if (!sharedBlock->completedWithError.swap(true)) {
+                    sharedBlock->resultPromise.setError(std::move(swValue.getStatus()));
+                }
+            }
+        });
     }
 
     return std::move(future).semi();
@@ -450,19 +478,17 @@ SemiFuture<ResultVector> whenAll(std::vector<FutureT>&& futures) {
     auto sharedBlock = std::make_shared<SharedBlock>(futures.size(), std::move(promise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
-        std::move(futures[i])
-            .getAsync([sharedBlock, myIndex = i](StatusOrStatusWith<Value> value) mutable {
-                sharedBlock->intermediateResult[myIndex] = std::move(value);
+        std::move(futures[i]).getAsync([sharedBlock, myIndex = i](StatusOrStatusWith<Value> value) {
+            sharedBlock->intermediateResult[myIndex] = std::move(value);
 
-                auto numReady = sharedBlock->numReady.addAndFetch(1);
-                invariant(numReady <= sharedBlock->numFuturesToWaitFor);
+            auto numReady = sharedBlock->numReady.addAndFetch(1);
+            invariant(numReady <= sharedBlock->numFuturesToWaitFor);
 
-                if (numReady == sharedBlock->numFuturesToWaitFor) {
-                    // All results are ready.
-                    sharedBlock->resultPromise.emplaceValue(
-                        std::move(sharedBlock->intermediateResult));
-                }
-            });
+            if (numReady == sharedBlock->numFuturesToWaitFor) {
+                // All results are ready.
+                sharedBlock->resultPromise.emplaceValue(std::move(sharedBlock->intermediateResult));
+            }
+        });
     }
 
     return std::move(future).semi();
@@ -504,14 +530,13 @@ SemiFuture<Result> whenAny(std::vector<FutureT>&& futures) {
     auto sharedBlock = std::make_shared<SharedBlock>(std::move(promise));
 
     for (size_t i = 0; i < futures.size(); ++i) {
-        std::move(futures[i])
-            .getAsync([sharedBlock, myIndex = i](StatusOrStatusWith<Value> value) mutable {
-                // If this is the first input future to complete, change done to true and set the
-                // value on the promise.
-                if (!sharedBlock->done.swap(true)) {
-                    sharedBlock->resultPromise.emplaceValue(Result{std::move(value), myIndex});
-                }
-            });
+        std::move(futures[i]).getAsync([sharedBlock, myIndex = i](StatusOrStatusWith<Value> value) {
+            // If this is the first input future to complete, change done to true and set the
+            // value on the promise.
+            if (!sharedBlock->done.swap(true)) {
+                sharedBlock->resultPromise.emplaceValue(Result{std::move(value), myIndex});
+            }
+        });
     }
 
     return std::move(future).semi();

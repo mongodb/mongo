@@ -87,7 +87,9 @@ using AsyncTryUntilTest = FutureUtilTest;
 
 TEST_F(AsyncTryUntilTest, LoopExecutesOnceWithAlwaysTrueCondition) {
     auto i = 0;
-    auto resultFut = AsyncTry([&] { ++i; }).until([](Status s) { return true; }).on(executor());
+    auto resultFut = AsyncTry([&] { ++i; })
+                         .until([](Status s) { return true; })
+                         .on(executor(), CancelationToken::uncancelable());
     resultFut.wait();
 
     ASSERT_EQ(i, 1);
@@ -101,7 +103,7 @@ TEST_F(AsyncTryUntilTest, LoopExecutesUntilConditionIsTrue) {
                          return i;
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
-                         .on(executor());
+                         .on(executor(), CancelationToken::uncancelable());
     resultFut.wait();
 
     ASSERT_EQ(i, numLoops);
@@ -112,7 +114,7 @@ TEST_F(AsyncTryUntilTest, LoopDoesNotRespectConstDelayIfConditionIsAlreadyTrue) 
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
                          .withDelayBetweenIterations(Seconds(10000000))
-                         .on(executor());
+                         .on(executor(), CancelationToken::uncancelable());
     // This would hang for a very long time if the behavior were incorrect.
     resultFut.wait();
 
@@ -124,7 +126,7 @@ TEST_F(AsyncTryUntilTest, LoopDoesNotRespectBackoffDelayIfConditionIsAlreadyTrue
     auto resultFut = AsyncTry([&] { ++i; })
                          .until([](Status s) { return true; })
                          .withBackoffBetweenIterations(TestBackoff{Seconds(10000000)})
-                         .on(executor());
+                         .on(executor(), CancelationToken::uncancelable());
     // This would hang for a very long time if the behavior were incorrect.
     resultFut.wait();
 
@@ -140,7 +142,7 @@ TEST_F(AsyncTryUntilTest, LoopRespectsConstDelayAfterEvaluatingCondition) {
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
                          .withDelayBetweenIterations(Seconds(1000))
-                         .on(executor());
+                         .on(executor(), CancelationToken::uncancelable());
     ASSERT_FALSE(resultFut.isReady());
 
     // Advance the time some, but not enough to be past the delay yet.
@@ -171,7 +173,7 @@ TEST_F(AsyncTryUntilTest, LoopRespectsBackoffDelayAfterEvaluatingCondition) {
                      })
                          .until([&](StatusWith<int> swInt) { return swInt.getValue() == numLoops; })
                          .withBackoffBetweenIterations(TestBackoff{Seconds(1000)})
-                         .on(executor());
+                         .on(executor(), CancelationToken::uncancelable());
     ASSERT_FALSE(resultFut.isReady());
 
     // Due to the backoff, the delays are going to be 1000 seconds and 2000 seconds.
@@ -220,7 +222,7 @@ TEST_F(AsyncTryUntilTest, LoopBodyPropagatesValueOfLastIterationToCaller) {
                          return i;
                      })
                          .until([&](StatusWith<int> swInt) { return i == expectedResult; })
-                         .on(executor());
+                         .on(executor(), CancelationToken::uncancelable());
 
     ASSERT_EQ(resultFut.get(), expectedResult);
 }
@@ -235,9 +237,81 @@ TEST_F(AsyncTryUntilTest, LoopBodyPropagatesErrorToConditionAndCaller) {
                              ASSERT_EQ(swInt.getStatus().code(), ErrorCodes::InternalError);
                              return true;
                          })
-                         .on(executor());
+                         .on(executor(), CancelationToken::uncancelable());
 
     ASSERT_EQ(resultFut.getNoThrow(), ErrorCodes::InternalError);
+}
+
+static const Status kCanceledStatus = {ErrorCodes::CallbackCanceled, "AsyncTry::until canceled"};
+
+TEST_F(AsyncTryUntilTest, AsyncTryUntilCanBeCanceled) {
+    CancelationSource cancelSource;
+    auto resultFut =
+        AsyncTry([] {}).until([](Status) { return false; }).on(executor(), cancelSource.token());
+    // This should hang forever if it is not canceled.
+    cancelSource.cancel();
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+}
+
+TEST_F(AsyncTryUntilTest, AsyncTryUntilWithDelayCanBeCanceled) {
+    CancelationSource cancelSource;
+    auto resultFut = AsyncTry([] {})
+                         .until([](Status) { return false; })
+                         .withDelayBetweenIterations(Hours(1000))
+                         .on(executor(), cancelSource.token());
+    // Since the "until" condition is false, and the delay between iterations is very long, the only
+    // way this test should pass without hanging is if the future produced by TaskExecutor::sleepFor
+    // is resolved and set with ErrorCodes::CallbackCanceled well _before_ the deadline.
+    cancelSource.cancel();
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+}
+
+TEST_F(AsyncTryUntilTest, AsyncTryUntilWithBackoffCanBeCanceled) {
+    CancelationSource cancelSource;
+    auto resultFut = AsyncTry([] {})
+                         .until([](Status) { return false; })
+                         .withBackoffBetweenIterations(TestBackoff{Seconds(10000000)})
+                         .on(executor(), cancelSource.token());
+    cancelSource.cancel();
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+}
+
+TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopDoesNotExecuteIfAlreadyCanceled) {
+    int counter{0};
+    CancelationSource cancelSource;
+    auto canceledToken = cancelSource.token();
+    cancelSource.cancel();
+    auto resultFut = AsyncTry([&] { ++counter; })
+                         .until([](Status) { return false; })
+                         .on(executor(), canceledToken);
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+    ASSERT_EQ(counter, 0);
+}
+
+TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopWithDelayDoesNotExecuteIfAlreadyCanceled) {
+    CancelationSource cancelSource;
+    int counter{0};
+    auto canceledToken = cancelSource.token();
+    cancelSource.cancel();
+    auto resultFut = AsyncTry([&] { ++counter; })
+                         .until([](Status) { return false; })
+                         .withDelayBetweenIterations(Hours(1000))
+                         .on(executor(), canceledToken);
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+    ASSERT_EQ(counter, 0);
+}
+
+TEST_F(AsyncTryUntilTest, CanceledTryUntilLoopWithBackoffDoesNotExecuteIfAlreadyCanceled) {
+    CancelationSource cancelSource;
+    int counter{0};
+    auto canceledToken = cancelSource.token();
+    cancelSource.cancel();
+    auto resultFut = AsyncTry([&] { ++counter; })
+                         .until([](Status) { return false; })
+                         .withBackoffBetweenIterations(TestBackoff{Seconds(10000000)})
+                         .on(executor(), canceledToken);
+    ASSERT_EQ(resultFut.getNoThrow(), kCanceledStatus);
+    ASSERT_EQ(counter, 0);
 }
 
 template <typename T>

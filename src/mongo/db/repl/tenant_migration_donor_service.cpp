@@ -110,7 +110,7 @@ ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
            })
         .until([](Status status) { return shouldStopCreatingTTLIndex(status); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor);
+        .on(**executor, CancelationToken::uncancelable());
 }
 
 TenantMigrationDonorService::Instance::Instance(ServiceContext* serviceContext,
@@ -249,7 +249,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
             return shouldStopInsertingDonorStateDoc(swOpTime.getStatus());
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor);
+        .on(**executor, CancelationToken::uncancelable());
 }
 
 ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateStateDocument(
@@ -344,7 +344,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
             return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus());
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor);
+        .on(**executor, CancelationToken::uncancelable());
 }
 
 ExecutorFuture<repl::OpTime>
@@ -382,7 +382,7 @@ TenantMigrationDonorService::Instance::_markStateDocumentAsGarbageCollectable(
             return shouldStopUpdatingDonorStateDoc(swOpTime.getStatus());
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor);
+        .on(**executor, CancelationToken::uncancelable());
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWriteConcern(
@@ -446,7 +446,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendCommandToRecipi
                })
         .until([](Status status) { return shouldStopSendingRecipientCommand(status); })
         .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor);
+        .on(**executor, token);
 }
 
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDataCommand(
