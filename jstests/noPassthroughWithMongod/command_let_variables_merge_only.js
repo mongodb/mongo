@@ -1,6 +1,6 @@
-// Tests that commands like find, aggregate and update accepts a 'let' parameter which defines
-// variables for use in expressions within the command.
-// TODO SERVER-46707: move this back to core after let params work in sharded commands is complete.
+// Tests that the aggregate command can use command-level let variables with $merge. Note $merge
+// tests must be run in a noPassthrough suite so the other operators are exercised in
+// jstests/core/command_let_variables.js.
 // @tags: [assumes_against_mongod_not_mongos, requires_fcv46]
 
 (function() {
@@ -40,76 +40,6 @@ assert.commandWorked(coll.insert([
         ]
     }
 ]));
-
-// Aggregate tests
-const pipeline = [
-    {$project: {_id: 0}},
-    {$unwind: "$population_trends"},
-    {$match: {$expr: {$eq: ["$population_trends.trend", "$$target_trend"]}}},
-    {$sort: {Species: 1}}
-];
-let expectedResults = [{
-    Species: "Bullfinch (Pyrrhula pyrrhula)",
-    population_trends:
-        {term: {start: 2009, end: 2014}, pct_change: 12, annual: 2.38, trend: "weak increase"}
-}];
-assert.eq(coll.aggregate(pipeline, {let : {target_trend: "weak increase"}}).toArray(),
-          expectedResults);
-
-expectedResults = [
-    {
-        Species: "Chaffinch (Fringilla coelebs)",
-        population_trends:
-            {term: {start: 2009, end: 2014}, pct_change: -7, annual: -1.49, trend: "weak decline"}
-    },
-    {
-        Species: "Song Thrush (Turdus philomelos)",
-        population_trends:
-            {term: {start: 1970, end: 2014}, pct_change: -53, annual: -1.7, trend: "weak decline"}
-    }
-];
-assert.eq(coll.aggregate(pipeline, {let : {target_trend: "weak decline"}}).toArray(),
-          expectedResults);
-
-// Test that if runtimeConstants and let are both specified, both will coexist.
-let constants = {
-    localNow: new Date(),
-    clusterTime: new Timestamp(0, 0),
-};
-
-assert.eq(
-    coll.aggregate(pipeline, {runtimeConstants: constants, let : {target_trend: "weak decline"}})
-        .toArray(),
-    expectedResults);
-
-// Test that undefined let params in the pipeline fail gracefully.
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: pipeline,
-    runtimeConstants: constants,
-    cursor: {},
-    let : {cat: "not_a_bird"}
-}),
-                             17276);
-
-// Test null and empty let parameters
-const pipeline_no_lets = [
-    {$project: {_id: 0}},
-    {$unwind: "$population_trends"},
-    {$match: {$expr: {$eq: ["$population_trends.trend", "weak decline"]}}},
-    {$sort: {Species: 1}}
-];
-assert.eq(coll.aggregate(pipeline_no_lets, {runtimeConstants: constants, let : {}}).toArray(),
-          expectedResults);
-
-assert.commandFailedWithCode(db.runCommand({
-    aggregate: coll.getName(),
-    pipeline: pipeline_no_lets,
-    runtimeConstants: constants,
-    cursor: {},
-    let : null
-}),
-                             ErrorCodes.TypeMismatch);
 
 // Function to prepare target collection of $merge stage for testing.
 function prepMergeTargetColl() {
