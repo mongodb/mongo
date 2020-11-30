@@ -486,7 +486,7 @@ if needed
 
 DDL operations often involve multiple hops between nodes. Generally, if a command is idempotent on
 the receiving node, the sending node will retry it upon receiving a retryable error, such as a
-network or NotMaster error. There are some cases where the sending node retries even though the
+network or NotPrimaryError. There are some cases where the sending node retries even though the
 command is not idempotent, such as in shardCollection. In this case, the receiving node may return
 ManualInterventionRequired if the first attempt failed partway.
 
@@ -1108,4 +1108,27 @@ If the mongod server is primary, it will [try to step down](https://github.com/m
 * [Shutdown logic](https://github.com/mongodb/mongo/blob/30f5448e95114d344e6acffa92856536885e35dd/src/mongo/s/mongos_main.cpp#L336-L354) for mongos.
 
 ### Quiesce mode on shutdown
-mongos enters quiesce mode prior to shutdown, to allow short-running operations to finish. During this time, new and existing operations are allowed to run, but `isMaster` requests return a `ShutdownInProgress` error, to indicate that clients should start routing operations to other nodes. Entering quiesce mode is considered a significant topology change in the streaming `isMaster` protocol, so mongos tracks a `TopologyVersion`, which it increments on entering quiesce mode, prompting it to respond to all waiting isMaster requests.
+mongos enters quiesce mode prior to shutdown, to allow short-running operations to finish.
+During this time, new and existing operations are allowed to run, but `isMaster`/`hello`
+requests return a `ShutdownInProgress` error, to indicate that clients should start routing
+operations to other nodes. Entering quiesce mode is considered a significant topology change
+in the streaming `hello` protocol, so mongos tracks a `TopologyVersion`, which it increments
+on entering quiesce mode, prompting it to respond to all waiting hello requests.
+
+### helloOk Protocol Negotation
+
+In order to preserve backwards compatibility with old drivers, mongos currently supports both
+the [`isMaster`] command and the [`hello`] command. New drivers and 5.0+ versions of the server
+will support `hello`. When connecting to a sharded cluster via mongos, a new driver will send
+"helloOk: true" as a part of the initial handshake. If mongos supports hello, it will respond
+with "helloOk: true" as well. This way, new drivers know that they're communicating with a version
+of the mongos that supports `hello` and can start sending `hello` instead of `isMaster` on this
+connection.
+
+If mongos does not support `hello`, the `helloOk` flag is ignored. A new driver will subsequently
+not see "helloOk: true" in the response and must continue to send `isMaster` on this connection. Old
+drivers will not specify this flag at all, so the behavior remains the same.
+
+#### Code references
+* [isMaster command](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L248) for mongos.
+* [hello command](https://github.com/mongodb/mongo/blob/r4.8.0-alpha/src/mongo/s/commands/cluster_is_master_cmd.cpp#L64) for mongos.
