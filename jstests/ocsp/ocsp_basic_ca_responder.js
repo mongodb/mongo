@@ -53,10 +53,5 @@ function test(serverCert, caCert, responderCertPair) {
 
 test(OCSP_SERVER_CERT, OCSP_CA_PEM, OCSP_CA_RESPONDER);
 
-// TODO: SERVER-47963 - remove this platform check.
-if (determineSSLProvider() === "windows") {
-    return;
-}
-
 test(OCSP_SERVER_INTERMEDIATE_CA_CERT, OCSP_INTERMEDIATE_CA_PEM, OCSP_INTERMEDIATE_RESPONDER);
 }());
