@@ -118,23 +118,38 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         auto nextState = coordinatorDoc.getState();
         switch (nextState) {
             case CoordinatorStateEnum::kPreparingToDonate:
-                // Insert the new coordinator state document
+                // Insert the new coordinator document.
                 return buildInsertOp(NamespaceString::kConfigReshardingOperationsNamespace,
                                      std::vector<BSONObj>{coordinatorDoc.toBSON()});
             case CoordinatorStateEnum::kDone:
-                // Remove the coordinator state document
+                // Remove the coordinator document.
                 return buildDeleteOp(NamespaceString::kConfigReshardingOperationsNamespace,
                                      BSON("_id" << coordinatorDoc.get_id()),  // query
                                      false                                    // multi
                 );
-            default:
-                // Replacement update for the coordinator state document
+            default: {
+                // Partially update the coordinator document.
+                BSONObjBuilder updateBuilder;
+                {
+                    BSONObjBuilder setBuilder(updateBuilder.subobjStart("$set"));
+
+                    // Always update the state field.
+                    setBuilder.append(ReshardingCoordinatorDocument::kStateFieldName,
+                                      CoordinatorState_serializer(coordinatorDoc.getState()));
+                    if (auto fetchTimestamp = coordinatorDoc.getFetchTimestamp()) {
+                        // If the fetchTimestamp exists, include it in the update.
+                        setBuilder.append(ReshardingCoordinatorDocument::kFetchTimestampFieldName,
+                                          *fetchTimestamp);
+                    }
+                }
+
                 return buildUpdateOp(NamespaceString::kConfigReshardingOperationsNamespace,
                                      BSON("_id" << coordinatorDoc.get_id()),
-                                     coordinatorDoc.toBSON(),
+                                     updateBuilder.obj(),
                                      false,  // upsert
                                      false   // multi
                 );
+            }
         }
     }());
 
