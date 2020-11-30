@@ -928,8 +928,10 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                         "Recipient migration service starting oplog applier",
                         "tenantId"_attr = getTenantId(),
                         "migrationId"_attr = getMigrationUUID());
-
-            uassertStatusOK(_tenantOplogApplier->startup());
+            {
+                stdx::lock_guard lk(_mutex);
+                uassertStatusOK(_tenantOplogApplier->startup());
+            }
             _stopOrHangOnFailPoint(&fpAfterStartingOplogApplierMigrationRecipientInstance);
             return _getDataConsistentFuture();
         })
@@ -947,6 +949,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
         })
         .then([this] {
             _stopOrHangOnFailPoint(&fpAfterDataConsistentMigrationRecipientInstance);
+            stdx::lock_guard lk(_mutex);
             // wait for oplog applier to complete/stop.
             // The oplog applier does not exit normally; it must be shut down externally,
             // e.g. by recipientForgetMigration.
