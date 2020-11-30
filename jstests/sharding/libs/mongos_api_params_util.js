@@ -934,7 +934,7 @@ let MongosAPIParametersUtil = (function() {
             commandName: "renameCollection",
             run: {
                 inAPIVersion1: false,
-                shardCommandName: "renameCollection",
+                shardCommandName: "_shardsvrRenameCollection",
                 permittedOnShardedCollection: false,
                 permittedInTxn: false,
                 runsAgainstAdminDb: true,

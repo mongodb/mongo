@@ -31,7 +31,20 @@ global:
 
 imports:
     - "mongo/db/drop_database.idl"
+    - "mongo/db/commands/rename_collection.idl"
+    - "mongo/idl/basic_types.idl"
     - "mongo/s/database_version.idl"
+    - "mongo/s/chunk_version.idl"
+
+structs:
+    RenameCollectionResponse:
+        description: "Response for the rename collection command"
+        strict: false
+        fields:
+            collectionVersion:
+                type: ChunkVersion
+                description: "Latest version of the collection"
+                optional: false
 
 commands:
     _shardsvrDropDatabase:
@@ -47,3 +60,26 @@ commands:
         command_name: _shardsvrDropCollection
         namespace: concatenate_with_db
         cpp_name: ShardsvrDropCollection
+        strict: true
+        reply_type: DropDatabaseReply
+
+    _shardsvrRenameCollection:
+        command_name: _shardsvrRenameCollection
+        cpp_name: ShardsvrRenameCollection
+        description: "Internal renameCollection command for a shard."
+        strict: false
+        namespace: concatenate_with_db
+        fields:
+            to:
+                type: namespacestring
+                description: "The new namespace for the collection being renamed."
+            dropTarget:
+                type: bool
+                description: "If true, mongod will drop the target of renameCollection prior to
+                renaming the collection."
+                default: false
+            stayTemp:
+                type: bool
+                description: "If true, the original collection will remain temp if it was temp
+                before the rename."
+                default: false

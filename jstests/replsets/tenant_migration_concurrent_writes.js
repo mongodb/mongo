@@ -436,6 +436,7 @@ const testCases = {
     _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},
     _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
     _shardsvrShardCollection: {skip: isNotRunOnUserDatabase},
+    _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
     _transferMods: {skip: isNotRunOnUserDatabase},
     abortTransaction: {
         skip: isNotWriteCommand  // aborting unprepared transaction doesn't create an abort oplog

@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclient_cursor.h"
@@ -45,6 +47,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -95,8 +98,13 @@ public:
         RenameCollectionOptions options;
         options.dropTarget = renameRequest.getDropTarget();
         options.stayTemp = renameRequest.getStayTemp();
-        validateAndRunRenameCollection(
-            opCtx, renameRequest.getCommandParameter(), renameRequest.getTo(), options);
+        try {
+            validateAndRunRenameCollection(
+                opCtx, renameRequest.getCommandParameter(), renameRequest.getTo(), options);
+        } catch (std::exception& ex) {
+            LOGV2(99998, "Exception while renaming {what}", "what"_attr = ex.what());
+            throw;
+        }
         return true;
     }
 

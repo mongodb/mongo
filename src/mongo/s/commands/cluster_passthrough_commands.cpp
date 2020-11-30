@@ -31,14 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/commands/rename_collection_common.h"
-#include "mongo/db/commands/rename_collection_gen.h"
-#include "mongo/executor/task_executor_pool.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -72,70 +65,6 @@ bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
     out->appendElementsUnique(CommandHelpers::filterCommandReplyForPassthrough(cmdResponse.data));
     return status.isOK();
 }
-
-class RenameCollectionCmd : public BasicCommand {
-public:
-    RenameCollectionCmd() : BasicCommand("renameCollection") {}
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
-    }
-
-    bool adminOnly() const override {
-        return true;
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kNever;
-    }
-
-    Status checkAuthForCommand(Client* client,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj) const override {
-        return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
-    }
-
-    bool run(OperationContext* opCtx,
-             const std::string& dbName,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) override {
-        auto renameRequest =
-            RenameCollectionCommand::parse(IDLParserErrorContext("renameCollection"), cmdObj);
-        auto fromNss = renameRequest.getCommandParameter();
-        auto toNss = renameRequest.getTo();
-
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid target namespace: " << toNss.ns(),
-                toNss.isValid());
-
-        const auto fromCM = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, fromNss));
-        uassert(13138, "You can't rename a sharded collection", !fromCM.isSharded());
-
-        const auto toCM = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, toNss));
-        uassert(13139, "You can't rename to a sharded collection", !toCM.isSharded());
-
-        uassert(13137,
-                "Source and destination collections must be on same shard",
-                fromCM.dbPrimary() == toCM.dbPrimary());
-
-        return nonShardedCollectionCommandPassthrough(
-            opCtx,
-            NamespaceString::kAdminDb,
-            fromNss,
-            fromCM,
-            applyReadWriteConcern(
-                opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
-            Shard::RetryPolicy::kNoRetry,
-            &result);
-    }
-
-} renameCollectionCmd;
 
 class ConvertToCappedCmd : public BasicCommand {
 public:

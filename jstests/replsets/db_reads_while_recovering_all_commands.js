@@ -68,6 +68,7 @@ const allCommands = {
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
     _shardsvrShardCollection: {skip: isPrimaryOnly},
     _shardsvrDropDatabase: {skip: isPrimaryOnly},
+    _shardsvrRenameCollection: {skip: isPrimaryOnly},
     _transferMods: {skip: isPrimaryOnly},
     _vectorClockPersist: {skip: isPrimaryOnly},
     abortTransaction: {skip: isPrimaryOnly},

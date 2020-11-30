@@ -338,6 +338,7 @@ env.Library(
         'sharding_state_command.cpp',
         'shardsvr_drop_collection_command.cpp',
         'shardsvr_drop_database_command.cpp',
+        'shardsvr_rename_collection.cpp',
         'shardsvr_shard_collection.cpp',
         'split_chunk_command.cpp',
         'split_vector_command.cpp',
