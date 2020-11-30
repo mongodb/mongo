@@ -171,6 +171,19 @@ struct Helpers {
      * Does not oplog the operation.
      */
     static void emptyCollection(OperationContext* opCtx, const NamespaceString& nss);
+
+    /*
+     * Finds the doc and then runs a no-op update by running an update using the doc just read. Used
+     * in order to force a conflict if a concurrent storage transaction writes to the doc we're
+     * reading.
+     * Callers must hold the collection lock in MODE_IX.
+     * Uasserts if no _id index.
+     * Returns true if object found
+     */
+    static bool findByIdAndNoopUpdate(OperationContext* opCtx,
+                                      const CollectionPtr& collection,
+                                      const BSONObj& idQuery,
+                                      BSONObj& result);
 };
 
 }  // namespace mongo

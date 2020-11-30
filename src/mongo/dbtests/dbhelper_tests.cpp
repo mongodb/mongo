@@ -33,10 +33,17 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/write_conflict_exception.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_settings.h"
+#include "mongo/db/op_observer_impl.h"
+#include "mongo/db/op_observer_registry.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/range_arithmetic.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -88,11 +95,172 @@ private:
     int _max;
 };
 
+class FindAndNoopUpdateTest {
+public:
+    void run() {
+        auto serviceContext = getGlobalServiceContext();
+
+        repl::ReplSettings replSettings;
+        replSettings.setOplogSizeBytes(10 * 1024 * 1024);
+        replSettings.setReplSetString("rs");
+        setGlobalReplSettings(replSettings);
+        auto coordinatorMock = new repl::ReplicationCoordinatorMock(serviceContext, replSettings);
+        _coordinatorMock = coordinatorMock;
+        coordinatorMock->alwaysAllowWrites(true);
+        repl::ReplicationCoordinator::set(
+            serviceContext, std::unique_ptr<repl::ReplicationCoordinator>(coordinatorMock));
+
+        NamespaceString nss("test.findandnoopupdate");
+
+        auto client1 = serviceContext->makeClient("client1");
+        auto opCtx1 = client1->makeOperationContext();
+
+        auto client2 = serviceContext->makeClient("client2");
+        auto opCtx2 = client2->makeOperationContext();
+
+        auto registry = std::make_unique<OpObserverRegistry>();
+        registry->addObserver(std::make_unique<OpObserverImpl>());
+        opCtx1.get()->getServiceContext()->setOpObserver(std::move(registry));
+        repl::createOplog(opCtx1.get());
+
+        Lock::DBLock dbLk1(opCtx1.get(), nss.db(), LockMode::MODE_IX);
+        Lock::CollectionLock collLk1(opCtx1.get(), nss, LockMode::MODE_IX);
+
+        Lock::DBLock dbLk2(opCtx2.get(), nss.db(), LockMode::MODE_IX);
+        Lock::CollectionLock collLk2(opCtx2.get(), nss, LockMode::MODE_IX);
+
+        Database* db = DatabaseHolder::get(opCtx1.get())->openDb(opCtx1.get(), nss.db(), nullptr);
+
+        // Create the collection and insert one doc
+        BSONObj doc = BSON("_id" << 1 << "x" << 2);
+        BSONObj idQuery = BSON("_id" << 1);
+
+        CollectionPtr collection1;
+        {
+            WriteUnitOfWork wuow(opCtx1.get());
+            collection1 = db->createCollection(opCtx1.get(), nss, CollectionOptions(), true);
+            ASSERT_TRUE(collection1 != nullptr);
+            ASSERT_TRUE(collection1
+                            ->insertDocument(
+                                opCtx1.get(), InsertStatement(doc), nullptr /* opDebug */, false)
+                            .isOK());
+            wuow.commit();
+        }
+
+        BSONObj result;
+        Helpers::findById(opCtx1.get(), db, nss.ns(), idQuery, result, nullptr, nullptr);
+        ASSERT_BSONOBJ_EQ(result, doc);
+
+        // Assert that the same doc still exists after findByIdAndNoopUpdate
+        {
+            WriteUnitOfWork wuow(opCtx1.get());
+            BSONObj res;
+            auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx1.get(), collection1, idQuery, res);
+            wuow.commit();
+            ASSERT_TRUE(foundDoc);
+            ASSERT_BSONOBJ_EQ(res, doc);
+        }
+
+        // Assert that findByIdAndNoopUpdate did not generate an oplog entry.
+        BSONObj oplogEntry;
+        Helpers::getLast(opCtx1.get(), NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+        ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
+        ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
+
+        // Run two concurrent storage transactions. Run findByIdAndNoopUpdate in one, and then
+        // attempt to delete all docs in the collection in the other. Assert that the delete op
+        // throws a WCE.
+        assertWriteAttemptAfterFindAndNoopUpdateThrowsWCE(
+            opCtx1.get(), opCtx2.get(), nss, db, doc, idQuery);
+
+        // Run two concurrent storage transactions. Run a delete op to remove all documents in the
+        // collection in one, and then attempt to run findByIdAndNoopUpdate in the second. Assert
+        // that findByIdAndNoopUpdate throws WCE.
+        assertFindAndNoopUpdateAfterWriteThrowsWCE(
+            opCtx1.get(), opCtx2.get(), nss, db, doc, idQuery);
+    }
+
+private:
+    void assertWriteAttemptAfterFindAndNoopUpdateThrowsWCE(OperationContext* opCtx1,
+                                                           OperationContext* opCtx2,
+                                                           const NamespaceString& nss,
+                                                           Database* db,
+                                                           const BSONObj& doc,
+                                                           const BSONObj& idQuery) {
+        {
+            WriteUnitOfWork wuow1(opCtx1);
+
+            WriteUnitOfWork wuow2(opCtx2);
+            auto collection2 =
+                CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
+            ASSERT(collection2 != nullptr);
+            BSONObj res;
+            ASSERT_TRUE(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res));
+
+            ASSERT_THROWS(Helpers::emptyCollection(opCtx1, nss), WriteConflictException);
+
+            wuow2.commit();
+        }
+
+        // Assert that the doc still exists in the collection.
+        BSONObj res1;
+        Helpers::findById(opCtx1, db, nss.ns(), idQuery, res1, nullptr, nullptr);
+        ASSERT_BSONOBJ_EQ(res1, doc);
+
+        BSONObj res2;
+        Helpers::findById(opCtx2, db, nss.ns(), idQuery, res2, nullptr, nullptr);
+        ASSERT_BSONOBJ_EQ(res2, doc);
+
+        // Assert that findByIdAndNoopUpdate did not generate an oplog entry.
+        BSONObj oplogEntry;
+        Helpers::getLast(opCtx2, NamespaceString::kRsOplogNamespace.ns().c_str(), oplogEntry);
+        ASSERT_BSONOBJ_NE(oplogEntry, BSONObj());
+        ASSERT_TRUE(oplogEntry.getStringField("op") == "i"_sd);
+    }
+
+    void assertFindAndNoopUpdateAfterWriteThrowsWCE(OperationContext* opCtx1,
+                                                    OperationContext* opCtx2,
+                                                    const NamespaceString& nss,
+                                                    Database* db,
+                                                    const BSONObj& doc,
+                                                    const BSONObj& idQuery) {
+        {
+            WriteUnitOfWork wuow1(opCtx1);
+            Helpers::emptyCollection(opCtx1, nss);
+
+            {
+                WriteUnitOfWork wuow2(opCtx2);
+                auto collection2 =
+                    CollectionCatalog::get(opCtx2)->lookupCollectionByNamespace(opCtx2, nss);
+                ASSERT(collection2 != nullptr);
+
+                BSONObj res;
+                ASSERT_THROWS(Helpers::findByIdAndNoopUpdate(opCtx2, collection2, idQuery, res),
+                              WriteConflictException);
+            }
+
+            wuow1.commit();
+        }
+
+        // Assert that the first storage transaction succeeded and that the doc is removed.
+        BSONObj res1;
+        Helpers::findById(opCtx1, db, nss.ns(), idQuery, res1, nullptr, nullptr);
+        ASSERT_BSONOBJ_EQ(res1, BSONObj());
+
+        BSONObj res2;
+        Helpers::findById(opCtx2, db, nss.ns(), idQuery, res2, nullptr, nullptr);
+        ASSERT_BSONOBJ_EQ(res2, BSONObj());
+    }
+
+    repl::ReplicationCoordinatorMock* _coordinatorMock;
+};
+
 class All : public OldStyleSuiteSpecification {
 public:
-    All() : OldStyleSuiteSpecification("remove") {}
+    All() : OldStyleSuiteSpecification("dbhelpers") {}
     void setupTests() {
         add<RemoveRange>();
+        add<FindAndNoopUpdateTest>();
     }
 };
 

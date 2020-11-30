@@ -312,4 +312,35 @@ void Helpers::emptyCollection(OperationContext* opCtx, const NamespaceString& ns
     deleteObjects(opCtx, collection, nss, BSONObj(), false);
 }
 
+bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
+                                    const CollectionPtr& collection,
+                                    const BSONObj& idQuery,
+                                    BSONObj& result) {
+    auto recordId = Helpers::findById(opCtx, collection, idQuery);
+    if (recordId.isNull()) {
+        return false;
+    }
+
+    Snapshotted<BSONObj> snapshottedDoc;
+    auto foundDoc = collection->findDoc(opCtx, recordId, &snapshottedDoc);
+    if (!foundDoc) {
+        return false;
+    }
+
+    result = snapshottedDoc.value();
+
+    // Use an UnreplicatedWritesBlock to avoid generating an oplog entry for this no-op update.
+    // The update is being used to generated write conflicts and isn't modifying the data itself, so
+    // secondaries don't need to know about it. Also set CollectionUpdateArgs::update to an empty
+    // BSONObj because that's a second way OpObserverImpl::onUpdate() detects and ignores no-op
+    // updates.
+    repl::UnreplicatedWritesBlock uwb(opCtx);
+    CollectionUpdateArgs args;
+    args.criteria = idQuery;
+    args.update = BSONObj();
+    collection->updateDocument(opCtx, recordId, snapshottedDoc, result, false, nullptr, &args);
+
+    return true;
+}
+
 }  // namespace mongo
