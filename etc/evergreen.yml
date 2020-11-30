@@ -6949,7 +6949,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1604-power8-test
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   expansions:
     push_path: linux
     push_bucket: downloads.10gen.com
@@ -9225,7 +9225,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel71-power8-test
-  batchtime: 1440 # 1 day
+  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     # We need to compensate for SMT8 setting the cpu count very high and lower the amount of parallelism down
