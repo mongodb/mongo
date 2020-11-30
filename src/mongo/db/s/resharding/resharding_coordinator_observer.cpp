@@ -80,7 +80,6 @@ template <class TState, class TParticipant>
 StatusWith<bool> allParticipantsInStateGTE(WithLock lk,
                                            TState expectedState,
                                            const std::vector<TParticipant>& participants) {
-
     bool allInStateGTE = true;
     for (const auto& shard : participants) {
         auto state = shard.getState();
@@ -89,12 +88,15 @@ StatusWith<bool> allParticipantsInStateGTE(WithLock lk,
                 return generateErrorStatus(lk, shard);
             }
 
-            // If one state is greater than the expectedState, it is guaranteed that all other
-            // participant states are at least expectedState or greater.
-            //
-            // Instead of early returning, continue loop in case another participant reported an
-            // error.
-            allInStateGTE = state > expectedState;
+            if (allInStateGTE) {
+                // Ensure allInStateGTE never goes from false -> true. It's possible that while one
+                // participant has not yet reached the expectedState, another participant is in a
+                // state greater than the expectedState.
+                //
+                // Instead of early returning, continue loop in case another participant reported an
+                // error.
+                allInStateGTE = state > expectedState;
+            }
         }
     }
     return allInStateGTE;

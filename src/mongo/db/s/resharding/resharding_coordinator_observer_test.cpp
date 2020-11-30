@@ -148,6 +148,33 @@ TEST_F(ReshardingCoordinatorObserverTest, participantReportsError) {
     reshardingObserver->interrupt(Status{ErrorCodes::Interrupted, "interrupted"});
 }
 
+/**
+ * Confirms that if one recipient is more than one state behind the other, the promise does not get
+ * fulfilled early.
+ */
+TEST_F(ReshardingCoordinatorObserverTest, onReshardingRecipientsOutOfSync) {
+    auto reshardingObserver = std::make_shared<ReshardingCoordinatorObserver>();
+    auto fut = reshardingObserver->awaitAllRecipientsFinishedCloning();
+    ASSERT_FALSE(fut.isReady());
+
+    auto donorShards = makeMockDonorsInState(DonorStateEnum::kDonatingInitialData, Timestamp());
+    std::vector<RecipientShardEntry> recipientShards0{
+        makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kUnused),
+        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)};
+    auto coordinatorDoc0 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards0, donorShards);
+    reshardingObserver->onReshardingParticipantTransition(coordinatorDoc0);
+    ASSERT_FALSE(fut.isReady());
+
+    std::vector<RecipientShardEntry> recipientShards1{
+        makeRecipientShard(ShardId{"s1"}, RecipientStateEnum::kApplying),
+        makeRecipientShard(ShardId{"s2"}, RecipientStateEnum::kSteadyState)};
+    auto coordinatorDoc1 = makeCoordinatorDocWithRecipientsAndDonors(recipientShards1, donorShards);
+    reshardingObserver->onReshardingParticipantTransition(coordinatorDoc1);
+    ASSERT_TRUE(fut.isReady());
+
+    reshardingObserver->interrupt(Status{ErrorCodes::Interrupted, "interrupted"});
+}
+
 TEST_F(ReshardingCoordinatorObserverTest, onDonorsReportedMinFetchTimestamp) {
     auto reshardingObserver = std::make_shared<ReshardingCoordinatorObserver>();
     auto fut = reshardingObserver->awaitAllDonorsReadyToDonate();

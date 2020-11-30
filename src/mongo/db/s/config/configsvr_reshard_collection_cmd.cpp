@@ -210,6 +210,9 @@ public:
             instance->setInitialChunksAndZones(std::move(initialChunks), std::move(newZones));
 
             instance->getObserver()->awaitAllDonorsReadyToDonate().wait(opCtx);
+
+            instance->getObserver()->awaitAllRecipientsFinishedCloning().wait(opCtx);
+
             // This promise is currently automatically filled by recipient shards after creating
             // the temporary resharding collection.
             instance->getObserver()->awaitAllRecipientsFinishedApplying().wait(opCtx);

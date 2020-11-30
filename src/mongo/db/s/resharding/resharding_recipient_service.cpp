@@ -311,7 +311,7 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
     }
 
     return _collectionCloner->run(serviceContext, **executor).then([this] {
-        _transitionState(RecipientStateEnum::kApplying);
+        _transitionStateAndUpdateCoordinator(RecipientStateEnum::kApplying);
     });
 }
 
@@ -332,7 +332,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
     }
 
     return _allDonorsMirroring.getFuture().thenRunOn(**executor).then([this]() {
-        _transitionState(RecipientStateEnum::kStrictConsistency);
+        _transitionStateAndUpdateCoordinator(RecipientStateEnum::kStrictConsistency);
     });
 }
 
@@ -364,7 +364,7 @@ void ReshardingRecipientService::RecipientStateMachine::
     options.dropTarget = true;
     uassertStatusOK(renameCollection(opCtx.get(), reshardingNss, _recipientDoc.getNss(), options));
 
-    _transitionState(RecipientStateEnum::kDone);
+    _transitionStateAndUpdateCoordinator(RecipientStateEnum::kDone);
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionState(
