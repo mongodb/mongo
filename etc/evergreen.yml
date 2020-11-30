@@ -9174,6 +9174,7 @@ buildvariants:
   - enterprise
   run_on:
   - ubuntu1804-power8-test
+  batchtime: 10080 # 7 days
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     push_path: linux
@@ -10939,6 +10940,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel81-power8-small
+  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
@@ -11248,6 +11250,7 @@ buildvariants:
   - enterprise
   run_on:
   - rhel71-power8-test
+  batchtime: 10080 # 7 days
   stepback: false
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
