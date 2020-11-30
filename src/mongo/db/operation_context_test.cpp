@@ -257,6 +257,29 @@ TEST(OperationContextTest, setIsExecutingShutdownWorks) {
     ASSERT_OK(opCtx->getKillStatus());
 }
 
+TEST(OperationContextTest, CancelationTokenIsCanceledWhenMarkKilledIsCalled) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+    auto cancelToken = opCtx->getCancelationToken();
+
+    // Should not be canceled yet.
+    ASSERT_FALSE(cancelToken.isCanceled());
+
+    opCtx->markKilled();
+
+    // Now should be canceled.
+    ASSERT_TRUE(cancelToken.isCanceled());
+}
+
+TEST(OperationContextTest, CancelationTokenIsCancelableAtFirst) {
+    auto serviceCtx = ServiceContext::make();
+    auto client = serviceCtx->makeClient("OperationContextTest");
+    auto opCtx = client->makeOperationContext();
+    auto cancelToken = opCtx->getCancelationToken();
+    ASSERT_TRUE(cancelToken.isCancelable());
+}
+
 class OperationDeadlineTests : public unittest::Test {
 public:
     void setUp() {
@@ -306,6 +329,52 @@ TEST_F(OperationDeadlineTests, OperationDeadlineExpiration) {
     ASSERT_EQ(ErrorCodes::ExceededTimeLimit, opCtx->checkForInterruptNoAssert());
 }
 
+TEST_F(OperationDeadlineTests, CancelationTokenIsCanceledAfterDeadlineExpires) {
+    auto opCtx = client->makeOperationContext();
+    const Seconds timeout{1};
+    opCtx->setDeadlineAfterNowBy(timeout, ErrorCodes::ExceededTimeLimit);
+
+    auto cancelToken = opCtx->getCancelationToken();
+
+    // Should not be canceled yet.
+    ASSERT_FALSE(cancelToken.isCanceled());
+
+    // Advance past the timeout.
+    mockClock->advance(timeout * 2);
+
+    // This is required for the OperationContext to realize that the timeout has passed and mark
+    // itself killed, which is what triggers cancelation.
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, opCtx->checkForInterruptNoAssert());
+
+    // Should be canceled now.
+    ASSERT_TRUE(cancelToken.isCanceled());
+}
+
+TEST_F(OperationDeadlineTests,
+       WaitingOnAFutureWithAnOperationContextThatHasCancelationCallbacksDoesNotDeadlock) {
+    auto opCtx = client->makeOperationContext();
+    const Seconds timeout{1};
+    opCtx->setDeadlineAfterNowBy(timeout, ErrorCodes::ExceededTimeLimit);
+
+    auto cancelToken = opCtx->getCancelationToken();
+
+    // Should not be canceled yet.
+    ASSERT_FALSE(cancelToken.isCanceled());
+
+    // Advance past the timeout.
+    mockClock->advance(timeout * 2);
+
+    // Chain a callback to the token. This will mean that calling cancel() on the CancelationSource
+    // will eventually have to acquire a mutex when fulfilling its SharedPromie.
+    auto fut = cancelToken.onCancel().unsafeToInlineFuture().then([] {});
+
+    // Make sure this does not deadlock. (Because in a previous implementation, it did.)
+    ASSERT_EQ(ErrorCodes::ExceededTimeLimit, std::move(fut).waitNoThrow(opCtx.get()));
+
+    // Should be canceled now.
+    ASSERT_TRUE(cancelToken.isCanceled());
+}
+
 template <typename D>
 void assertLargeRelativeDeadlineLikeInfinity(Client& client, D maxTime) {
     auto opCtx = client.makeOperationContext();
@@ -351,9 +420,11 @@ TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCV) {
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
+    ASSERT_FALSE(opCtx->getCancelationToken().isCanceled());
     ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; }),
                        DBException,
                        ErrorCodes::ExceededTimeLimit);
+    ASSERT_TRUE(opCtx->getCancelationToken().isCanceled());
 }
 
 TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
@@ -362,10 +433,12 @@ TEST_F(OperationDeadlineTests, WaitForMaxTimeExpiredCVWithWaitUntilSet) {
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
+    ASSERT_FALSE(opCtx->getCancelationToken().isCanceled());
     ASSERT_THROWS_CODE(opCtx->waitForConditionOrInterruptUntil(
                            cv, lk, mockClock->now() + Seconds{10}, [] { return false; }),
                        DBException,
                        ErrorCodes::ExceededTimeLimit);
+    ASSERT_TRUE(opCtx->getCancelationToken().isCanceled());
 }
 
 TEST_F(OperationDeadlineTests, NestedTimeoutsTimeoutInOrder) {
@@ -656,10 +729,12 @@ TEST_F(OperationDeadlineTests, DuringWaitMaxTimeExpirationDominatesUntilExpirati
     auto m = MONGO_MAKE_LATCH();
     stdx::condition_variable cv;
     stdx::unique_lock<Latch> lk(m);
+    ASSERT_FALSE(opCtx->getCancelationToken().isCanceled());
     ASSERT_THROWS_CODE(
         opCtx->waitForConditionOrInterruptUntil(cv, lk, mockClock->now(), [] { return false; }),
         DBException,
         ErrorCodes::ExceededTimeLimit);
+    ASSERT_TRUE(opCtx->getCancelationToken().isCanceled());
 }
 
 class ThreadedOperationDeadlineTests : public OperationDeadlineTests {
@@ -787,11 +862,13 @@ TEST_F(ThreadedOperationDeadlineTests, KillArrivesWhileWaiting) {
     auto waiterResult = startWaiter(opCtx.get(), &state);
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
+    ASSERT_FALSE(opCtx->getCancelationToken().isCanceled());
     {
         stdx::lock_guard<Client> clientLock(*opCtx->getClient());
         opCtx->markKilled();
     }
     ASSERT_THROWS_CODE(waiterResult.get(), DBException, ErrorCodes::Interrupted);
+    ASSERT_TRUE(opCtx->getCancelationToken().isCanceled());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, MaxTimeExpiresWhileWaiting) {
@@ -808,8 +885,10 @@ TEST_F(ThreadedOperationDeadlineTests, MaxTimeExpiresWhileWaiting) {
     mockClock->advance(Seconds{9});
     ASSERT(stdx::future_status::ready !=
            waiterResult.wait_for(Milliseconds::zero().toSystemDuration()));
+    ASSERT_FALSE(opCtx->getCancelationToken().isCanceled());
     mockClock->advance(Seconds{2});
     ASSERT_THROWS_CODE(waiterResult.get(), DBException, ErrorCodes::ExceededTimeLimit);
+    ASSERT_TRUE(opCtx->getCancelationToken().isCanceled());
 }
 
 TEST_F(ThreadedOperationDeadlineTests, UntilExpiresWhileWaiting) {
@@ -982,6 +1061,7 @@ TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
     Date_t deadline = Date_t::now() + Milliseconds(500);
     ASSERT_EQ(opCtx->waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }),
               false);
+    ASSERT_FALSE(opCtx->getCancelationToken().isCanceled());
 
     // Case (3). Expect an error of `MaxTimeMSExpired`.
     opCtx->setDeadlineByDate(Date_t::now(), ErrorCodes::MaxTimeMSExpired);
@@ -990,6 +1070,7 @@ TEST(OperationContextTest, TestWaitForConditionOrInterruptUntilAPI) {
         opCtx->waitForConditionOrInterruptUntil(cv, lk, deadline, [] { return false; }),
         DBException,
         ErrorCodes::MaxTimeMSExpired);
+    ASSERT_TRUE(opCtx->getCancelationToken().isCanceled());
 }
 
 TEST(OperationContextTest, TestIsWaitingForConditionOrInterrupt) {

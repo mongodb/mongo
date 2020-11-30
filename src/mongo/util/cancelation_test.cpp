@@ -41,7 +41,7 @@ TEST(CancelTest, CancelSourceDestructorDoesNotCauseCancelation) {
     {
         CancelationSource source;
         source.token().onCancel().unsafeToInlineFuture().getAsync([&ran](Status s) mutable {
-            ASSERT_EQ(s, detail::kCancelNeverCalledOnSourceError);
+            ASSERT_EQ(s, detail::getCancelNeverCalledOnSourceError());
             ran = true;
         });
     }
@@ -181,7 +181,7 @@ TEST(CancelTest, CancelTokenRemembersNotCanceledForNotCanceledSourceEvenAfterSou
     }();
     ASSERT_FALSE(token.isCanceled());
     ASSERT_TRUE(token.onCancel().isReady());
-    ASSERT_EQ(token.onCancel().getNoThrow(), detail::kCancelNeverCalledOnSourceError);
+    ASSERT_EQ(token.onCancel().getNoThrow(), detail::getCancelNeverCalledOnSourceError());
 }
 
 TEST(CancelTest, UncancelableTokenReturnsFalseForIsCanceled) {
@@ -193,7 +193,7 @@ TEST(CancelTest, UncancelableTokenNeverRunsCallbacks) {
     auto token = CancelationToken::uncancelable();
     auto cancelFuture = token.onCancel();
     ASSERT_TRUE(cancelFuture.isReady());
-    ASSERT_EQ(cancelFuture.getNoThrow(), detail::kCancelNeverCalledOnSourceError);
+    ASSERT_EQ(cancelFuture.getNoThrow(), detail::getCancelNeverCalledOnSourceError());
 }
 
 TEST(CancelTest, UncancelableTokenReturnsFalseForIsCancelable) {

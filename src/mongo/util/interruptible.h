@@ -41,6 +41,16 @@
 
 namespace mongo {
 
+namespace interruptible_detail {
+// Helper to release a lock, call a callable, and then reacquire the lock.
+template <typename Callable>
+auto doWithoutLock(BasicLockableAdapter m, Callable&& callable) {
+    m.unlock();
+    ON_BLOCK_EXIT([&] { m.lock(); });
+    return callable();
+}
+}  // namespace interruptible_detail
+
 /**
  * A type which can be used to wait on condition variables with a level triggered one-way interrupt.
  * I.e. after the interrupt is triggered (via some non-public api call) subsequent calls to
@@ -380,6 +390,21 @@ public:
             advanceWaitTimer();
         });
 
+        auto handleInterruptAndAssert = [&](Status status, WakeSpeed speed) {
+            _onWake(latchName, WakeReason::kInterrupt, speed);
+            iassert(std::move(status));
+        };
+
+        auto checkForInterruptWithoutLockAndAssert = [&](WakeSpeed speed) {
+            // We drop the lock before checking for interrupt since checkForInterruptNoAssert can
+            // sometimes try to reacquire the same lock.
+            if (auto status = interruptible_detail::doWithoutLock(
+                    m, [&] { return checkForInterruptNoAssert(); });
+                !status.isOK()) {
+                handleInterruptAndAssert(status, speed);
+            }
+        };
+
         auto waitUntil = [&](Date_t deadline, WakeSpeed speed) -> boost::optional<WakeReason> {
             // If the result of waitForConditionOrInterruptNoAssertUntil() is non-spurious, return
             // a WakeReason. Otherwise, return boost::none
@@ -394,10 +419,13 @@ public:
             }
 
             if (!swResult.isOK()) {
-                _onWake(latchName, WakeReason::kInterrupt, speed);
-                iassert(std::move(swResult));
+                handleInterruptAndAssert(swResult.getStatus(), speed);
             }
 
+            // Check if an interrupt occurred while waiting.
+            checkForInterruptWithoutLockAndAssert(speed);
+
+            // Check the predicate after re-acquiring the lock.
             if (pred()) {
                 _onWake(latchName, WakeReason::kPredicate, speed);
                 return WakeReason::kPredicate;
@@ -412,14 +440,16 @@ public:
         };
 
         auto waitUntilNonSpurious = [&](Date_t deadline, WakeSpeed speed) -> WakeReason {
-            // Check waitUntil() in a loop until it says it has a genuine WakeReason
+            // Check for interrupt before waiting.
+            checkForInterruptWithoutLockAndAssert(speed);
 
+            // Check the predicate after re-acquiring the lock and before waiting.
             if (pred()) {
-                // Check for the predicate first, just in case
                 _onWake(latchName, WakeReason::kPredicate, speed);
                 return WakeReason::kPredicate;
             }
 
+            // Check waitUntil() in a loop until it says it has a genuine WakeReason
             auto maybeWakeReason = waitUntil(deadline, speed);
             while (!maybeWakeReason) {
                 maybeWakeReason = waitUntil(deadline, speed);

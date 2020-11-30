@@ -69,7 +69,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(checkForInterruptFail);
 
 const auto kNoWaiterThread = stdx::thread::id();
-
 }  // namespace
 
 OperationContext::OperationContext(Client* client, OperationId opId)
@@ -276,7 +275,6 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
     return Status::OK();
 }
 
-
 // waitForConditionOrInterruptNoAssertUntil returns when:
 //
 // Normal condvar wait criteria:
@@ -290,13 +288,12 @@ Status OperationContext::checkForInterruptNoAssert() noexcept {
 // Baton criteria:
 // - _baton is notified (someone's queuing work for the baton)
 // - _baton::run returns (timeout fired / networking is ready / socket disconnected)
+//
+// We release the lock held by m whenever we call markKilled, since it may trigger CancelationSource
+// cancelation which can in turn emplace a SharedPromise which then may acquire a mutex.
 StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAssertUntil(
     stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept {
     invariant(getClient());
-
-    if (auto status = checkForInterruptNoAssert(); !status.isOK()) {
-        return status;
-    }
 
     // If the maxTimeNeverTimeOut failpoint is set, behave as though the operation's deadline does
     // not exist. Under normal circumstances, if the op has an existing deadline which is sooner
@@ -321,17 +318,13 @@ StatusWith<stdx::cv_status> OperationContext::waitForConditionOrInterruptNoAsser
             cv, m, deadline, _baton.get());
     }();
 
-    if (auto status = checkForInterruptNoAssert(); !status.isOK()) {
-        return status;
-    }
-
     if (opHasDeadline && waitStatus == stdx::cv_status::timeout && deadline == getDeadline()) {
         // It's possible that the system clock used in stdx::condition_variable::wait_until
         // is slightly ahead of the FastClock used in checkForInterrupt. In this case,
         // we treat the operation as though it has exceeded its time limit, just as if the
         // FastClock and system clock had agreed.
         if (!_hasArtificialDeadline) {
-            markKilled(_timeoutError);
+            interruptible_detail::doWithoutLock(m, [&] { markKilled(_timeoutError); });
         }
         return Status(_timeoutError, "operation exceeded time limit");
     }
@@ -350,6 +343,7 @@ void OperationContext::markKilled(ErrorCodes::Error killCode) {
     }
 
     if (auto status = ErrorCodes::OK; _killCode.compareAndSwap(&status, killCode)) {
+        _cancelSource.cancel();
         if (_baton) {
             _baton->notify();
         }

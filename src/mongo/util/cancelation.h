@@ -29,14 +29,18 @@
 #pragma once
 
 #include "mongo/util/future.h"
+#include "mongo/util/static_immortal.h"
 
 namespace mongo {
 
 namespace detail {
 
-static const inline Status kCancelNeverCalledOnSourceError{
-    ErrorCodes::CallbackCanceled,
-    "Cancel was never called on the CancelationSource for this token."};
+inline Status getCancelNeverCalledOnSourceError() {
+    static const StaticImmortal<Status> cancelNeverCalledOnSourceError{
+        ErrorCodes::CallbackCanceled,
+        "Cancel was never called on the CancelationSource for this token."};
+    return *cancelNeverCalledOnSourceError;
+}
 
 /**
  * Holds the main state shared between CancelationSource/CancelationToken.
@@ -72,7 +76,7 @@ public:
     void dismiss() {
         State precondition{State::kInit};
         if (_state.compareAndSwap(&precondition, State::kDismissed)) {
-            _cancelationPromise.setError(kCancelNeverCalledOnSourceError);
+            _cancelationPromise.setError(getCancelNeverCalledOnSourceError());
         }
     }
 

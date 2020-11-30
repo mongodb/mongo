@@ -106,7 +106,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
     // If we've been interrupted, the response queue should be filled with interrupted answers, go
     // ahead and return one of those
     if (!_interruptStatus.isOK()) {
-        return _responseQueue.pop(_opCtx);
+        return _responseQueue.pop();
     }
 
     // Try to pop a value from the queue
@@ -132,7 +132,7 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
     // shutdown the scoped task executor
     _subExecutor->shutdown();
 
-    return _responseQueue.pop(_opCtx);
+    return _responseQueue.pop();
 }
 
 void AsyncRequestsSender::stopRetrying() noexcept {

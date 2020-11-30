@@ -45,6 +45,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/cancelation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
@@ -224,6 +225,15 @@ public:
      */
     boost::optional<TxnNumber> getTxnNumber() const {
         return _txnNumber;
+    }
+
+    /**
+     * Returns a CancelationToken that will be canceled when the OperationContext is killed via
+     * markKilled (including for internal reasons, like the OperationContext deadline being
+     * reached).
+     */
+    CancelationToken getCancelationToken() {
+        return _cancelSource.token();
     }
 
     /**
@@ -622,6 +632,10 @@ private:
     // operation is not killed. If killed, it will contain a specific code. This value changes only
     // once from OK to some kill code.
     AtomicWord<ErrorCodes::Error> _killCode{ErrorCodes::OK};
+
+    // Used to cancel all tokens obtained via getCancelationToken() when this OperationContext is
+    // killed.
+    CancelationSource _cancelSource;
 
     BatonHandle _baton;
 

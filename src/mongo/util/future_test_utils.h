@@ -61,7 +61,8 @@ class DummyInterruptible final : public Interruptible {
         MONGO_UNREACHABLE;
     }
     Status checkForInterruptNoAssert() noexcept override {
-        MONGO_UNREACHABLE;
+        // Must be implemented because it's called by Interruptible::waitForConditionOrInterrupt.
+        return Status::OK();
     }
     IgnoreInterruptsState pushIgnoreInterrupts() override {
         MONGO_UNREACHABLE;
