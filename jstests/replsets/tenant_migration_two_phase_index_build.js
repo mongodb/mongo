@@ -14,9 +14,7 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-// TODO SERVER-48862: Remove 'enableRecipientTesting: false'.
-const tenantMigrationTest =
-    new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     tenantMigrationTest.stop();

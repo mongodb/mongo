@@ -74,9 +74,7 @@ const donorRst = new ReplSetTest({
 donorRst.startSet();
 donorRst.initiate();
 
-// TODO SERVER-48814: Remove 'enableRecipientTesting: false'.
-const tenantMigrationTest =
-    new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false, donorRst});
+const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
 if (!tenantMigrationTest.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     donorRst.stopSet();

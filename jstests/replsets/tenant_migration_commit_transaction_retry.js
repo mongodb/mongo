@@ -29,8 +29,16 @@ const donorRst = new ReplSetTest({
         }
     }
 });
-const recipientRst = new ReplSetTest(
-    {nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}], name: "recipient"});
+const recipientRst = new ReplSetTest({
+    nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
+    name: "recipient",
+    nodeOptions: {
+        setParameter: {
+            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
+        }
+    }
+});
 
 donorRst.startSet();
 donorRst.initiate();

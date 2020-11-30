@@ -48,7 +48,7 @@ const recipientRst = new ReplSetTest({
                 kMaxBatchSize /* Decrease internal max batch size so we can still show writes are
                                  batched without inserting hundreds of documents. */
             ,
-            // TODO SERVER-52934: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
             'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
         },
     }
