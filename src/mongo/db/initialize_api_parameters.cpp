@@ -40,18 +40,10 @@
 
 namespace mongo {
 
-const APIParametersFromClient initializeAPIParameters(OperationContext* opCtx,
-                                                      const BSONObj& requestBody,
+const APIParametersFromClient initializeAPIParameters(const BSONObj& requestBody,
                                                       Command* command) {
     auto apiParamsFromClient =
         APIParametersFromClient::parse("APIParametersFromClient"_sd, requestBody);
-
-    if (gRequireApiVersion.load() && !opCtx->getClient()->isInDirectClient()) {
-        uassert(
-            498870,
-            "The apiVersion parameter is required, please configure your MongoClient's API version",
-            apiParamsFromClient.getApiVersion());
-    }
 
     if (command->acceptsAnyApiVersionParameters()) {
         return apiParamsFromClient;
@@ -101,4 +93,13 @@ const APIParametersFromClient initializeAPIParameters(OperationContext* opCtx,
     return apiParamsFromClient;
 }
 
+void enforceRequireAPIVersion(OperationContext* opCtx, Command* command) {
+    if (gRequireApiVersion.load() && !opCtx->getClient()->isInDirectClient() &&
+        command->getName() != "getMore" && !opCtx->isContinuingMultiDocumentTransaction()) {
+        uassert(
+            498870,
+            "The apiVersion parameter is required, please configure your MongoClient's API version",
+            APIParameters::get(opCtx).getParamsPassed());
+    }
+}
 }  // namespace mongo

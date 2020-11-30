@@ -1295,7 +1295,7 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
     auto command = _execContext->getCommand();
     auto replyBuilder = _execContext->getReplyBuilder();
 
-    const auto apiParamsFromClient = initializeAPIParameters(opCtx, request.body, command);
+    const auto apiParamsFromClient = initializeAPIParameters(request.body, command);
     Client* client = opCtx->getClient();
 
     {
@@ -1536,6 +1536,9 @@ Future<void> ExecCommandDatabase::_initiateCommand() try {
     // Remember whether or not this operation is starting a transaction, in case something later in
     // the execution needs to adjust its behavior based on this.
     opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
+
+    // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
+    enforceRequireAPIVersion(opCtx, command);
 
     auto& oss = OperationShardingState::get(opCtx);
 

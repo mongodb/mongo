@@ -548,7 +548,7 @@ Status ParseAndRunCommand::_prologue() {
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));
 
     Client* client = opCtx->getClient();
-    auto const apiParamsFromClient = initializeAPIParameters(opCtx, request.body, command);
+    auto const apiParamsFromClient = initializeAPIParameters(request.body, command);
 
     auto& readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     Status readConcernParseStatus = Status::OK();
@@ -787,6 +787,9 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     // Remember whether or not this operation is starting a transaction, in case something later in
     // the execution needs to adjust its behavior based on this.
     opCtx->setIsStartingMultiDocumentTransaction(startTransaction);
+
+    // Once API params and txn state are set on opCtx, enforce the "requireApiVersion" setting.
+    enforceRequireAPIVersion(opCtx, command);
 
     command->incrementCommandsExecuted();
 
