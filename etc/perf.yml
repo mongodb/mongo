@@ -31,8 +31,6 @@ variables:
   _modules: &modules
     - enterprise
     - mongo-tools
-    - wtdevelop
-
     - dsi
     - genny
     - signal-processing
@@ -64,10 +62,6 @@ modules:
   repo: git@github.com:10gen/workloads.git
   prefix: workloads
   branch: master
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
 - name: linkbench
   repo: git@github.com:10gen/linkbench.git
   prefix: ../../src
@@ -316,12 +310,6 @@ functions:
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe --abbrev=7)
 
-          # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
-          # that githash to version string.
-          if [ "${compile-variant|}" = "-wtdevelop" ]; then
-            WT_VERSION=$(cd src/third_party/wtdevelop; git describe --abbrev=7 | cut -c 9-)
-            MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
-          fi
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|false}" = "true" ]; then
@@ -477,21 +465,7 @@ tasks:
         directory: src
         revisions:
           enterprise: ${enterprise_rev}
-          wtdevelop: ${wtdevelop_rev}
           mongo-tools: ${mongo-tools_rev}
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          if [ "${compile-variant|}" = "-wtdevelop" ]; then
-            cd src/third_party
-            for wtdir in dist examples ext lang src test tools ; do
-              rm -rf wiredtiger/$wtdir
-              mv wtdevelop/$wtdir wiredtiger/
-            done
-          fi
     - func: "compile mongodb"
 
 

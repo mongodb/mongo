@@ -14,11 +14,6 @@ variables:
         variant: compile-rhel70
       - name: genny_generate_all_tasks
         variant: compile-amazon2
-  _real_wtdevelop_amazon2: &_compile_wtdevelop_amazon2
-      - name: compile
-        variant: wtdevelop-compile-amazon2
-      - name: genny_generate_all_tasks
-        variant: compile-amazon2
   _real_expansions: &_expansion_updates
     []
   ###
@@ -31,13 +26,8 @@ variables:
   # _skip_compile_rhel70: &_compile_rhel70
   #     - name: genny_generate_all_tasks
   #       variant: compile-amazon2
-  # _skip_compile_wtdevelop_amazon2: &_compile_wtdevelop_amazon2
-  #     - name: genny_generate_all_tasks
-  #       variant: compile-amazon2
   # _skip_expansions: &_expansion_updates
   #   # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_4.4_78207ca380688c73b1a217f23d5b7c8803bef9cd
-  #   # It will not work for wtdevelop or rhel7 ("atlas-like") or wtdevelop patches. You can replace
-  #   # this url with a compile artifact from those variants if you wish to skip compile for such tasks.
   #   - key: mongodb_binary_archive
   #     value: https://dsi-donot-remove.s3-us-west-2.amazonaws.com/compile_artifacts/mongodb-sys_perf_4.4_78207ca380688c73b1a217f23d5b7c8803bef9cd.tar.gz
   ##
@@ -46,8 +36,6 @@ variables:
   _modules: &modules
     - enterprise
     - mongo-tools
-    - wtdevelop
-
     - dsi
     - genny
     - signal-processing
@@ -78,10 +66,6 @@ modules:
   repo: git@github.com:10gen/workloads.git
   prefix: ../../src
   branch: master
-- name: wtdevelop
-  repo: git@github.com:wiredtiger/wiredtiger.git
-  prefix: src/third_party
-  branch: develop
 - name: linkbench
   repo: git@github.com:10gen/linkbench.git
   prefix: ../../src
@@ -331,12 +315,6 @@ functions:
           # We get the raw version string (r1.2.3-45-gabcdef) from git
           MONGO_VERSION=$(git describe --abbrev=7)
 
-          # If we're going to compile the upstream wtdevelop repository for wiredtiger, add
-          # that githash to version string.
-          if [ "${compile-variant|}" = "-wtdevelop" ]; then
-            WT_VERSION=$(cd src/third_party/wtdevelop; git describe --abbrev=7 | cut -c 9-)
-            MONGO_VERSION="$MONGO_VERSION-wtdevelop-$WT_VERSION"
-          fi
           # If this is a patch build, we add the patch version id to the version string so we know
           # this build was a patch, and which evergreen task it came from
           if [ "${is_patch|false}" = "true" ]; then
@@ -492,21 +470,7 @@ tasks:
         directory: src
         revisions:
           enterprise: ${enterprise_rev}
-          wtdevelop: ${wtdevelop_rev}
           mongo-tools: ${mongo-tools_rev}
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o errexit
-          set -o verbose
-          if [ "${compile-variant|}" = "-wtdevelop" ]; then
-            cd src/third_party
-            for wtdir in dist examples ext lang src test tools ; do
-              rm -rf wiredtiger/$wtdir
-              mv wtdevelop/$wtdir wiredtiger/
-            done
-          fi
     - func: "compile mongodb"
 
 - name: renew_ssl_cert
@@ -999,17 +963,6 @@ buildvariants:
     - name: bestbuy_agg_merge_same_db
     - name: bestbuy_agg_merge_wordcount
     - name: bestbuy_query
-
-
-- <<: *compile-amazon2
-  name: wtdevelop-compile-amazon2
-  display_name: WT Develop Compile
-  modules: *modules
-  expansions:
-    <<: *compile-expansions
-    compile-variant: -wtdevelop
-  tasks:
-    - name: compile
 
 - name: compile-rhel70
   display_name: Compile for Atlas-like
@@ -1608,57 +1561,6 @@ buildvariants:
     - name: linkbench
     - name: genny_patch_tasks
     - name: genny_auto_tasks
-
-- name: wtdevelop-1-node-replSet
-  display_name: WT Develop 1-Node ReplSet
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    mongodb_setup: single-replica
-    infrastructure_provisioning: single
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-single"
-  depends_on: *_compile_wtdevelop_amazon2
-  tasks: *1nodetasks
-
-- name: wtdevelop-standalone
-  display_name: WT Develop Standalone
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    mongodb_setup: standalone
-    infrastructure_provisioning: single
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-single"
-  depends_on: *_compile_wtdevelop_amazon2
-  tasks: *standalonetasks
-
-- name: wtdevelop-3-node-replSet
-  display_name: WT Develop 3-Node ReplSet
-  batchtime: 10080 # 7 days
-  modules: *modules
-  expansions:
-    mongodb_setup: replica
-    infrastructure_provisioning: replica
-    platform: linux
-    project_dir: *project_dir
-    compile-variant: -wtdevelop
-    authentication: enabled
-    storageEngine: wiredTiger
-  run_on:
-      - "rhel70-perf-replset"
-  depends_on: *_compile_wtdevelop_amazon2
-  tasks: *3nodetasks
 
 - name: renew-ssl-cert
   display_name: Renew SSL Cert
