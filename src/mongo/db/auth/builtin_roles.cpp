@@ -257,7 +257,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::moveChunk
         << ActionType::enableSharding
         << ActionType::splitVector
-        << ActionType::refineCollectionShardKey;
+        << ActionType::refineCollectionShardKey
+        << ActionType::reshardCollection;
 
     return Status::OK();
 }
@@ -311,6 +312,7 @@ void addEnableShardingPrivileges(PrivilegeVector* privileges) {
     ActionSet enableShardingActions;
     enableShardingActions.addAction(ActionType::enableSharding);
     enableShardingActions.addAction(ActionType::refineCollectionShardKey);
+    enableShardingActions.addAction(ActionType::reshardCollection);
     Privilege::addPrivilegeToPrivilegeVector(
         privileges, Privilege(ResourcePattern::forAnyNormalResource(), enableShardingActions));
 }

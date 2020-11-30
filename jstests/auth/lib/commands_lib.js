@@ -5190,6 +5190,39 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "reshardCollection",
+          command: {reshardCollection: "test.x", key: {_id: 1}},
+          skipUnlessSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: Object.extend({enableSharding: 1}, roles_clusterManager),
+                privileges:
+                    [{resource: {db: "test", collection: "x"}, actions: ["reshardCollection"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+
+        {
+          testname: "_configsvrReshardCollection",
+          command:
+            {_configsvrReshardCollection: "test.x", key: {_id: 1}},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "rotateCertificates",
           command: {rotateCertificates: 1},
           testcases: [
