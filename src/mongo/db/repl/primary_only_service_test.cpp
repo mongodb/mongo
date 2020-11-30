@@ -405,22 +405,87 @@ DEATH_TEST_F(PrimaryOnlyServiceTest,
     registry.registerService(std::move(service2));
 }
 
-TEST_F(PrimaryOnlyServiceTest, CancelationOnShutdown) {
+TEST_F(PrimaryOnlyServiceTest, CancelationOnStepdown) {
+    // Used to ensure that _scheduleRun is run before we run the stepdown logic so that we fulfill
+    // the _completionPromise.
+    auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
     auto opCtx = makeOperationContext();
     auto instance =
         TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
     ASSERT(instance.get());
-    _registry->onShutdown();
+
+    TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+    stepDown();
+    TestServiceHangDuringInitialization.setMode(FailPoint::off);
+
     ASSERT_EQ(instance->getCompletionFuture().getNoThrow().code(), ErrorCodes::Interrupted);
 }
 
-TEST_F(PrimaryOnlyServiceTest, CancelationOnStepdown) {
-    auto opCtx = makeOperationContext();
-    auto instance =
-        TestService::Instance::getOrCreate(opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
-    ASSERT(instance.get());
-    _registry->onStepDown();
-    ASSERT_EQ(instance->getCompletionFuture().getNoThrow().code(), ErrorCodes::Interrupted);
+TEST_F(PrimaryOnlyServiceTest, ResetCancelationSourceOnStepupAndCompleteSuccessfully) {
+    {
+        // Used to ensure that _scheduleRun is run before we run the stepdown logic so that we
+        // fulfill the _completionPromise.
+        auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+        ASSERT(instance.get());
+
+        TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+        stepDown();
+        TestServiceHangDuringInitialization.setMode(FailPoint::off);
+
+        ASSERT_EQ(instance->getCompletionFuture().getNoThrow().code(), ErrorCodes::Interrupted);
+    }
+
+    stepUp();
+
+    {
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 1 << "state" << 0));
+        ASSERT(instance.get());
+
+        instance->getCompletionFuture().get();
+    }
+}
+
+TEST_F(PrimaryOnlyServiceTest, ResetCancelationSourceOnStepupAndStepDownAgain) {
+    {
+        // Used to ensure that _scheduleRun is run before we run the stepdown logic so that we
+        // fulfill the _completionPromise.
+        auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 0 << "state" << 0));
+        ASSERT(instance.get());
+
+        TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+        stepDown();
+        TestServiceHangDuringInitialization.setMode(FailPoint::off);
+
+        ASSERT_EQ(instance->getCompletionFuture().getNoThrow().code(), ErrorCodes::Interrupted);
+    }
+
+    stepUp();
+
+    {
+        auto timesEntered = TestServiceHangDuringInitialization.setMode(FailPoint::alwaysOn);
+
+        auto opCtx = makeOperationContext();
+        auto instance = TestService::Instance::getOrCreate(
+            opCtx.get(), _service, BSON("_id" << 1 << "state" << 0));
+        ASSERT(instance.get());
+
+        TestServiceHangDuringInitialization.waitForTimesEntered(timesEntered + 1);
+        stepDown();
+        TestServiceHangDuringInitialization.setMode(FailPoint::off);
+
+        ASSERT_EQ(instance->getCompletionFuture().getNoThrow().code(), ErrorCodes::Interrupted);
+    }
 }
 
 TEST_F(PrimaryOnlyServiceTest, StepUpAfterShutdown) {
