@@ -755,6 +755,11 @@ private:
     Microseconds computeElapsedTimeTotal(TickSource::Tick startTime,
                                          TickSource::Tick endTime) const;
 
+    /**
+     * Adds 'this' to the stack of active CurOp objects.
+     */
+    void _finishInit(OperationContext* opCtx, CurOpStack* stack);
+
     static const OperationContext::Decoration<CurOpStack> _curopStack;
 
     CurOp(OperationContext*, CurOpStack*);

@@ -343,14 +343,8 @@ void CurOp::setGenericCursor_inlock(GenericCursor gc) {
     _genericCursor = std::move(gc);
 }
 
-CurOp::CurOp(OperationContext* opCtx) : CurOp(opCtx, &_curopStack(opCtx)) {
-    // If this is a sub-operation, we store the snapshot of lock stats as the base lock stats of the
-    // current operation.
-    if (_parent != nullptr)
-        _lockStatsBase = opCtx->lockState()->getLockerInfo(boost::none)->stats;
-}
-
-CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
+void CurOp::_finishInit(OperationContext* opCtx, CurOpStack* stack) {
+    _stack = stack;
     _tickSource = SystemTickSource::get();
 
     if (opCtx) {
@@ -358,6 +352,20 @@ CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) : _stack(stack) {
     } else {
         _stack->push_nolock(this);
     }
+}
+
+CurOp::CurOp(OperationContext* opCtx) {
+    // If this is a sub-operation, we store the snapshot of lock stats as the base lock stats of the
+    // current operation.
+    if (_parent != nullptr)
+        _lockStatsBase = opCtx->lockState()->getLockerInfo(boost::none)->stats;
+
+    // Add the CurOp object onto the stack of active CurOp objects.
+    _finishInit(opCtx, &_curopStack(opCtx));
+}
+
+CurOp::CurOp(OperationContext* opCtx, CurOpStack* stack) {
+    _finishInit(opCtx, stack);
 }
 
 CurOp::~CurOp() {
