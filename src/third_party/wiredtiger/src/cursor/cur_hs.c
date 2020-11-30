@@ -645,16 +645,69 @@ __curhs_insert(WT_CURSOR *cursor)
         hs_tombstone = NULL;
     }
 
+retry:
     /* Search the page and insert the updates. */
     WT_WITH_PAGE_INDEX(session, ret = __wt_hs_row_search(cbt, &file_cursor->key, true));
     WT_ERR(ret);
-    WT_ERR(__wt_hs_modify(cbt, hs_upd));
+    ret = __wt_hs_modify(cbt, hs_upd);
+    if (ret == WT_RESTART)
+        goto retry;
+    WT_ERR(ret);
 
     if (0) {
 err:
         __wt_free(session, hs_tombstone);
         __wt_free(session, hs_upd);
     }
+
+    API_END_RET(session, ret);
+}
+
+/*
+ * __curhs_remove --
+ *     WT_CURSOR->remove method for the hs cursor type.
+ */
+static int
+__curhs_remove(WT_CURSOR *cursor)
+{
+    WT_CURSOR *file_cursor;
+    WT_CURSOR_BTREE *cbt;
+    WT_CURSOR_HS *hs_cursor;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    WT_UPDATE *hs_tombstone;
+
+    hs_cursor = (WT_CURSOR_HS *)cursor;
+    file_cursor = hs_cursor->file_cursor;
+    cbt = (WT_CURSOR_BTREE *)file_cursor;
+    hs_tombstone = NULL;
+
+    CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, insert, CUR2BT(file_cursor));
+
+    /* Remove must be called with cursor positioned. */
+    WT_ASSERT(session, F_ISSET(file_cursor, WT_CURSTD_KEY_INT));
+
+    /*
+     * Since we're using internal functions to modify the row structure, we need to manually set the
+     * comparison to an exact match.
+     */
+    cbt->compare = 0;
+    /* Add a tombstone with WT_TXN_NONE transaction id and WT_TS_NONE timestamps. */
+    WT_ERR(__wt_upd_alloc_tombstone(session, &hs_tombstone, NULL));
+    hs_tombstone->txnid = WT_TXN_NONE;
+    hs_tombstone->start_ts = hs_tombstone->durable_ts = WT_TS_NONE;
+    while ((ret = __wt_hs_modify(cbt, hs_tombstone)) == WT_RESTART) {
+        WT_WITH_PAGE_INDEX(session, ret = __wt_hs_row_search(cbt, &file_cursor->key, false));
+        WT_ERR(ret);
+    }
+
+    WT_ERR(ret);
+
+    if (0) {
+err:
+        __wt_free(session, hs_tombstone);
+    }
+
     API_END_RET(session, ret);
 }
 
@@ -679,7 +732,7 @@ __wt_curhs_open(WT_SESSION_IMPL *session, WT_CURSOR *owner, WT_CURSOR **cursorp)
       __curhs_insert,                             /* insert */
       __wt_cursor_modify_value_format_notsup,     /* modify */
       __wt_cursor_notsup,                         /* update */
-      __wt_cursor_notsup,                         /* remove */
+      __curhs_remove,                             /* remove */
       __wt_cursor_notsup,                         /* reserve */
       __wt_cursor_reconfigure_notsup,             /* reconfigure */
       __wt_cursor_notsup,                         /* cache */
