@@ -30,6 +30,22 @@ function getPlanStages(root, stage) {
         results = results.concat(getPlanStages(root.queryPlanner.winningPlan, stage));
     }
 
+    if ("thenStage" in root) {
+        results = results.concat(getPlanStages(root.thenStage, stage));
+    }
+
+    if ("elseStage" in root) {
+        results = results.concat(getPlanStages(root.elseStage, stage));
+    }
+
+    if ("outerStage" in root) {
+        results = results.concat(getPlanStages(root.outerStage, stage));
+    }
+
+    if ("innerStage" in root) {
+        results = results.concat(getPlanStages(root.innerStage, stage));
+    }
+
     if ("shards" in root) {
         if (Array.isArray(root.shards)) {
             results = root.shards.reduce(
