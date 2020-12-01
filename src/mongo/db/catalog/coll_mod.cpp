@@ -426,14 +426,12 @@ Status _collModInternal(OperationContext* opCtx,
             if (!viewOn.empty())
                 view->setViewOn(NamespaceString(dbName, viewOn));
 
-            ViewCatalog* catalog = ViewCatalog::get(db);
-
             BSONArrayBuilder pipeline;
             for (auto& item : view->pipeline()) {
                 pipeline.append(item);
             }
             auto errorStatus =
-                catalog->modifyView(opCtx, nss, view->viewOn(), BSONArray(pipeline.obj()));
+                ViewCatalog::modifyView(opCtx, db, nss, view->viewOn(), BSONArray(pipeline.obj()));
             if (!errorStatus.isOK()) {
                 return errorStatus;
             }

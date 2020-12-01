@@ -155,7 +155,7 @@ public:
     /**
      * Returns nullptr if the view didn't exist.
      */
-    ViewDefinition* getView() const {
+    const ViewDefinition* getView() const {
         return _view.get();
     }
 
@@ -188,7 +188,7 @@ protected:
     AutoGetDb _autoDb;
     boost::optional<Lock::CollectionLock> _collLock;
     CollectionPtr _coll = nullptr;
-    std::shared_ptr<ViewDefinition> _view;
+    std::shared_ptr<const ViewDefinition> _view;
 
     // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
     // the same as the input namespace string
@@ -260,7 +260,7 @@ public:
     /**
      * Returns nullptr if the view didn't exist.
      */
-    ViewDefinition* getView() const {
+    const ViewDefinition* getView() const {
         return _view.get();
     }
 
@@ -290,7 +290,7 @@ private:
     // The CollectionPtr is the access point to the Collection instance for callers.
     CollectionPtr _collectionPtr;
 
-    std::shared_ptr<ViewDefinition> _view;
+    std::shared_ptr<const ViewDefinition> _view;
 };
 
 /**

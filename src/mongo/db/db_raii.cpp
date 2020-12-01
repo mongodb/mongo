@@ -450,7 +450,7 @@ AutoGetCollectionForReadMaybeLockFree::AutoGetCollectionForReadMaybeLockFree(
     }
 }
 
-ViewDefinition* AutoGetCollectionForReadMaybeLockFree::getView() const {
+const ViewDefinition* AutoGetCollectionForReadMaybeLockFree::getView() const {
     if (_autoGet) {
         return _autoGet->getView();
     } else {
@@ -545,7 +545,7 @@ const CollectionPtr& AutoGetCollectionForReadCommandMaybeLockFree::getCollection
     }
 }
 
-ViewDefinition* AutoGetCollectionForReadCommandMaybeLockFree::getView() const {
+const ViewDefinition* AutoGetCollectionForReadCommandMaybeLockFree::getView() const {
     if (_autoGet) {
         return _autoGet->getView();
     } else {

@@ -74,7 +74,7 @@ public:
      * to ensure the Database object is safe to access. This class' internal mutex provides
      * concurrency protection around looking up and accessing the Database object matching 'dbName.
      */
-    virtual std::shared_ptr<ViewCatalog> getSharedViewCatalog(OperationContext* const opCtx,
+    virtual std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* const opCtx,
                                                               StringData dbName) const = 0;
 
     /**

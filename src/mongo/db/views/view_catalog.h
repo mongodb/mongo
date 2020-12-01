@@ -53,41 +53,33 @@ class OperationContext;
 class Database;
 
 /**
- * In-memory data structure for view definitions. This data structure is thread-safe -- this is
- * needed as concurrent updates may happen through direct writes to the views catalog collection.
+ * In-memory data structure for view definitions. Instances returned by get() are immutable,
+ * modifications through the static functions copy the existing instance and perform the
+ * modification on the copy. A new call to get() is necessary to observe the modification.
  *
- * All public methods of the view catalog obtain the mutex and refresh the in-memory map with the
- * views catalog collection if necessary, throwing if the refresh fails.
+ * Writes via the static functions are thread-safe and serialized with a mutex per Database -- this
+ * is needed as concurrent updates may happen through direct writes to the views catalog collection.
+ *
+ * The static methods refresh the in-memory map with the views catalog collection if necessary,
+ * throwing if the refresh fails.
  */
 class ViewCatalog {
-    ViewCatalog(const ViewCatalog&) = delete;
-    ViewCatalog& operator=(const ViewCatalog&) = delete;
-
 public:
     using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
     using ViewIteratorCallback = std::function<void(const ViewDefinition& view)>;
 
-    /**
-     * This getter should only be used when not holding a database lock. Otherwise the regular get()
-     * is appropriate and safe.
-     */
-    static std::shared_ptr<ViewCatalog> getShared(const Database* db);
-
-    static ViewCatalog* get(const Database* db);
+    static std::shared_ptr<const ViewCatalog> get(const Database* db);
     static void set(Database* db, std::unique_ptr<ViewCatalog> catalog);
 
     explicit ViewCatalog(std::unique_ptr<DurableViewCatalog> durable)
-        : _durable(std::move(durable)),
-          _valid(false),
-          _viewGraphNeedsRefresh(true),
-          _ignoreExternalChange(false) {}
+        : _durable(std::move(durable)), _valid(false), _viewGraphNeedsRefresh(true) {}
 
     /**
      * Iterates through the catalog, applying 'callback' to each view. This callback function
      * executes under the catalog's mutex, so it must not access other methods of the catalog,
      * acquire locks or run for a long time.
      */
-    void iterate(OperationContext* opCtx, ViewIteratorCallback callback);
+    void iterate(OperationContext* opCtx, ViewIteratorCallback callback) const;
 
     /**
      * Create a new view 'viewName' with contents defined by running the specified aggregation
@@ -98,49 +90,53 @@ public:
      *
      * Must be in WriteUnitOfWork. View creation rolls back if the unit of work aborts.
      */
-    Status createView(OperationContext* opCtx,
-                      const NamespaceString& viewName,
-                      const NamespaceString& viewOn,
-                      const BSONArray& pipeline,
-                      const BSONObj& collation,
-                      const boost::optional<TimeseriesOptions>& timeseries);
+    static Status createView(OperationContext* opCtx,
+                             const Database* db,
+                             const NamespaceString& viewName,
+                             const NamespaceString& viewOn,
+                             const BSONArray& pipeline,
+                             const BSONObj& collation,
+                             const boost::optional<TimeseriesOptions>& timeseries);
 
     /**
      * Drop the view named 'viewName'.
      *
      * Must be in WriteUnitOfWork. The drop rolls back if the unit of work aborts.
      */
-    Status dropView(OperationContext* opCtx, const NamespaceString& viewName);
+    static Status dropView(OperationContext* opCtx,
+                           const Database* db,
+                           const NamespaceString& viewName);
 
     /**
      * Modify the view named 'viewName' to have the new 'viewOn' and 'pipeline'.
      *
      * Must be in WriteUnitOfWork. The modification rolls back if the unit of work aborts.
      */
-    Status modifyView(OperationContext* opCtx,
-                      const NamespaceString& viewName,
-                      const NamespaceString& viewOn,
-                      const BSONArray& pipeline);
+    static Status modifyView(OperationContext* opCtx,
+                             const Database* db,
+                             const NamespaceString& viewName,
+                             const NamespaceString& viewOn,
+                             const BSONArray& pipeline);
 
     /**
      * Look up the 'nss' in the view catalog, returning a shared pointer to a View definition, or
      * nullptr if it doesn't exist.
      */
-    std::shared_ptr<ViewDefinition> lookup(OperationContext* opCtx, StringData nss);
+    std::shared_ptr<const ViewDefinition> lookup(OperationContext* opCtx, StringData nss) const;
 
     /**
      * Same functionality as above, except this function skips validating durable views in the view
      * catalog.
      */
-    std::shared_ptr<ViewDefinition> lookupWithoutValidatingDurableViews(OperationContext* opCtx,
-                                                                        StringData nss);
+    std::shared_ptr<const ViewDefinition> lookupWithoutValidatingDurableViews(
+        OperationContext* opCtx, StringData nss) const;
 
     /**
      * Resolve the views on 'nss', transforming the pipeline appropriately. This function returns a
      * fully-resolved view definition containing the backing namespace, the resolved pipeline and
      * the collation to use for the operation.
      */
-    StatusWith<ResolvedView> resolveView(OperationContext* opCtx, const NamespaceString& nss);
+    StatusWith<ResolvedView> resolveView(OperationContext* opCtx, const NamespaceString& nss) const;
 
     /**
      * Reloads the in-memory state of the view catalog from the 'system.views' collection catalog.
@@ -151,21 +147,24 @@ public:
      * catalog, on external changes to the 'system.views' collection and on the first opening of a
      * database.
      */
-    Status reload(OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior);
+    static Status reload(OperationContext* opCtx,
+                         const Database* db,
+                         ViewCatalogLookupBehavior lookupBehavior);
 
     /**
      * Clears the in-memory state of the view catalog.
      */
-    void clear();
+    static void clear(const Database* db);
 
     /**
      * The view catalog needs to ignore external changes for its own modifications.
      */
-    bool shouldIgnoreExternalChange(OperationContext* opCtx, const NamespaceString& name) const;
+    static bool shouldIgnoreExternalChange(OperationContext* opCtx,
+                                           const Database* db,
+                                           const NamespaceString& name);
 
 private:
-    Status _createOrUpdateView(WithLock,
-                               OperationContext* opCtx,
+    Status _createOrUpdateView(OperationContext* opCtx,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline,
@@ -175,45 +174,44 @@ private:
      * Parses the view definition pipeline, attempts to upsert into the view graph, and refreshes
      * the graph if necessary. Returns an error status if the resulting graph would be invalid.
      */
-    Status _upsertIntoGraph(WithLock, OperationContext* opCtx, const ViewDefinition& viewDef);
+    Status _upsertIntoGraph(OperationContext* opCtx, const ViewDefinition& viewDef);
 
     /**
      * Returns Status::OK with the set of involved namespaces if the given pipeline is eligible to
      * act as a view definition. Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
     StatusWith<stdx::unordered_set<NamespaceString>> _validatePipeline(
-        WithLock, OperationContext* opCtx, const ViewDefinition& viewDef) const;
+        OperationContext* opCtx, const ViewDefinition& viewDef) const;
 
     /**
      * Returns Status::OK if each view namespace in 'refs' has the same default collation as 'view'.
      * Otherwise, returns ErrorCodes::OptionNotSupportedOnView.
      */
-    Status _validateCollation(WithLock,
-                              OperationContext* opCtx,
+    Status _validateCollation(OperationContext* opCtx,
                               const ViewDefinition& view,
-                              const std::vector<NamespaceString>& refs);
+                              const std::vector<NamespaceString>& refs) const;
 
-    std::shared_ptr<ViewDefinition> _lookup(WithLock,
-                                            OperationContext* opCtx,
+    std::shared_ptr<const ViewDefinition> _lookup(OperationContext* opCtx,
+                                                  StringData ns,
+                                                  ViewCatalogLookupBehavior lookupBehavior) const;
+    std::shared_ptr<ViewDefinition> _lookup(OperationContext* opCtx,
                                             StringData ns,
                                             ViewCatalogLookupBehavior lookupBehavior);
 
-    Status _reload(WithLock, OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior);
+    Status _reload(OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior);
 
     /**
      * uasserts with the InvalidViewDefinition error if the current in-memory state of the view
      * catalog is invalid. This ensures that calling into the view catalog while it is invalid
      * renders it inoperable.
      */
-    void _requireValidCatalog(WithLock);
+    void _requireValidCatalog() const;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ViewCatalog::_mutex");  // Protects all members.
     ViewMap _viewMap;
     ViewMap _viewMapBackup;
-    std::unique_ptr<DurableViewCatalog> _durable;
+    std::shared_ptr<DurableViewCatalog> _durable;
     bool _valid;
     ViewGraph _viewGraph;
     bool _viewGraphNeedsRefresh;
-    bool _ignoreExternalChange;
 };
 }  // namespace mongo

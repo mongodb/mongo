@@ -192,9 +192,8 @@ void DatabaseImpl::init(OperationContext* const opCtx) const {
         // initialized, reload the viewCatalog to populate its in-memory state. If there are
         // problems with the catalog contents as might be caused by incorrect mongod versions or
         // similar, they are found right away.
-        auto views = ViewCatalog::get(this);
         Status reloadStatus =
-            views->reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
+            ViewCatalog::reload(opCtx, this, ViewCatalogLookupBehavior::kValidateDurableViews);
         if (!reloadStatus.isOK()) {
             LOGV2_WARNING_OPTIONS(20326,
                                   {logv2::LogTag::kStartupWarnings},
@@ -324,8 +323,7 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName)
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
 
-    auto views = ViewCatalog::get(this);
-    Status status = views->dropView(opCtx, viewName);
+    Status status = ViewCatalog::dropView(opCtx, this, viewName);
     Top::get(opCtx->getServiceContext()).collectionDropped(viewName);
     return status;
 }
@@ -618,8 +616,8 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
         status = {ErrorCodes::InvalidNamespace,
                   str::stream() << "invalid namespace name for a view: " + viewName.toString()};
     } else {
-        status = ViewCatalog::get(this)->createView(
-            opCtx, viewName, viewOnNss, pipeline, options.collation, options.timeseries);
+        status = ViewCatalog::createView(
+            opCtx, this, viewName, viewOnNss, pipeline, options.collation, options.timeseries);
     }
 
     audit::logCreateView(&cc(), viewName.toString(), viewOnNss.toString(), pipeline, status.code());

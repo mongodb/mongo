@@ -59,7 +59,7 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx,
     CollectionPtr collection = collectionCatalog->lookupCollectionByNamespace(opCtx, collectionNss);
 
     if (!collection) {
-        std::shared_ptr<ViewDefinition> view =
+        std::shared_ptr<const ViewDefinition> view =
             ViewCatalog::get(database)->lookup(opCtx, collectionNss.ns());
         uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
         uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");

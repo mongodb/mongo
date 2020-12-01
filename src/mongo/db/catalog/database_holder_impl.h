@@ -42,7 +42,7 @@ public:
 
     Database* getDb(OperationContext* opCtx, StringData ns) const override;
 
-    std::shared_ptr<ViewCatalog> getSharedViewCatalog(OperationContext* const opCtx,
+    std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* const opCtx,
                                                       StringData dbName) const override;
 
     Database* openDb(OperationContext* opCtx, StringData ns, bool* justCreated = nullptr) override;

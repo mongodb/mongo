@@ -97,7 +97,7 @@ bool shouldSkipOutput(OperationContext* opCtx) {
  * Returns true if 'ns' refers to a time-series collection.
  */
 bool isTimeseries(OperationContext* opCtx, const NamespaceString& ns) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, ns.db());
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
     if (!viewCatalog) {
         return false;
     }

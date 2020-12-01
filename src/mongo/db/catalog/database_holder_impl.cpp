@@ -82,14 +82,14 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, StringData ns) cons
     return nullptr;
 }
 
-std::shared_ptr<ViewCatalog> DatabaseHolderImpl::getSharedViewCatalog(OperationContext* opCtx,
+std::shared_ptr<const ViewCatalog> DatabaseHolderImpl::getViewCatalog(OperationContext* opCtx,
                                                                       StringData dbName) const {
     stdx::lock_guard<SimpleMutex> lk(_m);
     DBs::const_iterator it = _dbs.find(dbName);
     if (it != _dbs.end()) {
         const Database* db = it->second;
         if (db) {
-            return ViewCatalog::getShared(db);
+            return ViewCatalog::get(db);
         }
     }
 

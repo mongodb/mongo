@@ -65,12 +65,11 @@ void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const Namespa
         // is reloaded. This will prevent any further usage of the view catalog until the invalid
         // view definitions are removed. We use kValidateDurableViews here to catch any invalid view
         // definitions in the view catalog to make it unusable for subsequent callers.
-        ViewCatalog* viewCatalog = ViewCatalog::get(db);
-        if (viewCatalog->shouldIgnoreExternalChange(opCtx, name)) {
+        if (ViewCatalog::shouldIgnoreExternalChange(opCtx, db, name)) {
             return;
         }
 
-        viewCatalog->reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews).ignore();
+        ViewCatalog::reload(opCtx, db, ViewCatalogLookupBehavior::kValidateDurableViews).ignore();
     }
 }
 
@@ -86,7 +85,7 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
     if (db) {
         // If the 'system.views' collection is dropped, we need to clear the in-memory state of the
         // view catalog.
-        ViewCatalog::get(db)->clear();
+        ViewCatalog::clear(db);
     }
 }
 

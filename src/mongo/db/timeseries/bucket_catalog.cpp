@@ -131,7 +131,7 @@ BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
                                                   const BSONObj& doc) {
     stdx::lock_guard lk(_mutex);
 
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, ns.db());
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, ns.db());
     invariant(viewCatalog);
     auto viewDef = viewCatalog->lookup(opCtx, ns.ns());
     invariant(viewDef);

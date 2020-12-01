@@ -41,7 +41,7 @@ public:
         return nullptr;
     }
 
-    std::shared_ptr<ViewCatalog> getSharedViewCatalog(OperationContext* const opCtx,
+    std::shared_ptr<const ViewCatalog> getViewCatalog(OperationContext* const opCtx,
                                                       StringData dbName) const override {
         return nullptr;
     }

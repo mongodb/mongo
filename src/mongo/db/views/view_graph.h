@@ -50,9 +50,6 @@ class ViewDefinition;
  * This is owned and managed by the ViewCatalog.
  */
 class ViewGraph {
-    ViewGraph(const ViewGraph&) = delete;
-    ViewGraph& operator=(const ViewGraph&) = delete;
-
 public:
     static const int kMaxViewDepth;
     static const int kMaxViewPipelineSizeBytes;

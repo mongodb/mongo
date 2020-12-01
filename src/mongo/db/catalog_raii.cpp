@@ -240,7 +240,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     }
 
     // Returns nullptr for 'viewCatalog' if db does not exist.
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, _resolvedNss.db());
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, _resolvedNss.db());
     if (!viewCatalog) {
         return;
     }

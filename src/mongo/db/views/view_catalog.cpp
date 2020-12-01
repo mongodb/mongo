@@ -60,7 +60,84 @@
 namespace mongo {
 
 namespace {
-auto getViewCatalog = Database::declareDecoration<std::shared_ptr<ViewCatalog>>();
+/**
+ * Helper class to manage copy-on-write for the ViewCatalog.
+ */
+class ViewCatalogWriter {
+public:
+    ViewCatalogWriter(Mutex& mutex,
+                      std::shared_ptr<const ViewCatalog> instance,
+                      std::shared_ptr<ViewCatalog>* storage)
+        : _mutex(mutex), _read(std::move(instance)), _storage(storage) {}
+
+    ViewCatalogWriter(ViewCatalogWriter&&) = delete;
+    ViewCatalogWriter& operator=(ViewCatalogWriter&&) = delete;
+
+    const ViewCatalog* operator->() const {
+        if (_write)
+            return _write.get();
+
+        return _read.get();
+    }
+
+    ViewCatalog* writable() {
+        if (!_write) {
+            _lock = stdx::unique_lock<Mutex>(_mutex);
+            _write = std::make_shared<ViewCatalog>(*_read);
+        }
+        return _write.get();
+    }
+
+    void commit() {
+        if (_write) {
+            atomic_store(_storage, std::move(_write));
+            _lock.unlock();
+        }
+    }
+
+private:
+    Mutex& _mutex;
+    stdx::unique_lock<Mutex> _lock;
+    std::shared_ptr<const ViewCatalog> _read;
+    std::shared_ptr<ViewCatalog> _write;
+    std::shared_ptr<ViewCatalog>* _storage;
+};
+
+/**
+ * Decoration on the Database object for storing the latest ViewCatalog instance and its associated
+ * write mutex.
+ *
+ * We don't want a non-const Database to be required to do modifications on the ViewCatalog, so all
+ * members of this class is mutable.
+ */
+class ViewCatalogStorage {
+public:
+    std::shared_ptr<const ViewCatalog> get() const {
+        return atomic_load(&_catalog);
+    }
+
+    void set(std::shared_ptr<ViewCatalog> instance) const {
+        atomic_store(&_catalog, std::move(instance));
+    }
+
+    ViewCatalogWriter writer() const {
+        return ViewCatalogWriter(_mutex, get(), &_catalog);
+    }
+
+    void setIgnoreExternalChange(bool value) const {
+        _ignoreExternalChange = value;
+    }
+
+    bool shouldIgnoreExternalChange() const {
+        return _ignoreExternalChange;
+    }
+
+private:
+    mutable std::shared_ptr<ViewCatalog> _catalog;
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ViewCatalogStorage::mutex");  // Serializes writes
+    mutable bool _ignoreExternalChange = false;
+};
+auto getViewCatalog = Database::declareDecoration<ViewCatalogStorage>();
 
 StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* opCtx,
                                                              BSONObj collationSpec) {
@@ -73,30 +150,30 @@ StatusWith<std::unique_ptr<CollatorInterface>> parseCollator(OperationContext* o
 }
 }  // namespace
 
-std::shared_ptr<ViewCatalog> ViewCatalog::getShared(const Database* db) {
-    return getViewCatalog(db);
-}
-
-ViewCatalog* ViewCatalog::get(const Database* db) {
+std::shared_ptr<const ViewCatalog> ViewCatalog::get(const Database* db) {
     return getViewCatalog(db).get();
 }
 
 void ViewCatalog::set(Database* db, std::unique_ptr<ViewCatalog> catalog) {
-    getViewCatalog(db) = std::move(catalog);
+    getViewCatalog(db).set(std::move(catalog));
 }
 
-Status ViewCatalog::reload(OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior) {
+Status ViewCatalog::reload(OperationContext* opCtx,
+                           const Database* db,
+                           ViewCatalogLookupBehavior lookupBehavior) {
+    auto catalog = getViewCatalog(db).writer();
     Lock::CollectionLock systemViewsLock(
         opCtx,
-        NamespaceString(_durable->getName(), NamespaceString::kSystemDotViewsCollectionName),
+        NamespaceString(catalog->_durable->getName(),
+                        NamespaceString::kSystemDotViewsCollectionName),
         MODE_IS);
-    stdx::unique_lock<Latch> lk(_mutex);
-    return _reload(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
+    auto result =
+        catalog.writable()->_reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
+    catalog.commit();
+    return result;
 }
 
-Status ViewCatalog::_reload(WithLock,
-                            OperationContext* opCtx,
-                            ViewCatalogLookupBehavior lookupBehavior) {
+Status ViewCatalog::_reload(OperationContext* opCtx, ViewCatalogLookupBehavior lookupBehavior) {
     LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = _durable->getName());
 
     _viewMap.clear();
@@ -162,37 +239,36 @@ Status ViewCatalog::_reload(WithLock,
     return Status::OK();
 }
 
-void ViewCatalog::clear() {
-    stdx::unique_lock<Latch> lk(_mutex);
-
-    _viewMap.clear();
-    _viewGraph.clear();
-    _valid = true;
-    _viewGraphNeedsRefresh = false;
+void ViewCatalog::clear(const Database* db) {
+    auto catalog = getViewCatalog(db).writer();
+    catalog.writable()->_viewMap.clear();
+    catalog.writable()->_viewGraph.clear();
+    catalog.writable()->_valid = true;
+    catalog.writable()->_viewGraphNeedsRefresh = false;
+    catalog.commit();
 }
 
 bool ViewCatalog::shouldIgnoreExternalChange(OperationContext* opCtx,
-                                             const NamespaceString& name) const {
-    return _ignoreExternalChange;
+                                             const Database* db,
+                                             const NamespaceString& name) {
+    return getViewCatalog(db).shouldIgnoreExternalChange();
 }
 
-void ViewCatalog::_requireValidCatalog(WithLock) {
+void ViewCatalog::_requireValidCatalog() const {
     uassert(ErrorCodes::InvalidViewDefinition,
             "Invalid view definition detected in the view catalog. Remove the invalid view "
             "manually to prevent disallowing any further usage of the view catalog.",
             _valid);
 }
 
-void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) {
-    stdx::lock_guard<Latch> lk(_mutex);
-    _requireValidCatalog(lk);
+void ViewCatalog::iterate(OperationContext* opCtx, ViewIteratorCallback callback) const {
+    _requireValidCatalog();
     for (auto&& view : _viewMap) {
         callback(*view.second);
     }
 }
 
-Status ViewCatalog::_createOrUpdateView(WithLock lk,
-                                        OperationContext* opCtx,
+Status ViewCatalog::_createOrUpdateView(OperationContext* opCtx,
                                         const NamespaceString& viewName,
                                         const NamespaceString& viewOn,
                                         const BSONArray& pipeline,
@@ -203,11 +279,7 @@ Status ViewCatalog::_createOrUpdateView(WithLock lk,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    _requireValidCatalog(lk);
-
-    ON_BLOCK_EXIT([this] { _ignoreExternalChange = false; });
-
-    _ignoreExternalChange = true;
+    _requireValidCatalog();
 
     // Build the BSON definition for this view to be saved in the durable view catalog. If the
     // collation is empty, omit it from the definition altogether.
@@ -231,7 +303,7 @@ Status ViewCatalog::_createOrUpdateView(WithLock lk,
                                                  timeseries);
 
     // Check that the resulting dependency graph is acyclic and within the maximum depth.
-    Status graphStatus = _upsertIntoGraph(lk, opCtx, *(view.get()));
+    Status graphStatus = _upsertIntoGraph(opCtx, *(view.get()));
     if (!graphStatus.isOK()) {
         return graphStatus;
     }
@@ -244,13 +316,7 @@ Status ViewCatalog::_createOrUpdateView(WithLock lk,
     CollectionCatalog::write(
         opCtx, [&](CollectionCatalog& catalog) { catalog.addResource(viewRid, viewName.ns()); });
 
-    opCtx->recoveryUnit()->onRollback([this, viewName, opCtx, viewRid]() {
-        {
-            stdx::lock_guard<Latch> lk(_mutex);
-            this->_viewMap.erase(viewName.ns());
-            this->_viewGraphNeedsRefresh = true;
-        }
-
+    opCtx->recoveryUnit()->onRollback([viewName, opCtx, viewRid]() {
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.removeResource(viewRid, viewName.ns());
         });
@@ -258,19 +324,16 @@ Status ViewCatalog::_createOrUpdateView(WithLock lk,
 
 
     // Reload the view catalog with the changes applied.
-    return _reload(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
+    return _reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
 }
 
-Status ViewCatalog::_upsertIntoGraph(WithLock lk,
-                                     OperationContext* opCtx,
-                                     const ViewDefinition& viewDef) {
+Status ViewCatalog::_upsertIntoGraph(OperationContext* opCtx, const ViewDefinition& viewDef) {
 
     // Performs the insert into the graph.
-    auto doInsert = [this, &lk, &opCtx](const ViewDefinition& viewDef,
-                                        bool needsValidation) -> Status {
+    auto doInsert = [this, &opCtx](const ViewDefinition& viewDef, bool needsValidation) -> Status {
         // Validate that the pipeline is eligible to serve as a view definition. If it is, this
         // will also return the set of involved namespaces.
-        auto pipelineStatus = _validatePipeline(lk, opCtx, viewDef);
+        auto pipelineStatus = _validatePipeline(opCtx, viewDef);
         if (!pipelineStatus.isOK()) {
             if (needsValidation) {
                 uassertStatusOKWithContext(pipelineStatus.getStatus(),
@@ -291,7 +354,7 @@ Status ViewCatalog::_upsertIntoGraph(WithLock lk,
 
         if (needsValidation) {
             // Check the collation of all the dependent namespaces before updating the graph.
-            auto collationStatus = _validateCollation(lk, opCtx, viewDef, refs);
+            auto collationStatus = _validateCollation(opCtx, viewDef, refs);
             if (!collationStatus.isOK()) {
                 return collationStatus;
             }
@@ -312,7 +375,6 @@ Status ViewCatalog::_upsertIntoGraph(WithLock lk,
             }
         }
         // Only if the inserts completed without error will we no longer need a refresh.
-        opCtx->recoveryUnit()->onRollback([this]() { this->_viewGraphNeedsRefresh = true; });
         _viewGraphNeedsRefresh = false;
     }
 
@@ -324,7 +386,7 @@ Status ViewCatalog::_upsertIntoGraph(WithLock lk,
 }
 
 StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
-    WithLock lk, OperationContext* opCtx, const ViewDefinition& viewDef) const {
+    OperationContext* opCtx, const ViewDefinition& viewDef) const {
     const LiteParsedPipeline liteParsedPipeline(viewDef.viewOn(), viewDef.pipeline());
     const auto involvedNamespaces = liteParsedPipeline.getInvolvedNamespaces();
 
@@ -399,13 +461,12 @@ StatusWith<stdx::unordered_set<NamespaceString>> ViewCatalog::_validatePipeline(
     return std::move(involvedNamespaces);
 }
 
-Status ViewCatalog::_validateCollation(WithLock lk,
-                                       OperationContext* opCtx,
+Status ViewCatalog::_validateCollation(OperationContext* opCtx,
                                        const ViewDefinition& view,
-                                       const std::vector<NamespaceString>& refs) {
+                                       const std::vector<NamespaceString>& refs) const {
     for (auto&& potentialViewNss : refs) {
-        auto otherView = _lookup(
-            lk, opCtx, potentialViewNss.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+        auto otherView =
+            _lookup(opCtx, potentialViewNss.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
         if (otherView &&
             !CollatorInterface::collatorsMatch(view.defaultCollator(),
                                                otherView->defaultCollator())) {
@@ -419,6 +480,7 @@ Status ViewCatalog::_validateCollation(WithLock lk,
 }
 
 Status ViewCatalog::createView(OperationContext* opCtx,
+                               const Database* db,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline,
@@ -429,14 +491,15 @@ Status ViewCatalog::createView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    const auto& catalogStorage = getViewCatalog(db);
+    auto catalog = catalogStorage.writer();
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    if (_lookup(
-            lk, opCtx, StringData(viewName.ns()), ViewCatalogLookupBehavior::kValidateDurableViews))
+    if (catalog->_lookup(
+            opCtx, StringData(viewName.ns()), ViewCatalogLookupBehavior::kValidateDurableViews))
         return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
 
     if (!NamespaceString::validCollectionName(viewOn.coll()))
@@ -447,11 +510,22 @@ Status ViewCatalog::createView(OperationContext* opCtx,
     if (!collator.isOK())
         return collator.getStatus();
 
-    return _createOrUpdateView(
-        lk, opCtx, viewName, viewOn, pipeline, std::move(collator.getValue()), timeseries);
+    Status result = Status::OK();
+    {
+        ON_BLOCK_EXIT([&catalogStorage] { catalogStorage.setIgnoreExternalChange(false); });
+        catalogStorage.setIgnoreExternalChange(true);
+
+        result = catalog.writable()->_createOrUpdateView(
+            opCtx, viewName, viewOn, pipeline, std::move(collator.getValue()), timeseries);
+    }
+    if (result.isOK()) {
+        catalog.commit();
+    }
+    return result;
 }
 
 Status ViewCatalog::modifyView(OperationContext* opCtx,
+                               const Database* db,
                                const NamespaceString& viewName,
                                const NamespaceString& viewOn,
                                const BSONArray& pipeline) {
@@ -459,14 +533,15 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    const auto& catalogStorage = getViewCatalog(db);
+    auto catalog = catalogStorage.writer();
 
     if (viewName.db() != viewOn.db())
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
     auto viewPtr =
-        _lookup(lk, opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+        catalog->_lookup(opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
     if (!viewPtr)
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "cannot modify missing view " << viewName.ns());
@@ -475,14 +550,7 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid name for 'viewOn': " << viewOn.coll());
 
-    ViewDefinition savedDefinition = *viewPtr;
-
-    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition, opCtx]() {
-        auto definition = std::make_shared<ViewDefinition>(savedDefinition);
-        {
-            stdx::lock_guard<Latch> lk(_mutex);
-            this->_viewMap[viewName.ns()] = std::move(definition);
-        }
+    opCtx->recoveryUnit()->onRollback([viewName, opCtx]() {
         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
 
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
@@ -490,63 +558,79 @@ Status ViewCatalog::modifyView(OperationContext* opCtx,
         });
     });
 
-    return _createOrUpdateView(lk,
-                               opCtx,
-                               viewName,
-                               viewOn,
-                               pipeline,
-                               CollatorInterface::cloneCollator(savedDefinition.defaultCollator()));
+    Status result = Status::OK();
+    {
+        ON_BLOCK_EXIT([&catalogStorage] { catalogStorage.setIgnoreExternalChange(false); });
+        catalogStorage.setIgnoreExternalChange(true);
+
+        result = catalog.writable()->_createOrUpdateView(
+            opCtx,
+            viewName,
+            viewOn,
+            pipeline,
+            CollatorInterface::cloneCollator(viewPtr->defaultCollator()));
+    }
+
+    if (result.isOK()) {
+        catalog.commit();
+    }
+
+    return result;
 }
 
-Status ViewCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) {
+Status ViewCatalog::dropView(OperationContext* opCtx,
+                             const Database* db,
+                             const NamespaceString& viewName) {
     invariant(opCtx->lockState()->isDbLockedForMode(viewName.db(), MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    stdx::lock_guard<Latch> lk(_mutex);
-    _requireValidCatalog(lk);
+    const auto& catalogStorage = getViewCatalog(db);
+    auto catalog = catalogStorage.writer();
+    catalog->_requireValidCatalog();
 
-    ON_BLOCK_EXIT([this] { _ignoreExternalChange = false; });
+    Status result = Status::OK();
 
-    _ignoreExternalChange = true;
+    {
+        ON_BLOCK_EXIT([&catalogStorage] { catalogStorage.setIgnoreExternalChange(false); });
 
-    // Save a copy of the view definition in case we need to roll back.
-    auto viewPtr =
-        _lookup(lk, opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
-    if (!viewPtr) {
-        return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "cannot drop missing view: " << viewName.ns()};
-    }
+        catalogStorage.setIgnoreExternalChange(true);
 
-    ViewDefinition savedDefinition = *viewPtr;
+        // Save a copy of the view definition in case we need to roll back.
+        auto viewPtr = catalog->_lookup(
+            opCtx, viewName.ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+        if (!viewPtr) {
+            return {ErrorCodes::NamespaceNotFound,
+                    str::stream() << "cannot drop missing view: " << viewName.ns()};
+        }
 
-    invariant(_valid);
-    _durable->remove(opCtx, viewName);
-    _viewGraph.remove(savedDefinition.name());
-    _viewMap.erase(viewName.ns());
+        invariant(catalog->_valid);
+        catalog.writable()->_durable->remove(opCtx, viewName);
+        catalog.writable()->_viewGraph.remove(viewPtr->name());
+        catalog.writable()->_viewMap.erase(viewName.ns());
 
-    auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
-    CollectionCatalog::write(
-        opCtx, [&](CollectionCatalog& catalog) { catalog.removeResource(viewRid, viewName.ns()); });
-
-    opCtx->recoveryUnit()->onRollback([this, viewName, savedDefinition, opCtx, viewRid]() {
-        this->_viewGraphNeedsRefresh = true;
-        this->_viewMap[viewName.ns()] = std::make_shared<ViewDefinition>(savedDefinition);
-
+        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-            catalog.addResource(viewRid, viewName.ns());
+            catalog.removeResource(viewRid, viewName.ns());
         });
-    });
 
-    // Reload the view catalog with the changes applied.
-    return _reload(lk, opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
+        opCtx->recoveryUnit()->onRollback([viewName, opCtx, viewRid]() {
+            CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+                catalog.addResource(viewRid, viewName.ns());
+            });
+        });
+
+        // Reload the view catalog with the changes applied.
+        result =
+            catalog.writable()->_reload(opCtx, ViewCatalogLookupBehavior::kValidateDurableViews);
+    }
+    catalog.commit();
+    return result;
 }
 
-std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
-                                                     OperationContext* opCtx,
-                                                     StringData ns,
-                                                     ViewCatalogLookupBehavior lookupBehavior) {
+std::shared_ptr<const ViewDefinition> ViewCatalog::_lookup(
+    OperationContext* opCtx, StringData ns, ViewCatalogLookupBehavior lookupBehavior) const {
     ViewMap::const_iterator it = _viewMap.find(ns);
     if (it != _viewMap.end()) {
         return it->second;
@@ -554,8 +638,15 @@ std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(WithLock lk,
     return nullptr;
 }
 
-std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, StringData ns) {
-    stdx::lock_guard<Latch> lk(_mutex);
+std::shared_ptr<ViewDefinition> ViewCatalog::_lookup(OperationContext* opCtx,
+                                                     StringData ns,
+                                                     ViewCatalogLookupBehavior lookupBehavior) {
+    return std::const_pointer_cast<ViewDefinition>(
+        std::as_const(*this)._lookup(opCtx, ns, lookupBehavior));
+}
+
+std::shared_ptr<const ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx,
+                                                          StringData ns) const {
     if (!_valid && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
         if (!NamespaceString::validCollectionName(ns)) {
@@ -565,23 +656,20 @@ std::shared_ptr<ViewDefinition> ViewCatalog::lookup(OperationContext* opCtx, Str
         // ApplyOps should work on a valid existing collection, despite the presence of bad views
         // otherwise the server would crash. The view catalog will remain invalid until the bad view
         // definitions are removed.
-        _requireValidCatalog(lk);
+        _requireValidCatalog();
     }
 
-    return _lookup(lk, opCtx, ns, ViewCatalogLookupBehavior::kValidateDurableViews);
+    return _lookup(opCtx, ns, ViewCatalogLookupBehavior::kValidateDurableViews);
 }
 
-std::shared_ptr<ViewDefinition> ViewCatalog::lookupWithoutValidatingDurableViews(
-    OperationContext* opCtx, StringData ns) {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _lookup(lk, opCtx, ns, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
+std::shared_ptr<const ViewDefinition> ViewCatalog::lookupWithoutValidatingDurableViews(
+    OperationContext* opCtx, StringData ns) const {
+    return _lookup(opCtx, ns, ViewCatalogLookupBehavior::kAllowInvalidDurableViews);
 }
 
 StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
-                                                  const NamespaceString& nss) {
-    stdx::unique_lock<Latch> lock(_mutex);
-
-    _requireValidCatalog(lock);
+                                                  const NamespaceString& nss) const {
+    _requireValidCatalog();
 
     // Keep looping until the resolution completes. If the catalog is invalidated during the
     // resolution, we start over from the beginning.
@@ -602,8 +690,8 @@ StatusWith<ResolvedView> ViewCatalog::resolveView(OperationContext* opCtx,
 
         int depth = 0;
         for (; depth < ViewGraph::kMaxViewDepth; depth++) {
-            auto view = _lookup(
-                lock, opCtx, resolvedNss->ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
+            auto view =
+                _lookup(opCtx, resolvedNss->ns(), ViewCatalogLookupBehavior::kValidateDurableViews);
             if (!view) {
                 // Return error status if pipeline is too large.
                 int pipelineSize = 0;

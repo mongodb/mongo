@@ -113,7 +113,7 @@ public:
         return _autoColl->getCollection();
     }
 
-    ViewDefinition* getView() const {
+    const ViewDefinition* getView() const {
         return _autoColl->getView();
     }
 
@@ -209,7 +209,7 @@ public:
         return _autoGetCollectionForReadBase->getCollection();
     }
 
-    ViewDefinition* getView() const {
+    const ViewDefinition* getView() const {
         return _autoGetCollectionForReadBase->getView();
     }
 
@@ -269,7 +269,7 @@ public:
         return getCollection();
     }
     const CollectionPtr& getCollection() const;
-    ViewDefinition* getView() const;
+    const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
 
 private:
@@ -300,7 +300,7 @@ public:
         return _autoCollForRead.getCollection();
     }
 
-    ViewDefinition* getView() const {
+    const ViewDefinition* getView() const {
         return _autoCollForRead.getView();
     }
 
@@ -382,7 +382,7 @@ public:
         return getCollection();
     }
     const CollectionPtr& getCollection() const;
-    ViewDefinition* getView() const;
+    const ViewDefinition* getView() const;
     const NamespaceString& getNss() const;
 
 private:

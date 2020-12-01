@@ -276,7 +276,7 @@ public:
             // Time-series collections are only supported in 5.0. If the user tries to downgrade the
             // cluster to an earlier version, they must first remove all time-series collections.
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, dbName);
+                auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
                 if (!viewCatalog) {
                     continue;
                 }

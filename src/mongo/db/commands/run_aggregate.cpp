@@ -278,7 +278,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                                                NamespaceString::kSystemDotViewsCollectionName),
                                MODE_IS);
     Database* const db = autoColl.getDb();
-    ViewCatalog* viewCatalog = db ? ViewCatalog::get(db) : nullptr;
+    auto viewCatalog = db ? ViewCatalog::get(db) : nullptr;
 
     std::deque<NamespaceString> involvedNamespacesQueue(pipelineInvolvedNamespaces.begin(),
                                                         pipelineInvolvedNamespaces.end());
@@ -365,7 +365,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
                                       StringData dbName,
                                       const CollatorInterface* collator,
                                       const LiteParsedPipeline& liteParsedPipeline) {
-    auto viewCatalog = DatabaseHolder::get(opCtx)->getSharedViewCatalog(opCtx, dbName);
+    auto viewCatalog = DatabaseHolder::get(opCtx)->getViewCatalog(opCtx, dbName);
     if (!viewCatalog) {
         return Status::OK();
     }
@@ -626,7 +626,7 @@ Status runAggregate(OperationContext* opCtx,
 
 
             auto resolvedView = uassertStatusOK(DatabaseHolder::get(opCtx)
-                                                    ->getSharedViewCatalog(opCtx, nss.db())
+                                                    ->getViewCatalog(opCtx, nss.db())
                                                     ->resolveView(opCtx, nss));
             uassert(std::move(resolvedView),
                     "On sharded systems, resolved views must be executed by mongos",
