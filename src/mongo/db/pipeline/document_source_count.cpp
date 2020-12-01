@@ -43,9 +43,9 @@ using boost::intrusive_ptr;
 using std::list;
 using std::string;
 
-REGISTER_MULTI_STAGE_ALIAS(count,
-                           LiteParsedDocumentSourceDefault::parse,
-                           DocumentSourceCount::createFromBson);
+REGISTER_DOCUMENT_SOURCE(count,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceCount::createFromBson);
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

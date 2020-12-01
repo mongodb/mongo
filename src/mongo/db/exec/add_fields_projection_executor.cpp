@@ -218,6 +218,22 @@ std::unique_ptr<AddFieldsProjectionExecutor> AddFieldsProjectionExecutor::create
     return executor;
 }
 
+std::unique_ptr<AddFieldsProjectionExecutor> AddFieldsProjectionExecutor::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const FieldPath& fieldPath,
+    const boost::intrusive_ptr<Expression>& expr) {
+
+    // This helper is only meant for creating top-level fields. Dotted field paths require
+    // thinking about implicit array traversal.
+    tassert(5339700,
+            str::stream() << "Expected a top-level field name, but got " << fieldPath.fullPath(),
+            fieldPath.getPathLength() == 1);
+
+    auto executor = std::make_unique<AddFieldsProjectionExecutor>(expCtx);
+    executor->_root->addExpressionForPath(fieldPath, expr);
+    return executor;
+}
+
 void AddFieldsProjectionExecutor::parse(const BSONObj& spec) {
     for (auto elem : spec) {
         // The field name might be a dotted path.

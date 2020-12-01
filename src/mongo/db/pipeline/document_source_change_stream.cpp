@@ -65,9 +65,9 @@ using std::vector;
 // and re-parse the pipeline. To make this work, the 'transformation' stage will serialize itself
 // with the original specification, and all other stages that are created during the alias expansion
 // will not serialize themselves.
-REGISTER_MULTI_STAGE_ALIAS(changeStream,
-                           DocumentSourceChangeStream::LiteParsed::parse,
-                           DocumentSourceChangeStream::createFromBson);
+REGISTER_DOCUMENT_SOURCE(changeStream,
+                         DocumentSourceChangeStream::LiteParsed::parse,
+                         DocumentSourceChangeStream::createFromBson);
 
 constexpr StringData DocumentSourceChangeStream::kDocumentKeyField;
 constexpr StringData DocumentSourceChangeStream::kFullDocumentBeforeChangeField;
