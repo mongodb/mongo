@@ -44,6 +44,7 @@ using unittest::assertGet;
 using MergeChunkTest = ConfigServerTestFixture;
 
 const NamespaceString kNamespace("TestDB.TestColl");
+// To prevent initialization-order-fiasco, do not use UUID::gen() here
 const KeyPattern kKeyPattern(BSON("x" << 1));
 
 TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {

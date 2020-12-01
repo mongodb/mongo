@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_tags.h"
@@ -44,6 +45,10 @@ namespace mongo {
 
 struct SplitPolicyParams {
     NamespaceString nss;
+    // TODO SERVER-53105 update this comment explaining that just (nss || uuid) field will be
+    // persisted If boost::none, the resulting config.chunks document(s) are not going to include
+    // the collection UUID field
+    boost::optional<CollectionUUID> collectionUUID;
     ShardId primaryShardId;
 };
 
@@ -101,9 +106,8 @@ public:
      * assignments as configSvrShardCollection.
      */
     static ShardCollectionConfig generateShardCollectionInitialChunks(
-        const NamespaceString& nss,
+        SplitPolicyParams params,
         const ShardKeyPattern& shardKeyPattern,
-        const ShardId& databasePrimaryShardId,
         const Timestamp& validAfter,
         const std::vector<BSONObj>& splitPoints,
         const std::vector<ShardId>& allShardIds,

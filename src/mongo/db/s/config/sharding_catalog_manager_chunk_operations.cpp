@@ -56,12 +56,15 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
+
+using FeatureCompatibilityParams = ServerGlobalParams::FeatureCompatibility;
 
 MONGO_FAIL_POINT_DEFINE(migrationCommitVersionError);
 MONGO_FAIL_POINT_DEFINE(migrateCommitInvalidChunkQuery);
@@ -230,6 +233,10 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.append(ChunkType::name(), chunkID);
         migratedChunk.getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
+        // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
+        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+            n.append(ChunkType::collectionUUID(), migratedChunk.getCollectionUUID().toString());
+        }
         n.append(ChunkType::min(), migratedChunk.getMin());
         n.append(ChunkType::max(), migratedChunk.getMax());
         n.append(ChunkType::shard(), toShard);
@@ -254,6 +261,10 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         n.append(ChunkType::name(), controlChunk->getName());
         controlChunk->getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
+        // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
+        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+            n.append(ChunkType::collectionUUID(), migratedChunk.getCollectionUUID().toString());
+        }
         n.append(ChunkType::min(), controlChunk->getMin());
         n.append(ChunkType::max(), controlChunk->getMax());
         n.append(ChunkType::shard(), fromShard);
@@ -518,6 +529,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         // because we perform an update operation below (with upsert true). Keeping the original ID
         // ensures we overwrite the old chunk (before the split) without having to perform a delete.
         chunkID = shouldTakeOriginalChunkID ? origChunk.getValue().getName() : OID::gen();
+
         shouldTakeOriginalChunkID = false;
 
         // build an update operation against the chunks collection of the config database
@@ -532,6 +544,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         n.append(ChunkType::name(), chunkID);
         currentMaxVersion.appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
+        // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
+        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+            auto collectionUUID = origChunk.getValue().getCollectionUUID().toString();
+            n.append(ChunkType::collectionUUID(), collectionUUID);
+        }
         n.append(ChunkType::min(), startKey);
         n.append(ChunkType::max(), endKey);
         n.append(ChunkType::shard(), shardName);
@@ -700,6 +717,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
         }
 
         itChunk.setName(itOrigChunk.getValue().getName());
+        // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
+        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+            itChunk.setCollectionUUID(itOrigChunk.getValue().getCollectionUUID());
+        }
 
         // Ensure the chunk boundaries are strictly increasing
         if (chunkBoundaries[i].woCompare(itChunk.getMin()) <= 0) {
@@ -899,6 +920,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     // will be 0.
     ChunkType newMigratedChunk = migratedChunk;
     newMigratedChunk.setName(origChunk.getValue().getName());
+    // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
+    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        auto collectionUUID = origChunk.getValue().getCollectionUUID();
+        newMigratedChunk.setCollectionUUID(collectionUUID);
+    }
     newMigratedChunk.setShard(toShard);
     newMigratedChunk.setVersion(ChunkVersion(
         currentCollectionVersion.majorVersion() + 1, 0, currentCollectionVersion.epoch()));

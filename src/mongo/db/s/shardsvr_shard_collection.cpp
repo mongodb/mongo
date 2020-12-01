@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -567,6 +568,17 @@ UUID shardCollection(OperationContext* opCtx,
     std::unique_ptr<InitialSplitPolicy> splitPolicy;
     InitialSplitPolicy::ShardCollectionConfig initialChunks;
 
+    bool shouldUseUUIDForChunkIndexing;
+    {
+        invariant(!opCtx->lockState()->isLocked());
+        Lock::SharedLock fcvLock(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
+        shouldUseUUIDForChunkIndexing =
+            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
+                FeatureCompatibilityParams::Version::kVersion49) &&
+            feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV();
+        // TODO SERVER-53092: persist FCV placeholder
+    }
+
     {
         pauseShardCollectionBeforeCriticalSection.pauseWhileSet();
 
@@ -594,8 +606,14 @@ UUID shardCollection(OperationContext* opCtx,
                                                               targetState->tags,
                                                               getNumShards(opCtx),
                                                               targetState->collectionIsEmpty);
+
+        boost::optional<CollectionUUID> optCollectionUUID;
+        if (shouldUseUUIDForChunkIndexing) {
+            optCollectionUUID = targetState->uuid;
+        }
+
         initialChunks = splitPolicy->createFirstChunks(
-            opCtx, targetState->shardKeyPattern, {nss, dbPrimaryShardId});
+            opCtx, targetState->shardKeyPattern, {nss, optCollectionUUID, dbPrimaryShardId});
 
         logStartShardCollection(opCtx, cmdObj, nss, request, *targetState, dbPrimaryShardId);
 
@@ -617,6 +635,8 @@ UUID shardCollection(OperationContext* opCtx,
     if (!splitPolicy->isOptimized()) {
         writeChunkDocumentsAndRefreshShards(*targetState, initialChunks);
     }
+
+    // TODO SERVER-53092: delete FCV placeholder
 
     LOGV2(22101,
           "Created {numInitialChunks} chunk(s) for: {namespace}, producing collection version "

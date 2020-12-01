@@ -206,7 +206,7 @@ TEST_F(ReshardingSplitPolicyTest, SamplingSuceeds) {
         const auto chunks = policy
                                 .createFirstChunks(operationContext(),
                                                    shardKeyPattern,
-                                                   {kTestAggregateNss, primaryShardId})
+                                                   {kTestAggregateNss, boost::none, primaryShardId})
                                 .chunks;
         // We sample all of the documents since numSplitPoints(3) * samplingRatio (10) = 30 and the
         // document source has 23 chunks. So we can assert on the split points.

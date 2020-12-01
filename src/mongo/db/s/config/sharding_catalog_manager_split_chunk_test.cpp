@@ -40,6 +40,7 @@ namespace {
 using unittest::assertGet;
 
 const NamespaceString kNamespace("TestDB", "TestColl");
+// To prevent initialization-order-fiasco, do not use UUID::gen() here
 const KeyPattern kKeyPattern(BSON("a" << 1));
 
 using SplitChunkTest = ConfigServerTestFixture;

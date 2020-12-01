@@ -208,7 +208,19 @@ StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& so
 ChunkType::ChunkType() = default;
 
 ChunkType::ChunkType(NamespaceString nss, ChunkRange range, ChunkVersion version, ShardId shardId)
-    : _nss(nss),
+    : _nss(std::move(nss)),
+      _min(range.getMin()),
+      _max(range.getMax()),
+      _version(version),
+      _shard(std::move(shardId)) {}
+
+ChunkType::ChunkType(NamespaceString nss,
+                     CollectionUUID collectionUUID,
+                     ChunkRange range,
+                     ChunkVersion version,
+                     ShardId shardId)
+    : _nss(std::move(nss)),
+      _collectionUUID(collectionUUID),
       _min(range.getMin()),
       _max(range.getMax()),
       _version(version),
@@ -236,6 +248,19 @@ StatusWith<ChunkType> ChunkType::parseFromConfigBSONCommand(const BSONObj& sourc
         if (!status.isOK())
             return status;
         chunk._nss = NamespaceString(chunkNS);
+    }
+
+    {
+        std::string collectionUUIDString;
+        Status status =
+            bsonExtractStringField(source, collectionUUID.name(), &collectionUUIDString);
+        if (status.isOK() && !collectionUUIDString.empty()) {
+            auto swUUID = CollectionUUID::parse(collectionUUIDString);
+            if (!swUUID.isOK()) {
+                return swUUID.getStatus();
+            }
+            chunk._collectionUUID = std::move(swUUID.getValue());
+        }
     }
 
     {
@@ -324,6 +349,8 @@ BSONObj ChunkType::toConfigBSON() const {
         builder.append(name.name(), getName());
     if (_nss)
         builder.append(ns.name(), getNS().ns());
+    if (_collectionUUID)
+        builder.append(collectionUUID.name(), getCollectionUUID().toString());
     if (_min)
         builder.append(min.name(), getMin());
     if (_max)
@@ -430,8 +457,6 @@ void ChunkType::setNS(const NamespaceString& nss) {
 }
 
 void ChunkType::setCollectionUUID(const CollectionUUID& uuid) {
-    invariant(
-        feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility));
     _collectionUUID = uuid;
 }
 

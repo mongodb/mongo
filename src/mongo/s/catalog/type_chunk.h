@@ -256,11 +256,13 @@ public:
      * Getters and setters.
      */
     const NamespaceString& getNS() const {
+        invariant(_nss);
         return _nss.get();
     }
     void setNS(const NamespaceString& nss);
 
     const CollectionUUID& getCollectionUUID() const {
+        invariant(_collectionUUID);
         return *_collectionUUID;
     }
     void setCollectionUUID(const CollectionUUID& uuid);
