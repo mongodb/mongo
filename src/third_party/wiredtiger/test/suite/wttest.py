@@ -527,6 +527,10 @@ class WiredTigerTestCase(unittest.TestCase):
         if self.captureout.hasUnexpectedOutput(self):
             self.captureout.checkAdditionalPattern(self, pat)
 
+    def ignoreStderrPatternIfExists(self, pat):
+        if self.captureerr.hasUnexpectedOutput(self):
+            self.captureerr.checkAdditionalPattern(self, pat)
+
     def assertRaisesWithMessage(self, exceptionType, expr, message):
         """
         Like TestCase.assertRaises(), but also checks to see

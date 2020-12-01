@@ -140,10 +140,13 @@ class test_schema08(wttest.WiredTigerTestCase, suite_subprocess):
         # Make an initial copy as well as a copy for each LSN we save.
         # Truncate the log to the appropriate offset as we make each copy.
         olddir = "."
+        errfile="errfile.txt"
         for lsn in self.lsns:
             newdir = self.backup_pfx + str(lsn)
             outfile = newdir + '.txt'
-            self.runWt(['-R', '-h', newdir, 'list', '-v'], outfilename=outfile)
+            self.runWt(['-R', '-h', newdir, 'list', '-v'], errfilename=errfile, outfilename=outfile)
+            if os.path.isfile(errfile) and os.path.getsize(errfile) > 0:
+                self.check_file_contains(errfile,'No such file or directory')
 
     # Test that creating and dropping tables does not write individual
     # log records.
