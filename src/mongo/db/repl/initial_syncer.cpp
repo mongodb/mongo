@@ -451,11 +451,12 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
             const auto statsObj = bob->asTempObj();
             auto totalInitialSyncElapsedMillis =
                 statsObj.getField("totalInitialSyncElapsedMillis").safeNumberLong();
+            const auto downloadRate =
+                (double)totalInitialSyncElapsedMillis / (double)approxTotalBytesCopied;
             const auto remainingInitialSyncEstimatedMillis =
-                (totalInitialSyncElapsedMillis / approxTotalBytesCopied) *
-                (approxTotalDataSize - approxTotalBytesCopied);
+                downloadRate * (double)(approxTotalDataSize - approxTotalBytesCopied);
             bob->appendNumber("remainingInitialSyncEstimatedMillis",
-                              remainingInitialSyncEstimatedMillis);
+                              (long long)remainingInitialSyncEstimatedMillis);
         }
     }
     bob->appendNumber("appliedOps", _initialSyncState->appliedOps);
