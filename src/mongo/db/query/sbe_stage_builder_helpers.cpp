@@ -47,9 +47,10 @@ namespace mongo::stage_builder {
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::EVariable& var) {
     return sbe::makeE<sbe::EPrimBinary>(
         sbe::EPrimBinary::logicOr,
-        sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                    sbe::makeE<sbe::EFunction>("exists", sbe::makeEs(var.clone()))),
-        sbe::makeE<sbe::EFunction>("isNull", sbe::makeEs(var.clone())));
+        makeNot(makeFunction("exists", var.clone())),
+        sbe::makeE<sbe::ETypeMatch>(var.clone(),
+                                    getBSONTypeMask(BSONType::jstNULL) |
+                                        getBSONTypeMask(BSONType::Undefined)));
 }
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(const sbe::FrameId frameId,

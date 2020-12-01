@@ -81,6 +81,9 @@ const char* advance(const char* be, size_t fieldNameSize) {
                 }
             }
         }
+    } else if (type == static_cast<unsigned char>(BSONType::MinKey) ||
+               type == static_cast<unsigned char>(BSONType::MaxKey)) {
+        // We don't have to adjust the 'be' pointer as the above types have no value part.
     } else {
         uasserted(4822804, "unsupported bson element");
     }
@@ -217,6 +220,12 @@ std::pair<value::TypeTags, value::Value> convertFrom(bool view,
             int64_t val = ConstDataView(be).read<LittleEndian<int64_t>>();
             return {value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(val)};
         }
+        case BSONType::MinKey:
+            return {value::TypeTags::MinKey, 0};
+        case BSONType::MaxKey:
+            return {value::TypeTags::MaxKey, 0};
+        case BSONType::Undefined:
+            return {value::TypeTags::bsonUndefined, 0};
         default:
             return {value::TypeTags::Nothing, 0};
     }
@@ -281,6 +290,12 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
             case value::TypeTags::ObjectId:
                 builder.append(OID::from(value::getObjectIdView(val)->data()));
                 break;
+            case value::TypeTags::MinKey:
+                builder.appendMinKey();
+                break;
+            case value::TypeTags::MaxKey:
+                builder.appendMaxKey();
+                break;
             case value::TypeTags::bsonObject:
                 builder.append(BSONObj{value::bitcastTo<const char*>(val)});
                 break;
@@ -297,6 +312,9 @@ void convertToBsonObj(BSONArrayBuilder& builder, value::ArrayEnumerator arr) {
                                            getBSONBinDataSubtype(tag, val)});
                 break;
             }
+            case value::TypeTags::bsonUndefined:
+                builder.appendUndefined();
+                break;
             default:
                 MONGO_UNREACHABLE;
         }
@@ -368,6 +386,12 @@ void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
             case value::TypeTags::ObjectId:
                 builder.append(name, OID::from(value::getObjectIdView(val)->data()));
                 break;
+            case value::TypeTags::MinKey:
+                builder.appendMinKey(name);
+                break;
+            case value::TypeTags::MaxKey:
+                builder.appendMaxKey(name);
+                break;
             case value::TypeTags::bsonObject:
                 builder.appendObject(name, value::bitcastTo<const char*>(val));
                 break;
@@ -384,6 +408,9 @@ void convertToBsonObj(BSONObjBuilder& builder, value::Object* obj) {
                                       value::getBSONBinData(tag, val));
                 break;
             }
+            case value::TypeTags::bsonUndefined:
+                builder.appendUndefined(name);
+                break;
             default:
                 MONGO_UNREACHABLE;
         }

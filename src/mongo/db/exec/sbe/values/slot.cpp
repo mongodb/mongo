@@ -67,6 +67,10 @@ static std::pair<TypeTags, Value> deserializeTagVal(BufReader& buf) {
             val = bitcastFrom<bool>(buf.read<char>());
             break;
         case TypeTags::Null:
+        case TypeTags::MinKey:
+        case TypeTags::MaxKey:
+        case TypeTags::bsonUndefined:
+            val = 0;
             break;
         case TypeTags::StringSmall:
         case TypeTags::StringBig:
@@ -206,6 +210,12 @@ static void serializeTagValue(BufBuilder& buf, TypeTags tag, Value val) {
             break;
         case TypeTags::Null:
             break;
+        case TypeTags::MinKey:
+            break;
+        case TypeTags::MaxKey:
+            break;
+        case TypeTags::bsonUndefined:
+            break;
         case TypeTags::StringSmall:
         case TypeTags::StringBig:
         case TypeTags::bsonString: {
@@ -303,6 +313,9 @@ static int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::Boolean:
         case TypeTags::StringSmall:
         case TypeTags::RecordId:
+        case TypeTags::MinKey:
+        case TypeTags::MaxKey:
+        case TypeTags::bsonUndefined:
             break;
         // There are deep types.
         case TypeTags::NumberDecimal:

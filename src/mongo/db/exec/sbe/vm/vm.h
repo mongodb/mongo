@@ -91,6 +91,16 @@ std::pair<value::TypeTags, value::Value> genericNumericCompare(value::TypeTags l
         // This is where Mongo differs from SQL.
         auto result = op(0, 0);
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
+    } else if (lhsTag == value::TypeTags::MinKey && rhsTag == value::TypeTags::MinKey) {
+        auto result = op(0, 0);
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
+    } else if (lhsTag == value::TypeTags::MaxKey && rhsTag == value::TypeTags::MaxKey) {
+        auto result = op(0, 0);
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
+    } else if (lhsTag == value::TypeTags::bsonUndefined &&
+               rhsTag == value::TypeTags::bsonUndefined) {
+        auto result = op(0, 0);
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(result)};
     } else if ((value::isArray(lhsTag) && value::isArray(rhsTag)) ||
                (value::isObject(lhsTag) && value::isObject(rhsTag))) {
         auto [tag, val] = value::compareValue(lhsTag, lhsValue, rhsTag, rhsValue);
@@ -154,6 +164,8 @@ struct Instruction {
         isDate,
         isNaN,
         isRecordId,
+        isMinKey,
+        isMaxKey,
         typeMatch,
 
         function,
@@ -316,6 +328,12 @@ public:
     void appendIsDate();
     void appendIsNaN();
     void appendIsRecordId();
+    void appendIsMinKey() {
+        appendSimpleInstruction(Instruction::isMinKey);
+    }
+    void appendIsMaxKey() {
+        appendSimpleInstruction(Instruction::isMaxKey);
+    }
     void appendTypeMatch(uint32_t typeMask);
     void appendFunction(Builtin f, ArityType arity);
     void appendJump(int jumpOffset);

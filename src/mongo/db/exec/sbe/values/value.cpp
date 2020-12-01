@@ -193,6 +193,12 @@ void writeTagToStream(T& stream, const TypeTags tag) {
         case TypeTags::ObjectId:
             stream << "ObjectId";
             break;
+        case TypeTags::MinKey:
+            stream << "MinKey";
+            break;
+        case TypeTags::MaxKey:
+            stream << "MaxKey";
+            break;
         case TypeTags::bsonObject:
             stream << "bsonObject";
             break;
@@ -207,6 +213,9 @@ void writeTagToStream(T& stream, const TypeTags tag) {
             break;
         case TypeTags::bsonBinData:
             stream << "bsonBinData";
+            break;
+        case TypeTags::bsonUndefined:
+            stream << "bsonUndefined";
             break;
         case TypeTags::ksValue:
             stream << "KeyString";
@@ -321,6 +330,12 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
         case value::TypeTags::Nothing:
             stream << "---===*** NOTHING ***===---";
             break;
+        case value::TypeTags::MinKey:
+            stream << "minKey";
+            break;
+        case value::TypeTags::MaxKey:
+            stream << "maxKey";
+            break;
         case value::TypeTags::bsonArray: {
             const char* be = getRawPointerView(val);
             const char* end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
@@ -413,6 +428,9 @@ void writeValueToStream(T& stream, TypeTags tag, Value val) {
             }
             break;
         }
+        case value::TypeTags::bsonUndefined:
+            stream << "undefined";
+            break;
         case value::TypeTags::ksValue: {
             auto ks = getKeyStringView(val);
             stream << "KS(" << ks->toString() << ")";
@@ -503,6 +521,10 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::Object;
         case TypeTags::ObjectId:
             return BSONType::jstOID;
+        case TypeTags::MinKey:
+            return BSONType::MinKey;
+        case TypeTags::MaxKey:
+            return BSONType::MaxKey;
         case TypeTags::bsonObject:
             return BSONType::Object;
         case TypeTags::bsonArray:
@@ -513,6 +535,8 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::jstOID;
         case TypeTags::bsonBinData:
             return BSONType::BinData;
+        case TypeTags::bsonUndefined:
+            return BSONType::Undefined;
         case TypeTags::ksValue:
             // This is completely arbitrary.
             return BSONType::EOO;
@@ -557,6 +581,9 @@ std::size_t hashValue(TypeTags tag, Value val) noexcept {
         case TypeTags::Boolean:
             return bitcastTo<bool>(val);
         case TypeTags::Null:
+        case TypeTags::MinKey:
+        case TypeTags::MaxKey:
+        case TypeTags::bsonUndefined:
             return 0;
         case TypeTags::StringSmall:
         case TypeTags::StringBig:
@@ -685,6 +712,12 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
         auto result = compareHelper(bitcastTo<bool>(lhsValue), bitcastTo<bool>(rhsValue));
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
     } else if (lhsTag == TypeTags::Null && rhsTag == TypeTags::Null) {
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+    } else if (lhsTag == TypeTags::MinKey && rhsTag == TypeTags::MinKey) {
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+    } else if (lhsTag == TypeTags::MaxKey && rhsTag == TypeTags::MaxKey) {
+        return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
+    } else if (lhsTag == TypeTags::bsonUndefined && rhsTag == TypeTags::bsonUndefined) {
         return {TypeTags::NumberInt32, bitcastFrom<int32_t>(0)};
     } else if (isArray(lhsTag) && isArray(rhsTag)) {
         // ArraySets carry semantics of an unordered set, so we cannot define a deterministic less

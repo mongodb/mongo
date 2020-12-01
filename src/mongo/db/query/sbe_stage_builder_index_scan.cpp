@@ -540,13 +540,19 @@ generateGenericMultiIntervalIndexScan(const CollectionPtr& collection,
     // match the bounds and we cannot generate a start seek key, inject an EOF sub-tree an exit
     // straight away - this index scan won't emit any results.
     if (!checker.getStartSeekPoint(&seekPoint)) {
+        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
+        projects.emplace(resultSlot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0));
+
+        for (auto slot : indexKeySlots) {
+            projects.emplace(slot, sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0));
+        }
+
         return {resultSlot,
-                sbe::makeProjectStage(
+                sbe::makeS<sbe::ProjectStage>(
                     sbe::makeS<sbe::LimitSkipStage>(
                         sbe::makeS<sbe::CoScanStage>(ixn->nodeId()), 0, boost::none, ixn->nodeId()),
-                    ixn->nodeId(),
-                    resultSlot,
-                    sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0))};
+                    std::move(projects),
+                    ixn->nodeId())};
     }
 
     // Build the anchor branch of the union.

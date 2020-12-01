@@ -3058,8 +3058,11 @@ std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable 
     // If any of these are false, the branch is considered false for the purposes of the
     // any logical expression.
     auto checkExists = makeFunction("exists", branchRef.clone());
-    auto checkNotNull = sbe::makeE<sbe::EPrimUnary>(sbe::EPrimUnary::logicNot,
-                                                    makeFunction("isNull", branchRef.clone()));
+    auto checkNotNull = sbe::makeE<sbe::EPrimUnary>(
+        sbe::EPrimUnary::logicNot,
+        sbe::makeE<sbe::ETypeMatch>(branchRef.clone(),
+                                    getBSONTypeMask(BSONType::jstNULL) |
+                                        getBSONTypeMask(BSONType::Undefined)));
     auto checkNotFalse = makeNeqCheck(sbe::makeE<sbe::EConstant>(
         sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(false)));
     auto checkNotZero = makeNeqCheck(sbe::makeE<sbe::EConstant>(

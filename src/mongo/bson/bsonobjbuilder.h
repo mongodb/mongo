@@ -922,6 +922,18 @@ public:
         return static_cast<Derived&>(*this);
     }
 
+    Derived& appendMinKey() {
+        _b.appendMinKey(_fieldCount);
+        ++_fieldCount;
+        return static_cast<Derived&>(*this);
+    }
+
+    Derived& appendMaxKey() {
+        _b.appendMaxKey(_fieldCount);
+        ++_fieldCount;
+        return static_cast<Derived&>(*this);
+    }
+
     BSONObj done() {
         return _b.done();
     }

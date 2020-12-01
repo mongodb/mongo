@@ -419,6 +419,66 @@ void generateComparison(MatchExpressionVisitorContext* context,
         // SBE EConstant assumes ownership of the value so we have to make a copy here.
         auto [tag, val] = sbe::value::copyValue(tagView, valView);
 
+        // Most commonly the comparison does not do any kind of type conversions (i.e. 12 > "10"
+        // does not evaluate to true as we do not try to convert a string to a number). Internally,
+        // SBE returns Nothing for mismatched types.
+        // However, there is a wrinkle with MQL (and there always is one). We can compare any type
+        // to MinKey or MaxKey type and expect a true/false answer.
+        if (tag == sbe::value::TypeTags::MinKey) {
+            switch (binaryOp) {
+                case sbe::EPrimBinary::eq:
+                case sbe::EPrimBinary::neq:
+                    break;
+                case sbe::EPrimBinary::greater: {
+                    return {makeFillEmptyFalse(makeNot(
+                                makeFunction("isMinKey", sbe::makeE<sbe::EVariable>(inputSlot)))),
+                            std::move(inputStage)};
+                }
+                case sbe::EPrimBinary::greaterEq: {
+                    return {makeFunction("exists", sbe::makeE<sbe::EVariable>(inputSlot)),
+                            std::move(inputStage)};
+                }
+                case sbe::EPrimBinary::less: {
+                    return {sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                                       sbe::value::bitcastFrom<bool>(false)),
+                            std::move(inputStage)};
+                }
+                case sbe::EPrimBinary::lessEq: {
+                    return {makeFillEmptyFalse(
+                                makeFunction("isMinKey", sbe::makeE<sbe::EVariable>(inputSlot))),
+                            std::move(inputStage)};
+                }
+                default:
+                    break;
+            }
+        } else if (tag == sbe::value::TypeTags::MaxKey) {
+            switch (binaryOp) {
+                case sbe::EPrimBinary::eq:
+                case sbe::EPrimBinary::neq:
+                    break;
+                case sbe::EPrimBinary::greater: {
+                    return {sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                                       sbe::value::bitcastFrom<bool>(false)),
+                            std::move(inputStage)};
+                }
+                case sbe::EPrimBinary::greaterEq: {
+                    return {makeFillEmptyFalse(
+                                makeFunction("isMaxKey", sbe::makeE<sbe::EVariable>(inputSlot))),
+                            std::move(inputStage)};
+                }
+                case sbe::EPrimBinary::less: {
+                    return {makeFillEmptyFalse(makeNot(
+                                makeFunction("isMaxKey", sbe::makeE<sbe::EVariable>(inputSlot)))),
+                            std::move(inputStage)};
+                }
+                case sbe::EPrimBinary::lessEq: {
+                    return {makeFunction("exists", sbe::makeE<sbe::EVariable>(inputSlot)),
+                            std::move(inputStage)};
+                }
+                default:
+                    break;
+            }
+        }
         return {
             makeFillEmptyFalse(sbe::makeE<sbe::EPrimBinary>(binaryOp,
                                                             sbe::makeE<sbe::EVariable>(inputSlot),

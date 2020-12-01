@@ -864,6 +864,13 @@ std::pair<value::TypeTags, value::Value> ByteCode::genericCompareEq(value::TypeT
     } else if (lhsTag == value::TypeTags::Null && rhsTag == value::TypeTags::Null) {
         // This is where Mongo differs from SQL.
         return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+    } else if (lhsTag == value::TypeTags::MinKey && rhsTag == value::TypeTags::MinKey) {
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+    } else if (lhsTag == value::TypeTags::MaxKey && rhsTag == value::TypeTags::MaxKey) {
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
+    } else if (lhsTag == value::TypeTags::bsonUndefined &&
+               rhsTag == value::TypeTags::bsonUndefined) {
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
     } else if (lhsTag == value::TypeTags::ObjectId && rhsTag == value::TypeTags::ObjectId) {
         return {value::TypeTags::Boolean,
                 value::bitcastFrom<bool>(*value::getObjectIdView(lhsValue) ==

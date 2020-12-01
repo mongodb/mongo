@@ -3,7 +3,6 @@
  * multikey index.
  * @tags: [
  *   requires_fcv_47,
- *   sbe_incompatible,
  * ]
  */
 

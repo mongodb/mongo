@@ -108,6 +108,8 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     0,  // isDate
     0,  // isNaN
     0,  // isRecordId
+    0,  // isMinKey
+    0,  // isMaxKey
     0,  // typeMatch
 
     0,  // function is special, the stack offset is encoded in the instruction itself
@@ -3125,6 +3127,34 @@ std::tuple<uint8_t, value::TypeTags, value::Value> ByteCode::run(const CodeFragm
                         topStack(false,
                                  value::TypeTags::Boolean,
                                  value::bitcastFrom<bool>(value::isRecordId(tag)));
+                    }
+
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::isMinKey: {
+                    auto [owned, tag, val] = getFromStack(0);
+
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(tag == value::TypeTags::MinKey));
+                    }
+
+                    if (owned) {
+                        value::releaseValue(tag, val);
+                    }
+                    break;
+                }
+                case Instruction::isMaxKey: {
+                    auto [owned, tag, val] = getFromStack(0);
+
+                    if (tag != value::TypeTags::Nothing) {
+                        topStack(false,
+                                 value::TypeTags::Boolean,
+                                 value::bitcastFrom<bool>(tag == value::TypeTags::MaxKey));
                     }
 
                     if (owned) {

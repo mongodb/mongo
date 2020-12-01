@@ -101,7 +101,9 @@ enum class TypeTags : uint8_t {
     ObjectId,
     RecordId,
 
-    // TODO add the rest of mongo types (regex, etc.)
+    // This is the result of tragic lack of imagination and foresight.
+    MinKey,
+    MaxKey,
 
     // Raw bson values.
     bsonObject,
@@ -109,6 +111,9 @@ enum class TypeTags : uint8_t {
     bsonString,
     bsonObjectId,
     bsonBinData,
+    // The bson prefix signifies the fact that this type can only come from BSON (either from disk
+    // or from user over the wire). It is never created or manipulated by SBE.
+    bsonUndefined,
 
     // KeyString::Value
     ksValue,

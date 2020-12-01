@@ -2,9 +2,6 @@
  * Demonstrate the expected behavior of $lt and $gt comparisons involving arrays. This is only
  * tested without an index, results between index and non-index behavior are compared in
  * array_index_and_nonIndex_consistent.js
- * @tags: [
- *   sbe_incompatible,
- * ]
  */
 
 (function() {

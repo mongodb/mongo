@@ -68,11 +68,11 @@ public:
     ValueBuilder(ValueBuilder& other) = delete;
 
     void append(const MinKeyLabeler& id) {
-        unsupportedType("minKey");
+        appendValue(TypeTags::MinKey, 0);
     }
 
     void append(const MaxKeyLabeler& id) {
-        unsupportedType("maxKey");
+        appendValue(TypeTags::MaxKey, 0);
     }
 
     void append(const NullLabeler& id) {
@@ -80,7 +80,7 @@ public:
     }
 
     void append(const UndefinedLabeler& id) {
-        unsupportedType("undefined");
+        appendValue(TypeTags::bsonUndefined, 0);
     }
 
     void append(const bool in) {
