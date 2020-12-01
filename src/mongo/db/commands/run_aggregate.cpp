@@ -293,29 +293,16 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             continue;
         }
 
-        if (involvedNs.db() != request.getNamespaceString().db()) {
-            // If the involved namespace is not in the same database as the aggregation, it must be
-            // from a $merge to a collection in a different database. Since we cannot write to
-            // views, simply assume that the namespace is a collection.
-            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
-        } else if (!db ||
-                   CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, involvedNs)) {
-            // If the aggregation database exists and 'involvedNs' refers to a collection namespace,
-            // then we resolve it as an empty pipeline in order to read directly from the underlying
-            // collection. If the database doesn't exist, then we still resolve it as an empty
-            // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
-            // snapshot of the view catalog.
-            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
-        } else if (viewCatalog->lookup(opCtx, involvedNs.ns())) {
-            // If 'involvedNs' refers to a view namespace, then we resolve its definition.
-            auto resolvedView = viewCatalog->resolveView(opCtx, involvedNs);
+        // If 'ns' refers to a view namespace, then we resolve its definition.
+        auto resolveViewDefinition = [&](const NamespaceString& ns) -> Status {
+            auto resolvedView = viewCatalog->resolveView(opCtx, ns);
             if (!resolvedView.isOK()) {
                 return resolvedView.getStatus().withContext(
                     str::stream() << "Failed to resolve view '" << involvedNs.ns());
             }
 
-            resolvedNamespaces[involvedNs.coll()] = {resolvedView.getValue().getNamespace(),
-                                                     resolvedView.getValue().getPipeline()};
+            resolvedNamespaces[ns.coll()] = {resolvedView.getValue().getNamespace(),
+                                             resolvedView.getValue().getPipeline()};
 
             // We parse the pipeline corresponding to the resolved view in case we must resolve
             // other view namespaces that are also involved.
@@ -327,6 +314,40 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
             involvedNamespacesQueue.insert(involvedNamespacesQueue.end(),
                                            resolvedViewInvolvedNamespaces.begin(),
                                            resolvedViewInvolvedNamespaces.end());
+            return Status::OK();
+        };
+
+        // If the involved namespace is not in the same database as the aggregation, it must be
+        // from an $out or a $merge to a collection in a different database.
+        if (involvedNs.db() != request.getNamespaceString().db()) {
+            // SERVER-51886: It is not correct to assume that we are reading from a collection
+            // because the collection targeted by $out/$merge on a given database can have the same
+            // name as a view on the source database. As such, we determine whether the collection
+            // name references a view on the aggregation request's database. Note that the inverse
+            // scenario (mistaking a view for a collection) is not an issue because $merge/$out
+            // cannot target a view.
+            auto nssToCheck = NamespaceString(request.getNamespaceString().db(), involvedNs.coll());
+            if (viewCatalog && viewCatalog->lookup(opCtx, nssToCheck.ns())) {
+                auto status = resolveViewDefinition(nssToCheck);
+                if (!status.isOK()) {
+                    return status;
+                }
+            } else {
+                resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+            }
+        } else if (!db ||
+                   CollectionCatalog::get(opCtx).lookupCollectionByNamespace(opCtx, involvedNs)) {
+            // If the aggregation database exists and 'involvedNs' refers to a collection namespace,
+            // then we resolve it as an empty pipeline in order to read directly from the underlying
+            // collection. If the database doesn't exist, then we still resolve it as an empty
+            // pipeline because 'involvedNs' doesn't refer to a view namespace in our consistent
+            // snapshot of the view catalog.
+            resolvedNamespaces[involvedNs.coll()] = {involvedNs, std::vector<BSONObj>{}};
+        } else if (viewCatalog->lookup(opCtx, involvedNs.ns())) {
+            auto status = resolveViewDefinition(involvedNs);
+            if (!status.isOK()) {
+                return status;
+            }
         } else {
             // 'involvedNs' is neither a view nor a collection, so resolve it as an empty pipeline
             // to treat it as reading from a non-existent collection.
