@@ -566,10 +566,19 @@ ShardId pickMergingShard(OperationContext* opCtx,
 // definition. It's okay that this is incorrect, we will repopulate the real namespace map on the
 // mongod. Note that this function must be called before forwarding an aggregation command on an
 // unsharded collection, in order to verify that the involved namespaces are allowed to be sharded.
-auto resolveInvolvedNamespaces(OperationContext* opCtx, const LiteParsedPipeline& litePipe) {
+auto resolveInvolvedNamespaces(OperationContext* opCtx,
+                               const LiteParsedPipeline& litePipe,
+                               const NamespaceString& requestNss) {
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     for (auto&& nss : litePipe.getInvolvedNamespaces()) {
-        resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
+        // SERVER-51886: Only add namespaces that are in the same database as the original request.
+        // This is done to avoid namespace collisions for cross-database $merge operations that
+        // read from and write to collections that have the same name. Note that we don't have to
+        // verify whether the target collection is sharded as $merge can output to sharded
+        // collections. The output namespace will never need to be resolved as we cannot write to
+        // views.
+        if (requestNss.db() == nss.db())
+            resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     }
     return resolvedNamespaces;
 }
@@ -801,7 +810,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     // If we don't have a routing table, then this is a $changeStream which must run on all shards.
     invariant(routingInfo || (mustRunOnAll && litePipe.hasChangeStream()));
 
-    auto resolvedNamespaces = resolveInvolvedNamespaces(opCtx, litePipe);
+    auto resolvedNamespaces =
+        resolveInvolvedNamespaces(opCtx, litePipe, request.getNamespaceString());
 
     // A pipeline is allowed to passthrough to the primary shard iff the following conditions are
     // met:
