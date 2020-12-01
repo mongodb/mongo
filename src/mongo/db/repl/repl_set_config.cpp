@@ -41,6 +41,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_set_config_params_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
