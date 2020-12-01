@@ -572,10 +572,8 @@ UUID shardCollection(OperationContext* opCtx,
     {
         invariant(!opCtx->lockState()->isLocked());
         Lock::SharedLock fcvLock(opCtx->lockState(), FeatureCompatibilityVersion::fcvLock);
-        shouldUseUUIDForChunkIndexing =
-            serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                FeatureCompatibilityParams::Version::kVersion49) &&
-            feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV();
+        shouldUseUUIDForChunkIndexing = feature_flags::gShardingFullDDLSupport.isEnabled(
+            serverGlobalParams.featureCompatibility);
         // TODO SERVER-53092: persist FCV placeholder
     }
 

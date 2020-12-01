@@ -234,7 +234,8 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         migratedChunk.getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
-        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             n.append(ChunkType::collectionUUID(), migratedChunk.getCollectionUUID().toString());
         }
         n.append(ChunkType::min(), migratedChunk.getMin());
@@ -262,7 +263,8 @@ BSONObj makeCommitChunkTransactionCommand(const NamespaceString& nss,
         controlChunk->getVersion().appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
-        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             n.append(ChunkType::collectionUUID(), migratedChunk.getCollectionUUID().toString());
         }
         n.append(ChunkType::min(), controlChunk->getMin());
@@ -545,7 +547,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         currentMaxVersion.appendLegacyWithField(&n, ChunkType::lastmod());
         n.append(ChunkType::ns(), nss.ns());
         // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
-        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             auto collectionUUID = origChunk.getValue().getCollectionUUID().toString();
             n.append(ChunkType::collectionUUID(), collectionUUID);
         }
@@ -718,7 +721,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMerge(
 
         itChunk.setName(itOrigChunk.getValue().getName());
         // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
-        if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
             itChunk.setCollectionUUID(itOrigChunk.getValue().getCollectionUUID());
         }
 
@@ -921,7 +925,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     ChunkType newMigratedChunk = migratedChunk;
     newMigratedChunk.setName(origChunk.getValue().getName());
     // TODO SERVER-53093 replace feature flag check with ChunkVersion timestamp check
-    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gShardingFullDDLSupport.isEnabled(serverGlobalParams.featureCompatibility)) {
         auto collectionUUID = origChunk.getValue().getCollectionUUID();
         newMigratedChunk.setCollectionUUID(collectionUUID);
     }
