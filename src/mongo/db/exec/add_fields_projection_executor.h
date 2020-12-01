@@ -64,6 +64,16 @@ public:
     static std::unique_ptr<AddFieldsProjectionExecutor> create(
         const boost::intrusive_ptr<ExpressionContext>& expCtx, const BSONObj& spec);
 
+    /**
+     * Create a projection that binds an expression to a top-level field.
+     *
+     * 'fieldPath' must be a top-level field name (exactly one element; no dots).
+     */
+    static std::unique_ptr<AddFieldsProjectionExecutor> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const FieldPath& fieldPath,
+        const boost::intrusive_ptr<Expression>& expr);
+
     TransformerType getType() const final {
         return TransformerType::kComputedProjection;
     }

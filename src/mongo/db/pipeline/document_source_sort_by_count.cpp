@@ -42,9 +42,9 @@ namespace mongo {
 using boost::intrusive_ptr;
 using std::list;
 
-REGISTER_MULTI_STAGE_ALIAS(sortByCount,
-                           LiteParsedDocumentSourceDefault::parse,
-                           DocumentSourceSortByCount::createFromBson);
+REGISTER_DOCUMENT_SOURCE(sortByCount,
+                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceSortByCount::createFromBson);
 
 list<intrusive_ptr<DocumentSource>> DocumentSourceSortByCount::createFromBson(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {

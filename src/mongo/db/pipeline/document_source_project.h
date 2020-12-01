@@ -60,14 +60,22 @@ public:
         BSONObj projectSpec,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         StringData specifiedName) try {
-        return create(projection_ast::parse(
-                          expCtx, projectSpec, ProjectionPolicies::aggregateProjectionPolicies()),
-                      expCtx,
-                      specifiedName);
+
+        auto projection = projection_ast::parse(
+            expCtx, projectSpec, ProjectionPolicies::aggregateProjectionPolicies());
+        return create(projection, expCtx, specifiedName);
     } catch (DBException& ex) {
         ex.addContext("Invalid " + specifiedName.toString());
         throw;
     }
+
+    /**
+     * Create an '$unset' stage, which removes a single top-level field.
+     *
+     * 'fieldPath' must be a top-level field.
+     */
+    static boost::intrusive_ptr<DocumentSource> createUnset(
+        const FieldPath& fieldPath, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     /**
      * Parses a $project stage from the user-supplied BSON.

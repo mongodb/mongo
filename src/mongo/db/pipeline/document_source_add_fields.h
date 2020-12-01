@@ -53,6 +53,16 @@ public:
         StringData stageName = kStageName);
 
     /**
+     * Create a stage that binds an expression to a top-level field.
+     *
+     * 'fieldPath' must be a top-level field name (exactly one element; no dots).
+     */
+    static boost::intrusive_ptr<DocumentSource> create(
+        const FieldPath& fieldPath,
+        const boost::intrusive_ptr<Expression>& expr,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
+    /**
      * Parses a $addFields stage from the user-supplied BSON.
      */
     static boost::intrusive_ptr<DocumentSource> createFromBson(

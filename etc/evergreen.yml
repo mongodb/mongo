@@ -9897,6 +9897,10 @@ buildvariants:
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
+            featureFlagWindowFunctions: true,
+        }"
+        --mongosSetParameters="{
+            featureFlagWindowFunctions: true,
         }"
 
 - &enterprise-windows-template
@@ -9993,6 +9997,10 @@ buildvariants:
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
+            featureFlagWindowFunctions: true,
+        }"
+        --mongosSetParameters="{
+            featureFlagWindowFunctions: true,
         }"
 
 - <<: *enterprise-windows-nopush-template
@@ -10655,6 +10663,10 @@ buildvariants:
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
+            featureFlagWindowFunctions: true,
+        }"
+        --mongosSetParameters="{
+            featureFlagWindowFunctions: true,
         }"
   tasks:
   - name: compile_parallel_TG
@@ -11958,6 +11970,10 @@ buildvariants:
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
+            featureFlagWindowFunctions: true,
+        }"
+        --mongosSetParameters="{
+            featureFlagWindowFunctions: true,
         }"
   tasks:
   - name: compile_all_run_unittests_TG
@@ -12960,6 +12976,10 @@ buildvariants:
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
+            featureFlagWindowFunctions: true,
+        }"
+        --mongosSetParameters="{
+            featureFlagWindowFunctions: true,
         }"
   tasks:
   - name: compile_all_run_unittests_TG
@@ -13122,6 +13142,10 @@ buildvariants:
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
+            featureFlagWindowFunctions: true,
+        }"
+        --mongosSetParameters="{
+            featureFlagWindowFunctions: true,
         }"
     multiversion_platform: ubuntu1804
     multiversion_edition: enterprise
@@ -13222,6 +13246,10 @@ buildvariants:
             featureFlagTimeseriesCollection: true,
             featureFlagShardingFullDDLSupport: true,
             featureFlagShardingFullDDLSupportTimestampedVersion: true,
+            featureFlagWindowFunctions: true,
+        }"
+        --mongosSetParameters="{
+            featureFlagWindowFunctions: true,
         }"
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
