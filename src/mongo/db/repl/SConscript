@@ -1776,5 +1776,6 @@ env.Library(
         'oplog',
         'oplog_application',
         'oplog_application_interface',
+        'repl_server_parameters'
     ],
 )

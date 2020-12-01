@@ -243,6 +243,53 @@ server_parameters:
             lte:
                 expr: 100 * 1024 * 1024
 
+    # From tenant_oplog_applier.cpp    
+    tenantApplierBatchSizeBytes:
+        description: The maximum tenant oplog applier batch size in bytes.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: tenantApplierBatchSizeBytes
+        default:
+            expr: 16 * 1024 * 1024
+        validator:
+            gte:
+                expr: 16 * 1024 * 1024
+            lte:
+                expr: 100 * 1024 * 1024
+
+    tenantApplierBatchSizeOps:
+        description: The maximum number of operations in a tenant oplog applier batch.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: tenantApplierBatchSizeOps
+        default: 500
+        validator:
+            gte: 1
+            lte:
+                expr: 100 * 1000
+    
+    minOplogEntriesPerThread:
+        description: >-
+            The minimum number of operations allotted to a tenant oplog applier worker thread.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: minOplogEntriesPerThread
+        default: 16
+        validator:
+            gte: 1
+            lte: 32
+
+    tenantApplierThreadCount:
+        description: >-
+            The number of threads in the tenant migration writer pool used to apply operations.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: tenantApplierThreadCount
+        default: 5
+        validator:
+            gte: 1
+            lte: 256
+
     # New parameters since this file was created, not taken from elsewhere.
     initialSyncTransientErrorRetryPeriodSeconds:
         description: >-

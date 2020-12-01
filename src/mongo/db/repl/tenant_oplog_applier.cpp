@@ -45,6 +45,7 @@
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/insert_group.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
@@ -53,18 +54,6 @@
 
 namespace mongo {
 namespace repl {
-
-// These batch sizes are pretty arbitrary.
-// TODO(SERVER-50024): come up with some reasonable numbers, and make them a settable parameter.
-constexpr size_t kTenantApplierBatchSizeBytes = 16 * 1024 * 1024;
-
-// TODO(SERVER-50024): kTenantApplierBatchSizeOps is currently chosen as the default value of
-// internalInsertMaxBatchSize.  This is probably reasonable but should be a settable parameter.
-constexpr size_t kTenantApplierBatchSizeOps = 500;
-const size_t kMinOplogEntriesPerThread = 16;
-
-// TODO(SERVER-50024):: This is also arbitary and should be a settable parameter.
-constexpr size_t kTenantApplierThreadCount = 5;
 
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const std::string& tenantId,
@@ -78,8 +67,7 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
       _beginApplyingAfterOpTime(applyFromOpTime),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
-      _writerPool(writerPool),
-      _limits(kTenantApplierBatchSizeBytes, kTenantApplierBatchSizeOps) {}
+      _writerPool(writerPool) {}
 
 TenantOplogApplier::~TenantOplogApplier() {
     shutdown();
@@ -110,7 +98,10 @@ Status TenantOplogApplier::_doStartup_inlock() noexcept {
     auto status = _oplogBatcher->startup();
     if (!status.isOK())
         return status;
-    auto fut = _oplogBatcher->getNextBatch(_limits);
+
+    auto fut = _oplogBatcher->getNextBatch(
+        TenantOplogBatcher::BatchLimits(std::size_t(tenantApplierBatchSizeBytes.load()),
+                                        std::size_t(tenantApplierBatchSizeOps.load())));
     std::move(fut)
         .thenRunOn(_executor)
         .then([&](TenantOplogBatch batch) { _applyLoop(std::move(batch)); })
@@ -128,7 +119,10 @@ void TenantOplogApplier::_doShutdown_inlock() noexcept {
 void TenantOplogApplier::_applyLoop(TenantOplogBatch batch) {
     // Getting the future for the next batch here means the batcher can retrieve the next batch
     // while the applier is processing the current one.
-    auto nextBatchFuture = _oplogBatcher->getNextBatch(_limits);
+
+    auto nextBatchFuture = _oplogBatcher->getNextBatch(
+        TenantOplogBatcher::BatchLimits(std::size_t(tenantApplierBatchSizeBytes.load()),
+                                        std::size_t(tenantApplierBatchSizeOps.load())));
     try {
         _applyOplogBatch(&batch);
     } catch (const DBException& e) {
@@ -329,8 +323,8 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         _setRecipientOpTime(op.entry.getOpTime(), *slotIter++);
     }
     const size_t numOplogThreads = _writerPool->getStats().numThreads;
-    const size_t numOpsPerThread =
-        std::max(kMinOplogEntriesPerThread, (batch.ops.size() / numOplogThreads));
+    const size_t numOpsPerThread = std::max(std::size_t(minOplogEntriesPerThread.load()),
+                                            (batch.ops.size() / numOplogThreads));
     slotIter = oplogSlots.begin();
     auto opsIter = batch.ops.begin();
     LOGV2_DEBUG(4886003,
@@ -540,7 +534,7 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<const OplogEntr
 }
 
 std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool() {
-    return makeTenantMigrationWriterPool(kTenantApplierThreadCount);
+    return makeTenantMigrationWriterPool(tenantApplierThreadCount);
 }
 
 std::unique_ptr<ThreadPool> makeTenantMigrationWriterPool(int threadCount) {

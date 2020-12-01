@@ -88,10 +88,6 @@ public:
      */
     SemiFuture<OpTimePair> getNotificationForOpTime(OpTime donorOpTime);
 
-    void setBatchLimits_forTest(TenantOplogBatcher::BatchLimits limits) {
-        _limits = limits;
-    }
-
 private:
     Status _doStartup_inlock() noexcept final;
     void _doShutdown_inlock() noexcept final;
@@ -148,7 +144,6 @@ private:
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
     ThreadPool* const _writerPool;                                        // (S)
-    TenantOplogBatcher::BatchLimits _limits;                              // (R)
     std::map<OpTime, SharedPromise<OpTimePair>> _opTimeNotificationList;  // (M)
     Status _finalStatus = Status::OK();                                   // (M)
     stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)

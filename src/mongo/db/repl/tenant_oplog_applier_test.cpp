@@ -39,6 +39,7 @@
 #include "mongo/db/op_observer_registry.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_batcher_test_fixture.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
@@ -116,6 +117,11 @@ class TenantOplogApplierTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
+
+        // These defaults are generated from the repl_server_paremeters IDL file. Set them here
+        // to start each test case from a clean state.
+        tenantApplierBatchSizeBytes.store(kTenantApplierBatchSizeBytesDefault);
+        tenantApplierBatchSizeOps.store(kTenantApplierBatchSizeOpsDefault);
 
         // Set up an OpObserver to track the documents OplogApplierImpl inserts.
         auto service = getServiceContext();
@@ -247,8 +253,9 @@ TEST_F(TenantOplogApplierTest, NoOpsForMultipleBatches) {
     TenantOplogApplier applier(
         _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
 
-    TenantOplogBatcher::BatchLimits smallLimits(100 * 1024 /* bytes */, 2 /*ops*/);
-    applier.setBatchLimits_forTest(smallLimits);
+    tenantApplierBatchSizeBytes.store(100 * 1024 /* bytes */);
+    tenantApplierBatchSizeOps.store(2 /* ops */);
+
     ASSERT_OK(applier.startup());
     auto firstBatchFuture = applier.getNotificationForOpTime(srcOps[0].getOpTime());
     auto secondBatchFuture = applier.getNotificationForOpTime(srcOps[2].getOpTime());
@@ -783,8 +790,10 @@ TEST_F(TenantOplogApplierTest, ApplyInsertThenResumeTokenNoopInDifferentBatch_Su
 
     TenantOplogApplier applier(
         _migrationUuid, _tenantId, OpTime(), &_oplogBuffer, _executor, writerPool.get());
-    TenantOplogBatcher::BatchLimits smallLimits(100 * 1024 /* bytes */, 1 /*ops*/);
-    applier.setBatchLimits_forTest(smallLimits);
+
+    tenantApplierBatchSizeBytes.store(100 * 1024 /* bytes */);
+    tenantApplierBatchSizeOps.store(1 /* ops */);
+
     ASSERT_OK(applier.startup());
     auto opAppliedFuture = applier.getNotificationForOpTime(srcOps[1].getOpTime());
     auto futureRes = opAppliedFuture.getNoThrow();
