@@ -168,6 +168,32 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
     }
 }
 
+/**
+ * Extracts the ShardId from each Donor/RecipientShardEntry in participantShardEntries.
+ */
+template <class T>
+std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntries) {
+    std::vector<ShardId> shardIds(participantShardEntries.size());
+    std::transform(participantShardEntries.begin(),
+                   participantShardEntries.end(),
+                   shardIds.begin(),
+                   [](auto& shardEntry) { return shardEntry.getId(); });
+    return shardIds;
+}
+
+/**
+ * Creates reshardingFields.recipientFields for the resharding operation. Note: these should not
+ * change once the operation has begun.
+ */
+TypeCollectionRecipientFields constructRecipientFields(
+    const ReshardingCoordinatorDocument& coordinatorDoc) {
+    auto donorShardIds = extractShardIds(coordinatorDoc.getDonorShards());
+    TypeCollectionRecipientFields recipientFields(
+        std::move(donorShardIds), coordinatorDoc.getExistingUUID(), coordinatorDoc.getNss());
+    emplaceFetchTimestampIfExists(recipientFields, coordinatorDoc.getFetchTimestamp());
+    return recipientFields;
+}
+
 BSONObj createReshardingFieldsUpdateForOriginalNss(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
@@ -193,15 +219,17 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             // the new sharded collection. Set 'uuid' to the reshardingUUID, 'key' to the new shard
             // key, 'lastmodEpoch' to newCollectionEpoch, and 'timestamp' to
             // newCollectionTimestamp (if newCollectionTimestamp has a value; i.e. when the
-            // shardingFullDDLSupport feature flag is enabled). Also update the 'state' field in the
-            // 'reshardingFields' section
+            // shardingFullDDLSupport feature flag is enabled). Also update the 'state' field and
+            // add the 'recipientFields' to the 'reshardingFields' section.
+            auto recipientFields = constructRecipientFields(coordinatorDoc);
             BSONObj setFields =
                 BSON("uuid" << coordinatorDoc.get_id() << "key"
                             << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
                             << newCollectionEpoch.get() << "lastmod"
                             << opCtx->getServiceContext()->getPreciseClockSource()->now()
                             << "reshardingFields.state"
-                            << CoordinatorState_serializer(coordinatorDoc.getState()).toString());
+                            << CoordinatorState_serializer(coordinatorDoc.getState()).toString()
+                            << "reshardingFields.recipientFields" << recipientFields.toBSON());
             if (newCollectionTimestamp.has_value()) {
                 setFields = setFields.addFields(BSON("timestamp" << newCollectionTimestamp.get()));
             }
@@ -396,19 +424,6 @@ void updateChunkAndTagsDocsForTempNss(OperationContext* opCtx,
         opCtx, TagsType::ConfigNS, tagsRequest, txnNumber);
 }
 
-/**
- * Extracts the ShardId from each Donor/RecipientShardEntry in participantShardEntries.
- */
-template <class T>
-std::vector<ShardId> extractShardIds(const std::vector<T>& participantShardEntries) {
-    std::vector<ShardId> shardIds(participantShardEntries.size());
-    std::transform(participantShardEntries.begin(),
-                   participantShardEntries.end(),
-                   shardIds.begin(),
-                   [](auto& shardEntry) { return shardEntry.getId(); });
-    return shardIds;
-}
-
 //
 // Helper methods for ensuring donors/ recipients are able to notice when certain state transitions
 // occur.
@@ -530,12 +545,8 @@ CollectionType createTempReshardingCollectionType(
     TypeCollectionReshardingFields tempEntryReshardingFields(coordinatorDoc.get_id());
     tempEntryReshardingFields.setState(coordinatorDoc.getState());
 
-    auto donorShardIds = extractShardIds(coordinatorDoc.getDonorShards());
-
-    TypeCollectionRecipientFields recipient(
-        std::move(donorShardIds), coordinatorDoc.getExistingUUID(), coordinatorDoc.getNss());
-    emplaceFetchTimestampIfExists(recipient, coordinatorDoc.getFetchTimestamp());
-    tempEntryReshardingFields.setRecipientFields(recipient);
+    auto recipientFields = constructRecipientFields(coordinatorDoc);
+    tempEntryReshardingFields.setRecipientFields(std::move(recipientFields));
     collType.setReshardingFields(std::move(tempEntryReshardingFields));
     return collType;
 }

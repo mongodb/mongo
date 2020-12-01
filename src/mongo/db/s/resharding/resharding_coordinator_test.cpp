@@ -286,13 +286,16 @@ protected:
     }
 
     void readOriginalCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
-        OperationContext* opCtx, CollectionType expectedCollType, bool doneState) {
+        OperationContext* opCtx,
+        CollectionType expectedCollType,
+        const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         CollectionType onDiskEntry(
             client.findOne(CollectionType::ConfigNS.ns(), Query(BSON("_id" << _originalNss.ns()))));
 
         auto expectedReshardingFields = expectedCollType.getReshardingFields();
-        if (doneState ||
+        auto expectedCoordinatorState = expectedCoordinatorDoc.getState();
+        if (expectedCoordinatorState == CoordinatorStateEnum::kDone ||
             (expectedReshardingFields &&
              expectedReshardingFields->getState() >= CoordinatorStateEnum::kCommitted &&
              expectedReshardingFields->getState() != CoordinatorStateEnum::kError)) {
@@ -316,8 +319,19 @@ protected:
                 expectedReshardingFields->getDonorFields()->getReshardingKey().toBSON()),
             0);
 
-        // 'recipientFields' should only in the entry for the temporary collection.
-        ASSERT(!onDiskReshardingFields.getRecipientFields());
+        // Check the reshardingFields.recipientFields.
+        if (expectedCoordinatorState != CoordinatorStateEnum::kError) {
+            // Don't bother checking the recipientFields if the coordinator state is already kError.
+            if (expectedCoordinatorState < CoordinatorStateEnum::kCommitted) {
+                // Until CoordinatorStateEnum::kCommitted, recipientsFields only live on the
+                // temporaryNss entry in config.collections.
+                ASSERT(!onDiskReshardingFields.getRecipientFields());
+            } else {
+                // The entry for the temporaryNss has been removed, recipientFields are appended to
+                // the originalCollection's reshardingFields.
+                ASSERT(onDiskReshardingFields.getRecipientFields());
+            }
+        }
     }
 
     void readTemporaryCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
@@ -417,9 +431,7 @@ protected:
             std::move(collectionEpoch),
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         readOriginalCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
-            opCtx,
-            originalCollType,
-            expectedCoordinatorDoc.getState() == CoordinatorStateEnum::kDone);
+            opCtx, originalCollType, expectedCoordinatorDoc);
 
         // Check the resharding fields in the config.collections entry for the temp collection. If
         // the expected state is >= kCommitted, the entry for the temp collection should have been
@@ -528,7 +540,7 @@ protected:
             _finalEpoch,
             opCtx->getServiceContext()->getPreciseClockSource()->now());
         readOriginalCollectionCatalogEntryAndAssertReshardingFieldsMatchExpected(
-            opCtx, collType, true);
+            opCtx, collType, expectedCoordinatorDoc);
     }
 
     void assertChunkVersionDidNotIncreaseAfterStateTransition(

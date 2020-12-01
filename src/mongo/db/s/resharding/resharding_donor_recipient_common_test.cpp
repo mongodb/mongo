@@ -351,8 +351,10 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     appendRecipientFieldsToReshardingFields(
         reshardingFields, kShardIds, kExistingUUID, kOriginalNss, kFetchTimestamp);
 
-    resharding::processReshardingFieldsForCollection(
-        opCtx, kTemporaryReshardingNss, metadata, reshardingFields);
+    ASSERT_THROWS_CODE(resharding::processReshardingFieldsForCollection(
+                           opCtx, kTemporaryReshardingNss, metadata, reshardingFields),
+                       DBException,
+                       5274202);
 
     auto recipientStateMachine =
         resharding::tryGetReshardingStateMachine<ReshardingRecipientService,
@@ -363,17 +365,17 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     ASSERT(recipientStateMachine == boost::none);
 }
 
-DEATH_TEST_F(ReshardingDonorRecipientCommonTest,
-             ProcessReshardingFieldsWithoutDonorOrRecipientFields,
-             "invariant") {
+TEST_F(ReshardingDonorRecipientCommonTest, ProcessReshardingFieldsWithoutDonorOrRecipientFields) {
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadataForTemporaryReshardingCollection(opCtx);
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kCloning);
 
-    resharding::processReshardingFieldsForCollection(
-        opCtx, kTemporaryReshardingNss, metadata, reshardingFields);
+    ASSERT_THROWS_CODE(resharding::processReshardingFieldsForCollection(
+                           opCtx, kTemporaryReshardingNss, metadata, reshardingFields),
+                       DBException,
+                       5274201);
 }
 
 }  // namespace

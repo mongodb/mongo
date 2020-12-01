@@ -31,6 +31,8 @@
 
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 
+#include <fmt/format.h>
+
 namespace mongo {
 namespace resharding {
 
@@ -38,6 +40,8 @@ using DonorStateMachine = ReshardingDonorService::DonorStateMachine;
 using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
 
 namespace {
+using namespace fmt::literals;
+
 std::vector<DonorShardMirroringEntry> createDonorShardMirroringEntriesFromDonorShardIds(
     const std::vector<ShardId>& shardIds) {
     std::vector<DonorShardMirroringEntry> donorShards(shardIds.size());
@@ -170,19 +174,42 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const CollectionMetadata& metadata,
                                           const ReshardingFields& reshardingFields) {
+    auto coordinatorState = reshardingFields.getState();
+    if (coordinatorState != CoordinatorStateEnum::kError) {
+        if (coordinatorState < CoordinatorStateEnum::kCommitted) {
+            // The reshardingFields are either (1) on the originalNss because this shard is a donor
+            // or (2) temporaryNss because this shard is a recipient. Until the cordinator is in
+            // state CoordinatorStateEnum::kCommitted, reshardingFields should contain either
+            // recipientFields or donorFields, not both.
+            uassert(
+                5274201,
+                fmt::format("reshardingFields must contain either donorFields or recipientFields "
+                            "(and not both) when the "
+                            "coordinator is in state {}. Got reshardingFields {}",
+                            CoordinatorState_serializer(reshardingFields.getState()),
+                            reshardingFields.toBSON().toString()),
+                reshardingFields.getDonorFields().is_initialized() ^
+                    reshardingFields.getRecipientFields().is_initialized());
+        } else {
+            // Once the entry in config.collections for the temporaryNss is removed, recipientFields
+            // and donorFields should both exist in the reshardingFields.
+            uassert(
+                5274202,
+                fmt::format("reshardingFields must contain both donorFields and recipientFields "
+                            "when the coordinator's state is greater than or equal to "
+                            "CoordinatorStateEnum::kCommitted. Got reshardingFields {}",
+                            reshardingFields.toBSON().toString()),
+                reshardingFields.getDonorFields() && reshardingFields.getRecipientFields());
+        }
+    }
+
     if (reshardingFields.getDonorFields()) {
-        invariant(!reshardingFields.getRecipientFields());
         processReshardingFieldsForDonorCollection(opCtx, nss, metadata, reshardingFields);
-        return;
     }
 
     if (reshardingFields.getRecipientFields()) {
-        invariant(!reshardingFields.getDonorFields());
         processReshardingFieldsForRecipientCollection(opCtx, metadata, reshardingFields);
-        return;
     }
-
-    MONGO_UNREACHABLE
 }
 
 }  // namespace resharding
