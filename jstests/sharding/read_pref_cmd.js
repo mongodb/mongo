@@ -309,11 +309,6 @@ let testConnReadPreference = function(conn, isMongos, rsNodes, {readPref, expect
 
     assert.commandWorked(shardedColl.createIndex({loc: '2d'}));
 
-    // TODO: SERVER-38961 Remove when simultaneous index builds complete.
-    // Run a no-op command and wait for it to be applied on secondaries. Due to the asynchronous
-    // completion nature of indexes on secondaries, we can guarantee an index build is complete
-    // on all secondaries once all secondaries have applied this collMod command.
-    assert.commandWorked(testDB.runCommand({collMod: kShardedCollName}));
     assert.commandWorked(testDB.runCommand({getLastError: 1, w: nodeCount}));
 
     // Test on sharded
