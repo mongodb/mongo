@@ -82,7 +82,6 @@ StatusWith<ChunkVersion> ChunkVersion::fromBSON(const BSONObj& obj) {
 
     if (it.more()) {
         // Expect the canThrowSSVOnIgnored field
-        // TODO (SERVER-53053): Once 5.0 is last stable, get rid of this field
         BSONElement canThrowSSVOnIgnoredPart = it.next();
         version._canThrowSSVOnIgnored = canThrowSSVOnIgnoredPart && canThrowSSVOnIgnoredPart.Bool();
     }

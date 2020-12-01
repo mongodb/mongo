@@ -45,8 +45,6 @@ namespace mongo {
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
  *
- * TODO: This is a "manual type" but, even so, still needs to comform to what's
- * expected from types.
  */
 struct ChunkVersion {
 public:
@@ -245,10 +243,10 @@ private:
     uint64_t _combined;
     OID _epoch;
 
-    /**
-     * Temporary flag to indicate shards that a router is able to process and retry
-     * multi-write operations. This should be removed by 4.4
-     */
+    // Temporary flag to indicate shards that a router is able to process and retry multi-write
+    // operations
+    //
+    // TODO (SERVER-53053): Once 5.0 is last stable, get rid of this field
     bool _canThrowSSVOnIgnored{false};
 };
 
