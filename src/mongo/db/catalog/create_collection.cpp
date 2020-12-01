@@ -501,7 +501,9 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
         const bool stayTemp = true;
         auto futureColl = db ? catalog->lookupCollectionByNamespace(opCtx, newCollName) : nullptr;
         bool needsRenaming = static_cast<bool>(futureColl);
-        invariant(!needsRenaming || allowRenameOutOfTheWay);
+        invariant(!needsRenaming || allowRenameOutOfTheWay,
+                  str::stream() << "Current collection name: " << currentName << ", UUID: " << uuid
+                                << ". Future collection name: " << newCollName);
 
         for (int tries = 0; needsRenaming && tries < 10; ++tries) {
             auto tmpNameResult = db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.create");
