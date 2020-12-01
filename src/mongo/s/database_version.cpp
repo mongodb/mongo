@@ -66,23 +66,30 @@ BSONObj ComparableDatabaseVersion::toBSONForLogging() const {
 }
 
 bool ComparableDatabaseVersion::operator==(const ComparableDatabaseVersion& other) const {
-    if (!_dbVersion && !other._dbVersion)
-        return true;  // Default constructed value
-    if (_dbVersion.is_initialized() != other._dbVersion.is_initialized())
-        return false;  // One side is default constructed value
-
-    return *_dbVersion == *other._dbVersion;
+    return _dbVersion == other._dbVersion;
 }
 
 bool ComparableDatabaseVersion::operator<(const ComparableDatabaseVersion& other) const {
-    if (!_dbVersion && !other._dbVersion)
-        return false;  // Default constructed value
+    // 1. If both versions are valid and have timestamps
+    //    1.1. if their timestamps are the same -> rely on lastMod to define the order
+    //    1.2. Otherwise  -> rely on the timestamps values to define order
+    // 2. If both versions are valid and have the same uuid -> rely on lastMod to define the order
+    // 3. Any other scenario -> rely on disambiguating sequence number
+    if (_dbVersion && other._dbVersion) {
+        const auto timestamp = _dbVersion->getTimestamp();
+        const auto otherTimestamp = other._dbVersion->getTimestamp();
+        if (timestamp && otherTimestamp) {
+            if (*timestamp == *otherTimestamp)
+                return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
+            else
+                return *timestamp < *otherTimestamp;
 
-    if (_dbVersion && other._dbVersion && _dbVersion->getUuid() == other._dbVersion->getUuid()) {
-        return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
-    } else {
-        return _uuidDisambiguatingSequenceNum < other._uuidDisambiguatingSequenceNum;
+        } else if (_dbVersion->getUuid() == other._dbVersion->getUuid()) {
+            return _dbVersion->getLastMod() < other._dbVersion->getLastMod();
+        }
     }
+
+    return _uuidDisambiguatingSequenceNum < other._uuidDisambiguatingSequenceNum;
 }
 
 }  // namespace mongo
