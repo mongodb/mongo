@@ -157,8 +157,9 @@ NamespaceString TenantMigrationRecipientService::getStateDocumentsNS() const {
 }
 
 ThreadPool::Limits TenantMigrationRecipientService::getThreadPoolLimits() const {
-    // TODO SERVER-50669: This will be replaced by a tunable server parameter.
-    return ThreadPool::Limits();
+    ThreadPool::Limits limits;
+    limits.maxThreads = maxTenantMigrationRecipientThreadPoolSize;
+    return limits;
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> TenantMigrationRecipientService::constructInstance(

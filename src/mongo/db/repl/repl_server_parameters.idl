@@ -355,6 +355,16 @@ server_parameters:
         #     defaultBatchSize to use.
         default:
             expr: (16 * 1024 * 1024) / 12 * 10
+    
+    maxTenantMigrationRecipientThreadPoolSize:
+        description: >-
+            The maximum number of threads in the tenant migration recipient's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: maxTenantMigrationRecipientThreadPoolSize
+        default: 8
+        validator:
+            gte: 1
 
 feature_flags:
     featureFlagTenantMigrations:
