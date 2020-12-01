@@ -99,6 +99,14 @@ public:
             : _matcher(std::move(matcher)), _action(std::move(action)) {}
         virtual ~Expectation() {}
 
+        // We should only try to match an expectation if all its prerequisites in the sequence are
+        // satisfied (or if it is not part of a sequence in the first place).
+        // Default expectations should always match, as they cannot form sequences, and because we
+        // generally have no restrictions on when and how many times they match.
+        virtual bool prerequisitesMet() {
+            return true;
+        }
+
         bool match(const BSONObj& request) {
             return _matcher(request);
         }
@@ -136,6 +144,17 @@ public:
             _allowedTimes = 1;
         }
 
+        // We forbid matching if we have unsatisfied prerequisites and allow it otherwise.
+        bool prerequisitesMet() override {
+            // No prerequisites at all - okay to match.
+            if (!_prevInSequence) {
+                return true;
+            }
+            // If this expectation's immediate prerequisite is satisfied, that implies the
+            // previous ones in the chain have also been satisfied.
+            return _prevInSequence->isSatisfied();
+        }
+
         Expectation& times(int t) {
             _allowedTimes = t;
             return *this;
@@ -148,6 +167,9 @@ public:
         void checkSatisfied() override {
             uassert(5015501, "UserExpectation not satisfied", isSatisfied());
         }
+
+        // The expectation that comes before this on in the sequence, if applicable.
+        UserExpectation* _prevInSequence = nullptr;
     };
 
     class DefaultExpectation : public Expectation {
@@ -157,6 +179,32 @@ public:
         bool isDefault() const override {
             return true;
         }
+    };
+
+    class Sequence {
+    public:
+        void addExpectation(UserExpectation& exp) {
+            exp._prevInSequence = _lastExpectation;
+            _lastExpectation = &exp;
+        }
+
+    private:
+        UserExpectation* _lastExpectation = nullptr;
+    };
+
+    // RAII construct to handle expectations declared as part of a sequence.
+    class InSequence {
+    public:
+        InSequence(MockNetwork& mock) : _mock(mock) {
+            invariant(!_mock._activeSequence);
+            _mock._activeSequence = std::make_unique<Sequence>();
+        };
+        ~InSequence() {
+            _mock._activeSequence.reset();
+        };
+
+    private:
+        MockNetwork& _mock;
     };
 
     explicit MockNetwork(executor::NetworkInterfaceMock* net) : _net(net) {}
@@ -170,6 +218,11 @@ public:
                                                      std::move(action));
         auto& ref = *exp;
         _expectations.emplace_back(std::move(exp));
+
+        if (_activeSequence) {
+            _activeSequence.get()->addExpectation(ref);
+        }
+
         return ref;
     }
 
@@ -229,6 +282,7 @@ private:
     bool _allExpectationsSatisfied() const;
 
     std::vector<std::unique_ptr<Expectation>> _expectations;
+    std::unique_ptr<Sequence> _activeSequence;
     executor::NetworkInterfaceMock* _net;
 };
 

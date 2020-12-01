@@ -84,11 +84,17 @@ public:
 
     std::string kExampleCmdName = "someCommandName";
     std::string kExampleCmdNameTwo = kExampleCmdName + "_two";
+    std::string kExampleCmdNameThree = kExampleCmdName + "_three";
+    std::string kExampleCmdNameFour = kExampleCmdName + "_four";
 
     RemoteCommandRequestOnAny kExampleRequest{
         {testHost()}, "testDB", BSON(kExampleCmdName << 1), rpc::makeEmptyMetadata(), nullptr};
     RemoteCommandRequestOnAny kExampleRequestTwo{
         {testHost()}, "testDB", BSON(kExampleCmdNameTwo << 1), rpc::makeEmptyMetadata(), nullptr};
+    RemoteCommandRequestOnAny kExampleRequestThree{
+        {testHost()}, "testDB", BSON(kExampleCmdNameThree << 1), rpc::makeEmptyMetadata(), nullptr};
+    RemoteCommandRequestOnAny kExampleRequestFour{
+        {testHost()}, "testDB", BSON(kExampleCmdNameFour << 1), rpc::makeEmptyMetadata(), nullptr};
 
     BSONObj kExampleResponse = BSON("some"
                                     << "response");
@@ -292,6 +298,171 @@ TEST_F(MockNetworkTest, MockFixtureNotEnoughTimesMatched) {
 
     mock().runUntilExpectationsSatisfied();
     evaluateResponses(2 /* numExpected */);
+}
+
+TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectOrder) {
+    // The requests will come in the expected order.
+    {
+        MockNetwork::InSequence seq(mock());
+
+        mock().expect(kExampleCmdName, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
+    }
+
+    RemoteCommandRequestOnAny requestOne{kExampleRequest};
+    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+
+    // Run commands in this specific order.
+    ASSERT_OK(startCommand(requestOne));
+    ASSERT_OK(startCommand(requestTwo));
+
+    mock().runUntilExpectationsSatisfied();
+    evaluateResponses(2 /* numExpected */);
+}
+
+TEST_F(MockNetworkTest, MockFixtureSequenceTestOppositeOrder) {
+    // We expect One -> Two, but the requests will come in the opposite order.
+    // We will refuse to match Two to its user expectation if One is not satisfied,
+    // so we make a default expectation to fall back to so the test can move forward.
+    mock().defaultExpect(kExampleCmdNameTwo, kExampleResponse);
+
+    {
+        MockNetwork::InSequence seq(mock());
+
+        mock().expect(kExampleCmdName, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
+    }
+
+    RemoteCommandRequestOnAny requestOne{kExampleRequest};
+    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+
+    // Run commands in this specific order.
+    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(startCommand(requestOne));
+
+    mock().runUntil(net().now() + Milliseconds(100));
+
+    // The second expectation will not have been satisfied, as the first one has not yet been
+    // met at that time it came in.
+    ASSERT_THROWS_CODE(mock().verifyExpectations(), DBException, (ErrorCodes::Error)5015501);
+
+    // Now we can send a request for expectation Two again.
+    ASSERT_OK(startCommand(requestTwo));
+
+    mock().runUntilExpectationsSatisfied();
+    evaluateResponses(3 /* numExpected */);
+}
+
+TEST_F(MockNetworkTest, MockFixtureSequenceTestCorrectPartialOrder) {
+    // We only require One -> Two, so One -> Three -> Two is valid.
+    {
+        MockNetwork::InSequence seq(mock());
+
+        mock().expect(kExampleCmdName, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
+    }
+
+    mock().expect(kExampleCmdNameThree, kExampleResponse).times(1);
+
+    RemoteCommandRequestOnAny requestOne{kExampleRequest};
+    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
+
+    // Run commands in this specific order.
+    ASSERT_OK(startCommand(requestOne));
+    ASSERT_OK(startCommand(requestThree));
+    ASSERT_OK(startCommand(requestTwo));
+
+    mock().runUntilExpectationsSatisfied();
+    evaluateResponses(3 /* numExpected */);
+}
+
+TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesNoOverlap) {
+    // We have One -> Two and Three -> Four. We run One -> Two -> Three -> Four;
+    {
+        MockNetwork::InSequence seqOne(mock());
+
+        mock().expect(kExampleCmdName, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
+    }
+
+    {
+        MockNetwork::InSequence seqTwo(mock());
+
+        mock().expect(kExampleCmdNameThree, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameFour, kExampleResponse).times(1);
+    }
+
+    RemoteCommandRequestOnAny requestOne{kExampleRequest};
+    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
+    RemoteCommandRequestOnAny requestFour{kExampleRequestFour};
+
+    // Run commands in this specific order.
+    ASSERT_OK(startCommand(requestOne));
+    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(startCommand(requestThree));
+    ASSERT_OK(startCommand(requestFour));
+
+    mock().runUntilExpectationsSatisfied();
+    evaluateResponses(4 /* numExpected */);
+}
+
+TEST_F(MockNetworkTest, MockFixtureSequenceTestTwoSequencesPartialOrder) {
+    // We have One -> Two and Three -> Four. We run One -> Three -> Two -> Four;
+    {
+        MockNetwork::InSequence seqOne(mock());
+
+        mock().expect(kExampleCmdName, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
+    }
+
+    {
+        MockNetwork::InSequence seqTwo(mock());
+
+        mock().expect(kExampleCmdNameThree, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameFour, kExampleResponse).times(1);
+    }
+
+    RemoteCommandRequestOnAny requestOne{kExampleRequest};
+    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
+    RemoteCommandRequestOnAny requestFour{kExampleRequestFour};
+
+    // Run commands in this specific order.
+    ASSERT_OK(startCommand(requestOne));
+    ASSERT_OK(startCommand(requestThree));
+    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(startCommand(requestFour));
+
+    mock().runUntilExpectationsSatisfied();
+    evaluateResponses(4 /* numExpected */);
+}
+
+TEST_F(MockNetworkTest, MockFixtureSequenceTestLongerChain) {
+    // One -> Two -> Three -> Four required.
+    {
+        MockNetwork::InSequence seqOne(mock());
+
+        mock().expect(kExampleCmdName, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameTwo, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameThree, kExampleResponse).times(1);
+        mock().expect(kExampleCmdNameFour, kExampleResponse).times(1);
+    }
+
+    RemoteCommandRequestOnAny requestOne{kExampleRequest};
+    RemoteCommandRequestOnAny requestTwo{kExampleRequestTwo};
+    RemoteCommandRequestOnAny requestThree{kExampleRequestThree};
+    RemoteCommandRequestOnAny requestFour{kExampleRequestFour};
+
+    // Run commands in this specific order.
+    ASSERT_OK(startCommand(requestOne));
+    ASSERT_OK(startCommand(requestTwo));
+    ASSERT_OK(startCommand(requestThree));
+    ASSERT_OK(startCommand(requestFour));
+
+    mock().runUntilExpectationsSatisfied();
+    evaluateResponses(4 /* numExpected */);
 }
 
 }  // namespace

@@ -95,7 +95,7 @@ void MockNetwork::_runUntilIdle() {
             // (Iterating a vector backwards is much cheaper than pushing to its front.)
             auto const& exp =
                 std::find_if(_expectations.rbegin(), _expectations.rend(), [&](const auto& exp) {
-                    return !exp->isSatisfied() && exp->match(request);
+                    return !exp->isSatisfied() && exp->prerequisitesMet() && exp->match(request);
                 });
 
             if (exp != _expectations.rend()) {
