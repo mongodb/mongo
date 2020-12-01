@@ -92,9 +92,9 @@ function testAllowedMigrationsFieldChecksAfterFCVDowngrade() {
 }
 
 // testTimestampField: Check that on FCV upgrade to 5.0, a 'timestamp' is created for the existing
-// collections in config.collections and config.cache.collections On downgrade, check that the
-// 'timestamp' field is removed from config.collections and config.cache.collections.
-
+// collections in config.databases, config.cache.databases, config.collections and
+// config.cache.collections. On downgrade, check that the 'timestamp' field is removed.
+//
 // This test must be removed once 5.0 is defined as the lastLTS.
 function testTimestampFieldSetup() {
     assert.commandWorked(
@@ -102,14 +102,31 @@ function testTimestampFieldSetup() {
 }
 
 function testTimestampFieldChecksAfterUpgrade() {
-    // Check that 'timestamp' has been created in configsvr config.collections
     let csrs_config_db = st.configRS.getPrimary().getDB('config');
-    let timestampInConfigSvr =
+
+    // Check that 'timestamp' has been created in configsvr config.databases
+    let dbTimestampInConfigSvr =
+        csrs_config_db.databases.findOne({_id: 'sharded'}).version.timestamp;
+    assert.neq(null, dbTimestampInConfigSvr);
+
+    // Check that 'timestamp' propagates to the shardsvr config.cache.databases
+    let primaryShard = st.getPrimaryShard('sharded');
+    primaryShard.adminCommand({
+        _flushDatabaseCacheUpdates: 'sharded',
+        syncFromConfig: true
+    });  // TODO: After SERVER-53104 it won't be necessary to issue this flush command from the
+         // test.
+    assert.eq(
+        dbTimestampInConfigSvr,
+        primaryShard.getDB('config').cache.databases.findOne({_id: 'sharded'}).version.timestamp);
+
+    // Check that 'timestamp' has been created in configsvr config.collections
+    let collTimestampInConfigSvr =
         csrs_config_db.collections.findOne({_id: 'sharded.test3_created_before_upgrade'}).timestamp;
-    assert.neq(null, timestampInConfigSvr);
+    assert.neq(null, collTimestampInConfigSvr);
 
     // TODO: After SERVER-52587, check that the timestamp in the shardsvr config.cache.collection
-    // exists and matches timestampInConfigSvr
+    // exists and matches collTimestampInConfigSvr
 }
 
 function testTimestampFieldSetupBeforeDowngrade() {
@@ -118,14 +135,23 @@ function testTimestampFieldSetupBeforeDowngrade() {
 }
 
 function testTimestampFieldChecksAfterFCVDowngrade() {
-    // Check that the 'timestamp' has been removed from config.collections.
     let csrs_config_db = st.configRS.getPrimary().getDB('config');
+    let primaryShard = st.getPrimaryShard('sharded');
+
+    // Check that the 'timestamp' has been removed from config.databases
+    assert.eq(null, csrs_config_db.databases.findOne({_id: 'sharded'}).version.timestamp);
+
+    // Check that the 'timestamp' has been removed from config.cache.databases.
+    assert.eq(
+        null,
+        primaryShard.getDB('config').cache.databases.findOne({_id: 'sharded'}).version.timestamp);
+
+    // Check that the 'timestamp' has been removed from config.collections.
     let collAfterUpgrade =
         csrs_config_db.collections.findOne({_id: 'sharded.test3_created_before_upgrade'});
     assert.eq(null, collAfterUpgrade.timestamp);
 
     // Check that the 'timestamp' has been removed from config.cache.collections.
-    let primaryShard = st.getPrimaryShard('sharded');
     let timestampInShard =
         primaryShard.getDB('config')
             .cache.collections.findOne({_id: 'sharded.test3_created_before_upgrade'})

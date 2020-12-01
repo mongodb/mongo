@@ -45,6 +45,10 @@ namespace mongo {
  */
 class DatabaseVersion : private DatabaseVersionBase {
 public:
+    // Make field names accessible
+    using DatabaseVersionBase::kTimestampFieldName;
+
+    // Make getters and setters accessible
     using DatabaseVersionBase::getLastMod;
     using DatabaseVersionBase::getTimestamp;
     using DatabaseVersionBase::toBSON;

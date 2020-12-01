@@ -52,6 +52,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -484,6 +485,89 @@ void ShardingCatalogManager::removePre49LegacyMetadata(OperationContext* opCtx) 
         return response.toStatus();
     }());
     uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
+}
+
+void ShardingCatalogManager::createDBTimestampsFor49(OperationContext* opCtx) {
+    LOGV2(5258802, "Starting upgrade of config.databases");
+
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto const catalogCache = Grid::get(opCtx)->catalogCache();
+    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto dbDocs =
+        uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                DatabaseType::ConfigNS,
+                BSON(DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName
+                     << BSON("$exists" << false)),
+                BSONObj(),
+                boost::none))
+            .docs;
+
+
+    for (const auto& doc : dbDocs) {
+        const DatabaseType db = uassertStatusOK(DatabaseType::fromBSON(doc));
+        const auto name = db.getName();
+
+        auto now = VectorClock::get(opCtx)->getTime();
+        auto clusterTime = now.clusterTime().asTimestamp();
+
+        uassertStatusOK(catalogClient->updateConfigDocument(
+            opCtx,
+            DatabaseType::ConfigNS,
+            BSON(DatabaseType::name << name),
+            BSON("$set" << BSON(DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName
+                                << clusterTime)),
+            false /* upsert */,
+            ShardingCatalogClient::kMajorityWriteConcern));
+
+        catalogCache->invalidateDatabaseEntry_LINEARIZABLE(name);
+    }
+
+    LOGV2(5258803, "Successfully upgraded config.databases");
+}
+
+void ShardingCatalogManager::downgradeConfigDatabasesEntriesToPre49(OperationContext* opCtx) {
+    if (feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+        LOGV2(5258806, "Starting downgrade of config.databases");
+
+        DBDirectClient client(opCtx);
+
+        // Clear the 'timestamp' fields from config.databases
+        write_ops::Update unsetTimestamp(DatabaseType::ConfigNS, [] {
+            write_ops::UpdateOpEntry u;
+            u.setQ({});
+            u.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
+                "$unset" << BSON(
+                    DatabaseType::version() + "." + DatabaseVersion::kTimestampFieldName << ""))));
+            u.setMulti(true);
+            return std::vector{u};
+        }());
+        unsetTimestamp.setWriteCommandBase([] {
+            write_ops::WriteCommandBase base;
+            base.setOrdered(false);
+            return base;
+        }());
+
+        auto commandResult = client.runCommand(OpMsgRequest::fromDBAndBody(
+            DatabaseType::ConfigNS.db(),
+            unsetTimestamp.toBSON(ShardingCatalogClient::kMajorityWriteConcern.toBSON())));
+
+        uassertStatusOK([&] {
+            BatchedCommandResponse response;
+            std::string unusedErrmsg;
+            response.parseBSON(
+                commandResult->getCommandReply(),
+                &unusedErrmsg);  // Return value intentionally ignored, because response.toStatus()
+                                 // will contain any errors in more detail
+            return response.toStatus();
+        }());
+        uassertStatusOK(getWriteConcernStatusFromCommandResult(commandResult->getCommandReply()));
+
+        LOGV2(5258807, "Successfully downgraded of config.databases");
+    }
 }
 
 void ShardingCatalogManager::createCollectionTimestampsFor49(OperationContext* opCtx) {

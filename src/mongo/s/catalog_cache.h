@@ -199,6 +199,14 @@ public:
      */
     void checkAndRecordOperationBlockedByRefresh(OperationContext* opCtx, mongo::LogicalOp opType);
 
+
+    /**
+     * Non-blocking method that marks the current database entry for the dbName as needing
+     * refresh. Will cause all further targetting attempts to block on a catalog cache refresh,
+     * even if they do not require causal consistency.
+     */
+    void invalidateDatabaseEntry_LINEARIZABLE(const StringData& dbName);
+
     /**
      * Non-blocking method that marks the current collection entry for the namespace as needing
      * refresh. Will cause all further targetting attempts to block on a catalog cache refresh,

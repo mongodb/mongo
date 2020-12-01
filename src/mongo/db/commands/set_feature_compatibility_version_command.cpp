@@ -254,12 +254,13 @@ public:
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
 
-                // Create a 'timestamp' for the collections that don't have one. This must be done
-                // after all shards have been upgraded in order to guarantee that when
-                // createCollectionTimestampsFor49 starts, no new collections without a timestamp
-                // will be added.
+                // Create a 'timestamp' for the databases and collections that don't have one. This
+                // must be done after all shards have been upgraded in order to guarantee that when
+                // createDBTimestampsFor49 and createCollectionTimestampsFor49 start, no new
+                // databases or collections without a timestamp will be added.
                 if (requestedVersion >= FeatureCompatibilityParams::Version::kVersion49 &&
                     feature_flags::gShardingFullDDLSupport.isEnabledAndIgnoreFCV()) {
+                    ShardingCatalogManager::get(opCtx)->createDBTimestampsFor49(opCtx);
                     ShardingCatalogManager::get(opCtx)->createCollectionTimestampsFor49(opCtx);
                 }
             }
@@ -338,6 +339,7 @@ public:
 
                 if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
                     // SERVER-52632: Remove once 5.0 becomes the LastLTS
+                    shardmetadatautil::downgradeShardConfigDatabasesEntriesToPre49(opCtx);
                     shardmetadatautil::downgradeShardConfigCollectionEntriesToPre49(opCtx);
                 }
 
@@ -354,11 +356,14 @@ public:
                     ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
                         opCtx, CommandHelpers::appendMajorityWriteConcern(request.toBSON({}))));
 
-                // Delete the 'timestamp' field in config.collections entries. This must be done
-                // after all shards have been downgraded in order to guarantee that when
-                // downgradeConfigCollectionEntriesToPre49 starts, no new collections with a
-                // timestamp will be added.
+                // Delete the 'timestamp' field in config.databases and config.collections entries.
+                // This must be done after all shards have been downgraded in order to guarantee
+                // that when downgradeConfigDatabasesEntriesToPre49 and
+                // downgradeConfigCollectionEntriesToPre49 start, no new databases or collections
+                // with a timestamp will be added.
                 if (requestedVersion < FeatureCompatibilityParams::Version::kVersion49) {
+                    ShardingCatalogManager::get(opCtx)->downgradeConfigDatabasesEntriesToPre49(
+                        opCtx);
                     ShardingCatalogManager::get(opCtx)->downgradeConfigCollectionEntriesToPre49(
                         opCtx);
                 }

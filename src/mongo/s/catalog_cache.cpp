@@ -403,6 +403,10 @@ void CatalogCache::checkAndRecordOperationBlockedByRefresh(OperationContext* opC
     }
 }
 
+void CatalogCache::invalidateDatabaseEntry_LINEARIZABLE(const StringData& dbName) {
+    _databaseCache.invalidate(dbName);
+}
+
 void CatalogCache::invalidateCollectionEntry_LINEARIZABLE(const NamespaceString& nss) {
     _collectionCache.invalidate(nss);
 }
