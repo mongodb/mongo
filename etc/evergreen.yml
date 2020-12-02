@@ -9985,7 +9985,7 @@ buildvariants:
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
   - name: multiversion_auth_gen
-  - name: .powercycle
+  # - name: .powercycle
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets
