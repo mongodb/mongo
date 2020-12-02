@@ -587,6 +587,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
                                                 std::move(defaultCollator),
                                                 collectionAndChunks.shardKeyIsUnique,
                                                 collectionAndChunks.epoch,
+                                                collectionAndChunks.creationTime,
                                                 std::move(collectionAndChunks.reshardingFields),
                                                 collectionAndChunks.allowMigrations,
                                                 collectionAndChunks.changedChunks);

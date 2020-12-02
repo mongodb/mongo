@@ -323,7 +323,7 @@ public:
                     result.appendBool("reloadConfig", true);
                     // Zero-version also needed to trigger full mongos reload, sadly
                     // TODO: Make this saner, and less impactful (full reload on last chunk is bad)
-                    ChunkVersion(0, 0, OID()).appendLegacyWithField(&result, "version");
+                    ChunkVersion::UNSHARDED().appendLegacyWithField(&result, "version");
                     // For debugging
                     requestedVersion.appendLegacyWithField(&result, "origVersion");
                 } else {

@@ -134,7 +134,7 @@ StatusWith<RefreshState> getPersistedRefreshFlags(OperationContext* opCtx,
                         entry.getRefreshing() ? *entry.getRefreshing() : true,
                         entry.getLastRefreshedCollectionVersion()
                             ? *entry.getLastRefreshedCollectionVersion()
-                            : ChunkVersion(0, 0, entry.getEpoch())};
+                            : ChunkVersion(0, 0, entry.getEpoch(), entry.getTimestamp())};
 }
 
 StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCtx,
@@ -292,7 +292,8 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    const BSONObj& query,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
-                                                   const OID& epoch) {
+                                                   const OID& epoch,
+                                                   const boost::optional<Timestamp>& timestamp) {
     try {
         Query fullQuery(query);
         fullQuery.sort(sort);
@@ -311,7 +312,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
         std::vector<ChunkType> chunks;
         while (cursor->more()) {
             BSONObj document = cursor->nextSafe().getOwned();
-            auto statusWithChunk = ChunkType::fromShardBSON(document, epoch);
+            auto statusWithChunk = ChunkType::fromShardBSON(document, epoch, timestamp);
             if (!statusWithChunk.isOK()) {
                 return statusWithChunk.getStatus().withContext(
                     str::stream() << "Failed to parse chunk '" << document.toString() << "'");

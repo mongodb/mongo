@@ -378,7 +378,8 @@ BSONObj getShardAndCollectionVersion(OperationContext* opCtx,
         if (swDonorShardVersion.getStatus().code() == 50577) {
             // The query to find 'nss' chunks belonging to the donor shard didn't return any chunks,
             // meaning the last chunk for fromShard was donated. Gracefully handle the error.
-            shardVersion = ChunkVersion(0, 0, collectionVersion.epoch());
+            shardVersion =
+                ChunkVersion(0, 0, collectionVersion.epoch(), collectionVersion.getTimestamp());
         } else {
             // Bubble up any other error
             uassertStatusOK(swDonorShardVersion);
@@ -404,8 +405,10 @@ void bumpMajorVersionOneChunkPerShard(OperationContext* opCtx,
                                       TxnNumber txnNumber,
                                       const std::vector<ShardId>& shardIds) {
     auto curCollectionVersion = uassertStatusOK(getCollectionVersion(opCtx, nss));
-    ChunkVersion targetChunkVersion(
-        curCollectionVersion.majorVersion() + 1, 0, curCollectionVersion.epoch());
+    ChunkVersion targetChunkVersion(curCollectionVersion.majorVersion() + 1,
+                                    0,
+                                    curCollectionVersion.epoch(),
+                                    curCollectionVersion.getTimestamp());
 
     for (const auto& shardId : shardIds) {
         BSONObjBuilder updateBuilder;
@@ -930,8 +933,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         newMigratedChunk.setCollectionUUID(collectionUUID);
     }
     newMigratedChunk.setShard(toShard);
-    newMigratedChunk.setVersion(ChunkVersion(
-        currentCollectionVersion.majorVersion() + 1, 0, currentCollectionVersion.epoch()));
+    newMigratedChunk.setVersion(ChunkVersion(currentCollectionVersion.majorVersion() + 1,
+                                             0,
+                                             currentCollectionVersion.epoch(),
+                                             currentCollectionVersion.getTimestamp()));
 
     // Copy the complete history.
     auto newHistory = origChunk.getValue().getHistory();
@@ -983,8 +988,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 
         newControlChunk = origControlChunk.getValue();
         newControlChunk->setName(origControlChunk.getValue().getName());
-        newControlChunk->setVersion(ChunkVersion(
-            currentCollectionVersion.majorVersion() + 1, 1, currentCollectionVersion.epoch()));
+        newControlChunk->setVersion(ChunkVersion(currentCollectionVersion.majorVersion() + 1,
+                                                 1,
+                                                 currentCollectionVersion.epoch(),
+                                                 currentCollectionVersion.getTimestamp()));
     }
 
     auto command = makeCommitChunkTransactionCommand(
@@ -1111,8 +1118,10 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                           << chunk.toString() << ").",
             currentCollectionVersion.epoch() == collectionEpoch);
 
-    ChunkVersion newVersion(
-        currentCollectionVersion.majorVersion() + 1, 0, currentCollectionVersion.epoch());
+    ChunkVersion newVersion(currentCollectionVersion.majorVersion() + 1,
+                            0,
+                            currentCollectionVersion.epoch(),
+                            currentCollectionVersion.getTimestamp());
 
     BSONObj chunkQuery(BSON(ChunkType::ns(nss.ns())
                             << ChunkType::epoch(collectionEpoch) << ChunkType::min(chunk.getMin())
@@ -1228,8 +1237,8 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
 
     // Generate a new version for the chunk by incrementing the collectionVersion's major version.
     auto newChunk = currentChunk;
-    newChunk.setVersion(
-        ChunkVersion(highestChunk.getVersion().majorVersion() + 1, 0, version.epoch()));
+    newChunk.setVersion(ChunkVersion(
+        highestChunk.getVersion().majorVersion() + 1, 0, version.epoch(), version.getTimestamp()));
 
     // Update the chunk, if it still exists, to have the bumped version.
     earlyReturnBeforeDoingWriteGuard.dismiss();

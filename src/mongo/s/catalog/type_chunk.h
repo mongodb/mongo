@@ -241,7 +241,9 @@ public:
      *
      * Also does validation of the contents.
      */
-    static StatusWith<ChunkType> fromShardBSON(const BSONObj& source, const OID& epoch);
+    static StatusWith<ChunkType> fromShardBSON(const BSONObj& source,
+                                               const OID& epoch,
+                                               const boost::optional<Timestamp>& timestamp);
 
     /**
      * Returns the BSON representation of the entry for a shard server's config.chunks.<epoch>

@@ -194,8 +194,13 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
         return ChunkVersion::UNSHARDED();
     }
 
-    auto statusWithChunk = shardmetadatautil::readShardChunks(
-        opCtx, nss, BSONObj(), BSON(ChunkType::lastmod() << -1), 1LL, cachedCollection.getEpoch());
+    auto statusWithChunk = shardmetadatautil::readShardChunks(opCtx,
+                                                              nss,
+                                                              BSONObj(),
+                                                              BSON(ChunkType::lastmod() << -1),
+                                                              1LL,
+                                                              cachedCollection.getEpoch(),
+                                                              cachedCollection.getTimestamp());
     uassertStatusOKWithContext(
         statusWithChunk,
         str::stream() << "Failed to read highest version persisted chunk for collection '"
@@ -224,12 +229,17 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
     // If the persisted epoch doesn't match what the CatalogCache requested, read everything.
     ChunkVersion startingVersion = (shardCollectionEntry.getEpoch() == version.epoch())
         ? version
-        : ChunkVersion(0, 0, shardCollectionEntry.getEpoch());
+        : ChunkVersion(0, 0, shardCollectionEntry.getEpoch(), shardCollectionEntry.getTimestamp());
 
     QueryAndSort diff = createShardChunkDiffQuery(startingVersion);
 
-    auto changedChunks = uassertStatusOK(
-        readShardChunks(opCtx, nss, diff.query, diff.sort, boost::none, startingVersion.epoch()));
+    auto changedChunks = uassertStatusOK(readShardChunks(opCtx,
+                                                         nss,
+                                                         diff.query,
+                                                         diff.sort,
+                                                         boost::none,
+                                                         startingVersion.epoch(),
+                                                         startingVersion.getTimestamp()));
 
     return CollectionAndChangedChunks{shardCollectionEntry.getEpoch(),
                                       shardCollectionEntry.getTimestamp(),

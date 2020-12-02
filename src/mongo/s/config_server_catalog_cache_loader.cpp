@@ -89,7 +89,7 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
     // If the collection's epoch has changed, do a full refresh
     const ChunkVersion startingCollectionVersion = (sinceVersion.epoch() == coll.getEpoch())
         ? sinceVersion
-        : ChunkVersion(0, 0, coll.getEpoch());
+        : ChunkVersion(0, 0, coll.getEpoch(), coll.getTimestamp());
 
     // Diff tracker should *always* find at least one chunk if collection exists
     const auto diffQuery = createConfigDiffQuery(nss, startingCollectionVersion);

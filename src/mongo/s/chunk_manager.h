@@ -59,7 +59,7 @@ struct ShardVersionTargetingInfo {
     // Max chunk version for the shard
     ChunkVersion shardVersion;
 
-    ShardVersionTargetingInfo(const OID& epoch);
+    ShardVersionTargetingInfo(const OID& epoch, const boost::optional<Timestamp>& timestamp);
 };
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
@@ -76,7 +76,10 @@ class ChunkMap {
     using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
 
 public:
-    explicit ChunkMap(OID epoch, size_t initialCapacity = 0) : _collectionVersion(0, 0, epoch) {
+    explicit ChunkMap(OID epoch,
+                      const boost::optional<Timestamp>& timestamp,
+                      size_t initialCapacity = 0)
+        : _collectionVersion(0, 0, epoch, timestamp) {
         _chunkMap.reserve(initialCapacity);
     }
 
@@ -165,6 +168,7 @@ public:
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
         OID epoch,
+        const boost::optional<Timestamp>& timestamp,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
         bool allowMigrations,
         const std::vector<ChunkType>& chunks);

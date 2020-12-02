@@ -54,11 +54,15 @@ public:
      */
     static constexpr StringData kShardVersionField = "shardVersion"_sd;
 
-    ChunkVersion(uint32_t major, uint32_t minor, const OID& epoch)
+    ChunkVersion(uint32_t major,
+                 uint32_t minor,
+                 const OID& epoch,
+                 boost::optional<Timestamp> timestamp)
         : _combined(static_cast<uint64_t>(minor) | (static_cast<uint64_t>(major) << 32)),
-          _epoch(epoch) {}
+          _epoch(epoch),
+          _timestamp(std::move(timestamp)) {}
 
-    ChunkVersion() : ChunkVersion(0, 0, OID()) {}
+    ChunkVersion() : ChunkVersion(0, 0, OID(), boost::none) {}
 
     static StatusWith<ChunkVersion> parseFromCommand(const BSONObj& obj) {
         return parseWithField(obj, kShardVersionField);
@@ -166,6 +170,10 @@ public:
         return _epoch;
     }
 
+    boost::optional<Timestamp> getTimestamp() const {
+        return _timestamp;
+    }
+
     //
     // Explicit comparison operators - versions with epochs have non-trivial comparisons.
     // > < operators do not check epoch cases.  Generally if using == we need to handle
@@ -242,6 +250,7 @@ public:
 private:
     uint64_t _combined;
     OID _epoch;
+    boost::optional<Timestamp> _timestamp;
 
     // Temporary flag to indicate shards that a router is able to process and retry multi-write
     // operations

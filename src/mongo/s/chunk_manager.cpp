@@ -127,8 +127,12 @@ ShardVersionMap ChunkMap::constructShardVersionMap() const {
         // Tracks the max shard version for the shard on which the current range will reside
         auto shardVersionIt = shardVersions.find(currentRangeShardId);
         if (shardVersionIt == shardVersions.end()) {
-            shardVersionIt =
-                shardVersions.emplace(currentRangeShardId, _collectionVersion.epoch()).first;
+            shardVersionIt = shardVersions
+                                 .emplace(std::piecewise_construct,
+                                          std::forward_as_tuple(currentRangeShardId),
+                                          std::forward_as_tuple(_collectionVersion.epoch(),
+                                                                _collectionVersion.getTimestamp()))
+                                 .first;
         }
 
         auto& maxShardVersion = shardVersionIt->second.shardVersion;
@@ -216,7 +220,8 @@ ChunkMap ChunkMap::createMerged(
     size_t chunkMapIndex = 0;
     size_t changedChunkIndex = 0;
 
-    ChunkMap updatedChunkMap(getVersion().epoch(), _chunkMap.size() + changedChunks.size());
+    ChunkMap updatedChunkMap(
+        getVersion().epoch(), getVersion().getTimestamp(), _chunkMap.size() + changedChunks.size());
 
     while (chunkMapIndex < _chunkMap.size() || changedChunkIndex < changedChunks.size()) {
         if (chunkMapIndex >= _chunkMap.size()) {
@@ -298,8 +303,9 @@ ChunkMap::_overlappingBounds(const BSONObj& min, const BSONObj& max, bool isMaxI
     return {itMin, itMax};
 }
 
-ShardVersionTargetingInfo::ShardVersionTargetingInfo(const OID& epoch)
-    : shardVersion(0, 0, epoch) {}
+ShardVersionTargetingInfo::ShardVersionTargetingInfo(const OID& epoch,
+                                                     const boost::optional<Timestamp>& timestamp)
+    : shardVersion(0, 0, epoch, timestamp) {}
 
 RoutingTableHistory::RoutingTableHistory(
     NamespaceString nss,
@@ -680,8 +686,9 @@ ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
     auto it = _shardVersions.find(shardName);
     if (it == _shardVersions.end()) {
         // Shards without explicitly tracked shard versions (meaning they have no chunks) always
-        // have a version of (0, 0, epoch)
-        return ChunkVersion(0, 0, _chunkMap.getVersion().epoch());
+        // have a version of (0, 0, epoch, timestamp)
+        const auto collVersion = _chunkMap.getVersion();
+        return ChunkVersion(0, 0, collVersion.epoch(), collVersion.getTimestamp());
     }
 
     if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {
@@ -726,6 +733,7 @@ RoutingTableHistory RoutingTableHistory::makeNew(
     std::unique_ptr<CollatorInterface> defaultCollator,
     bool unique,
     OID epoch,
+    const boost::optional<Timestamp>& timestamp,
     boost::optional<TypeCollectionReshardingFields> reshardingFields,
     bool allowMigrations,
     const std::vector<ChunkType>& chunks) {
@@ -736,7 +744,7 @@ RoutingTableHistory RoutingTableHistory::makeNew(
                                std::move(unique),
                                boost::none,
                                allowMigrations,
-                               ChunkMap{epoch})
+                               ChunkMap{epoch, timestamp})
         .makeUpdated(std::move(reshardingFields), allowMigrations, chunks);
 }
 

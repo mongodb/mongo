@@ -61,8 +61,8 @@ ShardCollectionType::ShardCollectionType(const BSONObj& obj) {
     // it exists, into a chunk version.
     if (getLastRefreshedCollectionVersion()) {
         ChunkVersion version = *getLastRefreshedCollectionVersion();
-        setLastRefreshedCollectionVersion(
-            ChunkVersion(version.majorVersion(), version.minorVersion(), getEpoch()));
+        setLastRefreshedCollectionVersion(ChunkVersion(
+            version.majorVersion(), version.minorVersion(), getEpoch(), getTimestamp()));
     }
 }
 

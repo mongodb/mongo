@@ -365,7 +365,9 @@ BSONObj ChunkType::toConfigBSON() const {
     return builder.obj();
 }
 
-StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source, const OID& epoch) {
+StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source,
+                                               const OID& epoch,
+                                               const boost::optional<Timestamp>& timestamp) {
     ChunkType chunk;
 
     {
@@ -406,7 +408,8 @@ StatusWith<ChunkType> ChunkType::fromShardBSON(const BSONObj& source, const OID&
             return statusWithChunkVersion.getStatus();
         }
         auto version = std::move(statusWithChunkVersion.getValue());
-        chunk._version = ChunkVersion(version.majorVersion(), version.minorVersion(), epoch);
+        chunk._version =
+            ChunkVersion(version.majorVersion(), version.minorVersion(), epoch, timestamp);
     }
 
     {

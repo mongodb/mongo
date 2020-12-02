@@ -39,10 +39,12 @@
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding_util.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
+#include "mongo/s/sharded_collections_ddl_parameters_gen.h"
 
 namespace mongo {
 namespace {
@@ -127,7 +129,15 @@ public:
             int numInitialChunks;
             std::set<ShardId> recipientShardIds;
             std::vector<ChunkType> initialChunks;
-            ChunkVersion version(1, 0, OID::gen());
+
+            boost::optional<Timestamp> timestamp;
+            if (feature_flags::gShardingFullDDLSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                const auto now = VectorClock::get(opCtx)->getTime();
+                timestamp = now.clusterTime().asTimestamp();
+            }
+
+            ChunkVersion version(1, 0, OID::gen(), timestamp);
             auto tempReshardingNss = constructTemporaryReshardingNss(
                 nss.db(), getCollectionUUIDFromChunkManger(nss, cm));
 
