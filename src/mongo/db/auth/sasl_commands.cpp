@@ -204,10 +204,15 @@ Status doSaslStep(OperationContext* opCtx,
     };
 
     if (!swResponse.isOK()) {
+        int64_t dLevel = 0;
+        if (session->isSpeculative() &&
+            (swResponse.getStatus() == ErrorCodes::MechanismUnavailable)) {
+            dLevel = 5;
+        }
         auto attrs = makeLogAttributes();
         auto errorString = redact(swResponse.getStatus());
         attrs.add("error", errorString);
-        LOGV2(20249, "Authentication failed", attrs);
+        LOGV2_DEBUG(20249, dLevel, "Authentication failed", attrs);
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.

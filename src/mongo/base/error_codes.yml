@@ -370,6 +370,8 @@ error_codes:
 
     - {code: 326, name: OplogQueryMinTsMissing}
 
+    - {code: 334, name: MechanismUnavailable}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

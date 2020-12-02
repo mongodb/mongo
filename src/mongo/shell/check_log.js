@@ -50,7 +50,7 @@ checkLog = (function() {
         return false;
     };
 
-    const checkContainsOnceJson = function(conn, id, attrsDict) {
+    const checkContainsOnceJson = function(conn, id, attrsDict, severity = null) {
         const logMessages = getGlobalLog(conn);
         if (logMessages === null) {
             return false;
@@ -66,29 +66,37 @@ checkLog = (function() {
                 throw ex;
             }
 
-            if (obj.id === id) {
-                let allAttrMatch = true;
-                for (let attrKey in attrsDict) {
-                    const attrValue = attrsDict[attrKey];
-                    if (attrValue instanceof Function) {
-                        if (!attrValue(obj.attr[attrKey])) {
-                            allAttrMatch = false;
-                            break;
-                        }
-                    } else {
-                        if (obj.attr[attrKey] !== attrValue) {
-                            allAttrMatch = false;
-                            break;
-                        }
-                    }
-                }
-                if (allAttrMatch) {
-                    return true;
-                }
+            if (_compareLogs(obj, id, severity, attrsDict)) {
+                return true;
             }
         }
 
         return false;
+    };
+
+    const checkContainsWithCountJson = function(
+        conn, id, attrsDict, expectedCount, severity = null) {
+        const logMessages = getGlobalLog(conn);
+        if (logMessages === null) {
+            return false;
+        }
+
+        let count = 0;
+        for (let logMsg of logMessages) {
+            let obj;
+            try {
+                obj = JSON.parse(logMsg);
+            } catch (ex) {
+                print('checkLog.checkContainsOnce: JsonJSON.parse() failed: ' + tojson(ex) + ': ' +
+                      logMsg);
+                throw ex;
+            }
+
+            if (_compareLogs(obj, id, severity, attrsDict)) {
+                count++;
+            }
+        }
+        return count === expectedCount;
     };
 
     /*
@@ -243,10 +251,68 @@ checkLog = (function() {
         return (Array.isArray(value) ? `[${serialized.join(',')}]` : `{${serialized.join(',')}}`);
     };
 
+    // Internal helper to compare objects filed by field.
+    const _deepEqual = function(object1, object2) {
+        if (object1 == null || object2 == null) {
+            return false;
+        }
+        const keys1 = Object.keys(object1);
+        const keys2 = Object.keys(object2);
+
+        if (keys1.length !== keys2.length) {
+            return false;
+        }
+
+        for (const key of keys1) {
+            const val1 = object1[key];
+            const val2 = object2[key];
+            const areObjects = _isObject(val1) && _isObject(val2);
+            if (areObjects && !_deepEqual(val1, val2) || !areObjects && val1 !== val2) {
+                return false;
+            }
+        }
+
+        return true;
+    };
+
+    // Internal helper to check that the argument is a non-null object.
+    const _isObject = function(object) {
+        return object != null && typeof object === 'object';
+    };
+
+    // Internal helper to check if a log's id, severity, and attributes match with what's expected.
+    const _compareLogs = function(obj, id, severity, attrsDict) {
+        if (obj.id !== id) {
+            return false;
+        }
+        if (severity !== null && obj.s !== severity) {
+            return false;
+        }
+
+        for (let attrKey in attrsDict) {
+            const attrValue = attrsDict[attrKey];
+            if (attrValue instanceof Function) {
+                if (!attrValue(obj.attr[attrKey])) {
+                    return false;
+                }
+            } else if (obj.attr[attrKey] !== attrValue && typeof obj.attr[attrKey] == "object") {
+                if (!_deepEqual(obj.attr[attrKey], attrValue)) {
+                    return false;
+                }
+            } else {
+                if (obj.attr[attrKey] !== attrValue) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+
     return {
         getGlobalLog: getGlobalLog,
         checkContainsOnce: checkContainsOnce,
         checkContainsOnceJson: checkContainsOnceJson,
+        checkContainsWithCountJson: checkContainsWithCountJson,
         checkContainsOnceJsonStringMatch: checkContainsOnceJsonStringMatch,
         contains: contains,
         containsJson: containsJson,

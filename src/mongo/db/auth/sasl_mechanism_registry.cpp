@@ -81,7 +81,7 @@ StatusWith<std::unique_ptr<ServerMechanismBase>> SASLServerMechanismRegistry::ge
         return (*it)->create(std::move(authenticationDatabase));
     }
 
-    return Status(ErrorCodes::BadValue,
+    return Status(ErrorCodes::MechanismUnavailable,
                   str::stream() << "Unsupported mechanism '" << mechanismName
                                 << "' on authentication database '" << authenticationDatabase
                                 << "'");
