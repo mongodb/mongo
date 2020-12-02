@@ -923,6 +923,9 @@ void TransactionRouter::Router::beginOrContinueTxn(OperationContext* opCtx,
                 break;
             }
             case TransactionActions::kCommit:
+                uassert(4937702,
+                        "Only the first command in a transaction may specify API parameters",
+                        !APIParameters::get(opCtx).getParamsPassed());
                 ++p().latestStmtId;
                 _onContinue(opCtx);
                 break;

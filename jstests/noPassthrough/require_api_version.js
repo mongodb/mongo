@@ -10,7 +10,7 @@
 (function() {
 "use strict";
 
-function runTest(db) {
+function runTest(db, isMongos) {
     assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: true}));
     assert.commandFailedWithCode(db.runCommand({ping: 1}), 498870, "command without apiVersion");
     assert.commandWorked(db.runCommand({ping: 1, apiVersion: "1"}));
@@ -54,6 +54,31 @@ function runTest(db) {
         stmtId: NumberInt(2),
         autocommit: false
     }));
+    const commitTxnWithApiVersionErrorCode = isMongos ? 4937702 : 4937700;
+    assert.commandFailedWithCode(
+        sessionDb.runCommand(
+            {commitTransaction: 1, apiVersion: "1", txnNumber: NumberLong(0), autocommit: false}),
+        commitTxnWithApiVersionErrorCode);
+    assert.commandWorked(
+        sessionDb.runCommand({commitTransaction: 1, txnNumber: NumberLong(0), autocommit: false}));
+
+    // Start a new txn so we can test abortTransaction.
+    reply = sessionDb.runCommand({
+        find: "collection",
+        apiVersion: "1",
+        txnNumber: NumberLong(1),
+        stmtId: NumberInt(0),
+        startTransaction: true,
+        autocommit: false
+    });
+    assert.commandWorked(reply);
+    const abortTxnWithApiVersionErrorCode = isMongos ? 4937701 : 4937700;
+    assert.commandFailedWithCode(
+        sessionDb.runCommand(
+            {abortTransaction: 1, apiVersion: "1", txnNumber: NumberLong(1), autocommit: false}),
+        abortTxnWithApiVersionErrorCode);
+    assert.commandWorked(
+        sessionDb.runCommand({abortTransaction: 1, txnNumber: NumberLong(1), autocommit: false}));
 
     assert.commandWorked(
         db.runCommand({setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
@@ -63,10 +88,10 @@ function runTest(db) {
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
-runTest(rst.getPrimary().getDB("admin"));
+runTest(rst.getPrimary().getDB("admin"), false /* isMongos */);
 rst.stopSet();
 
 const st = new ShardingTest({});
-runTest(st.s0.getDB("admin"));
+runTest(st.s0.getDB("admin"), true /* isMongos */);
 st.stop();
 }());

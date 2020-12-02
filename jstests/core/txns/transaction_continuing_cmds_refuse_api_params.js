@@ -9,6 +9,7 @@
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
 
 const errorCode = FixtureHelpers.isMongos(db) ? 4937701 : 4937700;
+const commitTxnWithApiVersionErrorCode = FixtureHelpers.isMongos(db) ? 4937702 : 4937700;
 
 const dbName = jsTestName();
 const collName = "test";
@@ -21,6 +22,7 @@ assert.commandWorked(
     testDB.runCommand({create: testColl.getName(), writeConcern: {w: "majority"}}));
 
 const session = db.getMongo().startSession();
+const sessionAdminDB = session.getDatabase("admin");
 const sessionDB = session.getDatabase(dbName);
 const sessionColl = sessionDB.getCollection(collName);
 
@@ -43,6 +45,20 @@ assert.commandFailedWithCode(
     sessionColl.runCommand(
         {insert: collName, documents: [doc], apiVersion: "1", apiDeprecationErrors: false}),
     errorCode);
+let reply = sessionAdminDB.runCommand({
+    commitTransaction: 1,
+    txnNumber: session.getTxnNumber_forTesting(),
+    autocommit: false,
+    apiVersion: "1"
+});
+assert.commandFailedWithCode(reply, commitTxnWithApiVersionErrorCode);
+reply = sessionAdminDB.runCommand({
+    abortTransaction: 1,
+    txnNumber: session.getTxnNumber_forTesting(),
+    autocommit: false,
+    apiVersion: "1"
+});
+assert.commandFailedWithCode(reply, errorCode);
 
 // Transaction-continuing commands without API parameters are allowed.
 assert.commandWorked(sessionColl.runCommand({insert: collName, documents: [doc]}));
