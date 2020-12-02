@@ -19,7 +19,8 @@ load('jstests/libs/fail_point_util.js');
  * @param {Object} [donorRst] the ReplSetTest instance to adopt for the donor
  * @param {Object} [recipientRst] the ReplSetTest instance to adopt for the recipient
  */
-function TenantMigrationTest({name = "TenantMigrationTest", donorRst, recipientRst}) {
+function TenantMigrationTest(
+    {name = "TenantMigrationTest", enableRecipientTesting = true, donorRst, recipientRst}) {
     const donorPassedIn = (donorRst !== undefined);
     const recipientPassedIn = (recipientRst !== undefined);
 
@@ -42,8 +43,7 @@ function TenantMigrationTest({name = "TenantMigrationTest", donorRst, recipientR
                 tojsononeline(TestData.logComponentVerbosity);
         }
 
-        // TODO: SERVER-51734: Remove setting this failpoint.
-        if (!isDonor) {
+        if (!(isDonor || enableRecipientTesting)) {
             setParameterOpts["failpoint.returnResponseOkForRecipientSyncDataCmd"] =
                 tojson({mode: 'alwaysOn'});
         }
@@ -312,9 +312,7 @@ function TenantMigrationTest({name = "TenantMigrationTest", donorRst, recipientR
      * Verifies that the documents on the recipient primary are correct.
      */
     this.verifyReceipientDB = function(tenantId, dbName, collName, data = loadDummyData()) {
-        // TODO (SERVER-51734): Uncomment this line.
-        // const shouldMigrate = this.isNamespaceForTenant(tenantId, dbName);
-        const shouldMigrate = false;
+        const shouldMigrate = this.isNamespaceForTenant(tenantId, dbName);
 
         jsTestLog(`Verifying that data in collection ${collName} of DB ${dbName} was ${
             (shouldMigrate ? "" : "not")} migrated to the recipient`);

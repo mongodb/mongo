@@ -46,7 +46,9 @@ const donorRst = new ReplSetTest({nodes: 1, name: 'donorRst'});
 donorRst.startSet();
 donorRst.initiate();
 
-const tenantMigrationTest0 = new TenantMigrationTest({name: jsTestName(), donorRst});
+// TODO SERVER-53107: Remove 'enableRecipientTesting: false'.
+const tenantMigrationTest0 =
+    new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false, donorRst});
 if (!tenantMigrationTest0.isFeatureFlagEnabled()) {
     jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
     donorRst.stopSet();
@@ -215,7 +217,9 @@ function testConcurrentConflictingMigrations(
 
 // Test different recipient connection strings.
 (() => {
-    const tenantMigrationTest1 = new TenantMigrationTest({name: `${jsTestName()}1`, donorRst});
+    // TODO SERVER-53107: Remove 'enableRecipientTesting: false'.
+    const tenantMigrationTest1 = new TenantMigrationTest(
+        {name: `${jsTestName()}1`, enableRecipientTesting: false, donorRst});
 
     let makeTestParams = () => {
         const migrationOpts0 = {

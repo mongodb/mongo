@@ -48,7 +48,9 @@ function testDonorStartMigrationInterrupt(interruptFunc) {
     donorRst.startSet();
     donorRst.initiate();
 
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
+    // TODO SERVER-52719: Remove 'enableRecipientTesting: false'.
+    const tenantMigrationTest =
+        new TenantMigrationTest({name: jsTestName(), donorRst, enableRecipientTesting: false});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         donorRst.stopSet();
@@ -106,7 +108,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
         name: "recipientRst",
         nodeOptions: {
             setParameter: {
-                // TODO SERVER-51734: Remove the failpoint
+                // TODO SERVER-52719: Remove the failpoint
                 // 'returnResponseOkForRecipientSyncDataCmd'.
                 'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'}),
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,

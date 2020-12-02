@@ -119,7 +119,7 @@ executor:
             mode: alwaysOn
             data:
               blockTimeMS: 250
-        # TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
+        # TODO SERVER-48814: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
         failpoint.returnResponseOkForRecipientSyncDataCmd:
             mode: alwaysOn
         # Set the delay before migration state machine is garbage collected to be short to avoid

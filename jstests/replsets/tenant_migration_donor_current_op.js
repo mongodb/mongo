@@ -23,20 +23,6 @@ const migrationStates = {
     kAborted: 4
 };
 
-const recipientRst = new ReplSetTest({
-    nodes: 1,
-    name: 'recipient',
-    nodeOptions: {
-        setParameter: {
-            // TODO SERVER-51734: Remove the failpoint 'returnResponseOkForRecipientSyncDataCmd'.
-            'failpoint.returnResponseOkForRecipientSyncDataCmd': tojson({mode: 'alwaysOn'})
-        }
-    }
-});
-recipientRst.startSet();
-recipientRst.initiate();
-
-const kRecipientConnString = recipientRst.getURL();
 const kTenantId = 'testTenantId';
 const kReadPreference = {
     mode: "primary"
@@ -44,7 +30,7 @@ const kReadPreference = {
 
 (() => {
     jsTestLog("Testing currentOp output for migration in data sync state");
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         return;
@@ -67,7 +53,8 @@ const kReadPreference = {
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
     assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
-    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].recipientConnectionString,
+              tenantMigrationTest.getRecipientRst().getURL());
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kDataSync);
     assert.eq(res.inprog[0].migrationCompleted, false);
@@ -79,7 +66,7 @@ const kReadPreference = {
 
 (() => {
     jsTestLog("Testing currentOp output for migration in blocking state");
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         return;
@@ -101,7 +88,8 @@ const kReadPreference = {
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
     assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
-    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].recipientConnectionString,
+              tenantMigrationTest.getRecipientRst().getURL());
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kBlocking);
     assert(res.inprog[0].blockTimestamp);
@@ -114,7 +102,7 @@ const kReadPreference = {
 
 (() => {
     jsTestLog("Testing currentOp output for aborted migration");
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         return;
@@ -135,7 +123,8 @@ const kReadPreference = {
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
     assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
-    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].recipientConnectionString,
+              tenantMigrationTest.getRecipientRst().getURL());
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kAborted);
     assert(res.inprog[0].blockTimestamp);
@@ -148,7 +137,7 @@ const kReadPreference = {
 // Check currentOp while in committed state before and after a migration has completed.
 (() => {
     jsTestLog("Testing currentOp output for committed migration");
-    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
     if (!tenantMigrationTest.isFeatureFlagEnabled()) {
         jsTestLog("Skipping test because the tenant migrations feature flag is disabled");
         return;
@@ -167,7 +156,8 @@ const kReadPreference = {
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
     assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
-    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].recipientConnectionString,
+              tenantMigrationTest.getRecipientRst().getURL());
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kCommitted);
     assert(res.inprog[0].blockTimestamp);
@@ -182,7 +172,8 @@ const kReadPreference = {
     assert.eq(res.inprog.length, 1);
     assert.eq(bsonWoCompare(res.inprog[0].instanceID.uuid, migrationId), 0);
     assert.eq(bsonWoCompare(res.inprog[0].tenantId, kTenantId), 0);
-    assert.eq(res.inprog[0].recipientConnectionString, kRecipientConnString);
+    assert.eq(res.inprog[0].recipientConnectionString,
+              tenantMigrationTest.getRecipientRst().getURL());
     assert.eq(bsonWoCompare(res.inprog[0].readPreference, kReadPreference), 0);
     assert.eq(res.inprog[0].lastDurableState, migrationStates.kCommitted);
     assert(res.inprog[0].blockTimestamp);
@@ -191,6 +182,4 @@ const kReadPreference = {
     assert.eq(res.inprog[0].migrationCompleted, true);
     tenantMigrationTest.stop();
 })();
-
-recipientRst.stopSet();
 })();
