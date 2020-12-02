@@ -30,8 +30,8 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
-#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/namespace_string.h"
@@ -49,6 +49,7 @@ class TaskExecutor;
 
 }  // namespace executor
 
+class OperationContext;
 class ServiceContext;
 
 class ReshardingCollectionCloner {
@@ -64,7 +65,7 @@ public:
         OperationContext* opCtx, std::shared_ptr<MongoProcessInterface> mongoProcessInterface);
 
     ExecutorFuture<void> run(ServiceContext* serviceContext,
-                             std::shared_ptr<executor::TaskExecutor>);
+                             std::shared_ptr<executor::TaskExecutor> executor);
 
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(OperationContext* opCtx,

@@ -46,6 +46,18 @@ server_parameters:
             expr: 100 * 1024
         validator:
             gte: 1
+
+    reshardingTxnClonerProgressBatchSize:
+        description: >-
+            Number of config.transactions records from a donor shard to process before recording the
+            lsid locally to resume from on primary failover or server restart.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: gReshardingTxnClonerProgressBatchSize
+        default: 1000
+        validator:
+            gte: 1
+
     useReshardingOplogApplicationRules:
         description: >-
             Whether or not the ReshardingOplogApplier should use ReshardingOplogApplicationRules

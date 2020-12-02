@@ -659,6 +659,65 @@ std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     return mergePipeline;
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    AggregationRequest request,
+    ShardId shardId) {
+    invariant(!request.getExplain());
+
+    auto readPreference =
+        uassertStatusOK(ReadPreferenceSetting::fromContainingBSON(request.getUnwrappedReadPref()));
+
+    auto* opCtx = expCtx->opCtx;
+    auto* catalogCache = Grid::get(opCtx)->catalogCache();
+    auto cm = uassertStatusOK(
+        catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespaceString()));
+
+    auto versionedCmdObj = [&] {
+        if (cm.isSharded()) {
+            return appendShardVersion(request.serializeToCommandObj().toBson(),
+                                      cm.getVersion(shardId));
+        } else {
+            // The collection is unsharded. Don't append shard version info when contacting the
+            // config servers.
+            const auto cmdObjWithShardVersion = (shardId != ShardRegistry::kConfigServerShardId)
+                ? appendShardVersion(request.serializeToCommandObj().toBson(),
+                                     ChunkVersion::UNSHARDED())
+                : request.serializeToCommandObj().toBson();
+            return appendDbVersionIfPresent(std::move(cmdObjWithShardVersion), cm.dbVersion());
+        }
+    }();
+
+    auto cursors = establishCursors(opCtx,
+                                    expCtx->mongoProcessInterface->taskExecutor,
+                                    request.getNamespaceString(),
+                                    std::move(readPreference),
+                                    {{shardId, versionedCmdObj}},
+                                    false /* allowPartialResults */,
+                                    Shard::RetryPolicy::kIdempotent);
+    invariant(cursors.size() == 1);
+
+    // Convert remote cursors into a vector of "owned" cursors.
+    std::vector<OwnedRemoteCursor> ownedCursors;
+    for (auto&& cursor : cursors) {
+        auto cursorNss = cursor.getCursorResponse().getNSS();
+        ownedCursors.emplace_back(opCtx, std::move(cursor), std::move(cursorNss));
+    }
+
+    // We have not split the pipeline, and will execute entirely on the remote shard. Set up an
+    // empty local pipeline which we will attach the merge cursors stage to.
+    auto mergePipeline = Pipeline::parse(std::vector<BSONObj>{}, expCtx);
+
+    addMergeCursorsSource(mergePipeline.get(),
+                          std::move(versionedCmdObj),
+                          std::move(ownedCursors),
+                          {std::move(shardId)},
+                          boost::none /* shardCursorsSortSpec */,
+                          false /* hasChangeStream */);
+
+    return mergePipeline;
+}
+
 boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationContext* opCtx,
                                                                   const Pipeline* mergePipeline) {
     if (internalQueryDisableExchange.load()) {
