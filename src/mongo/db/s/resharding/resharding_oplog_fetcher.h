@@ -70,10 +70,15 @@ public:
     Future<void> schedule(executor::TaskExecutor* executor);
 
     /**
-     * Given a shard, fetches and copies oplog entries until reaching an error, or coming
-     * across a sentinel finish oplog entry. Throws if there's more oplog entries to be copied.
+     * Given a shard, fetches and copies oplog entries until
+     *  - reaching an error,
+     *  - coming across a sentinel finish oplog entry, or
+     *  - hitting the end of the donor's oplog.
+     *
+     * Returns true if there are more oplog entries to be copied, and returns false if the sentinel
+     * finish oplog entry has been copied.
      */
-    void consume(Client* client, Shard* shard);
+    bool consume(Client* client, Shard* shard);
 
     bool iterate(Client* client);
 

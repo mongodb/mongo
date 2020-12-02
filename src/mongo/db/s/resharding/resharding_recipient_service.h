@@ -161,6 +161,9 @@ private:
 
     std::unique_ptr<ReshardingCollectionCloner> _collectionCloner;
 
+    std::vector<std::unique_ptr<ReshardingOplogFetcher>> _oplogFetchers;
+    std::shared_ptr<executor::TaskExecutor> _oplogFetcherExecutor;
+
     // Protects the promises below
     Mutex _mutex = MONGO_MAKE_LATCH("ReshardingRecipient::_mutex");
 

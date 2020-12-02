@@ -40,6 +40,8 @@
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 #include "mongo/db/s/resharding_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -47,6 +49,35 @@
 #include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
+
+namespace {
+
+std::shared_ptr<executor::ThreadPoolTaskExecutor> makeTaskExecutor(StringData name,
+                                                                   size_t maxThreads) {
+    ThreadPool::Limits threadPoolLimits;
+    threadPoolLimits.maxThreads = maxThreads;
+
+    ThreadPool::Options threadPoolOptions(std::move(threadPoolLimits));
+    threadPoolOptions.threadNamePrefix = name + "-";
+    threadPoolOptions.poolName = name + "ThreadPool";
+
+    return std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(std::move(threadPoolOptions)),
+        executor::makeNetworkInterface(name + "Network"));
+}
+
+ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx, const NamespaceString& nss) {
+    auto* catalogCache = Grid::get(opCtx)->catalogCache();
+    auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+
+    uassert(ErrorCodes::NamespaceNotSharded,
+            str::stream() << "Expected collection " << nss << " to be sharded",
+            cm.isSharded());
+
+    return cm;
+}
+
+}  // namespace
 
 namespace resharding {
 
@@ -79,25 +110,21 @@ void createTemporaryReshardingCollectionLocally(OperationContext* opCtx,
                           });
 
     // Load the original collection's indexes from the shard that owns the global minimum chunk.
-    auto [indexes, idIndex] = shardVersionRetry(
-        opCtx,
-        catalogCache,
-        reshardingNss,
-        "loading indexes to create temporary resharding collection"_sd,
-        [&]() -> MigrationDestinationManager::IndexesAndIdIndex {
-            auto originalCm =
-                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, originalNss));
-            uassert(ErrorCodes::NamespaceNotSharded,
-                    str::stream() << "Expected collection " << originalNss << " to be sharded",
-                    originalCm.isSharded());
-            auto indexShardId = originalCm.getMinKeyShardIdWithSimpleCollation();
-            return MigrationDestinationManager::getCollectionIndexes(
-                opCtx,
-                NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
-                indexShardId,
-                originalCm,
-                fetchTimestamp);
-        });
+    auto [indexes, idIndex] =
+        shardVersionRetry(opCtx,
+                          catalogCache,
+                          reshardingNss,
+                          "loading indexes to create temporary resharding collection"_sd,
+                          [&]() -> MigrationDestinationManager::IndexesAndIdIndex {
+                              auto originalCm = getShardedCollectionRoutingInfo(opCtx, originalNss);
+                              auto indexShardId = originalCm.getMinKeyShardIdWithSimpleCollation();
+                              return MigrationDestinationManager::getCollectionIndexes(
+                                  opCtx,
+                                  NamespaceStringOrUUID(originalNss.db().toString(), existingUUID),
+                                  indexShardId,
+                                  originalCm,
+                                  fetchTimestamp);
+                          });
 
     // Set the temporary resharding collection's UUID to the resharding UUID. Note that
     // BSONObj::addFields() replaces any fields that already exist.
@@ -176,6 +203,10 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
     // Resolve any unresolved promises to avoid hanging.
     stdx::lock_guard<Latch> lg(_mutex);
 
+    if (_oplogFetcherExecutor) {
+        _oplogFetcherExecutor->shutdown();
+    }
+
     if (!_allDonorsMirroring.getFuture().isReady()) {
         _allDonorsMirroring.setError(status);
     }
@@ -237,6 +268,47 @@ ReshardingRecipientService::RecipientStateMachine::_cloneThenTransitionToApplyin
         ShardingState::get(serviceContext)->shardId(),
         *_recipientDoc.getFetchTimestamp(),
         std::move(tempNss));
+
+    auto numDonors = _recipientDoc.getDonorShardsMirroring().size();
+    _oplogFetchers.reserve(numDonors);
+
+    {
+        auto executor = makeTaskExecutor("ReshardingOplogFetcher"_sd, numDonors);
+        executor->startup();
+
+        stdx::lock_guard<Latch> lk(_mutex);
+        _oplogFetcherExecutor = std::move(executor);
+    }
+
+    const auto& minKeyChunkOwningShardId = [&] {
+        auto opCtx = cc().makeOperationContext();
+        auto sourceChunkMgr = getShardedCollectionRoutingInfo(opCtx.get(), _recipientDoc.getNss());
+        return sourceChunkMgr.getMinKeyShardIdWithSimpleCollation();
+    }();
+
+    const auto& recipientId = ShardingState::get(serviceContext)->shardId();
+    for (const auto& donor : _recipientDoc.getDonorShardsMirroring()) {
+        _oplogFetchers.emplace_back(std::make_unique<ReshardingOplogFetcher>(
+            _recipientDoc.get_id(),
+            _recipientDoc.getExistingUUID(),
+            // The recipient fetches oplog entries from the donor starting from the fetchTimestamp,
+            // which corresponds to {clusterTime: fetchTimestamp, ts: fetchTimestamp} as a resume
+            // token value.
+            ReshardingDonorOplogId{*_recipientDoc.getFetchTimestamp(),
+                                   *_recipientDoc.getFetchTimestamp()},
+            donor.getId(),
+            recipientId,
+            donor.getId() == minKeyChunkOwningShardId,
+            getLocalOplogBufferNamespace(_recipientDoc.get_id(), donor.getId())));
+
+        // TODO SERVER-52594: Unrecoverable errors during oplog fetching should be propagated
+        // through the RecipientStateMachine's future chain.
+        _oplogFetchers.back()->schedule(_oplogFetcherExecutor.get()).getAsync([](Status status) {
+            if (!status.isOK()) {
+                LOGV2(5259300, "Error fetching oplog entries", "error"_attr = redact(status));
+            }
+        });
+    }
 
     return _collectionCloner->run(serviceContext, **executor).then([this] {
         _transitionState(RecipientStateEnum::kApplying);

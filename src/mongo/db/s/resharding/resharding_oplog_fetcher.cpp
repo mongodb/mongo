@@ -100,14 +100,19 @@ Future<void> ReshardingOplogFetcher::schedule(executor::TaskExecutor* executor) 
 
 void ReshardingOplogFetcher::_reschedule(executor::TaskExecutor* executor) {
     executor->schedule([this, executor](Status status) {
-        ThreadClient client(
-            fmt::format("OplogFetcher-{}-{}", _reshardingUUID.toString(), _donorShard.toString()),
-            getGlobalServiceContext());
+        // The callback function is invoked in the execution context of the calling code when
+        // OutOfLineExecutor::schedule() is called with an error post-shutdown. This means that the
+        // ThreadClient in the outer context is still alive on the stack. We therefore delay
+        // constructing a new ThreadClient until after checking the status.
         if (!status.isOK()) {
             LOGV2_INFO(5192101, "Resharding oplog fetcher aborting.", "reason"_attr = status);
             _fetchedFinishPromise.setError(status);
             return;
         }
+
+        ThreadClient client(
+            fmt::format("OplogFetcher-{}-{}", _reshardingUUID.toString(), _donorShard.toString()),
+            getGlobalServiceContext());
 
         try {
             if (iterate(client.get())) {
@@ -142,10 +147,7 @@ bool ReshardingOplogFetcher::iterate(Client* client) {
     }
 
     try {
-        // Consume will throw if there's oplog entries to be copied. It only returns cleanly when
-        // the final oplog has been seen and copied.
-        consume(client, targetShard.get());
-        return false;
+        return consume(client, targetShard.get());
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         return false;
     } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>&) {
@@ -190,7 +192,7 @@ std::vector<BSONObj> ReshardingOplogFetcher::_makePipeline(Client* client) {
         ->serializeToBson();
 }
 
-void ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
+bool ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
     _ensureCollection(client, _toWriteInto);
     std::vector<BSONObj> serializedPipeline = _makePipeline(client);
 
@@ -202,6 +204,7 @@ void ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
         aggRequest.setReadConcern(readConcernArgs.toBSONInner());
     }
 
+    aggRequest.setWriteConcern({});
     aggRequest.setHint(BSON("$natural" << 1));
     aggRequest.setRequestReshardingResumeToken(true);
 
@@ -211,11 +214,14 @@ void ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
 
     auto opCtxRaii = client->makeOperationContext();
     int batchesProcessed = 0;
+    bool moreToCome = true;
     auto svcCtx = client->getServiceContext();
+    // Note that the oplog entries are *not* being copied with a tailable cursor.
+    // Shard::runAggregation() will instead return upon hitting the end of the donor's oplog.
     uassertStatusOK(shard->runAggregation(
         opCtxRaii.get(),
         aggRequest,
-        [this, svcCtx, &batchesProcessed](const std::vector<BSONObj>& batch) {
+        [this, svcCtx, &batchesProcessed, &moreToCome](const std::vector<BSONObj>& batch) {
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
@@ -242,6 +248,7 @@ void ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
                 ++_numOplogEntriesCopied;
 
                 if (isFinalOplog(nextOplog, _reshardingUUID)) {
+                    moreToCome = false;
                     return false;
                 }
             }
@@ -252,6 +259,8 @@ void ReshardingOplogFetcher::consume(Client* client, Shard* shard) {
 
             return true;
         }));
+
+    return moreToCome;
 }
 
 }  // namespace mongo
