@@ -187,15 +187,12 @@ Document redactSafePortionDollarOps(BSONObj expr) {
         if (field.fieldName()[0] != '$')
             continue;
 
-        if (field.fieldNameStringData() == "$eq") {
-            if (isTypeRedactSafeInComparison(field.type())) {
-                output[field.fieldNameStringData()] = Value(field);
-            }
+        auto keyword = MatchExpressionParser::parsePathAcceptingKeyword(field);
+        if (!keyword) {
             continue;
         }
 
-        switch (*MatchExpressionParser::parsePathAcceptingKeyword(field,
-                                                                  PathAcceptingKeyword::EQUALITY)) {
+        switch (*keyword) {
             // These are always ok
             case PathAcceptingKeyword::TYPE:
             case PathAcceptingKeyword::REGEX:
@@ -209,6 +206,7 @@ Document redactSafePortionDollarOps(BSONObj expr) {
                 break;
 
             // These are ok if the type of the rhs is allowed in comparisons
+            case PathAcceptingKeyword::EQUALITY:
             case PathAcceptingKeyword::LESS_THAN_OR_EQUAL:
             case PathAcceptingKeyword::GREATER_THAN_OR_EQUAL:
             case PathAcceptingKeyword::LESS_THAN:
@@ -264,7 +262,6 @@ Document redactSafePortionDollarOps(BSONObj expr) {
             }
 
             // These are never allowed
-            case PathAcceptingKeyword::EQUALITY:  // This actually means unknown
             case PathAcceptingKeyword::EXISTS:
             case PathAcceptingKeyword::GEO_INTERSECTS:
             case PathAcceptingKeyword::GEO_NEAR:

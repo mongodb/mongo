@@ -308,6 +308,25 @@ TEST_F(PullNodeTest, ApplyToArrayMatchingAll) {
     assertOplogEntry(fromjson("{$set: {a: []}}"), fromjson("{$v: 2, diff: {u: {a: []}}}"));
 }
 
+TEST_F(PullNodeTest, ApplyToArrayWithEq) {
+    auto update = fromjson("{$pull : {a: {$eq: 1}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    PullNode node;
+    ASSERT_OK(node.init(update["$pull"]["a"], expCtx));
+
+    mutablebson::Document doc(fromjson("{a: [0, 1, 2, 3]}"));
+    setPathTaken(makeRuntimeUpdatePathForTest("a"));
+    addIndexedPath("a");
+    auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
+    ASSERT_FALSE(result.noop);
+    ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(fromjson("{a: [0, 2, 3]}"), doc);
+    ASSERT_FALSE(doc.isInPlaceModeEnabled());
+
+    assertOplogEntry(fromjson("{$set: {a: [0, 2, 3]}}"),
+                     fromjson("{$v: 2, diff: {u: {a: [0, 2, 3]}}}"));
+}
+
 TEST_F(PullNodeTest, ApplyNoIndexDataNoLogBuilder) {
     auto update = fromjson("{$pull : {a: {$lt: 1}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

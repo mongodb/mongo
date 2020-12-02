@@ -1469,19 +1469,6 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
                                         DocumentParseLevel currentLevel) {
     invariant(e);
 
-    if ("$eq"_sd == e.fieldNameStringData()) {
-        return parseComparison(
-            name,
-            std::make_unique<EqualityMatchExpression>(
-                name,
-                e,
-                doc_validation_error::createAnnotation(
-                    expCtx, e.fieldNameStringData().toString(), BSON(name << e.wrap()))),
-            e,
-            expCtx,
-            allowedFeatures);
-    }
-
     if ("$not"_sd == e.fieldNameStringData()) {
         return parseNot(name, e, expCtx, extensionsCallback, allowedFeatures, currentLevel);
     }
@@ -2003,7 +1990,6 @@ std::unique_ptr<StringMap<PathAcceptingKeyword>> queryOperatorMap;
 MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
     queryOperatorMap =
         std::make_unique<StringMap<PathAcceptingKeyword>>(StringMap<PathAcceptingKeyword>{
-            // TODO: SERVER-19565 Add $eq after auditing callers.
             {"_internalExprEq", PathAcceptingKeyword::INTERNAL_EXPR_EQ},
             {"_internalSchemaAllElemMatchFromIndex",
              PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX},
@@ -2029,6 +2015,7 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"bitsAnyClear", PathAcceptingKeyword::BITS_ANY_CLEAR},
             {"bitsAnySet", PathAcceptingKeyword::BITS_ANY_SET},
             {"elemMatch", PathAcceptingKeyword::ELEM_MATCH},
+            {"eq", PathAcceptingKeyword::EQUALITY},
             {"exists", PathAcceptingKeyword::EXISTS},
             {"geoIntersects", PathAcceptingKeyword::GEO_INTERSECTS},
             {"geoNear", PathAcceptingKeyword::GEO_NEAR},

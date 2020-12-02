@@ -110,8 +110,7 @@ public:
 
     /**
      * Parses PathAcceptingKeyword from 'typeElem'. Returns 'defaultKeyword' if 'typeElem'
-     * doesn't represent a known type, or represents PathAcceptingKeyword::EQUALITY which is not
-     * handled by this parser (see SERVER-19565).
+     * doesn't represent a known type.
      */
     static boost::optional<PathAcceptingKeyword> parsePathAcceptingKeyword(
         BSONElement typeElem, boost::optional<PathAcceptingKeyword> defaultKeyword = boost::none);

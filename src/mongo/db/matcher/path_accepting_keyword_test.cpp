@@ -121,16 +121,8 @@ TEST(PathAcceptingKeyword, CanParseKnownMatchTypes) {
     ASSERT_TRUE(PathAcceptingKeyword::INTERNAL_EXPR_EQ ==
                 MatchExpressionParser::parsePathAcceptingKeyword(
                     BSON("$_internalExprEq" << 1).firstElement()));
-}
-
-TEST(PathAcceptingKeyword, EqualityMatchReturnsDefault) {
-    // 'boost::none' is the default when none specified.
-    ASSERT_TRUE(boost::none ==
+    ASSERT_TRUE(PathAcceptingKeyword::EQUALITY ==
                 MatchExpressionParser::parsePathAcceptingKeyword(BSON("$eq" << 1).firstElement()));
-    // Should return default specified by caller.
-    ASSERT_TRUE(PathAcceptingKeyword::GEO_NEAR ==
-                MatchExpressionParser::parsePathAcceptingKeyword(BSON("$eq" << 1).firstElement(),
-                                                                 PathAcceptingKeyword::GEO_NEAR));
 }
 
 TEST(PathAcceptingKeyword, UnknownExpressionReturnsDefault) {
@@ -142,6 +134,10 @@ TEST(PathAcceptingKeyword, UnknownExpressionReturnsDefault) {
     ASSERT_TRUE(PathAcceptingKeyword::NOT_IN ==
                 MatchExpressionParser::parsePathAcceptingKeyword(BSON("size" << 1).firstElement(),
                                                                  PathAcceptingKeyword::NOT_IN));
+    // 'boost::none' is the default when none specified.
+    ASSERT_TRUE(boost::none ==
+                MatchExpressionParser::parsePathAcceptingKeyword(
+                    BSON("NonExistentKeyWord" << 1).firstElement()));
 }
 
 TEST(PathAcceptingKeyword, EmptyBSONElemReturnsDefault) {
