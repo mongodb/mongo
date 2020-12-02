@@ -209,7 +209,7 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
                           "It is not possible to authenticate as the __system user "
                           "on servers started without a --keyFile parameter");
         } else if (scramCredentials.empty()) {
-            return {ErrorCodes::AuthenticationFailed,
+            return {ErrorCodes::MechanismUnavailable,
                     str::stream() << "Unable to use " << Policy::getName()
                                   << " based authentication for user without any "
                                   << Policy::getName() << " credentials registered"};

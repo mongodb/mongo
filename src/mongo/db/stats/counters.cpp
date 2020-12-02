@@ -208,7 +208,7 @@ Status AuthCounter::incSpeculativeAuthenticateReceived(const std::string& mechan
     _mechanisms.at(mechanism).speculativeAuthenticate.received.fetchAndAddRelaxed(1);
     return Status::OK();
 } catch (const std::out_of_range&) {
-    return {ErrorCodes::BadValue,
+    return {ErrorCodes::MechanismUnavailable,
             str::stream() << "Received " << auth::kSpeculativeAuthenticate << " for mechanism "
                           << mechanism << " which is unknown or not enabled"};
 }
@@ -219,7 +219,7 @@ Status AuthCounter::incSpeculativeAuthenticateSuccessful(const std::string& mech
 } catch (const std::out_of_range&) {
     // Should never actually occur since it'd mean we succeeded at a mechanism
     // we're not configured for.
-    return {ErrorCodes::BadValue,
+    return {ErrorCodes::MechanismUnavailable,
             str::stream() << "Unexpectedly succeeded at " << auth::kSpeculativeAuthenticate
                           << " for " << mechanism << " which is not enabled"};
 }
@@ -228,7 +228,7 @@ Status AuthCounter::incAuthenticateReceived(const std::string& mechanism) try {
     _mechanisms.at(mechanism).authenticate.received.fetchAndAddRelaxed(1);
     return Status::OK();
 } catch (const std::out_of_range&) {
-    return {ErrorCodes::BadValue,
+    return {ErrorCodes::MechanismUnavailable,
             str::stream() << "Received authentication for mechanism " << mechanism
                           << " which is unknown or not enabled"};
 }
@@ -239,7 +239,7 @@ Status AuthCounter::incAuthenticateSuccessful(const std::string& mechanism) try 
 } catch (const std::out_of_range&) {
     // Should never actually occur since it'd mean we succeeded at a mechanism
     // we're not configured for.
-    return {ErrorCodes::BadValue,
+    return {ErrorCodes::MechanismUnavailable,
             str::stream() << "Unexpectedly succeeded at authentication for " << mechanism
                           << " which is not enabled"};
 }
@@ -248,7 +248,7 @@ Status AuthCounter::incClusterAuthenticateReceived(const std::string& mechanism)
     _mechanisms.at(mechanism).clusterAuthenticate.received.fetchAndAddRelaxed(1);
     return Status::OK();
 } catch (const std::out_of_range&) {
-    return {ErrorCodes::BadValue,
+    return {ErrorCodes::MechanismUnavailable,
             str::stream() << "Received authentication for mechanism " << mechanism
                           << " which is unknown or not enabled"};
 }
@@ -257,7 +257,7 @@ Status AuthCounter::incClusterAuthenticateSuccessful(const std::string& mechanis
     _mechanisms.at(mechanism).clusterAuthenticate.successful.fetchAndAddRelaxed(1);
     return Status::OK();
 } catch (const std::out_of_range&) {
-    return {ErrorCodes::BadValue,
+    return {ErrorCodes::MechanismUnavailable,
             str::stream() << "Received authentication for mechanism " << mechanism
                           << " which is not enabled"};
 }

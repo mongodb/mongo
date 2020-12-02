@@ -406,6 +406,7 @@ error_codes:
     - {code: 332, name: CannotDowngrade}
 
     - {code: 333, name: ServiceExecutorInShutdown, categories: [ShutdownError,CancelationError,InternalOnly]}
+    - {code: 334, name: MechanismUnavailable}
 
     # Error codes 4000-8999 are reserved.
 

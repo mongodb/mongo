@@ -194,16 +194,23 @@ Status doSaslStep(OperationContext* opCtx,
     StatusWith<std::string> swResponse = mechanism.step(opCtx, payload);
 
     if (!swResponse.isOK()) {
-        LOGV2(20249,
-              "SASL {mechanism} authentication failed for "
-              "{principalName} on {authenticationDatabase} from client "
-              "{client} ; {result}",
-              "Authentication failed",
-              "mechanism"_attr = mechanism.mechanismName(),
-              "principalName"_attr = mechanism.getPrincipalName(),
-              "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
-              "remote"_attr = opCtx->getClient()->getRemote(),
-              "result"_attr = redact(swResponse.getStatus()));
+        int64_t dLevel = 0;
+        if (session->isSpeculative() &&
+            (swResponse.getStatus() == ErrorCodes::MechanismUnavailable)) {
+            dLevel = 5;
+        }
+        LOGV2_DEBUG(20249,
+                    dLevel,
+                    "SASL {mechanism} authentication failed for "
+                    "{principalName} on {authenticationDatabase} from client "
+                    "{client} ; {result}",
+                    "Authentication failed",
+                    "mechanism"_attr = mechanism.mechanismName(),
+                    "speculative"_attr = session->isSpeculative(),
+                    "principalName"_attr = mechanism.getPrincipalName(),
+                    "authenticationDatabase"_attr = mechanism.getAuthenticationDatabase(),
+                    "remote"_attr = opCtx->getClient()->getRemote(),
+                    "result"_attr = redact(swResponse.getStatus()));
 
         sleepmillis(saslGlobalParams.authFailedDelay.load());
         // All the client needs to know is that authentication has failed.
