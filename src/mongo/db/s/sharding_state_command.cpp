@@ -71,7 +71,10 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         ShardingState::get(opCtx)->appendInfo(opCtx, result);
-        CollectionShardingState::report(opCtx, &result);
+        const bool isEnabled = ShardingState::get(opCtx)->enabled();
+        if (isEnabled) {
+            CollectionShardingState::report(opCtx, &result);
+        }
         return true;
     }
 
