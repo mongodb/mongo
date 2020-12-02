@@ -8421,7 +8421,7 @@ buildvariants:
   - name: .logical_session_cache .one_sec
   - name: multiversion
   - name: multiversion_auth
-  - name: .powercycle
+  # - name: .powercycle
   - name: .read_write_concern
   - name: replica_sets
   - name: replica_sets_jscore_passthrough
