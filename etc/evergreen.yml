@@ -7898,11 +7898,11 @@ buildvariants:
   - name: noPassthrough_gen
   - name: parallel_gen
   - name: parallel_compatibility
-  - name: powercycle
-  - name: powercycle_fcv3.6
-  - name: powercycle_kill_mongod
-  - name: powercycle_replication
-  - name: powercycle_syncdelay
+  # - name: powercycle
+  # - name: powercycle_fcv3.6
+  # - name: powercycle_kill_mongod
+  # - name: powercycle_replication
+  # - name: powercycle_syncdelay
   - name: read_concern_linearizable_passthrough
   - name: read_concern_majority_passthrough_gen
   - name: replica_sets
