@@ -1386,6 +1386,13 @@ public:
         return visitor->visit(this);
     }
 
+    /**
+     * Returns true if this expression has parameter 'timezone' specified, otherwise false.
+     */
+    bool isTimezoneSpecified() const {
+        return static_cast<bool>(_timeZone);
+    }
+
 protected:
     void _doAddDependencies(DepsTracker* deps) const final;
 

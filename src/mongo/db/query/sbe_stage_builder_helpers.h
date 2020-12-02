@@ -347,4 +347,8 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
  */
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba);
 
+/**
+ * Returns a BSON type mask of all data types coercible to date.
+ */
+uint32_t dateTypeMask();
 }  // namespace mongo::stage_builder

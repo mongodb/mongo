@@ -486,4 +486,10 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> makeValue(const BSONArray& ba
     return {sbe::value::TypeTags::bsonArray, sbe::value::bitcastFrom<uint8_t*>(data)};
 }
 
+uint32_t dateTypeMask() {
+    return (getBSONTypeMask(sbe::value::TypeTags::Date) |
+            getBSONTypeMask(sbe::value::TypeTags::Timestamp) |
+            getBSONTypeMask(sbe::value::TypeTags::ObjectId) |
+            getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
+}
 }  // namespace mongo::stage_builder

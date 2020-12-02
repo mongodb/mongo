@@ -1197,7 +1197,82 @@ public:
         visitConditionalExpression(expr);
     }
     void visit(ExpressionDateDiff* expr) final {
-        unsupportedExpression("$dateDiff");
+        auto frameId = _context->frameIdGenerator->generate();
+        std::vector<std::unique_ptr<sbe::EExpression>> arguments;
+        std::vector<std::unique_ptr<sbe::EExpression>> bindings;
+        sbe::EVariable startDateRef(frameId, 0);
+        sbe::EVariable endDateRef(frameId, 1);
+        sbe::EVariable unitRef(frameId, 2);
+        sbe::EVariable timezoneRef(frameId, 3);
+
+        auto children = expr->getChildren();
+        invariant(children.size() == 4);
+        _context->ensureArity(expr->isTimezoneSpecified() ? 4 : 3);
+
+        // Get child expressions.
+        auto timezoneExpression =
+            expr->isTimezoneSpecified() ? _context->popExpr() : sbe::makeE<sbe::EConstant>("UTC");
+        auto unitExpression = _context->popExpr();
+        auto endDateExpression = _context->popExpr();
+        auto startDateExpression = _context->popExpr();
+
+        auto timezoneDBSlot = _context->runtimeEnvironment->getSlot("timeZoneDB"_sd);
+
+        //  Set parameters for an invocation of built-in "dateDiff" function.
+        arguments.push_back(sbe::makeE<sbe::EVariable>(timezoneDBSlot));
+        arguments.push_back(startDateRef.clone());
+        arguments.push_back(endDateRef.clone());
+        arguments.push_back(unitRef.clone());
+        arguments.push_back(timezoneRef.clone());
+
+        // Set bindings for the frame.
+        bindings.push_back(std::move(startDateExpression));
+        bindings.push_back(std::move(endDateExpression));
+        bindings.push_back(std::move(unitExpression));
+        bindings.push_back(std::move(timezoneExpression));
+
+        // Create an expression to invoke built-in "dateDiff" function.
+        auto dateDiffFunctionCall = sbe::makeE<sbe::EFunction>("dateDiff", std::move(arguments));
+
+        // Create expressions to check that each argument to "dateDiff" function exists, is not
+        // null, and is of the correct type.
+        auto dateDiffExpression = buildMultiBranchConditional(
+            // Return null if any of the parameters is either null or missing.
+            generateReturnNullIfNullOrMissing(startDateRef),
+            generateReturnNullIfNullOrMissing(endDateRef),
+            generateReturnNullIfNullOrMissing(unitRef),
+            generateReturnNullIfNullOrMissing(timezoneRef),
+
+            // "timezone" parameter validation.
+            CaseValuePair{
+                generateNonStringCheck(timezoneRef),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166504},
+                                       "$dateDiff parameter 'timezone' must be a string")},
+            CaseValuePair{
+                makeNot(makeFunction(
+                    "isTimezone", sbe::makeE<sbe::EVariable>(timezoneDBSlot), timezoneRef.clone())),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166505},
+                                       "$dateDiff parameter 'timezone' must be a valid timezone")},
+
+            // "startDate" parameter validation.
+            generateFailIfNotCoercibleToDate(
+                startDateRef, ErrorCodes::Error{5166500}, "$dateDiff"_sd, "startDate"_sd),
+
+            // "endDate" parameter validation.
+            generateFailIfNotCoercibleToDate(
+                endDateRef, ErrorCodes::Error{5166501}, "$dateDiff"_sd, "endDate"_sd),
+
+            // "unit" parameter validation.
+            CaseValuePair{generateNonStringCheck(unitRef),
+                          sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166502},
+                                                 "$dateDiff parameter 'unit' must be a string")},
+            CaseValuePair{
+                makeNot(makeFunction("isTimeUnit", unitRef.clone())),
+                sbe::makeE<sbe::EFail>(ErrorCodes::Error{5166503},
+                                       "$dateDiff parameter 'unit' must be a valid time unit")},
+            std::move(dateDiffFunctionCall));
+        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
+            frameId, std::move(bindings), std::move(dateDiffExpression)));
     }
     void visit(ExpressionDateFromString* expr) final {
         unsupportedExpression("$dateFromString");
@@ -1546,10 +1621,6 @@ public:
             sbe::makeE<sbe::EVariable>(_context->runtimeEnvironment->getSlot("timeZoneDB"_sd)));
 
         // Add date to arguments.
-        uint32_t dateTypeMask = (getBSONTypeMask(sbe::value::TypeTags::Date) |
-                                 getBSONTypeMask(sbe::value::TypeTags::Timestamp) |
-                                 getBSONTypeMask(sbe::value::TypeTags::ObjectId) |
-                                 getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
         operands.push_back(std::move(date));
         args.push_back(dateRef.clone());
         isoargs.push_back(dateRef.clone());
@@ -1604,7 +1675,7 @@ public:
             CaseValuePair{
                 sbe::makeE<sbe::EPrimUnary>(
                     sbe::EPrimUnary::logicNot,
-                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask)),
+                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{4997703},
                                        "$dateToParts date must have the format of a date")},
             std::move(checkIsoflagValue));
@@ -2655,10 +2726,6 @@ private:
         args.push_back(sbe::makeE<sbe::EVariable>(timeZoneDBSlot));
 
         // Add date to arguments.
-        uint32_t dateTypeMask = (getBSONTypeMask(sbe::value::TypeTags::Date) |
-                                 getBSONTypeMask(sbe::value::TypeTags::Timestamp) |
-                                 getBSONTypeMask(sbe::value::TypeTags::ObjectId) |
-                                 getBSONTypeMask(sbe::value::TypeTags::bsonObjectId));
         binds.push_back(std::move(date));
         args.push_back(dateRef.clone());
 
@@ -2687,13 +2754,41 @@ private:
             CaseValuePair{
                 sbe::makeE<sbe::EPrimUnary>(
                     sbe::EPrimUnary::logicNot,
-                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask)),
+                    sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{4998202},
                                        str::stream() << "$" << exprName.toString()
                                                      << " date must have a format of a date")},
             sbe::makeE<sbe::EFunction>(exprName.toString(), std::move(args)));
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(totalDayOfFunc)));
+    }
+
+    /**
+     * Creates a CaseValuePair such that an exception is thrown if a value of the parameter denoted
+     * by variable 'dateRef' is of a type that is not coercible to a date.
+     *
+     * dateRef - a variable corresponding to the parameter.
+     * errorCode - error code of the type mismatch error.
+     * expressionName - a name of an expression the parameter belongs to.
+     * parameterName - a name of the parameter corresponding to variable 'dateRef'.
+     */
+    CaseValuePair generateFailIfNotCoercibleToDate(const sbe::EVariable& dateRef,
+                                                   ErrorCodes::Error errorCode,
+                                                   StringData expressionName,
+                                                   StringData parameterName) {
+        return {makeNot(sbe::makeE<sbe::ETypeMatch>(dateRef.clone(), dateTypeMask())),
+                sbe::makeE<sbe::EFail>(errorCode,
+                                       str::stream()
+                                           << expressionName << " parameter '" << parameterName
+                                           << "' must be coercible to date")};
+    }
+
+    /**
+     * Creates a CaseValuePair such that Null value is returned if a value of variable denoted by
+     * 'variable' is null or missing.
+     */
+    CaseValuePair generateReturnNullIfNullOrMissing(const sbe::EVariable& variable) {
+        return {generateNullOrMissing(variable), makeConstant(sbe::value::TypeTags::Null, 0)};
     }
 
     /**

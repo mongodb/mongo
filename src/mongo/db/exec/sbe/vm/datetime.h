@@ -38,8 +38,16 @@ namespace sbe {
 namespace vm {
 
 /**
+ * Returns true if a timezone represented by 'timezoneTag' and 'timezoneValue' is valid and exists
+ * in database 'timezoneDB', meaning that it can be retrieved by function 'getTimezone()'.
+ */
+bool isValidTimezone(value::TypeTags timezoneTag,
+                     value::Value timezoneValue,
+                     const TimeZoneDatabase* timezoneDB);
+
+/**
  * Returns a TimeZone object representing the zone given by timezoneTag and timezoneVal, or UTC if
- * it was not a recognized time zone.
+ * it was an empty string.
  */
 TimeZone getTimezone(value::TypeTags timezoneTag,
                      value::Value timezoneVal,
@@ -49,6 +57,12 @@ TimeZone getTimezone(value::TypeTags timezoneTag,
  * Returns a Date_t object representing the datetime given by dateTag and dateVal.
  */
 Date_t getDate(value::TypeTags dateTag, value::Value dateVal);
+
+/**
+ * Returns 'true' if a value of type encoded by 'typeTag' can be coerced to Date_t by function
+ * 'getDate()', otherwise returns false.
+ */
+bool coercibleToDate(value::TypeTags typeTag);
 
 }  // namespace vm
 

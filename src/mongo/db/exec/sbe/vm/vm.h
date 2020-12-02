@@ -191,6 +191,7 @@ enum class Builtin : uint8_t {
     split,
     regexMatch,
     replaceOne,
+    dateDiff,
     dateParts,
     dateToParts,
     isoDateToParts,
@@ -239,6 +240,7 @@ enum class Builtin : uint8_t {
     isMember,
     indexOfBytes,
     indexOfCP,
+    isTimeUnit,
     isTimezone,
     setUnion,
     setIntersection,
@@ -555,6 +557,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinDateDiff(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDateToParts(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsoDateToParts(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinDayOfYear(ArityType arity);
@@ -603,6 +606,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfCP(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinIsTimeUnit(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsTimezone(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetUnion(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinSetIntersection(ArityType arity);

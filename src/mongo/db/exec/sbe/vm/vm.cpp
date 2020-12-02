@@ -1234,6 +1234,51 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDate(ArityType 
         timezoneTuple);
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateDiff(ArityType arity) {
+    invariant(arity == 5);
+
+    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
+    if (timezoneDBTag != value::TypeTags::timeZoneDB) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezoneDB = value::getTimeZoneDBView(timezoneDBValue);
+
+    // Get startDate.
+    auto [startDateOwn, startDateTag, startDateValue] = getFromStack(1);
+    if (!coercibleToDate(startDateTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto startDate = getDate(startDateTag, startDateValue);
+
+    // Get endDate.
+    auto [endDateOwn, endDateTag, endDateValue] = getFromStack(2);
+    if (!coercibleToDate(endDateTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto endDate = getDate(endDateTag, endDateValue);
+
+    // Get unit.
+    auto [unitOwn, unitTag, unitValue] = getFromStack(3);
+    if (!value::isString(unitTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto unitString = value::getStringView(unitTag, unitValue);
+    if (!isValidTimeUnit(unitString)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto unit = parseTimeUnit(unitString);
+
+    // Get timezone.
+    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(4);
+    if (!isValidTimezone(timezoneTag, timezoneValue, timezoneDB)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    auto timezone = getTimezone(timezoneTag, timezoneValue, timezoneDB);
+
+    auto result = dateDiff(startDate, endDate, unit, timezone);
+    return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinDateWeekYear(ArityType arity) {
     auto timeZoneDBTuple = getFromStack(0);
     auto yearTuple = getFromStack(1);
@@ -1831,6 +1876,18 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIndexOfCP(Arity
     return {false, value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(-1)};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimeUnit(ArityType arity) {
+    invariant(arity == 1);
+    auto [timeUnitOwn, timeUnitTag, timeUnitValue] = getFromStack(0);
+    if (!value::isString(timeUnitTag)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+    return {false,
+            value::TypeTags::Boolean,
+            value::bitcastFrom<bool>(
+                isValidTimeUnit(value::getStringView(timeUnitTag, timeUnitValue)))};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsTimezone(ArityType arity) {
     auto [timezoneDBOwn, timezoneDBTag, timezoneDBVal] = getFromStack(0);
     if (timezoneDBTag != value::TypeTags::timeZoneDB) {
@@ -2411,6 +2468,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(Ar
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           ArityType arity) {
     switch (f) {
+        case Builtin::dateDiff:
+            return builtinDateDiff(arity);
         case Builtin::dateParts:
             return builtinDate(arity);
         case Builtin::datePartsWeekYear:
@@ -2513,6 +2572,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinIndexOfBytes(arity);
         case Builtin::indexOfCP:
             return builtinIndexOfCP(arity);
+        case Builtin::isTimeUnit:
+            return builtinIsTimeUnit(arity);
         case Builtin::isTimezone:
             return builtinIsTimezone(arity);
         case Builtin::setUnion:

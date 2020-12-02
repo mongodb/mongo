@@ -348,6 +348,7 @@ struct BuiltinFn {
  * The map of recognized builtin functions.
  */
 static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
+    {"dateDiff", BuiltinFn{[](size_t n) { return n == 5; }, vm::Builtin::dateDiff, false}},
     {"dateParts", BuiltinFn{[](size_t n) { return n == 9; }, vm::Builtin::dateParts, false}},
     {"dateToParts",
      BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::dateToParts, false}},
@@ -409,6 +410,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfBytes, false}},
     {"indexOfCP",
      BuiltinFn{[](size_t n) { return n == 3 || n == 4; }, vm::Builtin::indexOfCP, false}},
+    {"isTimeUnit", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isTimeUnit, false}},
     {"isTimezone", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::isTimezone, false}},
     {"setUnion", BuiltinFn{[](size_t n) { return n > 0; }, vm::Builtin::setUnion, false}},
     {"setIntersection",

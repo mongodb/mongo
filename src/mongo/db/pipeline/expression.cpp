@@ -1895,11 +1895,12 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::parse(ExpressionContext* co
     uassert(5166303, "Missing 'startDate' parameter to $dateDiff", startDateElement);
     uassert(5166304, "Missing 'endDate' parameter to $dateDiff", endDateElement);
     uassert(5166305, "Missing 'unit' parameter to $dateDiff", unitElement);
-    return new ExpressionDateDiff(expCtx,
-                                  parseOperand(expCtx, startDateElement, vps),
-                                  parseOperand(expCtx, endDateElement, vps),
-                                  parseOperand(expCtx, unitElement, vps),
-                                  timezoneElem ? parseOperand(expCtx, timezoneElem, vps) : nullptr);
+    return make_intrusive<ExpressionDateDiff>(expCtx,
+                                              parseOperand(expCtx, startDateElement, vps),
+                                              parseOperand(expCtx, endDateElement, vps),
+                                              parseOperand(expCtx, unitElement, vps),
+                                              timezoneElem ? parseOperand(expCtx, timezoneElem, vps)
+                                                           : nullptr);
 }
 
 boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
@@ -1953,8 +1954,12 @@ TimeUnit ExpressionDateDiff::convertToTimeUnit(const Value& value) {
             str::stream() << "$dateDiff requires 'unit' to be a string, but got "
                           << typeName(value.getType()),
             BSONType::String == value.getType());
-    return addContextToAssertionException([&]() { return parseTimeUnit(value.getString()); },
-                                          "$dateDiff parameter 'unit' value parsing failed"_sd);
+    auto valueAsString = value.getStringData();
+    return addContextToAssertionException(
+        [&]() {
+            return parseTimeUnit(std::string_view{valueAsString.rawData(), valueAsString.size()});
+        },
+        "$dateDiff parameter 'unit' value parsing failed"_sd);
 }
 
 Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) const {

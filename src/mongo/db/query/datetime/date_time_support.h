@@ -451,7 +451,7 @@ public:
 
     /**
      * Returns a TimeZone object representing the zone given by 'timeZoneId', or throws an exception
-     * if the 'timeZoneId' was not recognized.
+     * if it is not a recognized time zone.
      */
     TimeZone getTimeZone(StringData timeZoneId) const;
 
@@ -496,7 +496,14 @@ private:
  * TimeUnit. Throws an exception with error code ErrorCodes::FailedToParse when passed an invalid
  * name.
  */
-TimeUnit parseTimeUnit(const std::string& unitName);
+TimeUnit parseTimeUnit(const std::string_view unitName);
+
+/**
+ * Returns true if 'unitName' is a valid time unit, meaning that it can be parsed by the
+ * 'parseTimeUnit()' function into one of the units represented by the 'TimeUnit' enum. Otherwise
+ * returns 'false'.
+ */
+bool isValidTimeUnit(const std::string_view unitName);
 
 /**
  * A custom-deleter which destructs a timelib_rel_time* when it goes out of scope.

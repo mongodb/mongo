@@ -677,6 +677,19 @@ inline long long dateDiffMillisecond(Date_t startDate, Date_t endDate) {
             !overflow::sub(endDate.toMillisSinceEpoch(), startDate.toMillisSinceEpoch(), &result));
     return result;
 }
+
+// A mapping from a string expression of TimeUnit to TimeUnit.
+static const StringMap<TimeUnit> timeUnitNameToTimeUnitMap{
+    {"year", TimeUnit::year},
+    {"quarter", TimeUnit::quarter},
+    {"month", TimeUnit::month},
+    {"week", TimeUnit::week},
+    {"day", TimeUnit::day},
+    {"hour", TimeUnit::hour},
+    {"minute", TimeUnit::minute},
+    {"second", TimeUnit::second},
+    {"millisecond", TimeUnit::millisecond},
+};
 }  // namespace
 
 long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZone& timezone) {
@@ -709,23 +722,18 @@ long long dateDiff(Date_t startDate, Date_t endDate, TimeUnit unit, const TimeZo
     }
 }
 
-TimeUnit parseTimeUnit(const std::string& unitName) {
-    static const StringMap<TimeUnit> timeUnitNameToTimeUnitMap{
-        {"year", TimeUnit::year},
-        {"quarter", TimeUnit::quarter},
-        {"month", TimeUnit::month},
-        {"week", TimeUnit::week},
-        {"day", TimeUnit::day},
-        {"hour", TimeUnit::hour},
-        {"minute", TimeUnit::minute},
-        {"second", TimeUnit::second},
-        {"millisecond", TimeUnit::millisecond},
-    };
-    auto iterator = timeUnitNameToTimeUnitMap.find(unitName);
+TimeUnit parseTimeUnit(const std::string_view unitName) {
+    const StringData unitNameAsStringData{unitName.data(), unitName.length()};
+    auto iterator = timeUnitNameToTimeUnitMap.find(unitNameAsStringData);
     uassert(ErrorCodes::FailedToParse,
-            str::stream() << "unknown time unit value: " << unitName,
+            str::stream() << "unknown time unit value: " << unitNameAsStringData,
             iterator != timeUnitNameToTimeUnitMap.end());
     return iterator->second;
+}
+
+bool isValidTimeUnit(const std::string_view unitName) {
+    return timeUnitNameToTimeUnitMap.find(StringData{unitName.data(), unitName.length()}) !=
+        timeUnitNameToTimeUnitMap.end();
 }
 
 void TimelibRelTimeDeleter::operator()(timelib_rel_time* relTime) {
@@ -894,5 +902,4 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
     timelib_time_dtor(newTime);
     return returnDate;
 }
-
 }  // namespace mongo
