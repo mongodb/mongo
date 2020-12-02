@@ -2,11 +2,14 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import NamedTuple, List
+from itertools import chain
+from typing import NamedTuple, List, Callable, Optional
 
 from evergreen import EvergreenApi, TestStats
 
-import buildscripts.util.testname as testname  # pylint: disable=wrong-import-position
+from buildscripts.util.testname import split_test_hook_name, is_resmoke_hook, get_short_name_from_test_file
+
+TASK_LEVEL_HOOKS = {"CleanEveryN"}
 
 
 class TestRuntime(NamedTuple):
@@ -63,16 +66,73 @@ def _average(value_a: float, num_a: int, value_b: float, num_b: int) -> float:
         return float(value_a * num_a + value_b * num_b) / divisor
 
 
+class HistoricHookInfo(NamedTuple):
+    """Historic information about a test hook."""
+
+    hook_id: str
+    num_pass: int
+    avg_duration: float
+
+    @classmethod
+    def from_test_stats(cls, test_stats: TestStats) -> "HistoricHookInfo":
+        """Create an instance from a test_stats object."""
+        return cls(hook_id=test_stats.test_file, num_pass=test_stats.num_pass,
+                   avg_duration=test_stats.avg_duration_pass)
+
+    def test_name(self) -> str:
+        """Get the name of the test associated with this hook."""
+        return split_test_hook_name(self.hook_id)[0]
+
+    def hook_name(self) -> str:
+        """Get the name of this hook."""
+        return split_test_hook_name(self.hook_id)[-1]
+
+    def is_task_level_hook(self) -> bool:
+        """Determine if this hook should be counted against the task not the test."""
+        return self.hook_name() in TASK_LEVEL_HOOKS
+
+
+class HistoricTestInfo(NamedTuple):
+    """Historic information about a test."""
+
+    test_name: str
+    num_pass: int
+    avg_duration: float
+    hooks: List[HistoricHookInfo]
+
+    @classmethod
+    def from_test_stats(cls, test_stats: TestStats,
+                        hooks: List[HistoricHookInfo]) -> "HistoricTestInfo":
+        """Create an instance from a test_stats object."""
+        return cls(test_name=test_stats.test_file, num_pass=test_stats.num_pass,
+                   avg_duration=test_stats.avg_duration_pass, hooks=hooks)
+
+    def normalized_test_name(self) -> str:
+        """Get the normalized version of the test name."""
+        return normalize_test_name(self.test_name)
+
+    def total_hook_runtime(self,
+                           predicate: Optional[Callable[[HistoricHookInfo], bool]] = None) -> float:
+        """Get the average runtime of all the hooks associated with this test."""
+        if not predicate:
+            predicate = lambda _: True
+        return sum([hook.avg_duration for hook in self.hooks if predicate(hook)])
+
+    def total_test_runtime(self) -> float:
+        """Get the average runtime of this test and it's non-task level hooks."""
+        return self.avg_duration + self.total_hook_runtime(lambda h: not h.is_task_level_hook())
+
+    def get_hook_overhead(self) -> float:
+        """Get the average runtime of this test and it's non-task level hooks."""
+        return self.total_hook_runtime(lambda h: h.is_task_level_hook())
+
+
 class HistoricTaskData(object):
     """Represent the test statistics for the task that is being analyzed."""
 
-    def __init__(self, evg_test_stats_results: List[TestStats]) -> None:
+    def __init__(self, historic_test_results: List[HistoricTestInfo]) -> None:
         """Initialize the TestStats with raw results from the Evergreen API."""
-        self._runtime_by_test = defaultdict(_RuntimeHistory.empty)
-        self._hook_runtime_by_test = defaultdict(lambda: defaultdict(_RuntimeHistory.empty))
-
-        for doc in evg_test_stats_results:
-            self._add_stats(doc)
+        self.historic_test_results = historic_test_results
 
     # pylint: disable=too-many-arguments
     @classmethod
@@ -90,39 +150,51 @@ class HistoricTaskData(object):
         :return: Test stats for the specified task.
         """
         days = (end_date - start_date).days
-        return cls(
-            evg_api.test_stats_by_project(project, after_date=start_date, before_date=end_date,
-                                          tasks=[task], variants=[variant], group_by="test",
-                                          group_num_days=days))
+        historic_stats = evg_api.test_stats_by_project(
+            project, after_date=start_date, before_date=end_date, tasks=[task], variants=[variant],
+            group_by="test", group_num_days=days)
 
-    def _add_stats(self, test_stats: TestStats) -> None:
-        """Add the statistics found in a document returned by the Evergreen test_stats/ endpoint."""
-        test_file = testname.normalize_test_file(test_stats.test_file)
-        duration = test_stats.avg_duration_pass
-        num_run = test_stats.num_pass
-        is_hook = testname.is_resmoke_hook(test_file)
-        if is_hook:
-            self._add_test_hook_stats(test_file, duration, num_run)
-        else:
-            self._add_test_stats(test_file, duration, num_run)
+        return cls.from_stats_list(historic_stats)
 
-    def _add_test_stats(self, test_file: str, duration: float, num_run: int) -> None:
-        """Add the statistics for a test."""
-        self._runtime_by_test[test_file].add_runtimes(duration, num_run)
+    @classmethod
+    def from_stats_list(cls, historic_stats: List[TestStats]) -> "HistoricTaskData":
+        """
+        Build historic task data from a list of historic stats.
 
-    def _add_test_hook_stats(self, test_file: str, duration: float, num_run: int) -> None:
-        """Add the statistics for a hook."""
-        test_name, hook_name = testname.split_test_hook_name(test_file)
-        self._hook_runtime_by_test[test_name][hook_name].add_runtimes(duration, num_run)
+        :param historic_stats: List of historic stats to build from.
+        :return: Historic task data from the list of stats.
+        """
+
+        hooks = defaultdict(list)
+        for hook in [stat for stat in historic_stats if is_resmoke_hook(stat.test_file)]:
+            historical_hook = HistoricHookInfo.from_test_stats(hook)
+            hooks[historical_hook.test_name()].append(historical_hook)
+
+        return cls([
+            HistoricTestInfo.from_test_stats(stat,
+                                             hooks[get_short_name_from_test_file(stat.test_file)])
+            for stat in historic_stats if not is_resmoke_hook(stat.test_file)
+        ])
 
     def get_tests_runtimes(self) -> List[TestRuntime]:
         """Return the list of (test_file, runtime_in_secs) tuples ordered by decreasing runtime."""
-        tests = []
-        for test_file, runtime_info in list(self._runtime_by_test.items()):
-            duration = runtime_info.duration
-            test_name = testname.get_short_name_from_test_file(test_file)
-            for _, hook_runtime_info in self._hook_runtime_by_test[test_name].items():
-                duration += hook_runtime_info.duration
-            test = TestRuntime(test_name=normalize_test_name(test_file), runtime=duration)
-            tests.append(test)
+        tests = [
+            TestRuntime(test_name=test_stats.normalized_test_name(),
+                        runtime=test_stats.total_test_runtime())
+            for test_stats in self.historic_test_results
+        ]
         return sorted(tests, key=lambda x: x.runtime, reverse=True)
+
+    def get_avg_hook_runtime(self, hook_name: str) -> float:
+        """Get the average runtime for the specified hook."""
+        hook_instances = list(
+            chain.from_iterable([[hook for hook in test.hooks if hook.hook_name() == hook_name]
+                                 for test in self.historic_test_results]))
+
+        if not hook_instances:
+            return 0
+        return sum([hook.avg_duration for hook in hook_instances]) / len(hook_instances)
+
+    def __len__(self) -> int:
+        """Get the number of historical entries."""
+        return len(self.historic_test_results)
