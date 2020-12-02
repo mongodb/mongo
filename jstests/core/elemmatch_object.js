@@ -95,4 +95,13 @@ assert(arrayEq(coll.find({a: {$elemMatch: {}}}, {_id: 0}).toArray(), [
     {a: [1, {}]},
     {a: [{b: 1}]},
 ]));
+
+assert(arrayEq(coll.find({a: {$elemMatch: {$or: [{}, {}]}}}, {_id: 0}).toArray(), [
+    {a: [[]]},
+    {a: [{}]},
+    {a: [[1]]},
+    {a: [1, []]},
+    {a: [1, {}]},
+    {a: [{b: 1}]},
+]));
 })();

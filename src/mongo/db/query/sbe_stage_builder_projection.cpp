@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 
+#include "mongo/base/exact_cast.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -39,7 +40,9 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
+#include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/tree_walker.h"
 #include "mongo/util/str.h"
@@ -227,16 +230,11 @@ public:
 
     void visit(const projection_ast::ProjectionSliceASTNode* node) final {}
 
-    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
-        uasserted(4822887, str::stream() << "ElemMatch projection is not supported in SBE");
-    }
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {}
 
     void visit(const projection_ast::ExpressionASTNode* node) final {}
 
-    void visit(const projection_ast::MatchExpressionASTNode* node) final {
-        uasserted(4822888,
-                  str::stream() << "Projection match expressions are not supported in SBE");
-    }
+    void visit(const projection_ast::MatchExpressionASTNode* node) final {}
 
     void visit(const projection_ast::BooleanConstantASTNode* node) final {}
 
@@ -473,7 +471,167 @@ public:
         _context->hasSliceProjection = true;
     }
 
-    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {}
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
+        using namespace std::literals;
+
+        const auto& children = node->children();
+        invariant(children.size() == 1);
+        auto matchExpression =
+            exact_pointer_cast<projection_ast::MatchExpressionASTNode*>(children[0].get())
+                ->matchExpression();
+
+        // We first construct SBE tree for $elemMatch predicate. 'getNext' call for the root of this
+        // tree returns ADVANCED if value in the input slot matches the predicate and EOF otherwise.
+        //
+        // We do not simply pass 'matchExpression' to 'generateFilter' function. Even though
+        // 'generateFilter' would generate appropriate tree for the $elemMatch expression, it would
+        // not allow us to record which array element matched the predicate.
+        // Instead we generate tree for the $elemMatch predicate and put it in the inner branch of
+        // traverse stage by ourselves. This allows us to return the first matching element in the
+        // array.
+        // The $elemMatch projection operator has the same semantics as the $elemMatch match
+        // expression, so this code adapts the logic from the 'sbe_stage_builder_filter.cpp'
+        // implementation.
+        // NOTE: The fact that $elemMatch predicate is passed to 'generateFilter' as root match
+        // expression forces function to apply top-level AND optimization. This optimization does
+        // not affect the correctness in this case. See 'AndMatchExpression' pre-visitor in
+        // 'sbe_stage_builder_filter.cpp' for details.
+        auto inputArraySlot = _context->slotIdGenerator->generate();
+        auto predicate = [&]() {
+            if (matchExpression->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
+                auto elemMatchObject =
+                    exact_pointer_cast<const ElemMatchObjectMatchExpression*>(&*matchExpression);
+                invariant(elemMatchObject);
+                invariant(elemMatchObject->numChildren() == 1);
+                auto elemMatchPredicate = elemMatchObject->getChild(0);
+                auto elemMatchPredicateTree =
+                    generateFilter(_context->opCtx,
+                                   elemMatchPredicate,
+                                   makeLimitCoScanTree(_context->planNodeId),
+                                   _context->slotIdGenerator,
+                                   _context->frameIdGenerator,
+                                   inputArraySlot,
+                                   _context->env,
+                                   sbe::makeSV(),
+                                   _context->planNodeId);
+
+                auto isObjectOrArrayExpr = sbe::makeE<sbe::EPrimBinary>(
+                    sbe::EPrimBinary::logicOr,
+                    makeFunction("isObject"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)),
+                    makeFunction("isArray"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)));
+                return sbe::makeS<sbe::FilterStage<true>>(std::move(elemMatchPredicateTree),
+                                                          std::move(isObjectOrArrayExpr),
+                                                          _context->planNodeId);
+            } else if (matchExpression->matchType() == MatchExpression::ELEM_MATCH_VALUE) {
+                auto elemMatchValue =
+                    exact_pointer_cast<const ElemMatchValueMatchExpression*>(&*matchExpression);
+                invariant(elemMatchValue);
+                // 'ElemMatchValueMatchExpression' is an implicit AND operator over its children.
+                // Since we cannot pass 'ElemMatchValueMatchExpression' to 'generateFilter' directly
+                // we construct an explicit AND operator instead.
+                auto topLevelAnd = std::make_unique<AndMatchExpression>();
+                for (size_t i = 0; i < elemMatchValue->numChildren(); i++) {
+                    auto clonedChild = elemMatchValue->getChild(i)->shallowClone();
+                    topLevelAnd->add(std::move(clonedChild));
+                }
+                return generateFilter(_context->opCtx,
+                                      topLevelAnd.get(),
+                                      makeLimitCoScanTree(_context->planNodeId),
+                                      _context->slotIdGenerator,
+                                      _context->frameIdGenerator,
+                                      inputArraySlot,
+                                      _context->env,
+                                      sbe::makeSV(),
+                                      _context->planNodeId);
+            } else {
+                MONGO_UNREACHABLE;
+            }
+        }();
+
+        // Predicate's SBE tree is placed in the inner branch of traverse stage. On top of this tree
+        // we place project stage to set 'earlyExitFlagSlot' to true. This is needed to stop
+        // traversal once we have found first matching array element. To prevent traversal of
+        // non-array values we add constant filter stage preventing filter tree from being
+        // evaluated.
+        //
+        // SBE tree looks like this:
+        //
+        // traverse
+        //   arrayToTraverse = inputArraySlot,
+        //   currentIterationResult = inputArraySlot,
+        //   resultArray = resultArraySlot,
+        //   earlyExitCondition = earlyExitFlagSlot
+        // from
+        //   project traversingAnArrayFlagSlot = isArray(inputArraySlot)
+        //   project inputArraySlot = if isObject(inputDocumentSlot)
+        //     then
+        //       getField(inputDocumentSlot, <field name>)
+        //     else
+        //       fail()
+        //   <current level evalStage>
+        // in
+        //   cfilter traversingAnArrayFlagSlot
+        //   project earlyExitFlagSlot = true
+        //   <$elemMatch predicate tree>
+        auto earlyExitFlagSlot = _context->slotIdGenerator->generate();
+        auto inBranch =
+            sbe::makeProjectStage(std::move(predicate),
+                                  _context->planNodeId,
+                                  earlyExitFlagSlot,
+                                  sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean,
+                                                             sbe::value::bitcastFrom<bool>(true)));
+
+        auto traversingAnArrayFlagSlot = _context->slotIdGenerator->generate();
+        inBranch = sbe::makeS<sbe::FilterStage<true>>(
+            std::move(inBranch),
+            sbe::makeE<sbe::EVariable>(traversingAnArrayFlagSlot),
+            _context->planNodeId);
+
+        auto inputDocumentSlot = _context->topLevel().inputSlot;
+        sbe::EVariable inputDocumentVariable{inputDocumentSlot};
+        auto fromBranch = sbe::makeProjectStage(
+            std::move(_context->topLevel().evalStage),
+            _context->planNodeId,
+            inputArraySlot,
+            makeFunction("getField"sv,
+                         inputDocumentVariable.clone(),
+                         sbe::makeE<sbe::EConstant>(_context->topFrontField())));
+
+        fromBranch = sbe::makeProjectStage(
+            std::move(fromBranch),
+            _context->planNodeId,
+            traversingAnArrayFlagSlot,
+            makeFunction("isArray"sv, sbe::makeE<sbe::EVariable>(inputArraySlot)));
+
+        auto filteredArraySlot = _context->slotIdGenerator->generate();
+        auto traverseStage =
+            sbe::makeS<sbe::TraverseStage>(std::move(fromBranch),
+                                           std::move(inBranch),
+                                           inputArraySlot,
+                                           filteredArraySlot,
+                                           inputArraySlot,
+                                           sbe::makeSV(traversingAnArrayFlagSlot),
+                                           nullptr,
+                                           sbe::makeE<sbe::EVariable>(earlyExitFlagSlot),
+                                           _context->planNodeId,
+                                           1);
+
+        // Finally, we check if the result of traversal is an empty array. In this case, there were
+        // no array elements matching the $elemMatch predicate. We replace empty array with Nothing
+        // to exclude the field from the resulting object.
+        auto resultSlot = _context->slotIdGenerator->generate();
+        auto resultStage = sbe::makeProjectStage(
+            std::move(traverseStage),
+            _context->planNodeId,
+            resultSlot,
+            sbe::makeE<sbe::EIf>(
+                makeFunction("isArrayEmpty", sbe::makeE<sbe::EVariable>(filteredArraySlot)),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
+                sbe::makeE<sbe::EVariable>(filteredArraySlot)));
+
+        _context->topLevel().evalStage = std::move(resultStage);
+        _context->topLevelEvals().emplace_back(resultSlot, nullptr);
+    }
 
     void visit(const projection_ast::MatchExpressionASTNode* node) final {}
 
@@ -641,7 +799,12 @@ public:
                                                std::move(sliceExpr));
     }
 
-    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {}
+    void visit(const projection_ast::ProjectionElemMatchASTNode* node) final {
+        // This expression is already built in the 'ProjectionTraversalPostVisitor'. We push an
+        // empty eval to match the size of 'evals' vector on the current level with the count of
+        // fields.
+        _context->topLevelEvals().emplace_back(EvalMode::IgnoreField);
+    }
 
     void visit(const projection_ast::ExpressionASTNode* node) final {
         // This expression is already built in the 'ProjectionTraversalPostVisitor'. We push an

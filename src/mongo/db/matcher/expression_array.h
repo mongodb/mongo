@@ -72,7 +72,7 @@ public:
     }
 };
 
-class ElemMatchObjectMatchExpression : public ArrayMatchingMatchExpression {
+class ElemMatchObjectMatchExpression final : public ArrayMatchingMatchExpression {
 public:
     ElemMatchObjectMatchExpression(StringData path,
                                    MatchExpression* sub,
@@ -128,7 +128,7 @@ private:
     std::unique_ptr<MatchExpression> _sub;
 };
 
-class ElemMatchValueMatchExpression : public ArrayMatchingMatchExpression {
+class ElemMatchValueMatchExpression final : public ArrayMatchingMatchExpression {
 public:
     /**
      * This constructor takes ownership of 'sub.'

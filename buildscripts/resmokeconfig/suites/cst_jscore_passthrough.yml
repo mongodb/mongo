@@ -120,7 +120,8 @@ selector:
   - jstests/core/doc_validation_options.js
   - jstests/core/dotted_path_in_null.js
   - jstests/core/elemmatch_or_pushdown.js
-  - jstests/core/elemMatchProjection.js
+  - jstests/core/elemmatch_projection.js
+  - jstests/core/positional_projection.js
   - jstests/core/ensure_sorted.js
   - jstests/core/exists.js
   - jstests/core/existsa.js
@@ -490,8 +491,8 @@ selector:
   - jstests/core/elemmatch_object.js
   - jstests/core/elemmatch_or_pushdown.js
   - jstests/core/elemmatch_value.js
-  - jstests/core/elemMatchProjection.js
-  - jstests/core/elemMatchProjection.js
+  - jstests/core/elemmatch_projection.js
+  - jstests/core/positional_projection.js
   - jstests/core/existsa.js
   - jstests/core/expr.js
   - jstests/core/expr_valid_positions.js
@@ -545,7 +546,8 @@ selector:
   - jstests/core/depth_limit.js
   - jstests/core/doc_validation.js
   - jstests/core/doc_validation_invalid_validators.js
-  - jstests/core/elemMatchProjection.js
+  - jstests/core/elemmatch_projection.js
+  - jstests/core/positional_projection.js
   - jstests/core/explain_sort_type.js
   - jstests/core/expr.js
   - jstests/core/expr_index_use.js

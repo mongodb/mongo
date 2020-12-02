@@ -193,10 +193,7 @@ public:
         using namespace fmt::literals;
 
         auto input = _children[0]->evaluate(root, variables);
-        uassert(51253,
-                "$elemMatch operator can only be applied to an object, but got {}"_format(
-                    typeName(input.getType())),
-                input.getType() == BSONType::Object);
+        invariant(input.getType() == BSONType::Object);
         return projection_executor_utils::applyFindElemMatchProjection(
             input.getDocument(), *_matchExpr, _path);
     }

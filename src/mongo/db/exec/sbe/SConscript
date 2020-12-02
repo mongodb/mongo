@@ -122,6 +122,7 @@ env.CppUnitTest(
         'expressions/sbe_extract_sub_array_builtin_test.cpp',
         'expressions/sbe_get_element_builtin_test.cpp',
         'expressions/sbe_index_of_test.cpp',
+        'expressions/sbe_is_array_empty_builtin_test.cpp',
         'expressions/sbe_is_member_builtin_test.cpp',
         'expressions/sbe_iso_date_to_parts_test.cpp',
         'expressions/sbe_mod_expression_test.cpp',

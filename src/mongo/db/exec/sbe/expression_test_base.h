@@ -159,6 +159,10 @@ protected:
         return {value::TypeTags::NumberDouble, value::bitcastFrom<double>(value)};
     }
 
+    std::pair<value::TypeTags, value::Value> makeBool(bool value) {
+        return {value::TypeTags::Boolean, value::bitcastFrom<bool>(value)};
+    }
+
 private:
     value::SlotIdGenerator _slotIdGenerator;
     CoScanStage _emptyStage{kEmptyPlanNodeId};

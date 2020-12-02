@@ -423,6 +423,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"shardFilter", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::shardFilter, false}},
     {"extractSubArray",
      BuiltinFn{[](size_t n) { return n == 2 || n == 3; }, vm::Builtin::extractSubArray, false}},
+    {"isArrayEmpty", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::isArrayEmpty, false}},
 };
 
 /**

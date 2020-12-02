@@ -640,9 +640,18 @@ public:
 
     void visit(const AndMatchExpression* expr) final {
         if (expr == _context->topLevelAnd) {
-            // For a top-level $and with at least one child, we evaluate each child within the
-            // current EvalFrame ('frame') so that each child builds directly on top of
-            // frame->stage.
+            // Usually, we implement AND expression using limit-1/union tree. Each branch of a union
+            // stage represents AND's argument. For top-level AND we apply an optimization that
+            // allows us to get rid of limit-1/union tree.
+            // Firstly, we add filter stage on top of tree for each of AND's arguments. This ensures
+            // that respective tree does not return ADVANCED if argument evaluates to false.
+            // Secondly, we place trees of AND's arguments on top of each other. This guarantees
+            // that the whole resulting tree for AND does not return ADVANCED if one of arguments
+            // did not returned ADVANCED (e.g. evaluated to false).
+            // First step is performed in 'MatchExpressionInVisitor' and
+            // 'MatchExpressionPostVisitor'. Second step is achieved by evaluating each child within
+            // one EvalFrame, so that each child builds directly on top of
+            // '_context->evalStack.topFrame().extractStage()'.
             return;
         }
 
@@ -857,24 +866,16 @@ public:
         auto childInputSlot = _context->evalStack.topFrame().data().inputSlot;
         auto [filterSlot, filterStage] = [&]() {
             auto [expr, stage] = _context->evalStack.popFrame();
-
-            if (matchExpr->getChild(0)->matchType() == MatchExpression::AND &&
-                matchExpr->getChild(0)->numChildren() == 0) {
-                auto childOutputSlot = _context->slotIdGenerator->generate();
-                auto isObjectOrArrayExpr = sbe::makeE<sbe::EPrimBinary>(
-                    sbe::EPrimBinary::logicOr,
-                    sbe::makeE<sbe::EFunction>(
-                        "isObject", sbe::makeEs(sbe::makeE<sbe::EVariable>(childInputSlot))),
-                    sbe::makeE<sbe::EFunction>(
-                        "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(childInputSlot))));
-                return std::make_pair(childOutputSlot,
-                                      makeProject(EvalStage{},
-                                                  _context->planNodeId,
-                                                  childOutputSlot,
-                                                  std::move(isObjectOrArrayExpr)));
-            }
-            return projectEvalExpr(
+            auto [predicateSlot, predicateStage] = projectEvalExpr(
                 std::move(expr), std::move(stage), _context->planNodeId, _context->slotIdGenerator);
+
+            auto isObjectOrArrayExpr = sbe::makeE<sbe::EPrimBinary>(
+                sbe::EPrimBinary::logicOr,
+                makeFunction("isObject", sbe::makeE<sbe::EVariable>(childInputSlot)),
+                makeFunction("isArray", sbe::makeE<sbe::EVariable>(childInputSlot)));
+            predicateStage = makeFilter<true>(
+                std::move(predicateStage), std::move(isObjectOrArrayExpr), _context->planNodeId);
+            return std::make_pair(predicateSlot, std::move(predicateStage));
         }();
 
         // We're using 'kDoNotTraverseLeaf' traverse mode, so we're guaranteed that 'makePredcate'

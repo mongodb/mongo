@@ -2387,6 +2387,27 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray
     return {true, resultTag, resultValue};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(ArityType arity) {
+    invariant(arity == 1);
+    auto [arrayOwned, arrayType, arrayValue] = getFromStack(0);
+
+    if (!value::isArray(arrayType)) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    if (arrayType == value::TypeTags::Array) {
+        auto arrayView = value::getArrayView(arrayValue);
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(arrayView->size() == 0)};
+    } else if (arrayType == value::TypeTags::bsonArray || arrayType == value::TypeTags::ArraySet) {
+        value::ArrayEnumerator enumerator(arrayType, arrayValue);
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(enumerator.atEnd())};
+    } else {
+        // Earlier in this function we bailed out if the `arrayType` wasn't Array, ArraySet or
+        // bsonArray, so it should be impossible to reach this point.
+        MONGO_UNREACHABLE
+    }
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                           ArityType arity) {
     switch (f) {
@@ -2512,6 +2533,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinShardFilter(arity);
         case Builtin::extractSubArray:
             return builtinExtractSubArray(arity);
+        case Builtin::isArrayEmpty:
+            return builtinIsArrayEmpty(arity);
     }
 
     MONGO_UNREACHABLE;
