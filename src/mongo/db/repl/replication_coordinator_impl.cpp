@@ -633,6 +633,11 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
     std::shared_ptr<InitialSyncer> initialSyncerCopy;
     {
         stdx::lock_guard<stdx::mutex> lk(_mutex);
+        if (!_startedSteadyStateReplication) {
+            return;
+        }
+
+        _startedSteadyStateReplication = false;
         _initialSyncer.swap(initialSyncerCopy);
     }
     if (initialSyncerCopy) {
@@ -652,20 +657,24 @@ void ReplicationCoordinatorImpl::_stopDataReplication(OperationContext* opCtx) {
 
 void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
                                                        stdx::function<void()> startCompleted) {
-    if (_startedSteadyStateReplication.swap(true)) {
-        // This is not the first call.
+    stdx::unique_lock<stdx::mutex> lk(_mutex);
+    if (_startedSteadyStateReplication) {
         return;
     }
 
+    _startedSteadyStateReplication = true;
+
     // Check to see if we need to do an initial sync.
-    const auto lastOpTime = getMyLastAppliedOpTime();
+    const auto lastOpTime = _getMyLastAppliedOpTime_inlock();
     const auto needsInitialSync =
         lastOpTime.isNull() || _externalState->isInitialSyncFlagSet(opCtx);
     if (!needsInitialSync) {
         // Start steady replication, since we already have data.
         // ReplSetConfig has been installed, so it's either in STARTUP2 or REMOVED.
-        auto memberState = getMemberState();
+        auto memberState = _getMemberState_inlock();
         invariant(memberState.startup2() || memberState.removed());
+
+        lk.unlock();
         invariantOK(setFollowerMode(MemberState::RS_RECOVERING));
         _externalState->startSteadyStateReplication(opCtx, this);
         return;
@@ -719,8 +728,6 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
     std::shared_ptr<InitialSyncer> initialSyncerCopy;
     try {
         {
-            // Must take the lock to set _initialSyncer, but not call it.
-            stdx::lock_guard<stdx::mutex> lock(_mutex);
             initialSyncerCopy = std::make_shared<InitialSyncer>(
                 createInitialSyncerOptions(this, _externalState.get()),
                 stdx::make_unique<DataReplicatorExternalStateInitialSync>(this,
@@ -732,6 +739,7 @@ void ReplicationCoordinatorImpl::_startDataReplication(OperationContext* opCtx,
         }
         // InitialSyncer::startup() must be called outside lock because it uses features (eg.
         // setting the initial sync flag) which depend on the ReplicationCoordinatorImpl.
+        lk.unlock();
         uassertStatusOK(initialSyncerCopy->startup(opCtx, numInitialSyncAttempts.load()));
     } catch (...) {
         auto status = exceptionToStatus();
