@@ -62,6 +62,16 @@ public:
     BucketCatalog operator=(const BucketCatalog&) = delete;
 
     /**
+     * Returns the metadata for the given bucket in the following format:
+     *     {<metadata field name>: <value>}
+     * All measurements in the given bucket share same metadata value.
+     *
+     * Returns an empty document if the given bucket cannot be found or if this time-series
+     * collection was not created with a metadata field name.
+     */
+    BSONObj getMetadata(const OID& bucketId) const;
+
+    /**
      * Returns the id of the bucket that the document belongs in, and a Future to wait on if the
      * caller is a waiter for the bucket. If no Future is provided, the caller is the committer for
      * this bucket.
@@ -143,7 +153,7 @@ private:
         bool full = false;
     };
 
-    Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("BucketCatalog");
 
     // All buckets currently in the catalog, including buckets which are full but not yet committed.
     stdx::unordered_map<OID, Bucket, OID::Hasher> _buckets;

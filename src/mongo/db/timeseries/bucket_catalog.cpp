@@ -52,6 +52,16 @@ BucketCatalog& BucketCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
+BSONObj BucketCatalog::getMetadata(const OID& bucketId) const {
+    stdx::lock_guard lk(_mutex);
+    auto it = _buckets.find(bucketId);
+    if (it == _buckets.cend()) {
+        return {};
+    }
+    const auto& bucket = it->second;
+    return bucket.metadata.metadata;
+}
+
 BucketCatalog::InsertResult BucketCatalog::insert(OperationContext* opCtx,
                                                   const NamespaceString& ns,
                                                   const BSONObj& doc) {

@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/views/view_catalog.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
 
 namespace mongo {
@@ -40,6 +41,7 @@ namespace {
 class BucketCatalogTest : public CatalogTestFixture {
 protected:
     void setUp() override;
+    virtual BSONObj _makeTimeseriesOptionsForCreate() const;
 
     void _commit(const OID& bucketId, uint16_t numCommittedMeasurements);
     void _insertOneAndCommit(const NamespaceString& ns, uint16_t numCommittedMeasurements);
@@ -57,6 +59,11 @@ protected:
     BucketCatalog::CommitInfo _commitInfo{StatusWith<SingleWriteResult>(SingleWriteResult{})};
 };
 
+class BucketCatalogWithoutMetadataTest : public BucketCatalogTest {
+protected:
+    BSONObj _makeTimeseriesOptionsForCreate() const override;
+};
+
 void BucketCatalogTest::setUp() {
     CatalogTestFixture::setUp();
 
@@ -67,9 +74,16 @@ void BucketCatalogTest::setUp() {
         ASSERT_OK(createCollection(
             _opCtx,
             ns.db().toString(),
-            BSON("create" << ns.coll() << "timeseries"
-                          << BSON("timeField" << _timeField << "metaField" << _metaField))));
+            BSON("create" << ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
     }
+}
+
+BSONObj BucketCatalogTest::_makeTimeseriesOptionsForCreate() const {
+    return BSON("timeField" << _timeField << "metaField" << _metaField);
+}
+
+BSONObj BucketCatalogWithoutMetadataTest::_makeTimeseriesOptionsForCreate() const {
+    return BSON("timeField" << _timeField);
 }
 
 void BucketCatalogTest::_commit(const OID& bucketId, uint16_t numCommittedMeasurements) {
@@ -114,9 +128,15 @@ TEST_F(BucketCatalogTest, InsertIntoSameBucket) {
     ASSERT(result2.commitInfo->isReady());
 }
 
-TEST_F(BucketCatalogTest, InsertInfoDifferentBuckets) {
+TEST_F(BucketCatalogTest, GetMetadataReturnsEmptyDocOnMissingBucket) {
+    auto bucketId = OID::gen();
+    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(bucketId));
+}
+
+TEST_F(BucketCatalogTest, InsertIntoDifferentBuckets) {
     // The first insert should be the committer.
-    auto result1 = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
+    auto result1 = _bucketCatalog->insert(
+        _opCtx, _ns1, BSON(_timeField << Date_t::now() << _metaField << "123"));
     ASSERT(!result1.commitInfo);
 
     // Subsequent inserts into different buckets should also be committers.
@@ -126,6 +146,11 @@ TEST_F(BucketCatalogTest, InsertInfoDifferentBuckets) {
 
     auto result3 = _bucketCatalog->insert(_opCtx, _ns2, BSON(_timeField << Date_t::now()));
     ASSERT(!result3.commitInfo);
+
+    // Check metadata in buckets.
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << "123"), _bucketCatalog->getMetadata(result1.bucketId));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONObj()), _bucketCatalog->getMetadata(result2.bucketId));
+    ASSERT_BSONOBJ_EQ(BSON(_metaField << BSONNULL), _bucketCatalog->getMetadata(result3.bucketId));
 
     // Committing one bucket should only return the one document in that bucket and shoukd not
     // affect the other bucket.
@@ -166,6 +191,15 @@ TEST_F(BucketCatalogTest, ClearDatabaseBuckets) {
 DEATH_TEST_F(BucketCatalogTest, CannotProvideCommitInfoOnFirstCommit, "invariant") {
     auto [bucketId, _] = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
     _bucketCatalog->commit(bucketId, _commitInfo);
+}
+
+TEST_F(BucketCatalogWithoutMetadataTest, GetMetadataReturnsEmptyDoc) {
+    auto result = _bucketCatalog->insert(_opCtx, _ns1, BSON(_timeField << Date_t::now()));
+    ASSERT(!result.commitInfo);
+
+    ASSERT_BSONOBJ_EQ(BSONObj(), _bucketCatalog->getMetadata(result.bucketId));
+
+    _commit(result.bucketId, 0);
 }
 }  // namespace
 }  // namespace mongo
