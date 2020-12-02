@@ -46,6 +46,7 @@
     WT_TRACK_OP_INIT(s);                                            \
     WT_SINGLE_THREAD_CHECK_START(s);                                \
     WT_ERR(WT_SESSION_CHECK_PANIC(s));                              \
+    __wt_op_timer_start(s);                                         \
     /* Reset wait time if this isn't an API reentry. */             \
     if (__oldname == NULL)                                          \
         (s)->cache_wait_us = 0;                                     \
@@ -69,6 +70,7 @@
         if ((ret) != 0 && (ret) != WT_NOTFOUND && (ret) != WT_DUPLICATE_KEY && \
           (ret) != WT_PREPARE_CONFLICT && F_ISSET(&(s)->txn, WT_TXN_RUNNING))  \
             F_SET(&(s)->txn, WT_TXN_ERROR);                                    \
+        __wt_op_timer_stop(s);                                                 \
         /*                                                                     \
          * No code after this line, otherwise error handling                   \
          * won't be correct.                                                   \

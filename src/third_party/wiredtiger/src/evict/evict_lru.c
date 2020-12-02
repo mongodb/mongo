@@ -2271,6 +2271,16 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
         }
 
         /*
+         * Check if we've exceeded our operation timeout, this would also get called from the
+         * previous txn is blocking call, however it won't pickup transactions that have been
+         * committed or rolled back as their mod count is 0, and that txn needs to be the oldest.
+         *
+         * Additionally we don't return rollback which could confuse the caller.
+         */
+        if (__wt_op_timer_fired(session))
+            break;
+
+        /*
          * Check if we have become busy.
          *
          * If we're busy (because of the transaction check we just did

@@ -62,6 +62,9 @@ struct __wt_session_impl {
     const char *lastop; /* Last operation */
     uint32_t id;        /* UID, offset in session array */
 
+    uint64_t operation_start_us;   /* Operation start */
+    uint64_t operation_timeout_us; /* Maximum operation period before rollback */
+
     WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 
     WT_DATA_HANDLE *dhandle; /* Current data handle */

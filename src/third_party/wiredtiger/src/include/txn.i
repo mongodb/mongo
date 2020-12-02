@@ -874,8 +874,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
     txn->isolation = session->isolation;
     txn->txn_logsync = S2C(session)->txn_logsync;
 
-    if (cfg != NULL)
-        WT_RET(__wt_txn_config(session, cfg));
+    WT_RET(__wt_txn_config(session, cfg));
 
     /*
      * Allocate a snapshot if required. Named snapshot transactions already have an ID setup.

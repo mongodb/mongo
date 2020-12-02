@@ -298,6 +298,9 @@ struct __wt_txn {
     WT_ITEM *ckpt_snapshot;
     bool full_ckpt;
 
+    /* Timeout */
+    uint64_t operation_timeout_us;
+
     const char *rollback_reason; /* If rollback, the reason */
 
 /* AUTOMATIC FLAG VALUE GENERATION START */
